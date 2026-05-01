@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.org.mapper.OrgDirectoryMapper">
+
+    <select id="selectDepartmentTreeNodes" resultType="com.workforcehub.org.dto.OrgDepartmentTreeNodeResponse">
+        SELECT
+            d.id AS id,
+            d.parent_id AS parentId,
+            d.tree_path AS treePath,
+            d.dept_code AS deptCode,
+            d.dept_name AS deptName,
+            d.dept_type AS deptType,
+            d.dept_level AS deptLevel,
+            d.leader_user_id AS leaderUserId,
+            u.real_name AS leaderName,
+            d.status AS status
+        FROM org_department d
+        LEFT JOIN org_user u
+            ON u.id = d.leader_user_id
+           AND u.is_deleted = 0
+        WHERE d.is_deleted = 0
+        ORDER BY d.dept_level ASC, d.dept_name ASC, d.id ASC
+    </select>
+
+    <select id="selectDepartmentSummaryById" resultType="com.workforcehub.org.dto.OrgDepartmentSummaryResponse">
+        SELECT
+            d.id AS id,
+            d.parent_id AS parentId,
+            d.tree_path AS treePath,
+            d.dept_code AS deptCode,
+            d.dept_name AS deptName,
+            d.dept_type AS deptType,
+            d.dept_level AS deptLevel,
+            d.leader_user_id AS leaderUserId,
+            u.real_name AS leaderName,
+            d.status AS status
+        FROM org_department d
+        LEFT JOIN org_user u
+            ON u.id = d.leader_user_id
+           AND u.is_deleted = 0
+        WHERE d.id = #{deptId}
+          AND d.is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectUserPage" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        WHERE u.is_deleted = 0
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                u.employee_no LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.real_name LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.mobile LIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.deptId != null">
+            AND u.primary_dept_id = #{query.deptId}
+        </if>
+        <if test="query.employmentStatus != null and query.employmentStatus != ''">
+            AND u.employment_status = #{query.employmentStatus}
+        </if>
+        <if test="query.managerUserId != null">
+            AND u.manager_user_id = #{query.managerUserId}
+        </if>
+        ORDER BY u.updated_at DESC, u.id DESC
+    </select>
+
+    <select id="selectUserSummaryById" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        WHERE u.id = #{userId}
+          AND u.is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectUserDetailById" resultType="com.workforcehub.org.dto.OrgUserDetailResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            u.gender AS gender,
+            u.mobile AS mobile,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            u.hire_date AS hireDate,
+            u.regularized_at AS regularizedAt,
+            u.service_start_date AS serviceStartDate,
+            u.annual_leave_start_date AS annualLeaveStartDate,
+            u.work_location AS workLocation
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        WHERE u.id = #{userId}
+          AND u.is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectDirectSubordinates" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        WHERE u.manager_user_id = #{managerUserId}
+          AND u.is_deleted = 0
+        ORDER BY u.real_name ASC, u.id ASC
+    </select>
+
+</mapper>

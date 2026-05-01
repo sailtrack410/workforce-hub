@@ -1,0 +1,151 @@
+package com.workforcehub.org.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.workforcehub.common.exception.BizException;
+import com.workforcehub.common.response.PageResult;
+import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.org.domain.OrgPosition;
+import com.workforcehub.org.dto.OrgDepartmentSummaryResponse;
+import com.workforcehub.org.dto.OrgDepartmentTreeNodeResponse;
+import com.workforcehub.org.dto.OrgPositionResponse;
+import com.workforcehub.org.dto.OrgUserDetailResponse;
+import com.workforcehub.org.dto.OrgUserListQuery;
+import com.workforcehub.org.dto.OrgUserSummaryResponse;
+import com.workforcehub.org.mapper.OrgDirectoryMapper;
+import com.workforcehub.org.mapper.OrgPositionMapper;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 组织目录查询服务
+ * 第一批先收口读侧能力，为审批、IM、Agent 提供稳定底座。
+ */
+@Service
+public class OrgDirectoryService {
+
+    private final OrgDirectoryMapper orgDirectoryMapper;
+    private final OrgPositionMapper orgPositionMapper;
+
+    public OrgDirectoryService(OrgDirectoryMapper orgDirectoryMapper,
+                               OrgPositionMapper orgPositionMapper) {
+        this.orgDirectoryMapper = orgDirectoryMapper;
+        this.orgPositionMapper = orgPositionMapper;
+    }
+
+    public List<OrgDepartmentTreeNodeResponse> getDepartmentTree() {
+        List<OrgDepartmentTreeNodeResponse> flatNodes = orgDirectoryMapper.selectDepartmentTreeNodes();
+        Map<Long, OrgDepartmentTreeNodeResponse> nodeMap = new LinkedHashMap<>();
+        List<OrgDepartmentTreeNodeResponse> roots = new ArrayList<>();
+
+        for (OrgDepartmentTreeNodeResponse node : flatNodes) {
+            if (node.getChildren() == null) {
+                node.setChildren(new ArrayList<>());
+            }
+            nodeMap.put(node.getId(), node);
+        }
+
+        for (OrgDepartmentTreeNodeResponse node : flatNodes) {
+            Long parentId = node.getParentId();
+            if (parentId == null) {
+                roots.add(node);
+                continue;
+            }
+            OrgDepartmentTreeNodeResponse parent = nodeMap.get(parentId);
+            if (parent == null) {
+                roots.add(node);
+                continue;
+            }
+            parent.getChildren().add(node);
+        }
+
+        return roots;
+    }
+
+    public List<OrgPositionResponse> listPositions() {
+        List<OrgPosition> positions = orgPositionMapper.selectList(
+            new LambdaQueryWrapper<OrgPosition>()
+                .eq(OrgPosition::getIsDeleted, 0)
+                .orderByAsc(OrgPosition::getPositionName)
+        );
+
+        List<OrgPositionResponse> result = new ArrayList<>(positions.size());
+        for (OrgPosition position : positions) {
+            OrgPositionResponse item = new OrgPositionResponse();
+            item.setId(position.getId());
+            item.setPositionCode(position.getPositionCode());
+            item.setPositionName(position.getPositionName());
+            item.setPositionCategory(position.getPositionCategory());
+            item.setStatus(position.getStatus());
+            result.add(item);
+        }
+        return result;
+    }
+
+    public PageResult<OrgUserSummaryResponse> pageUsers(OrgUserListQuery query) {
+        Page<OrgUserSummaryResponse> page = new Page<>(query.getPageNo(), query.getPageSize());
+        Page<OrgUserSummaryResponse> result = orgDirectoryMapper.selectUserPage(page, query);
+        return PageResult.of(result.getCurrent(), result.getSize(), result.getTotal(), result.getRecords());
+    }
+
+    public OrgUserSummaryResponse getUserSummary(Long userId) {
+        OrgUserSummaryResponse user = orgDirectoryMapper.selectUserSummaryById(userId);
+        if (user == null) {
+            throw new BizException(404, "员工不存在");
+        }
+        return user;
+    }
+
+    public OrgUserDetailResponse getUserDetail(Long userId) {
+        OrgUserDetailResponse user = orgDirectoryMapper.selectUserDetailById(userId);
+        if (user == null) {
+            throw new BizException(404, "员工不存在");
+        }
+        return user;
+    }
+
+    public OrgDepartmentSummaryResponse getDepartmentSummary(Long deptId) {
+        OrgDepartmentSummaryResponse dept = orgDirectoryMapper.selectDepartmentSummaryById(deptId);
+        if (dept == null) {
+            throw new BizException(404, "部门不存在");
+        }
+        return dept;
+    }
+
+    public OrgUserSummaryResponse getManager(Long userId) {
+        OrgUserDetailResponse detail = getUserDetail(userId);
+        if (detail.getManagerUserId() == null) {
+            return null;
+        }
+        return getUserSummary(detail.getManagerUserId());
+    }
+
+    public List<OrgUserSummaryResponse> listDirectSubordinates(Long userId) {
+        return orgDirectoryMapper.selectDirectSubordinates(userId);
+    }
+
+    public OrgUserDetailResponse getCurrentEmployeeProfile() {
+        ensureEmployeeContext();
+        return getUserDetail(CurrentUserHolder.requireUserId());
+    }
+
+    public OrgUserSummaryResponse getCurrentEmployeeManager() {
+        ensureEmployeeContext();
+        return getManager(CurrentUserHolder.requireUserId());
+    }
+
+    public List<OrgUserSummaryResponse> getCurrentEmployeeSubordinates() {
+        ensureEmployeeContext();
+        return listDirectSubordinates(CurrentUserHolder.requireUserId());
+    }
+
+    private void ensureEmployeeContext() {
+        if (!CurrentUserHolder.isEmployee()) {
+            throw new BizException(403, "仅员工端支持查看个人组织信息");
+        }
+    }
+}

@@ -1,0 +1,813 @@
+# API 文档 module-org 第一批查询接口
+
+## 一、文档信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 文档名称 | `module-org` 第一批查询接口 API 文档 |
+| 文档版本 | `v1.0` |
+| 适用范围 | 后台组织目录查询、员工个人组织信息查询 |
+| 对应模块 | `server/module-org` |
+| 发布日期 | `2026-05-02` |
+| 当前状态 | 已随代码落地，可用于联调与测试 |
+
+---
+
+## 二、文档范围
+
+本文档覆盖以下 `9` 个接口：
+
+### 1. 后台端
+
+- `GET /api/admin/departments/tree`
+- `GET /api/admin/positions`
+- `GET /api/admin/users`
+- `GET /api/admin/users/{userId}`
+- `GET /api/admin/users/{userId}/manager`
+- `GET /api/admin/users/{userId}/subordinates`
+
+### 2. 员工端
+
+- `GET /api/employee/me/profile`
+- `GET /api/employee/me/manager`
+- `GET /api/employee/me/subordinates`
+
+---
+
+## 三、调用约定
+
+## 3.1 基础地址
+
+开发环境默认：
+
+```text
+http://localhost:8080
+```
+
+完整请求路径示例：
+
+```text
+GET http://localhost:8080/api/admin/users?pageNo=1&pageSize=20
+```
+
+## 3.2 鉴权方式
+
+当前项目采用服务端 Session 鉴权，不使用 Bearer Token。
+
+调用方式：
+
+- 先调用登录接口获取会话
+- 客户端自动保存或手动透传 `SESSION` Cookie
+- 后续请求通过 `Cookie` 维持登录态
+
+示例：
+
+```http
+Cookie: SESSION=xxxxxxxxxxxxxxxx
+```
+
+### 当前权限边界说明
+
+- 后台端接口：要求已登录后台管理员会话
+- 员工端接口：要求已登录员工会话
+- 当前代码已做“员工/后台路径隔离”
+- 当前代码尚未对后台端做更细粒度 RBAC 拦截
+
+也就是说：
+
+- 后台管理员登录后可访问本文档中的全部后台端接口
+- 员工登录后可访问本文档中的全部员工端接口
+- 员工会话访问后台端路径会被拒绝
+- 后台管理员会话访问员工端路径会被拒绝
+
+## 3.3 请求头约定
+
+| Header | 必填 | 示例 | 说明 |
+| --- | --- | --- | --- |
+| `Cookie` | 是 | `SESSION=...` | 会话维持 |
+| `X-Request-Id` | 否 | `orgapi202605020001` | 请求链路 ID；不传则服务端自动生成 |
+| `Accept` | 建议 | `application/json` | 响应类型 |
+
+## 3.4 响应头约定
+
+| Header | 说明 |
+| --- | --- |
+| `X-Request-Id` | 服务端回写的请求链路 ID，可用于排障与日志追踪 |
+
+## 3.5 响应体格式
+
+所有接口统一返回：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {},
+  "requestId": "cb4cb41d69424374a9df7c1d7775287a"
+}
+```
+
+字段定义：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `code` | `int` | 业务码，`0` 表示成功 |
+| `message` | `string` | 业务提示文案 |
+| `data` | `object/array/null` | 业务数据 |
+| `requestId` | `string` | 请求链路 ID |
+
+## 3.6 分页结构
+
+分页接口 `GET /api/admin/users` 的 `data` 字段使用如下结构：
+
+```json
+{
+  "pageNo": 1,
+  "pageSize": 20,
+  "total": 2,
+  "list": []
+}
+```
+
+字段定义：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `pageNo` | `long` | 当前页码 |
+| `pageSize` | `long` | 每页条数 |
+| `total` | `long` | 总记录数 |
+| `list` | `array` | 当前页数据 |
+
+## 3.7 时间与日期格式
+
+| 类型 | 格式 | 示例 |
+| --- | --- | --- |
+| 日期 | `YYYY-MM-DD` | `2026-05-02` |
+| 日期时间 | ISO 8601 或服务端默认 JSON 序列化格式 | 当前本文档范围内无日期时间字段返回 |
+
+## 3.8 错误处理约定
+
+当前工程的错误返回分两类：
+
+### 1. HTTP 状态码直接体现错误
+
+适用于：
+
+- 未登录：`401`
+- 无权限：`403`
+- 参数校验失败：`400`
+- 系统异常：`500`
+
+### 2. HTTP 200 + 业务码体现错误
+
+适用于当前 `BizException` 业务异常，例如：
+
+- 员工不存在：`code = 404`
+- 部门不存在：`code = 404`
+
+这意味着联调时要同时看：
+
+- HTTP 状态码
+- 响应体中的 `code`
+
+### 常见错误码
+
+| HTTP 状态 | 业务码 | message 示例 | 场景 |
+| --- | --- | --- | --- |
+| `200` | `0` | `ok` | 成功 |
+| `200` | `404` | `员工不存在` | 业务对象不存在 |
+| `400` | `400` | `pageSize 最大为 200` | 参数校验失败 |
+| `401` | `401` | `未登录或会话已过期` | 未登录或会话失效 |
+| `403` | `403` | `无权限访问` | 访问了错误端接口或无权访问 |
+| `500` | `500` | `系统内部错误` | 未兜住的系统异常 |
+
+---
+
+## 四、数据模型定义
+
+## 4.1 DepartmentTreeNode
+
+| 字段 | 类型 | 必返 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `long` | 是 | 部门 ID |
+| `parentId` | `long/null` | 是 | 上级部门 ID，根节点为 `null` |
+| `treePath` | `string` | 是 | 树路径，如 `/1/3/7/` |
+| `deptCode` | `string` | 是 | 部门编码 |
+| `deptName` | `string` | 是 | 部门名称 |
+| `deptType` | `string` | 是 | 部门类型 |
+| `deptLevel` | `int` | 是 | 组织层级深度 |
+| `leaderUserId` | `long/null` | 是 | 第一负责人用户 ID |
+| `leaderName` | `string/null` | 是 | 第一负责人姓名 |
+| `status` | `string` | 是 | 部门状态 |
+| `children` | `array` | 是 | 子部门列表 |
+
+## 4.2 PositionItem
+
+| 字段 | 类型 | 必返 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `long` | 是 | 岗位 ID |
+| `positionCode` | `string` | 是 | 岗位编码 |
+| `positionName` | `string` | 是 | 岗位名称 |
+| `positionCategory` | `string/null` | 是 | 岗位类别 |
+| `status` | `string` | 是 | 岗位状态 |
+
+## 4.3 UserSummary
+
+| 字段 | 类型 | 必返 | 说明 |
+| --- | --- | --- | --- |
+| `userId` | `long` | 是 | 员工用户 ID |
+| `employeeNo` | `string` | 是 | 工号 |
+| `realName` | `string` | 是 | 姓名 |
+| `primaryDeptId` | `long` | 是 | 主部门 ID |
+| `primaryDeptName` | `string/null` | 是 | 主部门名称 |
+| `positionId` | `long/null` | 是 | 岗位 ID |
+| `positionName` | `string/null` | 是 | 岗位名称 |
+| `managerUserId` | `long/null` | 是 | 直属上级 ID |
+| `managerName` | `string/null` | 是 | 直属上级姓名 |
+| `employmentStatus` | `string` | 是 | 在职状态 |
+| `status` | `string` | 是 | 主档状态 |
+
+## 4.4 UserDetail
+
+在 `UserSummary` 基础上扩展以下字段：
+
+| 字段 | 类型 | 必返 | 说明 |
+| --- | --- | --- | --- |
+| `gender` | `string/null` | 是 | 性别 |
+| `mobile` | `string/null` | 是 | 手机号 |
+| `hireDate` | `string/null` | 是 | 入职日期 |
+| `regularizedAt` | `string/null` | 是 | 转正日期 |
+| `serviceStartDate` | `string/null` | 是 | 司龄起算日 |
+| `annualLeaveStartDate` | `string/null` | 是 | 年假工龄起算日 |
+| `workLocation` | `string/null` | 是 | 工作地点 |
+
+## 4.5 关键枚举说明
+
+### employmentStatus
+
+| 值 | 含义 |
+| --- | --- |
+| `PENDING_ONBOARD` | 待入职 |
+| `PROBATION` | 试用期 |
+| `ACTIVE` | 在职 |
+| `PENDING_OFFBOARD` | 待离职 |
+| `OFFBOARDED` | 已离职 |
+
+---
+
+## 五、接口清单总表
+
+| 序号 | 方法 | 路径 | 调用方 | 用途 |
+| --- | --- | --- | --- | --- |
+| 1 | `GET` | `/api/admin/departments/tree` | 后台 | 查询组织树 |
+| 2 | `GET` | `/api/admin/positions` | 后台 | 查询岗位列表 |
+| 3 | `GET` | `/api/admin/users` | 后台 | 分页查询员工列表 |
+| 4 | `GET` | `/api/admin/users/{userId}` | 后台 | 查询员工详情 |
+| 5 | `GET` | `/api/admin/users/{userId}/manager` | 后台 | 查询员工直属上级 |
+| 6 | `GET` | `/api/admin/users/{userId}/subordinates` | 后台 | 查询员工直属下级 |
+| 7 | `GET` | `/api/employee/me/profile` | 员工 | 查询本人档案 |
+| 8 | `GET` | `/api/employee/me/manager` | 员工 | 查询本人直属上级 |
+| 9 | `GET` | `/api/employee/me/subordinates` | 员工 | 查询本人直属下级 |
+
+---
+
+## 六、接口详细说明
+
+## 6.1 查询组织树
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/admin/departments/tree` |
+| 鉴权 | 后台管理员会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### 请求示例
+
+```bash
+curl --location 'http://localhost:8080/api/admin/departments/tree' \
+  --header 'Cookie: JSESSIONID=admin-session-id' \
+  --header 'X-Request-Id: org-admin-tree-001'
+```
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "id": 100,
+      "parentId": null,
+      "treePath": "/100/",
+      "deptCode": "HQ",
+      "deptName": "总部",
+      "deptType": "COMPANY",
+      "deptLevel": 0,
+      "leaderUserId": 2001,
+      "leaderName": "李总",
+      "status": "ACTIVE",
+      "children": [
+        {
+          "id": 110,
+          "parentId": 100,
+          "treePath": "/100/110/",
+          "deptCode": "RD",
+          "deptName": "研发中心",
+          "deptType": "DEPARTMENT",
+          "deptLevel": 1,
+          "leaderUserId": 2002,
+          "leaderName": "张经理",
+          "status": "ACTIVE",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "requestId": "org-admin-tree-001"
+}
+```
+
+### 业务说明
+
+- 返回完整树形结构
+- 根节点 `parentId` 为 `null`
+- `children` 永远返回数组，不返回 `null`
+
+## 6.2 查询岗位列表
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/admin/positions` |
+| 鉴权 | 后台管理员会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### 请求示例
+
+```bash
+curl --location 'http://localhost:8080/api/admin/positions' \
+  --header 'Cookie: JSESSIONID=admin-session-id'
+```
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "id": 3001,
+      "positionCode": "DEV_BACKEND",
+      "positionName": "后端开发工程师",
+      "positionCategory": "ENGINEERING",
+      "status": "ACTIVE"
+    }
+  ],
+  "requestId": "c071ab8f2d8f4470bfeac53d2439cf1d"
+}
+```
+
+## 6.3 分页查询员工列表
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/admin/users` |
+| 鉴权 | 后台管理员会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### Query 参数
+
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `pageNo` | `long` | 否 | `1` | 页码，最小 `1` |
+| `pageSize` | `long` | 否 | `20` | 每页条数，范围 `1-200` |
+| `keyword` | `string` | 否 | 无 | 按工号、姓名、手机号模糊搜索 |
+| `deptId` | `long` | 否 | 无 | 当前版本按主部门精确过滤 |
+| `employmentStatus` | `string` | 否 | 无 | 在职状态过滤 |
+| `managerUserId` | `long` | 否 | 无 | 按直属上级过滤 |
+
+### 请求示例
+
+```bash
+curl --location 'http://localhost:8080/api/admin/users?pageNo=1&pageSize=20&keyword=%E5%BC%A0&employmentStatus=ACTIVE' \
+  --header 'Cookie: JSESSIONID=admin-session-id'
+```
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 2,
+    "list": [
+      {
+        "userId": 2003,
+        "employeeNo": "E1003",
+        "realName": "张三",
+        "primaryDeptId": 110,
+        "primaryDeptName": "研发中心",
+        "positionId": 3001,
+        "positionName": "后端开发工程师",
+        "managerUserId": 2002,
+        "managerName": "李四",
+        "employmentStatus": "ACTIVE",
+        "status": "ACTIVE"
+      }
+    ]
+  },
+  "requestId": "8e9159ff9dce458f9d9d0c1a4ea55c34"
+}
+```
+
+### 参数校验失败示例
+
+```json
+{
+  "code": 400,
+  "message": "pageSize 最大为 200",
+  "data": null,
+  "requestId": "c4f20ec0a4484ddca0bd0958634129aa"
+}
+```
+
+## 6.4 查询员工详情
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/admin/users/{userId}` |
+| 鉴权 | 后台管理员会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### Path 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `userId` | `long` | 是 | 员工用户 ID |
+
+### 请求示例
+
+```bash
+curl --location 'http://localhost:8080/api/admin/users/2003' \
+  --header 'Cookie: JSESSIONID=admin-session-id'
+```
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "userId": 2003,
+    "employeeNo": "E1003",
+    "realName": "张三",
+    "gender": "MALE",
+    "mobile": "13800000003",
+    "primaryDeptId": 110,
+    "primaryDeptName": "研发中心",
+    "positionId": 3001,
+    "positionName": "后端开发工程师",
+    "managerUserId": 2002,
+    "managerName": "李四",
+    "employmentStatus": "ACTIVE",
+    "status": "ACTIVE",
+    "hireDate": "2024-03-01",
+    "regularizedAt": "2024-09-01",
+    "serviceStartDate": "2024-03-01",
+    "annualLeaveStartDate": "2024-03-01",
+    "workLocation": "上海"
+  },
+  "requestId": "b3c197ff0c4646ee9bb611b1ff6af0b9"
+}
+```
+
+### 不存在响应示例
+
+```json
+{
+  "code": 404,
+  "message": "员工不存在",
+  "data": null,
+  "requestId": "ef6617581b9f4f6bb5dd2f09364df900"
+}
+```
+
+## 6.5 查询员工直属上级
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/admin/users/{userId}/manager` |
+| 鉴权 | 后台管理员会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### Path 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `userId` | `long` | 是 | 员工用户 ID |
+
+### 返回说明
+
+- 如果员工存在直属上级，返回 `UserSummary`
+- 如果员工没有直属上级，返回 `data = null`
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "userId": 2002,
+    "employeeNo": "E1002",
+    "realName": "李四",
+    "primaryDeptId": 110,
+    "primaryDeptName": "研发中心",
+    "positionId": 3002,
+    "positionName": "研发经理",
+    "managerUserId": null,
+    "managerName": null,
+    "employmentStatus": "ACTIVE",
+    "status": "ACTIVE"
+  },
+  "requestId": "0a19353484c94b27beeea0a8d8ac2391"
+}
+```
+
+### 无直属上级示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": null,
+  "requestId": "5d6abdf0b7e6415aac5fe65ec770d479"
+}
+```
+
+## 6.6 查询员工直属下级
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/admin/users/{userId}/subordinates` |
+| 鉴权 | 后台管理员会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### Path 参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `userId` | `long` | 是 | 员工用户 ID |
+
+### 返回说明
+
+- 永远返回数组
+- 没有直属下级时返回空数组 `[]`
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "userId": 2003,
+      "employeeNo": "E1003",
+      "realName": "张三",
+      "primaryDeptId": 110,
+      "primaryDeptName": "研发中心",
+      "positionId": 3001,
+      "positionName": "后端开发工程师",
+      "managerUserId": 2002,
+      "managerName": "李四",
+      "employmentStatus": "ACTIVE",
+      "status": "ACTIVE"
+    }
+  ],
+  "requestId": "e47f98b4d1a74e12a8f2633eb5990e1a"
+}
+```
+
+## 6.7 查询本人档案
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/employee/me/profile` |
+| 鉴权 | 员工会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### 请求示例
+
+```bash
+curl --location 'http://localhost:8080/api/employee/me/profile' \
+  --header 'Cookie: JSESSIONID=employee-session-id'
+```
+
+### 成功响应说明
+
+- 响应结构与后台 `GET /api/admin/users/{userId}` 一致
+- 返回当前登录员工本人的组织档案
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "userId": 2003,
+    "employeeNo": "E1003",
+    "realName": "张三",
+    "gender": "MALE",
+    "mobile": "13800000003",
+    "primaryDeptId": 111,
+    "primaryDeptName": "后端组",
+    "positionId": 3001,
+    "positionName": "后端开发工程师",
+    "managerUserId": 2002,
+    "managerName": "李四",
+    "employmentStatus": "ACTIVE",
+    "status": "ACTIVE",
+    "hireDate": "2024-03-01",
+    "regularizedAt": "2024-09-01",
+    "serviceStartDate": "2024-03-01",
+    "annualLeaveStartDate": "2024-03-01",
+    "workLocation": "上海"
+  },
+  "requestId": "62f95d54d7f8433694d6cb7926f7243f"
+}
+```
+
+## 6.8 查询本人直属上级
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/employee/me/manager` |
+| 鉴权 | 员工会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### 返回说明
+
+- 返回当前登录员工的直属上级摘要
+- 如果本人无直属上级，`data = null`
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "userId": 2002,
+    "employeeNo": "E1002",
+    "realName": "李四",
+    "primaryDeptId": 110,
+    "primaryDeptName": "研发中心",
+    "positionId": 3002,
+    "positionName": "研发经理",
+    "managerUserId": null,
+    "managerName": null,
+    "employmentStatus": "ACTIVE",
+    "status": "ACTIVE"
+  },
+  "requestId": "b7d4b0a0c26d4c15a096c0ce4fb78d48"
+}
+```
+
+## 6.9 查询本人直属下级
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/employee/me/subordinates` |
+| 鉴权 | 员工会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### 返回说明
+
+- 返回当前登录员工的直属下级列表
+- 普通员工通常返回空数组
+- 领导用户通常返回一个或多个直属下级
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "userId": 2003,
+      "employeeNo": "E1003",
+      "realName": "张三",
+      "primaryDeptId": 111,
+      "primaryDeptName": "后端组",
+      "positionId": 3001,
+      "positionName": "后端开发工程师",
+      "managerUserId": 2002,
+      "managerName": "李四",
+      "employmentStatus": "ACTIVE",
+      "status": "ACTIVE"
+    },
+    {
+      "userId": 2004,
+      "employeeNo": "E1004",
+      "realName": "王五",
+      "primaryDeptId": 111,
+      "primaryDeptName": "后端组",
+      "positionId": 3001,
+      "positionName": "后端开发工程师",
+      "managerUserId": 2002,
+      "managerName": "李四",
+      "employmentStatus": "ACTIVE",
+      "status": "ACTIVE"
+    }
+  ],
+  "requestId": "55f4b7fa2e5442b0bd7c5482816ef820"
+}
+```
+
+---
+
+## 七、联调建议
+
+## 7.1 联调顺序
+
+建议顺序如下：
+
+1. 先登录后台端，验证 `departments/tree`、`positions`、`users`
+2. 再验证后台端 `user detail / manager / subordinates`
+3. 登录员工端，验证 `me/profile`
+4. 再验证 `me/manager` 与 `me/subordinates`
+5. 最后验证错误场景：
+   - 未登录
+   - 路径串用
+   - 参数越界
+   - 业务对象不存在
+
+## 7.2 前端接入注意事项
+
+- 这是 Session 模式，不是 Token 模式
+- 浏览器端跨域时要确认 Cookie 是否可发送
+- `requestId` 建议在前端日志和报错弹窗里保留
+- `manager` 接口可能返回 `null`
+- `subordinates` 接口一定按数组处理，不要按对象处理
+
+## 7.3 当前版本限制
+
+- 员工列表 `deptId` 目前按主部门精确匹配，不是整棵部门子树过滤
+- 部门负责人当前返回第一负责人摘要，不含完整领导成员列表
+- 后台端当前未接细粒度角色权限点校验
+
+---
+
+## 八、后续扩展建议
+
+下一阶段进入 `module-org` 写侧后，建议同步扩展文档：
+
+1. 部门新增、编辑、停用接口
+2. 员工新增、编辑、账号开通/停用接口
+3. 上下级绑定与变更接口
+4. 组织事件与回调契约
+5. 细粒度权限矩阵与错误码补充
