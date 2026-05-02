@@ -159,6 +159,12 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
   - `OFFBOARD`
   - `CHANGE_EMPLOYMENT_STATUS`
 - 写入表：`hr_employee_event`
+- 同时会按变化类型发布正式内部领域事件：
+  - `org.user.created`
+  - `org.user.manager-changed`
+  - `org.user.status-changed`
+  - `org.user.account-changed`
+  - `org.department.structure-changed`
 
 ---
 
@@ -339,7 +345,10 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 
 - 支持修改部门、岗位、直属上级、工作地点等
 - 如部门/岗位/直属上级发生变化，会写入 `hr_employee_event`
+- 如直属上级发生变化，会发布 `org.user.manager-changed`
 - 如主档 `status` 从 `ACTIVE` 变为非 `ACTIVE`，系统会自动停用已有账号
+- 如主档 `status` 变化，会发布 `org.user.status-changed`
+- 如主档状态联动触发自动停号，会额外发布 `org.user.account-changed`
 
 典型失败示例：
 
@@ -370,6 +379,8 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 - 会校验状态机流转是否合法
 - 当状态流转到不允许登录的状态时，会自动把账号降为 `DISABLED`
 - 会写 `hr_employee_event`
+- 会发布 `org.user.status-changed`
+- 若触发自动停号，还会发布 `org.user.account-changed`
 
 ## 6.8 创建或更新员工登录账号
 
@@ -401,13 +412,14 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 - 创建时必须传 `loginName` 与 `newPassword`
 - `loginName`、`email` 都必须唯一
 - 如果员工当前不允许登录，接口会拒绝把账号设为 `ACTIVE`
+- 创建、更新、自动停号都会发布 `org.user.account-changed`
 
 ---
 
 ## 七、当前版本限制
 
 - 当前写侧治理仍是“后台直接生效”模式，尚未接入审批通过后的生效时间机制
-- 当前只对 `hr_employee_event` 做了基础留痕，尚未向 `module-im`、`module-agent`、`module-workflow` 发布正式领域事件
+- 当前虽然已经发布正式内部领域事件，但 `module-im`、`module-agent`、`module-workflow` 还没有接正式消费者
 - 当前组织查询仍未提供“按部门子树筛人”的写侧联动筛选能力
 - 当前后台端仍未接细粒度 RBAC 权限点校验
 
@@ -415,7 +427,7 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 
 ## 八、下一步建议
 
-1. 为 `org.user.status-changed`、`org.user.manager-changed` 等变化补正式领域事件发布
+1. 让 `module-im`、`module-agent`、`module-workflow` 正式消费这批组织事件
 2. 为员工账号补“后台重置密码审计”和“账号详情查询”
 3. 为部门领导成员补独立治理接口，不再只维护第一负责人
 4. 为写侧补共享测试环境或容器化测试隔离方案

@@ -8,6 +8,12 @@ import com.workforcehub.auth.domain.AuthUserAccount;
 import com.workforcehub.auth.domain.OrgUser;
 import com.workforcehub.auth.mapper.AuthUserAccountMapper;
 import com.workforcehub.auth.mapper.OrgUserMapper;
+import com.workforcehub.common.event.DomainEventPublisher;
+import com.workforcehub.common.event.org.OrgDepartmentStructureChangedEvent;
+import com.workforcehub.common.event.org.OrgUserAccountChangedEvent;
+import com.workforcehub.common.event.org.OrgUserCreatedEvent;
+import com.workforcehub.common.event.org.OrgUserManagerChangedEvent;
+import com.workforcehub.common.event.org.OrgUserStatusChangedEvent;
 import com.workforcehub.common.enums.EmploymentStatus;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
@@ -66,6 +72,7 @@ public class OrgManagementService {
     private final HrEmployeeEventMapper hrEmployeeEventMapper;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+    private final DomainEventPublisher domainEventPublisher;
 
     public OrgManagementService(OrgDepartmentMapper departmentMapper,
                                 OrgPositionMapper positionMapper,
@@ -74,7 +81,8 @@ public class OrgManagementService {
                                 AuthUserAccountMapper authUserAccountMapper,
                                 HrEmployeeEventMapper hrEmployeeEventMapper,
                                 PasswordEncoder passwordEncoder,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                DomainEventPublisher domainEventPublisher) {
         this.departmentMapper = departmentMapper;
         this.positionMapper = positionMapper;
         this.departmentLeaderMapper = departmentLeaderMapper;
@@ -83,6 +91,7 @@ public class OrgManagementService {
         this.hrEmployeeEventMapper = hrEmployeeEventMapper;
         this.passwordEncoder = passwordEncoder;
         this.objectMapper = objectMapper;
+        this.domainEventPublisher = domainEventPublisher;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -108,6 +117,17 @@ public class OrgManagementService {
         department.setUpdatedBy(operatorId);
         departmentMapper.insert(department);
         syncPrimaryDepartmentLeader(department.getId(), request.getLeaderUserId(), operatorId);
+        publishDepartmentStructureChangedEvent(
+            "CREATED",
+            department,
+            null,
+            department.getParentId(),
+            null,
+            department.getLeaderUserId(),
+            null,
+            department.getStatus(),
+            operatorId
+        );
         return department.getId();
     }
 
@@ -125,6 +145,9 @@ public class OrgManagementService {
         Integer oldLevel = department.getDeptLevel();
         String newTreePath = buildTreePath(parent, deptId);
         Integer newLevel = parent == null ? 0 : parent.getDeptLevel() + 1;
+        Long beforeParentId = department.getParentId();
+        Long beforeLeaderUserId = department.getLeaderUserId();
+        String beforeStatus = department.getStatus();
 
         department.setParentId(parent == null ? null : parent.getId());
         department.setDeptCode(request.getDeptCode().trim());
@@ -142,6 +165,17 @@ public class OrgManagementService {
         }
 
         syncPrimaryDepartmentLeader(deptId, request.getLeaderUserId(), operatorId);
+        publishDepartmentStructureChangedEvent(
+            "UPDATED",
+            department,
+            beforeParentId,
+            department.getParentId(),
+            beforeLeaderUserId,
+            department.getLeaderUserId(),
+            beforeStatus,
+            department.getStatus(),
+            operatorId
+        );
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -207,6 +241,7 @@ public class OrgManagementService {
         user.setCreatedBy(operatorId);
         user.setUpdatedBy(operatorId);
         orgUserMapper.insert(user);
+        publishUserCreatedEvent(user, operatorId);
         return user.getId();
     }
 
@@ -247,8 +282,9 @@ public class OrgManagementService {
         user.setUpdatedBy(operatorId);
         orgUserMapper.updateById(user);
 
+        AccountMutation accountMutation = null;
         if (!"ACTIVE".equals(user.getStatus()) && "ACTIVE".equals(beforeStatus)) {
-            forceDisableAccountIfExists(userId, operatorId);
+            accountMutation = forceDisableAccountIfExists(userId, operatorId);
         }
 
         Map<String, Object> afterSnapshot = userSnapshot(user);
@@ -260,6 +296,13 @@ public class OrgManagementService {
         }
         if (!equalsLong(beforeManagerUserId, user.getManagerUserId())) {
             recordEmployeeEvent(userId, "CHANGE_MANAGER", beforeSnapshot, afterSnapshot, operatorId);
+            publishUserManagerChangedEvent(user, beforeManagerUserId, operatorId);
+        }
+        if (!beforeStatus.equals(user.getStatus())) {
+            publishUserStatusChangedEvent("RECORD_STATUS", user, beforeStatus, user.getStatus(), operatorId);
+        }
+        if (accountMutation != null) {
+            publishUserAccountChangedEvent(userId, accountMutation, operatorId);
         }
     }
 
@@ -283,12 +326,17 @@ public class OrgManagementService {
         user.setUpdatedBy(operatorId);
         orgUserMapper.updateById(user);
 
+        AccountMutation accountMutation = null;
         if (!isUserEligibleForActiveAccount(user)) {
-            forceDisableAccountIfExists(userId, operatorId);
+            accountMutation = forceDisableAccountIfExists(userId, operatorId);
         }
 
         Map<String, Object> afterSnapshot = userSnapshot(user);
         recordEmployeeEvent(userId, resolveEmploymentChangeType(currentStatus, targetStatus), beforeSnapshot, afterSnapshot, operatorId);
+        publishUserStatusChangedEvent("EMPLOYMENT_STATUS", user, currentStatus, targetStatus, operatorId);
+        if (accountMutation != null) {
+            publishUserAccountChangedEvent(userId, accountMutation, operatorId);
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -300,9 +348,15 @@ public class OrgManagementService {
         );
 
         if (existing == null) {
-            createUserAccount(user, request, operatorId);
+            AccountMutation created = createUserAccount(user, request, operatorId);
+            publishUserAccountChangedEvent(userId, created, operatorId);
             return;
         }
+
+        String beforeLoginName = existing.getLoginName();
+        String beforeEmail = existing.getEmail();
+        String beforeAccountStatus = existing.getAccountStatus();
+        boolean passwordChanged = false;
 
         if (StringUtils.hasText(request.getLoginName())) {
             String loginName = request.getLoginName().trim();
@@ -316,6 +370,7 @@ public class OrgManagementService {
         if (StringUtils.hasText(request.getNewPassword())) {
             existing.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
             existing.setPasswordUpdatedAt(LocalDateTime.now());
+            passwordChanged = true;
         }
         if (StringUtils.hasText(request.getAccountStatus())) {
             String accountStatus = normalizeAccountStatus(request.getAccountStatus());
@@ -326,9 +381,23 @@ public class OrgManagementService {
         }
         existing.setUpdatedBy(operatorId);
         authUserAccountMapper.updateById(existing);
+
+        AccountMutation updated = buildAccountMutation(
+            "UPDATED",
+            beforeLoginName,
+            existing.getLoginName(),
+            beforeEmail,
+            existing.getEmail(),
+            beforeAccountStatus,
+            existing.getAccountStatus(),
+            passwordChanged
+        );
+        if (updated != null) {
+            publishUserAccountChangedEvent(userId, updated, operatorId);
+        }
     }
 
-    private void createUserAccount(OrgUser user, OrgUserAccountUpsertRequest request, Long operatorId) {
+    private AccountMutation createUserAccount(OrgUser user, OrgUserAccountUpsertRequest request, Long operatorId) {
         if (!StringUtils.hasText(request.getLoginName())) {
             throw new BizException(400, "创建账号时 loginName 不能为空");
         }
@@ -357,6 +426,16 @@ public class OrgManagementService {
         account.setCreatedBy(operatorId);
         account.setUpdatedBy(operatorId);
         authUserAccountMapper.insert(account);
+        return new AccountMutation(
+            "CREATED",
+            account.getLoginName(),
+            account.getEmail(),
+            null,
+            account.getAccountStatus(),
+            true,
+            true,
+            account.getEmail() != null
+        );
     }
 
     private void cascadeDepartmentTreePathChange(String oldTreePath,
@@ -635,19 +714,30 @@ public class OrgManagementService {
             && LOGIN_ALLOWED_EMPLOYMENT_STATUSES.contains(user.getEmploymentStatus());
     }
 
-    private void forceDisableAccountIfExists(Long userId, Long operatorId) {
+    private AccountMutation forceDisableAccountIfExists(Long userId, Long operatorId) {
         AuthUserAccount account = authUserAccountMapper.selectOne(
             new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, userId)
         );
         if (account == null) {
-            return;
+            return null;
         }
         if ("DISABLED".equals(account.getAccountStatus())) {
-            return;
+            return null;
         }
+        String beforeStatus = account.getAccountStatus();
         account.setAccountStatus("DISABLED");
         account.setUpdatedBy(operatorId);
         authUserAccountMapper.updateById(account);
+        return new AccountMutation(
+            "AUTO_DISABLED",
+            account.getLoginName(),
+            account.getEmail(),
+            beforeStatus,
+            account.getAccountStatus(),
+            false,
+            false,
+            false
+        );
     }
 
     private String resolveEmploymentChangeType(String beforeStatus, String afterStatus) {
@@ -710,6 +800,128 @@ public class OrgManagementService {
         }
     }
 
+    private void publishDepartmentStructureChangedEvent(String changeAction,
+                                                        OrgDepartment department,
+                                                        Long beforeParentId,
+                                                        Long afterParentId,
+                                                        Long beforeLeaderUserId,
+                                                        Long afterLeaderUserId,
+                                                        String beforeStatus,
+                                                        String afterStatus,
+                                                        Long operatorId) {
+        domainEventPublisher.publishAfterCommit(new OrgDepartmentStructureChangedEvent(
+            changeAction,
+            department.getId(),
+            department.getDeptCode(),
+            department.getDeptName(),
+            beforeParentId,
+            afterParentId,
+            beforeLeaderUserId,
+            afterLeaderUserId,
+            beforeStatus,
+            afterStatus,
+            department.getTreePath(),
+            operatorId,
+            LocalDateTime.now()
+        ));
+    }
+
+    private void publishUserCreatedEvent(OrgUser user, Long operatorId) {
+        domainEventPublisher.publishAfterCommit(new OrgUserCreatedEvent(
+            user.getId(),
+            user.getEmployeeNo(),
+            user.getRealName(),
+            user.getPrimaryDeptId(),
+            user.getPositionId(),
+            user.getManagerUserId(),
+            user.getEmploymentStatus(),
+            user.getStatus(),
+            operatorId,
+            LocalDateTime.now()
+        ));
+    }
+
+    private void publishUserManagerChangedEvent(OrgUser user, Long beforeManagerUserId, Long operatorId) {
+        domainEventPublisher.publishAfterCommit(new OrgUserManagerChangedEvent(
+            user.getId(),
+            user.getEmployeeNo(),
+            user.getPrimaryDeptId(),
+            beforeManagerUserId,
+            user.getManagerUserId(),
+            operatorId,
+            LocalDateTime.now()
+        ));
+    }
+
+    private void publishUserStatusChangedEvent(String statusType,
+                                               OrgUser user,
+                                               String beforeStatus,
+                                               String afterStatus,
+                                               Long operatorId) {
+        AuthUserAccount account = findUserAccount(user.getId());
+        domainEventPublisher.publishAfterCommit(new OrgUserStatusChangedEvent(
+            statusType,
+            user.getId(),
+            user.getEmployeeNo(),
+            beforeStatus,
+            afterStatus,
+            user.getEmploymentStatus(),
+            user.getStatus(),
+            account == null ? null : account.getAccountStatus(),
+            operatorId,
+            LocalDateTime.now()
+        ));
+    }
+
+    private void publishUserAccountChangedEvent(Long userId, AccountMutation mutation, Long operatorId) {
+        domainEventPublisher.publishAfterCommit(new OrgUserAccountChangedEvent(
+            mutation.changeAction(),
+            userId,
+            mutation.loginName(),
+            mutation.email(),
+            mutation.beforeAccountStatus(),
+            mutation.afterAccountStatus(),
+            mutation.loginNameChanged(),
+            mutation.emailChanged(),
+            mutation.passwordChanged(),
+            operatorId,
+            LocalDateTime.now()
+        ));
+    }
+
+    private AuthUserAccount findUserAccount(Long userId) {
+        return authUserAccountMapper.selectOne(
+            new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, userId)
+        );
+    }
+
+    private AccountMutation buildAccountMutation(String changeAction,
+                                                 String beforeLoginName,
+                                                 String afterLoginName,
+                                                 String beforeEmail,
+                                                 String afterEmail,
+                                                 String beforeAccountStatus,
+                                                 String afterAccountStatus,
+                                                 boolean passwordChanged) {
+        boolean loginNameChanged = !equalsString(beforeLoginName, afterLoginName);
+        boolean emailChanged = !equalsString(beforeEmail, afterEmail);
+        boolean accountStatusChanged = !equalsString(beforeAccountStatus, afterAccountStatus);
+        if (!loginNameChanged && !emailChanged && !accountStatusChanged && !passwordChanged) {
+            return null;
+        }
+
+        return new AccountMutation(
+            changeAction,
+            afterLoginName,
+            afterEmail,
+            beforeAccountStatus,
+            afterAccountStatus,
+            loginNameChanged,
+            passwordChanged,
+            emailChanged
+        );
+    }
+
     private LocalDate defaultServiceStartDate(LocalDate serviceStartDate, LocalDate hireDate) {
         return serviceStartDate != null ? serviceStartDate : hireDate;
     }
@@ -746,5 +958,21 @@ public class OrgManagementService {
 
     private boolean equalsLong(Long left, Long right) {
         return left == null ? right == null : left.equals(right);
+    }
+
+    private boolean equalsString(String left, String right) {
+        return left == null ? right == null : left.equals(right);
+    }
+
+    private record AccountMutation(
+        String changeAction,
+        String loginName,
+        String email,
+        String beforeAccountStatus,
+        String afterAccountStatus,
+        boolean loginNameChanged,
+        boolean passwordChanged,
+        boolean emailChanged
+    ) {
     }
 }

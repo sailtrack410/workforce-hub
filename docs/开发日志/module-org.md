@@ -4,6 +4,117 @@
 
 ---
 
+## 2026-05-02 module-org 组织领域事件正式接入
+
+### 改动背景
+
+前一轮 `module-org` 第二批写侧已经能做：
+
+- 部门、岗位、员工、生命周期、账号治理
+- `hr_employee_event` 留痕
+- 写侧自动化测试
+
+但它仍然停在“本地总账记录”阶段。也就是说：
+
+- 变化虽然被记下来了
+- `module-im`、`module-workflow`、`module-agent` 理论上应该感知这些变化
+- 但系统里还没有一个正式的内部事件出口把这些变化发出来
+
+这会导致后续消息准入、审批候选刷新、Agent ACL 联动都只能继续靠直接查库或临时耦合，不利于后面扩模块。
+
+### 本次目标
+
+- 为 `module-org` 建立事务提交后的正式领域事件发布能力
+- 把用户创建、直属上级变化、状态变化、账号变化、部门结构变化五类事件接入写侧主链路
+- 让自动化测试不仅断业务结果，还断事件是否真的发出
+
+### 执行过程
+
+#### 1. 补统一领域事件发布器
+
+新增：
+
+- `DomainEvent`
+- `DomainEventPublisher`
+
+并采用“事务提交后再发布”的方式处理内部事件。
+
+**意义**：
+
+- 避免监听方读到未提交数据
+- 为后续各模块消费事件建立统一入口，而不是在各服务里自己手搓 `ApplicationEventPublisher`
+
+#### 2. 定义第一批组织领域事件契约
+
+新增：
+
+- `org.user.created`
+- `org.user.manager-changed`
+- `org.user.status-changed`
+- `org.user.account-changed`
+- `org.department.structure-changed`
+
+对应事件对象统一放在 `common.event.org` 下。
+
+**意义**：
+
+- 让其他模块依赖的是“稳定事件契约”，而不是 `module-org` 的实现细节
+- 后续接 `module-im`、`module-workflow`、`module-agent` 时，直接监听这些事件即可
+
+#### 3. 把事件接入写侧主链路
+
+本轮在 `OrgManagementService` 中把事件接入到了以下操作：
+
+- 新增员工后发布 `org.user.created`
+- 修改直属上级后发布 `org.user.manager-changed`
+- 修改员工主档状态或生命周期状态后发布 `org.user.status-changed`
+- 创建 / 更新 / 自动停用账号后发布 `org.user.account-changed`
+- 新增 / 修改部门结构后发布 `org.department.structure-changed`
+
+同时保留原先的 `hr_employee_event` 留痕，不做二选一替换。
+
+**意义**：
+
+- 现在系统里既有“可审计时间线”，也有“可被其他模块消费的实时事件”
+- 后续做跨模块联动时，不必再从 `hr_employee_event` 反查推断变化
+
+#### 4. 升级写侧自动化测试
+
+在 `ModuleOrgWriteApiIntegrationTest` 中新增了对领域事件的断言：
+
+- 新增部门 / 员工后，断言 `org.department.structure-changed`、`org.user.created`
+- 生命周期与账号联动后，断言 `org.user.status-changed`、`org.user.account-changed`
+- 成功修改部门结构与直属上级后，断言 `org.department.structure-changed`、`org.user.manager-changed`
+
+并重新执行：
+
+- `cd server && mvn -DskipTests compile`
+- `cd server && mvn -Dtest=ModuleOrgWriteApiIntegrationTest test`
+- `cd server && mvn -Dtest=ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest test`
+
+结果：
+
+- 编译通过
+- 写侧 `4` 个场景通过
+- 读写联合 `10` 个场景通过
+
+**意义**：
+
+- 以后如果有人把业务接口保住了，但把事件链路改没了，测试会直接报警
+
+### 当前结果
+
+- `module-org` 已正式具备内部领域事件发布能力
+- `hr_employee_event` 继续承接审计留痕
+- 组织事件的发布与业务结果都已进入自动化测试范围
+
+### 已知待补项
+
+- 当前只完成了事件生产端，还没有在 `module-im`、`module-workflow`、`module-agent` 接正式消费者
+- 集成测试仍写本地 `workforce_hub`，后续还要拆测试库或容器化环境
+
+---
+
 ## 2026-05-02 module-org 第二批写侧提交前复核
 
 ### 改动背景
