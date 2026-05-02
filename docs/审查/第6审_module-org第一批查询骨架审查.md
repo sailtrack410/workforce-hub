@@ -1,7 +1,7 @@
 # 第 6 审 module-org 第一批查询骨架审查
 
 - 审查日期：2026-05-02
-- 审查范围：`server/src/main/java/com/workforcehub/org/**`、`server/src/main/resources/mapper/org/OrgDirectoryMapper.xml`、`docs/接口与事件清单.md`、`docs/后端工程骨架说明.md`、`docs/开发日志.md`
+- 审查范围：`server/src/main/java/com/workforcehub/org/**`、`server/src/main/resources/mapper/org/OrgDirectoryMapper.xml`、`docs/架构与设计/接口与事件清单.md`、`docs/架构与设计/后端工程骨架说明.md`、`docs/开发日志/module-org.md`
 - 审查目标：确认 `module-org` 第一批读侧接口是否已经形成可复用底座，并识别其在查询语义、模块边界、文档一致性和后续扩展上的残留风险
 
 ---
@@ -30,7 +30,7 @@
 
 | 序号 | 问题位置 | 问题描述 | 严重程度 | 优化方案 |
 | --- | --- | --- | --- | --- |
-| 4-1 | `server/src/main/java/com/workforcehub/org/controller/**` + `docs/开发日志.md` | 这一轮有意识地只做了读侧主链，没有把组织新增、编辑、上下级绑定和事件发布混进来，这个范围控制本身是合理的。真正需要注意的是：第二批一旦进入写侧，必须同步把 `org.user.manager-changed`、`org.user.status-changed` 这类事件一起补上，否则审批和 IM 很难实时感知组织关系变化。 | 建议 | 继续保持“读侧先稳定、写侧第二批进入”的节奏；但第二批开始时，要把写接口、事件发布、数据校验视为同一批次的必做项，不要拆得过碎。 |
+| 4-1 | `server/src/main/java/com/workforcehub/org/controller/**` + `docs/开发日志/module-org.md` | 这一轮有意识地只做了读侧主链，没有把组织新增、编辑、上下级绑定和事件发布混进来，这个范围控制本身是合理的。真正需要注意的是：第二批一旦进入写侧，必须同步把 `org.user.manager-changed`、`org.user.status-changed` 这类事件一起补上，否则审批和 IM 很难实时感知组织关系变化。 | 建议 | 继续保持“读侧先稳定、写侧第二批进入”的节奏；但第二批开始时，要把写接口、事件发布、数据校验视为同一批次的必做项，不要拆得过碎。 |
 
 ### 五、审查问题汇总统计
 

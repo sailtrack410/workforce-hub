@@ -1,7 +1,7 @@
 # 第 3 审 module-auth 认证骨架与开发日志审查
 
 - 审查日期：2026-05-01
-- 审查范围：`docs/开发日志.md`、`docs/后端工程骨架说明.md`、`server/pom.xml`、`server/src/main/resources/application.yml`、`server/src/main/java/com/workforcehub/auth/**`、`server/src/main/java/com/workforcehub/common/config/**`、`server/src/main/java/com/workforcehub/common/response/**`、`server/src/main/java/com/workforcehub/common/exception/**`、`server/src/main/java/com/workforcehub/common/util/**`
+- 审查范围：`docs/开发日志/module-auth.md`、`docs/架构与设计/后端工程骨架说明.md`、`server/pom.xml`、`server/src/main/resources/application.yml`、`server/src/main/java/com/workforcehub/auth/**`、`server/src/main/java/com/workforcehub/common/config/**`、`server/src/main/java/com/workforcehub/common/response/**`、`server/src/main/java/com/workforcehub/common/exception/**`、`server/src/main/java/com/workforcehub/common/util/**`
 - 审查目标：识别 `module-auth` 认证骨架在构建可用性、认证安全链路、Flowable 组件边界和文档一致性上的阻断性与重大问题，判断当前骨架是否适合继续承接后续业务模块开发
 
 ---
@@ -34,9 +34,9 @@
 
 | 序号 | 问题位置 | 问题描述 | 严重程度 | 优化方案 |
 | --- | --- | --- | --- | --- |
-| 4-1 | `docs/开发日志.md` | 文档中写“第 2 审 6 个问题修完后，基础设施骨架进入稳定状态”，但当前 `server` 在 Maven 构建下仍无法通过编译，且 Flowable 改库边界也还处于“暂时保留 true、后续再处理”的阶段。这个表述明显比当前工程真实状态更乐观。 | 建议 | 将开发日志中的阶段性判断改为更准确的口径，例如“骨架方向基本成型，但构建链路、认证安全链路和 Flowable 边界仍待收口”，避免误导后续排期和协作判断。 |
-| 4-2 | `docs/开发日志.md` + `server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java` | 开发日志前文将验证码 Redis Key 口径写成 `auth:email:code:{email}` / `auth:email:send:{email}`，而当前实现实际使用的是带 `purpose` 维度的 `auth:email:code:{purpose}:{email}` / `auth:email:send:{purpose}:{email}`。设计说明与实现已经出现偏移。 | 建议 | 同步修正文档中的 Redis Key 设计描述，使其与实际代码一致，并补充“按 purpose 隔离验证码上下文”的设计原因，方便后续扩展管理员端或更多验证码用途。 |
-| 4-3 | `docs/后端工程骨架说明.md` + `server/src/main/resources/db/migration/V1__init_schema.sql` | 文档中仍写 MySQL 主业务库为 68 张表，而实际 `V1__init_schema.sql` 中 `CREATE TABLE` 数量已达到 69 张；同一个 DDL 文件头部注释又仍保留“覆盖全部 46 张业务表”的旧口径。当前表数量说明已经有多处不一致。 | 建议 | 重新按真实 DDL 统一总表数、各业务域小计和 DDL 头注释，确保设计文档、初始化脚本和后续排期口径完全一致。 |
+| 4-1 | `docs/开发日志/module-auth.md` | 文档中写“第 2 审 6 个问题修完后，基础设施骨架进入稳定状态”，但当前 `server` 在 Maven 构建下仍无法通过编译，且 Flowable 改库边界也还处于“暂时保留 true、后续再处理”的阶段。这个表述明显比当前工程真实状态更乐观。 | 建议 | 将开发日志中的阶段性判断改为更准确的口径，例如“骨架方向基本成型，但构建链路、认证安全链路和 Flowable 边界仍待收口”，避免误导后续排期和协作判断。 |
+| 4-2 | `docs/开发日志/module-auth.md` + `server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java` | 开发日志前文将验证码 Redis Key 口径写成 `auth:email:code:{email}` / `auth:email:send:{email}`，而当前实现实际使用的是带 `purpose` 维度的 `auth:email:code:{purpose}:{email}` / `auth:email:send:{purpose}:{email}`。设计说明与实现已经出现偏移。 | 建议 | 同步修正文档中的 Redis Key 设计描述，使其与实际代码一致，并补充“按 purpose 隔离验证码上下文”的设计原因，方便后续扩展管理员端或更多验证码用途。 |
+| 4-3 | `docs/架构与设计/后端工程骨架说明.md` + `server/src/main/resources/db/migration/V1__init_schema.sql` | 文档中仍写 MySQL 主业务库为 68 张表，而实际 `V1__init_schema.sql` 中 `CREATE TABLE` 数量已达到 69 张；同一个 DDL 文件头部注释又仍保留“覆盖全部 46 张业务表”的旧口径。当前表数量说明已经有多处不一致。 | 建议 | 重新按真实 DDL 统一总表数、各业务域小计和 DDL 头注释，确保设计文档、初始化脚本和后续排期口径完全一致。 |
 
 ### 五、审查问题汇总统计
 

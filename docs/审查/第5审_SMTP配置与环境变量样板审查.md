@@ -1,7 +1,7 @@
 # 第 5 审 SMTP 配置与环境变量样板审查
 
 - 审查日期：2026-05-01
-- 审查范围：`.env.example`、`.gitignore`、`server/src/main/resources/application.yml`、`docs/开发日志.md`、`docs/后端工程骨架说明.md`
+- 审查范围：`.env.example`、`.gitignore`、`server/src/main/resources/application.yml`、`docs/开发日志/module-auth.md`、`docs/架构与设计/后端工程骨架说明.md`
 - 审查目标：确认真实 SMTP 配置边界、环境变量样板、凭证忽略规则与文档说明是否已经形成闭环，并评估其对后续 `module-auth` 邮箱验证码联调的支撑程度
 
 ---
@@ -12,7 +12,7 @@
 
 | 序号 | 问题位置 | 问题描述 | 严重程度 | 优化方案 |
 | --- | --- | --- | --- | --- |
-| 1-1 | `server/src/main/resources/application.yml` + `docs/开发日志.md` | 当前已经补齐 `MAIL_SMTP_AUTH`、`MAIL_SMTP_SSL_ENABLE`、`MAIL_SMTP_STARTTLS_REQUIRED` 和超时参数，足以覆盖“本地 `1025` 测试 SMTP”与“网易 `163 465` 隐式 SSL”两条主路径。本轮没有发现新的阻断或重大配置缺口。需要注意的是，这次仍属于“配置边界补齐 + 编译验证”，还没有做真实 SMTP 发信冒烟。 | 建议 | 继续保持现状即可；等第一次联调真实网易邮箱时，再补一条最小化发信冒烟记录，确认授权码、网络出口、邮箱服务商策略都能打通。 |
+| 1-1 | `server/src/main/resources/application.yml` + `docs/开发日志/module-auth.md` | 当前已经补齐 `MAIL_SMTP_AUTH`、`MAIL_SMTP_SSL_ENABLE`、`MAIL_SMTP_STARTTLS_REQUIRED` 和超时参数，足以覆盖“本地 `1025` 测试 SMTP”与“网易 `163 465` 隐式 SSL”两条主路径。本轮没有发现新的阻断或重大配置缺口。需要注意的是，这次仍属于“配置边界补齐 + 编译验证”，还没有做真实 SMTP 发信冒烟。 | 建议 | 继续保持现状即可；等第一次联调真实网易邮箱时，再补一条最小化发信冒烟记录，确认授权码、网络出口、邮箱服务商策略都能打通。 |
 
 ### 二、环境变量治理
 
@@ -30,7 +30,7 @@
 
 | 序号 | 问题位置 | 问题描述 | 严重程度 | 优化方案 |
 | --- | --- | --- | --- | --- |
-| 4-1 | `docs/后端工程骨架说明.md` + `docs/开发日志.md` | 当前骨架说明已经能直接指向 `.env.example`，并明确了“不会自动加载”和“163 SMTP 最小必填项”，文档与仓库实际文件之间已经形成闭环。本轮没有发现命名、路径、用途描述不一致的问题。 | 建议 | 暂不需要额外调整；等后续正式补 `docker-compose.yml` 或“本机启动说明”时，再把注入方式进一步写实。 |
+| 4-1 | `docs/架构与设计/后端工程骨架说明.md` + `docs/开发日志/module-auth.md` | 当前骨架说明已经能直接指向 `.env.example`，并明确了“不会自动加载”和“163 SMTP 最小必填项”，文档与仓库实际文件之间已经形成闭环。本轮没有发现命名、路径、用途描述不一致的问题。 | 建议 | 暂不需要额外调整；等后续正式补 `docker-compose.yml` 或“本机启动说明”时，再把注入方式进一步写实。 |
 
 ### 五、审查问题汇总统计
 

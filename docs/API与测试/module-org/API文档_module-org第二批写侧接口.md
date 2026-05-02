@@ -1,0 +1,421 @@
+# API 文档 module-org 第二批写侧接口
+
+## 一、文档信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 文档名称 | `module-org` 第二批写侧接口 API 文档 |
+| 文档版本 | `v1.0` |
+| 适用范围 | 后台组织治理、岗位治理、员工档案治理、员工账号联动 |
+| 对应模块 | `server/module-org` |
+| 发布日期 | `2026-05-02` |
+| 当前状态 | 已随代码落地，并补齐自动化冒烟测试 |
+
+---
+
+## 二、文档范围
+
+本文档覆盖以下 `8` 个后台写侧接口：
+
+1. `POST /api/admin/departments`
+2. `PUT /api/admin/departments/{deptId}`
+3. `POST /api/admin/positions`
+4. `PUT /api/admin/positions/{positionId}`
+5. `POST /api/admin/users`
+6. `PUT /api/admin/users/{userId}`
+7. `PUT /api/admin/users/{userId}/employment-status`
+8. `PUT /api/admin/users/{userId}/account`
+
+读侧查询接口仍由：
+
+- `docs/API与测试/module-org/API文档_module-org第一批查询接口.md`
+
+单独维护。
+
+---
+
+## 三、调用约定
+
+### 3.1 基础地址
+
+开发环境默认：
+
+```text
+http://localhost:8080
+```
+
+### 3.2 鉴权方式
+
+- 当前项目采用服务端 Session 鉴权
+- 本文档所有接口仅允许后台管理员会话访问
+- 调用前需先登录 `POST /api/admin/auth/login`
+
+示例：
+
+```http
+Cookie: SESSION=xxxxxxxxxxxxxxxx
+```
+
+### 3.3 统一响应结构
+
+成功：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": 2050372589176631297,
+  "requestId": "f9bfe1fbc54a4f94b1f8907f0cd0c844"
+}
+```
+
+失败：
+
+```json
+{
+  "code": 400,
+  "message": "直属上级不能是当前员工的下级",
+  "data": null,
+  "requestId": "cb21c799ba3b446e9a52b90ac9bc5b9e"
+}
+```
+
+说明：
+
+- 创建接口的 `data` 返回新建对象 ID
+- 更新接口的 `data` 返回 `null`
+- 当前业务规则校验失败仍通过 `HTTP 200 + code != 0` 表达
+- 参数注解校验失败仍通过 `HTTP 400 + code=400` 表达
+
+### 3.4 常见错误语义
+
+| HTTP 状态 | 业务码 | message 示例 | 场景 |
+| --- | --- | --- | --- |
+| `200` | `0` | `ok` | 成功 |
+| `200` | `400` | `部门不能挂到自己的子部门下面` | 业务规则不满足 |
+| `200` | `404` | `员工不存在` | 对象不存在 |
+| `400` | `400` | `deptCode 不能为空` | 请求参数注解校验失败 |
+| `401` | `401` | `未登录或会话已过期` | 后台未登录 |
+| `403` | `403` | `无权限访问` | 员工会话访问后台端 |
+| `500` | `500` | `系统内部错误` | 未兜住的异常 |
+
+---
+
+## 四、关键业务规则
+
+### 4.1 部门治理规则
+
+- `dept_code` 必须唯一
+- 部门可挂到根或任一已有部门下
+- 部门不能挂到自己下面
+- 部门不能挂到自己的子部门下面
+- 更新部门父级时，系统会同步重算本部门及全部子孙节点的 `tree_path` 和 `dept_level`
+- `leader_user_id` 如有值，必须指向未离职员工
+- `leader_user_id` 会同步维护 `org_department_leader` 的正职记录
+
+### 4.2 岗位治理规则
+
+- `position_code` 必须唯一
+- 员工仅允许绑定启用状态的岗位
+
+### 4.3 员工档案治理规则
+
+- `employee_no` 必须唯一
+- 员工必须绑定一个主部门
+- 员工可选绑定一个岗位
+- 员工可选绑定一个直属上级
+- 直属上级不能是员工本人
+- 直属上级不能形成循环汇报关系
+- 直属上级必须为启用状态，且不能是已离职员工
+- `service_start_date` 为空时，默认回落到 `hire_date`
+- `annual_leave_start_date` 为空时，默认回落到 `service_start_date`，若仍为空则回落到 `hire_date`
+- `regularized_at` 不允许早于 `hire_date`
+
+### 4.4 生命周期与账号联动规则
+
+- 员工状态机当前支持：
+  - `PENDING_ONBOARD -> PROBATION / ACTIVE`
+  - `PROBATION -> ACTIVE / PENDING_OFFBOARD`
+  - `ACTIVE -> PENDING_OFFBOARD`
+  - `PENDING_OFFBOARD -> PROBATION / ACTIVE / OFFBOARDED`
+- 不支持的流转会被直接拒绝
+- 当前仅以下员工状态允许启用登录账号：
+  - `PROBATION`
+  - `ACTIVE`
+  - `PENDING_OFFBOARD`
+- `PENDING_ONBOARD`、`OFFBOARDED` 不允许把账号设为 `ACTIVE`
+- 员工主档状态变为非 `ACTIVE` 时，系统会自动把已有账号降为 `DISABLED`
+- 员工生命周期流转到不允许登录的状态时，系统会自动把已有账号降为 `DISABLED`
+
+### 4.5 生命周期事件留痕
+
+- 员工部门变更会写 `TRANSFER_DEPARTMENT`
+- 员工岗位变更会写 `TRANSFER_POSITION`
+- 直属上级变更会写 `CHANGE_MANAGER`
+- 生命周期状态变更会写：
+  - `ONBOARD`
+  - `REGULARIZE`
+  - `PREPARE_OFFBOARD`
+  - `OFFBOARD`
+  - `CHANGE_EMPLOYMENT_STATUS`
+- 写入表：`hr_employee_event`
+
+---
+
+## 五、请求体定义
+
+### 5.1 DepartmentSaveRequest
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `parentId` | `long/null` | 否 | 上级部门 ID；根节点传 `null` |
+| `deptCode` | `string` | 是 | 部门编码 |
+| `deptName` | `string` | 是 | 部门名称 |
+| `deptType` | `string` | 是 | `COMPANY/BRANCH/DEPARTMENT/TEAM` |
+| `leaderUserId` | `long/null` | 否 | 第一负责人用户 ID |
+| `status` | `string` | 否 | `ACTIVE/INACTIVE`，默认 `ACTIVE` |
+
+### 5.2 PositionSaveRequest
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `positionCode` | `string` | 是 | 岗位编码 |
+| `positionName` | `string` | 是 | 岗位名称 |
+| `positionCategory` | `string/null` | 否 | 岗位类别 |
+| `status` | `string` | 否 | `ACTIVE/INACTIVE`，默认 `ACTIVE` |
+
+### 5.3 UserCreateRequest
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `employeeNo` | `string` | 是 | 工号 |
+| `realName` | `string` | 是 | 姓名 |
+| `gender` | `string/null` | 否 | 性别 |
+| `mobile` | `string/null` | 否 | 手机号 |
+| `primaryDeptId` | `long` | 是 | 主部门 ID |
+| `positionId` | `long/null` | 否 | 岗位 ID |
+| `managerUserId` | `long/null` | 否 | 直属上级 ID |
+| `employmentStatus` | `string/null` | 否 | 默认 `PENDING_ONBOARD` |
+| `hireDate` | `date/null` | 否 | 入职日期 |
+| `regularizedAt` | `date/null` | 否 | 转正日期 |
+| `serviceStartDate` | `date/null` | 否 | 司龄起算日 |
+| `annualLeaveStartDate` | `date/null` | 否 | 年假工龄起算日 |
+| `workLocation` | `string/null` | 否 | 工作地点 |
+| `status` | `string/null` | 否 | 主档状态，默认 `ACTIVE` |
+
+### 5.4 UserUpdateRequest
+
+字段与 `UserCreateRequest` 基本一致，但不再接收 `employmentStatus`，生命周期变更统一走单独接口。
+
+### 5.5 EmploymentStatusUpdateRequest
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `employmentStatus` | `string` | 是 | 新的员工生命周期状态 |
+
+### 5.6 UserAccountUpsertRequest
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `loginName` | `string/null` | 创建时是 | 登录名 |
+| `newPassword` | `string/null` | 创建时是 | 新密码；更新时传入即重置密码 |
+| `email` | `string/null` | 否 | 邮箱，需全局唯一 |
+| `accountStatus` | `string/null` | 否 | `ACTIVE/LOCKED/DISABLED` |
+
+---
+
+## 六、接口明细
+
+## 6.1 新增部门
+
+- 方法：`POST`
+- 路径：`/api/admin/departments`
+
+请求示例：
+
+```json
+{
+  "parentId": 110,
+  "deptCode": "QA-AUTO-001",
+  "deptName": "测试质量组",
+  "deptType": "TEAM",
+  "leaderUserId": 2002,
+  "status": "ACTIVE"
+}
+```
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": 2050372755837304833,
+  "requestId": "93d5e4d8f560492da5b2c4b5803a42d4"
+}
+```
+
+## 6.2 修改部门
+
+- 方法：`PUT`
+- 路径：`/api/admin/departments/{deptId}`
+
+额外规则：
+
+- 支持修改父部门
+- 但不允许形成树循环
+
+典型失败示例：
+
+```json
+{
+  "code": 400,
+  "message": "部门不能挂到自己的子部门下面",
+  "data": null,
+  "requestId": "3b2bcab5ac4e4d298953e8f9473f2f68"
+}
+```
+
+## 6.3 新增岗位
+
+- 方法：`POST`
+- 路径：`/api/admin/positions`
+
+请求示例：
+
+```json
+{
+  "positionCode": "QA_ENGINEER_AUTO",
+  "positionName": "测试工程师",
+  "positionCategory": "ENGINEER",
+  "status": "ACTIVE"
+}
+```
+
+## 6.4 修改岗位
+
+- 方法：`PUT`
+- 路径：`/api/admin/positions/{positionId}`
+
+额外规则：
+
+- `positionCode` 保持全局唯一
+- 员工仅允许绑定启用状态岗位
+
+## 6.5 新增员工档案
+
+- 方法：`POST`
+- 路径：`/api/admin/users`
+
+请求示例：
+
+```json
+{
+  "employeeNo": "E920260501",
+  "realName": "测试员工",
+  "gender": "FEMALE",
+  "mobile": "13900001234",
+  "primaryDeptId": 111,
+  "positionId": 3001,
+  "managerUserId": 2002,
+  "employmentStatus": "PENDING_ONBOARD",
+  "hireDate": "2026-05-02",
+  "workLocation": "杭州",
+  "status": "ACTIVE"
+}
+```
+
+说明：
+
+- `serviceStartDate` 未传时，系统会自动回落到 `hireDate`
+- `annualLeaveStartDate` 未传时，系统会继续回落到 `serviceStartDate`
+
+## 6.6 修改员工档案
+
+- 方法：`PUT`
+- 路径：`/api/admin/users/{userId}`
+
+额外规则：
+
+- 支持修改部门、岗位、直属上级、工作地点等
+- 如部门/岗位/直属上级发生变化，会写入 `hr_employee_event`
+- 如主档 `status` 从 `ACTIVE` 变为非 `ACTIVE`，系统会自动停用已有账号
+
+典型失败示例：
+
+```json
+{
+  "code": 400,
+  "message": "直属上级不能是当前员工的下级",
+  "data": null,
+  "requestId": "fd1d72e65134477997f2af8d827dc8f3"
+}
+```
+
+## 6.7 更新员工生命周期状态
+
+- 方法：`PUT`
+- 路径：`/api/admin/users/{userId}/employment-status`
+
+请求示例：
+
+```json
+{
+  "employmentStatus": "PENDING_OFFBOARD"
+}
+```
+
+说明：
+
+- 会校验状态机流转是否合法
+- 当状态流转到不允许登录的状态时，会自动把账号降为 `DISABLED`
+- 会写 `hr_employee_event`
+
+## 6.8 创建或更新员工登录账号
+
+- 方法：`PUT`
+- 路径：`/api/admin/users/{userId}/account`
+
+创建示例：
+
+```json
+{
+  "loginName": "zhangsan.new",
+  "newPassword": "Employee@123456",
+  "email": "zhangsan.new@example.com",
+  "accountStatus": "ACTIVE"
+}
+```
+
+更新示例：
+
+```json
+{
+  "email": "zhangsan.updated@example.com",
+  "accountStatus": "LOCKED"
+}
+```
+
+额外规则：
+
+- 创建时必须传 `loginName` 与 `newPassword`
+- `loginName`、`email` 都必须唯一
+- 如果员工当前不允许登录，接口会拒绝把账号设为 `ACTIVE`
+
+---
+
+## 七、当前版本限制
+
+- 当前写侧治理仍是“后台直接生效”模式，尚未接入审批通过后的生效时间机制
+- 当前只对 `hr_employee_event` 做了基础留痕，尚未向 `module-im`、`module-agent`、`module-workflow` 发布正式领域事件
+- 当前组织查询仍未提供“按部门子树筛人”的写侧联动筛选能力
+- 当前后台端仍未接细粒度 RBAC 权限点校验
+
+---
+
+## 八、下一步建议
+
+1. 为 `org.user.status-changed`、`org.user.manager-changed` 等变化补正式领域事件发布
+2. 为员工账号补“后台重置密码审计”和“账号详情查询”
+3. 为部门领导成员补独立治理接口，不再只维护第一负责人
+4. 为写侧补共享测试环境或容器化测试隔离方案
