@@ -2,7 +2,7 @@
 -- Workforce Hub - module-org 第一批查询接口本地冒烟种子数据
 -- 用途：
 --   - 本地开发 / 联调 / 冒烟测试
---   - 为 docs/API测试用例_module-org第一批查询接口.md 提供可重复执行的数据基线
+--   - 为 docs/API与测试/module-org/API测试用例_module-org第一批查询接口.md 提供可重复执行的数据基线
 -- 注意：
 --   - 仅限本地或临时测试环境，不要直接在共享环境执行
 --   - 账号密码使用 BCrypt 哈希，明文见 API 测试文档
