@@ -1,0 +1,586 @@
+package com.workforcehub.file;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.support.LocalIntegrationTestSupport;
+import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * module-file 第一版文件中心接口自动化冒烟。
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("api")
+class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
+
+    private static final long EMPLOYEE_USER_ID = 2003L;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Value("${workforce.file.local-root:target/test-file-storage}")
+    private String localRoot;
+
+    @Test
+    @DisplayName("员工应能完成 LOCAL 上传票据、确认上传、秒传与下载票据闭环")
+    void employeeShouldUploadConfirmDeduplicateAndCreateDownloadTicket() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+
+        byte[] content = "module-file-same-content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        MvcResult ticketResult = createUploadTicket(employeeSession, "请假证明.pdf", content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(false))
+            .andExpect(jsonPath("$.data.storageProvider").value("LOCAL"))
+            .andExpect(jsonPath("$.data.uploadTicketId").isNumber())
+            .andReturn();
+
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        MvcResult confirmResult = mockMvc.perform(post("/api/employee/files/confirm-upload")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "uploadTicketId": %s,
+                      "objectKey": "%s",
+                      "contentSha256": "%s",
+                      "fileSize": %s,
+                      "ownerType": "PERSONAL_FILE",
+                      "ownerId": null,
+                      "displayName": "请假证明.pdf"
+                    }
+                    """.formatted(uploadTicketId, objectKey, sha256, content.length)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(false))
+            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andExpect(jsonPath("$.data.fileObjectId").isNumber())
+            .andReturn();
+
+        Long firstAttachmentRefId = data(confirmResult).get("attachmentRefId").asLong();
+        Long fileObjectId = data(confirmResult).get("fileObjectId").asLong();
+
+        mockMvc.perform(post("/api/employee/files/confirm-upload")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "uploadTicketId": %s,
+                      "objectKey": "%s",
+                      "contentSha256": "%s",
+                      "fileSize": %s,
+                      "ownerType": "PERSONAL_FILE",
+                      "ownerId": null,
+                      "displayName": "请假证明.pdf"
+                    }
+                    """.formatted(uploadTicketId, objectKey, sha256, content.length)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(firstAttachmentRefId));
+
+        createUploadTicket(employeeSession, "病假材料.pdf", content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(true))
+            .andExpect(jsonPath("$.data.attachmentRefId").isNumber());
+
+        Integer fileObjectCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_file_object WHERE content_sha256 = ? AND file_size = ?",
+            Integer.class,
+            sha256,
+            content.length
+        );
+        assertEquals(1, fileObjectCount);
+
+        Integer attachmentCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_attachment_ref WHERE file_object_id = ?",
+            Integer.class,
+            fileObjectId
+        );
+        assertEquals(2, attachmentCount);
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/download-tickets", firstAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": null
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.downloadTicketId").isNumber())
+            .andExpect(jsonPath("$.data.downloadUrl").value(containsString("/api/employee/files/download/")))
+            .andExpect(jsonPath("$.data.fileName").value("请假证明.pdf"));
+
+        assertAuditCountAtLeast("FILE_UPLOAD_TICKET_CREATED", 1);
+        assertAuditCountAtLeast("FILE_UPLOAD_CONFIRMED", 1);
+        assertAuditCountAtLeast("FILE_UPLOAD_DEDUP", 1);
+        assertAuditCountAtLeast("FILE_DOWNLOAD_TICKET_CREATED", 1);
+    }
+
+    @Test
+    @DisplayName("员工文件应支持回收站删除、恢复和彻底删除引用")
+    void employeeShouldTrashRestoreAndPurgeAttachmentReference() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        String content = "trash-content";
+        Long attachmentRefId = createConfirmedPersonalFile(employeeSession, "回收站文件.txt", content);
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/trash", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "个人清理文件"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonPath("$.data.deletedAt").isString())
+            .andExpect(jsonPath("$.data.purgeAfter").isString());
+
+        String deletedAt = jdbcTemplate.queryForObject(
+            "SELECT deleted_at FROM sys_attachment_ref WHERE id = ?",
+            String.class,
+            attachmentRefId
+        );
+        assertTrue(deletedAt != null && !deletedAt.isBlank());
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/restore", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "误删恢复"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonPath("$.data.restoredAt").isString());
+
+        Integer restoredDeletedCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_attachment_ref WHERE id = ? AND deleted_at IS NULL",
+            Integer.class,
+            attachmentRefId
+        );
+        assertEquals(1, restoredDeletedCount);
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/trash", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "再次删除"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(delete("/api/employee/files/{attachmentRefId}", attachmentRefId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.physicalCleanupScheduled").value(true));
+
+        Integer activeReferenceCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_attachment_ref WHERE id = ? AND is_deleted = 0",
+            Integer.class,
+            attachmentRefId
+        );
+        assertEquals(0, activeReferenceCount);
+        assertEquals(0L, usedBytes("USER", EMPLOYEE_USER_ID));
+        assertEquals(0L, usedBytes("GLOBAL", null));
+        assertEquals(0L, fileCount("USER", EMPLOYEE_USER_ID));
+        assertEquals(0L, fileCount("GLOBAL", null));
+        assertAuditCountAtLeast("FILE_TRASHED", 2);
+        assertAuditCountAtLeast("FILE_RESTORED", 1);
+        assertAuditCountAtLeast("FILE_PURGED", 1);
+    }
+
+    @Test
+    @DisplayName("恢复回收站文件时企业总池不足也应被拦截")
+    void restoreShouldRejectWhenGlobalQuotaIsInsufficient() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        Long attachmentRefId = createConfirmedPersonalFile(employeeSession, "企业空间恢复拦截.txt", "global-quota-content");
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/trash", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "先移入回收站"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        jdbcTemplate.update("""
+            UPDATE sys_storage_quota_policy
+            SET quota_bytes = 1, updated_at = DATE_ADD(NOW(), INTERVAL 1 SECOND)
+            WHERE policy_code = 'GLOBAL_400G'
+            """);
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/restore", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "恢复时企业空间已不足"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(507))
+            .andExpect(jsonPath("$.message", containsString("企业文件总空间不足")));
+    }
+
+    @Test
+    @DisplayName("彻底删除已删除引用不能重复释放空间")
+    void purgeShouldNotReleaseUsageTwice() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        Long firstAttachmentRefId = createConfirmedPersonalFile(employeeSession, "重复删除-1.txt", "first-content");
+        createConfirmedPersonalFile(employeeSession, "重复删除-2.txt", "second-content");
+        long remainingBytes = "second-content".getBytes(StandardCharsets.UTF_8).length;
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/trash", firstAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "先删除第一份"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(delete("/api/employee/files/{attachmentRefId}", firstAttachmentRefId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(delete("/api/employee/files/{attachmentRefId}", firstAttachmentRefId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message", containsString("附件引用不存在")));
+
+        assertEquals(remainingBytes, usedBytes("USER", EMPLOYEE_USER_ID));
+        assertEquals(remainingBytes, usedBytes("GLOBAL", null));
+        assertEquals(1L, fileCount("USER", EMPLOYEE_USER_ID));
+        assertEquals(1L, fileCount("GLOBAL", null));
+    }
+
+
+    @Test
+    @DisplayName("个人空间不足时应在申请上传票据阶段明确拦截")
+    void uploadTicketShouldRejectWhenPersonalQuotaIsInsufficient() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedQuotaPolicy("USER_DEFAULT_1B", "USER_DEFAULT", null, 1L);
+
+        byte[] content = "too-large".getBytes(StandardCharsets.UTF_8);
+
+        createUploadTicket(employeeSession, "空间不足.txt", content.length, sha256(content))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(507))
+            .andExpect(jsonPath("$.message", containsString("个人云空间不足")));
+    }
+
+    @Test
+    @DisplayName("同一客户端请求ID重复申请上传票据应返回同一张票据")
+    void uploadTicketShouldBeIdempotentByClientRequestId() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "idempotent-upload-ticket".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+        String clientRequestId = "same-upload-request";
+
+        MvcResult firstResult = createUploadTicket(employeeSession, "幂等上传.txt", content.length, sha256, clientRequestId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        MvcResult secondResult = createUploadTicket(employeeSession, "幂等上传.txt", content.length, sha256, clientRequestId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        assertEquals(data(firstResult).get("uploadTicketId").asLong(), data(secondResult).get("uploadTicketId").asLong());
+        assertEquals(data(firstResult).get("objectKey").asText(), data(secondResult).get("objectKey").asText());
+
+        Integer ticketCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_upload_ticket WHERE client_request_id = ?",
+            Integer.class,
+            clientRequestId
+        );
+        assertEquals(1, ticketCount);
+    }
+
+    @Test
+    @DisplayName("确认上传时不能篡改上传票据中的业务归属")
+    void confirmUploadShouldRejectWhenOwnerDoesNotMatchTicket() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "owner-mismatch-content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        MvcResult ticketResult = createUploadTicket(employeeSession, "归属校验.txt", content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        mockMvc.perform(post("/api/employee/files/confirm-upload")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "uploadTicketId": %s,
+                      "objectKey": "%s",
+                      "contentSha256": "%s",
+                      "fileSize": %s,
+                      "ownerType": "WF_REQUEST",
+                      "ownerId": 90001,
+                      "displayName": "归属校验.txt"
+                    }
+                    """.formatted(uploadTicketId, objectKey, sha256, content.length)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(422))
+            .andExpect(jsonPath("$.message", containsString("业务归属不匹配")));
+    }
+
+    @Test
+    @DisplayName("员工和后台应能查询文件配额与存储摘要")
+    void userAndAdminShouldQueryQuotaAndStorageSummary() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie adminSession = loginAdmin();
+        seedDefaultQuotaPolicy();
+        createConfirmedPersonalFile(employeeSession, "空间统计.txt", "quota-content");
+
+        mockMvc.perform(get("/api/employee/files/quota")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.personalQuotaBytes").value(10737418240L))
+            .andExpect(jsonPath("$.data.personalUsedBytes").value("quota-content".getBytes(StandardCharsets.UTF_8).length))
+            .andExpect(jsonPath("$.data.orgPoolQuotaBytes").value(429496729600L))
+            .andExpect(jsonPath("$.data.uploadWritable").value(true));
+
+        mockMvc.perform(get("/api/admin/files/storage-summary")
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.orgPoolQuotaBytes").value(429496729600L))
+            .andExpect(jsonPath("$.data.orgPoolUsedBytes").value("quota-content".getBytes(StandardCharsets.UTF_8).length))
+            .andExpect(jsonPath("$.data.fileObjectCount").value(1))
+            .andExpect(jsonPath("$.data.attachmentRefCount").value(1));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createUploadTicket(
+            Cookie session,
+            String fileName,
+            long fileSize,
+            String sha256) throws Exception {
+        return createUploadTicket(session, fileName, fileSize, sha256, "file-test-" + System.nanoTime());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createUploadTicket(
+            Cookie session,
+            String fileName,
+            long fileSize,
+            String sha256,
+            String clientRequestId) throws Exception {
+        return mockMvc.perform(post("/api/employee/files/upload-tickets")
+            .cookie(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "ownerType": "PERSONAL_FILE",
+                  "ownerId": null,
+                  "fileName": "%s",
+                  "mimeType": "text/plain",
+                  "fileSize": %s,
+                  "contentSha256": "%s",
+                  "contentMd5": null,
+                  "clientRequestId": "%s"
+                }
+                """.formatted(fileName, fileSize, sha256, clientRequestId)));
+    }
+
+    private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, String text) throws Exception {
+        byte[] content = text.getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+        MvcResult ticketResult = createUploadTicket(employeeSession, fileName, content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        MvcResult confirmResult = mockMvc.perform(post("/api/employee/files/confirm-upload")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "uploadTicketId": %s,
+                      "objectKey": "%s",
+                      "contentSha256": "%s",
+                      "fileSize": %s,
+                      "ownerType": "PERSONAL_FILE",
+                      "ownerId": null,
+                      "displayName": "%s"
+                    }
+                    """.formatted(uploadTicketId, objectKey, sha256, content.length, fileName)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        return data(confirmResult).get("attachmentRefId").asLong();
+    }
+
+    private void seedDefaultQuotaPolicy() {
+        seedQuotaPolicy("USER_DEFAULT_10G", "USER_DEFAULT", null, 10L * 1024L * 1024L * 1024L);
+        seedQuotaPolicy("GLOBAL_400G", "GLOBAL", null, 400L * 1024L * 1024L * 1024L);
+    }
+
+    private void seedQuotaPolicy(String policyCode, String scopeType, Long scopeId, long quotaBytes) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_storage_quota_policy
+                (id, policy_code, policy_name, scope_type, scope_id, quota_bytes,
+                 cache_quota_bytes, warning_threshold, block_threshold, status)
+            VALUES
+                (?, ?, ?, ?, ?, ?, NULL, 0.8, 1.0, 'ENABLED')
+            """, System.nanoTime(), policyCode, policyCode, scopeType, scopeId, quotaBytes);
+    }
+
+    private JsonNode data(MvcResult result) throws Exception {
+        JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
+        return root.get("data");
+    }
+
+    private void assertAuditCountAtLeast(String actionType, int expectedMin) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_audit_log WHERE action_type = ?",
+            Integer.class,
+            actionType
+        );
+        assertTrue(count != null && count >= expectedMin, "应写入审计动作: " + actionType);
+    }
+
+    private long usedBytes(String scopeType, Long scopeId) {
+        Long value = jdbcTemplate.query("""
+            SELECT used_bytes FROM sys_storage_usage
+            WHERE scope_type = ? AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
+            """,
+            rs -> rs.next() ? rs.getLong("used_bytes") : 0L,
+            scopeType,
+            scopeId,
+            scopeId
+        );
+        return value == null ? 0L : value;
+    }
+
+    private long fileCount(String scopeType, Long scopeId) {
+        Long value = jdbcTemplate.query("""
+            SELECT file_count FROM sys_storage_usage
+            WHERE scope_type = ? AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
+            """,
+            rs -> rs.next() ? rs.getLong("file_count") : 0L,
+            scopeType,
+            scopeId,
+            scopeId
+        );
+        return value == null ? 0L : value;
+    }
+
+    private Cookie loginEmployee() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "zhangsan.employee",
+                      "password": "Employee@123456"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(cookie().exists("SESSION"))
+            .andReturn();
+        return result.getResponse().getCookie("SESSION");
+    }
+
+    private Cookie loginAdmin() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/admin/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "admin.demo",
+                      "password": "Admin@123456"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(cookie().exists("SESSION"))
+            .andReturn();
+        return result.getResponse().getCookie("SESSION");
+    }
+
+    private void writeLocalObject(String objectKey, byte[] content) throws Exception {
+        Path target = Path.of(localRoot).resolve(objectKey);
+        Files.createDirectories(target.getParent());
+        Files.write(target, content);
+    }
+
+    private static String sha256(byte[] content) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+    }
+}

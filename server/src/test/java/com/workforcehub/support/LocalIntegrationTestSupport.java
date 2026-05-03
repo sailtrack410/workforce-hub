@@ -95,6 +95,12 @@ public abstract class LocalIntegrationTestSupport {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
         try {
+            jdbcTemplate.execute("DELETE FROM sys_download_ticket");
+            jdbcTemplate.execute("DELETE FROM sys_storage_usage");
+            jdbcTemplate.execute("DELETE FROM sys_storage_quota_policy");
+            jdbcTemplate.execute("DELETE FROM sys_upload_ticket");
+            jdbcTemplate.execute("DELETE FROM sys_attachment_ref");
+            jdbcTemplate.execute("DELETE FROM sys_file_object");
             jdbcTemplate.execute("DELETE FROM hr_employee_event");
             jdbcTemplate.execute("DELETE FROM auth_user_account");
             jdbcTemplate.execute("DELETE FROM org_department_leader");

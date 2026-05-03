@@ -9,13 +9,15 @@
 | 适用范围 | 两段式上传、文件去重、配额查询、下载票据、回收站、后台配额治理 |
 | 对应模块 | `server/module-file` |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 开发前契约，后续实现与自动化测试以本文档为准 |
+| 当前状态 | 契约已收口；员工端主链路与后台存储摘要已完成第一批后端实现 |
 
 ---
 
 ## 二、接口范围
 
 本文档覆盖以下 `17` 个接口。
+
+当前第一批已实现 `8` 个接口：员工端 `7` 个主链路接口，以及后台端 `GET /api/admin/files/storage-summary`。其余后台上传、配额策略、回收站治理和清理任务仍是后续实现契约。
 
 ### 1. 员工端
 
@@ -29,16 +31,16 @@
 
 ### 2. 后台端
 
-- `POST /api/admin/files/upload-tickets`
-- `POST /api/admin/files/confirm-upload`
-- `GET /api/admin/files/storage-summary`
-- `GET /api/admin/files/quota-policies`
-- `POST /api/admin/files/quota-policies`
-- `PUT /api/admin/files/quota-policies/{id}`
-- `GET /api/admin/files/recycle-bin`
-- `POST /api/admin/files/recycle-bin/{attachmentRefId}/restore`
-- `DELETE /api/admin/files/recycle-bin/{attachmentRefId}`
-- `POST /api/admin/files/cleanup-jobs/run`
+- `POST /api/admin/files/upload-tickets`（契约，待实现）
+- `POST /api/admin/files/confirm-upload`（契约，待实现）
+- `GET /api/admin/files/storage-summary`（已实现）
+- `GET /api/admin/files/quota-policies`（契约，待实现）
+- `POST /api/admin/files/quota-policies`（契约，待实现）
+- `PUT /api/admin/files/quota-policies/{id}`（契约，待实现）
+- `GET /api/admin/files/recycle-bin`（契约，待实现）
+- `POST /api/admin/files/recycle-bin/{attachmentRefId}/restore`（契约，待实现）
+- `DELETE /api/admin/files/recycle-bin/{attachmentRefId}`（契约，待实现）
+- `POST /api/admin/files/cleanup-jobs/run`（契约，待实现）
 
 ---
 
