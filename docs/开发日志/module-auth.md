@@ -460,3 +460,121 @@ Key 格式：`auth:login:fail:{loginType}:{loginName}`，TTL 30 分钟。失败 
 - 后台管理员的邮箱验证码相关接口（暂未实现，按需求第一版后台用账号密码即可）
 
 ---
+
+## 2026-05-03 真实 SMTP 冒烟入口补齐
+
+### 改动背景
+
+第 5 审和第 16 审都把“真实网易 SMTP 发信冒烟”列为后续收口项。前面已经补齐了 `smtp.163.com:465` 所需的 SSL、认证和超时配置，但还缺少一个可重复执行、不会把真实授权码写进仓库的冒烟入口。
+
+这类测试不能直接放进普通回归里自动执行，因为它会真的向外部邮箱发送邮件，也依赖服务商策略、网络出口和本机私有授权码。
+
+### 本次目标
+
+- 增加真实 SMTP 发信冒烟测试入口
+- 默认跳过，避免日常 `mvn test` 误发真实邮件
+- 通过环境变量显式开启，确保真实凭证只存在本机运行环境
+- 同步更新 `.env.example`、API 测试用例和骨架说明
+
+### 执行过程
+
+#### 1. 先验证缺口
+
+先执行：
+
+```bash
+cd server && mvn -Dtest=ModuleAuthMailSmtpSmokeTest test
+```
+
+当时仓库里还没有该测试类，Maven 返回“没有匹配测试”的失败。这说明真实 SMTP 冒烟还没有形成可执行入口。
+
+#### 2. 新增默认跳过的真实 SMTP 冒烟测试
+
+新增：
+
+- `server/src/test/java/com/workforcehub/auth/ModuleAuthMailSmtpSmokeTest.java`
+
+测试逻辑：
+
+- 只有 `MAIL_SMOKE_ENABLED=true` 时才启用
+- 启用后要求至少配置 `MAIL_HOST`、`MAIL_PORT`、`MAIL_USERNAME`、`MAIL_PASSWORD`
+- 收件人优先使用 `MAIL_SMOKE_TO`，未配置时退回 `MAIL_USERNAME`
+- 调用 `EmailCodeService.sendCode(email, "BIND")`
+- 验证 Redis 中写入 `auth:email:code:BIND:{email}`
+
+**意义**：
+
+- 真实 SMTP 联调可以复用同一条 Maven 命令
+- 日常集成测试不会误触发外部发信
+- 测试不需要知道真实验证码内容，只检查发送成功后业务侧状态是否成立
+
+#### 3. 更新环境变量样板
+
+在 `.env.example` 中补充：
+
+- `MAIL_SMOKE_ENABLED=false`
+- `MAIL_SMOKE_TO=`
+
+**意义**：
+
+- 把“真实发信默认关闭”写进变量样板
+- 明确 `MAIL_SMOKE_TO` 是冒烟测试专用收件人，不和业务配置混在一起
+
+#### 4. 更新 API 测试用例和骨架说明
+
+在 `docs/API与测试/module-auth/API测试用例_module-auth认证接口.md` 中补充：
+
+- `AUTH-MAIL-SMOKE-001`
+- `ModuleAuthMailSmtpSmokeTest`
+- 真实 SMTP 冒烟执行命令示例
+- 授权码只能走本机环境变量或 IDE 运行配置，不能写入仓库
+
+在 `docs/架构与设计/后端工程骨架说明.md` 中补充真实 SMTP 冒烟入口说明。
+
+**意义**：
+
+- 后续回看测试文档时能知道“Mock 邮件回归”和“真实 SMTP 冒烟”是两类不同验证
+- 骨架说明能直接指向真实发信验证方式
+
+#### 5. 默认跳过验证
+
+执行：
+
+```bash
+cd server && mvn -Dtest=ModuleAuthMailSmtpSmokeTest test
+```
+
+结果：
+
+- `Tests run: 1`
+- `Failures: 0`
+- `Errors: 0`
+- `Skipped: 1`
+- `BUILD SUCCESS`
+
+**意义**：
+
+- 证明普通回归不会误发真实邮件
+- 也证明测试类可以正常被 Maven 发现和编译
+
+### 当前结果
+
+- 真实 SMTP 冒烟入口已落地
+- 默认回归安全，不会向外部邮箱发信
+- 真实联调命令已沉淀到测试用例文档
+- 真实授权码仍不进入仓库文件
+
+### 改动文件清单
+
+- `.env.example`
+- `server/src/test/java/com/workforcehub/auth/ModuleAuthMailSmtpSmokeTest.java`
+- `docs/API与测试/module-auth/API测试用例_module-auth认证接口.md`
+- `docs/架构与设计/后端工程骨架说明.md`
+- `docs/开发日志/module-auth.md`
+
+### 已知待补项
+
+- 真实网易 SMTP 现场发信需要在本机 shell 或 IDE 中注入私有授权码后执行，不能把授权码写入命令记录或仓库文件
+- 如果后续要把邮件能力纳入部署健康检查，需要同步打开 `MAIL_HEALTH_ENABLED=true` 并在部署文档里明确告警语义
+
+---

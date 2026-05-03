@@ -121,6 +121,7 @@
 | `AUTH-MAIL-002` | P0 | `POST /api/employee/auth/email/send-code` | 同邮箱同用途短时间内重复发送 | 已成功发送一次验证码 | 再次发送相同请求 | HTTP `200`；`code=429`；提示发送过频 |
 | `AUTH-MAIL-003` | P0 | `POST /api/employee/auth/email/bind` | 员工正常绑定邮箱 | 已登录员工账号 A；已拿到绑定验证码 | `email + code` | HTTP `200`；`code=0`；数据库邮箱被更新 |
 | `AUTH-MAIL-004` | P1 | `POST /api/employee/auth/email/bind` | 未登录绑定邮箱 | 无会话 | `email + code` | HTTP `401`；`code=401` |
+| `AUTH-MAIL-SMOKE-001` | P1 | `EmailCodeService.sendCode` | 真实 SMTP 发信冒烟 | 显式配置 `MAIL_SMOKE_ENABLED=true`、真实 SMTP 变量、MySQL、Redis | `purpose=BIND` | Maven 用例通过；收件邮箱能收到验证码；Redis 写入验证码 |
 
 ## 6.4 密码重置
 
@@ -147,6 +148,7 @@
 当前仓库已落地自动化用例：
 
 - `server/src/test/java/com/workforcehub/auth/ModuleAuthApiIntegrationTest.java`
+- `server/src/test/java/com/workforcehub/auth/ModuleAuthMailSmtpSmokeTest.java`
 
 当前自动化已覆盖：
 
@@ -158,6 +160,25 @@
 - 密码重置
 - 登录失败频控
 - 生命周期不允许登录
+- 真实 SMTP 发信冒烟入口（默认跳过，避免日常回归误发邮件）
+
+真实 SMTP 冒烟执行命令示例：
+
+```bash
+cd server
+MAIL_SMOKE_ENABLED=true \
+MAIL_HOST=smtp.163.com \
+MAIL_PORT=465 \
+MAIL_USERNAME=yourname@163.com \
+MAIL_PASSWORD=your_smtp_authorization_code \
+MAIL_SMTP_AUTH=true \
+MAIL_SMTP_SSL_ENABLE=true \
+MAIL_SMTP_STARTTLS=false \
+MAIL_SMOKE_TO=yourname@163.com \
+mvn -Dtest=ModuleAuthMailSmtpSmokeTest test
+```
+
+注意：真实授权码只能通过本机环境变量、IDE 运行配置或本机 `.env` 注入，不写入仓库文件。
 
 ---
 
