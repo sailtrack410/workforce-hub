@@ -1,10 +1,10 @@
 package com.workforcehub.support;
 
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,13 +14,13 @@ import org.springframework.test.context.DynamicPropertySource;
 import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 /**
  * 本地集成测试支撑基类
  * - 统一注入本地 MySQL / Redis 连接参数
  * - 在测试开始前装载 module-org 冒烟种子数据
  */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class LocalIntegrationTestSupport {
 
     private static final String MYSQL_URL_TEMPLATE =
@@ -51,6 +51,9 @@ public abstract class LocalIntegrationTestSupport {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> String.format(
@@ -72,13 +75,20 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("logging.level.com.workforcehub", () -> "info");
     }
 
-    @BeforeAll
+    @BeforeEach
     void seedDatabase() {
+        resetRedisState();
         resetBusinessTables();
         ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
         populator.setSqlScriptEncoding("UTF-8");
         populator.addScript(resolveSeedScript());
         DatabasePopulatorUtils.execute(populator, dataSource);
+    }
+
+    private void resetRedisState() {
+        deleteKeys("workforce:test:session*");
+        deleteKeys("auth:login:fail:*");
+        deleteKeys("auth:email:*");
     }
 
     private void resetBusinessTables() {
@@ -131,5 +141,12 @@ public abstract class LocalIntegrationTestSupport {
             return FLOWABLE_TEST_EXCLUDES;
         }
         return existing + "," + FLOWABLE_TEST_EXCLUDES;
+    }
+
+    private void deleteKeys(String pattern) {
+        Set<String> keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
     }
 }

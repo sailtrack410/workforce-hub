@@ -4,6 +4,129 @@
 
 ---
 
+## 2026-05-02 module-auth 认证联测与文档闭环
+
+### 改动背景
+
+虽然 `module-auth` 的登录、`me`、邮箱验证码、绑定邮箱、密码重置代码已经基本落位，但当前仍存在两个明显缺口：
+
+- 还没有一套正式的自动化联测去证明认证主链路真的可回归
+- 文档层只有系统级接口清单，没有 `module-auth` 专属 API 文档、测试用例和阶段性过程记录
+
+这会带来一个很现实的问题：代码看起来“差不多有了”，但后续一旦改动登录频控、生命周期准入、验证码逻辑，很容易在没人察觉的情况下回归掉。
+
+### 本次目标
+
+- 为 `module-auth` 建立正式自动化联测
+- 补齐认证接口 API 文档与测试用例文档
+- 顺手收口认证链路里被联测打出来的真实问题
+- 确保新的测试支撑方式不会破坏现有 `module-org` 基线
+
+### 执行过程
+
+#### 1. 把本地集成测试支撑升级为“每测例复位”
+
+- `LocalIntegrationTestSupport`
+  - 种子装载由“每个测试类一次”改为“每个测试用例一次”
+  - 每次用例前先清空测试库业务表
+  - 每次用例前再清理 Redis 中的：
+    - `workforce:test:session*`
+    - `auth:login:fail:*`
+    - `auth:email:*`
+
+**意义**：
+- 避免不同认证用例之间因为会话、验证码、登录失败计数互相串状态
+- 也让现有 `module-org` 测试从“靠唯一后缀规避串测”进一步升级为“天然可重复执行”
+
+#### 2. 落地 `module-auth` 自动化联测
+
+新增：
+
+- `server/src/test/java/com/workforcehub/auth/ModuleAuthApiIntegrationTest.java`
+
+本轮覆盖 `8` 个核心场景：
+
+- 后台管理员登录 + `me`
+- 员工登录 + `me` + `logout`
+- 未登录访问 `me` 与 `email/bind`
+- 验证码发送与重发频控
+- 邮箱绑定成功回写账号邮箱
+- 密码重置后新密码立即生效
+- 连续输错密码触发登录频控锁定
+- 员工生命周期不允许登录时返回明确提示
+
+其中邮件发送器在测试中使用 Mock，不依赖真实 SMTP 服务。
+
+**意义**：
+- 现在 `module-auth` 不再只是“有接口”，而是已经进入可自动回归状态
+- 后续如果有人改坏登录、验证码或密码链路，测试会直接报警
+
+#### 3. 联测打出并修复生命周期登录提示语丢失问题
+
+联测第一次执行时，发现一个真实问题：
+
+- `EmployeeUserDetailsService` 里已经区分了 `PENDING_ONBOARD`、`OFFBOARDED` 等状态提示
+- 但进入 Spring Security 后被包装成 `InternalAuthenticationServiceException`
+- 最终前端只能拿到通用错误，生命周期语义没有真正透出
+
+本轮修复：
+
+- 新增 `EmploymentLoginBlockedException`
+- 生命周期不允许登录时显式抛出该异常
+- `LoginService` 中识别 `InternalAuthenticationServiceException` 的 `cause`
+- 对应返回：
+  - `403`
+  - 明确文案，如 `员工已离职，无法登录`
+
+**意义**：
+- 让员工生命周期规则真正从领域逻辑落到接口契约
+- 后续审批、组织变更、账号治理如果继续依赖生命周期状态，这条语义链路不会再被吞掉
+
+#### 4. 补齐认证接口文档与系统级引用
+
+新增：
+
+- `docs/API与测试/module-auth/API文档_module-auth认证接口.md`
+- `docs/API与测试/module-auth/API测试用例_module-auth认证接口.md`
+
+同步更新：
+
+- `docs/架构与设计/接口与事件清单.md`
+- `docs/架构与设计/后端工程骨架说明.md`
+
+**意义**：
+- `module-auth` 现在也有了和 `module-org` 一致的文档形态
+- 系统级接口清单、骨架说明、模块级 API 文档之间形成闭环
+
+### 验证结果
+
+执行：
+
+- `cd server && mvn -DskipTests compile`
+- `cd server && mvn -Dtest=ModuleAuthApiIntegrationTest test`
+- `cd server && mvn -Dtest=ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest test`
+
+结果：
+
+- 编译通过
+- `module-auth` `8` 个联测场景通过
+- `module-org` 读写联合 `10` 个场景继续通过
+
+### 当前结果
+
+- `module-auth` 已正式具备自动化联测基线
+- 认证接口已有专属 API 文档与测试用例文档
+- 生命周期不允许登录时已能返回明确业务提示
+- 新的测试支撑方式没有破坏现有 `module-org` 基线
+
+### 已知待补项
+
+- 真实网易 SMTP 仍未做一次发信冒烟验证
+- 当前后台管理员 `me` 还没有带角色权限摘要
+- 当前还没有 `module-auth` 前端页面或前端联调产物
+
+---
+
 ## 2026-05-01 真实 SMTP 兼容与环境变量样板补齐
 
 ### 改动背景

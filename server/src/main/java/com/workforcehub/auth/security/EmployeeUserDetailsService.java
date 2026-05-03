@@ -63,7 +63,7 @@ public class EmployeeUserDetailsService implements UserDetailsService {
                 case "OFFBOARDED" -> "员工已离职，无法登录";
                 default -> "当前员工状态不允许登录";
             };
-            throw new UsernameNotFoundException(message);
+            throw new EmploymentLoginBlockedException(message);
         }
 
         return new EmployeeUserDetails(
@@ -76,4 +76,3 @@ public class EmployeeUserDetailsService implements UserDetailsService {
         );
     }
 }
-

@@ -5,6 +5,7 @@ import com.workforcehub.auth.dto.LoginRequest;
 import com.workforcehub.auth.dto.LoginResponse;
 import com.workforcehub.auth.mapper.AuthUserAccountMapper;
 import com.workforcehub.auth.mapper.AdminUserMapper;
+import com.workforcehub.auth.security.EmploymentLoginBlockedException;
 import com.workforcehub.auth.security.WfhAuthenticationProvider;
 import com.workforcehub.auth.security.WfhUserDetails;
 import com.workforcehub.common.enums.UserType;
@@ -17,6 +18,7 @@ import org.springframework.security.authentication.AccountExpiredException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -94,6 +96,17 @@ public class LoginService {
             log.warn("登录失败 userType={} loginName={} failCount={} remaining={}",
                 userType, loginName, failCount, remaining);
             throw new BizException(401, "用户名或密码错误，剩余尝试次数 " + remaining);
+        } catch (InternalAuthenticationServiceException e) {
+            if (e.getCause() instanceof EmploymentLoginBlockedException blocked) {
+                log.warn("员工生命周期状态不允许登录 userType={} loginName={} message={}",
+                    userType, loginName, blocked.getMessage());
+                throw new BizException(403, blocked.getMessage());
+            }
+            throw e;
+        } catch (EmploymentLoginBlockedException e) {
+            log.warn("员工生命周期状态不允许登录 userType={} loginName={} message={}",
+                userType, loginName, e.getMessage());
+            throw new BizException(403, e.getMessage());
         } catch (LockedException e) {
             // 账号在数据库层面已被标记为锁定
             log.warn("账号已锁定 userType={} loginName={}", userType, loginName);
