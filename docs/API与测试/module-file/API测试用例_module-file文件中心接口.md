@@ -157,6 +157,7 @@
 | `FILE-UP-005` | P0 | `POST /api/employee/files/upload-tickets` | 个人空间不足时拦截 | 员工 A 已登录；个人配额调小 | `FILE-B1` | HTTP `507`；提示个人云空间不足 |
 | `FILE-UP-006` | P0 | `POST /api/employee/files/upload-tickets` | 企业总池不足时拦截 | 企业总池已满 | `FILE-B1` | HTTP `507`；提示企业文件总空间不足 |
 | `FILE-UP-007` | P1 | `POST /api/employee/files/upload-tickets` | 重复 `Idempotency-Key` 返回同一票据 | 员工 A 已登录 | 同一请求头和请求体重复提交 | HTTP `200`；返回同一 `uploadTicketId` |
+| `FILE-UP-008` | P0 | `POST /api/employee/files/upload-tickets` | 员工端第一版拒绝跨业务归属 | 员工 A 已登录 | `ownerType=WF_REQUEST`、`ownerId=90001` | HTTP `200`；`code=400`；提示员工端第一版仅支持个人文件 |
 
 ## 6.2 上传确认与去重
 
@@ -169,6 +170,7 @@
 | `FILE-CFM-005` | P0 | 服务层并发用例 | 同一文件并发确认只生成一条物理对象 | 两个票据指向同一 hash 和大小 | 并发确认 | 仅一条 `sys_file_object`；两条 `sys_attachment_ref` |
 | `FILE-CFM-006` | P1 | `POST /api/employee/files/confirm-upload` | 票据过期后不能确认 | 票据已过期 | 确认请求 | HTTP `409`；提示上传票据已过期 |
 | `FILE-CFM-007` | P1 | `POST /api/employee/files/confirm-upload` | 非票据创建人不能确认 | 员工 B 登录 | 员工 A 的票据 | HTTP `403`；提示无权确认该上传票据 |
+| `FILE-CFM-008` | P0 | `POST /api/employee/files/confirm-upload` | 待确认状态下重复确认仍保持幂等 | 已有 `source_upload_ticket_id` 附件引用；票据状态异常回到待确认 | 同一确认请求再次提交 | HTTP `200`；返回原 `attachmentRefId`；附件引用和用量账本不重复 |
 
 ## 6.3 配额查询
 

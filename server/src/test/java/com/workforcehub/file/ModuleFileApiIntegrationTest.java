@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
+import org.springframework.dao.DuplicateKeyException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ import java.util.HexFormat;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -54,6 +56,33 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
+
+    @Test
+    @DisplayName("员工端上传第一版应拒绝非个人文件归属")
+    void employeeUploadTicketShouldRejectBusinessOwnerType() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "workflow-attachment-content".getBytes(StandardCharsets.UTF_8);
+
+        mockMvc.perform(post("/api/employee/files/upload-tickets")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "ownerType": "WF_REQUEST",
+                      "ownerId": 90001,
+                      "fileName": "审批附件.txt",
+                      "mimeType": "text/plain",
+                      "fileSize": %s,
+                      "contentSha256": "%s",
+                      "contentMd5": null,
+                      "clientRequestId": "wf-owner-should-reject"
+                    }
+                    """.formatted(content.length, sha256(content))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message", containsString("员工端第一版仅支持个人文件")));
+    }
 
     @Test
     @DisplayName("员工应能完成 LOCAL 上传票据、确认上传、秒传与下载票据闭环")
@@ -388,6 +417,58 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
 
     @Test
+    @DisplayName("上传票据重复确认即使读到待确认状态也只能生成一条附件引用")
+    void confirmUploadShouldBeIdempotentWhenTicketStatusIsStale() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "stale-confirm-content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        MvcResult ticketResult = createUploadTicket(employeeSession, "并发确认.txt", content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        Long firstAttachmentRefId = data(confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, "并发确认.txt")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn()).get("attachmentRefId").asLong();
+
+        jdbcTemplate.update("""
+            UPDATE sys_upload_ticket
+            SET status = 'PENDING', confirmed_at = NULL
+            WHERE id = ?
+            """, uploadTicketId);
+
+        confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, "并发确认.txt")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(firstAttachmentRefId));
+
+        Integer attachmentCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_attachment_ref WHERE source_upload_ticket_id = ? AND is_deleted = 0",
+            Integer.class,
+            uploadTicketId
+        );
+        assertEquals(1, attachmentCount);
+        assertEquals(content.length, usedBytes("USER", EMPLOYEE_USER_ID));
+        assertEquals(content.length, usedBytes("GLOBAL", null));
+        assertEquals(1L, fileCount("USER", EMPLOYEE_USER_ID));
+        assertEquals(1L, fileCount("GLOBAL", null));
+
+        String ticketStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM sys_upload_ticket WHERE id = ?",
+            String.class,
+            uploadTicketId
+        );
+        assertEquals("CONFIRMED", ticketStatus);
+    }
+
+    @Test
     @DisplayName("个人空间不足时应在申请上传票据阶段明确拦截")
     void uploadTicketShouldRejectWhenPersonalQuotaIsInsufficient() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -649,6 +730,45 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("数据库应约束空作用域配额策略不能重复")
+    void databaseShouldRejectDuplicateNullScopeQuotaPolicy() {
+        insertQuotaPolicy("GLOBAL_A", "GLOBAL", null, 1024L);
+
+        assertThrows(DuplicateKeyException.class,
+            () -> insertQuotaPolicy("GLOBAL_B", "GLOBAL", null, 2048L));
+    }
+
+    @Test
+    @DisplayName("数据库应约束空作用域用量账本不能重复")
+    void databaseShouldRejectDuplicateNullScopeUsage() {
+        insertUsage("GLOBAL", null, 1024L, 1);
+
+        assertThrows(DuplicateKeyException.class,
+            () -> insertUsage("GLOBAL", null, 2048L, 1));
+    }
+
+    @Test
+    @DisplayName("集成测试重置应清理审计日志避免历史数据误报")
+    void integrationTestResetShouldClearAuditLog() throws Exception {
+        jdbcTemplate.update("""
+            INSERT INTO sys_audit_log
+                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
+            VALUES
+                (?, 'SYSTEM', NULL, 'TEST_AUDIT_RESET', 'TEST', 1, 'SUCCESS', CAST('{}' AS JSON))
+            """, System.nanoTime());
+
+        java.lang.reflect.Method seedDatabase = LocalIntegrationTestSupport.class.getDeclaredMethod("seedDatabase");
+        seedDatabase.setAccessible(true);
+        seedDatabase.invoke(this);
+
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_audit_log WHERE action_type = 'TEST_AUDIT_RESET'",
+            Integer.class
+        );
+        assertEquals(0, count);
+    }
+
+    @Test
     @DisplayName("后台不能重复创建相同编码的配额策略")
     void adminQuotaPolicyShouldRejectDuplicatePolicyCode() throws Exception {
         Cookie adminSession = loginAdmin();
@@ -739,24 +859,34 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         String objectKey = ticketData.get("objectKey").asText();
         writeLocalObject(objectKey, content);
 
-        MvcResult confirmResult = mockMvc.perform(post("/api/employee/files/confirm-upload")
-                .cookie(employeeSession)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {
-                      "uploadTicketId": %s,
-                      "objectKey": "%s",
-                      "contentSha256": "%s",
-                      "fileSize": %s,
-                      "ownerType": "PERSONAL_FILE",
-                      "ownerId": null,
-                      "displayName": "%s"
-                    }
-                    """.formatted(uploadTicketId, objectKey, sha256, content.length, fileName)))
+        MvcResult confirmResult = confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, fileName)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return data(confirmResult).get("attachmentRefId").asLong();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions confirmUpload(
+            Cookie employeeSession,
+            Long uploadTicketId,
+            String objectKey,
+            String sha256,
+            long fileSize,
+            String displayName) throws Exception {
+        return mockMvc.perform(post("/api/employee/files/confirm-upload")
+            .cookie(employeeSession)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "uploadTicketId": %s,
+                  "objectKey": "%s",
+                  "contentSha256": "%s",
+                  "fileSize": %s,
+                  "ownerType": "PERSONAL_FILE",
+                  "ownerId": null,
+                  "displayName": "%s"
+                }
+                """.formatted(uploadTicketId, objectKey, sha256, fileSize, displayName)));
     }
 
     private void seedDefaultQuotaPolicy() {
@@ -765,6 +895,10 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private void seedQuotaPolicy(String policyCode, String scopeType, Long scopeId, long quotaBytes) {
+        insertQuotaPolicy(policyCode, scopeType, scopeId, quotaBytes);
+    }
+
+    private void insertQuotaPolicy(String policyCode, String scopeType, Long scopeId, long quotaBytes) {
         jdbcTemplate.update("""
             INSERT INTO sys_storage_quota_policy
                 (id, policy_code, policy_name, scope_type, scope_id, quota_bytes,
@@ -772,6 +906,15 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             VALUES
                 (?, ?, ?, ?, ?, ?, NULL, 0.8, 1.0, 'ENABLED')
             """, System.nanoTime(), policyCode, policyCode, scopeType, scopeId, quotaBytes);
+    }
+
+    private void insertUsage(String scopeType, Long scopeId, long usedBytes, long fileCount) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_storage_usage
+                (id, scope_type, scope_id, used_bytes, cache_used_bytes, file_count)
+            VALUES
+                (?, ?, ?, ?, 0, ?)
+            """, System.nanoTime(), scopeType, scopeId, usedBytes, fileCount);
     }
 
     private JsonNode data(MvcResult result) throws Exception {

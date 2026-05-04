@@ -105,15 +105,17 @@ http://localhost:8080
 
 #### ownerType
 
+第一版员工端上传仅开放 `PERSONAL_FILE`。其他 `ownerType` 作为跨模块附件归属枚举保留，需等消息、文档、审批、知识库或 Agent 模块提供归属存在性与授权校验后，再通过专门入口开放。
+
 | 值 | 含义 |
 | --- | --- |
-| `PERSONAL_FILE` | 个人文件 |
-| `IM_MESSAGE` | 消息附件 |
-| `IM_GROUP_FILE` | 群文件 |
-| `DOC_DOCUMENT` | 文档文件 |
-| `KB_DOCUMENT` | 知识库原文件 |
-| `WF_REQUEST` | 审批附件 |
-| `AGENT_TEMP` | Agent 临时产物 |
+| `PERSONAL_FILE` | 个人文件，员工端第一版已开放 |
+| `IM_MESSAGE` | 消息附件，契约保留，待消息授权策略接入 |
+| `IM_GROUP_FILE` | 群文件，契约保留，待群组授权策略接入 |
+| `DOC_DOCUMENT` | 文档文件，契约保留，待文档空间授权策略接入 |
+| `KB_DOCUMENT` | 知识库原文件，契约保留，待知识库权限策略接入 |
+| `WF_REQUEST` | 审批附件，契约保留，待审批单授权策略接入 |
+| `AGENT_TEMP` | Agent 临时产物，契约保留，待 Agent 工具权限策略接入 |
 
 #### scopeType
 
@@ -174,8 +176,8 @@ http://localhost:8080
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `ownerType` | `string` | 是 | 文件归属业务类型 |
-| `ownerId` | `long/null` | 否 | 归属业务 ID，个人文件可为空或传个人空间 ID |
+| `ownerType` | `string` | 是 | 员工端第一版只允许 `PERSONAL_FILE` |
+| `ownerId` | `long/null` | 否 | 员工端第一版必须为空；跨模块附件需后续授权策略接入 |
 | `fileName` | `string` | 是 | 客户端原始文件名 |
 | `mimeType` | `string` | 是 | 客户端识别的 MIME |
 | `fileSize` | `long` | 是 | 文件大小，单位字节 |
@@ -187,8 +189,8 @@ http://localhost:8080
 
 ```json
 {
-  "ownerType": "IM_GROUP_FILE",
-  "ownerId": 3001,
+  "ownerType": "PERSONAL_FILE",
+  "ownerId": null,
   "fileName": "员工手册.pdf",
   "mimeType": "application/pdf",
   "fileSize": 2097152,
@@ -347,6 +349,7 @@ http://localhost:8080
 
 - 为员工端个人文件、消息附件、群文件、文档文件申请上传入口
 - 如果命中 `content_sha256 + file_size` 去重，可直接创建附件引用并返回秒传结果
+- 当前实现只允许员工端个人文件；消息、群文件、文档、审批、知识库附件需由后续业务模块接入授权策略后再开放
 
 请求体：
 
@@ -392,7 +395,8 @@ http://localhost:8080
 - 当前用户已登录且为员工身份
 - `fileSize > 0`
 - `contentSha256` 为合法 SHA-256
-- 文件类型和大小符合 `ownerType` 场景限制
+- `ownerType=PERSONAL_FILE` 且 `ownerId=null`
+- 文件类型和大小符合个人文件场景限制
 - 个人空间、目标空间、企业总池、存储后端真实容量均允许写入
 
 ### 6.2 确认上传完成

@@ -4,6 +4,73 @@
 
 ---
 
+## 2026-05-04 module-file 第22审风险复核修订
+
+### 改动背景
+
+第 22 审复核的是第一批后端骨架风险。由于当前代码已经推进到第二批，部分问题已经被第二批覆盖，例如真实下载入口已经落地；但仍有几类问题在当前 `HEAD` 下属实：
+
+- 员工端上传仍允许 `WF_REQUEST`、`IM_MESSAGE` 等跨业务归属类型
+- 同一上传票据在异常状态或并发确认下可能重复生成附件引用并重复加账
+- MySQL 唯一索引对 `scope_id = NULL` 无法约束全局配额和全局用量
+- 集成测试重置没有清理 `sys_audit_log`，审计断言存在历史数据误报风险
+
+### 红灯验证
+
+新增测试覆盖：
+
+- 员工端第一版拒绝非 `PERSONAL_FILE` 归属
+- 已有关联附件引用时，即使上传票据状态异常回到待确认，再次确认也必须返回原附件引用
+- 数据库层拒绝重复的 `GLOBAL` 空作用域配额策略
+- 数据库层拒绝重复的 `GLOBAL` 空作用域用量账本
+- 集成测试重置必须清理审计日志
+
+红灯结果：
+
+- `employeeUploadTicketShouldRejectBusinessOwnerType` 失败，实际返回 `code=0`
+- `confirmUploadShouldBeIdempotentWhenTicketStatusIsStale` 失败，实际创建了第二条附件引用
+- `databaseShouldRejectDuplicateNullScopeQuotaPolicy` 失败，重复 `GLOBAL` 配额策略未被数据库拒绝
+- `databaseShouldRejectDuplicateNullScopeUsage` 失败，重复 `GLOBAL` 用量账本未被数据库拒绝
+- `integrationTestResetShouldClearAuditLog` 失败，历史审计仍保留
+
+### 修订内容
+
+新增：
+
+- `server/src/main/resources/db/migration/V4__harden_file_center_idempotency.sql`
+
+修改：
+
+- `server/src/main/java/com/workforcehub/file/service/FileCenterService.java`
+- `server/src/test/java/com/workforcehub/file/ModuleFileApiIntegrationTest.java`
+- `server/src/test/java/com/workforcehub/support/LocalIntegrationTestSupport.java`
+- `docs/API与测试/module-file/API文档_module-file文件中心接口.md`
+- `docs/API与测试/module-file/API测试用例_module-file文件中心接口.md`
+
+关键修订：
+
+- 员工端上传和确认上传第一版只允许 `ownerType=PERSONAL_FILE` 且 `ownerId=null`
+- 上传确认在校验前先按 `source_upload_ticket_id` 回查已有附件引用，避免异常状态下重复加账
+- `sys_attachment_ref` 增加 `uk_attachment_upload_ticket_active`，数据库层保证同一上传票据只生成一条未删除附件引用
+- `sys_storage_quota_policy` 和 `sys_storage_usage` 增加 `scope_key` 生成列，用 `__NONE__` 表达空作用域，并重建唯一索引
+- `increaseUsage` 改为 `INSERT ... ON DUPLICATE KEY UPDATE`，避免用量行首次写入的先查再插并发窗口
+- 上传票据创建捕获 `clientRequestId` 唯一冲突后回查已有票据，避免并发重试冒成 `500`
+- 集成测试重置清理 `sys_audit_log`，审计断言不再被历史数据污染
+
+### 验证记录
+
+- `mvn -Dtest=ModuleFileApiIntegrationTest#employeeUploadTicketShouldRejectBusinessOwnerType,ModuleFileApiIntegrationTest#confirmUploadShouldBeIdempotentWhenTicketStatusIsStale,ModuleFileApiIntegrationTest#databaseShouldRejectDuplicateNullScopeQuotaPolicy,ModuleFileApiIntegrationTest#databaseShouldRejectDuplicateNullScopeUsage,ModuleFileApiIntegrationTest#integrationTestResetShouldClearAuditLog test`
+- `mvn -Dtest=ModuleFileApiIntegrationTest test`
+
+### 后续边界
+
+- `FileCenterService` 仍然偏大，下一批后台治理前建议继续拆 Repository 与 AuditService
+- `visibility_scope='OWNER'` 暂时只服务个人文件；跨业务附件开放前必须先定义 ownerType 到授权策略的映射
+- `uk_file_sha256_size_active` 的物理对象软删除语义留到清理任务阶段统一设计
+- MinIO 仍需真实容器端到端联调
+
+---
+
 ## 2026-05-04 module-file 第二批文件中心能力落地
 
 ### 改动背景

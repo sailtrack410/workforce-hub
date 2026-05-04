@@ -60,7 +60,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
-        validateOwnerType(request.getOwnerType());
+        validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
         ensurePersonalQuota(userId, request.getFileSize());
         ensureGlobalQuota(request.getFileSize());
         UploadTicketResponse existingTicket = findUploadTicketByClientRequestId(userId, request.getClientRequestId());
@@ -95,32 +95,40 @@ public class FileCenterService {
         String bucketName = provider.defaultBucketName();
         StorageUploadTarget uploadTarget = provider.buildUploadTarget(bucketName, objectKey, request.getMimeType(), 60);
 
-        jdbcTemplate.update("""
-            INSERT INTO sys_upload_ticket
-                (id, ticket_no, uploader_type, uploader_id, biz_type, biz_id,
-                 storage_provider, bucket_name, file_name, mime_type, file_size,
-                 content_md5, content_sha256, object_key, client_request_id,
-                 expire_at, status, created_by)
-            VALUES
-                (?, ?, 'USER', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
-            """,
-            ticketId,
-            ticketNo,
-            userId,
-            request.getOwnerType(),
-            request.getOwnerId(),
-            PROVIDER_LOCAL,
-            bucketName,
-            request.getFileName(),
-            request.getMimeType(),
-            request.getFileSize(),
-            blankToNull(request.getContentMd5()),
-            request.getContentSha256().toLowerCase(),
-            objectKey,
-            blankToNull(request.getClientRequestId()),
-            uploadTarget.expireAt(),
-            userId
-        );
+        try {
+            jdbcTemplate.update("""
+                INSERT INTO sys_upload_ticket
+                    (id, ticket_no, uploader_type, uploader_id, biz_type, biz_id,
+                     storage_provider, bucket_name, file_name, mime_type, file_size,
+                     content_md5, content_sha256, object_key, client_request_id,
+                     expire_at, status, created_by)
+                VALUES
+                    (?, ?, 'USER', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+                """,
+                ticketId,
+                ticketNo,
+                userId,
+                request.getOwnerType(),
+                request.getOwnerId(),
+                PROVIDER_LOCAL,
+                bucketName,
+                request.getFileName(),
+                request.getMimeType(),
+                request.getFileSize(),
+                blankToNull(request.getContentMd5()),
+                request.getContentSha256().toLowerCase(),
+                objectKey,
+                blankToNull(request.getClientRequestId()),
+                uploadTarget.expireAt(),
+                userId
+            );
+        } catch (DuplicateKeyException e) {
+            UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(userId, request.getClientRequestId());
+            if (concurrentTicket != null) {
+                return concurrentTicket;
+            }
+            throw e;
+        }
 
         UploadTicketResponse response = new UploadTicketResponse();
         response.setUploadTicketId(ticketId);
@@ -145,11 +153,12 @@ public class FileCenterService {
         if (!"USER".equals(ticket.uploaderType()) || !userId.equals(ticket.uploaderId())) {
             throw new BizException(403, "无权确认该上传票据");
         }
+        Long existingRefId = findAttachmentRefIdByTicket(ticket.id());
+        if (existingRefId != null) {
+            markUploadTicketConfirmed(ticket.id());
+            return buildAttachmentResponse(existingRefId, false);
+        }
         if ("CONFIRMED".equals(ticket.status())) {
-            Long existingRefId = findAttachmentRefIdByTicket(ticket.id());
-            if (existingRefId != null) {
-                return buildAttachmentResponse(existingRefId, false);
-            }
             throw new BizException(409, "上传票据已确认");
         }
         if (ticket.expireAt().isBefore(LocalDateTime.now())) {
@@ -165,6 +174,7 @@ public class FileCenterService {
         if (!ticket.bizType().equals(request.getOwnerType()) || !sameId(ticket.bizId(), request.getOwnerId())) {
             throw new BizException(422, "业务归属不匹配，请重新申请上传票据");
         }
+        validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
 
         storageProviderRegistry.require(ticket.storageProvider())
             .verifyObject(ticket.bucketName(), request.getObjectKey(), request.getContentSha256(), request.getFileSize());
@@ -179,23 +189,30 @@ public class FileCenterService {
             deduplicated = true;
         }
 
-        Long attachmentRefId = createAttachmentRef(
-            request.getOwnerType(),
-            request.getOwnerId(),
-            fileObject.id(),
-            ticket.id(),
-            ticket.fileName(),
-            request.getDisplayName(),
-            "USER",
-            userId
-        );
+        Long attachmentRefId;
+        try {
+            attachmentRefId = createAttachmentRef(
+                request.getOwnerType(),
+                request.getOwnerId(),
+                fileObject.id(),
+                ticket.id(),
+                ticket.fileName(),
+                request.getDisplayName(),
+                "USER",
+                userId
+            );
+        } catch (DuplicateKeyException e) {
+            Long concurrentRefId = findAttachmentRefIdByTicket(ticket.id());
+            if (concurrentRefId != null) {
+                markUploadTicketConfirmed(ticket.id());
+                return buildAttachmentResponse(concurrentRefId, false);
+            }
+            throw e;
+        }
         increaseFileRefCount(fileObject.id());
         increaseUsage("USER", userId, request.getFileSize(), 1);
         increaseUsage("GLOBAL", null, request.getFileSize(), 1);
-        jdbcTemplate.update(
-            "UPDATE sys_upload_ticket SET status = 'CONFIRMED', confirmed_at = NOW(), updated_at = NOW() WHERE id = ?",
-            ticket.id()
-        );
+        markUploadTicketConfirmed(ticket.id());
         audit("USER", userId, "FILE_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
         return buildAttachmentResponse(attachmentRefId, deduplicated);
@@ -533,13 +550,12 @@ public class FileCenterService {
         return response;
     }
 
-    private void validateOwnerType(String ownerType) {
-        if (!StringUtils.hasText(ownerType)) {
-            throw new BizException(400, "文件归属类型不能为空");
+    private void validateEmployeeOwner(String ownerType, Long ownerId) {
+        if (!"PERSONAL_FILE".equals(ownerType)) {
+            throw new BizException(400, "员工端第一版仅支持个人文件");
         }
-        if (!List.of("PERSONAL_FILE", "IM_MESSAGE", "IM_GROUP_FILE", "DOC_DOCUMENT", "KB_DOCUMENT", "WF_REQUEST", "AGENT_TEMP")
-            .contains(ownerType)) {
-            throw new BizException(400, "不支持的文件归属类型");
+        if (ownerId != null) {
+            throw new BizException(400, "个人文件不应指定业务归属ID");
         }
     }
 
@@ -850,29 +866,15 @@ public class FileCenterService {
     }
 
     private void increaseUsage(String scopeType, Long scopeId, Long bytes, int fileCount) {
-        Long existingId = jdbcTemplate.query("""
-            SELECT id FROM sys_storage_usage
-            WHERE scope_type = ? AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
-            """,
-            rs -> rs.next() ? rs.getLong("id") : null,
-            scopeType,
-            scopeId,
-            scopeId
-        );
-        if (existingId == null) {
-            jdbcTemplate.update("""
-                INSERT INTO sys_storage_usage
-                    (id, scope_type, scope_id, used_bytes, cache_used_bytes, file_count)
-                VALUES
-                    (?, ?, ?, ?, 0, ?)
-                """, IdWorker.getId(), scopeType, scopeId, bytes, fileCount);
-        } else {
-            jdbcTemplate.update("""
-                UPDATE sys_storage_usage
-                SET used_bytes = used_bytes + ?, file_count = file_count + ?
-                WHERE id = ?
-                """, bytes, fileCount, existingId);
-        }
+        jdbcTemplate.update("""
+            INSERT INTO sys_storage_usage
+                (id, scope_type, scope_id, used_bytes, cache_used_bytes, file_count)
+            VALUES
+                (?, ?, ?, ?, 0, ?)
+            ON DUPLICATE KEY UPDATE
+                used_bytes = used_bytes + VALUES(used_bytes),
+                file_count = file_count + VALUES(file_count)
+            """, IdWorker.getId(), scopeType, scopeId, bytes, fileCount);
     }
 
     private void releaseUsage(String scopeType, Long scopeId, Long bytes, int fileCount) {
@@ -903,6 +905,13 @@ public class FileCenterService {
         response.setHeaders(Map.of());
         response.setExpireAt(null);
         return response;
+    }
+
+    private void markUploadTicketConfirmed(Long ticketId) {
+        jdbcTemplate.update(
+            "UPDATE sys_upload_ticket SET status = 'CONFIRMED', confirmed_at = NOW(), updated_at = NOW() WHERE id = ?",
+            ticketId
+        );
     }
 
     private AttachmentRefResponse buildAttachmentResponse(Long attachmentRefId, boolean deduplicated) {
