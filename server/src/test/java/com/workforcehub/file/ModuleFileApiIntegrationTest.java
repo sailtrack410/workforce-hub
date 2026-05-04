@@ -483,6 +483,33 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("申请上传票据时应按场景策略拦截不支持的文件类型")
+    void uploadTicketShouldRejectUnsupportedFileType() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "unsafe-executable-content".getBytes(StandardCharsets.UTF_8);
+
+        createUploadTicket(employeeSession, "木马.exe", "application/x-msdownload", content.length, sha256(content))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(415))
+            .andExpect(jsonPath("$.message", containsString("当前场景不支持该文件类型")));
+    }
+
+    @Test
+    @DisplayName("申请上传票据时应按场景策略拦截超过大小上限的文件")
+    void uploadTicketShouldRejectWhenFileExceedsSceneLimit() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        long fileSize = 101L * 1024L * 1024L;
+        byte[] content = "oversized-content-fingerprint".getBytes(StandardCharsets.UTF_8);
+
+        createUploadTicket(employeeSession, "超大归档.zip", "application/zip", fileSize, sha256(content))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(413))
+            .andExpect(jsonPath("$.message", containsString("文件超过当前场景大小限制")));
+    }
+
+    @Test
     @DisplayName("同一客户端请求ID重复申请上传票据应返回同一张票据")
     void uploadTicketShouldBeIdempotentByClientRequestId() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -827,6 +854,25 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             long fileSize,
             String sha256,
             String clientRequestId) throws Exception {
+        return createUploadTicket(session, fileName, "text/plain", fileSize, sha256, clientRequestId);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createUploadTicket(
+            Cookie session,
+            String fileName,
+            String mimeType,
+            long fileSize,
+            String sha256) throws Exception {
+        return createUploadTicket(session, fileName, mimeType, fileSize, sha256, "file-test-" + System.nanoTime());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createUploadTicket(
+            Cookie session,
+            String fileName,
+            String mimeType,
+            long fileSize,
+            String sha256,
+            String clientRequestId) throws Exception {
         return mockMvc.perform(post("/api/employee/files/upload-tickets")
             .cookie(session)
             .contentType(MediaType.APPLICATION_JSON)
@@ -835,13 +881,13 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                   "ownerType": "PERSONAL_FILE",
                   "ownerId": null,
                   "fileName": "%s",
-                  "mimeType": "text/plain",
+                  "mimeType": "%s",
                   "fileSize": %s,
                   "contentSha256": "%s",
                   "contentMd5": null,
                   "clientRequestId": "%s"
                 }
-                """.formatted(fileName, fileSize, sha256, clientRequestId)));
+                """.formatted(fileName, mimeType, fileSize, sha256, clientRequestId)));
     }
 
     private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, String text) throws Exception {

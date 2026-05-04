@@ -4,6 +4,61 @@
 
 ---
 
+## 2026-05-05 module-file 上传限制策略配置化
+
+### 改动背景
+
+前面文件中心已经跑通员工端个人文件上传、确认、秒传、下载、回收站和配额主链路，但“文件类型与大小限制”仍停留在契约层。如果不在申请上传票据阶段拦截，前端可以对 `.exe` 等高风险文件或超大文件拿到上传地址，后续会浪费存储资源，也会让不同业务场景共用一套模糊规则。
+
+### 红灯验证
+
+新增自动化用例：
+
+- `uploadTicketShouldRejectUnsupportedFileType`
+- `uploadTicketShouldRejectWhenFileExceedsSceneLimit`
+
+红灯结果：
+
+- `.exe + application/x-msdownload` 实际返回 `code=0`
+- 超过 `100MB` 的 `.zip` 实际返回 `code=0`
+
+这说明当前上传票据创建阶段没有读取任何文件类型或大小策略。
+
+### 修订内容
+
+新增：
+
+- `server/src/main/resources/db/migration/V5__add_file_upload_policy.sql`
+
+修改：
+
+- `server/src/main/java/com/workforcehub/file/service/FileCenterService.java`
+- `server/src/test/java/com/workforcehub/file/ModuleFileApiIntegrationTest.java`
+- `docs/API与测试/module-file/API文档_module-file文件中心接口.md`
+- `docs/API与测试/module-file/API测试用例_module-file文件中心接口.md`
+
+关键修订：
+
+- 新增 `sys_file_upload_policy`，按 `owner_type` 管理单文件大小、允许扩展名、允许 MIME 类型
+- 内置 `PERSONAL_FILE_DEFAULT_100M` 策略，个人文件默认单文件上限 `100MB`
+- 上传票据创建前先校验 `ownerType`，再读取启用上传策略，最后校验大小、扩展名和 MIME
+- 文件过大返回业务码 `413`，文件类型不允许返回业务码 `415`
+- 唯一约束只限制同一 `ownerType` 同时存在一条启用策略，为后续后台配置页保留禁用和历史策略空间
+
+### 验证记录
+
+- `mvn -Dtest=ModuleFileApiIntegrationTest#uploadTicketShouldRejectUnsupportedFileType,ModuleFileApiIntegrationTest#uploadTicketShouldRejectWhenFileExceedsSceneLimit test`
+- `mvn -Dtest=ModuleFileApiIntegrationTest test`
+
+### 后续边界
+
+- 当前只内置 `PERSONAL_FILE` 第一版策略，后台上传、群文件、审批附件、知识库、Agent 临时文件需要在各自授权模型落地后再补对应 `ownerType` 策略
+- 还没有后台上传策略 CRUD；下一步可先做管理员查询和调整上传策略，再接前端配置页
+- MIME 仍来自客户端声明，后续需要在真实上传确认或异步扫描阶段补服务端文件嗅探和安全扫描
+- `FileCenterService` 继续增大，后续应拆出上传策略 Repository / Service，避免文件服务变成“万能抽屉”
+
+---
+
 ## 2026-05-04 module-file 第22审风险复核修订
 
 ### 改动背景

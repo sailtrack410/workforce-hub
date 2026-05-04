@@ -8,7 +8,7 @@
 | 文档版本 | `v1.0` |
 | 适用范围 | 两段式上传、秒传、配额、下载票据、回收站、清理任务 |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 测试契约已收口；第二批员工端下载执行与后台配额策略自动化测试已落地 |
+| 当前状态 | 测试契约已收口；第二批员工端下载执行、后台配额策略、上传限制策略自动化测试已落地 |
 
 ---
 
@@ -51,6 +51,8 @@
 - 后台配额不能低于当前已用量校验
 - 后台配额策略编码重复拦截
 - 后台同一作用域重复策略拦截
+- 个人文件上传类型限制拦截
+- 个人文件上传大小限制拦截
 
 当前尚未自动化覆盖：
 
@@ -58,7 +60,6 @@
 - 后台上传与确认上传
 - 后台回收站治理
 - 清理任务 dry-run 与执行
-- 文件类型和大小场景限制
 
 ---
 
@@ -152,8 +153,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `FILE-UP-001` | P0 | `POST /api/employee/files/upload-tickets` | 员工申请个人文件上传票据 | 员工 A 已登录；配额充足 | `FILE-A1` 元数据 | HTTP `200`；`code=0`；返回 `uploadTicketId`、`objectKey`、`uploadUrl` |
 | `FILE-UP-002` | P0 | `POST /api/employee/files/upload-tickets` | 文件大小为空被拒绝 | 员工 A 已登录 | `fileSize=0` | HTTP `400`；提示文件大小不能为空 |
-| `FILE-UP-003` | P1 | `POST /api/employee/files/upload-tickets` | 文件类型不允许 | 员工 A 已登录 | 不允许的扩展名和 MIME | HTTP `415`；提示当前场景不支持该文件类型 |
-| `FILE-UP-004` | P1 | `POST /api/employee/files/upload-tickets` | 文件超过场景限制 | 员工 A 已登录 | `FILE-LARGE` | HTTP `413`；提示当前场景最大大小 |
+| `FILE-UP-003` | P1 | `POST /api/employee/files/upload-tickets` | 文件类型不允许 | 员工 A 已登录；存在 `PERSONAL_FILE` 启用上传策略 | `.exe` + `application/x-msdownload` | HTTP `200`；`code=415`；提示当前场景不支持该文件类型 |
+| `FILE-UP-004` | P1 | `POST /api/employee/files/upload-tickets` | 文件超过场景限制 | 员工 A 已登录；存在 `PERSONAL_FILE` 启用上传策略 | `超大文件.zip`，超过 `100MB` | HTTP `200`；`code=413`；提示文件超过当前场景大小限制 |
 | `FILE-UP-005` | P0 | `POST /api/employee/files/upload-tickets` | 个人空间不足时拦截 | 员工 A 已登录；个人配额调小 | `FILE-B1` | HTTP `507`；提示个人云空间不足 |
 | `FILE-UP-006` | P0 | `POST /api/employee/files/upload-tickets` | 企业总池不足时拦截 | 企业总池已满 | `FILE-B1` | HTTP `507`；提示企业文件总空间不足 |
 | `FILE-UP-007` | P1 | `POST /api/employee/files/upload-tickets` | 重复 `Idempotency-Key` 返回同一票据 | 员工 A 已登录 | 同一请求头和请求体重复提交 | HTTP `200`；返回同一 `uploadTicketId` |

@@ -1,6 +1,9 @@
 package com.workforcehub.file.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.AttachmentRefResponse;
@@ -50,17 +53,21 @@ public class FileCenterService {
 
     private final JdbcTemplate jdbcTemplate;
     private final StorageProviderRegistry storageProviderRegistry;
+    private final ObjectMapper objectMapper;
 
     public FileCenterService(JdbcTemplate jdbcTemplate,
-                             StorageProviderRegistry storageProviderRegistry) {
+                             StorageProviderRegistry storageProviderRegistry,
+                             ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
+        ensureUploadPolicy(request);
         ensurePersonalQuota(userId, request.getFileSize());
         ensureGlobalQuota(request.getFileSize());
         UploadTicketResponse existingTicket = findUploadTicketByClientRequestId(userId, request.getClientRequestId());
@@ -557,6 +564,71 @@ public class FileCenterService {
         if (ownerId != null) {
             throw new BizException(400, "个人文件不应指定业务归属ID");
         }
+    }
+
+    private void ensureUploadPolicy(CreateUploadTicketRequest request) {
+        UploadPolicyRow policy = getUploadPolicyOrThrow(request.getOwnerType());
+        if (request.getFileSize() > policy.maxFileSizeBytes()) {
+            throw new BizException(413, "文件超过当前场景大小限制");
+        }
+
+        String extension = extractExt(request.getFileName());
+        List<String> allowedExtensions = parseJsonList(policy.allowedExtensions(), "扩展名");
+        if (!allowedExtensions.isEmpty()
+            && (!StringUtils.hasText(extension) || !allowedExtensions.contains(extension.toLowerCase()))) {
+            throw new BizException(415, "当前场景不支持该文件类型");
+        }
+
+        String mimeType = normalizeMimeType(request.getMimeType());
+        List<String> allowedMimeTypes = parseJsonList(policy.allowedMimeTypes(), "MIME类型");
+        if (!allowedMimeTypes.isEmpty() && !allowedMimeTypes.contains(mimeType)) {
+            throw new BizException(415, "当前场景不支持该文件类型");
+        }
+    }
+
+    private UploadPolicyRow getUploadPolicyOrThrow(String ownerType) {
+        List<UploadPolicyRow> rows = jdbcTemplate.query("""
+            SELECT id, owner_type, max_file_size_bytes, allowed_extensions, allowed_mime_types
+            FROM sys_file_upload_policy
+            WHERE owner_type = ? AND status = 'ENABLED' AND is_deleted = 0
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new UploadPolicyRow(
+                rs.getLong("id"),
+                rs.getString("owner_type"),
+                rs.getLong("max_file_size_bytes"),
+                rs.getString("allowed_extensions"),
+                rs.getString("allowed_mime_types")
+            ),
+            ownerType
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(409, "当前场景未配置上传策略");
+        }
+        return rows.get(0);
+    }
+
+    private List<String> parseJsonList(String json, String policyFieldName) {
+        if (!StringUtils.hasText(json)) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {})
+                .stream()
+                .filter(StringUtils::hasText)
+                .map(value -> value.trim().toLowerCase())
+                .distinct()
+                .toList();
+        } catch (JsonProcessingException e) {
+            throw new BizException(500, "上传策略" + policyFieldName + "配置格式不正确");
+        }
+    }
+
+    private String normalizeMimeType(String mimeType) {
+        String normalized = mimeType.trim().toLowerCase();
+        int parameterIndex = normalized.indexOf(';');
+        return parameterIndex < 0 ? normalized : normalized.substring(0, parameterIndex).trim();
     }
 
     private FileObjectRow createFileObject(UploadTicketRow ticket, ConfirmUploadRequest request, Long userId) {
@@ -1239,6 +1311,14 @@ public class FileCenterService {
         String status,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
+    ) {}
+
+    private record UploadPolicyRow(
+        Long id,
+        String ownerType,
+        Long maxFileSizeBytes,
+        String allowedExtensions,
+        String allowedMimeTypes
     ) {}
 
     private record AttachmentRow(
