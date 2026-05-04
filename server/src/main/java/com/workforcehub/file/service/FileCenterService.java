@@ -67,13 +67,13 @@ public class FileCenterService {
     public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
-        ensureUploadPolicy(request);
-        ensurePersonalQuota(userId, request.getFileSize());
-        ensureGlobalQuota(request.getFileSize());
         UploadTicketResponse existingTicket = findUploadTicketByClientRequestId(userId, request.getClientRequestId());
         if (existingTicket != null) {
             return existingTicket;
         }
+        ensureUploadPolicy(request);
+        ensurePersonalQuota(userId, request.getFileSize());
+        ensureGlobalQuota(request.getFileSize());
 
         FileObjectRow existing = findActiveFileObject(request.getContentSha256(), request.getFileSize());
         if (existing != null) {

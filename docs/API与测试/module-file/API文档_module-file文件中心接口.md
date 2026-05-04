@@ -121,6 +121,8 @@ http://localhost:8080
 
 员工端申请上传票据前会按 `ownerType` 读取 `sys_file_upload_policy` 中启用的场景策略，先校验单文件大小，再校验扩展名和 MIME 类型。
 
+该策略属于上传票据申请前的元数据前置拦截，只能阻断明显不符合场景的文件名、扩展名和 MIME 声明，不能替代服务端内容识别、安全扫描或杀毒流程。真实安全边界应在确认上传后结合对象内容嗅探、扫描状态和异步处置流程继续收口。
+
 第一版内置策略：
 
 | ownerType | 策略编码 | 单文件上限 | 说明 |
@@ -409,6 +411,7 @@ http://localhost:8080
 - `contentSha256` 为合法 SHA-256
 - `ownerType=PERSONAL_FILE` 且 `ownerId=null`
 - 文件类型和大小符合 `sys_file_upload_policy` 中 `PERSONAL_FILE` 启用策略
+- 若同一用户、同一 `clientRequestId` 已签发上传票据，重复申请优先返回原票据，不因后续策略调整重新判定
 - 个人空间、目标空间、企业总池、存储后端真实容量均允许写入
 
 ### 6.2 确认上传完成

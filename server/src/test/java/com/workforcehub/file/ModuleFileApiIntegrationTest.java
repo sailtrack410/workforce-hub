@@ -540,6 +540,43 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("已签发上传票据在策略变化后重复申请仍应返回原票据")
+    void uploadTicketShouldReturnExistingTicketWhenPolicyChangesAfterFirstRequest() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "policy-change-idempotent-ticket".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+        String clientRequestId = "policy-change-same-upload-request";
+
+        MvcResult firstResult = createUploadTicket(employeeSession, "策略变化重试.txt", content.length, sha256, clientRequestId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long firstUploadTicketId = data(firstResult).get("uploadTicketId").asLong();
+
+        jdbcTemplate.update("""
+            UPDATE sys_file_upload_policy
+            SET status = 'DISABLED', updated_at = NOW()
+            WHERE policy_code = 'PERSONAL_FILE_DEFAULT_100M'
+            """);
+
+        try {
+            MvcResult retryResult = createUploadTicket(employeeSession, "策略变化重试.txt", content.length, sha256, clientRequestId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn();
+
+            assertEquals(firstUploadTicketId, data(retryResult).get("uploadTicketId").asLong());
+        } finally {
+            jdbcTemplate.update("""
+                UPDATE sys_file_upload_policy
+                SET status = 'ENABLED', updated_at = NOW()
+                WHERE policy_code = 'PERSONAL_FILE_DEFAULT_100M'
+                """);
+        }
+    }
+
+    @Test
     @DisplayName("确认上传时不能篡改上传票据中的业务归属")
     void confirmUploadShouldRejectWhenOwnerDoesNotMatchTicket() throws Exception {
         Cookie employeeSession = loginEmployee();

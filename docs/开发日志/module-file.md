@@ -41,7 +41,7 @@
 
 - 新增 `sys_file_upload_policy`，按 `owner_type` 管理单文件大小、允许扩展名、允许 MIME 类型
 - 内置 `PERSONAL_FILE_DEFAULT_100M` 策略，个人文件默认单文件上限 `100MB`
-- 上传票据创建前先校验 `ownerType`，再读取启用上传策略，最后校验大小、扩展名和 MIME
+- 上传票据创建前先校验 `ownerType`，并优先按 `clientRequestId` 返回已签发票据；新票据才读取启用上传策略并校验大小、扩展名和 MIME
 - 文件过大返回业务码 `413`，文件类型不允许返回业务码 `415`
 - 唯一约束只限制同一 `ownerType` 同时存在一条启用策略，为后续后台配置页保留禁用和历史策略空间
 
@@ -54,8 +54,20 @@
 
 - 当前只内置 `PERSONAL_FILE` 第一版策略，后台上传、群文件、审批附件、知识库、Agent 临时文件需要在各自授权模型落地后再补对应 `ownerType` 策略
 - 还没有后台上传策略 CRUD；下一步可先做管理员查询和调整上传策略，再接前端配置页
-- MIME 仍来自客户端声明，后续需要在真实上传确认或异步扫描阶段补服务端文件嗅探和安全扫描
+- 上传限制策略只是元数据前置拦截，不能替代服务端内容识别、安全扫描或杀毒流程；后续需要在真实上传确认或异步扫描阶段补文件嗅探和扫描状态流转
 - `FileCenterService` 继续增大，后续应拆出上传策略 Repository / Service，避免文件服务变成“万能抽屉”
+
+### 第 23 审修订补充
+
+第 23 审指出上传策略校验先于 `clientRequestId` 幂等回查，会导致已签发票据在策略禁用、调整或误删后重试失败。本轮补充回归测试并调整顺序：
+
+- 已签发票据重复申请时，先按同一用户和同一 `clientRequestId` 回查原票据
+- 只有新上传票据才执行当前上传策略校验
+- 新增 `V6__align_file_upload_policy_owner_type_comment.sql`，将 `sys_file_upload_policy.owner_type` 列注释中的群文件 ownerType 示例统一为 `IM_GROUP_FILE`
+
+补充验证：
+
+- `mvn -Dtest=ModuleFileApiIntegrationTest#uploadTicketShouldReturnExistingTicketWhenPolicyChangesAfterFirstRequest test`
 
 ---
 
