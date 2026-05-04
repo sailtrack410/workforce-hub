@@ -5,6 +5,7 @@ import com.workforcehub.file.dto.AttachmentRefResponse;
 import com.workforcehub.file.dto.ConfirmUploadRequest;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.CreateUploadTicketRequest;
+import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.file.dto.FilePurgeResponse;
 import com.workforcehub.file.dto.FileRestoreResponse;
@@ -14,6 +15,11 @@ import com.workforcehub.file.dto.QuotaResponse;
 import com.workforcehub.file.dto.UploadTicketResponse;
 import com.workforcehub.file.service.FileCenterService;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,6 +60,23 @@ public class EmployeeFileController {
     public R<DownloadTicketResponse> createDownloadTicket(@PathVariable Long attachmentRefId,
                                                           @Valid @RequestBody CreateDownloadTicketRequest request) {
         return R.ok(fileCenterService.createEmployeeDownloadTicket(attachmentRefId, request));
+    }
+
+    @GetMapping("/download/{ticketNo}")
+    public ResponseEntity<Resource> download(@PathVariable String ticketNo) {
+        DownloadFileResult result = fileCenterService.downloadEmployeeFile(ticketNo);
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        if (result.mimeType() != null && !result.mimeType().isBlank()) {
+            mediaType = MediaType.parseMediaType(result.mimeType());
+        }
+        return ResponseEntity.ok()
+            .contentType(mediaType)
+            .contentLength(result.fileSize())
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                .filename(result.fileName(), java.nio.charset.StandardCharsets.UTF_8)
+                .build()
+                .toString())
+            .body(result.resource());
     }
 
     @PostMapping("/{attachmentRefId}/trash")

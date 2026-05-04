@@ -9,15 +9,15 @@
 | 适用范围 | 两段式上传、文件去重、配额查询、下载票据、回收站、后台配额治理 |
 | 对应模块 | `server/module-file` |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 契约已收口；员工端主链路与后台存储摘要已完成第一批后端实现 |
+| 当前状态 | 契约已收口；员工端主链路、真实下载入口、后台存储摘要和配额策略 CRUD 已完成第二批后端实现 |
 
 ---
 
 ## 二、接口范围
 
-本文档覆盖以下 `17` 个接口。
+本文档覆盖以下 `18` 个接口。
 
-当前第一批已实现 `8` 个接口：员工端 `7` 个主链路接口，以及后台端 `GET /api/admin/files/storage-summary`。其余后台上传、配额策略、回收站治理和清理任务仍是后续实现契约。
+当前第二批已实现 `12` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `4` 个接口（存储摘要 + 配额策略 CRUD）。其余后台上传、后台回收站治理和清理任务仍是后续实现契约。
 
 ### 1. 员工端
 
@@ -25,6 +25,7 @@
 - `POST /api/employee/files/confirm-upload`
 - `GET /api/employee/files/quota`
 - `POST /api/employee/files/{attachmentRefId}/download-tickets`
+- `GET /api/employee/files/download/{ticketNo}`
 - `POST /api/employee/files/{attachmentRefId}/trash`
 - `POST /api/employee/files/{attachmentRefId}/restore`
 - `DELETE /api/employee/files/{attachmentRefId}`
@@ -34,9 +35,9 @@
 - `POST /api/admin/files/upload-tickets`（契约，待实现）
 - `POST /api/admin/files/confirm-upload`（契约，待实现）
 - `GET /api/admin/files/storage-summary`（已实现）
-- `GET /api/admin/files/quota-policies`（契约，待实现）
-- `POST /api/admin/files/quota-policies`（契约，待实现）
-- `PUT /api/admin/files/quota-policies/{id}`（契约，待实现）
+- `GET /api/admin/files/quota-policies`（已实现）
+- `POST /api/admin/files/quota-policies`（已实现）
+- `PUT /api/admin/files/quota-policies/{id}`（已实现）
 - `GET /api/admin/files/recycle-bin`（契约，待实现）
 - `POST /api/admin/files/recycle-bin/{attachmentRefId}/restore`（契约，待实现）
 - `DELETE /api/admin/files/recycle-bin/{attachmentRefId}`（契约，待实现）
@@ -512,6 +513,31 @@ http://localhost:8080
 - 当前用户对该业务引用有下载权限
 - 下载行为写入审计日志
 
+### 6.4.1 使用下载票据下载文件
+
+`GET /api/employee/files/download/{ticketNo}`
+
+用途：
+
+- 使用短期下载票据获取文件二进制
+- 下载成功后将票据标记为 `USED`
+- 下载执行写入 `FILE_DOWNLOAD_EXECUTED` 审计
+
+成功响应：
+
+- HTTP `200`
+- Body 为原始文件二进制
+- `Content-Disposition` 使用附件下载方式返回展示文件名
+- `Content-Type` 优先使用文件记录的 MIME，缺失时退回 `application/octet-stream`
+
+关键校验：
+
+- 当前用户必须是票据申请人
+- 票据必须为 `ACTIVE`
+- 票据未过期；过期时返回业务码 `410`
+- 附件引用和物理文件对象未删除
+- 存储 Provider 中的对象必须存在
+
 ### 6.5 移入回收站
 
 `POST /api/employee/files/{attachmentRefId}/trash`
@@ -652,7 +678,7 @@ http://localhost:8080
 
 ### 7.4 查询配额策略
 
-`GET /api/admin/files/quota-policies?scopeType=USER_DEFAULT&status=ENABLED`
+`GET /api/admin/files/quota-policies?scopeType=USER_DEFAULT`
 
 成功响应：
 
@@ -660,25 +686,22 @@ http://localhost:8080
 {
   "code": 0,
   "message": "ok",
-  "data": {
-    "pageNo": 1,
-    "pageSize": 20,
-    "total": 1,
-    "list": [
-      {
-        "id": 1,
-        "policyCode": "USER_DEFAULT_10G",
-        "policyName": "员工默认 10GB",
-        "scopeType": "USER_DEFAULT",
-        "scopeId": null,
-        "quotaBytes": 10737418240,
-        "cacheQuotaBytes": null,
-        "warningThreshold": 0.8,
-        "blockThreshold": 1.0,
-        "status": "ENABLED"
-      }
-    ]
-  },
+  "data": [
+    {
+      "policyId": 1,
+      "policyCode": "USER_DEFAULT_10G",
+      "policyName": "员工默认 10GB",
+      "scopeType": "USER_DEFAULT",
+      "scopeId": null,
+      "quotaBytes": 10737418240,
+      "cacheQuotaBytes": null,
+      "warningThreshold": 0.8,
+      "blockThreshold": 1.0,
+      "status": "ENABLED",
+      "createdAt": "2026-05-03T11:00:00",
+      "updatedAt": "2026-05-03T11:00:00"
+    }
+  ],
   "requestId": "file202605030102"
 }
 ```
@@ -703,19 +726,32 @@ http://localhost:8080
 }
 ```
 
-成功响应返回配额策略详情。
+成功响应返回配额策略详情，字段同 `QuotaPolicyResponse`。
 
 ### 7.6 更新配额策略
 
 `PUT /api/admin/files/quota-policies/{id}`
 
-请求体同创建接口。
+请求体：
+
+```json
+{
+  "policyName": "张三个人 80GB",
+  "quotaBytes": 85899345920,
+  "cacheQuotaBytes": null,
+  "warningThreshold": 0.75,
+  "blockThreshold": 0.95,
+  "status": "ENABLED"
+}
+```
 
 关键校验：
 
-- `quotaBytes` 不能小于当前已用量，除非策略状态改为停用并有替代策略
+- `quotaBytes` 不能小于当前作用域已用量
 - `warningThreshold` 必须小于 `blockThreshold`
 - `blockThreshold` 不得大于 `1.0`
+- `GLOBAL`、`USER_DEFAULT`、`TEMP_CACHE` 不允许传 `scopeId`
+- `USER`、`DEPARTMENT`、`ROLE`、`GROUP`、`KNOWLEDGE_SPACE` 必须传 `scopeId`
 
 ### 7.7 查询回收站治理列表
 

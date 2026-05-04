@@ -5,31 +5,35 @@ import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.AttachmentRefResponse;
 import com.workforcehub.file.dto.ConfirmUploadRequest;
+import com.workforcehub.file.dto.CreateQuotaPolicyRequest;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.CreateUploadTicketRequest;
+import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.file.dto.FilePurgeResponse;
 import com.workforcehub.file.dto.FileRestoreResponse;
 import com.workforcehub.file.dto.FileTrashRequest;
 import com.workforcehub.file.dto.FileTrashResponse;
+import com.workforcehub.file.dto.QuotaPolicyResponse;
 import com.workforcehub.file.dto.QuotaResponse;
 import com.workforcehub.file.dto.StorageSummaryResponse;
+import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
-import org.springframework.beans.factory.annotation.Value;
+import com.workforcehub.file.storage.LocalStorageProvider;
+import com.workforcehub.file.storage.StorageObjectResource;
+import com.workforcehub.file.storage.StorageProvider;
+import com.workforcehub.file.storage.StorageProviderRegistry;
+import com.workforcehub.file.storage.StorageUploadTarget;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -40,18 +44,17 @@ import java.util.Map;
 @Service
 public class FileCenterService {
 
-    private static final String PROVIDER_LOCAL = "LOCAL";
-    private static final String BUCKET_LOCAL = "local";
+    private static final String PROVIDER_LOCAL = LocalStorageProvider.PROVIDER_CODE;
     private static final long DEFAULT_PERSONAL_QUOTA_BYTES = 10L * 1024L * 1024L * 1024L;
     private static final long DEFAULT_GLOBAL_QUOTA_BYTES = 400L * 1024L * 1024L * 1024L;
 
     private final JdbcTemplate jdbcTemplate;
-    private final Path localRoot;
+    private final StorageProviderRegistry storageProviderRegistry;
 
     public FileCenterService(JdbcTemplate jdbcTemplate,
-                             @Value("${workforce.file.local-root:target/test-file-storage}") String localRoot) {
+                             StorageProviderRegistry storageProviderRegistry) {
         this.jdbcTemplate = jdbcTemplate;
-        this.localRoot = Path.of(localRoot);
+        this.storageProviderRegistry = storageProviderRegistry;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -88,7 +91,9 @@ public class FileCenterService {
         Long ticketId = IdWorker.getId();
         String ticketNo = "UP" + ticketId;
         String objectKey = buildObjectKey(request.getContentSha256(), request.getFileName());
-        LocalDateTime expireAt = LocalDateTime.now().plusHours(1);
+        StorageProvider provider = storageProviderRegistry.require(PROVIDER_LOCAL);
+        String bucketName = provider.defaultBucketName();
+        StorageUploadTarget uploadTarget = provider.buildUploadTarget(bucketName, objectKey, request.getMimeType(), 60);
 
         jdbcTemplate.update("""
             INSERT INTO sys_upload_ticket
@@ -105,7 +110,7 @@ public class FileCenterService {
             request.getOwnerType(),
             request.getOwnerId(),
             PROVIDER_LOCAL,
-            BUCKET_LOCAL,
+            bucketName,
             request.getFileName(),
             request.getMimeType(),
             request.getFileSize(),
@@ -113,7 +118,7 @@ public class FileCenterService {
             request.getContentSha256().toLowerCase(),
             objectKey,
             blankToNull(request.getClientRequestId()),
-            expireAt,
+            uploadTarget.expireAt(),
             userId
         );
 
@@ -123,11 +128,11 @@ public class FileCenterService {
         response.setDeduplicated(false);
         response.setAttachmentRefId(null);
         response.setStorageProvider(PROVIDER_LOCAL);
-        response.setBucketName(BUCKET_LOCAL);
+        response.setBucketName(bucketName);
         response.setObjectKey(objectKey);
-        response.setUploadUrl(localRoot.resolve(objectKey).toString());
-        response.setHeaders(Map.of("Content-Type", request.getMimeType()));
-        response.setExpireAt(expireAt);
+        response.setUploadUrl(uploadTarget.uploadUrl());
+        response.setHeaders(uploadTarget.headers());
+        response.setExpireAt(uploadTarget.expireAt());
         audit("USER", userId, "FILE_UPLOAD_TICKET_CREATED", "UPLOAD_TICKET", ticketId, "SUCCESS",
             "{\"objectKey\":\"%s\"}".formatted(objectKey));
         return response;
@@ -161,7 +166,8 @@ public class FileCenterService {
             throw new BizException(422, "业务归属不匹配，请重新申请上传票据");
         }
 
-        verifyLocalObject(request.getObjectKey(), request.getContentSha256(), request.getFileSize());
+        storageProviderRegistry.require(ticket.storageProvider())
+            .verifyObject(ticket.bucketName(), request.getObjectKey(), request.getContentSha256(), request.getFileSize());
         ensurePersonalQuota(userId, request.getFileSize());
         ensureGlobalQuota(request.getFileSize());
 
@@ -241,6 +247,43 @@ public class FileCenterService {
         return response;
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public DownloadFileResult downloadEmployeeFile(String ticketNo) {
+        Long userId = CurrentUserHolder.requireUserId();
+        DownloadTicketRow ticket = getDownloadTicketOrThrow(ticketNo);
+        if (!"USER".equals(ticket.requesterType()) || !userId.equals(ticket.requesterId())) {
+            throw new BizException(403, "无权使用该下载票据");
+        }
+        if (!"ACTIVE".equals(ticket.status())) {
+            throw new BizException(409, "下载票据已使用或已失效");
+        }
+        if (ticket.expireAt().isBefore(LocalDateTime.now())) {
+            jdbcTemplate.update(
+                "UPDATE sys_download_ticket SET status = 'EXPIRED', updated_at = NOW() WHERE id = ? AND status = 'ACTIVE'",
+                ticket.id()
+            );
+            throw new BizException(410, "下载链接已过期，请重新申请");
+        }
+
+        DownloadAttachmentRow attachment = getDownloadAttachmentOrThrow(ticket.attachmentRefId());
+        if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
+            throw new BizException(403, "无权访问该文件");
+        }
+        if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
+            throw new BizException(409, "文件已删除");
+        }
+
+        StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
+            .loadObject(attachment.bucketName(), attachment.objectKey());
+        jdbcTemplate.update(
+            "UPDATE sys_download_ticket SET status = 'USED', updated_at = NOW() WHERE id = ? AND status = 'ACTIVE'",
+            ticket.id()
+        );
+        audit("USER", userId, "FILE_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
+            "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
+        return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
+    }
+
     public QuotaResponse getEmployeeQuota() {
         Long userId = CurrentUserHolder.requireUserId();
         long personalQuota = resolveQuota("USER", userId, resolveQuota("USER_DEFAULT", null, DEFAULT_PERSONAL_QUOTA_BYTES));
@@ -265,6 +308,7 @@ public class FileCenterService {
 
     public StorageSummaryResponse getStorageSummary() {
         CurrentUserHolder.requireUserId();
+        StorageProvider provider = storageProviderRegistry.require(PROVIDER_LOCAL);
         long globalQuota = resolveQuota("GLOBAL", null, DEFAULT_GLOBAL_QUOTA_BYTES);
         long globalUsed = resolveUsedBytes("GLOBAL", null);
         long cacheQuota = resolveQuota("TEMP_CACHE", null, 50L * 1024L * 1024L * 1024L);
@@ -277,14 +321,108 @@ public class FileCenterService {
         response.setOrgPoolBlockThreshold(BigDecimal.ONE);
         response.setCacheQuotaBytes(cacheQuota);
         response.setCacheUsedBytes(cacheUsed);
-        response.setBackendFreeBytes(localRoot.toFile().getFreeSpace());
-        response.setBackendWritable(localRoot.toFile().getFreeSpace() > 0 && globalUsed < globalQuota);
+        response.setBackendFreeBytes(provider.usableFreeBytes());
+        response.setBackendWritable(provider.usableFreeBytes() > 0 && globalUsed < globalQuota);
         response.setWriteProtectReason(globalUsed >= globalQuota ? "企业文件总空间不足" : null);
         response.setFileObjectCount(countLong("SELECT COUNT(*) FROM sys_file_object WHERE is_deleted = 0"));
         response.setAttachmentRefCount(countLong("SELECT COUNT(*) FROM sys_attachment_ref WHERE is_deleted = 0"));
         response.setRecycleBinCount(countLong("SELECT COUNT(*) FROM sys_attachment_ref WHERE deleted_at IS NOT NULL AND is_deleted = 0"));
         response.setPendingCleanupObjectCount(countLong("SELECT COUNT(*) FROM sys_file_object WHERE cleanup_after IS NOT NULL AND is_deleted = 0"));
         return response;
+    }
+
+    public List<QuotaPolicyResponse> listQuotaPolicies(String scopeType) {
+        CurrentUserHolder.requireUserId();
+        List<Object> args = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("""
+            SELECT id, policy_code, policy_name, scope_type, scope_id, quota_bytes,
+                   cache_quota_bytes, warning_threshold, block_threshold, status, created_at, updated_at
+            FROM sys_storage_quota_policy
+            WHERE is_deleted = 0
+            """);
+        if (StringUtils.hasText(scopeType)) {
+            validateScopeType(scopeType);
+            sql.append(" AND scope_type = ?");
+            args.add(scopeType);
+        }
+        sql.append(" ORDER BY updated_at DESC, id DESC");
+        return jdbcTemplate.query(sql.toString(), this::mapQuotaPolicy, args.toArray());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public QuotaPolicyResponse createQuotaPolicy(CreateQuotaPolicyRequest request) {
+        Long adminId = CurrentUserHolder.requireUserId();
+        validateQuotaPolicyPayload(
+            request.getScopeType(),
+            request.getScopeId(),
+            request.getQuotaBytes(),
+            request.getWarningThreshold(),
+            request.getBlockThreshold(),
+            request.getStatus()
+        );
+        ensureQuotaPolicyCodeNotExists(request.getPolicyCode());
+        ensureQuotaPolicyScopeNotExists(request.getScopeType(), request.getScopeId(), null);
+        Long policyId = IdWorker.getId();
+        jdbcTemplate.update("""
+            INSERT INTO sys_storage_quota_policy
+                (id, policy_code, policy_name, scope_type, scope_id, quota_bytes,
+                 cache_quota_bytes, warning_threshold, block_threshold, status, created_by)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            policyId,
+            request.getPolicyCode(),
+            request.getPolicyName(),
+            request.getScopeType(),
+            request.getScopeId(),
+            request.getQuotaBytes(),
+            request.getCacheQuotaBytes(),
+            request.getWarningThreshold(),
+            request.getBlockThreshold(),
+            request.getStatus(),
+            adminId
+        );
+        audit("ADMIN", adminId, "FILE_QUOTA_POLICY_CREATED", "STORAGE_QUOTA_POLICY", policyId, "SUCCESS",
+            "{\"scopeType\":\"%s\",\"scopeId\":%s}".formatted(request.getScopeType(), request.getScopeId()));
+        return getQuotaPolicyOrThrow(policyId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public QuotaPolicyResponse updateQuotaPolicy(Long policyId, UpdateQuotaPolicyRequest request) {
+        Long adminId = CurrentUserHolder.requireUserId();
+        QuotaPolicyRow existing = getQuotaPolicyRowOrThrow(policyId);
+        validateQuotaPolicyPayload(
+            existing.scopeType(),
+            existing.scopeId(),
+            request.getQuotaBytes(),
+            request.getWarningThreshold(),
+            request.getBlockThreshold(),
+            request.getStatus()
+        );
+        jdbcTemplate.update("""
+            UPDATE sys_storage_quota_policy
+            SET policy_name = ?,
+                quota_bytes = ?,
+                cache_quota_bytes = ?,
+                warning_threshold = ?,
+                block_threshold = ?,
+                status = ?,
+                updated_by = ?,
+                updated_at = NOW()
+            WHERE id = ? AND is_deleted = 0
+            """,
+            request.getPolicyName(),
+            request.getQuotaBytes(),
+            request.getCacheQuotaBytes(),
+            request.getWarningThreshold(),
+            request.getBlockThreshold(),
+            request.getStatus(),
+            adminId,
+            policyId
+        );
+        audit("ADMIN", adminId, "FILE_QUOTA_POLICY_UPDATED", "STORAGE_QUOTA_POLICY", policyId, "SUCCESS",
+            "{\"scopeType\":\"%s\",\"scopeId\":%s}".formatted(existing.scopeType(), existing.scopeId()));
+        return getQuotaPolicyOrThrow(policyId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -470,30 +608,6 @@ public class FileCenterService {
         return attachmentRefId;
     }
 
-    private void verifyLocalObject(String objectKey, String expectedSha256, Long expectedSize) {
-        Path path = localRoot.resolve(objectKey);
-        if (!Files.exists(path)) {
-            throw new BizException(422, "文件对象不存在，请重新上传");
-        }
-        try {
-            if (Files.size(path) != expectedSize) {
-                throw new BizException(422, "文件校验失败，请重新上传");
-            }
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (InputStream inputStream = Files.newInputStream(path)) {
-                inputStream.transferTo(new DigestOutputStream(digest));
-            }
-            String actualSha256 = HexFormat.of().formatHex(digest.digest());
-            if (!actualSha256.equalsIgnoreCase(expectedSha256)) {
-                throw new BizException(422, "文件校验失败，请重新上传");
-            }
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BizException(500, "文件服务异常，请稍后重试");
-        }
-    }
-
     private void ensureUploaderOwnsAttachment(Long userId, AttachmentRow attachment) {
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
@@ -556,6 +670,134 @@ public class FileCenterService {
             scopeId
         );
         return used == null ? 0L : used;
+    }
+
+    private void validateQuotaPolicyPayload(String scopeType,
+                                            Long scopeId,
+                                            Long quotaBytes,
+                                            BigDecimal warningThreshold,
+                                            BigDecimal blockThreshold,
+                                            String status) {
+        validateScopeType(scopeType);
+        if (requiresScopeId(scopeType) && scopeId == null) {
+            throw new BizException(400, "当前作用域必须指定 scopeId");
+        }
+        if (!requiresScopeId(scopeType) && scopeId != null) {
+            throw new BizException(400, "当前作用域不应指定 scopeId");
+        }
+        if (!List.of("ENABLED", "DISABLED").contains(status)) {
+            throw new BizException(400, "策略状态仅支持 ENABLED 或 DISABLED");
+        }
+        if (warningThreshold.compareTo(blockThreshold) >= 0) {
+            throw new BizException(400, "预警阈值必须小于阻断阈值");
+        }
+        long usedBytes = resolveUsedBytes(scopeType, scopeId);
+        if (quotaBytes < usedBytes) {
+            throw new BizException(409, "配额不能低于当前已用量");
+        }
+    }
+
+    private void validateScopeType(String scopeType) {
+        if (!List.of("GLOBAL", "USER_DEFAULT", "USER", "DEPARTMENT", "ROLE", "GROUP", "KNOWLEDGE_SPACE", "TEMP_CACHE")
+            .contains(scopeType)) {
+            throw new BizException(400, "不支持的配额作用域类型");
+        }
+    }
+
+    private void ensureQuotaPolicyScopeNotExists(String scopeType, Long scopeId, Long exceptPolicyId) {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM sys_storage_quota_policy
+            WHERE scope_type = ?
+              AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
+              AND (? IS NULL OR id <> ?)
+              AND is_deleted = 0
+            """,
+            Integer.class,
+            scopeType,
+            scopeId,
+            scopeId,
+            exceptPolicyId,
+            exceptPolicyId
+        );
+        if (count != null && count > 0) {
+            throw new BizException(409, "同一作用域已存在配额策略");
+        }
+    }
+
+    private void ensureQuotaPolicyCodeNotExists(String policyCode) {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM sys_storage_quota_policy
+            WHERE policy_code = ? AND is_deleted = 0
+            """,
+            Integer.class,
+            policyCode
+        );
+        if (count != null && count > 0) {
+            throw new BizException(409, "配额策略编码已存在");
+        }
+    }
+
+    private boolean requiresScopeId(String scopeType) {
+        return List.of("USER", "DEPARTMENT", "ROLE", "GROUP", "KNOWLEDGE_SPACE").contains(scopeType);
+    }
+
+    private QuotaPolicyResponse getQuotaPolicyOrThrow(Long policyId) {
+        QuotaPolicyRow row = getQuotaPolicyRowOrThrow(policyId);
+        return toQuotaPolicyResponse(row);
+    }
+
+    private QuotaPolicyRow getQuotaPolicyRowOrThrow(Long policyId) {
+        List<QuotaPolicyRow> rows = jdbcTemplate.query("""
+            SELECT id, policy_code, policy_name, scope_type, scope_id, quota_bytes,
+                   cache_quota_bytes, warning_threshold, block_threshold, status, created_at, updated_at
+            FROM sys_storage_quota_policy
+            WHERE id = ? AND is_deleted = 0
+            """,
+            this::mapQuotaPolicyRow,
+            policyId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "配额策略不存在");
+        }
+        return rows.get(0);
+    }
+
+    private QuotaPolicyResponse mapQuotaPolicy(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        return toQuotaPolicyResponse(mapQuotaPolicyRow(rs, rowNum));
+    }
+
+    private QuotaPolicyRow mapQuotaPolicyRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        return new QuotaPolicyRow(
+            rs.getLong("id"),
+            rs.getString("policy_code"),
+            rs.getString("policy_name"),
+            rs.getString("scope_type"),
+            rs.getObject("scope_id", Long.class),
+            rs.getLong("quota_bytes"),
+            rs.getObject("cache_quota_bytes", Long.class),
+            rs.getBigDecimal("warning_threshold"),
+            rs.getBigDecimal("block_threshold"),
+            rs.getString("status"),
+            rs.getTimestamp("created_at").toLocalDateTime(),
+            rs.getTimestamp("updated_at").toLocalDateTime()
+        );
+    }
+
+    private QuotaPolicyResponse toQuotaPolicyResponse(QuotaPolicyRow row) {
+        QuotaPolicyResponse response = new QuotaPolicyResponse();
+        response.setPolicyId(row.id());
+        response.setPolicyCode(row.policyCode());
+        response.setPolicyName(row.policyName());
+        response.setScopeType(row.scopeType());
+        response.setScopeId(row.scopeId());
+        response.setQuotaBytes(row.quotaBytes());
+        response.setCacheQuotaBytes(row.cacheQuotaBytes());
+        response.setWarningThreshold(row.warningThreshold());
+        response.setBlockThreshold(row.blockThreshold());
+        response.setStatus(row.status());
+        response.setCreatedAt(row.createdAt());
+        response.setUpdatedAt(row.updatedAt());
+        return response;
     }
 
     private BigDecimal ratio(long used, long quota) {
@@ -712,6 +954,63 @@ public class FileCenterService {
         return rows.get(0);
     }
 
+    private DownloadTicketRow getDownloadTicketOrThrow(String ticketNo) {
+        List<DownloadTicketRow> rows = jdbcTemplate.query("""
+            SELECT id, ticket_no, attachment_ref_id, requester_type, requester_id,
+                   download_type, expire_at, status
+            FROM sys_download_ticket
+            WHERE ticket_no = ? AND is_deleted = 0
+            """,
+            (rs, rowNum) -> new DownloadTicketRow(
+                rs.getLong("id"),
+                rs.getString("ticket_no"),
+                rs.getLong("attachment_ref_id"),
+                rs.getString("requester_type"),
+                rs.getLong("requester_id"),
+                rs.getString("download_type"),
+                rs.getTimestamp("expire_at").toLocalDateTime(),
+                rs.getString("status")
+            ),
+            ticketNo
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "下载票据不存在");
+        }
+        return rows.get(0);
+    }
+
+    private DownloadAttachmentRow getDownloadAttachmentOrThrow(Long attachmentRefId) {
+        List<DownloadAttachmentRow> rows = jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id, ar.display_name, ar.uploader_type, ar.uploader_id,
+                   ar.deleted_at, ar.is_deleted AS attachment_deleted,
+                   fo.storage_provider, fo.bucket_name, fo.object_key, fo.mime_type, fo.file_size,
+                   fo.is_deleted AS file_deleted
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE ar.id = ?
+            """,
+            (rs, rowNum) -> new DownloadAttachmentRow(
+                rs.getLong("attachment_ref_id"),
+                rs.getString("display_name"),
+                rs.getString("uploader_type"),
+                rs.getLong("uploader_id"),
+                rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime(),
+                rs.getInt("attachment_deleted"),
+                rs.getString("storage_provider"),
+                rs.getString("bucket_name"),
+                rs.getString("object_key"),
+                rs.getString("mime_type"),
+                rs.getLong("file_size"),
+                rs.getInt("file_deleted")
+            ),
+            attachmentRefId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "附件引用不存在");
+        }
+        return rows.get(0);
+    }
+
     private AttachmentRow getAttachmentOrThrow(Long attachmentRefId) {
         List<AttachmentRow> rows = jdbcTemplate.query("""
             SELECT ar.id, ar.file_object_id, ar.display_name, ar.uploader_type, ar.uploader_id,
@@ -818,8 +1117,10 @@ public class FileCenterService {
                 response.setStorageProvider(rs.getString("storage_provider"));
                 response.setBucketName(rs.getString("bucket_name"));
                 response.setObjectKey(rs.getString("object_key"));
-                response.setUploadUrl(localRoot.resolve(rs.getString("object_key")).toString());
-                response.setHeaders(Map.of("Content-Type", rs.getString("mime_type")));
+                StorageUploadTarget uploadTarget = storageProviderRegistry.require(rs.getString("storage_provider"))
+                    .buildUploadTarget(rs.getString("bucket_name"), rs.getString("object_key"), rs.getString("mime_type"), 60);
+                response.setUploadUrl(uploadTarget.uploadUrl());
+                response.setHeaders(uploadTarget.headers());
                 response.setExpireAt(rs.getTimestamp("expire_at").toLocalDateTime());
                 return response;
             },
@@ -890,6 +1191,47 @@ public class FileCenterService {
         String contentSha256
     ) {}
 
+    private record DownloadTicketRow(
+        Long id,
+        String ticketNo,
+        Long attachmentRefId,
+        String requesterType,
+        Long requesterId,
+        String downloadType,
+        LocalDateTime expireAt,
+        String status
+    ) {}
+
+    private record DownloadAttachmentRow(
+        Long attachmentRefId,
+        String displayName,
+        String uploaderType,
+        Long uploaderId,
+        LocalDateTime deletedAt,
+        Integer attachmentDeleted,
+        String storageProvider,
+        String bucketName,
+        String objectKey,
+        String mimeType,
+        Long fileSize,
+        Integer fileDeleted
+    ) {}
+
+    private record QuotaPolicyRow(
+        Long id,
+        String policyCode,
+        String policyName,
+        String scopeType,
+        Long scopeId,
+        Long quotaBytes,
+        Long cacheQuotaBytes,
+        BigDecimal warningThreshold,
+        BigDecimal blockThreshold,
+        String status,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+    ) {}
+
     private record AttachmentRow(
         Long id,
         Long fileObjectId,
@@ -906,21 +1248,4 @@ public class FileCenterService {
         String scanStatus
     ) {}
 
-    private static final class DigestOutputStream extends java.io.OutputStream {
-        private final MessageDigest digest;
-
-        private DigestOutputStream(MessageDigest digest) {
-            this.digest = digest;
-        }
-
-        @Override
-        public void write(int b) {
-            digest.update((byte) b);
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) {
-            digest.update(b, off, len);
-        }
-    }
 }

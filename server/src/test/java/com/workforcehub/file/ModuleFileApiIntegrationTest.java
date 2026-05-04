@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -158,6 +159,76 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         assertAuditCountAtLeast("FILE_UPLOAD_CONFIRMED", 1);
         assertAuditCountAtLeast("FILE_UPLOAD_DEDUP", 1);
         assertAuditCountAtLeast("FILE_DOWNLOAD_TICKET_CREATED", 1);
+    }
+
+    @Test
+    @DisplayName("员工使用有效下载票据应能下载原始文件并标记票据已使用")
+    void employeeShouldDownloadFileByActiveTicket() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "download-ticket-content".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedPersonalFile(employeeSession, "下载验证.txt", content);
+
+        MvcResult ticketResult = mockMvc.perform(post("/api/employee/files/{attachmentRefId}/download-tickets", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "下载验证"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        String ticketNo = data(ticketResult).get("ticketNo").asText();
+        mockMvc.perform(get("/api/employee/files/download/{ticketNo}", ticketNo)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(content));
+
+        String status = jdbcTemplate.queryForObject(
+            "SELECT status FROM sys_download_ticket WHERE ticket_no = ?",
+            String.class,
+            ticketNo
+        );
+        assertEquals("USED", status);
+        assertAuditCountAtLeast("FILE_DOWNLOAD_EXECUTED", 1);
+    }
+
+    @Test
+    @DisplayName("过期下载票据不能下载文件")
+    void expiredDownloadTicketShouldBeRejected() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        Long attachmentRefId = createConfirmedPersonalFile(employeeSession, "过期下载.txt", "expired-download-content");
+
+        MvcResult ticketResult = mockMvc.perform(post("/api/employee/files/{attachmentRefId}/download-tickets", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "过期验证"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        String ticketNo = data(ticketResult).get("ticketNo").asText();
+        jdbcTemplate.update("""
+            UPDATE sys_download_ticket
+            SET expire_at = DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+            WHERE ticket_no = ?
+            """, ticketNo);
+
+        mockMvc.perform(get("/api/employee/files/download/{ticketNo}", ticketNo)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(410))
+            .andExpect(jsonPath("$.message", containsString("下载链接已过期")));
     }
 
     @Test
@@ -424,6 +495,204 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.attachmentRefCount").value(1));
     }
 
+    @Test
+    @DisplayName("后台应能创建、查询和更新配额策略")
+    void adminShouldCreateListAndUpdateQuotaPolicy() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        MvcResult createResult = mockMvc.perform(post("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyCode": "USER_DEFAULT_20G",
+                      "policyName": "用户默认20G",
+                      "scopeType": "USER_DEFAULT",
+                      "scopeId": null,
+                      "quotaBytes": 21474836480,
+                      "cacheQuotaBytes": null,
+                      "warningThreshold": 0.8000,
+                      "blockThreshold": 1.0000,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.policyId").isNumber())
+            .andExpect(jsonPath("$.data.policyCode").value("USER_DEFAULT_20G"))
+            .andExpect(jsonPath("$.data.quotaBytes").value(21474836480L))
+            .andReturn();
+
+        Long policyId = data(createResult).get("policyId").asLong();
+
+        mockMvc.perform(get("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .param("scopeType", "USER_DEFAULT"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].policyCode").value("USER_DEFAULT_20G"));
+
+        mockMvc.perform(put("/api/admin/files/quota-policies/{policyId}", policyId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyName": "用户默认30G",
+                      "quotaBytes": 32212254720,
+                      "cacheQuotaBytes": 1073741824,
+                      "warningThreshold": 0.7500,
+                      "blockThreshold": 0.9500,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.policyName").value("用户默认30G"))
+            .andExpect(jsonPath("$.data.quotaBytes").value(32212254720L))
+            .andExpect(jsonPath("$.data.cacheQuotaBytes").value(1073741824L))
+            .andExpect(jsonPath("$.data.warningThreshold").value(0.7500))
+            .andExpect(jsonPath("$.data.blockThreshold").value(0.9500));
+    }
+
+    @Test
+    @DisplayName("后台配额策略应校验阈值和当前已用量")
+    void adminQuotaPolicyShouldValidateThresholdAndUsedBytes() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie adminSession = loginAdmin();
+        seedDefaultQuotaPolicy();
+        createConfirmedPersonalFile(employeeSession, "已用量校验.txt", "quota-used-content");
+
+        mockMvc.perform(post("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyCode": "INVALID_THRESHOLD",
+                      "policyName": "非法阈值",
+                      "scopeType": "USER",
+                      "scopeId": 2003,
+                      "quotaBytes": 1073741824,
+                      "cacheQuotaBytes": null,
+                      "warningThreshold": 0.9900,
+                      "blockThreshold": 0.8000,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message", containsString("预警阈值必须小于阻断阈值")));
+
+        mockMvc.perform(post("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyCode": "USER_2003_TOO_SMALL",
+                      "policyName": "低于已用量",
+                      "scopeType": "USER",
+                      "scopeId": 2003,
+                      "quotaBytes": 1,
+                      "cacheQuotaBytes": null,
+                      "warningThreshold": 0.8000,
+                      "blockThreshold": 1.0000,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message", containsString("配额不能低于当前已用量")));
+    }
+
+    @Test
+    @DisplayName("后台不能为同一作用域重复创建启用配额策略")
+    void adminQuotaPolicyShouldRejectDuplicateScope() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(post("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyCode": "USER_DEFAULT_20G",
+                      "policyName": "用户默认20G",
+                      "scopeType": "USER_DEFAULT",
+                      "scopeId": null,
+                      "quotaBytes": 21474836480,
+                      "cacheQuotaBytes": null,
+                      "warningThreshold": 0.8000,
+                      "blockThreshold": 1.0000,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyCode": "USER_DEFAULT_30G",
+                      "policyName": "用户默认30G",
+                      "scopeType": "USER_DEFAULT",
+                      "scopeId": null,
+                      "quotaBytes": 32212254720,
+                      "cacheQuotaBytes": null,
+                      "warningThreshold": 0.8000,
+                      "blockThreshold": 1.0000,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message", containsString("同一作用域已存在配额策略")));
+    }
+
+    @Test
+    @DisplayName("后台不能重复创建相同编码的配额策略")
+    void adminQuotaPolicyShouldRejectDuplicatePolicyCode() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(post("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyCode": "DUPLICATE_CODE",
+                      "policyName": "重复编码-用户默认",
+                      "scopeType": "USER_DEFAULT",
+                      "scopeId": null,
+                      "quotaBytes": 21474836480,
+                      "cacheQuotaBytes": null,
+                      "warningThreshold": 0.8000,
+                      "blockThreshold": 1.0000,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/admin/files/quota-policies")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "policyCode": "DUPLICATE_CODE",
+                      "policyName": "重复编码-单人覆盖",
+                      "scopeType": "USER",
+                      "scopeId": 2003,
+                      "quotaBytes": 32212254720,
+                      "cacheQuotaBytes": null,
+                      "warningThreshold": 0.8000,
+                      "blockThreshold": 1.0000,
+                      "status": "ENABLED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message", containsString("配额策略编码已存在")));
+    }
+
     private org.springframework.test.web.servlet.ResultActions createUploadTicket(
             Cookie session,
             String fileName,
@@ -456,7 +725,10 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, String text) throws Exception {
-        byte[] content = text.getBytes(StandardCharsets.UTF_8);
+        return createConfirmedPersonalFile(employeeSession, fileName, text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, byte[] content) throws Exception {
         String sha256 = sha256(content);
         MvcResult ticketResult = createUploadTicket(employeeSession, fileName, content.length, sha256)
             .andExpect(status().isOk())

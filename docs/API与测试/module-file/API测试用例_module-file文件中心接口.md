@@ -8,7 +8,7 @@
 | 文档版本 | `v1.0` |
 | 适用范围 | 两段式上传、秒传、配额、下载票据、回收站、清理任务 |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 测试契约已收口；第一批员工端主链路自动化测试已落地 |
+| 当前状态 | 测试契约已收口；第二批员工端下载执行与后台配额策略自动化测试已落地 |
 
 ---
 
@@ -35,6 +35,8 @@
 - 员工确认上传
 - 命中物理去重的秒传
 - 下载票据创建
+- 使用有效下载票据下载原始文件
+- 过期下载票据拦截
 - 个人配额不足拦截
 - 回收站删除、恢复、彻底删除
 - 彻底删除释放个人与企业总池用量
@@ -44,13 +46,16 @@
 - 确认上传业务归属防篡改
 - 员工云空间查询
 - 后台存储摘要查询
+- 后台创建、查询、更新配额策略
+- 后台配额策略阈值校验
+- 后台配额不能低于当前已用量校验
+- 后台配额策略编码重复拦截
+- 后台同一作用域重复策略拦截
 
 当前尚未自动化覆盖：
 
 - 真实 `MINIO` Provider
-- 真实下载执行入口
 - 后台上传与确认上传
-- 配额策略 CRUD
 - 后台回收站治理
 - 清理任务 dry-run 与执行
 - 文件类型和大小场景限制
@@ -179,9 +184,10 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `FILE-DL-001` | P0 | `POST /api/employee/files/{attachmentRefId}/download-tickets` | 有权限用户申请下载票据 | 员工 A 拥有附件引用 | `downloadType=SINGLE` | HTTP `200`；返回短期 `downloadUrl` |
 | `FILE-DL-002` | P0 | `POST /api/employee/files/{attachmentRefId}/download-tickets` | 无权限用户不能申请下载 | 员工 B 登录 | 员工 A 的个人文件 | HTTP `403`；提示无权访问该文件 |
-| `FILE-DL-003` | P0 | 下载入口 | 过期下载票据不能下载 | 下载票据已过期 | 访问下载入口 | HTTP `403` 或 `410`；提示下载链接已过期 |
+| `FILE-DL-003` | P0 | `GET /api/employee/files/download/{ticketNo}` | 过期下载票据不能下载 | 下载票据已过期 | 访问下载入口 | HTTP `200`；`code=410`；提示下载链接已过期 |
 | `FILE-DL-004` | P1 | `POST /api/employee/files/{attachmentRefId}/download-tickets` | 已进回收站文件不能下载 | 附件引用已删除 | 申请下载 | HTTP `404` 或 `409`；提示文件已删除 |
 | `FILE-DL-005` | P1 | 审计断言 | 下载票据创建写审计 | `FILE-DL-001` 成功 | 查询审计 | 存在下载票据创建审计记录 |
+| `FILE-DL-006` | P0 | `GET /api/employee/files/download/{ticketNo}` | 有效下载票据返回原始文件并标记已使用 | 下载票据有效且文件对象存在 | 访问下载入口 | HTTP `200`；Body 等于原始文件字节；票据状态更新为 `USED`；写入下载执行审计 |
 
 ## 6.5 回收站
 
@@ -199,10 +205,12 @@
 | 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `FILE-POL-001` | P0 | `POST /api/admin/files/quota-policies` | 创建用户默认配额策略 | 系统管理员已登录 | `USER_DEFAULT_10G` | HTTP `200`；返回策略详情 |
-| `FILE-POL-002` | P0 | `GET /api/admin/files/quota-policies` | 查询配额策略列表 | 已创建策略 | 按 `scopeType` 查询 | HTTP `200`；分页返回策略 |
+| `FILE-POL-002` | P0 | `GET /api/admin/files/quota-policies` | 查询配额策略列表 | 已创建策略 | 按 `scopeType` 查询 | HTTP `200`；返回策略数组 |
 | `FILE-POL-003` | P0 | `PUT /api/admin/files/quota-policies/{id}` | 更新单用户覆盖配额 | 已创建用户覆盖策略 | 调整 `quotaBytes` | HTTP `200`；策略更新 |
 | `FILE-POL-004` | P1 | `PUT /api/admin/files/quota-policies/{id}` | 预警阈值大于阻断阈值被拒绝 | 管理员已登录 | `warningThreshold=1.0`、`blockThreshold=0.8` | HTTP `400`；提示阈值非法 |
 | `FILE-POL-005` | P1 | `PUT /api/admin/files/quota-policies/{id}` | 配额低于已用量被拒绝 | 当前作用域已有使用量 | 调小到小于已用 | HTTP `409`；提示配额不能低于当前已用 |
+| `FILE-POL-006` | P1 | `POST /api/admin/files/quota-policies` | 配额策略编码重复被拒绝 | 已存在相同 `policyCode` | 重复编码创建另一策略 | HTTP `200`；`code=409`；提示配额策略编码已存在 |
+| `FILE-POL-007` | P1 | `POST /api/admin/files/quota-policies` | 同一作用域重复策略被拒绝 | 已存在同一 `scopeType + scopeId` 策略 | 创建同作用域策略 | HTTP `200`；`code=409`；提示同一作用域已存在配额策略 |
 
 ## 6.7 后台回收站与清理
 

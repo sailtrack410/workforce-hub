@@ -4,6 +4,184 @@
 
 ---
 
+## 2026-05-04 module-file 第二批文件中心能力落地
+
+### 改动背景
+
+第一批已经跑通员工端上传、确认、秒传、下载票据、配额查询和回收站主链路，但还存在三个明显缺口：
+
+- 下载票据只能生成短期地址，不能真正返回文件二进制
+- `LOCAL` 存储逻辑直接写在 `FileCenterService` 中，后续接 `MINIO` 会继续堆大 Service
+- 后台端只有存储摘要，管理员还不能通过接口维护用户默认配额或单人覆盖配额
+
+本轮目标是补第二批后端能力，并保持“先测试、再实现、再审查”的节奏。
+
+### 执行过程
+
+#### 1. 先补红灯测试
+
+修改：
+
+- `server/src/test/java/com/workforcehub/file/ModuleFileApiIntegrationTest.java`
+
+新增测试覆盖：
+
+- 有效下载票据可以下载原始文件字节
+- 下载成功后票据状态更新为 `USED`
+- 下载执行写入 `FILE_DOWNLOAD_EXECUTED` 审计
+- 过期下载票据返回业务码 `410`
+- 后台创建、查询、更新配额策略
+- 配额策略阈值非法时拦截
+- 配额低于当前已用量时拦截
+- 同一作用域不能重复创建配额策略
+- 相同 `policyCode` 不能重复创建配额策略，避免数据库唯一键异常冒成 `500`
+
+红灯结果：
+
+- `mvn -Dtest=ModuleFileApiIntegrationTest test`
+- 新增 4 个用例按预期失败在 `404`
+- 失败原因是 `GET /api/employee/files/download/{ticketNo}` 与后台配额策略接口尚未实现
+
+**意义**：
+
+- 先用测试把本轮要补的业务行为钉住，避免只做“看起来有代码”的空接口
+
+#### 2. 抽象存储 Provider
+
+新增：
+
+- `server/src/main/java/com/workforcehub/file/storage/StorageProvider.java`
+- `server/src/main/java/com/workforcehub/file/storage/StorageProviderRegistry.java`
+- `server/src/main/java/com/workforcehub/file/storage/StorageUploadTarget.java`
+- `server/src/main/java/com/workforcehub/file/storage/StorageObjectResource.java`
+- `server/src/main/java/com/workforcehub/file/storage/LocalStorageProvider.java`
+- `server/src/main/java/com/workforcehub/file/storage/MinioStorageProvider.java`
+
+本轮 Provider 边界：
+
+- `LOCAL` 负责本地上传目标、服务端 hash 校验、下载资源读取和后端剩余容量读取
+- `MINIO` 提供预签名上传地址、对象校验和对象读取结构
+- 普通自动化测试仍只依赖 `LOCAL`，不会要求 MinIO 服务在线
+
+**意义**：
+
+- 文件中心的业务 Service 不再直接依赖本地磁盘路径
+- 后续切换 MinIO、OSS、WebDAV 时，可以沿 Provider 接口扩展
+
+#### 3. 实现真实下载入口
+
+修改：
+
+- `server/src/main/java/com/workforcehub/file/controller/EmployeeFileController.java`
+- `server/src/main/java/com/workforcehub/file/service/FileCenterService.java`
+- `server/src/main/java/com/workforcehub/file/dto/DownloadFileResult.java`
+
+新增接口：
+
+- `GET /api/employee/files/download/{ticketNo}`
+
+接口行为：
+
+- 校验当前用户必须是下载票据申请人
+- 校验票据状态必须为 `ACTIVE`
+- 校验票据未过期，过期时更新为 `EXPIRED` 并返回业务码 `410`
+- 校验附件引用和物理文件对象未删除
+- 通过 `StorageProvider` 读取文件资源
+- 下载成功后把票据状态更新为 `USED`
+- 写入 `FILE_DOWNLOAD_EXECUTED` 审计
+
+**意义**：
+
+- 文件下载从“只创建票据”推进到“短期票据真正可用”
+- 后续消息附件、群文件、文档、审批附件都可以复用同一下载底座
+
+#### 4. 实现后台配额策略 CRUD
+
+新增：
+
+- `server/src/main/java/com/workforcehub/file/dto/CreateQuotaPolicyRequest.java`
+- `server/src/main/java/com/workforcehub/file/dto/UpdateQuotaPolicyRequest.java`
+- `server/src/main/java/com/workforcehub/file/dto/QuotaPolicyResponse.java`
+
+修改：
+
+- `server/src/main/java/com/workforcehub/file/controller/AdminFileController.java`
+- `server/src/main/java/com/workforcehub/file/service/FileCenterService.java`
+
+新增接口：
+
+- `GET /api/admin/files/quota-policies`
+- `POST /api/admin/files/quota-policies`
+- `PUT /api/admin/files/quota-policies/{policyId}`
+
+关键校验：
+
+- `warningThreshold` 必须小于 `blockThreshold`
+- `blockThreshold` 不得大于 `1.0`
+- `quotaBytes` 不能低于当前作用域已用量
+- `GLOBAL`、`USER_DEFAULT`、`TEMP_CACHE` 不允许传 `scopeId`
+- `USER`、`DEPARTMENT`、`ROLE`、`GROUP`、`KNOWLEDGE_SPACE` 必须传 `scopeId`
+- `status` 仅支持 `ENABLED`、`DISABLED`
+- `policyCode` 必须唯一，重复时返回业务码 `409`
+- 同一 `scopeType + scopeId` 只能保留一条未删除策略，显式规避 MySQL 唯一键遇到 `NULL` 时不能约束重复默认策略的问题
+
+**意义**：
+
+- 管理员可以通过后台接口维护默认配额和单人覆盖配额
+- 配额治理开始从“写死种子数据”进入“后台可配置”阶段
+
+#### 5. 同步 API 文档与测试用例
+
+修改：
+
+- `docs/API与测试/module-file/API文档_module-file文件中心接口.md`
+- `docs/API与测试/module-file/API测试用例_module-file文件中心接口.md`
+
+同步内容：
+
+- 已实现接口数量从第一批 `8` 个校准为第二批 `12` 个
+- 补 `GET /api/employee/files/download/{ticketNo}` 文档
+- 校准配额策略列表响应为数组结构
+- 自动化覆盖清单加入下载执行、过期下载拦截和配额策略 CRUD
+- 未覆盖清单移除“真实下载执行入口”和“配额策略 CRUD”
+
+### 自审结果
+
+| 角度 | 结论 | 后续建议 |
+| --- | --- | --- |
+| 功能完整性 | 第二批目标已覆盖：Provider 抽象、真实下载、配额策略 CRUD | 后台回收站治理、清理任务、后台上传仍需后续批次 |
+| 数据一致性 | 下载票据执行后会更新为 `USED`，过期会更新为 `EXPIRED` | 后续可补重复使用下载票据的自动化测试 |
+| 存储扩展性 | `FileCenterService` 已从直接碰磁盘改为通过 Provider 访问存储 | 后续建议继续拆 Repository，避免 Service 继续膨胀 |
+| MinIO 边界 | 已有 Provider 结构和 SDK 编译校验 | 仍未接真实 MinIO 容器做端到端上传/下载联调 |
+| 配额治理 | 已校验阈值、作用域、当前已用量、重复编码和同作用域重复创建 | 后续要把群空间、知识空间、部门策略的实际选择优先级补成测试 |
+| 安全与审计 | 下载执行、配额策略创建和更新都有审计入口 | 后台配额策略接口后续需要细化角色权限，不应长期只依赖管理员会话 |
+
+### 验证记录
+
+- `mvn -DskipTests compile`
+- `mvn -Dtest=ModuleFileApiIntegrationTest test`
+
+### 当前未完成边界
+
+- `MINIO` Provider 已编译接入，但还没有真实 MinIO 服务端到端联调
+- 后台上传与确认上传未实现
+- 后台回收站治理未实现
+- 清理任务 dry-run 与执行未实现
+- 文件类型、大小场景限制仍未配置化
+- 并发去重、并发配额扣减、并发幂等还需要专项测试
+
+### 下一步建议
+
+下一批建议继续做：
+
+1. 后台回收站治理接口
+2. 清理任务 dry-run 与执行
+3. 文件类型与大小限制配置化
+4. MinIO 本地容器联调和可选测试入口
+5. `FileCenterService` 仓储层拆分
+
+---
+
 ## 2026-05-03 module-file 第一批后端骨架落地与自审修订
 
 ### 改动背景
