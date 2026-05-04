@@ -154,6 +154,98 @@ public class FileCenterService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public UploadTicketResponse createAdminUploadTicket(CreateUploadTicketRequest request) {
+        Long adminId = CurrentUserHolder.requireUserId();
+        validateAdminOwner(request.getOwnerType(), request.getOwnerId());
+        UploadTicketResponse existingTicket = findUploadTicketByClientRequestId("ADMIN", adminId, request.getClientRequestId());
+        if (existingTicket != null) {
+            return existingTicket;
+        }
+        ensureUploadPolicy(request);
+        ensureGlobalQuota(request.getFileSize());
+
+        FileObjectRow existing = findActiveFileObject(request.getContentSha256(), request.getFileSize());
+        if (existing != null) {
+            Long attachmentRefId = createAttachmentRef(
+                request.getOwnerType(),
+                request.getOwnerId(),
+                existing.id(),
+                null,
+                request.getFileName(),
+                request.getFileName(),
+                "ADMIN",
+                adminId
+            );
+            increaseFileRefCount(existing.id());
+            increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+            audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+                "{\"fileObjectId\":%s}".formatted(existing.id()));
+            return deduplicatedResponse(existing, attachmentRefId);
+        }
+
+        Long ticketId = IdWorker.getId();
+        String ticketNo = "UP" + ticketId;
+        String objectKey = buildObjectKey(request.getContentSha256(), request.getFileName());
+        StorageProvider provider = storageProviderRegistry.require(PROVIDER_LOCAL);
+        String bucketName = provider.defaultBucketName();
+        StorageUploadTarget uploadTarget = provider.buildUploadTarget(bucketName, objectKey, request.getMimeType(), 60);
+
+        try {
+            jdbcTemplate.update("""
+                INSERT INTO sys_upload_ticket
+                    (id, ticket_no, uploader_type, uploader_id, biz_type, biz_id,
+                     storage_provider, bucket_name, file_name, mime_type, file_size,
+                     content_md5, content_sha256, object_key, client_request_id,
+                     expire_at, status, created_by)
+                VALUES
+                    (?, ?, 'ADMIN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+                """,
+                ticketId,
+                ticketNo,
+                adminId,
+                request.getOwnerType(),
+                request.getOwnerId(),
+                PROVIDER_LOCAL,
+                bucketName,
+                request.getFileName(),
+                request.getMimeType(),
+                request.getFileSize(),
+                blankToNull(request.getContentMd5()),
+                request.getContentSha256().toLowerCase(),
+                objectKey,
+                blankToNull(request.getClientRequestId()),
+                uploadTarget.expireAt(),
+                adminId
+            );
+        } catch (DuplicateKeyException e) {
+            UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(
+                "ADMIN",
+                adminId,
+                request.getClientRequestId()
+            );
+            if (concurrentTicket != null) {
+                return concurrentTicket;
+            }
+            throw e;
+        }
+
+        UploadTicketResponse response = new UploadTicketResponse();
+        response.setUploadTicketId(ticketId);
+        response.setTicketNo(ticketNo);
+        response.setDeduplicated(false);
+        response.setAttachmentRefId(null);
+        response.setStorageProvider(PROVIDER_LOCAL);
+        response.setBucketName(bucketName);
+        response.setObjectKey(objectKey);
+        response.setUploadUrl(uploadTarget.uploadUrl());
+        response.setHeaders(uploadTarget.headers());
+        response.setExpireAt(uploadTarget.expireAt());
+        audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_TICKET_CREATED", "UPLOAD_TICKET", ticketId, "SUCCESS",
+            "{\"objectKey\":\"%s\"}".formatted(objectKey));
+        return response;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public AttachmentRefResponse confirmEmployeeUpload(ConfirmUploadRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         UploadTicketRow ticket = getUploadTicketOrThrow(request.getUploadTicketId());
@@ -221,6 +313,76 @@ public class FileCenterService {
         increaseUsage("GLOBAL", null, request.getFileSize(), 1);
         markUploadTicketConfirmed(ticket.id());
         audit("USER", userId, "FILE_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+            "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
+        return buildAttachmentResponse(attachmentRefId, deduplicated);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public AttachmentRefResponse confirmAdminUpload(ConfirmUploadRequest request) {
+        Long adminId = CurrentUserHolder.requireUserId();
+        UploadTicketRow ticket = getUploadTicketOrThrow(request.getUploadTicketId());
+        if (!"ADMIN".equals(ticket.uploaderType()) || !adminId.equals(ticket.uploaderId())) {
+            throw new BizException(403, "无权确认该上传票据");
+        }
+        Long existingRefId = findAttachmentRefIdByTicket(ticket.id());
+        if (existingRefId != null) {
+            markUploadTicketConfirmed(ticket.id());
+            return buildAttachmentResponse(existingRefId, false);
+        }
+        if ("CONFIRMED".equals(ticket.status())) {
+            throw new BizException(409, "上传票据已确认");
+        }
+        if (ticket.expireAt().isBefore(LocalDateTime.now())) {
+            throw new BizException(409, "上传票据已过期");
+        }
+        if (!ticket.objectKey().equals(request.getObjectKey())) {
+            throw new BizException(422, "文件对象不匹配，请重新上传");
+        }
+        if (!ticket.contentSha256().equalsIgnoreCase(request.getContentSha256())
+            || !ticket.fileSize().equals(request.getFileSize())) {
+            throw new BizException(422, "文件校验失败，请重新上传");
+        }
+        if (!ticket.bizType().equals(request.getOwnerType()) || !sameId(ticket.bizId(), request.getOwnerId())) {
+            throw new BizException(422, "业务归属不匹配，请重新申请上传票据");
+        }
+        validateAdminOwner(request.getOwnerType(), request.getOwnerId());
+
+        storageProviderRegistry.require(ticket.storageProvider())
+            .verifyObject(ticket.bucketName(), request.getObjectKey(), request.getContentSha256(), request.getFileSize());
+        ensureGlobalQuota(request.getFileSize());
+
+        boolean deduplicated = false;
+        FileObjectRow fileObject = findActiveFileObject(request.getContentSha256(), request.getFileSize());
+        if (fileObject == null) {
+            fileObject = createFileObject(ticket, request, adminId);
+        } else {
+            deduplicated = true;
+        }
+
+        Long attachmentRefId;
+        try {
+            attachmentRefId = createAttachmentRef(
+                request.getOwnerType(),
+                request.getOwnerId(),
+                fileObject.id(),
+                ticket.id(),
+                ticket.fileName(),
+                request.getDisplayName(),
+                "ADMIN",
+                adminId
+            );
+        } catch (DuplicateKeyException e) {
+            Long concurrentRefId = findAttachmentRefIdByTicket(ticket.id());
+            if (concurrentRefId != null) {
+                markUploadTicketConfirmed(ticket.id());
+                return buildAttachmentResponse(concurrentRefId, false);
+            }
+            throw e;
+        }
+        increaseFileRefCount(fileObject.id());
+        increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+        markUploadTicketConfirmed(ticket.id());
+        audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
         return buildAttachmentResponse(attachmentRefId, deduplicated);
     }
@@ -563,6 +725,15 @@ public class FileCenterService {
         }
         if (ownerId != null) {
             throw new BizException(400, "个人文件不应指定业务归属ID");
+        }
+    }
+
+    private void validateAdminOwner(String ownerType, Long ownerId) {
+        if (!"ADMIN_FILE".equals(ownerType)) {
+            throw new BizException(400, "后台第一版仅支持后台治理文件");
+        }
+        if (ownerId != null) {
+            throw new BizException(400, "后台治理文件不应指定业务归属ID");
         }
     }
 
@@ -1178,13 +1349,17 @@ public class FileCenterService {
     }
 
     private UploadTicketResponse findUploadTicketByClientRequestId(Long userId, String clientRequestId) {
+        return findUploadTicketByClientRequestId("USER", userId, clientRequestId);
+    }
+
+    private UploadTicketResponse findUploadTicketByClientRequestId(String uploaderType, Long uploaderId, String clientRequestId) {
         if (!StringUtils.hasText(clientRequestId)) {
             return null;
         }
         List<UploadTicketResponse> rows = jdbcTemplate.query("""
             SELECT id, ticket_no, storage_provider, bucket_name, object_key, mime_type, expire_at
             FROM sys_upload_ticket
-            WHERE uploader_type = 'USER' AND uploader_id = ? AND client_request_id = ?
+            WHERE uploader_type = ? AND uploader_id = ? AND client_request_id = ?
               AND is_deleted = 0
             ORDER BY created_at DESC
             LIMIT 1
@@ -1205,7 +1380,8 @@ public class FileCenterService {
                 response.setExpireAt(rs.getTimestamp("expire_at").toLocalDateTime());
                 return response;
             },
-            userId,
+            uploaderType,
+            uploaderId,
             clientRequestId
         );
         return rows.isEmpty() ? null : rows.get(0);

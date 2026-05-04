@@ -9,7 +9,7 @@
 | 适用范围 | 两段式上传、文件去重、配额查询、下载票据、回收站、后台配额治理 |
 | 对应模块 | `server/module-file` |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 契约已收口；员工端主链路、真实下载入口、后台存储摘要、配额策略 CRUD、上传限制策略已完成第二批后端实现 |
+| 当前状态 | 契约已收口；员工端主链路、真实下载入口、后台上传确认、后台存储摘要、配额策略 CRUD、上传限制策略已完成后端实现 |
 
 ---
 
@@ -17,7 +17,7 @@
 
 本文档覆盖以下 `18` 个接口。
 
-当前第二批已实现 `12` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `4` 个接口（存储摘要 + 配额策略 CRUD）。其余后台上传、后台回收站治理和清理任务仍是后续实现契约。
+当前已实现 `14` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `6` 个接口（后台上传确认、存储摘要、配额策略 CRUD）。其余后台回收站治理和清理任务仍是后续实现契约。
 
 ### 1. 员工端
 
@@ -32,8 +32,8 @@
 
 ### 2. 后台端
 
-- `POST /api/admin/files/upload-tickets`（契约，待实现）
-- `POST /api/admin/files/confirm-upload`（契约，待实现）
+- `POST /api/admin/files/upload-tickets`（已实现）
+- `POST /api/admin/files/confirm-upload`（已实现）
 - `GET /api/admin/files/storage-summary`（已实现）
 - `GET /api/admin/files/quota-policies`（已实现）
 - `POST /api/admin/files/quota-policies`（已实现）
@@ -650,13 +650,16 @@ http://localhost:8080
 
 用途：
 
-- 后台上传知识库文件、治理附件或系统文档
+- 后台上传治理附件或系统文档
+- 第一版先支撑后台治理文件最小闭环，知识库文件和文档文件需等 `module-kb` / `module-doc` 的空间 ACL 落地后再开放
 
 请求体与员工端保持一致，区别在于：
 
 - 鉴权身份为后台管理员
-- `ownerType` 常见为 `KB_DOCUMENT`、`DOC_DOCUMENT`
-- 权限由后台角色和业务空间 ACL 共同决定
+- 第一版仅允许 `ownerType=ADMIN_FILE` 且 `ownerId=null`
+- 命中 `content_sha256 + file_size` 去重时直接创建后台附件引用并返回秒传结果
+- 后台治理文件只计入企业总池，不占员工个人云空间
+- 权限当前由后台管理员会话隔离，细分后台角色权限后再接入权限点
 
 ### 7.2 确认后台上传完成
 
@@ -664,7 +667,12 @@ http://localhost:8080
 
 请求体与员工端保持一致。
 
-成功后返回 `AttachmentRefResponse`。
+成功后返回 `AttachmentRefResponse`，并写入：
+
+- `sys_upload_ticket.uploader_type = ADMIN`
+- `sys_attachment_ref.uploader_type = ADMIN`
+- `sys_storage_usage.scope_type = GLOBAL`
+- `sys_audit_log.action_type = FILE_ADMIN_UPLOAD_CONFIRMED`
 
 ### 7.3 查询存储摘要
 

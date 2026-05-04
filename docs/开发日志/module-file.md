@@ -4,6 +4,60 @@
 
 ---
 
+## 2026-05-05 module-file 后台上传确认最小闭环
+
+### 改动背景
+
+后续知识库、文档和 Agent 文件能力都会依赖后台治理侧上传入口。员工端上传已经收口为 `PERSONAL_FILE`，不能继续拿员工入口承载后台文件，否则会把后台治理文件错误计入个人云空间，也会让业务归属授权边界变模糊。
+
+### 红灯验证
+
+新增自动化用例：
+
+- `ModuleFileAdminApiIntegrationTest#adminShouldUploadConfirmAndDeduplicateFile`
+
+红灯结果：
+
+- `POST /api/admin/files/upload-tickets` 返回 `404`
+
+这说明后台上传票据和确认上传接口尚未落地。
+
+### 修订内容
+
+新增：
+
+- `server/src/main/resources/db/migration/V7__add_admin_file_upload_policy.sql`
+- `server/src/test/java/com/workforcehub/file/ModuleFileAdminApiIntegrationTest.java`
+
+修改：
+
+- `server/src/main/java/com/workforcehub/file/controller/AdminFileController.java`
+- `server/src/main/java/com/workforcehub/file/service/FileCenterService.java`
+- `docs/API与测试/module-file/API文档_module-file文件中心接口.md`
+- `docs/API与测试/module-file/API测试用例_module-file文件中心接口.md`
+
+关键修订：
+
+- 新增后台端 `POST /api/admin/files/upload-tickets`
+- 新增后台端 `POST /api/admin/files/confirm-upload`
+- 第一版后台上传仅允许 `ownerType=ADMIN_FILE` 且 `ownerId=null`
+- 后台上传人写入 `uploader_type=ADMIN`，只计入企业总池 `GLOBAL`，不占员工个人云空间
+- 新增 `ADMIN_FILE_DEFAULT_200M` 上传策略，后台治理文件默认单文件上限 `200MB`
+- 后台确认上传复用物理去重、上传票据确认幂等和审计链路
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest test`
+- 绿灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest test`
+
+### 后续边界
+
+- `ADMIN_FILE` 只是后台治理文件最小闭环，不等同于知识库文件或文档文件
+- `KB_DOCUMENT`、`DOC_DOCUMENT` 等归属类型需等对应模块空间 ACL、权限校验和入库流程落地后再开放
+- 后续应继续拆出上传策略服务，避免 `FileCenterService` 持续膨胀
+
+---
+
 ## 2026-05-05 module-file 上传限制策略配置化
 
 ### 改动背景

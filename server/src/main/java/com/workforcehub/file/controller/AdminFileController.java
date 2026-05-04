@@ -1,10 +1,14 @@
 package com.workforcehub.file.controller;
 
 import com.workforcehub.common.response.R;
+import com.workforcehub.file.dto.AttachmentRefResponse;
+import com.workforcehub.file.dto.ConfirmUploadRequest;
 import com.workforcehub.file.dto.CreateQuotaPolicyRequest;
+import com.workforcehub.file.dto.CreateUploadTicketRequest;
 import com.workforcehub.file.dto.QuotaPolicyResponse;
 import com.workforcehub.file.dto.StorageSummaryResponse;
 import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
+import com.workforcehub.file.dto.UploadTicketResponse;
 import com.workforcehub.file.service.FileCenterService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +33,16 @@ public class AdminFileController {
 
     public AdminFileController(FileCenterService fileCenterService) {
         this.fileCenterService = fileCenterService;
+    }
+
+    @PostMapping("/upload-tickets")
+    public R<UploadTicketResponse> createUploadTicket(@Valid @RequestBody CreateUploadTicketRequest request) {
+        return R.ok(fileCenterService.createAdminUploadTicket(request));
+    }
+
+    @PostMapping("/confirm-upload")
+    public R<AttachmentRefResponse> confirmUpload(@Valid @RequestBody ConfirmUploadRequest request) {
+        return R.ok(fileCenterService.confirmAdminUpload(request));
     }
 
     @GetMapping("/storage-summary")
