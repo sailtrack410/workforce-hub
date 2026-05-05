@@ -24,7 +24,10 @@ import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -148,6 +151,137 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
         assertTrue(existingAttachmentRefId > 0);
     }
 
+    @Test
+    @DisplayName("后台不应仅凭员工文件hash和大小直接命中秒传")
+    void adminUploadTicketShouldNotDeduplicateEmployeeFileByHashOnly() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] content = "employee-private-hash-only-content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        Long employeeAttachmentRefId = createConfirmedEmployeeFile(employeeSession, "员工私有文件.pdf", content);
+
+        MvcResult adminTicketResult = createAdminUploadTicket(
+                adminSession,
+                "后台不能直接秒传员工文件.pdf",
+                content.length,
+                sha256,
+                "admin-should-upload-own-copy"
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(false))
+            .andExpect(jsonPath("$.data.uploadTicketId").isNumber())
+            .andExpect(jsonPath("$.data.attachmentRefId").doesNotExist())
+            .andReturn();
+
+        assertTrue(data(adminTicketResult).get("objectKey").asText().contains("/"));
+        assertEquals(0L, adminAttachmentRefCount());
+        assertTrue(employeeAttachmentRefId > 0);
+    }
+
+    @Test
+    @DisplayName("后台应能治理ADMIN_FILE列表、下载、回收站、恢复和彻底删除")
+    void adminShouldManageAdminFileLifecycle() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] content = "admin-lifecycle-content".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedAdminFile(adminSession, "后台生命周期.pdf", content);
+
+        mockMvc.perform(get("/api/admin/files")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonPath("$.data.list[0].ownerType").value("ADMIN_FILE"))
+            .andExpect(jsonPath("$.data.list[0].uploaderType").value("ADMIN"));
+
+        MvcResult downloadTicketResult = mockMvc.perform(post("/api/admin/files/{attachmentRefId}/download-tickets", attachmentRefId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "后台生命周期下载验证"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.ticketNo").isString())
+            .andReturn();
+        String ticketNo = data(downloadTicketResult).get("ticketNo").asText();
+
+        mockMvc.perform(get("/api/admin/files/download/{ticketNo}", ticketNo)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(content().bytes(content));
+
+        mockMvc.perform(post("/api/admin/files/{attachmentRefId}/trash", attachmentRefId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "后台生命周期删除验证"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonPath("$.data.deletedAt").isString());
+
+        mockMvc.perform(get("/api/admin/files/recycle-bin")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonPath("$.data.list[0].deletedAt").isString());
+
+        mockMvc.perform(post("/api/admin/files/{attachmentRefId}/restore", attachmentRefId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "后台生命周期恢复验证"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId));
+
+        mockMvc.perform(post("/api/admin/files/{attachmentRefId}/trash", attachmentRefId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "后台生命周期再次删除验证"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(delete("/api/admin/files/{attachmentRefId}", attachmentRefId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonPath("$.data.physicalCleanupScheduled").value(true));
+
+        assertEquals(0L, usedBytes("GLOBAL", null));
+        assertEquals(0L, fileCount("GLOBAL", null));
+        assertAuditCountAtLeast("FILE_ADMIN_DOWNLOAD_TICKET_CREATED", 1);
+        assertAuditCountAtLeast("FILE_ADMIN_DOWNLOAD_EXECUTED", 1);
+        assertAuditCountAtLeast("FILE_ADMIN_TRASHED", 2);
+        assertAuditCountAtLeast("FILE_ADMIN_RESTORED", 1);
+        assertAuditCountAtLeast("FILE_ADMIN_PURGED", 1);
+    }
+
     private org.springframework.test.web.servlet.ResultActions createAdminUploadTicket(
             Cookie session,
             String fileName,
@@ -218,6 +352,85 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return data(confirmResult).get("attachmentRefId").asLong();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createEmployeeUploadTicket(
+            Cookie session,
+            String fileName,
+            long fileSize,
+            String sha256) throws Exception {
+        return mockMvc.perform(post("/api/employee/files/upload-tickets")
+            .cookie(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "ownerType": "PERSONAL_FILE",
+                  "ownerId": null,
+                  "fileName": "%s",
+                  "mimeType": "application/pdf",
+                  "fileSize": %s,
+                  "contentSha256": "%s",
+                  "contentMd5": null,
+                  "clientRequestId": "employee-file-test-%s"
+                }
+                """.formatted(fileName, fileSize, sha256, System.nanoTime())));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions confirmEmployeeUpload(
+            Cookie session,
+            long uploadTicketId,
+            String objectKey,
+            String sha256,
+            long fileSize,
+            String displayName) throws Exception {
+        return mockMvc.perform(post("/api/employee/files/confirm-upload")
+            .cookie(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "uploadTicketId": %s,
+                  "objectKey": "%s",
+                  "contentSha256": "%s",
+                  "fileSize": %s,
+                  "ownerType": "PERSONAL_FILE",
+                  "ownerId": null,
+                  "displayName": "%s"
+                }
+                """.formatted(uploadTicketId, objectKey, sha256, fileSize, displayName)));
+    }
+
+    private Long createConfirmedEmployeeFile(Cookie employeeSession, String fileName, byte[] content) throws Exception {
+        String sha256 = sha256(content);
+        MvcResult ticketResult = createEmployeeUploadTicket(employeeSession, fileName, content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        MvcResult confirmResult = confirmEmployeeUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, fileName)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        return data(confirmResult).get("attachmentRefId").asLong();
+    }
+
+    private Cookie loginEmployee() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "zhangsan.employee",
+                      "password": "Employee@123456"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(cookie().exists("SESSION"))
+            .andReturn();
+        return result.getResponse().getCookie("SESSION");
     }
 
     private Cookie loginAdmin() throws Exception {
@@ -299,6 +512,15 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             JOIN sys_file_object fo ON fo.id = ar.file_object_id
             WHERE fo.content_sha256 = ? AND fo.file_size = ? AND ar.is_deleted = 0
             """, Long.class, sha256, fileSize);
+        return value == null ? 0L : value;
+    }
+
+    private long adminAttachmentRefCount() {
+        Long value = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_attachment_ref
+            WHERE uploader_type = 'ADMIN' AND owner_type = 'ADMIN_FILE' AND is_deleted = 0
+            """, Long.class);
         return value == null ? 0L : value;
     }
 

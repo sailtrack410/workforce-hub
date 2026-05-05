@@ -9,15 +9,15 @@
 | 适用范围 | 两段式上传、文件去重、配额查询、下载票据、回收站、后台配额治理 |
 | 对应模块 | `server/module-file` |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 契约已收口；员工端主链路、真实下载入口、后台 `ADMIN_FILE` 上传确认、后台存储摘要、配额策略 CRUD、上传限制策略已完成后端实现 |
+| 当前状态 | 契约已收口；员工端主链路、真实下载入口、后台 `ADMIN_FILE` 上传确认、后台文件生命周期治理、后台存储摘要、配额策略 CRUD、上传限制策略已完成后端实现 |
 
 ---
 
 ## 二、接口范围
 
-本文档覆盖以下 `18` 个接口。
+本文档覆盖以下 `22` 个接口。
 
-当前已实现 `14` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `6` 个接口（后台上传确认、存储摘要、配额策略 CRUD）。其余后台回收站治理和清理任务仍是后续实现契约。
+当前已实现 `21` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `13` 个接口（后台上传确认、后台文件生命周期治理、存储摘要、配额策略 CRUD）。后台清理任务仍是后续实现契约。
 
 ### 1. 员工端
 
@@ -32,15 +32,19 @@
 
 ### 2. 后台端
 
+- `GET /api/admin/files`（已实现）
+- `GET /api/admin/files/recycle-bin`（已实现）
 - `POST /api/admin/files/upload-tickets`（已实现）
 - `POST /api/admin/files/confirm-upload`（已实现）
+- `POST /api/admin/files/{attachmentRefId}/download-tickets`（已实现）
+- `GET /api/admin/files/download/{ticketNo}`（已实现）
+- `POST /api/admin/files/{attachmentRefId}/trash`（已实现）
+- `POST /api/admin/files/{attachmentRefId}/restore`（已实现）
+- `DELETE /api/admin/files/{attachmentRefId}`（已实现）
 - `GET /api/admin/files/storage-summary`（已实现）
 - `GET /api/admin/files/quota-policies`（已实现）
 - `POST /api/admin/files/quota-policies`（已实现）
 - `PUT /api/admin/files/quota-policies/{id}`（已实现）
-- `GET /api/admin/files/recycle-bin`（契约，待实现）
-- `POST /api/admin/files/recycle-bin/{attachmentRefId}/restore`（契约，待实现）
-- `DELETE /api/admin/files/recycle-bin/{attachmentRefId}`（契约，待实现）
 - `POST /api/admin/files/cleanup-jobs/run`（契约，待实现）
 
 ---
@@ -132,6 +136,15 @@ http://localhost:8080
 | `ADMIN_FILE` | `ADMIN_FILE_DEFAULT_200M` | `209715200` 字节，约 `200MB` | 后台治理文件最小闭环策略；不代表知识库或文档空间上传策略 |
 
 后续接入群文件、审批附件、知识库原文件、文档空间文件、Agent 临时产物时，应为对应 `ownerType` 单独配置策略，避免所有场景共用同一套限制。
+
+#### deduplicateProof
+
+第一版物理去重口径仍是 `content_sha256 + file_size`，但申请上传票据阶段的“秒传”不能被理解为只要知道 hash 和大小就能直接挂载已有对象。
+
+- 同一上传主体已经拥有相同内容的有效附件引用时，申请上传票据可直接生成已确认票据和新业务引用，返回 `deduplicated=true`。
+- 跨上传主体发现相同物理对象时，不在申请阶段直接秒传；调用方仍需拿到上传票据并实际上传对象。
+- 确认上传阶段会重新读取并校验对象内容；校验通过后才允许复用已有物理对象。
+- 这个口径用于避免后台或员工仅凭他人文件的 hash 和大小直接创建可下载引用。
 
 #### scopeType
 
@@ -414,6 +427,7 @@ http://localhost:8080
 - `ownerType=PERSONAL_FILE` 且 `ownerId=null`
 - 文件类型和大小符合 `sys_file_upload_policy` 中 `PERSONAL_FILE` 启用策略
 - 若同一用户、同一 `clientRequestId` 已签发上传票据，重复申请优先返回原票据，不因后续策略调整重新判定
+- 申请阶段秒传仅复用同一员工本人已有的有效附件引用；如果相同内容只存在于其他上传主体名下，则仍返回普通上传票据
 - 个人空间、目标空间、企业总池、存储后端真实容量均允许写入
 
 ### 6.2 确认上传完成
@@ -654,18 +668,67 @@ http://localhost:8080
 
 - 后台上传治理附件或系统文档
 - 第一版先支撑后台治理文件最小闭环，知识库文件和文档文件需等 `module-kb` / `module-doc` 的空间 ACL 落地后再开放
-- 当前后台上传确认只覆盖票据、确认和秒传，不包含后台文件列表、下载、回收站删除、彻底删除或用量释放治理闭环
+- 当前后台文件生命周期已覆盖票据、确认、秒传、列表、下载、回收站、恢复、彻底删除和企业总池用量释放闭环
 
 请求体与员工端保持一致，区别在于：
 
 - 鉴权身份为后台管理员
 - 第一版仅允许 `ownerType=ADMIN_FILE` 且 `ownerId=null`
-- 命中 `content_sha256 + file_size` 去重时会创建一张 `CONFIRMED` 秒传票据、创建后台附件引用并返回秒传结果
+- 命中同一管理员已有有效附件引用的 `content_sha256 + file_size` 去重时，会创建一张 `CONFIRMED` 秒传票据、创建后台附件引用并返回秒传结果
+- 如果相同物理对象只存在于员工或其他上传主体名下，后台申请阶段不会直接秒传，必须先上传对象并在确认阶段完成服务端校验
 - 同一管理员、同一 `clientRequestId` 重复请求秒传时，返回同一张秒传票据和同一附件引用，不重复增加 `GLOBAL` 用量
 - 后台治理文件只计入企业总池，不占员工个人云空间
 - 权限当前由后台管理员会话隔离，细分后台角色权限后再接入权限点
 
-### 7.2 确认后台上传完成
+### 7.2 查询后台文件列表
+
+`GET /api/admin/files?pageNo=1&pageSize=20`
+
+用途：
+
+- 分页查询当前有效的后台治理文件
+- 第一版只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的附件引用
+- 不返回员工个人文件、知识库文件、文档空间文件或群文件
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "attachmentRefId": 9001,
+        "fileObjectId": 8001,
+        "ownerType": "ADMIN_FILE",
+        "ownerId": null,
+        "originalFileName": "后台制度文件.pdf",
+        "displayName": "后台制度文件.pdf",
+        "uploaderType": "ADMIN",
+        "uploaderId": 8001,
+        "mimeType": "application/pdf",
+        "fileSize": 1048576,
+        "contentSha256": "9b7d4d8c9a0b7c1d2e3f4567890abcdeffedcba09876543211234567890abcd",
+        "storageProvider": "LOCAL",
+        "bucketName": "local",
+        "objectKey": "uploads/2026/05/05/9b7d4d8c9a0b7c1d.pdf",
+        "scanStatus": "PENDING",
+        "deletedAt": null,
+        "purgeAfter": null,
+        "createdAt": "2026-05-05T13:20:00",
+        "updatedAt": "2026-05-05T13:20:00"
+      }
+    ]
+  },
+  "requestId": "file202605050101"
+}
+```
+
+### 7.3 确认后台上传完成
 
 `POST /api/admin/files/confirm-upload`
 
@@ -678,7 +741,108 @@ http://localhost:8080
 - `sys_storage_usage.scope_type = GLOBAL`
 - `sys_audit_log.action_type = FILE_ADMIN_UPLOAD_CONFIRMED`
 
-### 7.3 查询存储摘要
+### 7.4 申请后台下载票据
+
+`POST /api/admin/files/{attachmentRefId}/download-tickets`
+
+请求体：
+
+```json
+{
+  "downloadType": "SINGLE",
+  "reason": "后台治理文件下载"
+}
+```
+
+成功响应字段同员工端 `DownloadTicketResponse`，但 `downloadUrl` 为：
+
+```text
+/api/admin/files/download/{ticketNo}
+```
+
+关键校验：
+
+- 仅允许下载 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的后台治理文件
+- 文件必须未进入回收站且未彻底删除
+- 第一版仅支持 `downloadType=SINGLE`
+- 写入 `FILE_ADMIN_DOWNLOAD_TICKET_CREATED` 审计
+
+### 7.5 使用后台下载票据下载文件
+
+`GET /api/admin/files/download/{ticketNo}`
+
+成功响应：
+
+- HTTP `200`
+- Body 为原始文件二进制
+- 下载成功后票据状态更新为 `USED`
+- 写入 `FILE_ADMIN_DOWNLOAD_EXECUTED` 审计
+
+关键校验：
+
+- 当前后台管理员必须是票据申请人
+- 票据必须为 `ACTIVE` 且未过期
+- 附件引用必须仍为后台治理文件且未删除
+
+### 7.6 后台文件移入回收站
+
+`POST /api/admin/files/{attachmentRefId}/trash`
+
+请求体：
+
+```json
+{
+  "reason": "后台治理文件清理"
+}
+```
+
+成功响应字段同员工端 `FileTrashResponse`。
+
+关键语义：
+
+- 回收站保留期第一版为 `30` 天
+- 移入回收站不释放企业总池用量，也不减少物理对象引用数
+- 写入 `FILE_ADMIN_TRASHED` 审计
+
+### 7.7 后台文件从回收站恢复
+
+`POST /api/admin/files/{attachmentRefId}/restore`
+
+请求体：
+
+```json
+{
+  "reason": "误删恢复"
+}
+```
+
+成功响应字段同员工端 `FileRestoreResponse`。
+
+关键语义：
+
+- 仅允许恢复仍在回收站保留期内的后台治理文件
+- 恢复时复核企业总池是否仍允许写入
+- 写入 `FILE_ADMIN_RESTORED` 审计
+
+### 7.8 后台文件彻底删除
+
+`DELETE /api/admin/files/{attachmentRefId}`
+
+用途：
+
+- 彻底删除已进入回收站的后台治理文件引用
+- 释放企业总池 `GLOBAL` 用量
+- 如果物理对象已无有效业务引用，则设置延迟物理清理时间
+
+成功响应字段同员工端 `FilePurgeResponse`。
+
+关键语义：
+
+- 文件必须先进入回收站，不能直接彻底删除有效文件
+- 后台治理文件不占员工个人云空间，因此彻底删除只释放 `GLOBAL` 用量，不释放 `USER` 用量
+- 写入 `FILE_ADMIN_PURGED` 审计
+
+### 7.9 查询存储摘要
 
 `GET /api/admin/files/storage-summary`
 
@@ -707,7 +871,7 @@ http://localhost:8080
 }
 ```
 
-### 7.4 查询配额策略
+### 7.10 查询配额策略
 
 `GET /api/admin/files/quota-policies?scopeType=USER_DEFAULT`
 
@@ -737,7 +901,7 @@ http://localhost:8080
 }
 ```
 
-### 7.5 创建配额策略
+### 7.11 创建配额策略
 
 `POST /api/admin/files/quota-policies`
 
@@ -759,7 +923,7 @@ http://localhost:8080
 
 成功响应返回配额策略详情，字段同 `QuotaPolicyResponse`。
 
-### 7.6 更新配额策略
+### 7.12 更新配额策略
 
 `PUT /api/admin/files/quota-policies/{id}`
 
@@ -784,9 +948,15 @@ http://localhost:8080
 - `GLOBAL`、`USER_DEFAULT`、`TEMP_CACHE` 不允许传 `scopeId`
 - `USER`、`DEPARTMENT`、`ROLE`、`GROUP`、`KNOWLEDGE_SPACE` 必须传 `scopeId`
 
-### 7.7 查询回收站治理列表
+### 7.13 查询后台文件回收站列表
 
-`GET /api/admin/files/recycle-bin?ownerType=PERSONAL_FILE&uploaderId=1001&pageNo=1&pageSize=20`
+`GET /api/admin/files/recycle-bin?pageNo=1&pageSize=20`
+
+用途：
+
+- 分页查询后台治理文件回收站
+- 第一版只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的附件引用
+- 员工个人回收站仍由员工端自己治理，后台暂不接管
 
 成功响应：
 
@@ -802,12 +972,12 @@ http://localhost:8080
       {
         "attachmentRefId": 9001,
         "fileObjectId": 8001,
-        "ownerType": "PERSONAL_FILE",
+        "ownerType": "ADMIN_FILE",
         "ownerId": null,
-        "displayName": "请假证明.pdf",
+        "displayName": "后台制度文件.pdf",
         "fileSize": 1048576,
-        "uploaderType": "USER",
-        "uploaderId": 1001,
+        "uploaderType": "ADMIN",
+        "uploaderId": 8001,
         "deletedAt": "2026-05-03T11:20:00+08:00",
         "purgeAfter": "2026-06-02T11:20:00+08:00"
       }
@@ -817,29 +987,7 @@ http://localhost:8080
 }
 ```
 
-### 7.8 管理员恢复文件
-
-`POST /api/admin/files/recycle-bin/{attachmentRefId}/restore`
-
-请求体：
-
-```json
-{
-  "reason": "用户误删，管理员恢复"
-}
-```
-
-成功响应返回恢复结果。
-
-### 7.9 管理员彻底删除文件
-
-`DELETE /api/admin/files/recycle-bin/{attachmentRefId}?reason=超过保留期后人工清理`
-
-说明：第一版不建议在 `DELETE` 请求中依赖 JSON 请求体，删除原因通过 `reason` 查询参数传入，避免客户端或代理层丢弃请求体。
-
-成功响应返回彻底删除结果。
-
-### 7.10 手动触发清理任务
+### 7.14 手动触发清理任务
 
 `POST /api/admin/files/cleanup-jobs/run`
 

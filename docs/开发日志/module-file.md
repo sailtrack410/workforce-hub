@@ -4,6 +4,70 @@
 
 ---
 
+## 2026-05-05 module-file 后台文件生命周期治理闭环
+
+### 改动背景
+
+第 24 审指出后台 `ADMIN_FILE` 已经可以上传和确认，但缺少后续治理闭环。如果后台文件只能入库，不能列表查看、下载、进入回收站、恢复和彻底删除，就会形成“只进不出”的管理黑洞，也无法验证企业总池用量释放是否自洽。
+
+### 红灯验证
+
+新增自动化用例：
+
+- `ModuleFileAdminApiIntegrationTest#adminShouldManageAdminFileLifecycle`
+- `ModuleFileAdminApiIntegrationTest#adminUploadTicketShouldNotDeduplicateEmployeeFileByHashOnly`
+
+红灯结果：
+
+- `GET /api/admin/files` 返回 `404 请求路径不存在`
+- 后台仅凭员工文件的 `contentSha256 + fileSize` 申请上传票据时返回 `deduplicated=true`
+
+这说明后台文件生命周期接口尚未落地，同时后台下载落地后，申请阶段秒传必须补“上传主体已拥有有效引用”的证明边界，不能只凭 hash 和大小直接挂载他人文件。
+
+### 修订内容
+
+新增：
+
+- `server/src/main/java/com/workforcehub/file/dto/AdminFileResponse.java`
+
+修改：
+
+- `server/src/main/java/com/workforcehub/file/controller/AdminFileController.java`
+- `server/src/main/java/com/workforcehub/file/service/FileCenterService.java`
+- `server/src/test/java/com/workforcehub/file/ModuleFileAdminApiIntegrationTest.java`
+- `docs/API与测试/module-file/API文档_module-file文件中心接口.md`
+- `docs/API与测试/module-file/API测试用例_module-file文件中心接口.md`
+
+关键修订：
+
+- 新增后台有效文件列表 `GET /api/admin/files`
+- 新增后台回收站列表 `GET /api/admin/files/recycle-bin`
+- 新增后台下载票据和真实下载入口
+- 新增后台移入回收站、恢复、彻底删除接口
+- 后台生命周期仅治理 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的文件，不接管员工个人文件、知识库文件、文档文件或群文件
+- 后台彻底删除只释放企业总池 `GLOBAL` 用量，不释放员工 `USER` 用量
+- 后台下载、删除、恢复、彻底删除均写入 `FILE_ADMIN_*` 审计动作
+- 申请阶段秒传收窄为只复用同一上传主体已有的有效附件引用；跨上传主体同内容必须先拿普通上传票据并实际上传对象
+- 普通上传票据的 `objectKey` 加入上传票据 ID，避免不同主体相同 hash 拿到同一个上传路径
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminShouldManageAdminFileLifecycle test`
+- 红灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminUploadTicketShouldNotDeduplicateEmployeeFileByHashOnly test`
+- 绿灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminShouldManageAdminFileLifecycle test`
+- 绿灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminUploadTicketShouldNotDeduplicateEmployeeFileByHashOnly test`
+- 后台文件回归：`mvn -Dtest=ModuleFileAdminApiIntegrationTest test`
+- 文件模块回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest test`
+- 空白检查：`git diff --check`
+
+### 后续边界
+
+- 后台清理任务 `POST /api/admin/files/cleanup-jobs/run` 仍未实现，需要下一批补 dry-run、真实执行和物理对象清理统计
+- `FileCenterService` 已继续膨胀，下一批清理任务前建议拆出文件查询、生命周期、票据、审计等内部服务或 Repository
+- 细粒度后台权限点尚未接入，目前仍依赖后台管理员会话边界
+
+---
+
 ## 2026-05-05 module-file 后台上传确认最小闭环
 
 ### 改动背景

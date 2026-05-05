@@ -8,7 +8,7 @@
 | 文档版本 | `v1.0` |
 | 适用范围 | 两段式上传、秒传、配额、下载票据、回收站、清理任务 |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 测试契约已收口；第二批员工端下载执行、后台配额策略、上传限制策略自动化测试已落地 |
+| 当前状态 | 测试契约已收口；第二批员工端下载执行、后台配额策略、上传限制策略、后台上传确认和后台 `ADMIN_FILE` 生命周期自动化测试已落地 |
 
 ---
 
@@ -28,6 +28,7 @@
 当前已落地自动化测试类：
 
 - `ModuleFileApiIntegrationTest`
+- `ModuleFileAdminApiIntegrationTest`
 
 当前已自动化覆盖：
 
@@ -53,12 +54,19 @@
 - 后台同一作用域重复策略拦截
 - 个人文件上传类型限制拦截
 - 个人文件上传大小限制拦截
+- 后台上传票据申请与确认上传
+- 后台上传命中物理去重
+- 后台秒传重复客户端请求 ID 幂等
+- 后台不能仅凭员工文件 hash 与大小直接秒传
+- 后台 `ADMIN_FILE` 有效文件列表
+- 后台下载票据创建与真实下载
+- 后台回收站删除、回收站列表、恢复、彻底删除
+- 后台彻底删除释放企业总池用量
+- 后台生命周期审计记录
 
 当前尚未自动化覆盖：
 
 - 真实 `MINIO` Provider
-- 后台上传与确认上传
-- 后台回收站治理
 - 清理任务 dry-run 与执行
 
 ---
@@ -177,7 +185,8 @@
 | `FILE-ADM-CFM-001` | P0 | `POST /api/admin/files/confirm-upload` | 后台确认治理文件上传 | 已创建后台票据；对象已写入存储 | 确认参数 | HTTP `200`；`code=0`；创建 `uploader_type=ADMIN` 的附件引用；只增加 `GLOBAL` 用量 |
 | `FILE-ADM-CFM-002` | P0 | `POST /api/admin/files/upload-tickets` | 后台同内容不同文件名触发秒传 | 后台文件已确认 | 同 hash 与大小、不同文件名 | HTTP `200`；`deduplicated=true`；不创建第二条物理对象 |
 | `FILE-ADM-CFM-003` | P0 | `POST /api/admin/files/upload-tickets` | 后台秒传重复客户端请求 ID 不重复加账 | 后台文件已确认；企业总池充足 | 同一 `clientRequestId` 重复请求秒传 | HTTP `200`；返回同一秒传票据和同一附件引用；`GLOBAL` 用量和附件引用数不重复增加 |
-| `FILE-ADM-CFM-004` | P1 | `POST /api/admin/files/upload-tickets` | 后台上传第一版不承载知识库或文档文件 | 管理员已登录；存在 `ADMIN_FILE` 策略 | `ownerType=KB_DOCUMENT` 或 `DOC_DOCUMENT` | HTTP `200`；`code=400`；提示后台第一版仅支持后台治理文件 |
+| `FILE-ADM-CFM-004` | P0 | `POST /api/admin/files/upload-tickets` | 后台不能仅凭员工文件 hash 直接秒传 | 员工个人文件已确认；管理员知道相同 hash 和大小 | 后台以同 hash 和大小申请上传票据 | HTTP `200`；`deduplicated=false`；返回普通上传票据；不创建后台附件引用 |
+| `FILE-ADM-CFM-005` | P1 | `POST /api/admin/files/upload-tickets` | 后台上传第一版不承载知识库或文档文件 | 管理员已登录；存在 `ADMIN_FILE` 策略 | `ownerType=KB_DOCUMENT` 或 `DOC_DOCUMENT` | HTTP `200`；`code=400`；提示后台第一版仅支持后台治理文件 |
 
 ## 6.3 配额查询
 
@@ -197,6 +206,9 @@
 | `FILE-DL-004` | P1 | `POST /api/employee/files/{attachmentRefId}/download-tickets` | 已进回收站文件不能下载 | 附件引用已删除 | 申请下载 | HTTP `404` 或 `409`；提示文件已删除 |
 | `FILE-DL-005` | P1 | 审计断言 | 下载票据创建写审计 | `FILE-DL-001` 成功 | 查询审计 | 存在下载票据创建审计记录 |
 | `FILE-DL-006` | P0 | `GET /api/employee/files/download/{ticketNo}` | 有效下载票据返回原始文件并标记已使用 | 下载票据有效且文件对象存在 | 访问下载入口 | HTTP `200`；Body 等于原始文件字节；票据状态更新为 `USED`；写入下载执行审计 |
+| `FILE-ADM-DL-001` | P0 | `GET /api/admin/files` | 后台查询有效治理文件列表 | 管理员已登录；存在 `ADMIN_FILE` 有效文件 | 分页查询 | HTTP `200`；只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的文件 |
+| `FILE-ADM-DL-002` | P0 | `POST /api/admin/files/{attachmentRefId}/download-tickets` | 后台申请治理文件下载票据 | 管理员已登录；后台治理文件未删除 | `downloadType=SINGLE` | HTTP `200`；返回 `/api/admin/files/download/{ticketNo}` |
+| `FILE-ADM-DL-003` | P0 | `GET /api/admin/files/download/{ticketNo}` | 后台有效下载票据返回原始文件 | 下载票据有效且文件对象存在 | 访问后台下载入口 | HTTP `200`；Body 等于原始文件字节；票据状态更新为 `USED`；写入后台下载执行审计 |
 
 ## 6.5 回收站
 
@@ -225,9 +237,11 @@
 
 | 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `FILE-ADM-TRASH-001` | P0 | `GET /api/admin/files/recycle-bin` | 管理员查询回收站 | 管理员已登录；存在回收站文件 | 分页查询 | HTTP `200`；返回回收站列表 |
-| `FILE-ADM-TRASH-002` | P0 | `POST /api/admin/files/recycle-bin/{attachmentRefId}/restore` | 管理员恢复回收站文件 | 文件在保留期内 | 恢复原因 | HTTP `200`；恢复成功 |
-| `FILE-ADM-TRASH-003` | P0 | `DELETE /api/admin/files/recycle-bin/{attachmentRefId}` | 管理员彻底删除回收站文件 | 文件已进入回收站 | `reason=超过保留期后人工清理` | HTTP `200`；引用彻底删除 |
+| `FILE-ADM-TRASH-001` | P0 | `POST /api/admin/files/{attachmentRefId}/trash` | 管理员将后台治理文件移入回收站 | 管理员已登录；存在 `ADMIN_FILE` 有效文件 | 删除原因 | HTTP `200`；写入 `deletedAt` 和 `purgeAfter`；不释放 `GLOBAL` 用量 |
+| `FILE-ADM-TRASH-002` | P0 | `GET /api/admin/files/recycle-bin` | 管理员查询后台治理文件回收站 | 管理员已登录；存在后台回收站文件 | 分页查询 | HTTP `200`；只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的回收站文件 |
+| `FILE-ADM-TRASH-003` | P0 | `POST /api/admin/files/{attachmentRefId}/restore` | 管理员恢复后台治理文件 | 文件在保留期内 | 恢复原因 | HTTP `200`；清空删除标记 |
+| `FILE-ADM-TRASH-004` | P0 | `DELETE /api/admin/files/{attachmentRefId}` | 管理员彻底删除后台治理文件 | 文件已进入回收站 | 无 | HTTP `200`；引用彻底删除；释放 `GLOBAL` 用量；按引用数决定是否延迟物理清理 |
+| `FILE-ADM-TRASH-005` | P1 | 审计断言 | 后台删除、恢复、彻底删除写审计 | 后台生命周期动作已执行 | 查询审计 | 存在 `FILE_ADMIN_TRASHED`、`FILE_ADMIN_RESTORED`、`FILE_ADMIN_PURGED` 审计记录 |
 | `FILE-CLEAN-001` | P0 | `POST /api/admin/files/cleanup-jobs/run` | dry-run 清理任务 | 存在过期数据 | `dryRun=true` | HTTP `200`；返回预计清理数量，不删除数据 |
 | `FILE-CLEAN-002` | P0 | `POST /api/admin/files/cleanup-jobs/run` | 执行过期清理任务 | 存在过期票据和无引用对象 | `dryRun=false` | HTTP `200`；过期对象被清理；返回释放字节数 |
 | `FILE-CLEAN-003` | P1 | 审计断言 | 清理任务写审计 | 清理任务已执行 | 查询审计 | 存在清理任务审计记录 |
