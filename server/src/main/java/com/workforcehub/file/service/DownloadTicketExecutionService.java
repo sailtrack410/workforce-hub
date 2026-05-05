@@ -3,6 +3,8 @@ package com.workforcehub.file.service;
 import com.workforcehub.common.exception.BizException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 下载票据状态机执行服务。
@@ -26,6 +28,7 @@ public class DownloadTicketExecutionService {
         }
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void expireActiveTicket(Long ticketId) {
         jdbcTemplate.update(
             "UPDATE sys_download_ticket SET status = 'EXPIRED', updated_at = NOW() WHERE id = ? AND status = 'ACTIVE'",

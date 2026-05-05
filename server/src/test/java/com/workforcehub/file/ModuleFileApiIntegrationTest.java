@@ -309,6 +309,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(410))
             .andExpect(jsonPath("$.message", containsString("下载链接已过期")));
+
+        assertEquals("EXPIRED", downloadTicketStatus(ticketNo));
     }
 
     @Test
@@ -1108,6 +1110,14 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         return jdbcTemplate.queryForObject(
             "SELECT id FROM sys_download_ticket WHERE ticket_no = ?",
             Long.class,
+            ticketNo
+        );
+    }
+
+    private String downloadTicketStatus(String ticketNo) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM sys_download_ticket WHERE ticket_no = ?",
+            String.class,
             ticketNo
         );
     }

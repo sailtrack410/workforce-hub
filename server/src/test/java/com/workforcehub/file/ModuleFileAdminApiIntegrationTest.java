@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import javax.sql.DataSource;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -335,6 +336,30 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("后台访问过期下载票据后应持久化过期状态")
+    void adminExpiredDownloadTicketShouldBeMarkedExpired() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] content = "admin-expired-download-content".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedAdminFile(adminSession, "后台过期下载.pdf", content);
+        String ticketNo = createAdminDownloadTicket(adminSession, attachmentRefId);
+
+        jdbcTemplate.update("""
+            UPDATE sys_download_ticket
+            SET expire_at = DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+            WHERE ticket_no = ?
+            """, ticketNo);
+
+        mockMvc.perform(get("/api/admin/files/download/{ticketNo}", ticketNo)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(410))
+            .andExpect(jsonPath("$.message", containsString("下载链接已过期")));
+
+        assertEquals("EXPIRED", downloadTicketStatus(ticketNo));
+    }
+
+    @Test
     @DisplayName("后台彻底删除同一附件时不应重复释放企业用量")
     void adminPurgeShouldReleaseUsageOnlyWhenStateChanged() throws Exception {
         Cookie adminSession = loginAdmin();
@@ -554,6 +579,14 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
         return jdbcTemplate.queryForObject(
             "SELECT id FROM sys_download_ticket WHERE ticket_no = ?",
             Long.class,
+            ticketNo
+        );
+    }
+
+    private String downloadTicketStatus(String ticketNo) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM sys_download_ticket WHERE ticket_no = ?",
+            String.class,
             ticketNo
         );
     }
