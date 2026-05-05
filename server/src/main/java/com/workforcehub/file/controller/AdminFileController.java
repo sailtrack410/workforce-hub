@@ -15,9 +15,12 @@ import com.workforcehub.file.dto.FileRestoreResponse;
 import com.workforcehub.file.dto.FileTrashRequest;
 import com.workforcehub.file.dto.FileTrashResponse;
 import com.workforcehub.file.dto.QuotaPolicyResponse;
+import com.workforcehub.file.dto.CleanupJobRunResponse;
+import com.workforcehub.file.dto.RunCleanupJobRequest;
 import com.workforcehub.file.dto.StorageSummaryResponse;
 import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
+import com.workforcehub.file.service.FileCleanupJobService;
 import com.workforcehub.file.service.FileCenterService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
@@ -42,11 +45,14 @@ import java.util.List;
 public class AdminFileController {
 
     private final FileCenterService fileCenterService;
+    private final FileCleanupJobService fileCleanupJobService;
     private final FileDownloadResponseFactory downloadResponseFactory;
 
     public AdminFileController(FileCenterService fileCenterService,
+                               FileCleanupJobService fileCleanupJobService,
                                FileDownloadResponseFactory downloadResponseFactory) {
         this.fileCenterService = fileCenterService;
+        this.fileCleanupJobService = fileCleanupJobService;
         this.downloadResponseFactory = downloadResponseFactory;
     }
 
@@ -104,6 +110,11 @@ public class AdminFileController {
     @DeleteMapping("/{attachmentRefId}")
     public R<FilePurgeResponse> purge(@PathVariable Long attachmentRefId) {
         return R.ok(fileCenterService.purgeAdminFile(attachmentRefId));
+    }
+
+    @PostMapping("/cleanup-jobs/run")
+    public R<CleanupJobRunResponse> runCleanupJob(@Valid @RequestBody RunCleanupJobRequest request) {
+        return R.ok(fileCleanupJobService.runCleanupJob(request));
     }
 
     @GetMapping("/quota-policies")

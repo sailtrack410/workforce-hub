@@ -8,7 +8,7 @@
 | 文档版本 | `v1.0` |
 | 适用范围 | 两段式上传、秒传、配额、下载票据、回收站、清理任务 |
 | 发布日期 | `2026-05-03` |
-| 当前状态 | 测试契约已收口；第二批员工端下载执行、后台配额策略、上传限制策略、后台上传确认和后台 `ADMIN_FILE` 生命周期自动化测试已落地 |
+| 当前状态 | 测试契约已收口；第二批员工端下载执行、后台配额策略、上传限制策略、后台上传确认、后台 `ADMIN_FILE` 生命周期和后台清理任务自动化测试已落地 |
 
 ---
 
@@ -29,6 +29,7 @@
 
 - `ModuleFileApiIntegrationTest`
 - `ModuleFileAdminApiIntegrationTest`
+- `ModuleFileCleanupIntegrationTest`
 
 当前已自动化覆盖：
 
@@ -68,11 +69,13 @@
 - 后台彻底删除释放企业总池用量
 - 后台同一附件并发彻底删除不重复释放企业用量
 - 后台生命周期审计记录
+- 清理任务 dry-run 不修改票据、引用和物理对象
+- 清理任务真实执行过期上传票据、过期下载票据、到期回收站引用和无引用物理对象
+- 清理任务执行写入审计记录
 
 当前尚未自动化覆盖：
 
 - 真实 `MINIO` Provider
-- 清理任务 dry-run 与执行
 
 ---
 
@@ -253,9 +256,9 @@
 | `FILE-ADM-TRASH-003` | P0 | `POST /api/admin/files/{attachmentRefId}/restore` | 管理员恢复后台治理文件 | 文件在保留期内 | 恢复原因 | HTTP `200`；清空删除标记 |
 | `FILE-ADM-TRASH-004` | P0 | `DELETE /api/admin/files/{attachmentRefId}` | 管理员彻底删除后台治理文件 | 文件已进入回收站 | 无 | HTTP `200`；引用彻底删除；释放 `GLOBAL` 用量；按引用数决定是否延迟物理清理 |
 | `FILE-ADM-TRASH-005` | P1 | 审计断言 | 后台删除、恢复、彻底删除写审计 | 后台生命周期动作已执行 | 查询审计 | 存在 `FILE_ADMIN_TRASHED`、`FILE_ADMIN_RESTORED`、`FILE_ADMIN_PURGED` 审计记录 |
-| `FILE-CLEAN-001` | P0 | `POST /api/admin/files/cleanup-jobs/run` | dry-run 清理任务 | 存在过期数据 | `dryRun=true` | HTTP `200`；返回预计清理数量，不删除数据 |
-| `FILE-CLEAN-002` | P0 | `POST /api/admin/files/cleanup-jobs/run` | 执行过期清理任务 | 存在过期票据和无引用对象 | `dryRun=false` | HTTP `200`；过期对象被清理；返回释放字节数 |
-| `FILE-CLEAN-003` | P1 | 审计断言 | 清理任务写审计 | 清理任务已执行 | 查询审计 | 存在清理任务审计记录 |
+| `FILE-CLEAN-001` | P0 | `POST /api/admin/files/cleanup-jobs/run` | dry-run 清理任务 | 存在过期上传票据、过期下载票据、到期回收站引用和无引用物理对象 | `dryRun=true` | HTTP `200`；返回预计清理数量；不修改票据、引用或物理对象 |
+| `FILE-CLEAN-002` | P0 | `POST /api/admin/files/cleanup-jobs/run` | 执行过期清理任务 | 存在过期票据、到期回收站引用和已到期无引用物理对象 | `dryRun=false` | HTTP `200`；过期票据标记为 `EXPIRED`；到期回收站引用被彻底删除并释放用量；已到期无引用物理对象被删除 |
+| `FILE-CLEAN-003` | P1 | 审计断言 | 清理任务写审计 | 清理任务已执行 | 查询审计 | 存在 `FILE_CLEANUP_JOB_RUN` 审计记录 |
 
 ## 6.8 鉴权与契约
 

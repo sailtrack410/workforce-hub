@@ -12,5 +12,7 @@ public interface StorageProvider {
 
     StorageObjectResource loadObject(String bucketName, String objectKey);
 
+    void deleteObject(String bucketName, String objectKey);
+
     long usableFreeBytes();
 }

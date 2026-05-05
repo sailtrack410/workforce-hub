@@ -17,7 +17,7 @@
 
 本文档覆盖以下 `22` 个接口。
 
-当前已实现 `21` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `13` 个接口（后台上传确认、后台文件生命周期治理、存储摘要、配额策略 CRUD）。后台清理任务仍是后续实现契约。
+当前已实现 `22` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `14` 个接口（后台上传确认、后台文件生命周期治理、清理任务、存储摘要、配额策略 CRUD）。
 
 ### 1. 员工端
 
@@ -45,7 +45,7 @@
 - `GET /api/admin/files/quota-policies`（已实现）
 - `POST /api/admin/files/quota-policies`（已实现）
 - `PUT /api/admin/files/quota-policies/{id}`（已实现）
-- `POST /api/admin/files/cleanup-jobs/run`（契约，待实现）
+- `POST /api/admin/files/cleanup-jobs/run`
 
 ---
 
@@ -1006,6 +1006,15 @@ http://localhost:8080
 | `EXPIRED_RECYCLE_REF` | 清理到期回收站引用 |
 | `UNREFERENCED_FILE_OBJECT` | 清理无引用物理对象 |
 | `ALL_EXPIRED` | 执行全部到期清理 |
+
+执行规则：
+
+- `dryRun=true` 只统计候选数量和预计释放字节，不修改票据、引用或物理对象。
+- 过期上传票据会从 `PENDING` 标记为 `EXPIRED`，并清理未确认的临时上传对象。
+- 过期下载票据会从 `ACTIVE` 标记为 `EXPIRED`。
+- 到期回收站引用第一版只处理 `PERSONAL_FILE` 与 `ADMIN_FILE`，会被标记为彻底删除，并释放对应空间用量。
+- 物理对象采用两阶段清理：回收站引用到期清理后，物理对象先进入 `cleanup_after` 候选；只有已经无有效引用且 `cleanup_after` 到期的对象，才会在 `UNREFERENCED_FILE_OBJECT` 阶段删除二进制并标记文件对象删除。
+- `LOCAL` 与 `MINIO` Provider 均提供删除对象入口；第一版由后台手动触发，后续可接入定时调度。
 
 成功响应：
 

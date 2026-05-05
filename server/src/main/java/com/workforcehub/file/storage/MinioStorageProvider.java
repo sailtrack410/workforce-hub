@@ -5,6 +5,7 @@ import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
+import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.http.Method;
@@ -105,6 +106,18 @@ public class MinioStorageProvider implements StorageProvider {
             return new StorageObjectResource(new InputStreamResource(object), stat.size());
         } catch (Exception e) {
             throw new BizException(404, "文件对象不存在");
+        }
+    }
+
+    @Override
+    public void deleteObject(String bucketName, String objectKey) {
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                .bucket(bucketName)
+                .object(objectKey)
+                .build());
+        } catch (Exception e) {
+            throw new BizException(500, "MinIO文件清理失败");
         }
     }
 

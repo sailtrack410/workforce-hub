@@ -820,3 +820,33 @@
 - 下载票据状态机和用量账本从大服务中剥离，后续拆 `FileLifecycleService`、清理任务或更多 ownerType 时不需要继续往一个类里堆 SQL
 - 这次只做小拆分，不改接口契约和表结构，降低对当前文件中心链路的扰动
 - 审查文件、开发日志、API 文档和测试用例编号保持一致，后续按审查轮次回溯时不会断链
+
+## 2026-05-05 后台清理任务第一版
+
+### 背景
+
+`module-file` 第一版还缺后台清理任务。此前手动彻底删除只会把无引用物理对象标记为 `cleanup_after` 候选，过期上传票据和过期下载票据也缺少统一回收入口。为了避免继续扩大 `FileCenterService`，本轮按方案 A 单独拆出清理任务服务。
+
+### 本次处理
+
+- 新增 `POST /api/admin/files/cleanup-jobs/run` 后台接口
+- 新增 `RunCleanupJobRequest` 与 `CleanupJobRunResponse`
+- 新增 `FileCleanupJobService`，集中处理过期上传票据、过期下载票据、到期回收站引用和无引用物理对象
+- `dryRun=true` 只统计候选数量和预计释放字节，不修改业务数据或物理对象
+- 真实执行会将过期上传票据标记为 `EXPIRED` 并清理未确认临时对象
+- 真实执行会将过期下载票据从 `ACTIVE` 标记为 `EXPIRED`
+- 真实执行第一版只处理 `PERSONAL_FILE` / `ADMIN_FILE` 到期回收站引用，并按对应空间释放用量
+- 无引用物理对象采用两阶段清理：到期回收站引用被清理后，物理对象先进入 `cleanup_after` 候选；后续到期后才删除二进制并标记 `sys_file_object.is_deleted=1`
+- `LOCAL` 和 `MINIO` Provider 均补充 `deleteObject` 接口
+- 新增 `ModuleFileCleanupIntegrationTest`，覆盖 dry-run、真实执行和审计
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest test`，失败于 `/api/admin/files/cleanup-jobs/run` 返回 `404`
+- 绿灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest test`，2 个清理任务用例通过
+
+### 意义
+
+- 清理任务从文件中心主服务中解耦，后续定时调度或任务运行表可以围绕 `FileCleanupJobService` 扩展
+- 文件中心形成“上传、确认、下载、回收站、彻底删除、物理清理”的闭环
+- 两阶段物理清理给误删恢复、并发插入和对象存储异常留出缓冲，默认比到期引用清理后立刻删二进制更稳

@@ -87,6 +87,16 @@ public class LocalStorageProvider implements StorageProvider {
     }
 
     @Override
+    public void deleteObject(String bucketName, String objectKey) {
+        Path path = objectPath(objectKey);
+        try {
+            Files.deleteIfExists(path);
+        } catch (Exception e) {
+            throw new BizException(500, "文件对象清理失败");
+        }
+    }
+
+    @Override
     public long usableFreeBytes() {
         return localRoot.toFile().getFreeSpace();
     }
