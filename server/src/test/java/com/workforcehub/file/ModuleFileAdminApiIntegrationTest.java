@@ -101,11 +101,67 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
         assertAuditCountAtLeast("FILE_ADMIN_UPLOAD_DEDUP", 1);
     }
 
+    @Test
+    @DisplayName("后台秒传重复客户端请求ID应返回同一附件引用且不重复加账")
+    void adminDeduplicatedUploadShouldBeIdempotentByClientRequestId() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] content = "admin-dedup-idempotent-content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+        Long existingAttachmentRefId = createConfirmedAdminFile(adminSession, "后台秒传源文件.pdf", content);
+        String clientRequestId = "same-admin-deduplicated-upload";
+
+        MvcResult firstDedupResult = createAdminUploadTicket(
+                adminSession,
+                "后台秒传复用-1.pdf",
+                content.length,
+                sha256,
+                clientRequestId
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(true))
+            .andExpect(jsonPath("$.data.uploadTicketId").isNumber())
+            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andReturn();
+        long firstUploadTicketId = data(firstDedupResult).get("uploadTicketId").asLong();
+        long firstAttachmentRefId = data(firstDedupResult).get("attachmentRefId").asLong();
+
+        MvcResult secondDedupResult = createAdminUploadTicket(
+                adminSession,
+                "后台秒传复用-2.pdf",
+                content.length,
+                sha256,
+                clientRequestId
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(true))
+            .andReturn();
+
+        assertEquals(firstUploadTicketId, data(secondDedupResult).get("uploadTicketId").asLong());
+        assertEquals(firstAttachmentRefId, data(secondDedupResult).get("attachmentRefId").asLong());
+        assertEquals(content.length * 2L, usedBytes("GLOBAL", null));
+        assertEquals(2L, fileCount("GLOBAL", null));
+        assertEquals(2L, attachmentRefCount(sha256, content.length));
+        assertEquals(1L, uploadTicketCount(clientRequestId));
+        assertTrue(existingAttachmentRefId > 0);
+    }
+
     private org.springframework.test.web.servlet.ResultActions createAdminUploadTicket(
             Cookie session,
             String fileName,
             long fileSize,
             String sha256) throws Exception {
+        return createAdminUploadTicket(session, fileName, fileSize, sha256, "admin-file-test-" + System.nanoTime());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createAdminUploadTicket(
+            Cookie session,
+            String fileName,
+            long fileSize,
+            String sha256,
+            String clientRequestId) throws Exception {
         return mockMvc.perform(post("/api/admin/files/upload-tickets")
             .cookie(session)
             .contentType(MediaType.APPLICATION_JSON)
@@ -118,9 +174,9 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
                   "fileSize": %s,
                   "contentSha256": "%s",
                   "contentMd5": null,
-                  "clientRequestId": "admin-file-test-%s"
+                  "clientRequestId": "%s"
                 }
-                """.formatted(fileName, fileSize, sha256, System.nanoTime())));
+                """.formatted(fileName, fileSize, sha256, clientRequestId)));
     }
 
     private org.springframework.test.web.servlet.ResultActions confirmAdminUpload(
@@ -144,6 +200,24 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
                   "displayName": "%s"
                 }
                 """.formatted(uploadTicketId, objectKey, sha256, fileSize, displayName)));
+    }
+
+    private Long createConfirmedAdminFile(Cookie adminSession, String fileName, byte[] content) throws Exception {
+        String sha256 = sha256(content);
+        MvcResult ticketResult = createAdminUploadTicket(adminSession, fileName, content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        MvcResult confirmResult = confirmAdminUpload(adminSession, uploadTicketId, objectKey, sha256, content.length, fileName)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        return data(confirmResult).get("attachmentRefId").asLong();
     }
 
     private Cookie loginAdmin() throws Exception {
@@ -215,6 +289,25 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             scopeId,
             scopeId
         );
+        return value == null ? 0L : value;
+    }
+
+    private long attachmentRefCount(String sha256, long fileSize) {
+        Long value = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE fo.content_sha256 = ? AND fo.file_size = ? AND ar.is_deleted = 0
+            """, Long.class, sha256, fileSize);
+        return value == null ? 0L : value;
+    }
+
+    private long uploadTicketCount(String clientRequestId) {
+        Long value = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_upload_ticket
+            WHERE client_request_id = ? AND status = 'CONFIRMED' AND is_deleted = 0
+            """, Long.class, clientRequestId);
         return value == null ? 0L : value;
     }
 

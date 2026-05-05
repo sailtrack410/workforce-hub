@@ -132,7 +132,7 @@
 - 下载无权限
 - 下载已删除文件
 - 恢复超过配额
-- 重复确认上传
+- 重复确认上传：当前按 `uploadTicketId` 宽松幂等返回原附件引用，不用当前请求体重建引用
 
 ### 5.3 契约覆盖
 
@@ -172,9 +172,12 @@
 | `FILE-CFM-006` | P1 | `POST /api/employee/files/confirm-upload` | 票据过期后不能确认 | 票据已过期 | 确认请求 | HTTP `409`；提示上传票据已过期 |
 | `FILE-CFM-007` | P1 | `POST /api/employee/files/confirm-upload` | 非票据创建人不能确认 | 员工 B 登录 | 员工 A 的票据 | HTTP `403`；提示无权确认该上传票据 |
 | `FILE-CFM-008` | P0 | `POST /api/employee/files/confirm-upload` | 待确认状态下重复确认仍保持幂等 | 已有 `source_upload_ticket_id` 附件引用；票据状态异常回到待确认 | 同一确认请求再次提交 | HTTP `200`；返回原 `attachmentRefId`；附件引用和用量账本不重复 |
+| `FILE-CFM-009` | P0 | `POST /api/employee/files/upload-tickets` | 员工秒传重复客户端请求 ID 不重复加账 | 已存在同 hash 和大小的物理对象 | 同一 `clientRequestId` 重复请求秒传 | HTTP `200`；返回同一秒传票据和同一附件引用；个人与企业用量不重复增加 |
 | `FILE-ADM-UP-001` | P0 | `POST /api/admin/files/upload-tickets` | 后台申请治理文件上传票据 | 管理员已登录；存在 `ADMIN_FILE` 启用上传策略；企业总池充足 | `ADMIN_FILE` 文件元数据 | HTTP `200`；`code=0`；返回 `uploadTicketId`、`objectKey`、`uploadUrl` |
 | `FILE-ADM-CFM-001` | P0 | `POST /api/admin/files/confirm-upload` | 后台确认治理文件上传 | 已创建后台票据；对象已写入存储 | 确认参数 | HTTP `200`；`code=0`；创建 `uploader_type=ADMIN` 的附件引用；只增加 `GLOBAL` 用量 |
 | `FILE-ADM-CFM-002` | P0 | `POST /api/admin/files/upload-tickets` | 后台同内容不同文件名触发秒传 | 后台文件已确认 | 同 hash 与大小、不同文件名 | HTTP `200`；`deduplicated=true`；不创建第二条物理对象 |
+| `FILE-ADM-CFM-003` | P0 | `POST /api/admin/files/upload-tickets` | 后台秒传重复客户端请求 ID 不重复加账 | 后台文件已确认；企业总池充足 | 同一 `clientRequestId` 重复请求秒传 | HTTP `200`；返回同一秒传票据和同一附件引用；`GLOBAL` 用量和附件引用数不重复增加 |
+| `FILE-ADM-CFM-004` | P1 | `POST /api/admin/files/upload-tickets` | 后台上传第一版不承载知识库或文档文件 | 管理员已登录；存在 `ADMIN_FILE` 策略 | `ownerType=KB_DOCUMENT` 或 `DOC_DOCUMENT` | HTTP `200`；`code=400`；提示后台第一版仅支持后台治理文件 |
 
 ## 6.3 配额查询
 

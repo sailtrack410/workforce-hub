@@ -77,22 +77,33 @@ public class FileCenterService {
 
         FileObjectRow existing = findActiveFileObject(request.getContentSha256(), request.getFileSize());
         if (existing != null) {
-            Long attachmentRefId = createAttachmentRef(
-                request.getOwnerType(),
-                request.getOwnerId(),
-                existing.id(),
-                null,
-                request.getFileName(),
-                request.getFileName(),
-                "USER",
-                userId
-            );
+            Long deduplicatedTicketId;
+            Long attachmentRefId;
+            try {
+                deduplicatedTicketId = createConfirmedDeduplicatedUploadTicket("USER", userId, request, existing);
+                attachmentRefId = createAttachmentRef(
+                    request.getOwnerType(),
+                    request.getOwnerId(),
+                    existing.id(),
+                    deduplicatedTicketId,
+                    request.getFileName(),
+                    request.getFileName(),
+                    "USER",
+                    userId
+                );
+            } catch (DuplicateKeyException e) {
+                UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(userId, request.getClientRequestId());
+                if (concurrentTicket != null) {
+                    return concurrentTicket;
+                }
+                throw e;
+            }
             increaseFileRefCount(existing.id());
             increaseUsage("USER", userId, request.getFileSize(), 1);
             increaseUsage("GLOBAL", null, request.getFileSize(), 1);
             audit("USER", userId, "FILE_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
-            return deduplicatedResponse(existing, attachmentRefId);
+            return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);
         }
 
         Long ticketId = IdWorker.getId();
@@ -166,21 +177,36 @@ public class FileCenterService {
 
         FileObjectRow existing = findActiveFileObject(request.getContentSha256(), request.getFileSize());
         if (existing != null) {
-            Long attachmentRefId = createAttachmentRef(
-                request.getOwnerType(),
-                request.getOwnerId(),
-                existing.id(),
-                null,
-                request.getFileName(),
-                request.getFileName(),
-                "ADMIN",
-                adminId
-            );
+            Long deduplicatedTicketId;
+            Long attachmentRefId;
+            try {
+                deduplicatedTicketId = createConfirmedDeduplicatedUploadTicket("ADMIN", adminId, request, existing);
+                attachmentRefId = createAttachmentRef(
+                    request.getOwnerType(),
+                    request.getOwnerId(),
+                    existing.id(),
+                    deduplicatedTicketId,
+                    request.getFileName(),
+                    request.getFileName(),
+                    "ADMIN",
+                    adminId
+                );
+            } catch (DuplicateKeyException e) {
+                UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(
+                    "ADMIN",
+                    adminId,
+                    request.getClientRequestId()
+                );
+                if (concurrentTicket != null) {
+                    return concurrentTicket;
+                }
+                throw e;
+            }
             increaseFileRefCount(existing.id());
             increaseUsage("GLOBAL", null, request.getFileSize(), 1);
             audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
-            return deduplicatedResponse(existing, attachmentRefId);
+            return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);
         }
 
         Long ticketId = IdWorker.getId();
@@ -837,6 +863,41 @@ public class FileCenterService {
         }
     }
 
+    private Long createConfirmedDeduplicatedUploadTicket(String uploaderType,
+                                                         Long uploaderId,
+                                                         CreateUploadTicketRequest request,
+                                                         FileObjectRow fileObject) {
+        Long ticketId = IdWorker.getId();
+        jdbcTemplate.update("""
+            INSERT INTO sys_upload_ticket
+                (id, ticket_no, uploader_type, uploader_id, biz_type, biz_id,
+                 storage_provider, bucket_name, file_name, mime_type, file_size,
+                 content_md5, content_sha256, object_key, client_request_id,
+                 expire_at, status, confirmed_at, created_by)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', NOW(), ?)
+            """,
+            ticketId,
+            "UP" + ticketId,
+            uploaderType,
+            uploaderId,
+            request.getOwnerType(),
+            request.getOwnerId(),
+            fileObject.storageProvider(),
+            fileObject.bucketName(),
+            request.getFileName(),
+            request.getMimeType(),
+            request.getFileSize(),
+            blankToNull(request.getContentMd5()),
+            request.getContentSha256().toLowerCase(),
+            fileObject.objectKey(),
+            blankToNull(request.getClientRequestId()),
+            LocalDateTime.now(),
+            uploaderId
+        );
+        return ticketId;
+    }
+
     private Long createAttachmentRef(String ownerType,
                                      Long ownerId,
                                      Long fileObjectId,
@@ -1150,6 +1211,16 @@ public class FileCenterService {
         return response;
     }
 
+    private UploadTicketResponse deduplicatedResponse(Long uploadTicketId,
+                                                      String ticketNo,
+                                                      FileObjectRow fileObject,
+                                                      Long attachmentRefId) {
+        UploadTicketResponse response = deduplicatedResponse(fileObject, attachmentRefId);
+        response.setUploadTicketId(uploadTicketId);
+        response.setTicketNo(ticketNo);
+        return response;
+    }
+
     private void markUploadTicketConfirmed(Long ticketId) {
         jdbcTemplate.update(
             "UPDATE sys_upload_ticket SET status = 'CONFIRMED', confirmed_at = NOW(), updated_at = NOW() WHERE id = ?",
@@ -1357,7 +1428,8 @@ public class FileCenterService {
             return null;
         }
         List<UploadTicketResponse> rows = jdbcTemplate.query("""
-            SELECT id, ticket_no, storage_provider, bucket_name, object_key, mime_type, expire_at
+            SELECT id, ticket_no, storage_provider, bucket_name, object_key, mime_type,
+                   file_size, content_sha256, expire_at, status
             FROM sys_upload_ticket
             WHERE uploader_type = ? AND uploader_id = ? AND client_request_id = ?
               AND is_deleted = 0
@@ -1365,8 +1437,16 @@ public class FileCenterService {
             LIMIT 1
             """,
             (rs, rowNum) -> {
+                Long uploadTicketId = rs.getLong("id");
+                Long attachmentRefId = findAttachmentRefIdByTicket(uploadTicketId);
+                if (attachmentRefId != null && "CONFIRMED".equals(rs.getString("status"))) {
+                    FileObjectRow fileObject = findActiveFileObject(rs.getString("content_sha256"), rs.getLong("file_size"));
+                    if (fileObject != null) {
+                        return deduplicatedResponse(uploadTicketId, rs.getString("ticket_no"), fileObject, attachmentRefId);
+                    }
+                }
                 UploadTicketResponse response = new UploadTicketResponse();
-                response.setUploadTicketId(rs.getLong("id"));
+                response.setUploadTicketId(uploadTicketId);
                 response.setTicketNo(rs.getString("ticket_no"));
                 response.setDeduplicated(false);
                 response.setAttachmentRefId(null);

@@ -664,3 +664,36 @@
 - 当前仍是开发范围和接口契约，尚未修改 DDL 与后端代码
 - MinIO 本地联调配置还未写入工程配置
 - 并发去重、配额扣减一致性需要在实现阶段用数据库约束和事务测试验证
+
+## 2026-05-05 第24审后台秒传幂等修复
+
+### 背景
+
+第24审指出后台上传命中秒传时直接创建 `sys_attachment_ref`，但没有创建可被 `clientRequestId` 回查的上传票据，导致同一管理员重复提交同一个秒传请求时，会重复创建附件引用并重复增加 `GLOBAL` 用量。
+
+### 本次处理
+
+- 秒传命中已有 `sys_file_object` 时，先创建一张 `status=CONFIRMED` 的 `sys_upload_ticket`
+- 秒传创建的 `sys_attachment_ref.source_upload_ticket_id` 绑定这张已确认票据
+- `clientRequestId` 幂等回查如果发现票据已有附件引用，则返回同一张秒传票据和同一附件引用
+- 秒传路径捕获唯一键冲突后回查已有结果，避免重复请求或并发重试冒成重复加账
+- 后台集成测试新增重复 `clientRequestId` 秒传用例，断言同一票据、同一附件引用、同一用量账本结果
+- API 文档和测试用例同步说明“秒传也会生成已确认票据”的第一版契约
+
+### 验证记录
+
+- `mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminDeduplicatedUploadShouldBeIdempotentByClientRequestId test`：通过
+- `mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest test`：通过
+
+### 意义
+
+- 后台秒传从“直接建引用”收口为“票据驱动的幂等结果”
+- 后续后台文件下载、删除、审计追踪时，可以统一从上传票据追溯来源
+- 员工端与后台端共用秒传幂等回查逻辑，减少两个入口行为分叉
+
+### 文档边界校准
+
+- API 文档明确 `ADMIN_FILE` 只是后台治理文件第一版归属，不等同于 `KB_DOCUMENT` 或 `DOC_DOCUMENT`
+- 知识库、文档、群文件、Agent 文件仍需等待各自业务模块 ACL 与入库流程落地后再开放
+- 重复确认当前采用宽松幂等：以 `uploadTicketId` 已生成的附件引用为准返回，不用当前请求体重建引用
+- 后台上传确认闭环不等于完整后台治理闭环，后台文件列表、下载、回收站、彻底删除和用量释放仍归入后续生命周期开发
