@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-05-05 module-file 配额策略服务拆分
+
+### 改动背景
+
+第 29 审建议继续降低 `FileCenterService` 的职责堆叠。上一轮已经拆出附件引用和文件对象数据访问层，但配额查询、存储摘要、配额策略 CRUD、上传/恢复前配额阻断仍然留在主服务里。后续个人云空间、企业总池、缓存保留池、知识库空间和群组空间都会依赖配额规则，如果继续混在文件上传生命周期里，后面会很难判断“是文件流程问题”还是“空间策略问题”。
+
+本轮不改接口、不改 DDL、不改响应结构，只把配额相关逻辑收敛到独立服务。
+
+### 本次处理
+
+- 新增 `FileQuotaPolicyService`，集中处理员工配额查询、后台存储摘要、配额策略列表/创建/更新
+- 将个人云空间和企业总池的上传/恢复前容量校验迁入 `FileQuotaPolicyService`
+- 将配额策略 payload 校验、作用域唯一性校验、策略编码唯一性校验、配额使用率计算、阻断原因计算迁出 `FileCenterService`
+- `FileCenterService` 保留对外方法入口和文件主流程编排，通过委托方式调用配额服务
+- 清理主服务中迁移后不再使用的默认配额常量和导入
+- `FileCenterService` 从 `1698` 行继续降到 `1377` 行，新增 `FileQuotaPolicyService` `405` 行
+
+### 验证记录
+
+- 重构前基线：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest test`，36 个文件模块用例通过
+- 配额相关定向回归：`mvn -Dtest=ModuleFileApiIntegrationTest#userAndAdminShouldQueryQuotaAndStorageSummary,ModuleFileApiIntegrationTest#adminShouldCreateListAndUpdateQuotaPolicy,ModuleFileApiIntegrationTest#adminQuotaPolicyShouldValidateThresholdAndUsedBytes,ModuleFileApiIntegrationTest#adminQuotaPolicyShouldRejectDuplicateScope,ModuleFileApiIntegrationTest#databaseShouldRejectDuplicateNullScopeQuotaPolicy,ModuleFileApiIntegrationTest#adminQuotaPolicyShouldRejectDuplicatePolicyCode,ModuleFileApiIntegrationTest#uploadTicketShouldRejectWhenPersonalQuotaIsInsufficient,ModuleFileApiIntegrationTest#restoreShouldRejectWhenGlobalQuotaIsInsufficient test`，8 个配额相关用例通过
+- 文件模块回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest test`，36 个文件模块用例通过
+- 编译验证：`mvn -DskipTests compile`
+- 空白检查：`git diff --check`
+
+### 意义
+
+- 配额策略从文件主流程中独立出来，后续接群文件、知识库文件、审批附件和 Agent 临时文件时，可以优先复用配额服务而不是继续扩写主服务
+- 主服务现在更接近“上传、确认、下载、回收站生命周期编排器”，配额规则有了单独演进边界
+- 本轮属于行为不变的安全重构，为后续继续拆 `FileUploadTicketService`、`FileUploadConfirmService` 和 `FileLifecycleService` 降低冲突面
+
+---
+
 ## 2026-05-05 module-file 文件数据访问层小拆分
 
 ### 改动背景
