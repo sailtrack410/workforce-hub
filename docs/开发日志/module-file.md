@@ -4,6 +4,40 @@
 
 ---
 
+## 2026-05-05 module-file 上传票据服务拆分
+
+### 改动背景
+
+配额策略已经从 `FileCenterService` 中拆出，但上传票据申请仍然把员工/后台 owner 校验、上传策略读取、`clientRequestId` 幂等回查、同主体秒传、普通上传票据落库、上传地址生成、对象 key 生成和审计写入都堆在主服务里。后续 `IM_GROUP_FILE`、审批附件、文档文件和知识库文件都会扩展上传入口，如果继续在主服务中追加分支，确认上传和生命周期逻辑会被一起拖复杂。
+
+本轮继续做行为不变拆分：只迁移“申请上传票据”职责，不迁移确认上传、不改接口、不改 DDL。
+
+### 本次处理
+
+- 新增 `FileUploadTicketService`，集中处理员工端和后台端上传票据申请
+- 将上传策略读取、扩展名/MIME 校验、单文件大小校验迁入 `FileUploadTicketService`
+- 将 `clientRequestId` 幂等回查、并发唯一键兜底、同上传主体秒传票据生成迁入新服务
+- 将普通上传票据落库、LOCAL 上传地址生成、对象 key 生成和创建上传票据审计迁入新服务
+- `FileCenterService` 的上传票据入口改为委托调用，确认上传、下载、回收站生命周期暂时保留在主服务
+- `AttachmentRefRepository` 新增附件引用创建方法，供上传票据秒传和后续确认上传拆分复用
+- `FileCenterService` 从 `1377` 行降到 `953` 行，新增 `FileUploadTicketService` `495` 行
+
+### 验证记录
+
+- 重构前上传票据基线：`mvn -Dtest=ModuleFileApiIntegrationTest#uploadTicketShouldRejectWhenPersonalQuotaIsInsufficient,ModuleFileApiIntegrationTest#uploadTicketShouldRejectUnsupportedFileType,ModuleFileApiIntegrationTest#uploadTicketShouldRejectWhenFileExceedsSceneLimit,ModuleFileApiIntegrationTest#uploadTicketShouldBeIdempotentByClientRequestId,ModuleFileApiIntegrationTest#uploadTicketShouldReturnExistingTicketWhenPolicyChangesAfterFirstRequest,ModuleFileAdminApiIntegrationTest#adminShouldUploadConfirmAndDeduplicateFile,ModuleFileAdminApiIntegrationTest#adminUploadTicketShouldNotDeduplicateEmployeeFileByHashOnly,ModuleFileAdminApiIntegrationTest#adminUploadTicketShouldBeIdempotentWhenDeduplicated test`，7 个上传票据相关用例通过
+- 重构后定向回归：同一条上传票据定向命令，7 个用例通过
+- 编译验证：`mvn -DskipTests compile`
+- 文件模块回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest test`
+- 空白检查：`git diff --check`
+
+### 意义
+
+- 上传票据申请从文件中心主服务中独立出来，后续新增群文件、文档文件、审批附件和知识库文件的上传策略时，有更清晰的扩展入口
+- 主服务继续回到“确认上传、下载、回收站生命周期编排器”的位置，减少后续改一个上传规则影响删除/下载流程的概率
+- 本轮刻意不拆确认上传，避免一次性跨越票据申请、对象校验、附件引用和账本入账多个边界；下一轮适合继续拆 `FileUploadConfirmService`
+
+---
+
 ## 2026-05-05 module-file 配额策略服务拆分
 
 ### 改动背景

@@ -25,6 +25,35 @@ public class AttachmentRefRepository {
             """, rs -> rs.next() ? rs.getLong("id") : null, uploadTicketId);
     }
 
+    public void create(Long attachmentRefId,
+                       String ownerType,
+                       Long ownerId,
+                       Long fileObjectId,
+                       Long sourceUploadTicketId,
+                       String originalFileName,
+                       String displayName,
+                       String uploaderType,
+                       Long uploaderId) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_attachment_ref
+                (id, owner_type, owner_id, file_object_id, source_upload_ticket_id, original_file_name,
+                 display_name, uploader_type, uploader_id, visibility_scope, created_by)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OWNER', ?)
+            """,
+            attachmentRefId,
+            ownerType,
+            ownerId,
+            fileObjectId,
+            sourceUploadTicketId,
+            originalFileName,
+            displayName,
+            uploaderType,
+            uploaderId,
+            uploaderId
+        );
+    }
+
     public int countActiveByFileObjectId(Long fileObjectId) {
         Integer count = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM sys_attachment_ref WHERE file_object_id = ? AND is_deleted = 0",
