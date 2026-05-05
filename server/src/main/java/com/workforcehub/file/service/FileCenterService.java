@@ -56,13 +56,19 @@ public class FileCenterService {
     private final JdbcTemplate jdbcTemplate;
     private final StorageProviderRegistry storageProviderRegistry;
     private final ObjectMapper objectMapper;
+    private final DownloadTicketExecutionService downloadTicketExecutionService;
+    private final StorageUsageLedgerService storageUsageLedgerService;
 
     public FileCenterService(JdbcTemplate jdbcTemplate,
                              StorageProviderRegistry storageProviderRegistry,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             DownloadTicketExecutionService downloadTicketExecutionService,
+                             StorageUsageLedgerService storageUsageLedgerService) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.objectMapper = objectMapper;
+        this.downloadTicketExecutionService = downloadTicketExecutionService;
+        this.storageUsageLedgerService = storageUsageLedgerService;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -106,8 +112,8 @@ public class FileCenterService {
                 throw e;
             }
             increaseFileRefCount(existing.id());
-            increaseUsage("USER", userId, request.getFileSize(), 1);
-            increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+            storageUsageLedgerService.increaseUsage("USER", userId, request.getFileSize(), 1);
+            storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
             audit("USER", userId, "FILE_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
             return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);
@@ -215,7 +221,7 @@ public class FileCenterService {
                 throw e;
             }
             increaseFileRefCount(existing.id());
-            increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+            storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
             audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
             return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);
@@ -347,8 +353,8 @@ public class FileCenterService {
             throw e;
         }
         increaseFileRefCount(fileObject.id());
-        increaseUsage("USER", userId, request.getFileSize(), 1);
-        increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+        storageUsageLedgerService.increaseUsage("USER", userId, request.getFileSize(), 1);
+        storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
         markUploadTicketConfirmed(ticket.id());
         audit("USER", userId, "FILE_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
@@ -418,7 +424,7 @@ public class FileCenterService {
             throw e;
         }
         increaseFileRefCount(fileObject.id());
-        increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+        storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
         markUploadTicketConfirmed(ticket.id());
         audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
@@ -482,10 +488,7 @@ public class FileCenterService {
             throw new BizException(409, "下载票据已使用或已失效");
         }
         if (ticket.expireAt().isBefore(LocalDateTime.now())) {
-            jdbcTemplate.update(
-                "UPDATE sys_download_ticket SET status = 'EXPIRED', updated_at = NOW() WHERE id = ? AND status = 'ACTIVE'",
-                ticket.id()
-            );
+            downloadTicketExecutionService.expireActiveTicket(ticket.id());
             throw new BizException(410, "下载链接已过期，请重新申请");
         }
 
@@ -497,12 +500,9 @@ public class FileCenterService {
             throw new BizException(409, "文件已删除");
         }
 
+        downloadTicketExecutionService.claimActiveTicket(ticket.id());
         StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
             .loadObject(attachment.bucketName(), attachment.objectKey());
-        jdbcTemplate.update(
-            "UPDATE sys_download_ticket SET status = 'USED', updated_at = NOW() WHERE id = ? AND status = 'ACTIVE'",
-            ticket.id()
-        );
         audit("USER", userId, "FILE_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
         return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
@@ -530,8 +530,7 @@ public class FileCenterService {
             SELECT ar.id AS attachment_ref_id, ar.file_object_id, ar.owner_type, ar.owner_id,
                    ar.original_file_name, ar.display_name, ar.uploader_type, ar.uploader_id,
                    ar.deleted_at, ar.purge_after, ar.created_at, ar.updated_at,
-                   fo.mime_type, fo.file_size, fo.content_sha256, fo.storage_provider,
-                   fo.bucket_name, fo.object_key, fo.scan_status
+                   fo.mime_type, fo.file_size, fo.scan_status
             FROM sys_attachment_ref ar
             JOIN sys_file_object fo ON fo.id = ar.file_object_id
             WHERE ar.owner_type = 'ADMIN_FILE'
@@ -604,10 +603,7 @@ public class FileCenterService {
             throw new BizException(409, "下载票据已使用或已失效");
         }
         if (ticket.expireAt().isBefore(LocalDateTime.now())) {
-            jdbcTemplate.update(
-                "UPDATE sys_download_ticket SET status = 'EXPIRED', updated_at = NOW() WHERE id = ? AND status = 'ACTIVE'",
-                ticket.id()
-            );
+            downloadTicketExecutionService.expireActiveTicket(ticket.id());
             throw new BizException(410, "下载链接已过期，请重新申请");
         }
 
@@ -617,12 +613,9 @@ public class FileCenterService {
             throw new BizException(409, "文件已删除");
         }
 
+        downloadTicketExecutionService.claimActiveTicket(ticket.id());
         StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
             .loadObject(attachment.bucketName(), attachment.objectKey());
-        jdbcTemplate.update(
-            "UPDATE sys_download_ticket SET status = 'USED', updated_at = NOW() WHERE id = ? AND status = 'ACTIVE'",
-            ticket.id()
-        );
         audit("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
         return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
@@ -631,11 +624,11 @@ public class FileCenterService {
     public QuotaResponse getEmployeeQuota() {
         Long userId = CurrentUserHolder.requireUserId();
         long personalQuota = resolveQuota("USER", userId, resolveQuota("USER_DEFAULT", null, DEFAULT_PERSONAL_QUOTA_BYTES));
-        long personalUsed = resolveUsedBytes("USER", userId);
+        long personalUsed = storageUsageLedgerService.usedBytes("USER", userId);
         long globalQuota = resolveQuota("GLOBAL", null, DEFAULT_GLOBAL_QUOTA_BYTES);
-        long globalUsed = resolveUsedBytes("GLOBAL", null);
+        long globalUsed = storageUsageLedgerService.usedBytes("GLOBAL", null);
         long cacheQuota = resolveQuota("TEMP_CACHE", null, 50L * 1024L * 1024L * 1024L);
-        long cacheUsed = resolveCacheUsedBytes("TEMP_CACHE", null);
+        long cacheUsed = storageUsageLedgerService.cacheUsedBytes("TEMP_CACHE", null);
 
         QuotaResponse response = new QuotaResponse();
         response.setPersonalQuotaBytes(personalQuota);
@@ -654,9 +647,9 @@ public class FileCenterService {
         CurrentUserHolder.requireUserId();
         StorageProvider provider = storageProviderRegistry.require(PROVIDER_LOCAL);
         long globalQuota = resolveQuota("GLOBAL", null, DEFAULT_GLOBAL_QUOTA_BYTES);
-        long globalUsed = resolveUsedBytes("GLOBAL", null);
+        long globalUsed = storageUsageLedgerService.usedBytes("GLOBAL", null);
         long cacheQuota = resolveQuota("TEMP_CACHE", null, 50L * 1024L * 1024L * 1024L);
-        long cacheUsed = resolveCacheUsedBytes("TEMP_CACHE", null);
+        long cacheUsed = storageUsageLedgerService.cacheUsedBytes("TEMP_CACHE", null);
 
         StorageSummaryResponse response = new StorageSummaryResponse();
         response.setOrgPoolQuotaBytes(globalQuota);
@@ -786,11 +779,22 @@ public class FileCenterService {
         }
         LocalDateTime deletedAt = LocalDateTime.now();
         LocalDateTime purgeAfter = deletedAt.plusDays(30);
-        jdbcTemplate.update("""
+        int updated = jdbcTemplate.update("""
             UPDATE sys_attachment_ref
             SET deleted_at = ?, deleted_by = ?, purge_after = ?, updated_by = ?
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NULL
             """, deletedAt, userId, purgeAfter, userId, attachmentRefId);
+        if (updated == 0) {
+            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
+                throw new BizException(404, "附件引用不存在");
+            }
+            FileTrashResponse response = new FileTrashResponse();
+            response.setAttachmentRefId(attachmentRefId);
+            response.setDeletedAt(latest.deletedAt());
+            response.setPurgeAfter(latest.purgeAfter());
+            return response;
+        }
 
         FileTrashResponse response = new FileTrashResponse();
         response.setAttachmentRefId(attachmentRefId);
@@ -820,11 +824,21 @@ public class FileCenterService {
         }
         ensurePersonalQuota(userId, 0L);
         ensureGlobalQuota(0L);
-        jdbcTemplate.update("""
+        int updated = jdbcTemplate.update("""
             UPDATE sys_attachment_ref
             SET deleted_at = NULL, deleted_by = NULL, purge_after = NULL, updated_by = ?
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
             """, userId, attachmentRefId);
+        if (updated == 0) {
+            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
+                throw new BizException(404, "附件引用不存在");
+            }
+            FileRestoreResponse response = new FileRestoreResponse();
+            response.setAttachmentRefId(attachmentRefId);
+            response.setRestoredAt(LocalDateTime.now());
+            return response;
+        }
 
         FileRestoreResponse response = new FileRestoreResponse();
         response.setAttachmentRefId(attachmentRefId);
@@ -845,13 +859,20 @@ public class FileCenterService {
         if (attachment.deletedAt() == null) {
             throw new BizException(409, "请先将文件移入回收站");
         }
-        jdbcTemplate.update(
-            "UPDATE sys_attachment_ref SET is_deleted = 1, updated_by = ? WHERE id = ? AND is_deleted = 0",
+        int updated = jdbcTemplate.update(
+            """
+                UPDATE sys_attachment_ref
+                SET is_deleted = 1, updated_by = ?
+                WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
+                """,
             userId,
             attachmentRefId
         );
-        releaseUsage("USER", userId, attachment.fileSize(), 1);
-        releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
+        if (updated == 0) {
+            throw new BizException(404, "附件引用不存在");
+        }
+        storageUsageLedgerService.releaseUsage("USER", userId, attachment.fileSize(), 1);
+        storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
         Integer refCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM sys_attachment_ref WHERE file_object_id = ? AND is_deleted = 0",
             Integer.class,
@@ -894,11 +915,22 @@ public class FileCenterService {
         }
         LocalDateTime deletedAt = LocalDateTime.now();
         LocalDateTime purgeAfter = deletedAt.plusDays(30);
-        jdbcTemplate.update("""
+        int updated = jdbcTemplate.update("""
             UPDATE sys_attachment_ref
             SET deleted_at = ?, deleted_by = ?, purge_after = ?, updated_by = ?
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NULL
             """, deletedAt, adminId, purgeAfter, adminId, attachmentRefId);
+        if (updated == 0) {
+            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
+                throw new BizException(404, "附件引用不存在");
+            }
+            FileTrashResponse response = new FileTrashResponse();
+            response.setAttachmentRefId(attachmentRefId);
+            response.setDeletedAt(latest.deletedAt());
+            response.setPurgeAfter(latest.purgeAfter());
+            return response;
+        }
 
         FileTrashResponse response = new FileTrashResponse();
         response.setAttachmentRefId(attachmentRefId);
@@ -927,11 +959,21 @@ public class FileCenterService {
             throw new BizException(409, "文件已超过回收站保留期");
         }
         ensureGlobalQuota(0L);
-        jdbcTemplate.update("""
+        int updated = jdbcTemplate.update("""
             UPDATE sys_attachment_ref
             SET deleted_at = NULL, deleted_by = NULL, purge_after = NULL, updated_by = ?
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
             """, adminId, attachmentRefId);
+        if (updated == 0) {
+            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
+                throw new BizException(404, "附件引用不存在");
+            }
+            FileRestoreResponse response = new FileRestoreResponse();
+            response.setAttachmentRefId(attachmentRefId);
+            response.setRestoredAt(LocalDateTime.now());
+            return response;
+        }
 
         FileRestoreResponse response = new FileRestoreResponse();
         response.setAttachmentRefId(attachmentRefId);
@@ -952,12 +994,19 @@ public class FileCenterService {
         if (attachment.deletedAt() == null) {
             throw new BizException(409, "请先将文件移入回收站");
         }
-        jdbcTemplate.update(
-            "UPDATE sys_attachment_ref SET is_deleted = 1, updated_by = ? WHERE id = ? AND is_deleted = 0",
+        int updated = jdbcTemplate.update(
+            """
+                UPDATE sys_attachment_ref
+                SET is_deleted = 1, updated_by = ?
+                WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
+                """,
             adminId,
             attachmentRefId
         );
-        releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
+        if (updated == 0) {
+            throw new BizException(404, "附件引用不存在");
+        }
+        storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
         Integer refCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM sys_attachment_ref WHERE file_object_id = ? AND is_deleted = 0",
             Integer.class,
@@ -1186,7 +1235,7 @@ public class FileCenterService {
 
     private void ensurePersonalQuota(Long userId, Long incomingBytes) {
         long quota = resolveQuota("USER", userId, resolveQuota("USER_DEFAULT", null, DEFAULT_PERSONAL_QUOTA_BYTES));
-        long used = resolveUsedBytes("USER", userId);
+        long used = storageUsageLedgerService.usedBytes("USER", userId);
         if (used + incomingBytes > quota) {
             throw new BizException(507, "个人云空间不足，请清理文件或联系管理员扩容");
         }
@@ -1194,7 +1243,7 @@ public class FileCenterService {
 
     private void ensureGlobalQuota(Long incomingBytes) {
         long quota = resolveQuota("GLOBAL", null, DEFAULT_GLOBAL_QUOTA_BYTES);
-        long used = resolveUsedBytes("GLOBAL", null);
+        long used = storageUsageLedgerService.usedBytes("GLOBAL", null);
         if (used + incomingBytes > quota) {
             throw new BizException(507, "企业文件总空间不足，请联系系统管理员扩容");
         }
@@ -1216,32 +1265,6 @@ public class FileCenterService {
         return values.isEmpty() ? defaultValue : values.get(0);
     }
 
-    private long resolveUsedBytes(String scopeType, Long scopeId) {
-        Long used = jdbcTemplate.query("""
-            SELECT used_bytes FROM sys_storage_usage
-            WHERE scope_type = ? AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
-            """,
-            rs -> rs.next() ? rs.getLong("used_bytes") : null,
-            scopeType,
-            scopeId,
-            scopeId
-        );
-        return used == null ? 0L : used;
-    }
-
-    private long resolveCacheUsedBytes(String scopeType, Long scopeId) {
-        Long used = jdbcTemplate.query("""
-            SELECT cache_used_bytes FROM sys_storage_usage
-            WHERE scope_type = ? AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
-            """,
-            rs -> rs.next() ? rs.getLong("cache_used_bytes") : null,
-            scopeType,
-            scopeId,
-            scopeId
-        );
-        return used == null ? 0L : used;
-    }
-
     private void validateQuotaPolicyPayload(String scopeType,
                                             Long scopeId,
                                             Long quotaBytes,
@@ -1261,7 +1284,7 @@ public class FileCenterService {
         if (warningThreshold.compareTo(blockThreshold) >= 0) {
             throw new BizException(400, "预警阈值必须小于阻断阈值");
         }
-        long usedBytes = resolveUsedBytes(scopeType, scopeId);
+        long usedBytes = storageUsageLedgerService.usedBytes(scopeType, scopeId);
         if (quotaBytes < usedBytes) {
             throw new BizException(409, "配额不能低于当前已用量");
         }
@@ -1419,33 +1442,6 @@ public class FileCenterService {
         return text.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private void increaseUsage(String scopeType, Long scopeId, Long bytes, int fileCount) {
-        jdbcTemplate.update("""
-            INSERT INTO sys_storage_usage
-                (id, scope_type, scope_id, used_bytes, cache_used_bytes, file_count)
-            VALUES
-                (?, ?, ?, ?, 0, ?)
-            ON DUPLICATE KEY UPDATE
-                used_bytes = used_bytes + VALUES(used_bytes),
-                file_count = file_count + VALUES(file_count)
-            """, IdWorker.getId(), scopeType, scopeId, bytes, fileCount);
-    }
-
-    private void releaseUsage(String scopeType, Long scopeId, Long bytes, int fileCount) {
-        jdbcTemplate.update("""
-            UPDATE sys_storage_usage
-            SET used_bytes = GREATEST(used_bytes - ?, 0),
-                file_count = GREATEST(file_count - ?, 0)
-            WHERE scope_type = ? AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
-            """,
-            bytes,
-            fileCount,
-            scopeType,
-            scopeId,
-            scopeId
-        );
-    }
-
     private UploadTicketResponse deduplicatedResponse(FileObjectRow fileObject, Long attachmentRefId) {
         UploadTicketResponse response = new UploadTicketResponse();
         response.setUploadTicketId(null);
@@ -1505,10 +1501,6 @@ public class FileCenterService {
         response.setUploaderId(rs.getObject("uploader_id", Long.class));
         response.setMimeType(rs.getString("mime_type"));
         response.setFileSize(rs.getLong("file_size"));
-        response.setContentSha256(rs.getString("content_sha256"));
-        response.setStorageProvider(rs.getString("storage_provider"));
-        response.setBucketName(rs.getString("bucket_name"));
-        response.setObjectKey(rs.getString("object_key"));
         response.setScanStatus(rs.getString("scan_status"));
         response.setDeletedAt(rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime());
         response.setPurgeAfter(rs.getTimestamp("purge_after") == null ? null : rs.getTimestamp("purge_after").toLocalDateTime());

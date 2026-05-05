@@ -20,9 +20,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -50,6 +59,9 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
@@ -282,6 +294,133 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
         assertAuditCountAtLeast("FILE_ADMIN_PURGED", 1);
     }
 
+    @Test
+    @DisplayName("后台同一下载票据并发执行时只能成功一次")
+    void adminDownloadTicketShouldBeClaimedOnceUnderConcurrency() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] content = "admin-concurrent-download-content".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedAdminFile(adminSession, "后台并发下载.pdf", content);
+        String ticketNo = createAdminDownloadTicket(adminSession, attachmentRefId);
+        Long ticketId = ticketId(ticketNo);
+
+        try (Connection lockConnection = dataSource.getConnection()) {
+            lockConnection.setAutoCommit(false);
+            try (PreparedStatement statement = lockConnection.prepareStatement(
+                    "SELECT id FROM sys_download_ticket WHERE id = ? FOR UPDATE")) {
+                statement.setLong(1, ticketId);
+                statement.executeQuery();
+
+                ExecutorService executor = Executors.newFixedThreadPool(2);
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch start = new CountDownLatch(1);
+                try {
+                    Future<Integer> first = executor.submit(() -> downloadCode(adminSession, ticketNo, ready, start));
+                    Future<Integer> second = executor.submit(() -> downloadCode(adminSession, ticketNo, ready, start));
+                    ready.await();
+                    start.countDown();
+                    Thread.sleep(200L);
+                    lockConnection.commit();
+
+                    List<Integer> resultCodes = List.of(first.get(), second.get());
+                    long successCount = resultCodes.stream().filter(code -> code == 0).count();
+                    long conflictCount = resultCodes.stream().filter(code -> code == 409).count();
+                    assertEquals(1L, successCount);
+                    assertEquals(1L, conflictCount);
+                } finally {
+                    executor.shutdownNow();
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("后台彻底删除同一附件时不应重复释放企业用量")
+    void adminPurgeShouldReleaseUsageOnlyWhenStateChanged() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] targetContent = "admin-purge-idempotent-target".getBytes(StandardCharsets.UTF_8);
+        byte[] survivorContent = "admin-purge-idempotent-survivor".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedAdminFile(adminSession, "后台重复彻底删除.pdf", targetContent);
+        createConfirmedAdminFile(adminSession, "后台账本哨兵.pdf", survivorContent);
+        trashAdminFile(adminSession, attachmentRefId);
+
+        try (Connection lockConnection = dataSource.getConnection()) {
+            lockConnection.setAutoCommit(false);
+            try (PreparedStatement statement = lockConnection.prepareStatement(
+                    "SELECT id FROM sys_attachment_ref WHERE id = ? FOR UPDATE")) {
+                statement.setLong(1, attachmentRefId);
+                statement.executeQuery();
+
+                ExecutorService executor = Executors.newFixedThreadPool(2);
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch start = new CountDownLatch(1);
+                try {
+                    Future<Integer> first = executor.submit(() -> purgeCode(adminSession, attachmentRefId, ready, start));
+                    Future<Integer> second = executor.submit(() -> purgeCode(adminSession, attachmentRefId, ready, start));
+                    ready.await();
+                    start.countDown();
+                    Thread.sleep(200L);
+                    lockConnection.commit();
+
+                    List<Integer> resultCodes = List.of(first.get(), second.get());
+                    long successCount = resultCodes.stream().filter(code -> code == 0).count();
+                    long notFoundCount = resultCodes.stream().filter(code -> code == 404).count();
+                    assertEquals(1L, successCount);
+                    assertEquals(1L, notFoundCount);
+                } finally {
+                    executor.shutdownNow();
+                }
+            }
+        }
+
+        assertEquals(survivorContent.length, usedBytes("GLOBAL", null));
+        assertEquals(1L, fileCount("GLOBAL", null));
+    }
+
+    @Test
+    @DisplayName("后台文件列表默认不暴露对象存储内部字段")
+    void adminFileListShouldHideStorageInternals() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] content = "admin-list-storage-internals-content".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedAdminFile(adminSession, "后台列表字段.pdf", content);
+
+        mockMvc.perform(get("/api/admin/files")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonPath("$.data.list[0].contentSha256").doesNotExist())
+            .andExpect(jsonPath("$.data.list[0].storageProvider").doesNotExist())
+            .andExpect(jsonPath("$.data.list[0].bucketName").doesNotExist())
+            .andExpect(jsonPath("$.data.list[0].objectKey").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("后台下载遇到非法MIME时降级为二进制响应")
+    void adminDownloadShouldFallbackWhenMimeTypeInvalid() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        byte[] content = "admin-invalid-mime-content".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedAdminFile(adminSession, "后台非法MIME.pdf", content);
+        jdbcTemplate.update("""
+            UPDATE sys_file_object fo
+            JOIN sys_attachment_ref ar ON ar.file_object_id = fo.id
+            SET fo.mime_type = ?
+            WHERE ar.id = ?
+            """, "bad mime", attachmentRefId);
+        String ticketNo = createAdminDownloadTicket(adminSession, attachmentRefId);
+
+        mockMvc.perform(get("/api/admin/files/download/{ticketNo}", ticketNo)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_OCTET_STREAM))
+            .andExpect(content().bytes(content));
+    }
+
     private org.springframework.test.web.servlet.ResultActions createAdminUploadTicket(
             Cookie session,
             String fileName,
@@ -352,6 +491,71 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return data(confirmResult).get("attachmentRefId").asLong();
+    }
+
+    private String createAdminDownloadTicket(Cookie adminSession, Long attachmentRefId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/admin/files/{attachmentRefId}/download-tickets", attachmentRefId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "后台下载票据测试"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        return data(result).get("ticketNo").asText();
+    }
+
+    private void trashAdminFile(Cookie adminSession, Long attachmentRefId) throws Exception {
+        mockMvc.perform(post("/api/admin/files/{attachmentRefId}/trash", attachmentRefId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "后台测试移入回收站"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+    }
+
+    private int downloadCode(Cookie adminSession,
+                             String ticketNo,
+                             CountDownLatch ready,
+                             CountDownLatch start) throws Exception {
+        ready.countDown();
+        start.await();
+        MvcResult result = mockMvc.perform(get("/api/admin/files/download/{ticketNo}", ticketNo)
+                .cookie(adminSession))
+            .andReturn();
+        String contentType = result.getResponse().getContentType();
+        if (contentType != null && contentType.contains(MediaType.APPLICATION_JSON_VALUE)) {
+            return objectMapper.readTree(result.getResponse().getContentAsString()).get("code").asInt();
+        }
+        return 0;
+    }
+
+    private int purgeCode(Cookie adminSession,
+                          Long attachmentRefId,
+                          CountDownLatch ready,
+                          CountDownLatch start) throws Exception {
+        ready.countDown();
+        start.await();
+        MvcResult result = mockMvc.perform(delete("/api/admin/files/{attachmentRefId}", attachmentRefId)
+                .cookie(adminSession))
+            .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("code").asInt();
+    }
+
+    private Long ticketId(String ticketNo) {
+        return jdbcTemplate.queryForObject(
+            "SELECT id FROM sys_download_ticket WHERE ticket_no = ?",
+            Long.class,
+            ticketNo
+        );
     }
 
     private org.springframework.test.web.servlet.ResultActions createEmployeeUploadTicket(

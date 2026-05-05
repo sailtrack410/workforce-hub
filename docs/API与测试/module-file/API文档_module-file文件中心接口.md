@@ -689,6 +689,7 @@ http://localhost:8080
 - 分页查询当前有效的后台治理文件
 - 第一版只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的附件引用
 - 不返回员工个人文件、知识库文件、文档空间文件或群文件
+- 默认不返回 `contentSha256`、`storageProvider`、`bucketName`、`objectKey` 等对象存储内部字段；排障详情后续通过更高权限接口单独开放
 
 成功响应：
 
@@ -712,10 +713,6 @@ http://localhost:8080
         "uploaderId": 8001,
         "mimeType": "application/pdf",
         "fileSize": 1048576,
-        "contentSha256": "9b7d4d8c9a0b7c1d2e3f4567890abcdeffedcba09876543211234567890abcd",
-        "storageProvider": "LOCAL",
-        "bucketName": "local",
-        "objectKey": "uploads/2026/05/05/9b7d4d8c9a0b7c1d.pdf",
         "scanStatus": "PENDING",
         "deletedAt": null,
         "purgeAfter": null,

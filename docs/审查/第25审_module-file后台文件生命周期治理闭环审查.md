@@ -1,7 +1,7 @@
 # 第 25 审 module-file 后台文件生命周期治理闭环审查
 
 - 审查日期：2026-05-05
-- 审查提交：工作区未提交状态
+- 审查提交：`e1a5a9924d7f50a040995ddfa096fb23ead86bad`（实现module-file后台文件生命周期治理）
 - 审查范围：`server/src/main/java/com/workforcehub/file/controller/AdminFileController.java`、`server/src/main/java/com/workforcehub/file/service/FileCenterService.java`、`server/src/test/java/com/workforcehub/file/ModuleFileAdminApiIntegrationTest.java`、`docs/API与测试/module-file/`、`docs/开发日志/module-file.md`
 - 审查目标：复核第 24 审 1-1 后台文件生命周期缺口修复是否形成自洽闭环，并检查新增后台下载能力是否引入跨主体秒传与可下载风险。
 

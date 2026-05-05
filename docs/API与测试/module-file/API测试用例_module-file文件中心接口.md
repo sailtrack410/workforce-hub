@@ -37,11 +37,12 @@
 - 命中物理去重的秒传
 - 下载票据创建
 - 使用有效下载票据下载原始文件
+- 员工端同一下载票据并发执行只能成功一次
 - 过期下载票据拦截
 - 个人配额不足拦截
 - 回收站删除、恢复、彻底删除
 - 彻底删除释放个人与企业总池用量
-- 重复彻底删除不重复释放空间
+- 员工端同一附件并发彻底删除不重复释放空间
 - 恢复时企业总池不足拦截
 - 上传票据 `clientRequestId` 顺序重试幂等
 - 确认上传业务归属防篡改
@@ -59,9 +60,13 @@
 - 后台秒传重复客户端请求 ID 幂等
 - 后台不能仅凭员工文件 hash 与大小直接秒传
 - 后台 `ADMIN_FILE` 有效文件列表
+- 后台列表默认隐藏对象存储内部字段
 - 后台下载票据创建与真实下载
+- 后台同一下载票据并发执行只能成功一次
+- 后台非法 MIME 下载降级为二进制响应
 - 后台回收站删除、回收站列表、恢复、彻底删除
 - 后台彻底删除释放企业总池用量
+- 后台同一附件并发彻底删除不重复释放企业用量
 - 后台生命周期审计记录
 
 当前尚未自动化覆盖：
@@ -206,9 +211,13 @@
 | `FILE-DL-004` | P1 | `POST /api/employee/files/{attachmentRefId}/download-tickets` | 已进回收站文件不能下载 | 附件引用已删除 | 申请下载 | HTTP `404` 或 `409`；提示文件已删除 |
 | `FILE-DL-005` | P1 | 审计断言 | 下载票据创建写审计 | `FILE-DL-001` 成功 | 查询审计 | 存在下载票据创建审计记录 |
 | `FILE-DL-006` | P0 | `GET /api/employee/files/download/{ticketNo}` | 有效下载票据返回原始文件并标记已使用 | 下载票据有效且文件对象存在 | 访问下载入口 | HTTP `200`；Body 等于原始文件字节；票据状态更新为 `USED`；写入下载执行审计 |
+| `FILE-DL-007` | P0 | 并发集成测试 | 员工端同一下载票据只能成功执行一次 | 员工下载票据有效；两个请求并发访问同一票据 | 并发访问员工下载入口 | 仅一个请求返回文件；另一个返回 `code=409`；票据最终为 `USED` |
 | `FILE-ADM-DL-001` | P0 | `GET /api/admin/files` | 后台查询有效治理文件列表 | 管理员已登录；存在 `ADMIN_FILE` 有效文件 | 分页查询 | HTTP `200`；只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的文件 |
 | `FILE-ADM-DL-002` | P0 | `POST /api/admin/files/{attachmentRefId}/download-tickets` | 后台申请治理文件下载票据 | 管理员已登录；后台治理文件未删除 | `downloadType=SINGLE` | HTTP `200`；返回 `/api/admin/files/download/{ticketNo}` |
 | `FILE-ADM-DL-003` | P0 | `GET /api/admin/files/download/{ticketNo}` | 后台有效下载票据返回原始文件 | 下载票据有效且文件对象存在 | 访问后台下载入口 | HTTP `200`；Body 等于原始文件字节；票据状态更新为 `USED`；写入后台下载执行审计 |
+| `FILE-ADM-DL-004` | P0 | 并发集成测试 | 后台同一下载票据只能成功执行一次 | 后台下载票据有效；两个请求并发访问同一票据 | 并发访问后台下载入口 | 仅一个请求返回文件；另一个返回 `code=409`；票据最终为 `USED` |
+| `FILE-ADM-DL-005` | P1 | `GET /api/admin/files` | 后台列表默认隐藏存储内部字段 | 管理员已登录；存在后台治理文件 | 分页查询 | 响应不包含 `contentSha256`、`storageProvider`、`bucketName`、`objectKey` |
+| `FILE-ADM-DL-006` | P1 | `GET /api/admin/files/download/{ticketNo}` | 非法 MIME 降级为二进制下载 | 历史数据或手工数据写入非法 MIME | 访问后台下载入口 | HTTP `200`；`Content-Type=application/octet-stream`；Body 等于原始文件字节 |
 
 ## 6.5 回收站
 
@@ -220,6 +229,8 @@
 | `FILE-TRASH-004` | P1 | `POST /api/employee/files/{attachmentRefId}/restore` | 恢复时配额不足被拒绝 | 文件在回收站；当前配额被调小 | 恢复原因 | HTTP `507`；提示恢复会超过当前配额 |
 | `FILE-TRASH-005` | P1 | `POST /api/employee/files/{attachmentRefId}/trash` | 非所有者不能删除个人文件 | 员工 B 登录 | 员工 A 的附件引用 | HTTP `403` |
 | `FILE-TRASH-006` | P1 | 审计断言 | 删除与恢复写审计 | 删除和恢复已执行 | 查询审计 | 存在删除、恢复审计记录 |
+| `FILE-TRASH-007` | P0 | 并发集成测试 | 员工端同一附件彻底删除只释放一次用量 | 员工文件已进入回收站；个人空间和企业总池还有其他文件作为账本哨兵 | 两个请求并发彻底删除同一附件 | 仅一个请求 `code=0`；另一个 `code=404`；`USER` 与 `GLOBAL` 只扣减目标文件一次 |
+| `FILE-ADM-TRASH-006` | P0 | 并发集成测试 | 后台同一附件彻底删除只释放一次用量 | 后台文件已进入回收站；企业总池还有其他文件作为账本哨兵 | 两个请求并发彻底删除同一附件 | 仅一个请求 `code=0`；另一个 `code=404`；`GLOBAL` 只扣减目标文件一次 |
 
 ## 6.6 后台配额治理
 

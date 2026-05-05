@@ -21,9 +21,6 @@ import com.workforcehub.file.dto.UploadTicketResponse;
 import com.workforcehub.file.service.FileCenterService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,9 +42,12 @@ import java.util.List;
 public class AdminFileController {
 
     private final FileCenterService fileCenterService;
+    private final FileDownloadResponseFactory downloadResponseFactory;
 
-    public AdminFileController(FileCenterService fileCenterService) {
+    public AdminFileController(FileCenterService fileCenterService,
+                               FileDownloadResponseFactory downloadResponseFactory) {
         this.fileCenterService = fileCenterService;
+        this.downloadResponseFactory = downloadResponseFactory;
     }
 
     @GetMapping
@@ -86,18 +86,7 @@ public class AdminFileController {
     @GetMapping("/download/{ticketNo}")
     public ResponseEntity<Resource> download(@PathVariable String ticketNo) {
         DownloadFileResult result = fileCenterService.downloadAdminFile(ticketNo);
-        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
-        if (result.mimeType() != null && !result.mimeType().isBlank()) {
-            mediaType = MediaType.parseMediaType(result.mimeType());
-        }
-        return ResponseEntity.ok()
-            .contentType(mediaType)
-            .contentLength(result.fileSize())
-            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                .filename(result.fileName(), java.nio.charset.StandardCharsets.UTF_8)
-                .build()
-                .toString())
-            .body(result.resource());
+        return downloadResponseFactory.attachment(result);
     }
 
     @PostMapping("/{attachmentRefId}/trash")

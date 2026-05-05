@@ -21,7 +21,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import javax.sql.DataSource;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,6 +61,9 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
@@ -224,6 +235,46 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         );
         assertEquals("USED", status);
         assertAuditCountAtLeast("FILE_DOWNLOAD_EXECUTED", 1);
+    }
+
+    @Test
+    @DisplayName("员工端同一下载票据并发执行时只能成功一次")
+    void employeeDownloadTicketShouldBeClaimedOnceUnderConcurrency() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "employee-concurrent-download-content".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedPersonalFile(employeeSession, "员工并发下载.txt", content);
+        String ticketNo = createEmployeeDownloadTicket(employeeSession, attachmentRefId);
+        Long ticketId = ticketId(ticketNo);
+
+        try (Connection lockConnection = dataSource.getConnection()) {
+            lockConnection.setAutoCommit(false);
+            try (PreparedStatement statement = lockConnection.prepareStatement(
+                    "SELECT id FROM sys_download_ticket WHERE id = ? FOR UPDATE")) {
+                statement.setLong(1, ticketId);
+                statement.executeQuery();
+
+                ExecutorService executor = Executors.newFixedThreadPool(2);
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch start = new CountDownLatch(1);
+                try {
+                    Future<Integer> first = executor.submit(() -> downloadCode(employeeSession, ticketNo, ready, start));
+                    Future<Integer> second = executor.submit(() -> downloadCode(employeeSession, ticketNo, ready, start));
+                    ready.await();
+                    start.countDown();
+                    Thread.sleep(200L);
+                    lockConnection.commit();
+
+                    List<Integer> resultCodes = List.of(first.get(), second.get());
+                    long successCount = resultCodes.stream().filter(code -> code == 0).count();
+                    long conflictCount = resultCodes.stream().filter(code -> code == 409).count();
+                    assertEquals(1L, successCount);
+                    assertEquals(1L, conflictCount);
+                } finally {
+                    executor.shutdownNow();
+                }
+            }
+        }
     }
 
     @Test
@@ -411,6 +462,53 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
         assertEquals(remainingBytes, usedBytes("USER", EMPLOYEE_USER_ID));
         assertEquals(remainingBytes, usedBytes("GLOBAL", null));
+        assertEquals(1L, fileCount("USER", EMPLOYEE_USER_ID));
+        assertEquals(1L, fileCount("GLOBAL", null));
+    }
+
+    @Test
+    @DisplayName("员工端并发彻底删除同一附件时不应重复释放用量")
+    void employeePurgeShouldReleaseUsageOnlyWhenStateChangedUnderConcurrency() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] targetContent = "employee-purge-idempotent-target".getBytes(StandardCharsets.UTF_8);
+        byte[] survivorContent = "employee-purge-idempotent-survivor".getBytes(StandardCharsets.UTF_8);
+        Long attachmentRefId = createConfirmedPersonalFile(employeeSession, "员工重复彻底删除.txt", targetContent);
+        createConfirmedPersonalFile(employeeSession, "员工账本哨兵.txt", survivorContent);
+
+        trashEmployeeFile(employeeSession, attachmentRefId);
+
+        try (Connection lockConnection = dataSource.getConnection()) {
+            lockConnection.setAutoCommit(false);
+            try (PreparedStatement statement = lockConnection.prepareStatement(
+                    "SELECT id FROM sys_attachment_ref WHERE id = ? FOR UPDATE")) {
+                statement.setLong(1, attachmentRefId);
+                statement.executeQuery();
+
+                ExecutorService executor = Executors.newFixedThreadPool(2);
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch start = new CountDownLatch(1);
+                try {
+                    Future<Integer> first = executor.submit(() -> purgeCode(employeeSession, attachmentRefId, ready, start));
+                    Future<Integer> second = executor.submit(() -> purgeCode(employeeSession, attachmentRefId, ready, start));
+                    ready.await();
+                    start.countDown();
+                    Thread.sleep(200L);
+                    lockConnection.commit();
+
+                    List<Integer> resultCodes = List.of(first.get(), second.get());
+                    long successCount = resultCodes.stream().filter(code -> code == 0).count();
+                    long notFoundCount = resultCodes.stream().filter(code -> code == 404).count();
+                    assertEquals(1L, successCount);
+                    assertEquals(1L, notFoundCount);
+                } finally {
+                    executor.shutdownNow();
+                }
+            }
+        }
+
+        assertEquals(survivorContent.length, usedBytes("USER", EMPLOYEE_USER_ID));
+        assertEquals(survivorContent.length, usedBytes("GLOBAL", null));
         assertEquals(1L, fileCount("USER", EMPLOYEE_USER_ID));
         assertEquals(1L, fileCount("GLOBAL", null));
     }
@@ -947,6 +1045,71 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return data(confirmResult).get("attachmentRefId").asLong();
+    }
+
+    private String createEmployeeDownloadTicket(Cookie employeeSession, Long attachmentRefId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employee/files/{attachmentRefId}/download-tickets", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "员工下载票据测试"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        return data(result).get("ticketNo").asText();
+    }
+
+    private void trashEmployeeFile(Cookie employeeSession, Long attachmentRefId) throws Exception {
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/trash", attachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "员工测试移入回收站"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+    }
+
+    private int downloadCode(Cookie employeeSession,
+                             String ticketNo,
+                             CountDownLatch ready,
+                             CountDownLatch start) throws Exception {
+        ready.countDown();
+        start.await();
+        MvcResult result = mockMvc.perform(get("/api/employee/files/download/{ticketNo}", ticketNo)
+                .cookie(employeeSession))
+            .andReturn();
+        String contentType = result.getResponse().getContentType();
+        if (contentType != null && contentType.contains(MediaType.APPLICATION_JSON_VALUE)) {
+            return objectMapper.readTree(result.getResponse().getContentAsString()).get("code").asInt();
+        }
+        return 0;
+    }
+
+    private int purgeCode(Cookie employeeSession,
+                          Long attachmentRefId,
+                          CountDownLatch ready,
+                          CountDownLatch start) throws Exception {
+        ready.countDown();
+        start.await();
+        MvcResult result = mockMvc.perform(delete("/api/employee/files/{attachmentRefId}", attachmentRefId)
+                .cookie(employeeSession))
+            .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("code").asInt();
+    }
+
+    private Long ticketId(String ticketNo) {
+        return jdbcTemplate.queryForObject(
+            "SELECT id FROM sys_download_ticket WHERE ticket_no = ?",
+            Long.class,
+            ticketNo
+        );
     }
 
     private org.springframework.test.web.servlet.ResultActions confirmUpload(

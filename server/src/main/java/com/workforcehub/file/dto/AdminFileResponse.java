@@ -17,10 +17,6 @@ public class AdminFileResponse {
     private Long uploaderId;
     private String mimeType;
     private Long fileSize;
-    private String contentSha256;
-    private String storageProvider;
-    private String bucketName;
-    private String objectKey;
     private String scanStatus;
     private LocalDateTime deletedAt;
     private LocalDateTime purgeAfter;

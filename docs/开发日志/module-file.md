@@ -761,3 +761,62 @@
 - 知识库、文档、群文件、Agent 文件仍需等待各自业务模块 ACL 与入库流程落地后再开放
 - 重复确认当前采用宽松幂等：以 `uploadTicketId` 已生成的附件引用为准返回，不用当前请求体重建引用
 - 后台上传确认闭环不等于完整后台治理闭环，后台文件列表、下载、回收站、彻底删除和用量释放仍归入后续生命周期开发
+
+## 2026-05-05 第26审后台生命周期并发与响应边界修复
+
+### 背景
+
+第26审指出后台文件生命周期闭环已经可用，但状态机在并发下还不够硬：下载票据和彻底删除都存在“先读状态、后条件更新但不看影响行数”的问题；后台列表默认暴露对象存储内部字段；员工端和后台端下载响应构造重复，非法 MIME 会在 Controller 层抛 500。
+
+### 本次处理
+
+- 下载执行改为先通过 `UPDATE sys_download_ticket ... WHERE status='ACTIVE'` 抢占票据，影响行数为 0 时返回 `code=409`
+- 员工端和后台端共用同一套下载票据抢占逻辑，避免只修后台而员工端遗留同类风险
+- 员工端和后台端彻底删除都改为条件更新成功后才释放用量、重算引用数和写成功审计
+- 移入回收站、恢复增加条件更新结果处理，避免并发交错时“未改到行但返回成功审计”的状态漂移
+- 后台文件列表默认移除 `contentSha256`、`storageProvider`、`bucketName`、`objectKey` 等存储内部字段
+- 新增 `FileDownloadResponseFactory`，统一下载响应头构造；非法 MIME 降级为 `application/octet-stream`
+- 新增并发下载、并发彻底删除、后台列表字段最小化、非法 MIME 降级测试
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest test`，新增 4 个用例中并发下载、列表字段、非法 MIME、并发彻底删除均能复现旧实现问题
+- 绿灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest test`，8 个后台文件用例通过
+
+### 意义
+
+- 下载票据从“读到 ACTIVE 就可能返回文件”收口为“抢到 ACTIVE 才能返回文件”
+- 彻底删除从“可能重复释放账本”收口为“状态真正变更后才执行副作用”
+- 后台默认响应面更克制，避免 MinIO 或对象存储路径在普通治理列表里泄露
+- 下载响应构造集中到一个组件，后续加范围下载、预览、缓存头时不用员工端和后台端双改
+
+## 2026-05-05 员工端并发镜像测试与服务小拆分
+
+### 背景
+
+第26审修复后，后台端已经有并发下载和并发彻底删除测试兜底；员工端代码虽然共用了同一套修复逻辑，但缺少镜像测试。与此同时，`FileCenterService` 继续承载票据状态机、用量账本、上传、下载、生命周期和配额治理，后续继续叠功能会越来越难维护。
+
+### 本次处理
+
+- 员工端新增同一下载票据并发执行测试，断言仅一个请求能返回文件，另一个返回 `code=409`
+- 员工端新增同一附件并发彻底删除测试，断言 `USER` 与 `GLOBAL` 用量只释放一次
+- 抽出 `DownloadTicketExecutionService`，集中处理下载票据 `ACTIVE -> USED` 抢占和过期标记
+- 抽出 `StorageUsageLedgerService`，集中处理 `sys_storage_usage` 的用量读取、增加和释放
+- `FileCenterService` 保留业务编排职责，不再直接承载下载票据执行和用量账本 SQL
+- 校准第 25 审的真实审查提交 hash，补齐第 26 审指出的审查追溯残留
+- 校准 API 测试用例编号，避免后台彻底删除并发用例与后台移入回收站用例共用同一个 ID
+
+### 验证记录
+
+- `mvn -Dtest=ModuleFileApiIntegrationTest test`：24 个员工端文件模块用例通过
+- `mvn -Dtest=ModuleFileApiIntegrationTest#employeeDownloadTicketShouldBeClaimedOnceUnderConcurrency,ModuleFileApiIntegrationTest#employeePurgeShouldReleaseUsageOnlyWhenStateChangedUnderConcurrency test`：2 个员工端并发镜像用例通过
+- `git diff --check`：无空白错误
+- 测试用例 ID 去重检查：无重复 `FILE-*` 用例 ID
+- `mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest test`：32 个文件模块用例通过
+
+### 意义
+
+- 员工端和后台端的关键并发语义都有自动化测试兜底
+- 下载票据状态机和用量账本从大服务中剥离，后续拆 `FileLifecycleService`、清理任务或更多 ownerType 时不需要继续往一个类里堆 SQL
+- 这次只做小拆分，不改接口契约和表结构，降低对当前文件中心链路的扰动
+- 审查文件、开发日志、API 文档和测试用例编号保持一致，后续按审查轮次回溯时不会断链
