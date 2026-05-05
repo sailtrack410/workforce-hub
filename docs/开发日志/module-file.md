@@ -882,3 +882,30 @@
 - 清理任务从文件中心主服务中解耦，后续定时调度或任务运行表可以围绕 `FileCleanupJobService` 扩展
 - 文件中心形成“上传、确认、下载、回收站、彻底删除、物理清理”的闭环
 - 两阶段物理清理给误删恢复、并发插入和对象存储异常留出缓冲，默认比到期引用清理后立刻删二进制更稳
+
+## 2026-05-05 清理任务两阶段与运行记录
+
+### 背景
+
+第 29 审指出后台清理任务第一版把数据库状态更新和对象存储删除放在同一个事务方法里。对象存储删除属于外部副作用，数据库回滚无法恢复已经删除的二进制对象；同时任务缺少运行记录和失败明细，中途失败只能靠应用日志追踪。
+
+### 本次处理
+
+- 新增 `sys_file_cleanup_job_run`，记录清理任务运行编号、类型、状态、统计值、开始/结束时间和执行管理员
+- 新增 `sys_file_cleanup_job_detail`，记录每个待物理删除对象的 Provider、bucket、objectKey、处理状态、尝试次数和失败原因
+- `FileCleanupJobService` 改为两阶段边界：事务内先标记上传票据、下载票据、回收站引用、无引用文件对象，并写入清理明细；事务提交后再逐条执行对象存储删除
+- 物理删除失败不再让接口整体返回 `500`，而是回写明细失败并返回 `jobStatus=PARTIAL_FAILED`
+- `CleanupJobRunResponse` 增加 `jobStatus` 与 `failedPhysicalObjects`
+- 集成测试补充成功明细断言和物理删除失败可追踪场景
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest#cleanupExecuteShouldExpireTicketsPurgeRefsDeleteObjectsAndAudit,ModuleFileCleanupIntegrationTest#cleanupPhysicalDeleteFailureShouldBeRecordedWithoutRollingBackRun test`，失败于响应缺少 `jobStatus`，以及对象存储 Provider 不存在时接口返回 `code=500`
+- 绿灯：同一命令通过，2 个清理任务运行记录用例通过
+- 回归：`mvn -Dtest=ModuleFileCleanupIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest test`，36 个用例通过
+
+### 意义
+
+- 清理任务从“同步脚本”升级为“可观测、可恢复作业”
+- 数据库状态和对象存储删除的边界更清楚，失败后能按 `jobRunId` 和明细追踪
+- 后续接定时调度、失败重试、分页游标时，不需要推翻当前清理模型

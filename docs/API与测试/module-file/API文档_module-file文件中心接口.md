@@ -1013,8 +1013,10 @@ http://localhost:8080
 - 过期上传票据会从 `PENDING` 标记为 `EXPIRED`，并清理未确认的临时上传对象。
 - 过期下载票据会从 `ACTIVE` 标记为 `EXPIRED`。
 - 到期回收站引用第一版只处理 `PERSONAL_FILE` 与 `ADMIN_FILE`，会被标记为彻底删除，并释放对应空间用量。
-- 物理对象采用两阶段清理：回收站引用到期清理后，物理对象先进入 `cleanup_after` 候选；只有已经无有效引用且 `cleanup_after` 到期的对象，才会在 `UNREFERENCED_FILE_OBJECT` 阶段删除二进制并标记文件对象删除。
+- 物理对象采用两阶段清理：数据库事务内先标记业务状态并写入 `sys_file_cleanup_job_run` / `sys_file_cleanup_job_detail`；事务提交后再逐条删除对象存储，成功或失败都会回写明细。
+- 到期回收站引用清理后，物理对象先进入 `cleanup_after` 候选；只有已经无有效引用且 `cleanup_after` 到期的对象，才会在 `UNREFERENCED_FILE_OBJECT` 阶段标记文件对象删除并进入物理删除明细。
 - `LOCAL` 与 `MINIO` Provider 均提供删除对象入口；第一版由后台手动触发，后续可接入定时调度。
+- `jobStatus=SUCCESS` 表示本次清理全部完成；`jobStatus=PARTIAL_FAILED` 表示数据库状态已提交，但存在物理对象删除失败，需要后续按明细排查或重试。
 
 成功响应：
 
@@ -1026,13 +1028,37 @@ http://localhost:8080
     "jobRunId": "FILE-CLEAN-20260503-001",
     "jobType": "ALL_EXPIRED",
     "dryRun": false,
+    "jobStatus": "SUCCESS",
     "expiredUploadTickets": 3,
     "expiredDownloadTickets": 12,
     "purgedAttachmentRefs": 2,
     "deletedPhysicalObjects": 1,
+    "failedPhysicalObjects": 0,
     "releasedBytes": 1048576
   },
   "requestId": "file202605030104"
+}
+```
+
+部分失败响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "jobRunId": "FILE-CLEAN-20260503-002",
+    "jobType": "UNREFERENCED_FILE_OBJECT",
+    "dryRun": false,
+    "jobStatus": "PARTIAL_FAILED",
+    "expiredUploadTickets": 0,
+    "expiredDownloadTickets": 0,
+    "purgedAttachmentRefs": 0,
+    "deletedPhysicalObjects": 0,
+    "failedPhysicalObjects": 1,
+    "releasedBytes": 0
+  },
+  "requestId": "file202605030105"
 }
 ```
 

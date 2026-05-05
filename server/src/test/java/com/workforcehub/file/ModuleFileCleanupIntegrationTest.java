@@ -108,7 +108,7 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
             "execute-unreferenced-content".getBytes(StandardCharsets.UTF_8)
         );
 
-        runCleanupJob(adminSession, "ALL_EXPIRED", false)
+        MvcResult result = runCleanupJob(adminSession, "ALL_EXPIRED", false)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.jobType").value("ALL_EXPIRED"))
@@ -117,7 +117,10 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.expiredDownloadTickets").value(1))
             .andExpect(jsonPath("$.data.purgedAttachmentRefs").value(2))
             .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(1))
-            .andExpect(jsonPath("$.data.releasedBytes").value(adminRecycleContent.length + employeeRecycleContent.length));
+            .andExpect(jsonPath("$.data.releasedBytes").value(adminRecycleContent.length + employeeRecycleContent.length))
+            .andExpect(jsonPath("$.data.jobStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.failedPhysicalObjects").value(0))
+            .andReturn();
 
         assertEquals("EXPIRED", uploadTicketStatus(expiredUpload.uploadTicketId()));
         assertEquals("EXPIRED", downloadTicketStatus(downloadTicketNo));
@@ -127,7 +130,37 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
         assertFalse(Files.exists(objectPath(expiredUpload.objectKey())));
         assertEquals(activeFileSize(activeDownloadAttachmentRefId), usedBytes("GLOBAL", null));
         assertEquals(0L, usedBytes("USER", EMPLOYEE_USER_ID));
+        String jobRunId = data(result).get("jobRunId").asText();
+        assertEquals("SUCCESS", cleanupJobStatus(jobRunId));
+        assertEquals(1, cleanupDetailCount(jobRunId, "EXPIRED_UPLOAD_TICKET", "SUCCESS"));
+        assertEquals(1, cleanupDetailCount(jobRunId, "UNREFERENCED_FILE_OBJECT", "SUCCESS"));
         assertAuditCountAtLeast("FILE_CLEANUP_JOB_RUN", 1);
+    }
+
+    @Test
+    @DisplayName("物理删除失败时清理任务应保留运行记录和失败明细")
+    void cleanupPhysicalDeleteFailureShouldBeRecordedWithoutRollingBackRun() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Long fileObjectId = createUnreferencedFileObject(
+            "MISSING_PROVIDER",
+            "missing",
+            "cleanup/missing-provider.txt",
+            "missing-provider-content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        MvcResult result = runCleanupJob(adminSession, "UNREFERENCED_FILE_OBJECT", false)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobType").value("UNREFERENCED_FILE_OBJECT"))
+            .andExpect(jsonPath("$.data.jobStatus").value("PARTIAL_FAILED"))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(0))
+            .andExpect(jsonPath("$.data.failedPhysicalObjects").value(1))
+            .andReturn();
+
+        String jobRunId = data(result).get("jobRunId").asText();
+        assertEquals(1, fileObjectDeleted(fileObjectId));
+        assertEquals("PARTIAL_FAILED", cleanupJobStatus(jobRunId));
+        assertEquals(1, cleanupDetailCount(jobRunId, "UNREFERENCED_FILE_OBJECT", "FAILED"));
     }
 
     private org.springframework.test.web.servlet.ResultActions runCleanupJob(Cookie adminSession,
@@ -211,6 +244,13 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private Long createUnreferencedFileObject(String objectKey, byte[] content) throws Exception {
+        return createUnreferencedFileObject("LOCAL", "local", objectKey, content);
+    }
+
+    private Long createUnreferencedFileObject(String storageProvider,
+                                              String bucketName,
+                                              String objectKey,
+                                              byte[] content) throws Exception {
         writeLocalObject(objectKey, content);
         Long fileObjectId = System.nanoTime();
         jdbcTemplate.update("""
@@ -219,10 +259,12 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
                  file_size, file_hash, upload_status, content_md5, content_sha256, ref_count,
                  scan_status, cleanup_after, is_deleted)
             VALUES
-                (?, 'LOCAL', 'local', ?, '无引用文件.txt', 'txt', 'text/plain',
+                (?, ?, ?, ?, '无引用文件.txt', 'txt', 'text/plain',
                  ?, ?, 'UPLOADED', NULL, ?, 0, 'PASSED', ?, 0)
             """,
             fileObjectId,
+            storageProvider,
+            bucketName,
             objectKey,
             content.length,
             sha256(content),
@@ -429,6 +471,27 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
             "SELECT is_deleted FROM sys_file_object WHERE id = ?",
             Integer.class,
             fileObjectId
+        );
+        return value == null ? 0 : value;
+    }
+
+    private String cleanupJobStatus(String jobRunId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM sys_file_cleanup_job_run WHERE job_run_id = ?",
+            String.class,
+            jobRunId
+        );
+    }
+
+    private int cleanupDetailCount(String jobRunId, String itemType, String status) {
+        Integer value = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM sys_file_cleanup_job_detail
+            WHERE job_run_id = ? AND item_type = ? AND status = ?
+            """,
+            Integer.class,
+            jobRunId,
+            itemType,
+            status
         );
         return value == null ? 0 : value;
     }

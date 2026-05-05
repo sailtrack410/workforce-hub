@@ -257,8 +257,9 @@
 | `FILE-ADM-TRASH-004` | P0 | `DELETE /api/admin/files/{attachmentRefId}` | 管理员彻底删除后台治理文件 | 文件已进入回收站 | 无 | HTTP `200`；引用彻底删除；释放 `GLOBAL` 用量；按引用数决定是否延迟物理清理 |
 | `FILE-ADM-TRASH-005` | P1 | 审计断言 | 后台删除、恢复、彻底删除写审计 | 后台生命周期动作已执行 | 查询审计 | 存在 `FILE_ADMIN_TRASHED`、`FILE_ADMIN_RESTORED`、`FILE_ADMIN_PURGED` 审计记录 |
 | `FILE-CLEAN-001` | P0 | `POST /api/admin/files/cleanup-jobs/run` | dry-run 清理任务 | 存在过期上传票据、过期下载票据、到期回收站引用和无引用物理对象 | `dryRun=true` | HTTP `200`；返回预计清理数量；不修改票据、引用或物理对象 |
-| `FILE-CLEAN-002` | P0 | `POST /api/admin/files/cleanup-jobs/run` | 执行过期清理任务 | 存在过期票据、到期回收站引用和已到期无引用物理对象 | `dryRun=false` | HTTP `200`；过期票据标记为 `EXPIRED`；到期回收站引用被彻底删除并释放用量；已到期无引用物理对象被删除 |
+| `FILE-CLEAN-002` | P0 | `POST /api/admin/files/cleanup-jobs/run` | 执行过期清理任务 | 存在过期票据、到期回收站引用和已到期无引用物理对象 | `dryRun=false` | HTTP `200`；`jobStatus=SUCCESS`；过期票据标记为 `EXPIRED`；到期回收站引用被彻底删除并释放用量；已到期无引用物理对象被删除；运行表和明细表记录成功 |
 | `FILE-CLEAN-003` | P1 | 审计断言 | 清理任务写审计 | 清理任务已执行 | 查询审计 | 存在 `FILE_CLEANUP_JOB_RUN` 审计记录 |
+| `FILE-CLEAN-004` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 物理删除失败可追踪 | 存在对象存储 Provider 不可用的到期无引用物理对象 | `dryRun=false` | HTTP `200`；`jobStatus=PARTIAL_FAILED`；`failedPhysicalObjects=1`；运行明细记录失败原因 |
 
 ## 6.8 鉴权与契约
 

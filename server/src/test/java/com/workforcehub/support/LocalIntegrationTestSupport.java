@@ -96,6 +96,8 @@ public abstract class LocalIntegrationTestSupport {
         jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
         try {
             jdbcTemplate.execute("DELETE FROM sys_download_ticket");
+            jdbcTemplate.execute("DELETE FROM sys_file_cleanup_job_detail");
+            jdbcTemplate.execute("DELETE FROM sys_file_cleanup_job_run");
             jdbcTemplate.execute("DELETE FROM sys_audit_log");
             jdbcTemplate.execute("DELETE FROM sys_storage_usage");
             jdbcTemplate.execute("DELETE FROM sys_storage_quota_policy");
