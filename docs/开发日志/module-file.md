@@ -4,6 +4,38 @@
 
 ---
 
+## 2026-05-05 module-file 文件数据访问层小拆分
+
+### 改动背景
+
+后台清理任务已经按独立服务落地，但 `FileCenterService` 仍然同时承担业务编排、附件引用查询、文件对象查询、引用计数刷新和下载附件装载等职责。后续流程、IM、文档和 Agent 都会复用文件引用，如果继续把 SQL 堆在一个服务里，后续每接一个 ownerType 都会增加误改风险。
+
+本轮不改变接口契约、不改表结构，只做低风险职责拆分：先把附件引用与文件对象的数据访问从主服务中剥离出来。
+
+### 本次处理
+
+- 新增 `AttachmentRefRepository`，集中处理附件引用查询、下载附件查询、按上传票据回查附件引用、统计文件对象有效引用数
+- 新增 `FileObjectRepository`，集中处理文件对象查询、按 hash/size 查找活动对象、按上传主体查找可复用对象、引用计数增加和清理候选刷新
+- 新增 `AttachmentRow`、`DownloadAttachmentRow`、`FileObjectRow`，把原先 `FileCenterService` 内部 record 迁到 `repository` 包
+- `FileCenterService` 改为调用 repository 完成数据访问，保留上传、下载、回收站和配额业务编排
+- 员工端和后台端彻底删除统一调用 `refreshRefCountAndCleanupAfter`，避免同一段引用数刷新 SQL 在两个分支里重复维护
+- `FileCenterService` 从 `1903` 行降到 `1698` 行，为后续继续拆 `FileLifecycleService`、`FileUploadTicketService` 和 `FileQuotaPolicyService` 留出边界
+
+### 验证记录
+
+- 重构前基线：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest test`，34 个文件模块用例通过
+- 重构后编译：`mvn -DskipTests compile`
+- 重构后回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest test`，34 个文件模块用例通过
+- 空白检查：`git diff --check`
+
+### 意义
+
+- 主服务开始从“全量 SQL 容器”回到“业务编排服务”
+- 附件引用、文件对象和引用计数的访问边界更清楚，后续接审批附件、IM 文件、知识库文件时更容易复用和审查
+- 这次只拆读写边界，不改 API 行为和数据结构，适合作为 `module-file` 第一版收口前的安全重构
+
+---
+
 ## 2026-05-05 module-file 后台文件生命周期治理闭环
 
 ### 改动背景

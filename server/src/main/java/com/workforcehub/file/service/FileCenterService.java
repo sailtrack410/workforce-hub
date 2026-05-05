@@ -24,6 +24,11 @@ import com.workforcehub.file.dto.QuotaResponse;
 import com.workforcehub.file.dto.StorageSummaryResponse;
 import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
+import com.workforcehub.file.repository.AttachmentRefRepository;
+import com.workforcehub.file.repository.AttachmentRow;
+import com.workforcehub.file.repository.DownloadAttachmentRow;
+import com.workforcehub.file.repository.FileObjectRepository;
+import com.workforcehub.file.repository.FileObjectRow;
 import com.workforcehub.file.storage.LocalStorageProvider;
 import com.workforcehub.file.storage.StorageObjectResource;
 import com.workforcehub.file.storage.StorageProvider;
@@ -58,17 +63,23 @@ public class FileCenterService {
     private final ObjectMapper objectMapper;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
     private final StorageUsageLedgerService storageUsageLedgerService;
+    private final FileObjectRepository fileObjectRepository;
+    private final AttachmentRefRepository attachmentRefRepository;
 
     public FileCenterService(JdbcTemplate jdbcTemplate,
                              StorageProviderRegistry storageProviderRegistry,
                              ObjectMapper objectMapper,
                              DownloadTicketExecutionService downloadTicketExecutionService,
-                             StorageUsageLedgerService storageUsageLedgerService) {
+                             StorageUsageLedgerService storageUsageLedgerService,
+                             FileObjectRepository fileObjectRepository,
+                             AttachmentRefRepository attachmentRefRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.objectMapper = objectMapper;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
         this.storageUsageLedgerService = storageUsageLedgerService;
+        this.fileObjectRepository = fileObjectRepository;
+        this.attachmentRefRepository = attachmentRefRepository;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -83,7 +94,7 @@ public class FileCenterService {
         ensurePersonalQuota(userId, request.getFileSize());
         ensureGlobalQuota(request.getFileSize());
 
-        FileObjectRow existing = findReusableFileObjectForUploader(
+        FileObjectRow existing = fileObjectRepository.findReusableForUploader(
             "USER",
             userId,
             request.getContentSha256(),
@@ -111,7 +122,7 @@ public class FileCenterService {
                 }
                 throw e;
             }
-            increaseFileRefCount(existing.id());
+            fileObjectRepository.increaseRefCount(existing.id());
             storageUsageLedgerService.increaseUsage("USER", userId, request.getFileSize(), 1);
             storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
             audit("USER", userId, "FILE_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
@@ -188,7 +199,7 @@ public class FileCenterService {
         ensureUploadPolicy(request);
         ensureGlobalQuota(request.getFileSize());
 
-        FileObjectRow existing = findReusableFileObjectForUploader(
+        FileObjectRow existing = fileObjectRepository.findReusableForUploader(
             "ADMIN",
             adminId,
             request.getContentSha256(),
@@ -220,7 +231,7 @@ public class FileCenterService {
                 }
                 throw e;
             }
-            increaseFileRefCount(existing.id());
+            fileObjectRepository.increaseRefCount(existing.id());
             storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
             audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
@@ -296,7 +307,7 @@ public class FileCenterService {
         if (!"USER".equals(ticket.uploaderType()) || !userId.equals(ticket.uploaderId())) {
             throw new BizException(403, "无权确认该上传票据");
         }
-        Long existingRefId = findAttachmentRefIdByTicket(ticket.id());
+        Long existingRefId = attachmentRefRepository.findIdByUploadTicket(ticket.id());
         if (existingRefId != null) {
             markUploadTicketConfirmed(ticket.id());
             return buildAttachmentResponse(existingRefId, false);
@@ -325,7 +336,7 @@ public class FileCenterService {
         ensureGlobalQuota(request.getFileSize());
 
         boolean deduplicated = false;
-        FileObjectRow fileObject = findActiveFileObject(request.getContentSha256(), request.getFileSize());
+        FileObjectRow fileObject = fileObjectRepository.findActiveBySha256AndSize(request.getContentSha256(), request.getFileSize());
         if (fileObject == null) {
             fileObject = createFileObject(ticket, request, userId);
         } else {
@@ -345,14 +356,14 @@ public class FileCenterService {
                 userId
             );
         } catch (DuplicateKeyException e) {
-            Long concurrentRefId = findAttachmentRefIdByTicket(ticket.id());
+            Long concurrentRefId = attachmentRefRepository.findIdByUploadTicket(ticket.id());
             if (concurrentRefId != null) {
                 markUploadTicketConfirmed(ticket.id());
                 return buildAttachmentResponse(concurrentRefId, false);
             }
             throw e;
         }
-        increaseFileRefCount(fileObject.id());
+        fileObjectRepository.increaseRefCount(fileObject.id());
         storageUsageLedgerService.increaseUsage("USER", userId, request.getFileSize(), 1);
         storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
         markUploadTicketConfirmed(ticket.id());
@@ -368,7 +379,7 @@ public class FileCenterService {
         if (!"ADMIN".equals(ticket.uploaderType()) || !adminId.equals(ticket.uploaderId())) {
             throw new BizException(403, "无权确认该上传票据");
         }
-        Long existingRefId = findAttachmentRefIdByTicket(ticket.id());
+        Long existingRefId = attachmentRefRepository.findIdByUploadTicket(ticket.id());
         if (existingRefId != null) {
             markUploadTicketConfirmed(ticket.id());
             return buildAttachmentResponse(existingRefId, false);
@@ -396,7 +407,7 @@ public class FileCenterService {
         ensureGlobalQuota(request.getFileSize());
 
         boolean deduplicated = false;
-        FileObjectRow fileObject = findActiveFileObject(request.getContentSha256(), request.getFileSize());
+        FileObjectRow fileObject = fileObjectRepository.findActiveBySha256AndSize(request.getContentSha256(), request.getFileSize());
         if (fileObject == null) {
             fileObject = createFileObject(ticket, request, adminId);
         } else {
@@ -416,14 +427,14 @@ public class FileCenterService {
                 adminId
             );
         } catch (DuplicateKeyException e) {
-            Long concurrentRefId = findAttachmentRefIdByTicket(ticket.id());
+            Long concurrentRefId = attachmentRefRepository.findIdByUploadTicket(ticket.id());
             if (concurrentRefId != null) {
                 markUploadTicketConfirmed(ticket.id());
                 return buildAttachmentResponse(concurrentRefId, false);
             }
             throw e;
         }
-        increaseFileRefCount(fileObject.id());
+        fileObjectRepository.increaseRefCount(fileObject.id());
         storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
         markUploadTicketConfirmed(ticket.id());
         audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
@@ -434,7 +445,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public DownloadTicketResponse createEmployeeDownloadTicket(Long attachmentRefId, CreateDownloadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
         }
@@ -492,7 +503,7 @@ public class FileCenterService {
             throw new BizException(410, "下载链接已过期，请重新申请");
         }
 
-        DownloadAttachmentRow attachment = getDownloadAttachmentOrThrow(ticket.attachmentRefId());
+        DownloadAttachmentRow attachment = attachmentRefRepository.getDownloadAttachmentOrThrow(ticket.attachmentRefId());
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
         }
@@ -551,7 +562,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public DownloadTicketResponse createAdminDownloadTicket(Long attachmentRefId, CreateDownloadTicketRequest request) {
         Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         ensureAdminFileAttachment(attachment);
         if (attachment.deletedAt() != null || attachment.isDeleted() != 0) {
             throw new BizException(409, "文件已删除");
@@ -607,7 +618,7 @@ public class FileCenterService {
             throw new BizException(410, "下载链接已过期，请重新申请");
         }
 
-        DownloadAttachmentRow attachment = getDownloadAttachmentOrThrow(ticket.attachmentRefId());
+        DownloadAttachmentRow attachment = attachmentRefRepository.getDownloadAttachmentOrThrow(ticket.attachmentRefId());
         ensureAdminDownloadAttachment(attachment);
         if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
             throw new BizException(409, "文件已删除");
@@ -765,7 +776,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public FileTrashResponse trashEmployeeFile(Long attachmentRefId, FileTrashRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         ensureUploaderOwnsAttachment(userId, attachment);
         if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
             throw new BizException(404, "附件引用不存在");
@@ -785,7 +796,7 @@ public class FileCenterService {
             WHERE id = ? AND is_deleted = 0 AND deleted_at IS NULL
             """, deletedAt, userId, purgeAfter, userId, attachmentRefId);
         if (updated == 0) {
-            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
             if (latest.isDeleted() != null && latest.isDeleted() == 1) {
                 throw new BizException(404, "附件引用不存在");
             }
@@ -808,7 +819,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public FileRestoreResponse restoreEmployeeFile(Long attachmentRefId, FileTrashRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         ensureUploaderOwnsAttachment(userId, attachment);
         if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
             throw new BizException(404, "附件引用不存在");
@@ -830,7 +841,7 @@ public class FileCenterService {
             WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
             """, userId, attachmentRefId);
         if (updated == 0) {
-            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
             if (latest.isDeleted() != null && latest.isDeleted() == 1) {
                 throw new BizException(404, "附件引用不存在");
             }
@@ -851,7 +862,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public FilePurgeResponse purgeEmployeeFile(Long attachmentRefId) {
         Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         ensureUploaderOwnsAttachment(userId, attachment);
         if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
             throw new BizException(404, "附件引用不存在");
@@ -873,21 +884,12 @@ public class FileCenterService {
         }
         storageUsageLedgerService.releaseUsage("USER", userId, attachment.fileSize(), 1);
         storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
-        Integer refCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM sys_attachment_ref WHERE file_object_id = ? AND is_deleted = 0",
-            Integer.class,
-            attachment.fileObjectId()
+        int refCount = attachmentRefRepository.countActiveByFileObjectId(attachment.fileObjectId());
+        boolean cleanupScheduled = fileObjectRepository.refreshRefCountAndCleanupAfter(
+            attachment.fileObjectId(),
+            refCount,
+            LocalDateTime.now().plusDays(7)
         );
-        boolean cleanupScheduled = refCount == null || refCount == 0;
-        if (cleanupScheduled) {
-            jdbcTemplate.update(
-                "UPDATE sys_file_object SET ref_count = 0, cleanup_after = ? WHERE id = ?",
-                LocalDateTime.now().plusDays(7),
-                attachment.fileObjectId()
-            );
-        } else {
-            jdbcTemplate.update("UPDATE sys_file_object SET ref_count = ? WHERE id = ?", refCount, attachment.fileObjectId());
-        }
 
         FilePurgeResponse response = new FilePurgeResponse();
         response.setAttachmentRefId(attachmentRefId);
@@ -901,7 +903,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public FileTrashResponse trashAdminFile(Long attachmentRefId, FileTrashRequest request) {
         Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         ensureAdminFileAttachment(attachment);
         if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
             throw new BizException(404, "附件引用不存在");
@@ -921,7 +923,7 @@ public class FileCenterService {
             WHERE id = ? AND is_deleted = 0 AND deleted_at IS NULL
             """, deletedAt, adminId, purgeAfter, adminId, attachmentRefId);
         if (updated == 0) {
-            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
             if (latest.isDeleted() != null && latest.isDeleted() == 1) {
                 throw new BizException(404, "附件引用不存在");
             }
@@ -944,7 +946,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public FileRestoreResponse restoreAdminFile(Long attachmentRefId, FileTrashRequest request) {
         Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         ensureAdminFileAttachment(attachment);
         if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
             throw new BizException(404, "附件引用不存在");
@@ -965,7 +967,7 @@ public class FileCenterService {
             WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
             """, adminId, attachmentRefId);
         if (updated == 0) {
-            AttachmentRow latest = getAttachmentOrThrow(attachmentRefId);
+            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
             if (latest.isDeleted() != null && latest.isDeleted() == 1) {
                 throw new BizException(404, "附件引用不存在");
             }
@@ -986,7 +988,7 @@ public class FileCenterService {
     @Transactional(rollbackFor = Exception.class)
     public FilePurgeResponse purgeAdminFile(Long attachmentRefId) {
         Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         ensureAdminFileAttachment(attachment);
         if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
             throw new BizException(404, "附件引用不存在");
@@ -1007,21 +1009,12 @@ public class FileCenterService {
             throw new BizException(404, "附件引用不存在");
         }
         storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
-        Integer refCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM sys_attachment_ref WHERE file_object_id = ? AND is_deleted = 0",
-            Integer.class,
-            attachment.fileObjectId()
+        int refCount = attachmentRefRepository.countActiveByFileObjectId(attachment.fileObjectId());
+        boolean cleanupScheduled = fileObjectRepository.refreshRefCountAndCleanupAfter(
+            attachment.fileObjectId(),
+            refCount,
+            LocalDateTime.now().plusDays(7)
         );
-        boolean cleanupScheduled = refCount == null || refCount == 0;
-        if (cleanupScheduled) {
-            jdbcTemplate.update(
-                "UPDATE sys_file_object SET ref_count = 0, cleanup_after = ? WHERE id = ?",
-                LocalDateTime.now().plusDays(7),
-                attachment.fileObjectId()
-            );
-        } else {
-            jdbcTemplate.update("UPDATE sys_file_object SET ref_count = ? WHERE id = ?", refCount, attachment.fileObjectId());
-        }
 
         FilePurgeResponse response = new FilePurgeResponse();
         response.setAttachmentRefId(attachmentRefId);
@@ -1140,9 +1133,9 @@ public class FileCenterService {
                 request.getContentSha256().toLowerCase(),
                 userId
             );
-            return getFileObjectOrThrow(fileObjectId);
+            return fileObjectRepository.getFileObjectOrThrow(fileObjectId);
         } catch (DuplicateKeyException e) {
-            FileObjectRow existing = findActiveFileObject(request.getContentSha256(), request.getFileSize());
+            FileObjectRow existing = fileObjectRepository.findActiveBySha256AndSize(request.getContentSha256(), request.getFileSize());
             if (existing == null) {
                 throw e;
             }
@@ -1475,7 +1468,7 @@ public class FileCenterService {
     }
 
     private AttachmentRefResponse buildAttachmentResponse(Long attachmentRefId, boolean deduplicated) {
-        AttachmentRow row = getAttachmentOrThrow(attachmentRefId);
+        AttachmentRow row = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
         AttachmentRefResponse response = new AttachmentRefResponse();
         response.setAttachmentRefId(row.id());
         response.setFileObjectId(row.fileObjectId());
@@ -1568,160 +1561,6 @@ public class FileCenterService {
         return rows.get(0);
     }
 
-    private DownloadAttachmentRow getDownloadAttachmentOrThrow(Long attachmentRefId) {
-        List<DownloadAttachmentRow> rows = jdbcTemplate.query("""
-            SELECT ar.id AS attachment_ref_id, ar.owner_type, ar.display_name, ar.uploader_type, ar.uploader_id,
-                   ar.deleted_at, ar.is_deleted AS attachment_deleted,
-                   fo.storage_provider, fo.bucket_name, fo.object_key, fo.mime_type, fo.file_size,
-                   fo.is_deleted AS file_deleted
-            FROM sys_attachment_ref ar
-            JOIN sys_file_object fo ON fo.id = ar.file_object_id
-            WHERE ar.id = ?
-            """,
-            (rs, rowNum) -> new DownloadAttachmentRow(
-                rs.getLong("attachment_ref_id"),
-                rs.getString("owner_type"),
-                rs.getString("display_name"),
-                rs.getString("uploader_type"),
-                rs.getLong("uploader_id"),
-                rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime(),
-                rs.getInt("attachment_deleted"),
-                rs.getString("storage_provider"),
-                rs.getString("bucket_name"),
-                rs.getString("object_key"),
-                rs.getString("mime_type"),
-                rs.getLong("file_size"),
-                rs.getInt("file_deleted")
-            ),
-            attachmentRefId
-        );
-        if (rows.isEmpty()) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        return rows.get(0);
-    }
-
-    private AttachmentRow getAttachmentOrThrow(Long attachmentRefId) {
-        List<AttachmentRow> rows = jdbcTemplate.query("""
-            SELECT ar.id, ar.file_object_id, ar.owner_type, ar.owner_id, ar.display_name, ar.uploader_type, ar.uploader_id,
-                   ar.deleted_at, ar.purge_after, ar.created_at, ar.is_deleted,
-                   fo.mime_type, fo.file_size, fo.content_sha256, fo.scan_status
-            FROM sys_attachment_ref ar
-            JOIN sys_file_object fo ON fo.id = ar.file_object_id
-            WHERE ar.id = ?
-            """,
-            (rs, rowNum) -> new AttachmentRow(
-                rs.getLong("id"),
-                rs.getLong("file_object_id"),
-                rs.getString("owner_type"),
-                rs.getObject("owner_id", Long.class),
-                rs.getString("display_name"),
-                rs.getString("uploader_type"),
-                rs.getLong("uploader_id"),
-                rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime(),
-                rs.getTimestamp("purge_after") == null ? null : rs.getTimestamp("purge_after").toLocalDateTime(),
-                rs.getTimestamp("created_at").toLocalDateTime(),
-                rs.getInt("is_deleted"),
-                rs.getString("mime_type"),
-                rs.getLong("file_size"),
-                rs.getString("content_sha256"),
-                rs.getString("scan_status")
-            ),
-            attachmentRefId
-        );
-        if (rows.isEmpty()) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        return rows.get(0);
-    }
-
-    private FileObjectRow getFileObjectOrThrow(Long fileObjectId) {
-        List<FileObjectRow> rows = jdbcTemplate.query("""
-            SELECT id, storage_provider, bucket_name, object_key, file_size, content_sha256
-            FROM sys_file_object
-            WHERE id = ? AND is_deleted = 0
-            """,
-            (rs, rowNum) -> new FileObjectRow(
-                rs.getLong("id"),
-                rs.getString("storage_provider"),
-                rs.getString("bucket_name"),
-                rs.getString("object_key"),
-                rs.getLong("file_size"),
-                rs.getString("content_sha256")
-            ),
-            fileObjectId
-        );
-        if (rows.isEmpty()) {
-            throw new BizException(404, "文件对象不存在");
-        }
-        return rows.get(0);
-    }
-
-    private FileObjectRow findActiveFileObject(String contentSha256, Long fileSize) {
-        List<FileObjectRow> rows = jdbcTemplate.query("""
-            SELECT id, storage_provider, bucket_name, object_key, file_size, content_sha256
-            FROM sys_file_object
-            WHERE content_sha256 = ? AND file_size = ? AND is_deleted = 0
-            LIMIT 1
-            """,
-            (rs, rowNum) -> new FileObjectRow(
-                rs.getLong("id"),
-                rs.getString("storage_provider"),
-                rs.getString("bucket_name"),
-                rs.getString("object_key"),
-                rs.getLong("file_size"),
-                rs.getString("content_sha256")
-            ),
-            contentSha256.toLowerCase(),
-            fileSize
-        );
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    private FileObjectRow findReusableFileObjectForUploader(String uploaderType,
-                                                            Long uploaderId,
-                                                            String contentSha256,
-                                                            Long fileSize) {
-        List<FileObjectRow> rows = jdbcTemplate.query("""
-            SELECT fo.id, fo.storage_provider, fo.bucket_name, fo.object_key, fo.file_size, fo.content_sha256
-            FROM sys_file_object fo
-            JOIN sys_attachment_ref ar ON ar.file_object_id = fo.id
-            WHERE fo.content_sha256 = ?
-              AND fo.file_size = ?
-              AND fo.is_deleted = 0
-              AND ar.uploader_type = ?
-              AND ar.uploader_id = ?
-              AND ar.deleted_at IS NULL
-              AND ar.is_deleted = 0
-            ORDER BY ar.created_at DESC, ar.id DESC
-            LIMIT 1
-            """,
-            (rs, rowNum) -> new FileObjectRow(
-                rs.getLong("id"),
-                rs.getString("storage_provider"),
-                rs.getString("bucket_name"),
-                rs.getString("object_key"),
-                rs.getLong("file_size"),
-                rs.getString("content_sha256")
-            ),
-            contentSha256.toLowerCase(),
-            fileSize,
-            uploaderType,
-            uploaderId
-        );
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    private Long findAttachmentRefIdByTicket(Long uploadTicketId) {
-        return jdbcTemplate.query("""
-            SELECT id
-            FROM sys_attachment_ref
-            WHERE source_upload_ticket_id = ? AND is_deleted = 0
-            ORDER BY created_at DESC
-            LIMIT 1
-            """, rs -> rs.next() ? rs.getLong("id") : null, uploadTicketId);
-    }
-
     private UploadTicketResponse findUploadTicketByClientRequestId(Long userId, String clientRequestId) {
         return findUploadTicketByClientRequestId("USER", userId, clientRequestId);
     }
@@ -1741,9 +1580,12 @@ public class FileCenterService {
             """,
             (rs, rowNum) -> {
                 Long uploadTicketId = rs.getLong("id");
-                Long attachmentRefId = findAttachmentRefIdByTicket(uploadTicketId);
+                Long attachmentRefId = attachmentRefRepository.findIdByUploadTicket(uploadTicketId);
                 if (attachmentRefId != null && "CONFIRMED".equals(rs.getString("status"))) {
-                    FileObjectRow fileObject = findActiveFileObject(rs.getString("content_sha256"), rs.getLong("file_size"));
+                    FileObjectRow fileObject = fileObjectRepository.findActiveBySha256AndSize(
+                        rs.getString("content_sha256"),
+                        rs.getLong("file_size")
+                    );
                     if (fileObject != null) {
                         return deduplicatedResponse(uploadTicketId, rs.getString("ticket_no"), fileObject, attachmentRefId);
                     }
@@ -1768,10 +1610,6 @@ public class FileCenterService {
             clientRequestId
         );
         return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    private void increaseFileRefCount(Long fileObjectId) {
-        jdbcTemplate.update("UPDATE sys_file_object SET ref_count = ref_count + 1 WHERE id = ?", fileObjectId);
     }
 
     private String buildObjectKey(String contentSha256, String fileName, Long uploadTicketId) {
@@ -1823,15 +1661,6 @@ public class FileCenterService {
         String status
     ) {}
 
-    private record FileObjectRow(
-        Long id,
-        String storageProvider,
-        String bucketName,
-        String objectKey,
-        Long fileSize,
-        String contentSha256
-    ) {}
-
     private record DownloadTicketRow(
         Long id,
         String ticketNo,
@@ -1841,22 +1670,6 @@ public class FileCenterService {
         String downloadType,
         LocalDateTime expireAt,
         String status
-    ) {}
-
-    private record DownloadAttachmentRow(
-        Long attachmentRefId,
-        String ownerType,
-        String displayName,
-        String uploaderType,
-        Long uploaderId,
-        LocalDateTime deletedAt,
-        Integer attachmentDeleted,
-        String storageProvider,
-        String bucketName,
-        String objectKey,
-        String mimeType,
-        Long fileSize,
-        Integer fileDeleted
     ) {}
 
     private record QuotaPolicyRow(
@@ -1880,24 +1693,6 @@ public class FileCenterService {
         Long maxFileSizeBytes,
         String allowedExtensions,
         String allowedMimeTypes
-    ) {}
-
-    private record AttachmentRow(
-        Long id,
-        Long fileObjectId,
-        String ownerType,
-        Long ownerId,
-        String displayName,
-        String uploaderType,
-        Long uploaderId,
-        LocalDateTime deletedAt,
-        LocalDateTime purgeAfter,
-        LocalDateTime createdAt,
-        Integer isDeleted,
-        String mimeType,
-        Long fileSize,
-        String contentSha256,
-        String scanStatus
     ) {}
 
 }
