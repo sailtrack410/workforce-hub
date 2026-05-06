@@ -1005,7 +1005,7 @@ http://localhost:8080
 | `EXPIRED_DOWNLOAD_TICKET` | 清理过期下载票据 |
 | `EXPIRED_RECYCLE_REF` | 清理到期回收站引用 |
 | `UNREFERENCED_FILE_OBJECT` | 清理无引用物理对象 |
-| `FAILED_PHYSICAL_OBJECT` | 重试历史物理删除失败对象 |
+| `FAILED_PHYSICAL_OBJECT` | 重试历史物理删除失败对象，并恢复可补偿的悬挂清理明细 |
 | `ALL_EXPIRED` | 执行全部到期清理 |
 
 执行规则：
@@ -1017,6 +1017,8 @@ http://localhost:8080
 - 物理对象采用两阶段清理：数据库事务内先标记业务状态并写入 `sys_file_cleanup_job_run` / `sys_file_cleanup_job_detail`；事务提交后再逐条删除对象存储，成功或失败都会回写明细。
 - 到期回收站引用清理后，物理对象先进入 `cleanup_after` 候选；只有已经无有效引用且 `cleanup_after` 到期的对象，才会在 `UNREFERENCED_FILE_OBJECT` 阶段标记文件对象删除并进入物理删除明细。
 - `FAILED_PHYSICAL_OBJECT` 会把当前仍未成功覆盖的最新 `FAILED` 明细复制到本次任务中重新执行；历史失败明细保留为审计链路，不会被直接改写。
+- `FAILED_PHYSICAL_OBJECT` 也会恢复超过 30 分钟仍处于 `RUNNING` 任务下的历史 `PENDING` 物理清理明细：原悬挂明细和任务会被标记为 `FAILED`，并复制到本次任务继续删除。
+- 确认上传阶段如果命中全局去重但本次确实已经上传了新的临时对象，系统会登记 `DEDUPLICATED_UPLOAD_OBJECT` 清理明细；该明细由 `FAILED_PHYSICAL_OBJECT` 统一删除，避免确认上传事务内直接执行对象存储副作用。
 - `LOCAL` 与 `MINIO` Provider 均提供删除对象入口；第一版由后台手动触发，后续可接入定时调度。
 - `deletedPhysicalObjects` 统计本次所有物理对象删除成功明细，包括过期上传临时对象、无引用文件对象和失败重试对象；`failedPhysicalObjects` 统计本次所有物理对象删除失败明细。
 - `jobStatus=SUCCESS` 表示本次清理全部完成；`jobStatus=PARTIAL_FAILED` 表示数据库状态已提交，但存在物理对象删除失败，需要后续按明细排查或重试；`jobStatus=FAILED` 表示数据库阶段失败，任务运行记录会保留 `errorMessage`。

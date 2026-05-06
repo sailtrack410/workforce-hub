@@ -262,6 +262,8 @@
 | `FILE-CLEAN-004` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 物理删除失败可追踪 | 存在对象存储 Provider 不可用的到期无引用物理对象 | `dryRun=false` | HTTP `200`；`jobStatus=PARTIAL_FAILED`；`failedPhysicalObjects=1`；运行明细记录失败原因 |
 | `FILE-CLEAN-005` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 物理删除失败可重试 | 已存在未被成功明细覆盖的 `FAILED` 清理明细 | `jobType=FAILED_PHYSICAL_OBJECT` | HTTP `200`；重新复制最新失败明细执行；成功后 `jobStatus=SUCCESS`；旧失败明细保留，后续 dry-run 不再重复计入已成功对象 |
 | `FILE-CLEAN-006` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 数据库阶段失败保留运行记录 | 清理数据库阶段发生异常 | `dryRun=false` | HTTP `200`；`jobStatus=FAILED`；返回 `errorMessage`；业务数据回滚；`sys_file_cleanup_job_run` 保留失败记录 |
+| `FILE-CLEAN-007` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 历史 PENDING 物理清理明细可恢复 | 存在超过 30 分钟仍为 `RUNNING` 的旧任务和 `PENDING` 明细 | `jobType=FAILED_PHYSICAL_OBJECT` | HTTP `200`；原任务和原明细标记为 `FAILED`；本次任务复制明细并删除物理对象成功 |
+| `FILE-CLEAN-008` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 普通确认全局去重临时对象可回收 | 后台普通确认上传命中已有全局文件对象，且本次临时对象已上传 | `jobType=FAILED_PHYSICAL_OBJECT` | 确认上传后登记 `DEDUPLICATED_UPLOAD_OBJECT`；清理任务执行后临时对象删除，旧明细保留失败态，新明细成功 |
 
 ## 6.8 鉴权与契约
 

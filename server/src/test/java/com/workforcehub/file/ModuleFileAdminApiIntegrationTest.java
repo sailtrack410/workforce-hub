@@ -195,6 +195,53 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("后台普通确认命中全局去重时应登记本次临时对象清理明细")
+    void adminConfirmUploadShouldScheduleTemporaryObjectCleanupWhenGlobalDeduplicated() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedGlobalQuotaPolicy();
+        byte[] content = "admin-confirm-global-dedup-temp-object".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        createConfirmedEmployeeFile(employeeSession, "员工已有同内容文件.pdf", content);
+        Cookie adminSession = loginAdmin();
+
+        MvcResult adminTicketResult = createAdminUploadTicket(
+                adminSession,
+                "后台实际上传同内容文件.pdf",
+                content.length,
+                sha256,
+                "admin-confirm-global-dedup-temp-object"
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(false))
+            .andReturn();
+        long uploadTicketId = data(adminTicketResult).get("uploadTicketId").asLong();
+        String objectKey = data(adminTicketResult).get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        confirmAdminUpload(adminSession, uploadTicketId, objectKey, sha256, content.length, "后台实际上传同内容文件.pdf")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(true));
+
+        assertEquals(1L, fileObjectCount(sha256, content.length));
+        assertEquals(1L, cleanupDetailCountByObjectKey(objectKey, "DEDUPLICATED_UPLOAD_OBJECT", "PENDING"));
+        assertTrue(Files.exists(Path.of(localRoot).resolve(objectKey)));
+
+        runCleanupJob(adminSession, "FAILED_PHYSICAL_OBJECT", false)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(1))
+            .andExpect(jsonPath("$.data.failedPhysicalObjects").value(0));
+
+        assertFalse(Files.exists(Path.of(localRoot).resolve(objectKey)));
+        assertEquals(1L, cleanupDetailCountByObjectKey(objectKey, "DEDUPLICATED_UPLOAD_OBJECT", "FAILED"));
+        assertEquals(1L, cleanupDetailCountByObjectKey(objectKey, "DEDUPLICATED_UPLOAD_OBJECT", "SUCCESS"));
+    }
+
+    @Test
     @DisplayName("后台应能治理ADMIN_FILE列表、下载、回收站、恢复和彻底删除")
     void adminShouldManageAdminFileLifecycle() throws Exception {
         Cookie adminSession = loginAdmin();
@@ -500,6 +547,20 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
                 """.formatted(uploadTicketId, objectKey, sha256, fileSize, displayName)));
     }
 
+    private org.springframework.test.web.servlet.ResultActions runCleanupJob(Cookie adminSession,
+                                                                            String jobType,
+                                                                            boolean dryRun) throws Exception {
+        return mockMvc.perform(post("/api/admin/files/cleanup-jobs/run")
+            .cookie(adminSession)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "jobType": "%s",
+                  "dryRun": %s
+                }
+                """.formatted(jobType, dryRun)));
+    }
+
     private Long createConfirmedAdminFile(Cookie adminSession, String fileName, byte[] content) throws Exception {
         String sha256 = sha256(content);
         MvcResult ticketResult = createAdminUploadTicket(adminSession, fileName, content.length, sha256)
@@ -767,6 +828,15 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             FROM sys_upload_ticket
             WHERE client_request_id = ? AND status = 'CONFIRMED' AND is_deleted = 0
             """, Long.class, clientRequestId);
+        return value == null ? 0L : value;
+    }
+
+    private long cleanupDetailCountByObjectKey(String objectKey, String itemType, String status) {
+        Long value = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_file_cleanup_job_detail
+            WHERE object_key = ? AND item_type = ? AND status = ?
+            """, Long.class, objectKey, itemType, status);
         return value == null ? 0L : value;
     }
 

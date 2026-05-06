@@ -26,6 +26,8 @@ public class FileCleanupJobService {
     private static final String JOB_UNREFERENCED_FILE_OBJECT = "UNREFERENCED_FILE_OBJECT";
     private static final String JOB_FAILED_PHYSICAL_OBJECT = "FAILED_PHYSICAL_OBJECT";
     private static final String JOB_ALL_EXPIRED = "ALL_EXPIRED";
+    private static final String ITEM_DEDUPLICATED_UPLOAD_OBJECT = "DEDUPLICATED_UPLOAD_OBJECT";
+    private static final int STALE_PENDING_MINUTES = 30;
     private static final Set<String> SUPPORTED_JOB_TYPES = Set.of(
         JOB_EXPIRED_UPLOAD_TICKET,
         JOB_EXPIRED_DOWNLOAD_TICKET,
@@ -111,8 +113,8 @@ public class FileCleanupJobService {
         }
         if (JOB_FAILED_PHYSICAL_OBJECT.equals(jobType)) {
             stats.deletedPhysicalObjects += dryRun
-                ? countRetryableFailedCleanupDetails()
-                : copyFailedCleanupDetailsForRetry(jobRunId);
+                ? countRetryablePhysicalCleanupDetails(now)
+                : copyRetryablePhysicalCleanupDetailsForRetry(jobRunId, now);
         }
 
         stats.jobStatus = dryRun ? "SUCCESS" : "RUNNING";
@@ -342,50 +344,17 @@ public class FileCleanupJobService {
         }
     }
 
-    private long countRetryableFailedCleanupDetails() {
-        Long count = jdbcTemplate.queryForObject("""
-            SELECT COUNT(*)
-            FROM sys_file_cleanup_job_detail failed
-            WHERE failed.status = 'FAILED'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM sys_file_cleanup_job_detail later
-                  WHERE later.id > failed.id
-                    AND later.status IN ('PENDING', 'SUCCESS', 'FAILED')
-                    AND later.storage_provider = failed.storage_provider
-                    AND COALESCE(later.bucket_name, '') = COALESCE(failed.bucket_name, '')
-                    AND later.object_key = failed.object_key
-              )
-            """, Long.class);
-        return count == null ? 0L : count;
+    private long countRetryablePhysicalCleanupDetails(LocalDateTime now) {
+        return findRetryablePhysicalCleanupDetails(now).size();
     }
 
-    private long copyFailedCleanupDetailsForRetry(String jobRunId) {
-        List<FailedCleanupDetailRow> rows = jdbcTemplate.query("""
-            SELECT item_type, target_type, target_id, storage_provider, bucket_name, object_key
-            FROM sys_file_cleanup_job_detail failed
-            WHERE failed.status = 'FAILED'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM sys_file_cleanup_job_detail later
-                  WHERE later.id > failed.id
-                    AND later.status IN ('PENDING', 'SUCCESS', 'FAILED')
-                    AND later.storage_provider = failed.storage_provider
-                    AND COALESCE(later.bucket_name, '') = COALESCE(failed.bucket_name, '')
-                    AND later.object_key = failed.object_key
-              )
-            ORDER BY failed.id ASC
-            """,
-            (rs, rowNum) -> new FailedCleanupDetailRow(
-                rs.getString("item_type"),
-                rs.getString("target_type"),
-                rs.getLong("target_id"),
-                rs.getString("storage_provider"),
-                rs.getString("bucket_name"),
-                rs.getString("object_key")
-            )
-        );
-        for (FailedCleanupDetailRow row : rows) {
+    private long copyRetryablePhysicalCleanupDetailsForRetry(String jobRunId, LocalDateTime now) {
+        List<RetryableCleanupDetailRow> rows = findRetryablePhysicalCleanupDetails(now);
+        long copied = 0L;
+        for (RetryableCleanupDetailRow row : rows) {
+            if ("PENDING".equals(row.sourceStatus()) && !markRecoveredPendingDetailFailed(row)) {
+                continue;
+            }
             createCleanupDetail(
                 jobRunId,
                 row.itemType(),
@@ -395,8 +364,99 @@ public class FileCleanupJobService {
                 row.bucketName(),
                 row.objectKey()
             );
+            copied++;
         }
-        return rows.size();
+        markRecoveredPendingJobRunsFailed(rows);
+        return copied;
+    }
+
+    private List<RetryableCleanupDetailRow> findRetryablePhysicalCleanupDetails(LocalDateTime now) {
+        LocalDateTime staleBefore = now.minusMinutes(STALE_PENDING_MINUTES);
+        return jdbcTemplate.query("""
+            SELECT candidate.id,
+                   candidate.job_run_id,
+                   candidate.status,
+                   candidate.item_type,
+                   candidate.target_type,
+                   candidate.target_id,
+                   candidate.storage_provider,
+                   candidate.bucket_name,
+                   candidate.object_key
+            FROM sys_file_cleanup_job_detail candidate
+            LEFT JOIN sys_file_cleanup_job_run job_run
+              ON job_run.job_run_id = candidate.job_run_id
+            WHERE (
+                  candidate.status = 'FAILED'
+                  OR (
+                      candidate.status = 'PENDING'
+                      AND (
+                          candidate.item_type = ?
+                          OR (job_run.status = 'RUNNING' AND job_run.started_at <= ?)
+                          OR (job_run.job_run_id IS NULL AND candidate.created_at <= ?)
+                      )
+                  )
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sys_file_cleanup_job_detail later
+                  WHERE later.id > candidate.id
+                    AND later.status IN ('PENDING', 'SUCCESS', 'FAILED')
+                    AND later.storage_provider = candidate.storage_provider
+                    AND COALESCE(later.bucket_name, '') = COALESCE(candidate.bucket_name, '')
+                    AND later.object_key = candidate.object_key
+              )
+            ORDER BY candidate.id ASC
+            """,
+            (rs, rowNum) -> new RetryableCleanupDetailRow(
+                rs.getLong("id"),
+                rs.getString("job_run_id"),
+                rs.getString("status"),
+                rs.getString("item_type"),
+                rs.getString("target_type"),
+                rs.getLong("target_id"),
+                rs.getString("storage_provider"),
+                rs.getString("bucket_name"),
+                rs.getString("object_key")
+            ),
+            ITEM_DEDUPLICATED_UPLOAD_OBJECT,
+            staleBefore,
+            staleBefore
+        );
+    }
+
+    private boolean markRecoveredPendingDetailFailed(RetryableCleanupDetailRow row) {
+        int updated = jdbcTemplate.update("""
+            UPDATE sys_file_cleanup_job_detail
+            SET status = 'FAILED',
+                error_message = ?,
+                processed_at = NOW()
+            WHERE id = ? AND status = 'PENDING'
+            """,
+            "清理任务中断或待回收对象进入失败重试",
+            row.sourceDetailId()
+        );
+        return updated == 1;
+    }
+
+    private void markRecoveredPendingJobRunsFailed(List<RetryableCleanupDetailRow> rows) {
+        List<String> jobRunIds = rows.stream()
+            .filter(row -> "PENDING".equals(row.sourceStatus()))
+            .map(RetryableCleanupDetailRow::sourceJobRunId)
+            .filter(jobRunId -> jobRunId != null && !jobRunId.startsWith("FILE-CLEAN-DEDUP-"))
+            .distinct()
+            .toList();
+        for (String jobRunId : jobRunIds) {
+            jdbcTemplate.update("""
+                UPDATE sys_file_cleanup_job_run
+                SET status = 'FAILED',
+                    error_message = ?,
+                    finished_at = NOW()
+                WHERE job_run_id = ? AND status = 'RUNNING'
+                """,
+                "清理任务超时未完成，已转入失败重试",
+                jobRunId
+            );
+        }
     }
 
     private void auditCleanupJob(Long adminId, String jobRunId, String jobType, boolean dryRun, CleanupStats stats) {
@@ -710,7 +770,10 @@ public class FileCleanupJobService {
         String objectKey
     ) {}
 
-    private record FailedCleanupDetailRow(
+    private record RetryableCleanupDetailRow(
+        Long sourceDetailId,
+        String sourceJobRunId,
+        String sourceStatus,
         String itemType,
         String targetType,
         Long targetId,

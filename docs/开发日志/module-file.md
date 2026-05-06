@@ -1074,3 +1074,33 @@
 - 运行记录覆盖数据库阶段失败和物理删除阶段失败，排障时能用 `jobRunId` 把接口响应、任务表、明细表和审计串起来。
 - 成功数和失败数口径统一为物理删除明细，后台响应更容易被运维解释。
 - 当前仍未引入定时调度、最大重试次数和退避时间；这些可以在清理任务生产化阶段基于现有运行表继续扩展。
+
+## 2026-05-06 第31审清理悬挂与去重临时对象补偿
+
+### 背景
+
+第31审指出两个存储闭环风险：一是清理任务如果在数据库阶段提交后、物理删除执行前崩溃，会留下旧 `RUNNING` 任务和 `PENDING` 明细，现有失败重试只消费 `FAILED` 明细，无法恢复这类悬挂对象；二是普通上传确认阶段如果先校验了本次临时对象、再命中全局去重，附件引用会挂到已有文件对象上，但本次临时对象没有 `sys_file_object` 记录，也不会再被过期上传票据清理。
+
+### 本次处理
+
+- `FAILED_PHYSICAL_OBJECT` 从“只重试失败明细”扩展为“物理清理补偿入口”，仍保留旧 `FAILED` 明细复制重试逻辑。
+- 新增历史 `PENDING` 恢复规则：超过 30 分钟仍处于 `RUNNING` 任务下的 `PENDING` 物理清理明细，会先把原明细和原任务标记为 `FAILED`，再复制到本次任务执行。
+- 上传确认命中全局去重且最终复用的物理对象不是本次票据对象时，登记 `DEDUPLICATED_UPLOAD_OBJECT` 清理明细，不在确认上传事务里直接删除对象。
+- `DEDUPLICATED_UPLOAD_OBJECT` 由 `FAILED_PHYSICAL_OBJECT` 统一消费，删除成功后保留原待补偿明细的 `FAILED` 状态和本次任务的 `SUCCESS` 明细，便于审计回溯。
+- 员工端和后台端确认上传的 `deduplicated` 判定改为基于最终物理对象是否等于本次票据对象，覆盖唯一键并发冲突后复用已有对象的场景。
+- API 文档和测试用例补充悬挂 `PENDING` 恢复、普通确认全局去重临时对象清理两个场景。
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest#cleanupPendingPhysicalDeleteShouldBeRecoveredByRetryJob test`，失败于 `deletedPhysicalObjects=0`，说明历史 `PENDING` 明细没有进入重试候选。
+- 红灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminConfirmUploadShouldScheduleTemporaryObjectCleanupWhenGlobalDeduplicated test`，调整测试夹具后失败于 `DEDUPLICATED_UPLOAD_OBJECT` 明细数为 0。
+- 绿灯：`mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminConfirmUploadShouldScheduleTemporaryObjectCleanupWhenGlobalDeduplicated test` 通过，确认去重临时对象会登记并可由清理任务删除。
+- 绿灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest#cleanupPendingPhysicalDeleteShouldBeRecoveredByRetryJob test` 通过，确认历史 `PENDING` 明细可恢复。
+- 绿灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest#cleanupFailedPhysicalDeleteShouldBeRetried test` 通过，确认旧失败重试语义未回退。
+- 回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleFileServiceBoundaryTest test`，42 个 module-file 用例通过。
+
+### 意义
+
+- 清理任务覆盖“失败可重试”和“崩溃可恢复”两个窗口，不再只处理已经显式标记为 `FAILED` 的对象。
+- 普通确认上传的全局去重不再把实际上传过的重复临时对象留在对象存储里，文件中心账本和物理存储更一致。
+- 去重临时对象清理走统一补偿任务，而不是在业务事务中同步删除外部对象，为后续 MinIO、定时调度和退避重试留出统一入口。

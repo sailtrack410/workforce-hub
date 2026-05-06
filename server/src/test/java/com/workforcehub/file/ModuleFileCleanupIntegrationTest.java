@@ -242,6 +242,53 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("历史PENDING物理清理明细可以通过失败重试任务恢复")
+    void cleanupPendingPhysicalDeleteShouldBeRecoveredByRetryJob() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String objectKey = "cleanup/recover-pending-object.txt";
+        byte[] content = "recover-pending-object-content".getBytes(StandardCharsets.UTF_8);
+        writeLocalObject(objectKey, content);
+        String stuckJobRunId = "FILE-CLEAN-STUCK-" + System.nanoTime();
+        jdbcTemplate.update("""
+            INSERT INTO sys_file_cleanup_job_run
+                (id, job_run_id, job_type, dry_run, status, operator_id, started_at)
+            VALUES
+                (?, ?, 'UNREFERENCED_FILE_OBJECT', 0, 'RUNNING', 8001, ?)
+            """,
+            System.nanoTime(),
+            stuckJobRunId,
+            LocalDateTime.now().minusHours(2)
+        );
+        jdbcTemplate.update("""
+            INSERT INTO sys_file_cleanup_job_detail
+                (id, job_run_id, item_type, target_type, target_id,
+                 storage_provider, bucket_name, object_key, status)
+            VALUES
+                (?, ?, 'UNREFERENCED_FILE_OBJECT', 'FILE_OBJECT', ?, 'LOCAL', 'local', ?, 'PENDING')
+            """,
+            System.nanoTime(),
+            stuckJobRunId,
+            System.nanoTime(),
+            objectKey
+        );
+
+        MvcResult result = runCleanupJob(adminSession, "FAILED_PHYSICAL_OBJECT", false)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobType").value("FAILED_PHYSICAL_OBJECT"))
+            .andExpect(jsonPath("$.data.jobStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(1))
+            .andExpect(jsonPath("$.data.failedPhysicalObjects").value(0))
+            .andReturn();
+
+        String recoveryJobRunId = data(result).get("jobRunId").asText();
+        assertFalse(Files.exists(objectPath(objectKey)));
+        assertEquals("FAILED", cleanupJobStatus(stuckJobRunId));
+        assertEquals(1, cleanupDetailCount(stuckJobRunId, "UNREFERENCED_FILE_OBJECT", "FAILED"));
+        assertEquals(1, cleanupDetailCount(recoveryJobRunId, "UNREFERENCED_FILE_OBJECT", "SUCCESS"));
+    }
+
+    @Test
     @DisplayName("数据库阶段失败时清理任务应保留失败运行记录")
     void cleanupDatabaseStageFailureShouldRecordFailedRun() throws Exception {
         Cookie adminSession = loginAdmin();

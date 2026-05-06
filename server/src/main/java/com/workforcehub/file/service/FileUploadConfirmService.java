@@ -26,6 +26,8 @@ import java.util.List;
 @Service
 public class FileUploadConfirmService {
 
+    private static final String CLEANUP_DEDUPLICATED_UPLOAD_OBJECT = "DEDUPLICATED_UPLOAD_OBJECT";
+
     private final JdbcTemplate jdbcTemplate;
     private final StorageProviderRegistry storageProviderRegistry;
     private final StorageUsageLedgerService storageUsageLedgerService;
@@ -92,6 +94,7 @@ public class FileUploadConfirmService {
         } else {
             deduplicated = true;
         }
+        deduplicated = isDeduplicatedUploadObject(ticket, fileObject);
 
         Long attachmentRefId;
         try {
@@ -116,6 +119,9 @@ public class FileUploadConfirmService {
         fileObjectRepository.increaseRefCount(fileObject.id());
         storageUsageLedgerService.increaseUsage("USER", userId, request.getFileSize(), 1);
         storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+        if (deduplicated) {
+            scheduleDeduplicatedUploadObjectCleanup(ticket, fileObject);
+        }
         markUploadTicketConfirmed(ticket.id());
         audit("USER", userId, "FILE_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
@@ -166,6 +172,7 @@ public class FileUploadConfirmService {
         } else {
             deduplicated = true;
         }
+        deduplicated = isDeduplicatedUploadObject(ticket, fileObject);
 
         Long attachmentRefId;
         try {
@@ -189,6 +196,9 @@ public class FileUploadConfirmService {
         }
         fileObjectRepository.increaseRefCount(fileObject.id());
         storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+        if (deduplicated) {
+            scheduleDeduplicatedUploadObjectCleanup(ticket, fileObject);
+        }
         markUploadTicketConfirmed(ticket.id());
         audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
@@ -272,6 +282,31 @@ public class FileUploadConfirmService {
             uploaderId
         );
         return attachmentRefId;
+    }
+
+    private void scheduleDeduplicatedUploadObjectCleanup(UploadTicketRow ticket, FileObjectRow fileObject) {
+        if (sameStorageObject(ticket, fileObject)) {
+            return;
+        }
+        jdbcTemplate.update("""
+            INSERT INTO sys_file_cleanup_job_detail
+                (id, job_run_id, item_type, target_type, target_id,
+                 storage_provider, bucket_name, object_key, status)
+            VALUES
+                (?, ?, ?, 'UPLOAD_TICKET', ?, ?, ?, ?, 'PENDING')
+            """,
+            IdWorker.getId(),
+            "FILE-CLEAN-DEDUP-" + ticket.id(),
+            CLEANUP_DEDUPLICATED_UPLOAD_OBJECT,
+            ticket.id(),
+            ticket.storageProvider(),
+            ticket.bucketName(),
+            ticket.objectKey()
+        );
+    }
+
+    private boolean isDeduplicatedUploadObject(UploadTicketRow ticket, FileObjectRow fileObject) {
+        return !sameStorageObject(ticket, fileObject);
     }
 
     private void markUploadTicketConfirmed(Long ticketId) {
@@ -362,6 +397,16 @@ public class FileUploadConfirmService {
     }
 
     private boolean sameId(Long left, Long right) {
+        return left == null ? right == null : left.equals(right);
+    }
+
+    private boolean sameStorageObject(UploadTicketRow ticket, FileObjectRow fileObject) {
+        return sameText(ticket.storageProvider(), fileObject.storageProvider())
+            && sameText(ticket.bucketName(), fileObject.bucketName())
+            && sameText(ticket.objectKey(), fileObject.objectKey());
+    }
+
+    private boolean sameText(String left, String right) {
         return left == null ? right == null : left.equals(right);
     }
 
