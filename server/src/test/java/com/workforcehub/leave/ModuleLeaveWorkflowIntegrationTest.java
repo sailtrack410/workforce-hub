@@ -1,0 +1,314 @@
+package com.workforcehub.leave;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
+import com.workforcehub.support.WorkflowFlowableTestConfiguration;
+import jakarta.servlet.http.Cookie;
+import org.flowable.engine.RuntimeService;
+import org.flowable.engine.TaskService;
+import org.flowable.engine.runtime.ProcessInstance;
+import org.flowable.task.api.Task;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * module-leave 与 module-workflow 的余额联动集成测试。
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("api")
+@Import(WorkflowFlowableTestConfiguration.class)
+class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTestSupport {
+
+    private static final long EMPLOYEE_USER_ID = 2003L;
+    private static final long MANAGER_USER_ID = 2002L;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RuntimeService runtimeService;
+
+    @Autowired
+    private TaskService taskService;
+
+    @Test
+    @DisplayName("员工请假余额不足时应在提交阶段被拦截且不生成审批申请")
+    void leaveRequestShouldRejectWhenBalanceInsufficient() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+
+        mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(leaveTypeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("假期余额不足"));
+
+        assertEquals(0L, workflowRequestCount());
+        assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
+    }
+
+    @Test
+    @DisplayName("请假审批通过后应扣减申请人假期余额并写审批扣减流水")
+    void approvedLeaveRequestShouldDeductBalance() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        approveManagerTask(managerSession, scenario.managerTask().getId());
+
+        assertNull(runtimeService.createProcessInstanceQuery()
+            .processInstanceId(scenario.processInstanceId())
+            .singleResult(), "审批通过后 Flowable 流程实例应结束");
+        assertEquals(480, availableMinutes(leaveTypeId));
+        assertEquals(1L, leaveDeductTxnCount(leaveTypeId));
+        assertEquals(-480, leaveDeductChangeMinutes(scenario.requestId()));
+        assertEquals(480, leaveDeductBalanceAfter(scenario.requestId()));
+    }
+
+    @Test
+    @DisplayName("请假审批驳回后不应扣减假期余额")
+    void rejectedLeaveRequestShouldNotDeductBalance() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/reject", scenario.managerTask().getId())
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "请假理由不充分"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("REJECTED"));
+
+        assertEquals(960, availableMinutes(leaveTypeId));
+        assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
+    }
+
+    private LeaveApprovalScenario submitLeaveRequest(Cookie employeeSession, long leaveTypeId) throws Exception {
+        MvcResult submitResult = mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(leaveTypeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
+            .andReturn();
+
+        JsonNode submitData = data(submitResult);
+        long requestId = submitData.get("requestId").asLong();
+        String processInstanceId = submitData.get("flowableProcessInstanceId").asText();
+        ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
+            .processInstanceId(processInstanceId)
+            .singleResult();
+        assertNotNull(processInstance, "提交请假后应存在运行中的 Flowable 流程实例");
+        Task managerTask = taskService.createTaskQuery()
+            .processInstanceId(processInstanceId)
+            .taskAssignee(String.valueOf(MANAGER_USER_ID))
+            .singleResult();
+        assertNotNull(managerTask, "直属上级应收到 Flowable 审批任务");
+        return new LeaveApprovalScenario(requestId, processInstanceId, managerTask);
+    }
+
+    private void approveManagerTask(Cookie managerSession, String taskId) throws Exception {
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/approve", taskId)
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "同意，请安排好交接"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("APPROVED"));
+    }
+
+    private long seedWorkflowAndLeaveType() {
+        seedWorkflowDefinitions();
+        return seedAnnualLeaveType();
+    }
+
+    private void seedWorkflowDefinitions() {
+        jdbcTemplate.update("""
+            INSERT INTO wf_process_type
+                (id, process_code, process_name, biz_type, status)
+            VALUES
+                (9101, 'LEAVE', '请假流程', 'LEAVE', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template
+                (id, process_type_id, template_code, template_name, status)
+            VALUES
+                (9201, 9101, 'LEAVE_MANAGER_APPROVAL', '请假直属上级审批', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template_version
+                (id, template_id, version_no, flowable_definition_key, status, published_by, published_at, effective_from)
+            VALUES
+                (9301, 9201, 1, 'leave_manager_approval', 'PUBLISHED', 8001, NOW(), DATE_SUB(NOW(), INTERVAL 1 DAY))
+            """);
+    }
+
+    private long seedAnnualLeaveType() {
+        long leaveTypeId = 9401L;
+        jdbcTemplate.update("""
+            INSERT INTO lv_type
+                (id, leave_code, leave_name, balance_mode, status)
+            VALUES
+                (?, 'ANNUAL_LEAVE', '年假', 'DEDUCT', 'ACTIVE')
+            """, leaveTypeId);
+        return leaveTypeId;
+    }
+
+    private void seedLeaveAccount(long leaveTypeId, int availableMinutes) {
+        long accountId = 9501L;
+        jdbcTemplate.update("""
+            INSERT INTO lv_account
+                (id, user_id, leave_type_id, available_minutes, frozen_minutes, version, status)
+            VALUES
+                (?, ?, ?, ?, 0, 0, 'ACTIVE')
+            """, accountId, EMPLOYEE_USER_ID, leaveTypeId, availableMinutes);
+        jdbcTemplate.update("""
+            INSERT INTO lv_account_txn
+                (id, account_id, txn_type, change_minutes, balance_after,
+                 source_type, source_id, source_txn_key, effective_at)
+            VALUES
+                (9502, ?, 'ADJUST', ?, ?, 'ADMIN', 8001, 'seed-leave-balance', NOW())
+            """, accountId, availableMinutes, availableMinutes);
+    }
+
+    private String leaveRequestJson(long leaveTypeId) {
+        return """
+            {
+              "leaveTypeId": %d,
+              "startAt": "2026-05-07 09:00:00",
+              "endAt": "2026-05-07 18:00:00",
+              "durationMinutes": 480,
+              "reason": "家中有事请假一天"
+            }
+            """.formatted(leaveTypeId);
+    }
+
+    private Cookie loginEmployee() throws Exception {
+        return login("zhangsan.employee", "Employee@123456");
+    }
+
+    private Cookie loginManager() throws Exception {
+        return login("lisi.manager", "Employee@123456");
+    }
+
+    private Cookie login(String loginName, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "%s",
+                      "password": "%s"
+                    }
+                    """.formatted(loginName, password)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(cookie().exists("SESSION"))
+            .andReturn();
+        Cookie session = result.getResponse().getCookie("SESSION");
+        assertNotNull(session, "登录后应返回 SESSION");
+        return session;
+    }
+
+    private JsonNode data(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
+    }
+
+    private long workflowRequestCount() {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM wf_request
+            """, Long.class);
+        return count == null ? 0L : count;
+    }
+
+    private int availableMinutes(long leaveTypeId) {
+        Integer minutes = jdbcTemplate.queryForObject("""
+            SELECT available_minutes
+            FROM lv_account
+            WHERE user_id = ? AND leave_type_id = ?
+            """, Integer.class, EMPLOYEE_USER_ID, leaveTypeId);
+        return minutes == null ? 0 : minutes;
+    }
+
+    private long leaveDeductTxnCount(long leaveTypeId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM lv_account_txn lat
+            JOIN lv_account la ON la.id = lat.account_id
+            WHERE la.user_id = ?
+              AND la.leave_type_id = ?
+              AND lat.txn_type = 'DEDUCT'
+              AND lat.source_type = 'WORKFLOW_REQUEST'
+            """, Long.class, EMPLOYEE_USER_ID, leaveTypeId);
+        return count == null ? 0L : count;
+    }
+
+    private int leaveDeductChangeMinutes(long requestId) {
+        Integer minutes = jdbcTemplate.queryForObject("""
+            SELECT change_minutes
+            FROM lv_account_txn
+            WHERE source_type = 'WORKFLOW_REQUEST'
+              AND source_id = ?
+            """, Integer.class, requestId);
+        return minutes == null ? 0 : minutes;
+    }
+
+    private int leaveDeductBalanceAfter(long requestId) {
+        Integer minutes = jdbcTemplate.queryForObject("""
+            SELECT balance_after
+            FROM lv_account_txn
+            WHERE source_type = 'WORKFLOW_REQUEST'
+              AND source_id = ?
+            """, Integer.class, requestId);
+        return minutes == null ? 0 : minutes;
+    }
+
+    private record LeaveApprovalScenario(
+        long requestId,
+        String processInstanceId,
+        Task managerTask
+    ) {
+    }
+}

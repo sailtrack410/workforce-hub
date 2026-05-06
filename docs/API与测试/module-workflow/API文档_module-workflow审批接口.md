@@ -9,7 +9,7 @@
 | 适用范围 | 请假申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权、轨迹与后台流程模板治理 |
 | 对应模块 | `server/module-workflow` |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理和 Agent 预审入口已实现；假期余额和完整 Agent 平台待后续迭代 |
+| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理、Agent 预审入口和假期余额联动已实现；完整 Agent 平台待后续迭代 |
 
 ---
 
@@ -844,6 +844,6 @@ Cookie: SESSION=...
 - 第一版支持 workflow 侧 Agent 预审入口：提交后可进入 `PENDING_REVIEW`，Agent 回调通过或转人工后进入 Flowable，Agent 回调驳回后直接终止。
 - Agent 回调必须匹配 `wf_request.agent_pre_review_task_id`，避免错误任务串写申请结果。
 - 第一版不支持可视化 BPMN 在线设计；BPMN 文件仍由工程侧部署。
-- 第一版不扣减假期余额，后续由 `module-leave` 接入。
+- 第一版已接入 `module-leave`：提交前校验 `DEDUCT` 假种余额，审批通过后扣减余额并写 `lv_account_txn`；驳回、撤回和 Agent 驳回不扣减。
 - 第一版不包含完整 `module-agent` 后台创建、任务调度、工具调用和运行监控；当前只完成 workflow 侧 SPI 接入口和回调收口。
 - 第一版 Flowable 表仍由开发环境自动创建；生产化时应把 Flowable 初始化 SQL 纳入迁移治理。

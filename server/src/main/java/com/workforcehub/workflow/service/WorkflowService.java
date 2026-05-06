@@ -15,6 +15,7 @@ import com.workforcehub.file.repository.DownloadAttachmentRow;
 import com.workforcehub.file.service.DownloadTicketExecutionService;
 import com.workforcehub.file.storage.StorageObjectResource;
 import com.workforcehub.file.storage.StorageProviderRegistry;
+import com.workforcehub.leave.service.LeaveService;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
 import com.workforcehub.spi.WorkflowAgentPreReviewTrigger;
@@ -84,6 +85,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private final TaskService taskService;
     private final StorageProviderRegistry storageProviderRegistry;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
+    private final LeaveService leaveService;
     private final ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider;
     private final ObjectMapper objectMapper;
 
@@ -93,6 +95,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                            TaskService taskService,
                            StorageProviderRegistry storageProviderRegistry,
                            DownloadTicketExecutionService downloadTicketExecutionService,
+                           LeaveService leaveService,
                            ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider,
                            ObjectMapper objectMapper) {
         this.workflowRepository = workflowRepository;
@@ -101,6 +104,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         this.taskService = taskService;
         this.storageProviderRegistry = storageProviderRegistry;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
+        this.leaveService = leaveService;
         this.agentPreReviewTriggerProvider = agentPreReviewTriggerProvider;
         this.objectMapper = objectMapper;
     }
@@ -454,6 +458,19 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             throw new BizException(400, "当前申请状态不允许审批");
         }
 
+        if ("APPROVE".equals(actionType)) {
+            WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(workflowRequest.id());
+            if (leaveDetail == null) {
+                throw new BizException(404, "请假申请明细不存在");
+            }
+            leaveService.deductForWorkflowApproval(
+                workflowRequest.applicantUserId(),
+                leaveDetail.leaveTypeId(),
+                leaveDetail.durationMinutes(),
+                workflowRequest.id(),
+                approverUserId
+            );
+        }
         workflowRepository.insertTaskAction(
             workflowRequest.id(),
             taskId,
@@ -542,6 +559,11 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         if (!workflowRepository.existsActiveLeaveType(request.getLeaveTypeId())) {
             throw new BizException(404, "假种不存在或已停用");
         }
+        leaveService.ensureLeaveRequestBalance(
+            CurrentUserHolder.requireUserId(),
+            request.getLeaveTypeId(),
+            request.getDurationMinutes()
+        );
     }
 
     private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {

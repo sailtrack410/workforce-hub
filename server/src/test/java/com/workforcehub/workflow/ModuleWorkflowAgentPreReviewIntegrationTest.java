@@ -361,6 +361,20 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
             VALUES
                 (?, 'ANNUAL_LEAVE', '年假', 'DEDUCT', 'ACTIVE')
             """, leaveTypeId);
+        jdbcTemplate.update("""
+            INSERT INTO lv_account
+                (id, user_id, leave_type_id, available_minutes, frozen_minutes, version, status)
+            VALUES
+                (9402, ?, ?, 9600, 0, 0, 'ACTIVE')
+            """, EMPLOYEE_USER_ID, leaveTypeId);
+        jdbcTemplate.update("""
+            INSERT INTO lv_account_txn
+                (id, account_id, txn_type, change_minutes, balance_after,
+                 source_type, source_id, source_txn_key, effective_at)
+            VALUES
+                (9403, 9402, 'ADJUST', 9600, 9600,
+                 'ADMIN', 8001, 'workflow-agent-seed-leave-balance', NOW())
+            """);
         return leaveTypeId;
     }
 

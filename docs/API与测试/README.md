@@ -12,6 +12,8 @@
   - 文件中心第一版接口 API 文档与测试用例
 - `module-workflow/`
   - 员工端审批接口 API 文档与测试用例
+- `module-leave/`
+  - 假期账户接口 API 文档与测试用例
 
 维护约定：
 
