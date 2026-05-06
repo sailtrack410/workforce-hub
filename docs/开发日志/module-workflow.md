@@ -185,3 +185,60 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - 审批详情页已经具备“看得到附件、也能按业务权限下载附件”的完整后端闭环。
 - 文件中心个人文件下载权限没有被审批场景污染，后续群文件、知识库文件也可以采用同样模式：业务模块先做场景授权，再复用下载票据和对象读取底座。
 - 审批附件下载有独立审计动作，后续做合规追踪、Agent 预审证据引用和审批材料访问记录时有可查依据。
+
+## 2026-05-06 后台流程模板与模板版本治理
+
+### 背景
+
+审批闭环此前依赖测试或种子数据准备 `wf_process_type`、`wf_template` 和 `wf_template_version`。这会导致两个问题：一是流程模板没有后台可维护入口，二是后续 Agent 预审规则只能硬编码，无法随着流程模板版本演进。因此本轮先补业务侧模板治理，不做在线 BPMN 编辑器，只绑定工程侧已经部署到 Flowable 的流程定义。
+
+### 本次处理
+
+- 新增后台接口：
+  - `POST /api/admin/workflow/process-types`
+  - `POST /api/admin/workflow/templates`
+  - `GET /api/admin/workflow/templates`
+  - `POST /api/admin/workflow/templates/{templateId}/versions`
+  - `GET /api/admin/workflow/templates/{templateId}/versions`
+  - `POST /api/admin/workflow/template-versions/{versionId}/publish`
+- 新增 `WorkflowAdminService`，把后台治理和员工审批流转服务拆开，避免 `WorkflowService` 继续膨胀。
+- 新增 `WorkflowAdminRepository` 和后台治理专用 Row，负责流程类型、模板、版本草稿、发布和查询 SQL。
+- 新增流程类型、模板、模板版本请求与响应 DTO。
+- 创建模板版本时保存 `formSchemaJson` 与 `ruleSnapshotJson`，并校验必须是合法 JSON。
+- 发布模板版本时校验 Flowable 最新流程定义存在，写入 `flowable_definition_key` 和 `flowable_definition_id`。
+- 同一模板发布新版本时，自动把旧的当前有效 `PUBLISHED` 版本改为 `ARCHIVED` 并写入 `effective_to`，保证员工端提交审批时只会命中一个当前有效版本。
+- 查询模板列表时返回 `currentVersion`，只展示当前有效发布版本。
+- 查询版本列表时返回全部版本，包含 `DRAFT`、`PUBLISHED`、`ARCHIVED`。
+- API 文档和测试用例同步补齐后台模板治理接口、错误码、状态流转和验证命令。
+
+### 红绿记录
+
+- 红灯：新增 `ModuleWorkflowAdminApiIntegrationTest` 后，`POST /api/admin/workflow/process-types` 返回 `404`，确认后台流程模板治理接口不存在。
+- 绿灯：补齐后台 Controller、Service、Repository 和 DTO 后，用例推进到版本列表断言。
+- 红灯：版本列表返回的 MySQL JSON 字段带空格，和接口期望的紧凑 JSON 字符串不一致，暴露响应格式受数据库 JSON 格式影响。
+- 绿灯：服务响应层统一把 `formSchemaJson`、`ruleSnapshotJson` 压成紧凑 JSON，避免前端和测试依赖数据库格式细节。
+- 回归：`mvn -Dtest=ModuleWorkflowAdminApiIntegrationTest test` 通过，3 个后台模板治理用例全部通过。
+
+### 当前完成范围
+
+- 管理员可以创建流程类型。
+- 管理员可以创建流程模板。
+- 管理员可以创建模板版本草稿。
+- 管理员可以发布模板版本并绑定已部署 Flowable 定义。
+- 发布不存在的 Flowable 定义会返回业务错误，草稿状态不变。
+- 同一模板发布新版本后旧版本归档，避免多个当前有效发布版本。
+- 模板列表可以展示当前有效发布版本。
+- 版本列表可以展示规则快照，为后续 Agent 预审提供规则入口。
+
+### 暂未覆盖
+
+- 在线 BPMN 可视化设计器。
+- 模板状态编辑、删除和版本撤回。
+- Agent 预审读取 `ruleSnapshotJson` 并自动驳回。
+- Flowable `ACT_*` 表结构纳入 Flyway 的生产治理终态。
+
+### 意义
+
+- `module-workflow` 从“固定测试种子流程”推进到“后台可治理流程模板”。
+- 版本发布语义已经和员工端 `getPublishedTemplateVersion` 查询保持一致，后续新增审批类型时不需要改员工端提交逻辑。
+- `ruleSnapshotJson` 给 Agent 介入流程留出了稳定入口：Agent 后续可以按模板版本读取规则快照、执行工具校验，并把预审结果写回审批轨迹。

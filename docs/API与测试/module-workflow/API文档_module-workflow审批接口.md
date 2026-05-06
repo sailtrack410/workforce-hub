@@ -6,16 +6,16 @@
 | --- | --- |
 | 文档名称 | `module-workflow` 审批接口 API 文档 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 请假申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权与轨迹 |
+| 适用范围 | 请假申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权、轨迹与后台流程模板治理 |
 | 对应模块 | `server/module-workflow` |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用和审批附件下载授权已实现；模板治理、假期余额和 Agent 预审待后续迭代 |
+| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权和后台流程模板治理已实现；假期余额和 Agent 预审待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `10` 个员工端接口。
+当前已实现 `10` 个员工端接口和 `6` 个后台流程模板治理接口。
 
 - `POST /api/employee/workflow/leave-requests`
 - `GET /api/employee/workflow/todos`
@@ -28,9 +28,17 @@
 - `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets`
 - `GET /api/employee/workflow/attachments/download/{ticketNo}`
 
+后台流程模板治理接口：
+
+- `POST /api/admin/workflow/process-types`
+- `POST /api/admin/workflow/templates`
+- `GET /api/admin/workflow/templates`
+- `POST /api/admin/workflow/templates/{templateId}/versions`
+- `GET /api/admin/workflow/templates/{templateId}/versions`
+- `POST /api/admin/workflow/template-versions/{versionId}/publish`
+
 当前暂未实现但已纳入后续规划：
 
-- 后台流程模板治理
 - Agent 预审与自动驳回
 
 ---
@@ -56,6 +64,8 @@ http://localhost:8080
 - 申请详情和审批轨迹只允许申请人、待办处理人或已处理人查看。
 - 审批附件下载票据只允许审批参与人为该申请下的 `WF_REQUEST` 附件创建。
 - 审批附件下载执行只允许票据申请人本人使用，且票据只能使用一次。
+- 后台流程模板治理接口必须使用管理员会话。
+- 后台发布模板版本时只绑定已部署的 Flowable 流程定义 Key，不提供在线 BPMN 设计器。
 
 ### 3.3 请求头约定
 
@@ -118,6 +128,16 @@ http://localhost:8080
 | `USED` | 已使用 |
 | `EXPIRED` | 已过期 |
 | `REVOKED` | 已撤销 |
+
+---
+
+### 4.5 templateVersionStatus
+
+| 值 | 含义 |
+| --- | --- |
+| `DRAFT` | 草稿，未发布，员工端不会使用 |
+| `PUBLISHED` | 当前有效发布版本，员工端提交审批时可选用 |
+| `ARCHIVED` | 已被新版本替代，保留历史追溯 |
 
 ---
 
@@ -577,6 +597,160 @@ Content-Disposition: attachment; filename*=UTF-8''%E8%AF%B7%E5%81%87%E8%AF%81%E6
 
 ---
 
+## 5.11 创建流程类型
+
+```http
+POST /api/admin/workflow/process-types
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `processCode` | `string` | 是 | 流程编码，唯一，例如 `LEAVE` |
+| `processName` | `string` | 是 | 流程名称 |
+| `bizType` | `string/null` | 否 | 关联业务类型，例如 `LEAVE` |
+| `status` | `string/null` | 否 | `ACTIVE` 或 `INACTIVE`，默认 `ACTIVE` |
+
+示例：
+
+```json
+{
+  "processCode": "LEAVE",
+  "processName": "请假流程",
+  "bizType": "LEAVE",
+  "status": "ACTIVE"
+}
+```
+
+### 落库语义
+
+- 写入 `wf_process_type`。
+- `process_code` 必须唯一。
+- `created_by`、`updated_by` 写当前管理员 ID。
+
+---
+
+## 5.12 创建流程模板
+
+```http
+POST /api/admin/workflow/templates
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `processTypeId` | `long` | 是 | 启用状态的流程类型 ID |
+| `templateCode` | `string` | 是 | 模板编码，唯一 |
+| `templateName` | `string` | 是 | 模板名称 |
+| `status` | `string/null` | 否 | `ACTIVE` 或 `INACTIVE`，默认 `ACTIVE` |
+
+### 落库语义
+
+- 写入 `wf_template`。
+- `template_code` 必须唯一。
+- `process_type_id` 必须指向启用且未删除的流程类型。
+
+---
+
+## 5.13 创建流程模板版本草稿
+
+```http
+POST /api/admin/workflow/templates/{templateId}/versions
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `versionNo` | `int` | 是 | 版本号，同模板下唯一，最小为 `1` |
+| `formSchemaJson` | `string/null` | 否 | 表单结构 JSON 字符串，第一版只保存快照 |
+| `ruleSnapshotJson` | `string/null` | 否 | 规则快照 JSON 字符串，后续 Agent 预审读取该快照 |
+
+示例：
+
+```json
+{
+  "versionNo": 1,
+  "formSchemaJson": "{\"formKey\":\"leave-request\"}",
+  "ruleSnapshotJson": "{\"leaveCode\":\"ANNUAL_LEAVE\",\"maxDurationMinutes\":480}"
+}
+```
+
+### 落库语义
+
+- 写入 `wf_template_version`。
+- 新版本初始状态固定为 `DRAFT`。
+- `form_schema_json` 和 `rule_snapshot_json` 必须是合法 JSON；为空时保存 `NULL`。
+- 本接口不部署 BPMN，也不发布版本。
+
+---
+
+## 5.14 发布流程模板版本
+
+```http
+POST /api/admin/workflow/template-versions/{versionId}/publish
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `flowableDefinitionKey` | `string` | 是 | 已部署 Flowable 流程定义 Key，例如 `leave_manager_approval` |
+
+示例：
+
+```json
+{
+  "flowableDefinitionKey": "leave_manager_approval"
+}
+```
+
+### 发布规则
+
+- 只能发布 `DRAFT` 版本。
+- `flowableDefinitionKey` 必须能在 Flowable 中查询到最新流程定义。
+- 发布后当前版本状态变为 `PUBLISHED`，写入 `flowable_definition_key`、`flowable_definition_id`、`published_by`、`published_at`、`effective_from`。
+- 同一模板下旧的当前有效 `PUBLISHED` 版本会自动变为 `ARCHIVED`，并写入 `effective_to`。
+- 员工端提交请假申请时，仍按 `wf_process_type.process_code=LEAVE` 查询最新有效发布版本。
+
+---
+
+## 5.15 查询流程模板与版本
+
+```http
+GET /api/admin/workflow/templates?processCode=LEAVE
+Cookie: SESSION=...
+```
+
+查询模板响应语义：
+
+- 返回模板基础信息。
+- `currentVersion` 只返回当前有效发布版本。
+- 如果模板尚未发布任何版本，`currentVersion=null`。
+
+```http
+GET /api/admin/workflow/templates/{templateId}/versions
+Cookie: SESSION=...
+```
+
+查询版本响应语义：
+
+- 返回指定模板下全部版本。
+- 按 `versionNo DESC, id DESC` 排序。
+- 包含 `DRAFT`、`PUBLISHED`、`ARCHIVED`。
+
+---
+
 ## 六、错误码
 
 | HTTP 状态 | 业务码 | message 示例 | 场景 |
@@ -592,8 +766,15 @@ Content-Disposition: attachment; filename*=UTF-8''%E8%AF%B7%E5%81%87%E8%AF%81%E6
 | `200` | `404` | `附件引用不存在` | 附件引用不存在、已删除或物理文件已删除 |
 | `200` | `404` | `审批附件不存在` | 下载票据申请的附件不属于该审批申请 |
 | `200` | `404` | `下载票据不存在` | 下载票据编号不存在 |
+| `200` | `404` | `流程类型不存在或未启用` | 创建模板时流程类型不存在、停用或已删除 |
+| `200` | `404` | `流程模板不存在或未启用` | 创建模板版本或发布时模板不存在、停用或已删除 |
+| `200` | `404` | `Flowable流程定义不存在` | 发布模板版本时绑定了不存在的 Flowable 定义 Key |
 | `200` | `409` | `附件安全扫描未通过` | 附件安全扫描失败 |
 | `200` | `409` | `下载票据已使用或已失效` | 下载票据不是 `ACTIVE`，或被并发请求抢占 |
+| `200` | `409` | `流程编码已存在` | 创建流程类型时编码重复 |
+| `200` | `409` | `流程模板编码已存在` | 创建流程模板时编码重复 |
+| `200` | `409` | `流程模板版本号已存在` | 同一模板下重复创建版本号 |
+| `200` | `409` | `只有草稿版本可以发布` | 重复发布或发布非草稿版本 |
 | `200` | `410` | `下载链接已过期，请重新申请` | 下载票据超过有效期 |
 | `404` | `404` | `假种不存在或已停用` | 业务对象不存在 |
 | `500` | `500` | `Flowable 未生成直属上级审批任务` | 引擎或流程定义异常 |
@@ -606,6 +787,8 @@ Content-Disposition: attachment; filename*=UTF-8''%E8%AF%B7%E5%81%87%E8%AF%81%E6
 - 第一版支持提交时绑定已有个人附件，并克隆为 `WF_REQUEST` 业务引用。
 - 第一版支持审批参与人为审批附件创建短期下载票据，并按一次性票据状态机下载原文件。
 - 第一版详情返回请假明细和审批申请业务附件。
+- 第一版支持后台维护流程类型、流程模板和模板版本草稿，并发布绑定已部署 Flowable 定义。
+- 第一版不支持可视化 BPMN 在线设计；BPMN 文件仍由工程侧部署。
 - 第一版不扣减假期余额，后续由 `module-leave` 接入。
 - 第一版不支持 Agent 预审，后续在人工节点前增加 Agent 预审节点或事件监听。
 - 第一版 Flowable 表仍由开发环境自动创建；生产化时应把 Flowable 初始化 SQL 纳入迁移治理。

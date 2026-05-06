@@ -8,7 +8,7 @@
 | 文档版本 | `v0.1` |
 | 适用范围 | Flowable 请假直属上级审批最小闭环 |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | Flowable 请假直属上级审批闭环、我的申请列表、审批附件业务引用和审批附件下载授权已落地；假期余额和 Agent 预审待后续补充 |
+| 当前状态 | Flowable 请假直属上级审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权和后台流程模板治理已落地；假期余额和 Agent 预审待后续补充 |
 
 ---
 
@@ -38,10 +38,15 @@
 - 验证非本申请附件不能创建审批附件下载票据。
 - 验证下载票据使用后状态变为 `USED`，并写入下载审计。
 - 验证审批附件创建下载票据后，如果文件最新扫描状态变为 `FAILED`，下载执行会拒绝且不消费票据。
+- 验证管理员可以创建流程类型、流程模板和模板版本草稿。
+- 验证模板版本发布时必须绑定已存在的 Flowable 定义 Key。
+- 验证同一模板发布新版本后旧版本自动归档，避免多个当前有效版本。
+- 验证模板列表能返回当前有效发布版本，版本列表能返回规则快照。
 
 当前已落地自动化测试类：
 
 - `ModuleWorkflowFlowableIntegrationTest`
+- `ModuleWorkflowAdminApiIntegrationTest`
 
 当前已自动化覆盖：
 
@@ -70,6 +75,14 @@
 - Flowable 流程结束校验。
 - `wf_task_action` 写入校验。
 - `sys_todo_item` 待办关闭校验。
+- 管理员登录。
+- 流程类型创建。
+- 流程模板创建。
+- 模板版本草稿创建。
+- 模板版本发布。
+- 发布不存在 Flowable 定义时保持草稿状态。
+- 发布新版本后旧版本归档。
+- 后台模板列表和版本列表查询。
 
 当前尚未自动化覆盖：
 
@@ -102,6 +115,7 @@
 | --- | --- | --- | --- |
 | 员工账号 | `zhangsan.employee` | `Employee@123456` | 申请人 |
 | 直属上级 | `lisi.manager` | `Employee@123456` | 审批人 |
+| 管理员 | `admin.demo` | `Admin@123456` | 后台流程模板治理 |
 
 组织关系：
 
@@ -115,6 +129,7 @@
 - `wf_template.template_code=LEAVE_MANAGER_APPROVAL`
 - `wf_template_version.flowable_definition_key=leave_manager_approval`
 - `lv_type.leave_code=ANNUAL_LEAVE`
+- Flowable 自动部署流程定义 `leave_manager_approval`
 
 ---
 
@@ -151,7 +166,20 @@
 | `WF-FILE-DL-005` | P0 | `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets` | 非本申请附件不能创建下载票据 | 张三登录；传入未绑定到该申请的附件引用 | 申请下载 | HTTP `200`；`code=404`；提示 `审批附件不存在` |
 | `WF-FILE-DL-006` | P1 | `GET /api/employee/workflow/attachments/download/{ticketNo}` | 票据创建后扫描失败不能下载 | 李四已创建审批附件下载票据；文件对象最新 `scan_status=FAILED` | 下载票据编号 | HTTP `200`；`code=409`；提示 `附件安全扫描未通过`；票据仍为 `ACTIVE` |
 
-## 5.2 待补测试
+## 5.2 后台流程模板治理
+
+| 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `WF-ADMIN-001` | P0 | `POST /api/admin/workflow/process-types` | 管理员创建流程类型 | 管理员已登录 | `processCode=LEAVE` | HTTP `200`；`code=0`；返回 `processTypeId`、`processCode=LEAVE` |
+| `WF-ADMIN-002` | P0 | `POST /api/admin/workflow/templates` | 管理员创建流程模板 | `WF-ADMIN-001` 成功 | `templateCode=LEAVE_MANAGER_APPROVAL` | HTTP `200`；`code=0`；返回 `templateId`、流程类型和模板基础信息 |
+| `WF-ADMIN-003` | P0 | `POST /api/admin/workflow/templates/{templateId}/versions` | 管理员创建模板版本草稿 | `WF-ADMIN-002` 成功 | `versionNo=1`，传入 `formSchemaJson` 和 `ruleSnapshotJson` | HTTP `200`；`code=0`；返回 `status=DRAFT`；JSON 快照保存为合法 JSON |
+| `WF-ADMIN-004` | P0 | `POST /api/admin/workflow/template-versions/{versionId}/publish` | 管理员发布模板版本 | `WF-ADMIN-003` 成功；Flowable 已部署 `leave_manager_approval` | `flowableDefinitionKey=leave_manager_approval` | HTTP `200`；`code=0`；返回 `status=PUBLISHED`、`flowableDefinitionId`、`publishedBy=8001`、`effectiveFrom` |
+| `WF-ADMIN-005` | P1 | `GET /api/admin/workflow/templates` | 管理员查询模板列表 | 模板版本已发布 | `processCode=LEAVE` | HTTP `200`；返回模板基础信息和 `currentVersion.status=PUBLISHED` |
+| `WF-ADMIN-006` | P1 | `GET /api/admin/workflow/templates/{templateId}/versions` | 管理员查询模板版本列表 | 模板版本已发布 | 无 | HTTP `200`；返回版本列表，包含 `ruleSnapshotJson` |
+| `WF-ADMIN-007` | P0 | `POST /api/admin/workflow/template-versions/{versionId}/publish` | 发布不存在的 Flowable 定义应失败 | 存在草稿版本 | `flowableDefinitionKey=missing_definition_key` | HTTP `200`；`code=404`；提示 `Flowable流程定义不存在`；版本状态仍为 `DRAFT` |
+| `WF-ADMIN-008` | P0 | 数据库断言 | 新版本发布后旧版本归档 | 同模板第 1 版已发布；第 2 版草稿存在 | 发布第 2 版 | 旧版本 `status=ARCHIVED` 且 `effective_to` 不为空；新版本 `status=PUBLISHED`；同模板当前有效发布版本只有一个 |
+
+## 5.3 待补测试
 
 | 用例 ID | 优先级 | 接口 | 用例名称 | 当前状态 |
 | --- | --- | --- | --- | --- |
@@ -178,13 +206,14 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#participantShouldDownloadWorkfl
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#workflowAttachmentDownloadShouldRecheckLatestScanStatus test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test
+mvn -Dtest=ModuleWorkflowAdminApiIntegrationTest test
 ```
 
 后续建议扩展为：
 
 ```bash
 cd server
-mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowApprovalIntegrationTest test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest test
 ```
 
 ---
@@ -196,4 +225,7 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowApprovalIntegrati
 - `sys_todo_item.source_id` 当前使用 `wf_request.id`，查询 taskId 时需通过 Flowable 运行任务反查。
 - 审批动作与业务状态更新必须在同一服务层事务中完成。
 - 不允许前端或后台绕过 `module-workflow` 直接操作 Flowable 任务。
+- 后台模板治理只绑定已部署 Flowable 定义，不在线生成或修改 BPMN。
+- 同一模板任意时刻只能有一个当前有效 `PUBLISHED` 版本。
+- `ruleSnapshotJson` 是后续 Agent 预审的规则入口，必须保持合法 JSON。
 - 后续接 Agent 时，workflow 只依赖 SPI 或领域事件，不直接依赖 agent 具体实现。
