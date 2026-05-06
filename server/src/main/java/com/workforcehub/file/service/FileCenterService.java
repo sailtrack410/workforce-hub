@@ -1,7 +1,5 @@
 package com.workforcehub.file.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.AdminFileResponse;
@@ -21,15 +19,9 @@ import com.workforcehub.file.dto.QuotaResponse;
 import com.workforcehub.file.dto.StorageSummaryResponse;
 import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
-import com.workforcehub.file.repository.AttachmentRefRepository;
-import com.workforcehub.file.repository.AttachmentRow;
-import com.workforcehub.file.repository.FileObjectRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -43,26 +35,20 @@ public class FileCenterService {
     private final FileUploadTicketService fileUploadTicketService;
     private final FileUploadConfirmService fileUploadConfirmService;
     private final FileDownloadService fileDownloadService;
-    private final StorageUsageLedgerService storageUsageLedgerService;
-    private final FileObjectRepository fileObjectRepository;
-    private final AttachmentRefRepository attachmentRefRepository;
+    private final FileLifecycleService fileLifecycleService;
     private final FileQuotaPolicyService fileQuotaPolicyService;
 
     public FileCenterService(JdbcTemplate jdbcTemplate,
                              FileUploadTicketService fileUploadTicketService,
                              FileUploadConfirmService fileUploadConfirmService,
                              FileDownloadService fileDownloadService,
-                             StorageUsageLedgerService storageUsageLedgerService,
-                             FileObjectRepository fileObjectRepository,
-                             AttachmentRefRepository attachmentRefRepository,
+                             FileLifecycleService fileLifecycleService,
                              FileQuotaPolicyService fileQuotaPolicyService) {
         this.jdbcTemplate = jdbcTemplate;
         this.fileUploadTicketService = fileUploadTicketService;
         this.fileUploadConfirmService = fileUploadConfirmService;
         this.fileDownloadService = fileDownloadService;
-        this.storageUsageLedgerService = storageUsageLedgerService;
-        this.fileObjectRepository = fileObjectRepository;
-        this.attachmentRefRepository = attachmentRefRepository;
+        this.fileLifecycleService = fileLifecycleService;
         this.fileQuotaPolicyService = fileQuotaPolicyService;
     }
 
@@ -158,294 +144,28 @@ public class FileCenterService {
         return fileQuotaPolicyService.updateQuotaPolicy(policyId, request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public FileTrashResponse trashEmployeeFile(Long attachmentRefId, FileTrashRequest request) {
-        Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        ensureUploaderOwnsAttachment(userId, attachment);
-        if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        if (attachment.deletedAt() != null) {
-            FileTrashResponse response = new FileTrashResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setDeletedAt(attachment.deletedAt());
-            response.setPurgeAfter(attachment.purgeAfter());
-            return response;
-        }
-        LocalDateTime deletedAt = LocalDateTime.now();
-        LocalDateTime purgeAfter = deletedAt.plusDays(30);
-        int updated = jdbcTemplate.update("""
-            UPDATE sys_attachment_ref
-            SET deleted_at = ?, deleted_by = ?, purge_after = ?, updated_by = ?
-            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NULL
-            """, deletedAt, userId, purgeAfter, userId, attachmentRefId);
-        if (updated == 0) {
-            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
-                throw new BizException(404, "附件引用不存在");
-            }
-            FileTrashResponse response = new FileTrashResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setDeletedAt(latest.deletedAt());
-            response.setPurgeAfter(latest.purgeAfter());
-            return response;
-        }
-
-        FileTrashResponse response = new FileTrashResponse();
-        response.setAttachmentRefId(attachmentRefId);
-        response.setDeletedAt(deletedAt);
-        response.setPurgeAfter(purgeAfter);
-        audit("USER", userId, "FILE_TRASHED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
-            "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
-        return response;
+        return fileLifecycleService.trashEmployeeFile(attachmentRefId, request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public FileRestoreResponse restoreEmployeeFile(Long attachmentRefId, FileTrashRequest request) {
-        Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        ensureUploaderOwnsAttachment(userId, attachment);
-        if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        if (attachment.deletedAt() == null) {
-            FileRestoreResponse response = new FileRestoreResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setRestoredAt(LocalDateTime.now());
-            return response;
-        }
-        if (attachment.purgeAfter() != null && attachment.purgeAfter().isBefore(LocalDateTime.now())) {
-            throw new BizException(409, "文件已超过回收站保留期");
-        }
-        fileQuotaPolicyService.ensurePersonalQuota(userId, 0L);
-        fileQuotaPolicyService.ensureGlobalQuota(0L);
-        int updated = jdbcTemplate.update("""
-            UPDATE sys_attachment_ref
-            SET deleted_at = NULL, deleted_by = NULL, purge_after = NULL, updated_by = ?
-            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
-            """, userId, attachmentRefId);
-        if (updated == 0) {
-            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
-                throw new BizException(404, "附件引用不存在");
-            }
-            FileRestoreResponse response = new FileRestoreResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setRestoredAt(LocalDateTime.now());
-            return response;
-        }
-
-        FileRestoreResponse response = new FileRestoreResponse();
-        response.setAttachmentRefId(attachmentRefId);
-        response.setRestoredAt(LocalDateTime.now());
-        audit("USER", userId, "FILE_RESTORED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
-            "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
-        return response;
+        return fileLifecycleService.restoreEmployeeFile(attachmentRefId, request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public FilePurgeResponse purgeEmployeeFile(Long attachmentRefId) {
-        Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        ensureUploaderOwnsAttachment(userId, attachment);
-        if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        if (attachment.deletedAt() == null) {
-            throw new BizException(409, "请先将文件移入回收站");
-        }
-        int updated = jdbcTemplate.update(
-            """
-                UPDATE sys_attachment_ref
-                SET is_deleted = 1, updated_by = ?
-                WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
-                """,
-            userId,
-            attachmentRefId
-        );
-        if (updated == 0) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        storageUsageLedgerService.releaseUsage("USER", userId, attachment.fileSize(), 1);
-        storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
-        int refCount = attachmentRefRepository.countActiveByFileObjectId(attachment.fileObjectId());
-        boolean cleanupScheduled = fileObjectRepository.refreshRefCountAndCleanupAfter(
-            attachment.fileObjectId(),
-            refCount,
-            LocalDateTime.now().plusDays(7)
-        );
-
-        FilePurgeResponse response = new FilePurgeResponse();
-        response.setAttachmentRefId(attachmentRefId);
-        response.setPurgedAt(LocalDateTime.now());
-        response.setPhysicalCleanupScheduled(cleanupScheduled);
-        audit("USER", userId, "FILE_PURGED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
-            "{\"physicalCleanupScheduled\":%s}".formatted(cleanupScheduled));
-        return response;
+        return fileLifecycleService.purgeEmployeeFile(attachmentRefId);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public FileTrashResponse trashAdminFile(Long attachmentRefId, FileTrashRequest request) {
-        Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        ensureAdminFileAttachment(attachment);
-        if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        if (attachment.deletedAt() != null) {
-            FileTrashResponse response = new FileTrashResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setDeletedAt(attachment.deletedAt());
-            response.setPurgeAfter(attachment.purgeAfter());
-            return response;
-        }
-        LocalDateTime deletedAt = LocalDateTime.now();
-        LocalDateTime purgeAfter = deletedAt.plusDays(30);
-        int updated = jdbcTemplate.update("""
-            UPDATE sys_attachment_ref
-            SET deleted_at = ?, deleted_by = ?, purge_after = ?, updated_by = ?
-            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NULL
-            """, deletedAt, adminId, purgeAfter, adminId, attachmentRefId);
-        if (updated == 0) {
-            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
-                throw new BizException(404, "附件引用不存在");
-            }
-            FileTrashResponse response = new FileTrashResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setDeletedAt(latest.deletedAt());
-            response.setPurgeAfter(latest.purgeAfter());
-            return response;
-        }
-
-        FileTrashResponse response = new FileTrashResponse();
-        response.setAttachmentRefId(attachmentRefId);
-        response.setDeletedAt(deletedAt);
-        response.setPurgeAfter(purgeAfter);
-        audit("ADMIN", adminId, "FILE_ADMIN_TRASHED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
-            "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
-        return response;
+        return fileLifecycleService.trashAdminFile(attachmentRefId, request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public FileRestoreResponse restoreAdminFile(Long attachmentRefId, FileTrashRequest request) {
-        Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        ensureAdminFileAttachment(attachment);
-        if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        if (attachment.deletedAt() == null) {
-            FileRestoreResponse response = new FileRestoreResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setRestoredAt(LocalDateTime.now());
-            return response;
-        }
-        if (attachment.purgeAfter() != null && attachment.purgeAfter().isBefore(LocalDateTime.now())) {
-            throw new BizException(409, "文件已超过回收站保留期");
-        }
-        fileQuotaPolicyService.ensureGlobalQuota(0L);
-        int updated = jdbcTemplate.update("""
-            UPDATE sys_attachment_ref
-            SET deleted_at = NULL, deleted_by = NULL, purge_after = NULL, updated_by = ?
-            WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
-            """, adminId, attachmentRefId);
-        if (updated == 0) {
-            AttachmentRow latest = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-            if (latest.isDeleted() != null && latest.isDeleted() == 1) {
-                throw new BizException(404, "附件引用不存在");
-            }
-            FileRestoreResponse response = new FileRestoreResponse();
-            response.setAttachmentRefId(attachmentRefId);
-            response.setRestoredAt(LocalDateTime.now());
-            return response;
-        }
-
-        FileRestoreResponse response = new FileRestoreResponse();
-        response.setAttachmentRefId(attachmentRefId);
-        response.setRestoredAt(LocalDateTime.now());
-        audit("ADMIN", adminId, "FILE_ADMIN_RESTORED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
-            "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
-        return response;
+        return fileLifecycleService.restoreAdminFile(attachmentRefId, request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public FilePurgeResponse purgeAdminFile(Long attachmentRefId) {
-        Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        ensureAdminFileAttachment(attachment);
-        if (attachment.isDeleted() != null && attachment.isDeleted() == 1) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        if (attachment.deletedAt() == null) {
-            throw new BizException(409, "请先将文件移入回收站");
-        }
-        int updated = jdbcTemplate.update(
-            """
-                UPDATE sys_attachment_ref
-                SET is_deleted = 1, updated_by = ?
-                WHERE id = ? AND is_deleted = 0 AND deleted_at IS NOT NULL
-                """,
-            adminId,
-            attachmentRefId
-        );
-        if (updated == 0) {
-            throw new BizException(404, "附件引用不存在");
-        }
-        storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
-        int refCount = attachmentRefRepository.countActiveByFileObjectId(attachment.fileObjectId());
-        boolean cleanupScheduled = fileObjectRepository.refreshRefCountAndCleanupAfter(
-            attachment.fileObjectId(),
-            refCount,
-            LocalDateTime.now().plusDays(7)
-        );
-
-        FilePurgeResponse response = new FilePurgeResponse();
-        response.setAttachmentRefId(attachmentRefId);
-        response.setPurgedAt(LocalDateTime.now());
-        response.setPhysicalCleanupScheduled(cleanupScheduled);
-        audit("ADMIN", adminId, "FILE_ADMIN_PURGED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
-            "{\"physicalCleanupScheduled\":%s}".formatted(cleanupScheduled));
-        return response;
-    }
-
-    private void ensureUploaderOwnsAttachment(Long userId, AttachmentRow attachment) {
-        if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
-            throw new BizException(403, "无权访问该文件");
-        }
-    }
-
-    private void ensureAdminFileAttachment(AttachmentRow attachment) {
-        if (!"ADMIN_FILE".equals(attachment.ownerType()) || !"ADMIN".equals(attachment.uploaderType())) {
-            throw new BizException(403, "后台接口仅允许治理后台文件");
-        }
-    }
-
-    private void audit(String operatorType, Long operatorId, String actionType,
-                       String targetType, Long targetId, String result, String detailJson) {
-        jdbcTemplate.update("""
-            INSERT INTO sys_audit_log
-                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
-            """,
-            IdWorker.getId(),
-            operatorType,
-            operatorId,
-            actionType,
-            targetType,
-            targetId,
-            result,
-            detailJson
-        );
-    }
-
-    private String safeJsonText(String text) {
-        if (!StringUtils.hasText(text)) {
-            return "";
-        }
-        return text.replace("\\", "\\\\").replace("\"", "\\\"");
+        return fileLifecycleService.purgeAdminFile(attachmentRefId);
     }
 
     private AdminFileResponse mapAdminFile(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {

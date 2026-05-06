@@ -1104,3 +1104,32 @@
 - 清理任务覆盖“失败可重试”和“崩溃可恢复”两个窗口，不再只处理已经显式标记为 `FAILED` 的对象。
 - 普通确认上传的全局去重不再把实际上传过的重复临时对象留在对象存储里，文件中心账本和物理存储更一致。
 - 去重临时对象清理走统一补偿任务，而不是在业务事务中同步删除外部对象，为后续 MinIO、定时调度和退避重试留出统一入口。
+
+## 2026-05-06 文件生命周期服务拆分
+
+### 背景
+
+`FileCenterService` 已经承担上传票据、上传确认、下载、回收站生命周期、配额策略、后台列表等多个职责。第31审修复后，清理与去重补偿链路已经进一步稳定，但文件中心门面仍然过重；如果继续把后续回收站治理和清理策略堆在同一个服务里，会降低可读性，也会让事务边界越来越难审查。
+
+### 本次处理
+
+- 新增 `FileLifecycleService`，集中承接员工端与后台端的移入回收站、恢复、彻底删除逻辑。
+- `FileCenterService` 保持对 Controller 的入口不变，只把 6 个生命周期方法委托给 `FileLifecycleService`。
+- 生命周期相关的权限校验、审计写入、空间释放、物理清理候选刷新保留在同一个事务服务内。
+- `ModuleFileServiceBoundaryTest` 新增服务边界断言，确保回收站生命周期不再由文件中心门面直接持有。
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileServiceBoundaryTest#lifecycleShouldBeOwnedByDedicatedService test`，失败于 `ClassNotFoundException: com.workforcehub.file.service.FileLifecycleService`。
+- 绿灯：同一命令通过，确认新生命周期服务及 6 个方法签名存在。
+- 针对性验证：`mvn -Dtest=ModuleFileApiIntegrationTest#employeeShouldTrashRestoreAndPurgeAttachmentReference test` 通过，确认员工端回收站生命周期不回退。
+- 针对性验证：`mvn -Dtest=ModuleFileAdminApiIntegrationTest#adminShouldManageAdminFileLifecycle test` 通过，确认后台端文件生命周期不回退。
+- 回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleFileServiceBoundaryTest test`，43 个 module-file 用例通过。
+- 编译：`mvn -DskipTests compile` 通过。
+- 差异检查：`git diff --check` 通过。
+
+### 意义
+
+- 文件中心继续作为稳定门面，对外 API 不变，内部职责开始按上传、确认、下载、生命周期、配额逐步解耦。
+- 生命周期事务边界更集中，后续补充保留期策略、批量恢复、管理员强制清理时，不需要继续扩大 `FileCenterService`。
+- 这一步属于 `module-file` 第一版收口中的低风险拆分，为后续进入 `module-workflow` 留出更干净的文件附件依赖面。
