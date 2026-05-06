@@ -102,7 +102,7 @@ public class AttachmentRefRepository {
             SELECT ar.id AS attachment_ref_id, ar.owner_type, ar.display_name, ar.uploader_type, ar.uploader_id,
                    ar.deleted_at, ar.is_deleted AS attachment_deleted,
                    fo.storage_provider, fo.bucket_name, fo.object_key, fo.mime_type, fo.file_size,
-                   fo.is_deleted AS file_deleted
+                   fo.scan_status, fo.is_deleted AS file_deleted
             FROM sys_attachment_ref ar
             JOIN sys_file_object fo ON fo.id = ar.file_object_id
             WHERE ar.id = ?
@@ -120,6 +120,7 @@ public class AttachmentRefRepository {
                 rs.getString("object_key"),
                 rs.getString("mime_type"),
                 rs.getLong("file_size"),
+                rs.getString("scan_status"),
                 rs.getInt("file_deleted")
             ),
             attachmentRefId

@@ -8,7 +8,7 @@
 | 文档版本 | `v0.1` |
 | 适用范围 | Flowable 请假直属上级审批最小闭环 |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | Flowable 请假直属上级审批闭环、我的申请列表和审批附件业务引用已落地；假期余额和 Agent 预审待后续补充 |
+| 当前状态 | Flowable 请假直属上级审批闭环、我的申请列表、审批附件业务引用和审批附件下载授权已落地；假期余额和 Agent 预审待后续补充 |
 
 ---
 
@@ -32,6 +32,12 @@
 - 验证申请人只能查询自己发起的审批申请列表。
 - 验证请假申请可绑定当前申请人拥有的有效个人附件，并克隆为 `WF_REQUEST` 业务附件引用。
 - 验证请假申请不能绑定他人附件或已删除附件。
+- 验证审批参与人可以为 `WF_REQUEST` 附件创建下载票据。
+- 验证审批参与人可以用本人下载票据下载原文件。
+- 验证非参与人不能创建审批附件下载票据。
+- 验证非本申请附件不能创建审批附件下载票据。
+- 验证下载票据使用后状态变为 `USED`，并写入下载审计。
+- 验证审批附件创建下载票据后，如果文件最新扫描状态变为 `FAILED`，下载执行会拒绝且不消费票据。
 
 当前已落地自动化测试类：
 
@@ -54,6 +60,11 @@
 - 我的申请列表查询。
 - 审批附件业务引用克隆。
 - 他人附件、已删除附件拒绝。
+- 审批附件下载票据创建。
+- 审批附件下载执行。
+- 非参与人和非本申请附件下载授权拒绝。
+- 下载执行阶段最新扫描状态失败拦截。
+- 下载票据状态和审计写入。
 - 申请详情查询。
 - 审批轨迹查询。
 - Flowable 流程结束校验。
@@ -133,6 +144,12 @@
 | `WF-FILE-001` | P1 | `POST /api/employee/workflow/leave-requests` | 提交请假时绑定本人附件 | 张三已有有效 `PERSONAL_FILE` 附件引用 | 请求体传 `attachmentRefIds` | HTTP `200`；创建 `WF_REQUEST` 业务附件引用；`wf_request_attachment` 指向业务附件引用；详情返回业务附件 |
 | `WF-FILE-002` | P1 | `POST /api/employee/workflow/leave-requests` | 不能绑定他人附件 | 张三登录；传入李四上传的附件引用 | 请求体传他人 `attachmentRefIds` | HTTP `200`；`code=403`；提示 `无权使用该附件引用` |
 | `WF-FILE-003` | P1 | `POST /api/employee/workflow/leave-requests` | 不能绑定已删除附件 | 张三登录；传入已删除附件引用 | 请求体传已删除 `attachmentRefIds` | HTTP `200`；`code=404`；提示 `附件引用不存在` |
+| `WF-FILE-DL-001` | P0 | `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets` | 审批参与人创建审批附件下载票据 | 张三提交带附件请假；李四是直属上级审批人 | `downloadType=SINGLE` | HTTP `200`；`code=0`；返回 `ticketNo`、`downloadUrl`、`fileName`、`fileSize` |
+| `WF-FILE-DL-002` | P0 | `GET /api/employee/workflow/attachments/download/{ticketNo}` | 审批参与人使用下载票据下载原文件 | `WF-FILE-DL-001` 成功；李四登录 | 下载票据编号 | HTTP `200`；返回原文件字节；`sys_download_ticket.status=USED` |
+| `WF-FILE-DL-003` | P1 | 数据库断言 | 审批附件下载审计写入 | `WF-FILE-DL-002` 成功 | 查询 `sys_audit_log` | 存在 `WORKFLOW_ATTACHMENT_DOWNLOAD_TICKET_CREATED` 和 `WORKFLOW_ATTACHMENT_DOWNLOAD_EXECUTED` |
+| `WF-FILE-DL-004` | P0 | `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets` | 非参与人不能创建审批附件下载票据 | 王五不是申请人也不是审批参与人 | 申请下载 | HTTP `200`；`code=403`；提示 `无权查看该审批申请` |
+| `WF-FILE-DL-005` | P0 | `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets` | 非本申请附件不能创建下载票据 | 张三登录；传入未绑定到该申请的附件引用 | 申请下载 | HTTP `200`；`code=404`；提示 `审批附件不存在` |
+| `WF-FILE-DL-006` | P1 | `GET /api/employee/workflow/attachments/download/{ticketNo}` | 票据创建后扫描失败不能下载 | 李四已创建审批附件下载票据；文件对象最新 `scan_status=FAILED` | 下载票据编号 | HTTP `200`；`code=409`；提示 `附件安全扫描未通过`；票据仍为 `ACTIVE` |
 
 ## 5.2 待补测试
 
@@ -157,6 +174,9 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#requestDetailAndActionsShouldBe
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#employeeShouldListOwnWorkflowRequestsOnly test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#leaveRequestShouldBindOwnedAttachmentRefs test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#leaveRequestShouldRejectInvalidAttachmentRefs test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#participantShouldDownloadWorkflowAttachmentWithTicket test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#workflowAttachmentDownloadShouldRecheckLatestScanStatus test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test
 ```
 

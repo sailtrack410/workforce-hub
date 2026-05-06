@@ -4,6 +4,13 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.file.dto.CreateDownloadTicketRequest;
+import com.workforcehub.file.dto.DownloadFileResult;
+import com.workforcehub.file.dto.DownloadTicketResponse;
+import com.workforcehub.file.repository.DownloadAttachmentRow;
+import com.workforcehub.file.service.DownloadTicketExecutionService;
+import com.workforcehub.file.storage.StorageObjectResource;
+import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
@@ -35,7 +42,9 @@ import org.flowable.task.api.Task;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -57,15 +66,21 @@ public class WorkflowService {
     private final OrgDirectoryService orgDirectoryService;
     private final RuntimeService runtimeService;
     private final TaskService taskService;
+    private final StorageProviderRegistry storageProviderRegistry;
+    private final DownloadTicketExecutionService downloadTicketExecutionService;
 
     public WorkflowService(WorkflowRepository workflowRepository,
                            OrgDirectoryService orgDirectoryService,
                            RuntimeService runtimeService,
-                           TaskService taskService) {
+                           TaskService taskService,
+                           StorageProviderRegistry storageProviderRegistry,
+                           DownloadTicketExecutionService downloadTicketExecutionService) {
         this.workflowRepository = workflowRepository;
         this.orgDirectoryService = orgDirectoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
+        this.storageProviderRegistry = storageProviderRegistry;
+        this.downloadTicketExecutionService = downloadTicketExecutionService;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -199,6 +214,87 @@ public class WorkflowService {
             .toList();
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public DownloadTicketResponse createAttachmentDownloadTicket(Long requestId,
+                                                                Long attachmentRefId,
+                                                                CreateDownloadTicketRequest request) {
+        Long userId = CurrentUserHolder.requireUserId();
+        ensureRequestParticipant(requestId, userId);
+        if (!"SINGLE".equalsIgnoreCase(request.getDownloadType())) {
+            throw new BizException(400, "第一版仅支持单文件下载");
+        }
+
+        WorkflowAttachmentRow attachment = workflowRepository.getWorkflowAttachmentOrThrow(requestId, attachmentRefId);
+        ensureDownloadableWorkflowAttachment(attachment);
+        Long ticketId = IdWorker.getId();
+        String ticketNo = "WFDL" + ticketId;
+        LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
+        String downloadUrl = "/api/employee/workflow/attachments/download/" + ticketNo;
+        workflowRepository.insertDownloadTicket(
+            ticketId,
+            ticketNo,
+            attachmentRefId,
+            userId,
+            downloadUrl,
+            blankToNull(request.getReason()),
+            expireAt
+        );
+        workflowRepository.insertAudit(
+            "USER",
+            userId,
+            "WORKFLOW_ATTACHMENT_DOWNLOAD_TICKET_CREATED",
+            "DOWNLOAD_TICKET",
+            ticketId,
+            "SUCCESS",
+            "{\"requestId\":%s,\"attachmentRefId\":%s}".formatted(requestId, attachmentRefId)
+        );
+
+        DownloadTicketResponse response = new DownloadTicketResponse();
+        response.setDownloadTicketId(ticketId);
+        response.setTicketNo(ticketNo);
+        response.setDownloadUrl(downloadUrl);
+        response.setExpireAt(expireAt);
+        response.setFileName(attachment.displayName());
+        response.setFileSize(attachment.fileSize());
+        return response;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DownloadFileResult downloadAttachment(String ticketNo) {
+        Long userId = CurrentUserHolder.requireUserId();
+        WorkflowRepository.WorkflowDownloadTicketRow ticket = workflowRepository.getWorkflowDownloadTicketOrThrow(ticketNo);
+        if (!"USER".equals(ticket.requesterType()) || !userId.equals(ticket.requesterId())) {
+            throw new BizException(403, "无权使用该下载票据");
+        }
+        if (!"ACTIVE".equals(ticket.status())) {
+            throw new BizException(409, "下载票据已使用或已失效");
+        }
+        if (ticket.expireAt().isBefore(LocalDateTime.now())) {
+            downloadTicketExecutionService.expireActiveTicket(ticket.id());
+            throw new BizException(410, "下载链接已过期，请重新申请");
+        }
+
+        WorkflowRepository.WorkflowAttachmentDownloadScopeRow scope =
+            workflowRepository.getWorkflowAttachmentDownloadScopeOrThrow(ticket.attachmentRefId());
+        ensureRequestParticipant(scope.requestId(), userId);
+        DownloadAttachmentRow attachment = workflowRepository.getDownloadAttachmentOrThrow(ticket.attachmentRefId());
+        ensureDownloadableWorkflowAttachment(attachment);
+
+        downloadTicketExecutionService.claimActiveTicket(ticket.id());
+        StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
+            .loadObject(attachment.bucketName(), attachment.objectKey());
+        workflowRepository.insertAudit(
+            "USER",
+            userId,
+            "WORKFLOW_ATTACHMENT_DOWNLOAD_EXECUTED",
+            "DOWNLOAD_TICKET",
+            ticket.id(),
+            "SUCCESS",
+            "{\"requestId\":%s,\"attachmentRefId\":%s}".formatted(scope.requestId(), ticket.attachmentRefId())
+        );
+        return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
+    }
+
     private WorkflowRequestStatusResponse completeManagerTask(String taskId,
                                                               String comment,
                                                               String actionType,
@@ -263,6 +359,30 @@ public class WorkflowService {
         }
         if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
             throw new BizException(404, "附件引用不存在");
+        }
+        if ("FAILED".equals(attachment.scanStatus())) {
+            throw new BizException(409, "附件安全扫描未通过");
+        }
+    }
+
+    private void ensureDownloadableWorkflowAttachment(WorkflowAttachmentRow attachment) {
+        if (!"WF_REQUEST".equals(attachment.ownerType())) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
+            throw new BizException(409, "审批附件已删除");
+        }
+        if ("FAILED".equals(attachment.scanStatus())) {
+            throw new BizException(409, "附件安全扫描未通过");
+        }
+    }
+
+    private void ensureDownloadableWorkflowAttachment(DownloadAttachmentRow attachment) {
+        if (!"WF_REQUEST".equals(attachment.ownerType())) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
+            throw new BizException(409, "审批附件已删除");
         }
         if ("FAILED".equals(attachment.scanStatus())) {
             throw new BizException(409, "附件安全扫描未通过");
@@ -375,5 +495,9 @@ public class WorkflowService {
     private String buildRequestNo() {
         return "WF-LEAVE-" + java.time.LocalDateTime.now().format(REQUEST_NO_TIME_FORMATTER)
             + "-" + IdWorker.getIdStr();
+    }
+
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value : null;
     }
 }

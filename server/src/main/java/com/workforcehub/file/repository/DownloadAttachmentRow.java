@@ -15,5 +15,6 @@ public record DownloadAttachmentRow(
     String objectKey,
     String mimeType,
     Long fileSize,
+    String scanStatus,
     Integer fileDeleted
 ) {}

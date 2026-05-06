@@ -2,6 +2,7 @@ package com.workforcehub.workflow.repository;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
+import com.workforcehub.file.repository.DownloadAttachmentRow;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -434,6 +435,43 @@ public class WorkflowRepository {
         );
     }
 
+    public WorkflowAttachmentRow getWorkflowAttachmentOrThrow(Long requestId, Long attachmentRefId) {
+        List<WorkflowAttachmentRow> rows = jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.file_object_id,
+                   ar.owner_type,
+                   ar.owner_id,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.is_deleted AS file_deleted,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.content_sha256,
+                   fo.scan_status
+            FROM wf_request_attachment wra
+            JOIN sys_attachment_ref ar ON ar.id = wra.attachment_ref_id
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE wra.request_id = ?
+              AND wra.attachment_ref_id = ?
+              AND wra.is_deleted = 0
+              AND ar.owner_type = 'WF_REQUEST'
+              AND ar.owner_id = ?
+            LIMIT 1
+            """,
+            this::mapAttachment,
+            requestId,
+            attachmentRefId,
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        return rows.get(0);
+    }
+
     public WorkflowAttachmentRow getAttachmentByIdOrThrow(Long attachmentRefId) {
         List<WorkflowAttachmentRow> rows = jdbcTemplate.query("""
             SELECT ar.id AS attachment_ref_id,
@@ -487,6 +525,144 @@ public class WorkflowRepository {
                 rs.getTimestamp("acted_at").toLocalDateTime()
             ),
             requestId
+        );
+    }
+
+    public void insertDownloadTicket(Long ticketId,
+                                     String ticketNo,
+                                     Long attachmentRefId,
+                                     Long requesterId,
+                                     String downloadUrl,
+                                     String reason,
+                                     LocalDateTime expireAt) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_download_ticket
+                (id, ticket_no, attachment_ref_id, requester_type, requester_id,
+                 download_type, download_url, reason, expire_at, status)
+            VALUES
+                (?, ?, ?, 'USER', ?, 'SINGLE', ?, ?, ?, 'ACTIVE')
+            """,
+            ticketId,
+            ticketNo,
+            attachmentRefId,
+            requesterId,
+            downloadUrl,
+            reason,
+            expireAt
+        );
+    }
+
+    public WorkflowDownloadTicketRow getWorkflowDownloadTicketOrThrow(String ticketNo) {
+        List<WorkflowDownloadTicketRow> rows = jdbcTemplate.query("""
+            SELECT id, ticket_no, attachment_ref_id, requester_type, requester_id,
+                   expire_at, status
+            FROM sys_download_ticket
+            WHERE ticket_no = ? AND is_deleted = 0
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowDownloadTicketRow(
+                rs.getLong("id"),
+                rs.getString("ticket_no"),
+                rs.getLong("attachment_ref_id"),
+                rs.getString("requester_type"),
+                rs.getLong("requester_id"),
+                rs.getTimestamp("expire_at").toLocalDateTime(),
+                rs.getString("status")
+            ),
+            ticketNo
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "下载票据不存在");
+        }
+        return rows.get(0);
+    }
+
+    public WorkflowAttachmentDownloadScopeRow getWorkflowAttachmentDownloadScopeOrThrow(Long attachmentRefId) {
+        List<WorkflowAttachmentDownloadScopeRow> rows = jdbcTemplate.query("""
+            SELECT wra.request_id
+            FROM wf_request_attachment wra
+            JOIN sys_attachment_ref ar ON ar.id = wra.attachment_ref_id
+            WHERE wra.attachment_ref_id = ?
+              AND wra.is_deleted = 0
+              AND ar.owner_type = 'WF_REQUEST'
+              AND ar.owner_id = wra.request_id
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowAttachmentDownloadScopeRow(rs.getLong("request_id")),
+            attachmentRefId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        return rows.get(0);
+    }
+
+    public DownloadAttachmentRow getDownloadAttachmentOrThrow(Long attachmentRefId) {
+        List<DownloadAttachmentRow> rows = jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.owner_type,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.storage_provider,
+                   fo.bucket_name,
+                   fo.object_key,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.scan_status,
+                   fo.is_deleted AS file_deleted
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE ar.id = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new DownloadAttachmentRow(
+                rs.getLong("attachment_ref_id"),
+                rs.getString("owner_type"),
+                rs.getString("display_name"),
+                rs.getString("uploader_type"),
+                rs.getLong("uploader_id"),
+                rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime(),
+                rs.getInt("attachment_deleted"),
+                rs.getString("storage_provider"),
+                rs.getString("bucket_name"),
+                rs.getString("object_key"),
+                rs.getString("mime_type"),
+                rs.getLong("file_size"),
+                rs.getString("scan_status"),
+                rs.getInt("file_deleted")
+            ),
+            attachmentRefId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        return rows.get(0);
+    }
+
+    public void insertAudit(String operatorType,
+                            Long operatorId,
+                            String actionType,
+                            String targetType,
+                            Long targetId,
+                            String result,
+                            String detailJson) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_audit_log
+                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
+            """,
+            IdWorker.getId(),
+            operatorType,
+            operatorId,
+            actionType,
+            targetType,
+            targetId,
+            result,
+            detailJson
         );
     }
 
@@ -565,5 +741,19 @@ public class WorkflowRepository {
             rs.getLong("applicant_user_id"),
             rs.getString("flowable_process_instance_id")
         );
+    }
+
+    public record WorkflowDownloadTicketRow(
+        Long id,
+        String ticketNo,
+        Long attachmentRefId,
+        String requesterType,
+        Long requesterId,
+        LocalDateTime expireAt,
+        String status
+    ) {
+    }
+
+    public record WorkflowAttachmentDownloadScopeRow(Long requestId) {
     }
 }

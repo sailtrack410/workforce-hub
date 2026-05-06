@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -21,6 +22,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,6 +62,9 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
 
     @Autowired
     private TaskService taskService;
+
+    @Value("${workforce.file.local-root:target/test-file-storage}")
+    private String localRoot;
 
     @Test
     @DisplayName("员工提交请假申请后应启动Flowable并由直属上级审批通过")
@@ -288,6 +295,154 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     }
 
     @Test
+    @DisplayName("审批参与人可以为审批附件申请下载票据并下载原文件")
+    void participantShouldDownloadWorkflowAttachmentWithTicket() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long sourceAttachmentRefId = seedPersonalAttachmentRef(
+            EMPLOYEE_USER_ID,
+            "请假证明.pdf",
+            0,
+            false,
+            "workflow-attachment-download-content"
+        );
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, List.of(sourceAttachmentRefId));
+        long workflowAttachmentRefId = workflowAttachmentRefId(scenario.requestId(), sourceAttachmentRefId);
+
+        MvcResult ticketResult = mockMvc.perform(post(
+                    "/api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets",
+                    scenario.requestId(),
+                    workflowAttachmentRefId
+                )
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "审批查看证明材料"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.ticketNo").isString())
+            .andExpect(jsonPath("$.data.downloadUrl").isString())
+            .andExpect(jsonPath("$.data.fileName").value("请假证明.pdf"))
+            .andReturn();
+
+        String ticketNo = data(ticketResult).get("ticketNo").asText();
+        mockMvc.perform(get("/api/employee/workflow/attachments/download/{ticketNo}", ticketNo)
+                .cookie(managerSession))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .bytes("workflow-attachment-download-content".getBytes(StandardCharsets.UTF_8)));
+
+        assertEquals("USED", downloadTicketStatus(ticketNo));
+        assertEquals(1L, auditCount("USER", MANAGER_USER_ID, "WORKFLOW_ATTACHMENT_DOWNLOAD_TICKET_CREATED"));
+        assertEquals(1L, auditCount("USER", MANAGER_USER_ID, "WORKFLOW_ATTACHMENT_DOWNLOAD_EXECUTED"));
+    }
+
+    @Test
+    @DisplayName("非参与人或非本申请附件不能申请审批附件下载票据")
+    void nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie outsiderSession = login("wangwu.employee", "Employee@123456");
+        long sourceAttachmentRefId = seedPersonalAttachmentRef(
+            EMPLOYEE_USER_ID,
+            "请假证明.pdf",
+            0,
+            false,
+            "workflow-attachment-auth-content"
+        );
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, List.of(sourceAttachmentRefId));
+        long workflowAttachmentRefId = workflowAttachmentRefId(scenario.requestId(), sourceAttachmentRefId);
+
+        mockMvc.perform(post(
+                    "/api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets",
+                    scenario.requestId(),
+                    workflowAttachmentRefId
+                )
+                .cookie(outsiderSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "越权查看"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权查看该审批申请"));
+
+        long otherPersonalAttachmentRefId = seedPersonalAttachmentRef(
+            EMPLOYEE_USER_ID,
+            "未绑定证明.pdf",
+            0,
+            false,
+            "workflow-foreign-attachment-content"
+        );
+        mockMvc.perform(post(
+                    "/api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets",
+                    scenario.requestId(),
+                    otherPersonalAttachmentRefId
+                )
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "错误附件"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message").value("审批附件不存在"));
+    }
+
+    @Test
+    @DisplayName("审批附件创建下载票据后扫描失败不能下载")
+    void workflowAttachmentDownloadShouldRecheckLatestScanStatus() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long sourceAttachmentRefId = seedPersonalAttachmentRef(
+            EMPLOYEE_USER_ID,
+            "扫描状态变化证明.pdf",
+            0,
+            false,
+            "workflow-attachment-scan-status-content"
+        );
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, List.of(sourceAttachmentRefId));
+        long workflowAttachmentRefId = workflowAttachmentRefId(scenario.requestId(), sourceAttachmentRefId);
+
+        MvcResult ticketResult = mockMvc.perform(post(
+                    "/api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets",
+                    scenario.requestId(),
+                    workflowAttachmentRefId
+                )
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "审批查看证明材料"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        String ticketNo = data(ticketResult).get("ticketNo").asText();
+        updateAttachmentScanStatus(workflowAttachmentRefId, "FAILED");
+
+        mockMvc.perform(get("/api/employee/workflow/attachments/download/{ticketNo}", ticketNo)
+                .cookie(managerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("附件安全扫描未通过"));
+
+        assertEquals("ACTIVE", downloadTicketStatus(ticketNo));
+    }
+
+    @Test
     @DisplayName("请假申请不能绑定他人或已删除的附件引用")
     void leaveRequestShouldRejectInvalidAttachmentRefs() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -431,9 +586,20 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     }
 
     private long seedPersonalAttachmentRef(long uploaderId, String displayName, int isDeleted, boolean deletedAt) {
-        long fileObjectId = 9500L + uploaderId + isDeleted + (deletedAt ? 100 : 0);
-        long attachmentRefId = 9600L + uploaderId + isDeleted + (deletedAt ? 100 : 0);
+        return seedPersonalAttachmentRef(uploaderId, displayName, isDeleted, deletedAt, "workflow-test-content-" + displayName);
+    }
+
+    private long seedPersonalAttachmentRef(long uploaderId,
+                                           String displayName,
+                                           int isDeleted,
+                                           boolean deletedAt,
+                                           String content) {
+        long suffix = Math.abs((long) content.hashCode());
+        long fileObjectId = 9500_0000L + suffix;
+        long attachmentRefId = 9600_0000L + suffix;
         String contentSha256 = "%064x".formatted(attachmentRefId);
+        String objectKey = "workflow-test/" + attachmentRefId + ".pdf";
+        writeLocalObject(objectKey, content.getBytes(StandardCharsets.UTF_8));
         jdbcTemplate.update("""
             INSERT INTO sys_file_object
                 (id, storage_provider, bucket_name, object_key, file_name, file_ext,
@@ -441,12 +607,13 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                  upload_status, scan_status, created_by, is_deleted)
             VALUES
                 (?, 'LOCAL', 'workforce-local', ?, ?, 'pdf',
-                 'application/pdf', 1024, ?, ?, 1,
+                 'application/pdf', ?, ?, ?, 1,
                  'UPLOADED', 'PASSED', ?, 0)
             """,
             fileObjectId,
-            "workflow-test/" + attachmentRefId + ".pdf",
+            objectKey,
             displayName,
+            (long) content.getBytes(StandardCharsets.UTF_8).length,
             contentSha256,
             contentSha256,
             uploaderId
@@ -470,6 +637,16 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
             isDeleted
         );
         return attachmentRefId;
+    }
+
+    private void writeLocalObject(String objectKey, byte[] content) {
+        try {
+            Path target = Path.of(localRoot).resolve(objectKey);
+            Files.createDirectories(target.getParent());
+            Files.write(target, content);
+        } catch (Exception e) {
+            throw new IllegalStateException("写入本地测试文件失败", e);
+        }
     }
 
     private Long requestAttachmentCount(long requestId, long attachmentRefId) {
@@ -497,6 +674,18 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         return jdbcTemplate.queryForObject(
             "SELECT file_object_id FROM sys_attachment_ref WHERE id = ?",
             Long.class,
+            attachmentRefId
+        );
+    }
+
+    private void updateAttachmentScanStatus(long attachmentRefId, String scanStatus) {
+        jdbcTemplate.update("""
+            UPDATE sys_file_object fo
+            JOIN sys_attachment_ref ar ON ar.file_object_id = fo.id
+            SET fo.scan_status = ?
+            WHERE ar.id = ?
+            """,
+            scanStatus,
             attachmentRefId
         );
     }
@@ -572,6 +761,22 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
               AND owner_id = ?
               AND status = 'PENDING'
             """, Long.class, requestId, ownerId);
+    }
+
+    private String downloadTicketStatus(String ticketNo) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM sys_download_ticket WHERE ticket_no = ?",
+            String.class,
+            ticketNo
+        );
+    }
+
+    private Long auditCount(String operatorType, long operatorId, String actionType) {
+        return jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_audit_log
+            WHERE operator_type = ? AND operator_id = ? AND action_type = ?
+            """, Long.class, operatorType, operatorId, actionType);
     }
 
     private record LeaveApprovalScenario(

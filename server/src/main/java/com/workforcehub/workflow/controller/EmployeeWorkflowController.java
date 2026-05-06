@@ -2,6 +2,10 @@ package com.workforcehub.workflow.controller;
 
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.response.R;
+import com.workforcehub.file.controller.FileDownloadResponseFactory;
+import com.workforcehub.file.dto.CreateDownloadTicketRequest;
+import com.workforcehub.file.dto.DownloadFileResult;
+import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
@@ -16,6 +20,8 @@ import com.workforcehub.workflow.dto.WorkflowTodoResponse;
 import com.workforcehub.workflow.service.WorkflowService;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,9 +40,12 @@ import java.util.List;
 public class EmployeeWorkflowController {
 
     private final WorkflowService workflowService;
+    private final FileDownloadResponseFactory downloadResponseFactory;
 
-    public EmployeeWorkflowController(WorkflowService workflowService) {
+    public EmployeeWorkflowController(WorkflowService workflowService,
+                                      FileDownloadResponseFactory downloadResponseFactory) {
         this.workflowService = workflowService;
+        this.downloadResponseFactory = downloadResponseFactory;
     }
 
     @PostMapping("/leave-requests")
@@ -81,5 +90,18 @@ public class EmployeeWorkflowController {
     @GetMapping("/requests/{requestId}/actions")
     public R<List<WorkflowTaskActionResponse>> requestActions(@PathVariable Long requestId) {
         return R.ok(workflowService.listRequestActions(requestId));
+    }
+
+    @PostMapping("/requests/{requestId}/attachments/{attachmentRefId}/download-tickets")
+    public R<DownloadTicketResponse> createAttachmentDownloadTicket(@PathVariable Long requestId,
+                                                                    @PathVariable Long attachmentRefId,
+                                                                    @Valid @RequestBody CreateDownloadTicketRequest request) {
+        return R.ok(workflowService.createAttachmentDownloadTicket(requestId, attachmentRefId, request));
+    }
+
+    @GetMapping("/attachments/download/{ticketNo}")
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable String ticketNo) {
+        DownloadFileResult result = workflowService.downloadAttachment(ticketNo);
+        return downloadResponseFactory.attachment(result);
     }
 }

@@ -125,3 +125,63 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - 申请列表让员工端可以从“提交动作”进入“可追踪的个人流程中心”。
 - 附件采用业务引用克隆后，个人文件生命周期和审批归档生命周期解耦，后续做文件回收站、审批归档、审计下载时不会互相破坏。
 - workflow 对文件中心保持低耦合：只依赖 `sys_attachment_ref` 元数据和 `attachment_ref_id`，不处理二进制上传和下载执行。
+
+## 2026-05-06 审批附件下载授权入口
+
+### 背景
+
+上一轮已经让请假申请可以克隆 `WF_REQUEST` 业务附件引用，但详情页只能看到附件元数据，不能按审批参与人下载原文件。不能直接放宽 `module-file` 员工下载规则，因为个人文件下载仍应保持“上传人拥有”的边界；审批附件属于 `module-workflow` 的业务归档，授权主体应是申请参与人，而不是原始上传人。
+
+因此本轮采用“workflow 判定业务权限，file 复用下载底座”的方式：`module-workflow` 负责校验审批参与人与附件归属，下载票据、对象读取和一次性状态机复用文件中心已有能力。
+
+### 本次处理
+
+- 新增员工端审批附件下载票据接口：
+  - `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets`
+  - `GET /api/employee/workflow/attachments/download/{ticketNo}`
+- `EmployeeWorkflowController` 注入 `FileDownloadResponseFactory`，下载执行返回真实文件流，不包裹统一 `R`。
+- `WorkflowService` 新增 `createAttachmentDownloadTicket`，按当前用户是否为审批参与人、附件是否属于该申请、附件是否为 `WF_REQUEST` 业务引用做授权。
+- `WorkflowService` 新增 `downloadAttachment`，校验票据申请人、票据状态、过期时间和参与人权限后，复用 `DownloadTicketExecutionService` 抢占 `ACTIVE` 票据为 `USED`。
+- 下载执行阶段重新读取文件对象最新 `scan_status`，如果票据创建后安全扫描结果变为 `FAILED`，拒绝下载且不消费票据。
+- `WorkflowRepository` 新增审批附件归属查询、审批下载票据查询、下载对象查询和下载审计写入 SQL。
+- 下载审计新增：
+  - `WORKFLOW_ATTACHMENT_DOWNLOAD_TICKET_CREATED`
+  - `WORKFLOW_ATTACHMENT_DOWNLOAD_EXECUTED`
+- `ModuleWorkflowFlowableIntegrationTest` 新增审批附件下载正向用例，覆盖创建票据、下载原文件、票据变为 `USED`、审计写入。
+- `ModuleWorkflowFlowableIntegrationTest` 新增授权负例，覆盖非参与人和非本申请附件不能创建下载票据。
+- API 文档和测试用例同步补齐审批附件下载接口、错误码、票据状态和验证命令。
+
+### 红绿记录
+
+- 红灯：新增 `participantShouldDownloadWorkflowAttachmentWithTicket` 后，`POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets` 返回 `404`。
+- 绿灯：补齐 workflow 下载票据创建接口、服务层授权、仓储 SQL 和下载执行接口后，该用例通过。
+- 回归补充：新增 `nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment`，覆盖王五作为非参与人返回 `code=403`，以及未绑定到该申请的附件返回 `code=404`；该用例通过。
+- 红灯：新增 `workflowAttachmentDownloadShouldRecheckLatestScanStatus` 后，票据创建后把文件对象扫描状态改为 `FAILED`，下载仍返回文件流，暴露下载执行没有二次读取最新扫描状态。
+- 绿灯：下载对象行补充 `scan_status`，`WorkflowService.downloadAttachment` 执行前再次校验扫描状态；该用例通过，且安全拦截时票据保持 `ACTIVE`。
+- 回归：`mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test` 通过，11 个 workflow 用例全部通过。
+
+### 当前完成范围
+
+- 审批申请参与人可以为该申请下的 `WF_REQUEST` 附件创建下载票据。
+- 下载票据只允许申请票据的本人使用。
+- 下载票据过期会标记为 `EXPIRED`。
+- 下载票据使用前通过条件更新抢占为 `USED`，避免并发重复下载。
+- 下载执行时再次校验用户仍是审批参与人。
+- 下载执行时再次校验文件对象最新安全扫描状态，扫描失败不会返回原文件。
+- 非参与人不能创建审批附件下载票据。
+- 非本申请附件不能创建审批附件下载票据。
+- 下载票据创建和下载执行均写入审计。
+
+### 暂未覆盖
+
+- 流程模板和模板版本后台治理接口。
+- 审批附件归档保留期和清理策略。
+- 假期余额扣减与 `module-leave` 联动。
+- Agent 预审、自动驳回和人工审批页展示 Agent 结论。
+- Flowable 表结构纳入 Flyway 的生产治理终态。
+
+### 意义
+
+- 审批详情页已经具备“看得到附件、也能按业务权限下载附件”的完整后端闭环。
+- 文件中心个人文件下载权限没有被审批场景污染，后续群文件、知识库文件也可以采用同样模式：业务模块先做场景授权，再复用下载票据和对象读取底座。
+- 审批附件下载有独立审计动作，后续做合规追踪、Agent 预审证据引用和审批材料访问记录时有可查依据。

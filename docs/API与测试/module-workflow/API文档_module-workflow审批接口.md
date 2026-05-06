@@ -6,16 +6,16 @@
 | --- | --- |
 | 文档名称 | `module-workflow` 审批接口 API 文档 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 请假申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件与轨迹 |
+| 适用范围 | 请假申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权与轨迹 |
 | 对应模块 | `server/module-workflow` |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表和审批附件业务引用已实现；模板治理、假期余额和 Agent 预审待后续迭代 |
+| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用和审批附件下载授权已实现；模板治理、假期余额和 Agent 预审待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `8` 个员工端接口。
+当前已实现 `10` 个员工端接口。
 
 - `POST /api/employee/workflow/leave-requests`
 - `GET /api/employee/workflow/todos`
@@ -25,11 +25,12 @@
 - `POST /api/employee/workflow/requests/{requestId}/withdraw`
 - `GET /api/employee/workflow/requests/{requestId}`
 - `GET /api/employee/workflow/requests/{requestId}/actions`
+- `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets`
+- `GET /api/employee/workflow/attachments/download/{ticketNo}`
 
 当前暂未实现但已纳入后续规划：
 
 - 后台流程模板治理
-- 审批附件下载授权入口
 - Agent 预审与自动驳回
 
 ---
@@ -53,6 +54,8 @@ http://localhost:8080
 - `/api/employee/workflow/tasks/{taskId}/reject` 只允许该 Flowable 任务的 assignee 驳回。
 - `/api/employee/workflow/requests/{requestId}/withdraw` 只允许申请人撤回审批中的申请。
 - 申请详情和审批轨迹只允许申请人、待办处理人或已处理人查看。
+- 审批附件下载票据只允许审批参与人为该申请下的 `WF_REQUEST` 附件创建。
+- 审批附件下载执行只允许票据申请人本人使用，且票据只能使用一次。
 
 ### 3.3 请求头约定
 
@@ -104,6 +107,17 @@ http://localhost:8080
 | `PENDING` | 待处理 |
 | `DONE` | 已完成 |
 | `CLOSED` | 已关闭 |
+
+---
+
+### 4.4 downloadTicketStatus
+
+| 值 | 含义 |
+| --- | --- |
+| `ACTIVE` | 可使用 |
+| `USED` | 已使用 |
+| `EXPIRED` | 已过期 |
+| `REVOKED` | 已撤销 |
 
 ---
 
@@ -463,6 +477,106 @@ Cookie: SESSION=...
 
 ---
 
+## 5.9 创建审批附件下载票据
+
+```http
+POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 路径参数
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `requestId` | `long` | 是 | 审批申请 ID |
+| `attachmentRefId` | `long` | 是 | 审批申请业务附件引用 ID，必须属于该申请的 `WF_REQUEST` 附件 |
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `downloadType` | `string` | 是 | 下载类型，第一版仅支持 `SINGLE` |
+| `reason` | `string/null` | 否 | 下载原因，最长 256 字符 |
+
+示例：
+
+```json
+{
+  "downloadType": "SINGLE",
+  "reason": "审批查看证明材料"
+}
+```
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "downloadTicketId": 2051964970056302595,
+    "ticketNo": "WFDL2051964970056302595",
+    "downloadUrl": "/api/employee/workflow/attachments/download/WFDL2051964970056302595",
+    "expireAt": "2026-05-06T18:09:07",
+    "fileName": "请假证明.pdf",
+    "fileSize": 36
+  },
+  "requestId": "cb4cb41d69424374a9df7c1d7775287a"
+}
+```
+
+### 授权与落库语义
+
+- 当前登录员工必须是该审批申请参与人。
+- `attachmentRefId` 必须满足 `wf_request_attachment.request_id = requestId`。
+- 附件引用必须满足 `sys_attachment_ref.owner_type = WF_REQUEST` 且 `owner_id = requestId`。
+- 附件引用、物理文件对象不能被删除。
+- 安全扫描失败的附件不能创建下载票据。
+- 写入 `sys_download_ticket`，`requester_type=USER`、`requester_id=当前登录员工`、`status=ACTIVE`。
+- 票据有效期第一版固定为 10 分钟。
+- 写入 `sys_audit_log`，`action_type=WORKFLOW_ATTACHMENT_DOWNLOAD_TICKET_CREATED`。
+
+---
+
+## 5.10 使用审批附件下载票据下载文件
+
+```http
+GET /api/employee/workflow/attachments/download/{ticketNo}
+Cookie: SESSION=...
+```
+
+### 路径参数
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `ticketNo` | `string` | 是 | 审批附件下载票据编号 |
+
+### 成功响应
+
+成功时返回文件流，不包裹统一 `R` 响应。
+
+典型响应头：
+
+```http
+HTTP/1.1 200
+Content-Type: application/pdf
+Content-Disposition: attachment; filename*=UTF-8''%E8%AF%B7%E5%81%87%E8%AF%81%E6%98%8E.pdf
+```
+
+### 授权与状态机语义
+
+- 票据必须存在且未删除。
+- 票据申请人必须是当前登录员工。
+- 票据状态必须为 `ACTIVE`。
+- 票据过期后会被标记为 `EXPIRED`，并返回 `410` 业务码。
+- 下载执行会重新读取文件对象最新扫描状态；如果最新状态为 `FAILED`，返回 `409`，票据保持 `ACTIVE`。
+- 下载前通过条件更新把 `ACTIVE` 抢占为 `USED`，避免同一票据并发重复使用。
+- 下载执行时会再次校验当前用户仍是审批申请参与人。
+- 写入 `sys_audit_log`，`action_type=WORKFLOW_ATTACHMENT_DOWNLOAD_EXECUTED`。
+
+---
+
 ## 六、错误码
 
 | HTTP 状态 | 业务码 | message 示例 | 场景 |
@@ -474,8 +588,13 @@ Cookie: SESSION=...
 | `200` | `403` | `只有申请人可以撤回该申请` | 非申请人撤回 |
 | `200` | `403` | `无权查看该审批申请` | 非参与人查看申请详情或轨迹 |
 | `200` | `403` | `无权使用该附件引用` | 提交申请时引用了他人附件或非个人附件 |
+| `200` | `403` | `无权使用该下载票据` | 当前用户不是票据申请人 |
 | `200` | `404` | `附件引用不存在` | 附件引用不存在、已删除或物理文件已删除 |
+| `200` | `404` | `审批附件不存在` | 下载票据申请的附件不属于该审批申请 |
+| `200` | `404` | `下载票据不存在` | 下载票据编号不存在 |
 | `200` | `409` | `附件安全扫描未通过` | 附件安全扫描失败 |
+| `200` | `409` | `下载票据已使用或已失效` | 下载票据不是 `ACTIVE`，或被并发请求抢占 |
+| `200` | `410` | `下载链接已过期，请重新申请` | 下载票据超过有效期 |
 | `404` | `404` | `假种不存在或已停用` | 业务对象不存在 |
 | `500` | `500` | `Flowable 未生成直属上级审批任务` | 引擎或流程定义异常 |
 
@@ -484,7 +603,8 @@ Cookie: SESSION=...
 ## 七、当前边界
 
 - 第一版只支持直属上级单节点审批。
-- 第一版支持提交时绑定已有个人附件，并克隆为 `WF_REQUEST` 业务引用；暂未提供审批附件专用下载票据接口。
+- 第一版支持提交时绑定已有个人附件，并克隆为 `WF_REQUEST` 业务引用。
+- 第一版支持审批参与人为审批附件创建短期下载票据，并按一次性票据状态机下载原文件。
 - 第一版详情返回请假明细和审批申请业务附件。
 - 第一版不扣减假期余额，后续由 `module-leave` 接入。
 - 第一版不支持 Agent 预审，后续在人工节点前增加 Agent 预审节点或事件监听。
