@@ -4,6 +4,38 @@
 
 ---
 
+## 2026-05-06 module-file 上传确认服务拆分
+
+### 改动背景
+
+上传票据申请已经拆到 `FileUploadTicketService`，但确认上传仍然留在 `FileCenterService` 中。确认上传同时包含上传票据归属校验、对象完整性校验、物理对象校验、文件对象去重、附件引用创建、配额记账、票据确认和审计写入。后续群文件、文档文件、审批附件和知识库文件都会复用确认上传链路，如果继续堆在主服务里，生命周期、下载和确认上传会互相牵连。
+
+本轮继续做行为不变拆分：只迁移“确认上传”职责，不改接口契约、不改 DDL、不改变员工端和后台端已有响应结构。
+
+### 本次处理
+
+- 新增 `FileUploadConfirmService`，集中处理员工端和后台端确认上传
+- 将上传票据读取、上传人归属校验、业务归属校验和过期/重复确认判断迁入新服务
+- 将 LOCAL 对象校验、文件对象去重创建、附件引用创建、引用计数增加、配额使用量入账迁入新服务
+- 将确认上传审计动作迁入新服务，保留员工端 `FILE_UPLOAD_CONFIRMED` 和后台端 `FILE_ADMIN_UPLOAD_CONFIRMED`
+- `FileCenterService` 的确认上传入口改为委托调用，继续保留下载、列表、回收站和清理编排
+- 新增 `ModuleFileServiceBoundaryTest`，用结构测试约束上传确认必须由独立服务承接
+- `FileCenterService` 从 `953` 行降到 `657` 行，新增 `FileUploadConfirmService` `386` 行
+
+### 验证记录
+
+- 红灯验证：`mvn -Dtest=ModuleFileServiceBoundaryTest test`，因 `FileUploadConfirmService` 不存在失败
+- 结构绿灯：`mvn -Dtest=ModuleFileServiceBoundaryTest test`，1 个结构用例通过
+- 上传确认回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest test`，33 个文件 API 用例通过
+
+### 意义
+
+- 上传票据申请、上传确认、下载和生命周期开始形成独立边界，后续新增 ownerType 时不需要继续把分支堆进主服务
+- 确认上传内部的去重、配额、审计和附件引用创建集中在一个服务里，更容易继续抽取公共校验或适配群文件/文档文件/知识库文件
+- 这仍然是行为不变重构，下一步可以继续拆 `FileDownloadService` 或 `FileLifecycleService`，把 `FileCenterService` 收敛成薄编排门面
+
+---
+
 ## 2026-05-05 module-file 上传票据服务拆分
 
 ### 改动背景
