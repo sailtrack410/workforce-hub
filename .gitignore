@@ -1,4 +1,6 @@
 .DS_Store
+.idea/
+.playwright-mcp/
 
 # Local environment files
 .env

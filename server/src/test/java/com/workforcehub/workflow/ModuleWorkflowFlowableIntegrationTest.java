@@ -1,0 +1,583 @@
+package com.workforcehub.workflow;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
+import com.workforcehub.support.WorkflowFlowableTestConfiguration;
+import jakarta.servlet.http.Cookie;
+import org.flowable.engine.RuntimeService;
+import org.flowable.engine.TaskService;
+import org.flowable.engine.runtime.ProcessInstance;
+import org.flowable.task.api.Task;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * module-workflow 真实 Flowable 引擎集成测试。
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("api")
+@Import(WorkflowFlowableTestConfiguration.class)
+class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationTestSupport {
+
+    private static final long EMPLOYEE_USER_ID = 2003L;
+    private static final long MANAGER_USER_ID = 2002L;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RuntimeService runtimeService;
+
+    @Autowired
+    private TaskService taskService;
+
+    @Test
+    @DisplayName("员工提交请假申请后应启动Flowable并由直属上级审批通过")
+    void employeeLeaveRequestShouldBeApprovedByManagerWithFlowable() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+        mockMvc.perform(get("/api/employee/workflow/todos")
+                .cookie(managerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].requestId").value(scenario.requestId()))
+            .andExpect(jsonPath("$.data[0].taskId").value(scenario.managerTask().getId()))
+            .andExpect(jsonPath("$.data[0].title").value("张三的请假申请"))
+            .andExpect(jsonPath("$.data[0].status").value("PENDING"));
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/approve", scenario.managerTask().getId())
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "同意，请安排好交接"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonPath("$.data.status").value("APPROVED"));
+
+        assertNull(runtimeService.createProcessInstanceQuery()
+            .processInstanceId(scenario.processInstanceId())
+            .singleResult(), "审批通过后 Flowable 流程实例应结束");
+        assertEquals("APPROVED", requestStatus(scenario.requestId()));
+        assertEquals(1L, actionCount(scenario.requestId(), "APPROVE", MANAGER_USER_ID));
+        assertEquals(0L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+    }
+
+    @Test
+    @DisplayName("非审批人不能处理他人的Flowable审批任务")
+    void nonAssigneeShouldNotApproveWorkflowTask() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/approve", scenario.managerTask().getId())
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "我自己审批自己的申请"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("当前用户不是该审批任务处理人"))
+            .andExpect(jsonPath("$.data").doesNotExist());
+
+        Task managerTask = taskService.createTaskQuery()
+            .taskId(scenario.managerTask().getId())
+            .taskAssignee(String.valueOf(MANAGER_USER_ID))
+            .singleResult();
+        assertNotNull(managerTask, "非审批人尝试处理后，直属上级任务仍应保留");
+        assertNotNull(runtimeService.createProcessInstanceQuery()
+            .processInstanceId(scenario.processInstanceId())
+            .singleResult(), "非审批人尝试处理后，流程实例仍应运行中");
+        assertEquals("IN_APPROVAL", requestStatus(scenario.requestId()));
+        assertEquals(0L, actionCount(scenario.requestId(), "APPROVE", EMPLOYEE_USER_ID));
+        assertEquals(1L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+    }
+
+    @Test
+    @DisplayName("直属上级可以驳回Flowable审批任务")
+    void managerShouldRejectWorkflowTask() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/reject", scenario.managerTask().getId())
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "请假理由不充分"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonPath("$.data.status").value("REJECTED"));
+
+        assertNull(runtimeService.createProcessInstanceQuery()
+            .processInstanceId(scenario.processInstanceId())
+            .singleResult(), "审批驳回后 Flowable 流程实例应结束");
+        assertEquals("REJECTED", requestStatus(scenario.requestId()));
+        assertEquals(1L, actionCount(scenario.requestId(), "REJECT", MANAGER_USER_ID));
+        assertEquals(0L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+    }
+
+    @Test
+    @DisplayName("申请人可以撤回审批中的请假申请")
+    void applicantShouldWithdrawWorkflowRequest() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+        mockMvc.perform(post("/api/employee/workflow/requests/{requestId}/withdraw", scenario.requestId())
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "计划有变，取消请假"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonPath("$.data.status").value("WITHDRAWN"));
+
+        assertNull(runtimeService.createProcessInstanceQuery()
+            .processInstanceId(scenario.processInstanceId())
+            .singleResult(), "申请撤回后 Flowable 流程实例应删除");
+        assertEquals("WITHDRAWN", requestStatus(scenario.requestId()));
+        assertEquals(1L, actionCount(scenario.requestId(), "WITHDRAW", EMPLOYEE_USER_ID));
+        assertEquals(0L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+    }
+
+    @Test
+    @DisplayName("申请详情和审批轨迹应对流程参与人可查")
+    void requestDetailAndActionsShouldBeQueryableByParticipant() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+        mockMvc.perform(get("/api/employee/workflow/requests/{requestId}", scenario.requestId())
+                .cookie(managerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
+            .andExpect(jsonPath("$.data.currentStepKey").value("manager_approval"))
+            .andExpect(jsonPath("$.data.leave.reason").value("家中有事请假一天"))
+            .andExpect(jsonPath("$.data.leave.durationMinutes").value(480));
+
+        mockMvc.perform(get("/api/employee/workflow/requests/{requestId}/actions", scenario.requestId())
+                .cookie(managerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data").isEmpty());
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/approve", scenario.managerTask().getId())
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "同意"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(get("/api/employee/workflow/requests/{requestId}", scenario.requestId())
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("APPROVED"))
+            .andExpect(jsonPath("$.data.finishedAt").isString());
+
+        mockMvc.perform(get("/api/employee/workflow/requests/{requestId}/actions", scenario.requestId())
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].requestId").value(scenario.requestId()))
+            .andExpect(jsonPath("$.data[0].actorId").value(MANAGER_USER_ID))
+            .andExpect(jsonPath("$.data[0].actionType").value("APPROVE"))
+            .andExpect(jsonPath("$.data[0].comment").value("同意"))
+            .andExpect(jsonPath("$.data[0].afterStatus").value("APPROVED"));
+    }
+
+    @Test
+    @DisplayName("员工只能分页查询自己的审批申请")
+    void employeeShouldListOwnWorkflowRequestsOnly() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+        mockMvc.perform(get("/api/employee/workflow/requests")
+                .cookie(employeeSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.pageNo").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(20))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].requestId").value(scenario.requestId()))
+            .andExpect(jsonPath("$.data.list[0].status").value("IN_APPROVAL"))
+            .andExpect(jsonPath("$.data.list[0].title").value("张三的请假申请"));
+
+        mockMvc.perform(get("/api/employee/workflow/requests")
+                .cookie(managerSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(0))
+            .andExpect(jsonPath("$.data.list").isEmpty());
+    }
+
+    @Test
+    @DisplayName("请假申请可以绑定当前申请人拥有的有效附件引用")
+    void leaveRequestShouldBindOwnedAttachmentRefs() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        long sourceAttachmentRefId = seedPersonalAttachmentRef(EMPLOYEE_USER_ID, "请假证明.pdf", 0, false);
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, List.of(sourceAttachmentRefId));
+        long workflowAttachmentRefId = workflowAttachmentRefId(scenario.requestId(), sourceAttachmentRefId);
+
+        mockMvc.perform(get("/api/employee/workflow/requests/{requestId}", scenario.requestId())
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachments[0].attachmentRefId").value(workflowAttachmentRefId))
+            .andExpect(jsonPath("$.data.attachments[0].displayName").value("请假证明.pdf"))
+            .andExpect(jsonPath("$.data.attachments[0].mimeType").value("application/pdf"));
+
+        assertEquals(1L, requestAttachmentCount(scenario.requestId(), workflowAttachmentRefId));
+        assertEquals("WF_REQUEST", attachmentOwnerType(workflowAttachmentRefId));
+        assertEquals(scenario.requestId(), attachmentOwnerId(workflowAttachmentRefId));
+        assertEquals(fileObjectId(sourceAttachmentRefId), fileObjectId(workflowAttachmentRefId));
+    }
+
+    @Test
+    @DisplayName("请假申请不能绑定他人或已删除的附件引用")
+    void leaveRequestShouldRejectInvalidAttachmentRefs() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Long annualLeaveTypeId = seedWorkflowAndLeaveType();
+        long managerAttachmentRefId = seedPersonalAttachmentRef(MANAGER_USER_ID, "他人证明.pdf", 0, false);
+        mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(annualLeaveTypeId, List.of(managerAttachmentRefId))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权使用该附件引用"));
+
+        long deletedAttachmentRefId = seedPersonalAttachmentRef(EMPLOYEE_USER_ID, "已删除证明.pdf", 1, false);
+        mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(annualLeaveTypeId, List.of(deletedAttachmentRefId))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message").value("附件引用不存在"));
+    }
+
+    private LeaveApprovalScenario submitLeaveRequest(Cookie employeeSession) throws Exception {
+        return submitLeaveRequest(employeeSession, List.of());
+    }
+
+    private LeaveApprovalScenario submitLeaveRequest(Cookie employeeSession, List<Long> attachmentRefIds) throws Exception {
+        Long annualLeaveTypeId = seedWorkflowAndLeaveType();
+
+        MvcResult submitResult = mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(annualLeaveTypeId, attachmentRefIds)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").isNumber())
+            .andExpect(jsonPath("$.data.requestNo").isString())
+            .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
+            .andExpect(jsonPath("$.data.flowableProcessInstanceId").isString())
+            .andReturn();
+
+        JsonNode submitData = data(submitResult);
+        long requestId = submitData.get("requestId").asLong();
+        String processInstanceId = submitData.get("flowableProcessInstanceId").asText();
+
+        assertEquals(requestId, leaveDetailRequestId(requestId));
+        assertEquals(leaveDetailId(requestId), requestBizId(requestId));
+
+        ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
+            .processInstanceId(processInstanceId)
+            .singleResult();
+        assertNotNull(processInstance, "提交请假后应存在运行中的 Flowable 流程实例");
+
+        Task managerTask = taskService.createTaskQuery()
+            .processInstanceId(processInstanceId)
+            .taskAssignee(String.valueOf(MANAGER_USER_ID))
+            .singleResult();
+        assertNotNull(managerTask, "直属上级应收到 Flowable 审批任务");
+        assertEquals("manager_approval", managerTask.getTaskDefinitionKey());
+
+        return new LeaveApprovalScenario(requestId, processInstanceId, managerTask);
+    }
+
+    private Long seedWorkflowAndLeaveType() {
+        seedWorkflowDefinitions();
+        return seedAnnualLeaveType();
+    }
+
+    private String leaveRequestJson(Long annualLeaveTypeId, List<Long> attachmentRefIds) {
+        String attachmentsJson = attachmentRefIds.stream()
+            .map(String::valueOf)
+            .reduce((left, right) -> left + "," + right)
+            .map(ids -> ",\n                      \"attachmentRefIds\": [" + ids + "]")
+            .orElse("");
+        return """
+            {
+              "leaveTypeId": %d,
+              "startAt": "2026-05-07 09:00:00",
+              "endAt": "2026-05-07 18:00:00",
+              "durationMinutes": 480,
+              "reason": "家中有事请假一天"%s
+            }
+            """.formatted(annualLeaveTypeId, attachmentsJson);
+    }
+
+    private Cookie loginEmployee() throws Exception {
+        return login("zhangsan.employee", "Employee@123456");
+    }
+
+    private Cookie loginManager() throws Exception {
+        return login("lisi.manager", "Employee@123456");
+    }
+
+    private Cookie login(String loginName, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "%s",
+                      "password": "%s"
+                    }
+                    """.formatted(loginName, password)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(cookie().exists("SESSION"))
+            .andReturn();
+        return result.getResponse().getCookie("SESSION");
+    }
+
+    private void seedWorkflowDefinitions() {
+        jdbcTemplate.update("""
+            INSERT INTO wf_process_type
+                (id, process_code, process_name, biz_type, status)
+            VALUES
+                (9101, 'LEAVE', '请假流程', 'LEAVE', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template
+                (id, process_type_id, template_code, template_name, status)
+            VALUES
+                (9201, 9101, 'LEAVE_MANAGER_APPROVAL', '请假直属上级审批', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template_version
+                (id, template_id, version_no, flowable_definition_key, status, published_by, published_at, effective_from)
+            VALUES
+                (9301, 9201, 1, 'leave_manager_approval', 'PUBLISHED', 8001, NOW(), DATE_SUB(NOW(), INTERVAL 1 DAY))
+            """);
+    }
+
+    private Long seedAnnualLeaveType() {
+        long leaveTypeId = 9401L;
+        jdbcTemplate.update("""
+            INSERT INTO lv_type
+                (id, leave_code, leave_name, balance_mode, status)
+            VALUES
+                (?, 'ANNUAL_LEAVE', '年假', 'DEDUCT', 'ACTIVE')
+            """, leaveTypeId);
+        return leaveTypeId;
+    }
+
+    private long seedPersonalAttachmentRef(long uploaderId, String displayName, int isDeleted, boolean deletedAt) {
+        long fileObjectId = 9500L + uploaderId + isDeleted + (deletedAt ? 100 : 0);
+        long attachmentRefId = 9600L + uploaderId + isDeleted + (deletedAt ? 100 : 0);
+        String contentSha256 = "%064x".formatted(attachmentRefId);
+        jdbcTemplate.update("""
+            INSERT INTO sys_file_object
+                (id, storage_provider, bucket_name, object_key, file_name, file_ext,
+                 mime_type, file_size, file_hash, content_sha256, ref_count,
+                 upload_status, scan_status, created_by, is_deleted)
+            VALUES
+                (?, 'LOCAL', 'workforce-local', ?, ?, 'pdf',
+                 'application/pdf', 1024, ?, ?, 1,
+                 'UPLOADED', 'PASSED', ?, 0)
+            """,
+            fileObjectId,
+            "workflow-test/" + attachmentRefId + ".pdf",
+            displayName,
+            contentSha256,
+            contentSha256,
+            uploaderId
+        );
+        jdbcTemplate.update("""
+            INSERT INTO sys_attachment_ref
+                (id, owner_type, owner_id, file_object_id, original_file_name,
+                 display_name, uploader_type, uploader_id, visibility_scope,
+                 deleted_at, sort_order, created_by, is_deleted)
+            VALUES
+                (?, 'PERSONAL_FILE', NULL, ?, ?, ?, 'USER', ?, 'OWNER',
+                 IF(?, NOW(), NULL), 0, ?, ?)
+            """,
+            attachmentRefId,
+            fileObjectId,
+            displayName,
+            displayName,
+            uploaderId,
+            deletedAt,
+            uploaderId,
+            isDeleted
+        );
+        return attachmentRefId;
+    }
+
+    private Long requestAttachmentCount(long requestId, long attachmentRefId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM wf_request_attachment
+            WHERE request_id = ? AND attachment_ref_id = ?
+            """, Long.class, requestId, attachmentRefId);
+    }
+
+    private Long workflowAttachmentRefId(long requestId, long sourceAttachmentRefId) {
+        Long sourceFileObjectId = fileObjectId(sourceAttachmentRefId);
+        return jdbcTemplate.queryForObject("""
+            SELECT wra.attachment_ref_id
+            FROM wf_request_attachment wra
+            JOIN sys_attachment_ref ar ON ar.id = wra.attachment_ref_id
+            WHERE wra.request_id = ?
+              AND ar.file_object_id = ?
+              AND ar.owner_type = 'WF_REQUEST'
+            LIMIT 1
+            """, Long.class, requestId, sourceFileObjectId);
+    }
+
+    private Long fileObjectId(long attachmentRefId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT file_object_id FROM sys_attachment_ref WHERE id = ?",
+            Long.class,
+            attachmentRefId
+        );
+    }
+
+    private String attachmentOwnerType(long attachmentRefId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT owner_type FROM sys_attachment_ref WHERE id = ?",
+            String.class,
+            attachmentRefId
+        );
+    }
+
+    private Long attachmentOwnerId(long attachmentRefId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT owner_id FROM sys_attachment_ref WHERE id = ?",
+            Long.class,
+            attachmentRefId
+        );
+    }
+
+    private JsonNode data(MvcResult result) throws Exception {
+        JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
+        return root.get("data");
+    }
+
+    private String requestStatus(long requestId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM wf_request WHERE id = ?",
+            String.class,
+            requestId
+        );
+    }
+
+    private Long requestBizId(long requestId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT biz_id FROM wf_request WHERE id = ?",
+            Long.class,
+            requestId
+        );
+    }
+
+    private Long leaveDetailId(long requestId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT id FROM wf_req_leave WHERE request_id = ?",
+            Long.class,
+            requestId
+        );
+    }
+
+    private Long leaveDetailRequestId(long requestId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT request_id FROM wf_req_leave WHERE request_id = ?",
+            Long.class,
+            requestId
+        );
+    }
+
+    private Long actionCount(long requestId, String actionType, long actorId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM wf_task_action
+            WHERE request_id = ? AND action_type = ? AND actor_type = 'USER' AND actor_id = ?
+            """, Long.class, requestId, actionType, actorId);
+    }
+
+    private Long pendingTodoCount(long requestId, long ownerId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_todo_item
+            WHERE source_type = 'WORKFLOW_TASK'
+              AND source_id = ?
+              AND owner_type = 'USER'
+              AND owner_id = ?
+              AND status = 'PENDING'
+            """, Long.class, requestId, ownerId);
+    }
+
+    private record LeaveApprovalScenario(
+        long requestId,
+        String processInstanceId,
+        Task managerTask
+    ) {
+    }
+}

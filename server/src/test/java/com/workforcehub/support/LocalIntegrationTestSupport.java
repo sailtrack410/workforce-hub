@@ -69,6 +69,7 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("spring.data.redis.password", () -> env("REDIS_PASSWORD", ""));
         registry.add("spring.session.redis.namespace", () -> "workforce:test:session");
         registry.add("spring.autoconfigure.exclude", LocalIntegrationTestSupport::resolveAutoConfigurationExcludes);
+        registry.add("workforce.workflow.enabled", () -> "false");
         registry.add("spring.mail.host", () -> env("MAIL_HOST", "localhost"));
         registry.add("spring.mail.port", () -> env("MAIL_PORT", "1025"));
         registry.add("management.health.mail.enabled", () -> "false");
