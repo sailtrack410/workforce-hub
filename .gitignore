@@ -9,3 +9,6 @@
 
 # Build outputs
 server/target/
+
+# Local declaration materials
+docs/申报材料/

@@ -395,6 +395,66 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工个人文件生命周期接口不能操作审批归档附件")
+    void employeeLifecycleShouldRejectWorkflowAttachmentRef() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        Long personalAttachmentRefId = createConfirmedPersonalFile(
+            employeeSession,
+            "审批归档源文件.txt",
+            "workflow-archive-source"
+        );
+        Long workflowAttachmentRefId = cloneWorkflowAttachmentRef(personalAttachmentRefId);
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/trash", workflowAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "申请人不能删除审批归档附件"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message", containsString("个人文件接口仅允许操作个人文件")));
+
+        jdbcTemplate.update("""
+            UPDATE sys_attachment_ref
+            SET deleted_at = NOW(), deleted_by = ?, purge_after = DATE_ADD(NOW(), INTERVAL 30 DAY)
+            WHERE id = ?
+            """, EMPLOYEE_USER_ID, workflowAttachmentRefId);
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/restore", workflowAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "申请人不能恢复审批归档附件"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message", containsString("个人文件接口仅允许操作个人文件")));
+
+        mockMvc.perform(delete("/api/employee/files/{attachmentRefId}", workflowAttachmentRefId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message", containsString("个人文件接口仅允许操作个人文件")));
+
+        Integer activeWorkflowRefCount = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_attachment_ref
+            WHERE id = ?
+              AND owner_type = 'WF_REQUEST'
+              AND is_deleted = 0
+            """, Integer.class, workflowAttachmentRefId);
+        assertEquals(1, activeWorkflowRefCount);
+        assertEquals("workflow-archive-source".getBytes(StandardCharsets.UTF_8).length, usedBytes("USER", EMPLOYEE_USER_ID));
+        assertEquals("workflow-archive-source".getBytes(StandardCharsets.UTF_8).length, usedBytes("GLOBAL", null));
+    }
+
+    @Test
     @DisplayName("恢复回收站文件时企业总池不足也应被拦截")
     void restoreShouldRejectWhenGlobalQuotaIsInsufficient() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -1047,6 +1107,29 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return data(confirmResult).get("attachmentRefId").asLong();
+    }
+
+    private Long cloneWorkflowAttachmentRef(Long sourceAttachmentRefId) {
+        Long fileObjectId = jdbcTemplate.queryForObject(
+            "SELECT file_object_id FROM sys_attachment_ref WHERE id = ?",
+            Long.class,
+            sourceAttachmentRefId
+        );
+        Long workflowAttachmentRefId = System.nanoTime();
+        jdbcTemplate.update("""
+            INSERT INTO sys_attachment_ref
+                (id, owner_type, owner_id, file_object_id, original_file_name,
+                 display_name, uploader_type, uploader_id, visibility_scope, created_by)
+            VALUES
+                (?, 'WF_REQUEST', 910001, ?, '审批归档源文件.txt',
+                 '审批归档源文件.txt', 'USER', ?, 'WORKFLOW_PARTICIPANT', ?)
+            """,
+            workflowAttachmentRefId,
+            fileObjectId,
+            EMPLOYEE_USER_ID,
+            EMPLOYEE_USER_ID
+        );
+        return workflowAttachmentRefId;
     }
 
     private String createEmployeeDownloadTicket(Cookie employeeSession, Long attachmentRefId) throws Exception {

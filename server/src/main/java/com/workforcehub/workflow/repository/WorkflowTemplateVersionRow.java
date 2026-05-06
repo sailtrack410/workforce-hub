@@ -5,6 +5,7 @@ package com.workforcehub.workflow.repository;
  */
 public record WorkflowTemplateVersionRow(
     Long id,
-    String flowableDefinitionKey
+    String flowableDefinitionKey,
+    String flowableDefinitionId
 ) {
 }

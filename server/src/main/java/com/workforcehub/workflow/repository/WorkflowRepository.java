@@ -28,7 +28,7 @@ public class WorkflowRepository {
 
     public WorkflowTemplateVersionRow getPublishedTemplateVersion(String processCode) {
         List<WorkflowTemplateVersionRow> rows = jdbcTemplate.query("""
-            SELECT wtv.id, wtv.flowable_definition_key
+            SELECT wtv.id, wtv.flowable_definition_key, wtv.flowable_definition_id
             FROM wf_process_type wpt
             JOIN wf_template wt ON wt.process_type_id = wpt.id
             JOIN wf_template_version wtv ON wtv.template_id = wt.id
@@ -45,7 +45,8 @@ public class WorkflowRepository {
             """,
             (rs, rowNum) -> new WorkflowTemplateVersionRow(
                 rs.getLong("id"),
-                rs.getString("flowable_definition_key")
+                rs.getString("flowable_definition_key"),
+                rs.getString("flowable_definition_id")
             ),
             processCode
         );
@@ -172,8 +173,8 @@ public class WorkflowRepository {
         );
     }
 
-    public void markHumanApprovalStarted(Long requestId, String processInstanceId, Long operatorId) {
-        jdbcTemplate.update("""
+    public int markHumanApprovalStarted(Long requestId, String processInstanceId, Long operatorId) {
+        return jdbcTemplate.update("""
             UPDATE wf_request
             SET status = 'IN_APPROVAL',
                 current_step_key = 'manager_approval',
@@ -187,6 +188,25 @@ public class WorkflowRepository {
             operatorId,
             requestId
         );
+    }
+
+    public WorkflowRequestRow getRequestByIdForUpdateOrThrow(Long requestId) {
+        List<WorkflowRequestRow> rows = jdbcTemplate.query("""
+            SELECT wr.id, wr.request_no, wr.status, wr.title, wr.applicant_user_id,
+                   wr.flowable_process_instance_id, wr.agent_pre_review_task_id
+            FROM wf_request wr
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
+            LIMIT 1
+            FOR UPDATE
+            """,
+            this::mapRequest,
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批申请不存在");
+        }
+        return rows.get(0);
     }
 
     public void insertTodo(Long requestId,
@@ -408,7 +428,7 @@ public class WorkflowRepository {
 
     public WorkflowTemplateVersionRow getTemplateVersionByRequestId(Long requestId) {
         List<WorkflowTemplateVersionRow> rows = jdbcTemplate.query("""
-            SELECT wtv.id, wtv.flowable_definition_key
+            SELECT wtv.id, wtv.flowable_definition_key, wtv.flowable_definition_id
             FROM wf_request wr
             JOIN wf_template_version wtv ON wtv.id = wr.template_version_id
             WHERE wr.id = ?
@@ -417,7 +437,8 @@ public class WorkflowRepository {
             """,
             (rs, rowNum) -> new WorkflowTemplateVersionRow(
                 rs.getLong("id"),
-                rs.getString("flowable_definition_key")
+                rs.getString("flowable_definition_key"),
+                rs.getString("flowable_definition_id")
             ),
             requestId
         );

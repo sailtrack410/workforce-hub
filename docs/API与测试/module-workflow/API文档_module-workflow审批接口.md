@@ -158,7 +158,7 @@ Cookie: SESSION=...
 | `leaveTypeId` | `long` | 是 | 假种 ID，必须存在且启用 |
 | `startAt` | `string` | 是 | 开始时间，格式 `yyyy-MM-dd HH:mm:ss` |
 | `endAt` | `string` | 是 | 结束时间，必须晚于开始时间 |
-| `durationMinutes` | `int` | 是 | 请假时长，单位分钟，必须大于 0 |
+| `durationMinutes` | `int` | 是 | 请假时长，单位分钟，必须大于 0；服务端会按开始、结束时间计算工作分钟数并校验一致，第一版默认扣除每天 `12:00-13:00` 午休 |
 | `reason` | `string` | 是 | 请假理由，最长 512 字符 |
 | `attachmentRefIds` | `array<long>` | 否 | 申请附件引用 ID，最多 10 个；必须是当前申请人拥有且未删除的个人附件 |
 
@@ -215,6 +215,7 @@ Cookie: SESSION=...
 - 写入 `wf_req_leave`。
 - `wf_request.biz_id` 指向 `wf_req_leave.id`。
 - `wf_req_leave.request_id` 回指 `wf_request.id`。
+- 服务端校验 `durationMinutes` 必须等于 `startAt` 到 `endAt` 的工作分钟数；第一版仅扣除每天 `12:00-13:00` 午休，暂不处理节假日和排班日历。
 - 如果传入 `attachmentRefIds`，先校验原附件必须是当前申请人上传的 `PERSONAL_FILE` 引用，且附件引用、文件对象未删除，安全扫描未失败。
 - 对每个有效原附件创建新的 `sys_attachment_ref` 业务引用，`owner_type=WF_REQUEST`、`owner_id=wf_request.id`，并写入 `wf_request_attachment`。
 - 审批申请后续展示和归档使用 `WF_REQUEST` 业务附件引用，避免申请人删除个人文件后破坏审批归档；物理文件对象仍复用同一 `sys_file_object`。

@@ -11,6 +11,7 @@ import com.workforcehub.support.WorkflowFlowableTestConfiguration;
 import jakarta.servlet.http.Cookie;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
+import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -56,6 +66,9 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Autowired
     private RuntimeService runtimeService;
@@ -231,6 +244,72 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
         assertNotNull(processInstanceId(requestId));
         assertEquals(1L, pendingTodoCount(requestId, MANAGER_USER_ID));
         assertNull(agentTrigger.getLastRequestId(), "触发器关闭时不应记录 Agent 预审任务上下文");
+    }
+
+    @Test
+    @DisplayName("Agent预审通过回调并发重复投递时不能重复启动Flowable")
+    void concurrentAgentApprovedCallbacksShouldNotStartDuplicateFlowableInstances() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Long leaveTypeId = seedWorkflowAndLeaveType();
+        long requestId = submitLeaveRequest(employeeSession, leaveTypeId, 480, "家中有事请假一天");
+
+        try (Connection lockConnection = dataSource.getConnection()) {
+            lockConnection.setAutoCommit(false);
+            try (PreparedStatement statement = lockConnection.prepareStatement(
+                    "SELECT id FROM wf_request WHERE id = ? FOR UPDATE")) {
+                statement.setLong(1, requestId);
+                statement.executeQuery();
+
+                ExecutorService executor = Executors.newFixedThreadPool(2);
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch start = new CountDownLatch(1);
+                try {
+                    Future<Integer> first = executor.submit(
+                        () -> approvedCallbackCode(requestId, "第一次回调", ready, start)
+                    );
+                    Future<Integer> second = executor.submit(
+                        () -> approvedCallbackCode(requestId, "重复回调", ready, start)
+                    );
+                    ready.await();
+                    start.countDown();
+                    Thread.sleep(200L);
+                    lockConnection.commit();
+
+                    List<Integer> resultCodes = List.of(first.get(), second.get());
+                    long successCount = resultCodes.stream().filter(code -> code == 0).count();
+                    long rejectedCount = resultCodes.stream().filter(code -> code == 400).count();
+                    assertEquals(1L, successCount);
+                    assertEquals(1L, rejectedCount);
+                } finally {
+                    executor.shutdownNow();
+                }
+            }
+        }
+
+        List<ProcessInstance> instances = runtimeService.createProcessInstanceQuery()
+            .processInstanceBusinessKey(String.valueOf(requestId))
+            .list();
+        assertEquals(1, instances.size(), "重复 Agent 回调不能为同一申请创建多个 Flowable 实例");
+        assertEquals(1L, pendingTodoCount(requestId, MANAGER_USER_ID));
+        assertEquals(1L, actionCount(requestId, "AGENT_PRE_REVIEW", "IN_APPROVAL"));
+    }
+
+    private int approvedCallbackCode(Long requestId,
+                                     String reason,
+                                     CountDownLatch ready,
+                                     CountDownLatch start) throws Exception {
+        ready.countDown();
+        start.await();
+        try {
+            workflowAgentResultCallback.onPreReviewApproved(
+                requestId,
+                AGENT_TASK_ID,
+                "{\"decision\":\"APPROVED\",\"reason\":\"%s\"}".formatted(reason)
+            );
+            return 0;
+        } catch (BizException ex) {
+            return ex.getCode();
+        }
     }
 
     private long submitLeaveRequest(Cookie employeeSession, Long leaveTypeId, int durationMinutes, String reason)

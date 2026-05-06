@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
 import com.workforcehub.support.WorkflowFlowableTestConfiguration;
 import jakarta.servlet.http.Cookie;
+import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
+import org.flowable.engine.repository.ProcessDefinition;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.DisplayName;
@@ -56,6 +58,9 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RepositoryService repositoryService;
 
     @Autowired
     private RuntimeService runtimeService;
@@ -270,6 +275,66 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(0))
             .andExpect(jsonPath("$.data.list").isEmpty());
+    }
+
+    @Test
+    @DisplayName("员工提交请假应使用模板发布时固定的Flowable定义ID")
+    void leaveRequestShouldStartPublishedFlowableDefinitionId() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        ProcessDefinition publishedDefinition = repositoryService.createProcessDefinitionQuery()
+            .processDefinitionKey("leave_manager_approval")
+            .latestVersion()
+            .singleResult();
+        assertNotNull(publishedDefinition, "测试环境应存在请假审批流程定义");
+
+        seedWorkflowDefinitions(publishedDefinition.getId());
+        Long annualLeaveTypeId = seedAnnualLeaveType();
+        repositoryService.createDeployment()
+            .name("duplicate-leave-manager-approval")
+            .addClasspathResource("processes/leave-manager-approval.bpmn20.xml")
+            .deploy();
+
+        MvcResult submitResult = mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(annualLeaveTypeId, List.of())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        String processInstanceId = data(submitResult).get("flowableProcessInstanceId").asText();
+        ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
+            .processInstanceId(processInstanceId)
+            .singleResult();
+        assertNotNull(processInstance);
+        assertEquals(
+            publishedDefinition.getId(),
+            processInstance.getProcessDefinitionId(),
+            "模板发布版本应固定启动发布时绑定的 Flowable 定义 ID"
+        );
+    }
+
+    @Test
+    @DisplayName("请假时长必须与开始结束时间一致")
+    void leaveRequestShouldRejectMismatchedDurationMinutes() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Long annualLeaveTypeId = seedWorkflowAndLeaveType();
+
+        mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "leaveTypeId": %d,
+                      "startAt": "2026-05-07 09:00:00",
+                      "endAt": "2026-05-07 18:00:00",
+                      "durationMinutes": 60,
+                      "reason": "试图少填请假时长"
+                    }
+                    """.formatted(annualLeaveTypeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("请假时长与开始结束时间不一致"));
     }
 
     @Test
@@ -510,6 +575,28 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     private Long seedWorkflowAndLeaveType() {
         seedWorkflowDefinitions();
         return seedAnnualLeaveType();
+    }
+
+    private void seedWorkflowDefinitions(String flowableDefinitionId) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_process_type
+                (id, process_code, process_name, biz_type, status)
+            VALUES
+                (9101, 'LEAVE', '请假流程', 'LEAVE', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template
+                (id, process_type_id, template_code, template_name, status)
+            VALUES
+                (9201, 9101, 'LEAVE_MANAGER_APPROVAL', '请假直属上级审批', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template_version
+                (id, template_id, version_no, flowable_definition_key, flowable_definition_id,
+                 status, published_by, published_at, effective_from)
+            VALUES
+                (9301, 9201, 1, 'leave_manager_approval', ?, 'PUBLISHED', 8001, NOW(), DATE_SUB(NOW(), INTERVAL 1 DAY))
+            """, flowableDefinitionId);
     }
 
     private String leaveRequestJson(Long annualLeaveTypeId, List<Long> attachmentRefIds) {

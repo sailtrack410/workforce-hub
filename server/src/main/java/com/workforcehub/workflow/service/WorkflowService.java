@@ -51,7 +51,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -70,6 +73,8 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private static final String STATUS_PENDING_REVIEW = "PENDING_REVIEW";
     private static final String STATUS_IN_APPROVAL = "IN_APPROVAL";
     private static final String STATUS_REJECTED = "REJECTED";
+    private static final LocalTime LUNCH_BREAK_START = LocalTime.of(12, 0);
+    private static final LocalTime LUNCH_BREAK_END = LocalTime.of(13, 0);
     private static final DateTimeFormatter REQUEST_NO_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
@@ -165,7 +170,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void onPreReviewRejected(Long requestId, Long agentTaskId, String decisionJson) {
-        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdOrThrow(requestId);
+        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdForUpdateOrThrow(requestId);
         ensurePendingAgentPreReview(workflowRequest, agentTaskId);
         workflowRepository.insertAgentPreReviewAction(
             requestId,
@@ -187,7 +192,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private void completeAgentPreReviewWithHumanApproval(Long requestId,
                                                          Long agentTaskId,
                                                          String decisionJson) {
-        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdOrThrow(requestId);
+        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdForUpdateOrThrow(requestId);
         ensurePendingAgentPreReview(workflowRequest, agentTaskId);
         workflowRepository.insertAgentPreReviewAction(
             requestId,
@@ -237,12 +242,21 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         variables.put("requestId", requestId);
         variables.put("applicantUserId", String.valueOf(applicant.getUserId()));
         variables.put("managerUserId", String.valueOf(applicant.getManagerUserId()));
-        ProcessInstance processInstance = runtimeService.startProcessInstanceByKey(
-            templateVersion.flowableDefinitionKey(),
-            String.valueOf(requestId),
-            variables
-        );
-        workflowRepository.markHumanApprovalStarted(requestId, processInstance.getProcessInstanceId(), operatorId);
+        ProcessInstance processInstance = StringUtils.hasText(templateVersion.flowableDefinitionId())
+            ? runtimeService.startProcessInstanceById(
+                templateVersion.flowableDefinitionId(),
+                String.valueOf(requestId),
+                variables
+            )
+            : runtimeService.startProcessInstanceByKey(
+                templateVersion.flowableDefinitionKey(),
+                String.valueOf(requestId),
+                variables
+            );
+        int updated = workflowRepository.markHumanApprovalStarted(requestId, processInstance.getProcessInstanceId(), operatorId);
+        if (updated == 0) {
+            throw new BizException(409, "审批申请已被其他事务处理");
+        }
 
         Task managerTask = taskService.createTaskQuery()
             .processInstanceId(processInstance.getProcessInstanceId())
@@ -521,9 +535,30 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         if (!request.getEndAt().isAfter(request.getStartAt())) {
             throw new BizException(400, "结束时间必须晚于开始时间");
         }
+        long actualDurationMinutes = calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt());
+        if (actualDurationMinutes != request.getDurationMinutes()) {
+            throw new BizException(400, "请假时长与开始结束时间不一致");
+        }
         if (!workflowRepository.existsActiveLeaveType(request.getLeaveTypeId())) {
             throw new BizException(404, "假种不存在或已停用");
         }
+    }
+
+    private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
+        long durationMinutes = Duration.between(startAt, endAt).toMinutes();
+        LocalDate currentDate = startAt.toLocalDate();
+        LocalDate endDate = endAt.toLocalDate();
+        while (!currentDate.isAfter(endDate)) {
+            LocalDateTime lunchStart = currentDate.atTime(LUNCH_BREAK_START);
+            LocalDateTime lunchEnd = currentDate.atTime(LUNCH_BREAK_END);
+            LocalDateTime overlapStart = startAt.isAfter(lunchStart) ? startAt : lunchStart;
+            LocalDateTime overlapEnd = endAt.isBefore(lunchEnd) ? endAt : lunchEnd;
+            if (overlapEnd.isAfter(overlapStart)) {
+                durationMinutes -= Duration.between(overlapStart, overlapEnd).toMinutes();
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+        return durationMinutes;
     }
 
     private WorkflowTodoResponse toTodoResponse(WorkflowTodoRow row) {

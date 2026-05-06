@@ -234,6 +234,9 @@ public class FileLifecycleService {
     }
 
     private void ensureUploaderOwnsAttachment(Long userId, AttachmentRow attachment) {
+        if (!"PERSONAL_FILE".equals(attachment.ownerType())) {
+            throw new BizException(403, "个人文件接口仅允许操作个人文件");
+        }
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
         }

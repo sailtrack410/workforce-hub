@@ -300,3 +300,44 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - 审批流程现在具备“Agent 先看一眼”的稳定插槽，明显不合规申请可以在人工审批前被自动收口。
 - 回调入口有任务 ID 匹配校验，后续多个 Agent、重试任务或异步执行时不容易串写申请状态。
 - 当前只做 workflow 侧接入口，没有把 Agent 平台实现提前硬塞进 workflow，后续开发 `module-agent` 时可以独立完善任务、工具、版本和权限模型。
+
+## 2026-05-07 第37审正确性风险修复
+
+### 背景
+
+第37审复核了第31审之后到 `b425dc2` 的 module-file 与 module-workflow 合并状态，指出四个会影响真实协作和后续联动的正确性风险：个人文件生命周期接口可误操作审批归档附件、Agent 预审回调并发重复启动 Flowable、模板版本保存了 Flowable 定义 ID 但运行时仍按 Key 跟随最新版本、请假时长未和起止时间做服务端一致性校验。
+
+### 本次处理
+
+- `FileLifecycleService` 的员工个人文件回收站、恢复、彻底删除入口增加 `owner_type=PERSONAL_FILE` 硬边界，`WF_REQUEST` 审批附件不能再走个人文件生命周期语义。
+- `WorkflowRepository` 增加 `getRequestByIdForUpdateOrThrow`，Agent 预审通过、转人工、驳回回调先对 `wf_request` 加行锁，再校验 `PENDING_REVIEW` 和 `agent_pre_review_task_id`。
+- `WorkflowTemplateVersionRow` 和员工端模板版本查询补齐 `flowable_definition_id`，`WorkflowService.startHumanApproval` 优先用 `startProcessInstanceById` 启动发布版本绑定的 Flowable 定义，缺失时才回退 Key。
+- 请假提交增加服务端工作时长一致性校验：第一版按起止时间扣除每天 `12:00-13:00` 午休，要求结果等于 `durationMinutes`；节假日和排班日历留到 `module-leave` 深化。
+- API 文档同步说明 `durationMinutes` 的工作分钟口径，避免前端误以为服务端只校验正数。
+
+### 红绿记录
+
+- 红灯：新增 `employeeLifecycleShouldRejectWorkflowAttachmentRef` 后，个人文件删除接口对 `WF_REQUEST` 审批附件返回 `code=0`，确认跨模块生命周期边界缺失。
+- 绿灯：限制个人生命周期入口只接受 `PERSONAL_FILE` 后，该用例通过，审批归档附件仍保持未删除。
+- 红灯：新增 `concurrentAgentApprovedCallbacksShouldNotStartDuplicateFlowableInstances` 后，两个并发 Agent 通过回调会创建两个 Flowable 实例。
+- 绿灯：回调前对申请行加锁后，同一申请只启动一个 Flowable 实例，重复回调返回业务错误。
+- 红灯：新增 `leaveRequestShouldStartPublishedFlowableDefinitionId` 后，同 Key 重新部署后员工申请会启动最新定义，而不是模板发布时绑定的定义 ID。
+- 绿灯：运行时按 `flowable_definition_id` 启动后，流程实例定义 ID 与发布版本一致。
+- 红灯：新增 `leaveRequestShouldRejectMismatchedDurationMinutes` 后，`09:00-18:00` 却填 `60` 分钟仍可提交。
+- 校准：现有 API 示例和测试已把 `09:00-18:00` 视为 `480` 分钟，因此服务端口径应扣除 `12:00-13:00` 午休，而不是简单自然分钟。
+- 绿灯：工作分钟校验落地后，正常 `480` 分钟申请通过，伪造 `60` 分钟申请返回 `请假时长与开始结束时间不一致`。
+
+### 验证
+
+- `mvn -Dtest=ModuleFileApiIntegrationTest#employeeLifecycleShouldRejectWorkflowAttachmentRef test`
+- `mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#leaveRequestShouldRejectMismatchedDurationMinutes test`
+- `mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#leaveRequestShouldStartPublishedFlowableDefinitionId test`
+- `mvn -Dtest=ModuleWorkflowAgentPreReviewIntegrationTest#concurrentAgentApprovedCallbacksShouldNotStartDuplicateFlowableInstances test`
+- `mvn -Dtest=ModuleFileApiIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest test`
+
+### 意义
+
+- 审批附件归档边界不再被个人文件删除、恢复、彻底删除接口污染。
+- Agent 预审回调具备基础并发幂等保护，后续接真实任务重试和消息重复投递时不会重复启动审批流。
+- 流程模板版本治理的“发布快照”语义和运行时启动行为一致，历史发布版本不会被同 Key 新部署静默改写。
+- 请假时长从客户端自报字段变成后端可信校验字段，为后续假期余额扣减和 Agent 规则判断打基础。
