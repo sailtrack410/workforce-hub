@@ -2,6 +2,9 @@ package com.workforcehub.file;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.common.exception.BizException;
+import com.workforcehub.file.service.StorageUsageLedgerService;
+import com.workforcehub.file.storage.LocalStorageProvider;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,6 +30,12 @@ import java.util.HexFormat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -52,6 +62,12 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @SpyBean
+    private LocalStorageProvider localStorageProvider;
+
+    @SpyBean
+    private StorageUsageLedgerService storageUsageLedgerService;
+
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
 
@@ -77,7 +93,7 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.expiredUploadTickets").value(1))
             .andExpect(jsonPath("$.data.expiredDownloadTickets").value(1))
             .andExpect(jsonPath("$.data.purgedAttachmentRefs").value(1))
-            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(1))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(2))
             .andReturn();
 
         assertTrue(data(result).get("jobRunId").asText().startsWith("FILE-CLEAN-"));
@@ -116,7 +132,7 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.expiredUploadTickets").value(1))
             .andExpect(jsonPath("$.data.expiredDownloadTickets").value(1))
             .andExpect(jsonPath("$.data.purgedAttachmentRefs").value(2))
-            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(1))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(2))
             .andExpect(jsonPath("$.data.releasedBytes").value(adminRecycleContent.length + employeeRecycleContent.length))
             .andExpect(jsonPath("$.data.jobStatus").value("SUCCESS"))
             .andExpect(jsonPath("$.data.failedPhysicalObjects").value(0))
@@ -161,6 +177,95 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
         assertEquals(1, fileObjectDeleted(fileObjectId));
         assertEquals("PARTIAL_FAILED", cleanupJobStatus(jobRunId));
         assertEquals(1, cleanupDetailCount(jobRunId, "UNREFERENCED_FILE_OBJECT", "FAILED"));
+    }
+
+    @Test
+    @DisplayName("物理删除失败明细可以通过失败重试任务恢复")
+    void cleanupFailedPhysicalDeleteShouldBeRetried() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String objectKey = "cleanup/retry-unreferenced.txt";
+        Long fileObjectId = createUnreferencedFileObject(
+            objectKey,
+            "retry-unreferenced-content".getBytes(StandardCharsets.UTF_8)
+        );
+        doThrow(new BizException(500, "模拟物理删除失败"))
+            .doThrow(new BizException(500, "模拟物理删除再次失败"))
+            .doCallRealMethod()
+            .when(localStorageProvider)
+            .deleteObject(eq("local"), eq(objectKey));
+
+        MvcResult failedResult = runCleanupJob(adminSession, "UNREFERENCED_FILE_OBJECT", false)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobStatus").value("PARTIAL_FAILED"))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(0))
+            .andExpect(jsonPath("$.data.failedPhysicalObjects").value(1))
+            .andReturn();
+
+        String failedRunId = data(failedResult).get("jobRunId").asText();
+        assertEquals(1, fileObjectDeleted(fileObjectId));
+        assertTrue(Files.exists(objectPath(objectKey)));
+        assertEquals(1, cleanupDetailCount(failedRunId, "UNREFERENCED_FILE_OBJECT", "FAILED"));
+
+        MvcResult retryFailedResult = runCleanupJob(adminSession, "FAILED_PHYSICAL_OBJECT", false)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobType").value("FAILED_PHYSICAL_OBJECT"))
+            .andExpect(jsonPath("$.data.jobStatus").value("PARTIAL_FAILED"))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(0))
+            .andExpect(jsonPath("$.data.failedPhysicalObjects").value(1))
+            .andReturn();
+
+        String retryFailedRunId = data(retryFailedResult).get("jobRunId").asText();
+        assertTrue(Files.exists(objectPath(objectKey)));
+        assertEquals(1, cleanupDetailCount(retryFailedRunId, "UNREFERENCED_FILE_OBJECT", "FAILED"));
+
+        MvcResult retryResult = runCleanupJob(adminSession, "FAILED_PHYSICAL_OBJECT", false)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobType").value("FAILED_PHYSICAL_OBJECT"))
+            .andExpect(jsonPath("$.data.jobStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(1))
+            .andExpect(jsonPath("$.data.failedPhysicalObjects").value(0))
+            .andReturn();
+
+        String retryRunId = data(retryResult).get("jobRunId").asText();
+        assertFalse(Files.exists(objectPath(objectKey)));
+        assertEquals(1, cleanupDetailCount(failedRunId, "UNREFERENCED_FILE_OBJECT", "FAILED"));
+        assertEquals(1, cleanupDetailCount(retryFailedRunId, "UNREFERENCED_FILE_OBJECT", "FAILED"));
+        assertEquals(1, cleanupDetailCount(retryRunId, "UNREFERENCED_FILE_OBJECT", "SUCCESS"));
+
+        runCleanupJob(adminSession, "FAILED_PHYSICAL_OBJECT", true)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deletedPhysicalObjects").value(0));
+    }
+
+    @Test
+    @DisplayName("数据库阶段失败时清理任务应保留失败运行记录")
+    void cleanupDatabaseStageFailureShouldRecordFailedRun() throws Exception {
+        Cookie adminSession = loginAdmin();
+        seedGlobalQuotaPolicy();
+        Long recycleRefId = createExpiredAdminRecycleRef(
+            adminSession,
+            "db-stage-failure.pdf",
+            "db-stage-failure-content".getBytes(StandardCharsets.UTF_8)
+        );
+        doThrow(new RuntimeException("模拟数据库阶段失败"))
+            .when(storageUsageLedgerService)
+            .releaseUsage(eq("GLOBAL"), isNull(), anyLong(), anyInt());
+
+        MvcResult result = runCleanupJob(adminSession, "EXPIRED_RECYCLE_REF", false)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobStatus").value("FAILED"))
+            .andExpect(jsonPath("$.data.errorMessage").value("模拟数据库阶段失败"))
+            .andReturn();
+
+        String jobRunId = data(result).get("jobRunId").asText();
+        assertEquals(0, attachmentDeleted(recycleRefId));
+        assertEquals("FAILED", cleanupJobStatus(jobRunId));
+        assertEquals("模拟数据库阶段失败", cleanupJobErrorMessage(jobRunId));
     }
 
     private org.springframework.test.web.servlet.ResultActions runCleanupJob(Cookie adminSession,
@@ -478,6 +583,14 @@ class ModuleFileCleanupIntegrationTest extends LocalIntegrationTestSupport {
     private String cleanupJobStatus(String jobRunId) {
         return jdbcTemplate.queryForObject(
             "SELECT status FROM sys_file_cleanup_job_run WHERE job_run_id = ?",
+            String.class,
+            jobRunId
+        );
+    }
+
+    private String cleanupJobErrorMessage(String jobRunId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT error_message FROM sys_file_cleanup_job_run WHERE job_run_id = ?",
             String.class,
             jobRunId
         );

@@ -24,12 +24,14 @@ public class FileCleanupJobService {
     private static final String JOB_EXPIRED_DOWNLOAD_TICKET = "EXPIRED_DOWNLOAD_TICKET";
     private static final String JOB_EXPIRED_RECYCLE_REF = "EXPIRED_RECYCLE_REF";
     private static final String JOB_UNREFERENCED_FILE_OBJECT = "UNREFERENCED_FILE_OBJECT";
+    private static final String JOB_FAILED_PHYSICAL_OBJECT = "FAILED_PHYSICAL_OBJECT";
     private static final String JOB_ALL_EXPIRED = "ALL_EXPIRED";
     private static final Set<String> SUPPORTED_JOB_TYPES = Set.of(
         JOB_EXPIRED_UPLOAD_TICKET,
         JOB_EXPIRED_DOWNLOAD_TICKET,
         JOB_EXPIRED_RECYCLE_REF,
         JOB_UNREFERENCED_FILE_OBJECT,
+        JOB_FAILED_PHYSICAL_OBJECT,
         JOB_ALL_EXPIRED
     );
 
@@ -55,13 +57,19 @@ public class FileCleanupJobService {
         String jobRunId = "FILE-CLEAN-" + IdWorker.getId();
         LocalDateTime now = LocalDateTime.now();
 
-        CleanupStats stats = transactionTemplate.execute(status ->
-            prepareCleanupJob(adminId, jobRunId, jobType, dryRun, now)
-        );
+        createJobRun(adminId, jobRunId, jobType, dryRun, now);
+        CleanupStats stats;
+        try {
+            stats = transactionTemplate.execute(status ->
+                prepareCleanupJob(adminId, jobRunId, jobType, dryRun, now)
+            );
+        } catch (RuntimeException e) {
+            stats = markJobRunFailed(jobRunId, e.getMessage());
+        }
         if (stats == null) {
             stats = new CleanupStats();
         }
-        if (!dryRun) {
+        if (!dryRun && "RUNNING".equals(stats.jobStatus)) {
             executePendingPhysicalDeletes(jobRunId);
             stats = loadCleanupStats(jobRunId);
         }
@@ -70,12 +78,15 @@ public class FileCleanupJobService {
     }
 
     private CleanupStats prepareCleanupJob(Long adminId, String jobRunId, String jobType, boolean dryRun, LocalDateTime now) {
-        createJobRun(adminId, jobRunId, jobType, dryRun, now);
         CleanupStats stats = new CleanupStats();
         if (shouldRun(jobType, JOB_EXPIRED_UPLOAD_TICKET)) {
-            stats.expiredUploadTickets += dryRun
-                ? countExpiredUploadTickets(now)
-                : expireUploadTickets(jobRunId, now);
+            if (dryRun) {
+                long expiredUploadTickets = countExpiredUploadTickets(now);
+                stats.expiredUploadTickets += expiredUploadTickets;
+                stats.deletedPhysicalObjects += expiredUploadTickets;
+            } else {
+                stats.expiredUploadTickets += expireUploadTickets(jobRunId, now);
+            }
         }
         if (shouldRun(jobType, JOB_EXPIRED_DOWNLOAD_TICKET)) {
             stats.expiredDownloadTickets += dryRun
@@ -97,6 +108,11 @@ public class FileCleanupJobService {
             } else {
                 markUnreferencedFileObjectsForDeletion(jobRunId, now);
             }
+        }
+        if (JOB_FAILED_PHYSICAL_OBJECT.equals(jobType)) {
+            stats.deletedPhysicalObjects += dryRun
+                ? countRetryableFailedCleanupDetails()
+                : copyFailedCleanupDetailsForRetry(jobRunId);
         }
 
         stats.jobStatus = dryRun ? "SUCCESS" : "RUNNING";
@@ -326,17 +342,75 @@ public class FileCleanupJobService {
         }
     }
 
+    private long countRetryableFailedCleanupDetails() {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_file_cleanup_job_detail failed
+            WHERE failed.status = 'FAILED'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sys_file_cleanup_job_detail later
+                  WHERE later.id > failed.id
+                    AND later.status IN ('PENDING', 'SUCCESS', 'FAILED')
+                    AND later.storage_provider = failed.storage_provider
+                    AND COALESCE(later.bucket_name, '') = COALESCE(failed.bucket_name, '')
+                    AND later.object_key = failed.object_key
+              )
+            """, Long.class);
+        return count == null ? 0L : count;
+    }
+
+    private long copyFailedCleanupDetailsForRetry(String jobRunId) {
+        List<FailedCleanupDetailRow> rows = jdbcTemplate.query("""
+            SELECT item_type, target_type, target_id, storage_provider, bucket_name, object_key
+            FROM sys_file_cleanup_job_detail failed
+            WHERE failed.status = 'FAILED'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sys_file_cleanup_job_detail later
+                  WHERE later.id > failed.id
+                    AND later.status IN ('PENDING', 'SUCCESS', 'FAILED')
+                    AND later.storage_provider = failed.storage_provider
+                    AND COALESCE(later.bucket_name, '') = COALESCE(failed.bucket_name, '')
+                    AND later.object_key = failed.object_key
+              )
+            ORDER BY failed.id ASC
+            """,
+            (rs, rowNum) -> new FailedCleanupDetailRow(
+                rs.getString("item_type"),
+                rs.getString("target_type"),
+                rs.getLong("target_id"),
+                rs.getString("storage_provider"),
+                rs.getString("bucket_name"),
+                rs.getString("object_key")
+            )
+        );
+        for (FailedCleanupDetailRow row : rows) {
+            createCleanupDetail(
+                jobRunId,
+                row.itemType(),
+                row.targetType(),
+                row.targetId(),
+                row.storageProvider(),
+                row.bucketName(),
+                row.objectKey()
+            );
+        }
+        return rows.size();
+    }
+
     private void auditCleanupJob(Long adminId, String jobRunId, String jobType, boolean dryRun, CleanupStats stats) {
         jdbcTemplate.update("""
             INSERT INTO sys_audit_log
                 (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
             VALUES
-                (?, 'ADMIN', ?, 'FILE_CLEANUP_JOB_RUN', 'CLEANUP_JOB', NULL, 'SUCCESS', CAST(? AS JSON))
+                (?, 'ADMIN', ?, 'FILE_CLEANUP_JOB_RUN', 'CLEANUP_JOB', NULL, ?, CAST(? AS JSON))
             """,
             IdWorker.getId(),
             adminId,
+            auditResult(stats.jobStatus),
             """
-                {"jobRunId":"%s","jobType":"%s","dryRun":%s,"jobStatus":"%s","expiredUploadTickets":%d,"expiredDownloadTickets":%d,"purgedAttachmentRefs":%d,"deletedPhysicalObjects":%d,"failedPhysicalObjects":%d,"releasedBytes":%d}
+                {"jobRunId":"%s","jobType":"%s","dryRun":%s,"jobStatus":"%s","expiredUploadTickets":%d,"expiredDownloadTickets":%d,"purgedAttachmentRefs":%d,"deletedPhysicalObjects":%d,"failedPhysicalObjects":%d,"releasedBytes":%d,"errorMessage":"%s"}
                 """.formatted(
                     jobRunId,
                     jobType,
@@ -347,7 +421,8 @@ public class FileCleanupJobService {
                     stats.purgedAttachmentRefs,
                     stats.deletedPhysicalObjects,
                     stats.failedPhysicalObjects,
-                    stats.releasedBytes
+                    stats.releasedBytes,
+                    safeJsonText(stats.errorMessage)
                 )
         );
     }
@@ -364,6 +439,7 @@ public class FileCleanupJobService {
         response.setDeletedPhysicalObjects(stats.deletedPhysicalObjects);
         response.setFailedPhysicalObjects(stats.failedPhysicalObjects);
         response.setReleasedBytes(stats.releasedBytes);
+        response.setErrorMessage(stats.errorMessage);
         return response;
     }
 
@@ -375,6 +451,7 @@ public class FileCleanupJobService {
         private long deletedPhysicalObjects;
         private long failedPhysicalObjects;
         private long releasedBytes;
+        private String errorMessage;
     }
 
     private void createJobRun(Long adminId, String jobRunId, String jobType, boolean dryRun, LocalDateTime now) {
@@ -403,6 +480,7 @@ public class FileCleanupJobService {
                 deleted_physical_objects = ?,
                 failed_physical_objects = ?,
                 released_bytes = ?,
+                error_message = ?,
                 finished_at = CASE WHEN ? THEN NOW() ELSE finished_at END
             WHERE job_run_id = ?
             """,
@@ -413,9 +491,27 @@ public class FileCleanupJobService {
             stats.deletedPhysicalObjects,
             stats.failedPhysicalObjects,
             stats.releasedBytes,
+            stats.errorMessage,
             finished,
             jobRunId
         );
+    }
+
+    private CleanupStats markJobRunFailed(String jobRunId, String errorMessage) {
+        CleanupStats stats = loadCleanupStats(jobRunId);
+        stats.jobStatus = "FAILED";
+        stats.errorMessage = trimError(errorMessage);
+        jdbcTemplate.update("""
+            UPDATE sys_file_cleanup_job_run
+            SET status = 'FAILED',
+                error_message = ?,
+                finished_at = NOW()
+            WHERE job_run_id = ?
+            """,
+            stats.errorMessage,
+            jobRunId
+        );
+        return loadCleanupStats(jobRunId);
     }
 
     private void createCleanupDetail(String jobRunId,
@@ -495,7 +591,7 @@ public class FileCleanupJobService {
     }
 
     private void finalizePhysicalCleanup(String jobRunId) {
-        long deletedPhysicalObjects = countCleanupDetails(jobRunId, JOB_UNREFERENCED_FILE_OBJECT, "SUCCESS");
+        long deletedPhysicalObjects = countCleanupDetails(jobRunId, null, "SUCCESS");
         long failedPhysicalObjects = countCleanupDetails(jobRunId, null, "FAILED");
         String jobStatus = failedPhysicalObjects > 0 ? "PARTIAL_FAILED" : "SUCCESS";
         jdbcTemplate.update("""
@@ -533,7 +629,7 @@ public class FileCleanupJobService {
     private CleanupStats loadCleanupStats(String jobRunId) {
         return jdbcTemplate.query("""
             SELECT status, expired_upload_tickets, expired_download_tickets, purged_attachment_refs,
-                   deleted_physical_objects, failed_physical_objects, released_bytes
+                   deleted_physical_objects, failed_physical_objects, released_bytes, error_message
             FROM sys_file_cleanup_job_run
             WHERE job_run_id = ?
             """,
@@ -549,10 +645,18 @@ public class FileCleanupJobService {
                 stats.deletedPhysicalObjects = rs.getLong("deleted_physical_objects");
                 stats.failedPhysicalObjects = rs.getLong("failed_physical_objects");
                 stats.releasedBytes = rs.getLong("released_bytes");
+                stats.errorMessage = rs.getString("error_message");
                 return stats;
             },
             jobRunId
         );
+    }
+
+    private String auditResult(String jobStatus) {
+        if ("FAILED".equals(jobStatus) || "PARTIAL_FAILED".equals(jobStatus)) {
+            return "FAIL";
+        }
+        return "SUCCESS";
     }
 
     private String trimError(String message) {
@@ -560,6 +664,18 @@ public class FileCleanupJobService {
             return "物理对象清理失败";
         }
         return message.length() > 512 ? message.substring(0, 512) : message;
+    }
+
+    private String safeJsonText(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        return text
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t");
     }
 
     private record UploadTicketCleanupRow(
@@ -589,6 +705,15 @@ public class FileCleanupJobService {
     private record PhysicalCleanupItem(
         Long id,
         String itemType,
+        String storageProvider,
+        String bucketName,
+        String objectKey
+    ) {}
+
+    private record FailedCleanupDetailRow(
+        String itemType,
+        String targetType,
+        Long targetId,
         String storageProvider,
         String bucketName,
         String objectKey

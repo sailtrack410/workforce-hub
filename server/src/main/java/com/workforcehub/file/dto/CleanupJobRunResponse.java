@@ -15,4 +15,5 @@ public class CleanupJobRunResponse {
     private Long deletedPhysicalObjects;
     private Long failedPhysicalObjects;
     private Long releasedBytes;
+    private String errorMessage;
 }

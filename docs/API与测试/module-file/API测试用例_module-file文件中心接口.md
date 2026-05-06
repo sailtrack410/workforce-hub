@@ -260,6 +260,8 @@
 | `FILE-CLEAN-002` | P0 | `POST /api/admin/files/cleanup-jobs/run` | 执行过期清理任务 | 存在过期票据、到期回收站引用和已到期无引用物理对象 | `dryRun=false` | HTTP `200`；`jobStatus=SUCCESS`；过期票据标记为 `EXPIRED`；到期回收站引用被彻底删除并释放用量；已到期无引用物理对象被删除；运行表和明细表记录成功 |
 | `FILE-CLEAN-003` | P1 | 审计断言 | 清理任务写审计 | 清理任务已执行 | 查询审计 | 存在 `FILE_CLEANUP_JOB_RUN` 审计记录 |
 | `FILE-CLEAN-004` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 物理删除失败可追踪 | 存在对象存储 Provider 不可用的到期无引用物理对象 | `dryRun=false` | HTTP `200`；`jobStatus=PARTIAL_FAILED`；`failedPhysicalObjects=1`；运行明细记录失败原因 |
+| `FILE-CLEAN-005` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 物理删除失败可重试 | 已存在未被成功明细覆盖的 `FAILED` 清理明细 | `jobType=FAILED_PHYSICAL_OBJECT` | HTTP `200`；重新复制最新失败明细执行；成功后 `jobStatus=SUCCESS`；旧失败明细保留，后续 dry-run 不再重复计入已成功对象 |
+| `FILE-CLEAN-006` | P1 | `POST /api/admin/files/cleanup-jobs/run` | 数据库阶段失败保留运行记录 | 清理数据库阶段发生异常 | `dryRun=false` | HTTP `200`；`jobStatus=FAILED`；返回 `errorMessage`；业务数据回滚；`sys_file_cleanup_job_run` 保留失败记录 |
 
 ## 6.8 鉴权与契约
 

@@ -1005,18 +1005,21 @@ http://localhost:8080
 | `EXPIRED_DOWNLOAD_TICKET` | 清理过期下载票据 |
 | `EXPIRED_RECYCLE_REF` | 清理到期回收站引用 |
 | `UNREFERENCED_FILE_OBJECT` | 清理无引用物理对象 |
+| `FAILED_PHYSICAL_OBJECT` | 重试历史物理删除失败对象 |
 | `ALL_EXPIRED` | 执行全部到期清理 |
 
 执行规则：
 
-- `dryRun=true` 只统计候选数量和预计释放字节，不修改票据、引用或物理对象。
+- `dryRun=true` 只统计候选数量和预计释放字节，不修改票据、引用或物理对象；其中 `deletedPhysicalObjects` 表示预计会触发物理删除的对象数。
 - 过期上传票据会从 `PENDING` 标记为 `EXPIRED`，并清理未确认的临时上传对象。
 - 过期下载票据会从 `ACTIVE` 标记为 `EXPIRED`。
 - 到期回收站引用第一版只处理 `PERSONAL_FILE` 与 `ADMIN_FILE`，会被标记为彻底删除，并释放对应空间用量。
 - 物理对象采用两阶段清理：数据库事务内先标记业务状态并写入 `sys_file_cleanup_job_run` / `sys_file_cleanup_job_detail`；事务提交后再逐条删除对象存储，成功或失败都会回写明细。
 - 到期回收站引用清理后，物理对象先进入 `cleanup_after` 候选；只有已经无有效引用且 `cleanup_after` 到期的对象，才会在 `UNREFERENCED_FILE_OBJECT` 阶段标记文件对象删除并进入物理删除明细。
+- `FAILED_PHYSICAL_OBJECT` 会把当前仍未成功覆盖的最新 `FAILED` 明细复制到本次任务中重新执行；历史失败明细保留为审计链路，不会被直接改写。
 - `LOCAL` 与 `MINIO` Provider 均提供删除对象入口；第一版由后台手动触发，后续可接入定时调度。
-- `jobStatus=SUCCESS` 表示本次清理全部完成；`jobStatus=PARTIAL_FAILED` 表示数据库状态已提交，但存在物理对象删除失败，需要后续按明细排查或重试。
+- `deletedPhysicalObjects` 统计本次所有物理对象删除成功明细，包括过期上传临时对象、无引用文件对象和失败重试对象；`failedPhysicalObjects` 统计本次所有物理对象删除失败明细。
+- `jobStatus=SUCCESS` 表示本次清理全部完成；`jobStatus=PARTIAL_FAILED` 表示数据库状态已提交，但存在物理对象删除失败，需要后续按明细排查或重试；`jobStatus=FAILED` 表示数据库阶段失败，任务运行记录会保留 `errorMessage`。
 
 成功响应：
 
@@ -1032,9 +1035,10 @@ http://localhost:8080
     "expiredUploadTickets": 3,
     "expiredDownloadTickets": 12,
     "purgedAttachmentRefs": 2,
-    "deletedPhysicalObjects": 1,
+    "deletedPhysicalObjects": 4,
     "failedPhysicalObjects": 0,
-    "releasedBytes": 1048576
+    "releasedBytes": 1048576,
+    "errorMessage": null
   },
   "requestId": "file202605030104"
 }
@@ -1056,9 +1060,33 @@ http://localhost:8080
     "purgedAttachmentRefs": 0,
     "deletedPhysicalObjects": 0,
     "failedPhysicalObjects": 1,
-    "releasedBytes": 0
+    "releasedBytes": 0,
+    "errorMessage": null
   },
   "requestId": "file202605030105"
+}
+```
+
+数据库阶段失败响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "jobRunId": "FILE-CLEAN-20260503-003",
+    "jobType": "EXPIRED_RECYCLE_REF",
+    "dryRun": false,
+    "jobStatus": "FAILED",
+    "expiredUploadTickets": 0,
+    "expiredDownloadTickets": 0,
+    "purgedAttachmentRefs": 0,
+    "deletedPhysicalObjects": 0,
+    "failedPhysicalObjects": 0,
+    "releasedBytes": 0,
+    "errorMessage": "数据库阶段失败原因"
+  },
+  "requestId": "file202605030106"
 }
 ```
 

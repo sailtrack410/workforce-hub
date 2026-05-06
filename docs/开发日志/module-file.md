@@ -976,3 +976,36 @@
 - 清理任务从“同步脚本”升级为“可观测、可恢复作业”
 - 数据库状态和对象存储删除的边界更清楚，失败后能按 `jobRunId` 和明细追踪
 - 后续接定时调度、失败重试、分页游标时，不需要推翻当前清理模型
+
+## 2026-05-06 第30审清理任务失败恢复闭环
+
+### 背景
+
+第30审指出清理任务虽然已经能记录物理删除失败明细，但失败明细只停留在 `FAILED`，普通清理任务不会再次消费；同时 `deletedPhysicalObjects` 只统计无引用文件对象成功数，和失败数统计所有物理对象失败数的口径不一致；数据库阶段异常也会让任务运行记录随事务回滚，`error_message` 没有写入路径。
+
+### 本次处理
+
+- 新增清理任务类型 `FAILED_PHYSICAL_OBJECT`，复用 `POST /api/admin/files/cleanup-jobs/run` 作为失败物理对象重试入口。
+- 失败重试采用“复制最新失败明细到本次任务”的方式执行，旧失败记录保留作历史审计，不直接改写。
+- 重试候选限定为同一 `storageProvider + bucketName + objectKey` 的最新明细仍为 `FAILED` 的对象；如果后续已有 `SUCCESS` 或新的 `PENDING` 明细覆盖，则不再重复重试。
+- 清理任务运行记录改为先在事务外创建；数据库阶段异常时保留同一个 `jobRunId`，并回写 `jobStatus=FAILED`、`errorMessage`、`finishedAt`。
+- `deletedPhysicalObjects` 统一为“本次所有物理删除成功明细数”，不再只统计 `UNREFERENCED_FILE_OBJECT`。
+- `dryRun=true` 时，过期上传票据的临时对象也计入预计 `deletedPhysicalObjects`，和真实执行的物理删除规模保持一致。
+- `CleanupJobRunResponse` 增加 `errorMessage`，API 文档和测试用例同步失败重试、数据库阶段失败与统计口径。
+- 审计记录的 `result` 按任务结果区分 `SUCCESS` / `FAIL`，审计详情同步记录 `errorMessage`。
+
+### 验证记录
+
+- 红灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest#cleanupFailedPhysicalDeleteShouldBeRetried,ModuleFileCleanupIntegrationTest#cleanupDatabaseStageFailureShouldRecordFailedRun,ModuleFileCleanupIntegrationTest#cleanupDryRunShouldOnlyReportCandidates,ModuleFileCleanupIntegrationTest#cleanupExecuteShouldExpireTicketsPurgeRefsDeleteObjectsAndAudit test`，失败于 `FAILED_PHYSICAL_OBJECT` 不支持、统计口径仍为 1、数据库阶段异常返回 500。
+- 绿灯：同一命令通过，4 个清理任务关键用例通过。
+- 红灯：`mvn -Dtest=ModuleFileCleanupIntegrationTest#cleanupFailedPhysicalDeleteShouldBeRetried test`，追加“已成功覆盖的旧失败明细不应继续 dry-run 计数”后失败于 `deletedPhysicalObjects=1`。
+- 绿灯：同一命令通过，确认已成功覆盖的旧失败明细不再重复进入候选。
+- 红灯：同一用例追加“两次失败后第三次成功”后失败于同一对象被复制成两条成功明细，`deletedPhysicalObjects=2`。
+- 绿灯：同一命令通过，确认同一物理对象只取最新失败明细重试。
+
+### 意义
+
+- 清理任务从“可观测失败”补成“可恢复失败”，一次 MinIO、权限或网络抖动不会把对象永久卡在人工查表处理。
+- 运行记录覆盖数据库阶段失败和物理删除阶段失败，排障时能用 `jobRunId` 把接口响应、任务表、明细表和审计串起来。
+- 成功数和失败数口径统一为物理删除明细，后台响应更容易被运维解释。
+- 当前仍未引入定时调度、最大重试次数和退避时间；这些可以在清理任务生产化阶段基于现有运行表继续扩展。
