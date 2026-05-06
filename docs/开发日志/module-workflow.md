@@ -242,3 +242,61 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - `module-workflow` 从“固定测试种子流程”推进到“后台可治理流程模板”。
 - 版本发布语义已经和员工端 `getPublishedTemplateVersion` 查询保持一致，后续新增审批类型时不需要改员工端提交逻辑。
 - `ruleSnapshotJson` 给 Agent 介入流程留出了稳定入口：Agent 后续可以按模板版本读取规则快照、执行工具校验，并把预审结果写回审批轨迹。
+
+## 2026-05-07 Agent 预审入口与自动驳回闭环
+
+### 背景
+
+流程模板版本已经可以保存 `ruleSnapshotJson`，但请假提交仍会直接进入 Flowable 人工审批。这样 Agent 无法在流程前置阶段介入，也无法把明显不合规的申请直接驳回。本轮先做 workflow 侧最小闭环：workflow 只依赖 `WorkflowAgentPreReviewTrigger` 和 `WorkflowAgentResultCallback` 两个 SPI，不直接依赖 `module-agent` 的任务调度、工具调用或后台创建实现。
+
+### 本次处理
+
+- `WorkflowService` 实现 `WorkflowAgentResultCallback`，作为 `module-agent` 后续回写预审结果的 workflow 侧入口。
+- 请假提交后先落 `wf_request`、`wf_req_leave` 和附件，再可选调用 `WorkflowAgentPreReviewTrigger`。
+- Agent 触发器返回 `agentTaskId` 时，申请进入 `PENDING_REVIEW`，`current_step_key=agent_pre_review`，不启动 Flowable，不生成直属上级待办。
+- Agent 触发器返回 `null` 时，保持旧行为，直接启动 Flowable 直属上级审批。
+- 新增 `wf_request.agent_pre_review_task_id` 字段和 V10 Flyway 迁移，用于持久化当前申请的预审任务 ID。
+- Agent 回调通过或转人工时，校验申请状态和 `agentTaskId` 匹配，写入 `AGENT_PRE_REVIEW` 动作，再启动 Flowable 直属上级审批。
+- Agent 回调驳回时，校验申请状态和 `agentTaskId` 匹配，写入 `AGENT_PRE_REVIEW` 动作，申请直接进入 `REJECTED`，不启动 Flowable。
+- 审批轨迹响应新增 `agentDecisionJson`，返回 Agent 结构化预审结论。
+- Agent 决策 JSON 响应层做稳定紧凑输出，避免 MySQL JSON 字段键顺序影响接口测试。
+- 新增 `ModuleWorkflowAgentPreReviewIntegrationTest`，覆盖预审等待、通过后转人工、驳回终止、任务 ID 不匹配拒绝回写、任务 ID 为空拒绝回写、触发器返回空时保持旧流程。
+
+### 红绿记录
+
+- 红灯：`mvn -Dtest=ModuleWorkflowAgentPreReviewIntegrationTest test` 失败于缺少 `WorkflowAgentResultCallback` Bean，确认 workflow 侧回调入口不存在。
+- 绿灯：`WorkflowService` 实现回调接口，并拆出 `startHumanApproval` 复用人工审批启动逻辑后，测试推进到触发器状态污染问题。
+- 修复：测试触发器新增 `reset`，每个用例前恢复默认开启，避免单例测试 Bean 被上一个用例关闭后影响后续用例。
+- 红灯：Agent 驳回轨迹中的 `agentDecisionJson` 因 MySQL JSON 输出键顺序不稳定导致断言失败。
+- 绿灯：响应层对 Agent 决策 JSON 做紧凑与稳定字段顺序输出。
+- 红灯：新增 `agentCallbackShouldMatchPendingAgentTaskId` 后，错误 `agentTaskId` 回调被接受，暴露缺少当前预审任务 ID 持久化与匹配校验。
+- 修复：新增 V10 迁移 `agent_pre_review_task_id`，提交时记录触发任务 ID，回调时强制匹配。
+- 过程问题：曾尝试直接修改已执行的 `V1__init_schema.sql`，触发 Flyway checksum mismatch；已还原 V1，只保留 V10 增量迁移，符合迁移治理原则。
+- 校准：Agent 通过或转人工动作流水的 `after_status` 统一记录申请状态 `IN_APPROVAL`，Agent 决策枚举保存在 `agent_decision_json.decision`，避免状态字段混入非状态值。
+- 修复：`ensurePendingAgentPreReview` 增加空 `agentTaskId` 防御，避免后续内部调用或 HTTP 封装把参数问题变成空指针异常。
+- 绿灯：`mvn -Dtest=ModuleWorkflowAgentPreReviewIntegrationTest test` 通过，6 个 Agent 预审用例全部通过。
+- 回归：`mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest test` 通过，20 个 workflow 用例全部通过。
+
+### 当前完成范围
+
+- workflow 侧已经具备 Agent 预审前置入口。
+- 提交申请可以按 Agent 触发结果分流到 `PENDING_REVIEW` 或直接 `IN_APPROVAL`。
+- Agent 预审通过后可以启动直属上级人工审批。
+- Agent 预审驳回后可以直接终止申请。
+- Agent 预审动作写入 `wf_task_action`，并在轨迹接口展示结构化结论。
+- Agent 回调必须匹配当前申请记录的 `agent_pre_review_task_id`。
+- workflow 与 agent 仍通过 SPI 解耦，没有引入 `module-agent` 具体依赖。
+
+### 暂未覆盖
+
+- `module-agent` 后台创建、版本发布、ACL、工具绑定和任务调度。
+- Agent 实际读取 `ruleSnapshotJson`、调用工具、生成预审结论。
+- 人工审批页对 Agent 结论的前端展示。
+- 假期余额扣减与 `module-leave` 联动。
+- Flowable `ACT_*` 表结构纳入 Flyway 的生产治理终态。
+
+### 意义
+
+- 审批流程现在具备“Agent 先看一眼”的稳定插槽，明显不合规申请可以在人工审批前被自动收口。
+- 回调入口有任务 ID 匹配校验，后续多个 Agent、重试任务或异步执行时不容易串写申请状态。
+- 当前只做 workflow 侧接入口，没有把 Agent 平台实现提前硬塞进 workflow，后续开发 `module-agent` 时可以独立完善任务、工具、版本和权限模型。

@@ -15,6 +15,7 @@ public record WorkflowTaskActionRow(
     Long actorId,
     String actionType,
     String comment,
+    String agentDecisionJson,
     String beforeStatus,
     String afterStatus,
     LocalDateTime actedAt

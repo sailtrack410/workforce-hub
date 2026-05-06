@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-workflow` 审批接口测试用例 |
 | 文档版本 | `v0.1` |
-| 适用范围 | Flowable 请假直属上级审批最小闭环 |
+| 适用范围 | Flowable 请假直属上级审批闭环、后台模板治理和 Agent 预审入口 |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | Flowable 请假直属上级审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权和后台流程模板治理已落地；假期余额和 Agent 预审待后续补充 |
+| 当前状态 | Flowable 请假直属上级审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理和 Agent 预审入口已落地；假期余额和完整 Agent 平台待后续补充 |
 
 ---
 
@@ -42,11 +42,17 @@
 - 验证模板版本发布时必须绑定已存在的 Flowable 定义 Key。
 - 验证同一模板发布新版本后旧版本自动归档，避免多个当前有效版本。
 - 验证模板列表能返回当前有效发布版本，版本列表能返回规则快照。
+- 验证存在 Agent 预审任务时，提交后先进入 `PENDING_REVIEW`，不启动 Flowable，不生成直属上级待办。
+- 验证 Agent 预审通过后启动 Flowable 并生成直属上级待办。
+- 验证 Agent 预审驳回后直接终止申请，不启动 Flowable。
+- 验证 Agent 回调任务 ID 必须匹配申请上的 `agent_pre_review_task_id`。
+- 验证没有 Agent 任务时保持原直属上级审批流程。
 
 当前已落地自动化测试类：
 
 - `ModuleWorkflowFlowableIntegrationTest`
 - `ModuleWorkflowAdminApiIntegrationTest`
+- `ModuleWorkflowAgentPreReviewIntegrationTest`
 
 当前已自动化覆盖：
 
@@ -83,11 +89,16 @@
 - 发布不存在 Flowable 定义时保持草稿状态。
 - 发布新版本后旧版本归档。
 - 后台模板列表和版本列表查询。
+- Agent 预审触发后申请停留在 `PENDING_REVIEW`。
+- Agent 预审通过回调后启动直属上级审批。
+- Agent 预审驳回回调后直接置为 `REJECTED`。
+- Agent 预审回调任务 ID 不匹配时拒绝回写。
+- Agent 触发器返回 `null` 时保持原人工审批链路。
 
 当前尚未自动化覆盖：
 
 - 假期余额扣减。
-- Agent 预审与自动驳回。
+- 完整 `module-agent` 后台创建、任务调度、工具调用和运行监控。
 
 ---
 
@@ -179,12 +190,25 @@
 | `WF-ADMIN-007` | P0 | `POST /api/admin/workflow/template-versions/{versionId}/publish` | 发布不存在的 Flowable 定义应失败 | 存在草稿版本 | `flowableDefinitionKey=missing_definition_key` | HTTP `200`；`code=404`；提示 `Flowable流程定义不存在`；版本状态仍为 `DRAFT` |
 | `WF-ADMIN-008` | P0 | 数据库断言 | 新版本发布后旧版本归档 | 同模板第 1 版已发布；第 2 版草稿存在 | 发布第 2 版 | 旧版本 `status=ARCHIVED` 且 `effective_to` 不为空；新版本 `status=PUBLISHED`；同模板当前有效发布版本只有一个 |
 
-## 5.3 待补测试
+## 5.3 Agent 预审入口
 
 | 用例 ID | 优先级 | 接口 | 用例名称 | 当前状态 |
 | --- | --- | --- | --- | --- |
-| `WF-AGT-001` | P1 | 流程节点或事件 | Agent 预审通过后进入人工审批 | 待实现 |
-| `WF-AGT-002` | P1 | 流程节点或事件 | Agent 判定不合规后自动驳回 | 待实现 |
+| `WF-AGT-001` | P0 | `POST /api/employee/workflow/leave-requests` | 触发 Agent 预审后申请先停留在待预审状态 | 已自动化 |
+| `WF-AGT-002` | P0 | `WorkflowAgentResultCallback#onPreReviewApproved` | Agent 预审通过后进入直属上级审批 | 已自动化 |
+| `WF-AGT-003` | P0 | `WorkflowAgentResultCallback#onPreReviewRejected` | Agent 预审驳回后直接终止申请 | 已自动化 |
+| `WF-AGT-004` | P0 | `WorkflowAgentResultCallback#onPreReviewRejected` | Agent 回调任务 ID 必须匹配申请当前预审任务 | 已自动化 |
+| `WF-AGT-005` | P0 | `WorkflowAgentResultCallback#onPreReviewRejected` | Agent 回调任务 ID 为空时按任务不匹配处理 | 已自动化 |
+| `WF-AGT-006` | P0 | `POST /api/employee/workflow/leave-requests` | Agent 触发器返回空时保持原人工审批链路 | 已自动化 |
+
+预期要点：
+
+- `WF-AGT-001`：响应 `status=PENDING_REVIEW`，返回 `agentTaskId`；`wf_request.current_step_key=agent_pre_review`；`flowable_process_instance_id` 为空；直属上级无 `PENDING` 待办。
+- `WF-AGT-002`：回调后写入 `AGENT_PRE_REVIEW` 动作，`after_status=IN_APPROVAL`；随后启动 Flowable，状态进入 `IN_APPROVAL`，直属上级收到待办；Agent 决策枚举保存在 `agent_decision_json.decision`。
+- `WF-AGT-003`：回调后写入 `AGENT_PRE_REVIEW` 动作，`actor_type=AGENT`，`agent_decision_json` 返回结构化结论；申请直接 `REJECTED`，不启动 Flowable。
+- `WF-AGT-004`：传入非当前申请记录的 `agentTaskId` 时抛出 `Agent预审任务不匹配`，申请仍保持 `PENDING_REVIEW`，不写动作流水。
+- `WF-AGT-005`：传入空 `agentTaskId` 时抛出 `Agent预审任务不匹配`，申请仍保持 `PENDING_REVIEW`，不写动作流水。
+- `WF-AGT-006`：触发器返回 `null` 时响应 `IN_APPROVAL`，生成 Flowable 实例和直属上级待办，不返回 `agentTaskId`。
 
 ---
 
@@ -207,13 +231,14 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#nonParticipantOrForeignAttachme
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#workflowAttachmentDownloadShouldRecheckLatestScanStatus test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test
 mvn -Dtest=ModuleWorkflowAdminApiIntegrationTest test
+mvn -Dtest=ModuleWorkflowAgentPreReviewIntegrationTest test
 ```
 
 后续建议扩展为：
 
 ```bash
 cd server
-mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest test
 ```
 
 ---
@@ -228,4 +253,5 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrati
 - 后台模板治理只绑定已部署 Flowable 定义，不在线生成或修改 BPMN。
 - 同一模板任意时刻只能有一个当前有效 `PUBLISHED` 版本。
 - `ruleSnapshotJson` 是后续 Agent 预审的规则入口，必须保持合法 JSON。
-- 后续接 Agent 时，workflow 只依赖 SPI 或领域事件，不直接依赖 agent 具体实现。
+- workflow 只依赖 Agent SPI，不直接依赖 `module-agent` 具体实现。
+- Agent 预审回调必须校验 `wf_request.agent_pre_review_task_id`，防止错误任务串写申请状态。

@@ -9,13 +9,13 @@
 | 适用范围 | 请假申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权、轨迹与后台流程模板治理 |
 | 对应模块 | `server/module-workflow` |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权和后台流程模板治理已实现；假期余额和 Agent 预审待后续迭代 |
+| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理和 Agent 预审入口已实现；假期余额和完整 Agent 平台待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `10` 个员工端接口和 `6` 个后台流程模板治理接口。
+当前已实现 `10` 个员工端接口、`6` 个后台流程模板治理接口，以及 workflow 侧 Agent 预审 SPI 回调入口。
 
 - `POST /api/employee/workflow/leave-requests`
 - `GET /api/employee/workflow/todos`
@@ -39,7 +39,7 @@
 
 当前暂未实现但已纳入后续规划：
 
-- Agent 预审与自动驳回
+- 完整 `module-agent` 任务调度、工具调用、后台创建和运行监控
 
 ---
 
@@ -95,7 +95,7 @@ http://localhost:8080
 | 值 | 含义 | 当前是否会产生 |
 | --- | --- | --- |
 | `DRAFT` | 草稿 | 否 |
-| `PENDING_REVIEW` | 待预审 | 否 |
+| `PENDING_REVIEW` | 待预审 | 是，存在 Agent 预审任务时产生 |
 | `IN_APPROVAL` | 审批中 | 是 |
 | `APPROVED` | 已通过 | 是 |
 | `REJECTED` | 已驳回 | 是 |
@@ -108,7 +108,7 @@ http://localhost:8080
 | `APPROVE` | 审批通过 | 是 |
 | `REJECT` | 审批驳回 | 是 |
 | `WITHDRAW` | 申请撤回 | 是 |
-| `AGENT_PRE_REVIEW` | Agent 预审 | 待实现 |
+| `AGENT_PRE_REVIEW` | Agent 预审 | 是 |
 
 ### 4.3 todoStatus
 
@@ -177,6 +177,8 @@ Cookie: SESSION=...
 
 ### 成功响应
 
+无 Agent 预审任务时，保持原直属上级审批响应：
+
 ```json
 {
   "code": 0,
@@ -191,17 +193,36 @@ Cookie: SESSION=...
 }
 ```
 
+存在 Agent 预审任务时，申请先停留在 `PENDING_REVIEW`，不会立即启动 Flowable：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "requestId": 2052112388202749954,
+    "requestNo": "WF-LEAVE-20260507034454-2052112388202749953",
+    "status": "PENDING_REVIEW",
+    "agentTaskId": 88001
+  },
+  "requestId": "f02351bbb11640468dc6f758f8afde95"
+}
+```
+
 ### 落库语义
 
-- 写入 `wf_request`，`biz_type=LEAVE`，`status=IN_APPROVAL`。
+- 写入 `wf_request`，`biz_type=LEAVE`。
 - 写入 `wf_req_leave`。
 - `wf_request.biz_id` 指向 `wf_req_leave.id`。
 - `wf_req_leave.request_id` 回指 `wf_request.id`。
 - 如果传入 `attachmentRefIds`，先校验原附件必须是当前申请人上传的 `PERSONAL_FILE` 引用，且附件引用、文件对象未删除，安全扫描未失败。
 - 对每个有效原附件创建新的 `sys_attachment_ref` 业务引用，`owner_type=WF_REQUEST`、`owner_id=wf_request.id`，并写入 `wf_request_attachment`。
 - 审批申请后续展示和归档使用 `WF_REQUEST` 业务附件引用，避免申请人删除个人文件后破坏审批归档；物理文件对象仍复用同一 `sys_file_object`。
-- 启动 Flowable 流程 `leave_manager_approval`。
-- 为直属上级写入 `sys_todo_item`，`source_type=WORKFLOW_TASK`。
+- 如果没有可用 Agent 预审触发器，或触发器返回 `null`，直接进入人工审批：`wf_request.status=IN_APPROVAL`，启动 Flowable 流程 `leave_manager_approval`，为直属上级写入 `sys_todo_item`。
+- 如果触发器返回 `agentTaskId`，申请进入 `PENDING_REVIEW`，`current_step_key=agent_pre_review`，`agent_pre_review_task_id=agentTaskId`，不启动 Flowable，也不生成直属上级待办。
+- 后续 Agent 回调通过或转人工时，workflow 校验 `agentTaskId` 匹配后写入 `AGENT_PRE_REVIEW` 动作，再启动直属上级 Flowable 审批。
+- 后续 Agent 回调驳回时，workflow 校验 `agentTaskId` 匹配后写入 `AGENT_PRE_REVIEW` 动作，直接把申请置为 `REJECTED`，不启动 Flowable。
+- Agent 回调的 `decisionJson` 会写入 `wf_task_action.agent_decision_json`，员工端轨迹接口返回 `agentDecisionJson`。
 
 ---
 
@@ -486,9 +507,37 @@ Cookie: SESSION=...
       "actorId": 2002,
       "actionType": "APPROVE",
       "comment": "同意",
+      "agentDecisionJson": null,
       "beforeStatus": "IN_APPROVAL",
       "afterStatus": "APPROVED",
       "actedAt": "2026-05-06T13:52:59"
+    }
+  ],
+  "requestId": "cb4cb41d69424374a9df7c1d7775287a"
+}
+```
+
+Agent 预审轨迹示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "actionId": 2052110803351396354,
+      "requestId": 2052110803330424834,
+      "taskId": null,
+      "stepKey": "agent_pre_review",
+      "stepName": "Agent预审",
+      "actorType": "AGENT",
+      "actorId": 88001,
+      "actionType": "AGENT_PRE_REVIEW",
+      "comment": null,
+      "agentDecisionJson": "{\"decision\":\"REJECTED\",\"reason\":\"缺少证明材料\"}",
+      "beforeStatus": "PENDING_REVIEW",
+      "afterStatus": "REJECTED",
+      "actedAt": "2026-05-07T03:38:36"
     }
   ],
   "requestId": "cb4cb41d69424374a9df7c1d7775287a"
@@ -757,6 +806,7 @@ Cookie: SESSION=...
 | --- | --- | --- | --- |
 | `200` | `0` | `ok` | 成功 |
 | `400` | `400` | `结束时间必须晚于开始时间` | 参数或状态不合法 |
+| `200` | `400` | `当前申请状态不允许处理Agent预审结果` | Agent 回调时申请不在 `PENDING_REVIEW` |
 | `401` | `401` | `未登录或会话已过期` | 未登录 |
 | `200` | `403` | `当前用户不是该审批任务处理人` | 已登录但不是该 Flowable 任务处理人 |
 | `200` | `403` | `只有申请人可以撤回该申请` | 非申请人撤回 |
@@ -770,6 +820,8 @@ Cookie: SESSION=...
 | `200` | `404` | `流程模板不存在或未启用` | 创建模板版本或发布时模板不存在、停用或已删除 |
 | `200` | `404` | `Flowable流程定义不存在` | 发布模板版本时绑定了不存在的 Flowable 定义 Key |
 | `200` | `409` | `附件安全扫描未通过` | 附件安全扫描失败 |
+| `200` | `409` | `Agent预审任务不匹配` | Agent 回调任务 ID 与申请当前预审任务不一致 |
+| `200` | `409` | `Agent预审完成前不应存在Flowable流程实例` | Agent 回调时申请已异常启动 Flowable |
 | `200` | `409` | `下载票据已使用或已失效` | 下载票据不是 `ACTIVE`，或被并发请求抢占 |
 | `200` | `409` | `流程编码已存在` | 创建流程类型时编码重复 |
 | `200` | `409` | `流程模板编码已存在` | 创建流程模板时编码重复 |
@@ -788,7 +840,9 @@ Cookie: SESSION=...
 - 第一版支持审批参与人为审批附件创建短期下载票据，并按一次性票据状态机下载原文件。
 - 第一版详情返回请假明细和审批申请业务附件。
 - 第一版支持后台维护流程类型、流程模板和模板版本草稿，并发布绑定已部署 Flowable 定义。
+- 第一版支持 workflow 侧 Agent 预审入口：提交后可进入 `PENDING_REVIEW`，Agent 回调通过或转人工后进入 Flowable，Agent 回调驳回后直接终止。
+- Agent 回调必须匹配 `wf_request.agent_pre_review_task_id`，避免错误任务串写申请结果。
 - 第一版不支持可视化 BPMN 在线设计；BPMN 文件仍由工程侧部署。
 - 第一版不扣减假期余额，后续由 `module-leave` 接入。
-- 第一版不支持 Agent 预审，后续在人工节点前增加 Agent 预审节点或事件监听。
+- 第一版不包含完整 `module-agent` 后台创建、任务调度、工具调用和运行监控；当前只完成 workflow 侧 SPI 接入口和回调收口。
 - 第一版 Flowable 表仍由开发环境自动创建；生产化时应把 Flowable 初始化 SQL 纳入迁移治理。

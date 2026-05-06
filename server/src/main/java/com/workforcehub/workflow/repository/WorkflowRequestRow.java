@@ -9,6 +9,7 @@ public record WorkflowRequestRow(
     String status,
     String title,
     Long applicantUserId,
-    String flowableProcessInstanceId
+    String flowableProcessInstanceId,
+    Long agentPreReviewTaskId
 ) {
 }

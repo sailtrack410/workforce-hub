@@ -1,5 +1,9 @@
 package com.workforcehub.workflow.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
@@ -13,6 +17,8 @@ import com.workforcehub.file.storage.StorageObjectResource;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
+import com.workforcehub.spi.WorkflowAgentPreReviewTrigger;
+import com.workforcehub.spi.WorkflowAgentResultCallback;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateResponse;
 import com.workforcehub.workflow.dto.WorkflowLeaveDetailResponse;
@@ -39,6 +45,7 @@ import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,9 +63,13 @@ import java.util.Map;
  */
 @Service
 @ConditionalOnProperty(prefix = "workforce.workflow", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class WorkflowService {
+public class WorkflowService implements WorkflowAgentResultCallback {
 
     private static final String LEAVE_PROCESS_CODE = "LEAVE";
+    private static final String LEAVE_BIZ_TYPE = "LEAVE";
+    private static final String STATUS_PENDING_REVIEW = "PENDING_REVIEW";
+    private static final String STATUS_IN_APPROVAL = "IN_APPROVAL";
+    private static final String STATUS_REJECTED = "REJECTED";
     private static final DateTimeFormatter REQUEST_NO_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
@@ -68,19 +79,25 @@ public class WorkflowService {
     private final TaskService taskService;
     private final StorageProviderRegistry storageProviderRegistry;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
+    private final ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider;
+    private final ObjectMapper objectMapper;
 
     public WorkflowService(WorkflowRepository workflowRepository,
                            OrgDirectoryService orgDirectoryService,
                            RuntimeService runtimeService,
                            TaskService taskService,
                            StorageProviderRegistry storageProviderRegistry,
-                           DownloadTicketExecutionService downloadTicketExecutionService) {
+                           DownloadTicketExecutionService downloadTicketExecutionService,
+                           ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider,
+                           ObjectMapper objectMapper) {
         this.workflowRepository = workflowRepository;
         this.orgDirectoryService = orgDirectoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
         this.storageProviderRegistry = storageProviderRegistry;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
+        this.agentPreReviewTriggerProvider = agentPreReviewTriggerProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -111,16 +128,121 @@ public class WorkflowService {
         workflowRepository.insertLeaveDetail(leaveDetailId, requestId, request);
         bindAttachments(requestId, applicantUserId, request.getAttachmentRefIds());
 
+        Long agentTaskId = triggerAgentPreReview(requestId, leaveDetailId, applicantUserId);
+        if (agentTaskId != null) {
+            workflowRepository.markPendingAgentPreReview(requestId, agentTaskId, applicantUserId);
+            LeaveRequestCreateResponse response = new LeaveRequestCreateResponse();
+            response.setRequestId(requestId);
+            response.setRequestNo(requestNo);
+            response.setStatus(STATUS_PENDING_REVIEW);
+            response.setAgentTaskId(agentTaskId);
+            return response;
+        }
+
+        String processInstanceId = startHumanApproval(
+            requestId,
+            title,
+            request.getReason(),
+            applicant,
+            templateVersion,
+            applicantUserId
+        );
+
+        LeaveRequestCreateResponse response = new LeaveRequestCreateResponse();
+        response.setRequestId(requestId);
+        response.setRequestNo(requestNo);
+        response.setStatus(STATUS_IN_APPROVAL);
+        response.setFlowableProcessInstanceId(processInstanceId);
+        return response;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void onPreReviewApproved(Long requestId, Long agentTaskId, String decisionJson) {
+        completeAgentPreReviewWithHumanApproval(requestId, agentTaskId, decisionJson);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void onPreReviewRejected(Long requestId, Long agentTaskId, String decisionJson) {
+        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdOrThrow(requestId);
+        ensurePendingAgentPreReview(workflowRequest, agentTaskId);
+        workflowRepository.insertAgentPreReviewAction(
+            requestId,
+            agentTaskId,
+            decisionJson,
+            workflowRequest.status(),
+            STATUS_REJECTED
+        );
+        workflowRepository.finishRequest(requestId, STATUS_REJECTED, agentTaskId);
+        workflowRepository.closeAllPendingTodos(requestId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void onPreReviewToHuman(Long requestId, Long agentTaskId, String decisionJson) {
+        completeAgentPreReviewWithHumanApproval(requestId, agentTaskId, decisionJson);
+    }
+
+    private void completeAgentPreReviewWithHumanApproval(Long requestId,
+                                                         Long agentTaskId,
+                                                         String decisionJson) {
+        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdOrThrow(requestId);
+        ensurePendingAgentPreReview(workflowRequest, agentTaskId);
+        workflowRepository.insertAgentPreReviewAction(
+            requestId,
+            agentTaskId,
+            decisionJson,
+            workflowRequest.status(),
+            STATUS_IN_APPROVAL
+        );
+
+        OrgUserDetailResponse applicant = orgDirectoryService.getUserDetail(workflowRequest.applicantUserId());
+        if (applicant.getManagerUserId() == null) {
+            throw new BizException(400, "当前员工没有直属上级，无法发起请假审批");
+        }
+        WorkflowTemplateVersionRow templateVersion = workflowRepository.getTemplateVersionByRequestId(requestId);
+        WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(requestId);
+        startHumanApproval(
+            requestId,
+            workflowRequest.title(),
+            leaveDetail == null ? null : leaveDetail.reason(),
+            applicant,
+            templateVersion,
+            agentTaskId
+        );
+    }
+
+    private Long triggerAgentPreReview(Long requestId, Long leaveDetailId, Long applicantUserId) {
+        WorkflowAgentPreReviewTrigger trigger = agentPreReviewTriggerProvider.getIfAvailable();
+        if (trigger == null) {
+            return null;
+        }
+        return trigger.triggerPreReview(
+            requestId,
+            LEAVE_PROCESS_CODE,
+            LEAVE_BIZ_TYPE,
+            leaveDetailId,
+            applicantUserId
+        );
+    }
+
+    private String startHumanApproval(Long requestId,
+                                      String title,
+                                      String summary,
+                                      OrgUserDetailResponse applicant,
+                                      WorkflowTemplateVersionRow templateVersion,
+                                      Long operatorId) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("requestId", requestId);
-        variables.put("applicantUserId", String.valueOf(applicantUserId));
+        variables.put("applicantUserId", String.valueOf(applicant.getUserId()));
         variables.put("managerUserId", String.valueOf(applicant.getManagerUserId()));
         ProcessInstance processInstance = runtimeService.startProcessInstanceByKey(
             templateVersion.flowableDefinitionKey(),
             String.valueOf(requestId),
             variables
         );
-        workflowRepository.updateProcessInstanceId(requestId, processInstance.getProcessInstanceId());
+        workflowRepository.markHumanApprovalStarted(requestId, processInstance.getProcessInstanceId(), operatorId);
 
         Task managerTask = taskService.createTaskQuery()
             .processInstanceId(processInstance.getProcessInstanceId())
@@ -134,15 +256,21 @@ public class WorkflowService {
             applicant.getManagerUserId(),
             managerTask.getId(),
             title,
-            request.getReason()
+            summary
         );
+        return processInstance.getProcessInstanceId();
+    }
 
-        LeaveRequestCreateResponse response = new LeaveRequestCreateResponse();
-        response.setRequestId(requestId);
-        response.setRequestNo(requestNo);
-        response.setStatus("IN_APPROVAL");
-        response.setFlowableProcessInstanceId(processInstance.getProcessInstanceId());
-        return response;
+    private void ensurePendingAgentPreReview(WorkflowRequestRow workflowRequest, Long agentTaskId) {
+        if (!STATUS_PENDING_REVIEW.equals(workflowRequest.status())) {
+            throw new BizException(400, "当前申请状态不允许处理Agent预审结果");
+        }
+        if (workflowRequest.flowableProcessInstanceId() != null) {
+            throw new BizException(409, "Agent预审完成前不应存在Flowable流程实例");
+        }
+        if (agentTaskId == null || !agentTaskId.equals(workflowRequest.agentPreReviewTaskId())) {
+            throw new BizException(409, "Agent预审任务不匹配");
+        }
     }
 
     public List<WorkflowTodoResponse> listCurrentEmployeeTodos() {
@@ -178,7 +306,7 @@ public class WorkflowService {
         if (!applicantUserId.equals(workflowRequest.applicantUserId())) {
             throw new BizException(403, "只有申请人可以撤回该申请");
         }
-        if (!"IN_APPROVAL".equals(workflowRequest.status())) {
+        if (!STATUS_IN_APPROVAL.equals(workflowRequest.status())) {
             throw new BizException(400, "当前申请状态不允许撤回");
         }
 
@@ -308,7 +436,7 @@ public class WorkflowService {
         if (task == null) {
             throw new BizException(403, "当前用户不是该审批任务处理人");
         }
-        if (!"IN_APPROVAL".equals(workflowRequest.status())) {
+        if (!STATUS_IN_APPROVAL.equals(workflowRequest.status())) {
             throw new BizException(400, "当前申请状态不允许审批");
         }
 
@@ -481,6 +609,7 @@ public class WorkflowService {
         response.setComment(row.comment());
         response.setBeforeStatus(row.beforeStatus());
         response.setAfterStatus(row.afterStatus());
+        response.setAgentDecisionJson(compactJson(row.agentDecisionJson()));
         response.setActedAt(row.actedAt());
         return response;
     }
@@ -499,5 +628,35 @@ public class WorkflowService {
 
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value : null;
+    }
+
+    private String compactJson(String json) {
+        if (!StringUtils.hasText(json)) {
+            return null;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (node.isObject()) {
+                ObjectNode ordered = objectMapper.createObjectNode();
+                putIfPresent(ordered, node, "decision");
+                putIfPresent(ordered, node, "reason");
+                node.fields().forEachRemaining(entry -> {
+                    if (!ordered.has(entry.getKey())) {
+                        ordered.set(entry.getKey(), entry.getValue());
+                    }
+                });
+                return objectMapper.writeValueAsString(ordered);
+            }
+            return objectMapper.writeValueAsString(node);
+        } catch (JsonProcessingException ex) {
+            return json;
+        }
+    }
+
+    private void putIfPresent(ObjectNode target, JsonNode source, String fieldName) {
+        JsonNode value = source.get(fieldName);
+        if (value != null) {
+            target.set(fieldName, value);
+        }
     }
 }

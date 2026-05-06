@@ -19,6 +19,7 @@ public class WorkflowTaskActionResponse {
     private Long actorId;
     private String actionType;
     private String comment;
+    private String agentDecisionJson;
     private String beforeStatus;
     private String afterStatus;
     private LocalDateTime actedAt;

@@ -12,4 +12,5 @@ public class LeaveRequestCreateResponse {
     private String requestNo;
     private String status;
     private String flowableProcessInstanceId;
+    private Long agentTaskId;
 }

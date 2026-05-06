@@ -153,12 +153,40 @@ public class WorkflowRepository {
         return workflowAttachmentRefId;
     }
 
-    public void updateProcessInstanceId(Long requestId, String processInstanceId) {
+    public void markPendingAgentPreReview(Long requestId, Long agentTaskId, Long operatorId) {
         jdbcTemplate.update("""
             UPDATE wf_request
-            SET flowable_process_instance_id = ?
-            WHERE id = ? AND is_deleted = 0
-            """, processInstanceId, requestId);
+            SET status = 'PENDING_REVIEW',
+                current_step_key = 'agent_pre_review',
+                current_step_name = 'Agent预审',
+                agent_pre_review_task_id = ?,
+                updated_by = ?
+            WHERE id = ?
+              AND status = 'IN_APPROVAL'
+              AND flowable_process_instance_id IS NULL
+              AND is_deleted = 0
+            """,
+            agentTaskId,
+            operatorId,
+            requestId
+        );
+    }
+
+    public void markHumanApprovalStarted(Long requestId, String processInstanceId, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE wf_request
+            SET status = 'IN_APPROVAL',
+                current_step_key = 'manager_approval',
+                current_step_name = '直属上级审批',
+                flowable_process_instance_id = ?,
+                updated_by = ?
+            WHERE id = ?
+              AND is_deleted = 0
+            """,
+            processInstanceId,
+            operatorId,
+            requestId
+        );
     }
 
     public void insertTodo(Long requestId,
@@ -262,7 +290,7 @@ public class WorkflowRepository {
     public WorkflowRequestRow getRequestByTaskIdOrThrow(String taskId) {
         List<WorkflowRequestRow> rows = jdbcTemplate.query("""
             SELECT wr.id, wr.request_no, wr.status, wr.title, wr.applicant_user_id,
-                   wr.flowable_process_instance_id
+                   wr.flowable_process_instance_id, wr.agent_pre_review_task_id
             FROM wf_request wr
             JOIN ACT_RU_TASK art ON art.PROC_INST_ID_ = wr.flowable_process_instance_id
             WHERE art.ID_ = ?
@@ -299,6 +327,28 @@ public class WorkflowRepository {
             actorId,
             actionType,
             comment,
+            beforeStatus,
+            afterStatus
+        );
+    }
+
+    public void insertAgentPreReviewAction(Long requestId,
+                                           Long agentTaskId,
+                                           String decisionJson,
+                                           String beforeStatus,
+                                           String afterStatus) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_task_action
+                (id, request_id, flowable_task_id, step_key, step_name, actor_type,
+                 actor_id, action_type, action_comment, agent_decision_json, before_status, after_status)
+            VALUES
+                (?, ?, NULL, 'agent_pre_review', 'Agent预审', 'AGENT',
+                 ?, 'AGENT_PRE_REVIEW', NULL, CAST(? AS JSON), ?, ?)
+            """,
+            IdWorker.getId(),
+            requestId,
+            agentTaskId,
+            decisionJson,
             beforeStatus,
             afterStatus
         );
@@ -341,7 +391,7 @@ public class WorkflowRepository {
     public WorkflowRequestRow getRequestByIdOrThrow(Long requestId) {
         List<WorkflowRequestRow> rows = jdbcTemplate.query("""
             SELECT wr.id, wr.request_no, wr.status, wr.title, wr.applicant_user_id,
-                   wr.flowable_process_instance_id
+                   wr.flowable_process_instance_id, wr.agent_pre_review_task_id
             FROM wf_request wr
             WHERE wr.id = ?
               AND wr.is_deleted = 0
@@ -352,6 +402,27 @@ public class WorkflowRepository {
         );
         if (rows.isEmpty()) {
             throw new BizException(404, "审批申请不存在");
+        }
+        return rows.get(0);
+    }
+
+    public WorkflowTemplateVersionRow getTemplateVersionByRequestId(Long requestId) {
+        List<WorkflowTemplateVersionRow> rows = jdbcTemplate.query("""
+            SELECT wtv.id, wtv.flowable_definition_key
+            FROM wf_request wr
+            JOIN wf_template_version wtv ON wtv.id = wr.template_version_id
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowTemplateVersionRow(
+                rs.getLong("id"),
+                rs.getString("flowable_definition_key")
+            ),
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批申请模板版本不存在");
         }
         return rows.get(0);
     }
@@ -505,7 +576,8 @@ public class WorkflowRepository {
     public List<WorkflowTaskActionRow> listTaskActions(Long requestId) {
         return jdbcTemplate.query("""
             SELECT id, request_id, flowable_task_id, step_key, step_name, actor_type,
-                   actor_id, action_type, action_comment, before_status, after_status, acted_at
+                   actor_id, action_type, action_comment, agent_decision_json,
+                   before_status, after_status, acted_at
             FROM wf_task_action
             WHERE request_id = ?
             ORDER BY acted_at ASC, id ASC
@@ -520,6 +592,7 @@ public class WorkflowRepository {
                 rs.getLong("actor_id"),
                 rs.getString("action_type"),
                 rs.getString("action_comment"),
+                rs.getString("agent_decision_json"),
                 rs.getString("before_status"),
                 rs.getString("after_status"),
                 rs.getTimestamp("acted_at").toLocalDateTime()
@@ -739,7 +812,8 @@ public class WorkflowRepository {
             rs.getString("status"),
             rs.getString("title"),
             rs.getLong("applicant_user_id"),
-            rs.getString("flowable_process_instance_id")
+            rs.getString("flowable_process_instance_id"),
+            rs.getObject("agent_pre_review_task_id", Long.class)
         );
     }
 
