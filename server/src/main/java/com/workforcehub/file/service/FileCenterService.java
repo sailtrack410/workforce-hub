@@ -23,10 +23,7 @@ import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
 import com.workforcehub.file.repository.AttachmentRefRepository;
 import com.workforcehub.file.repository.AttachmentRow;
-import com.workforcehub.file.repository.DownloadAttachmentRow;
 import com.workforcehub.file.repository.FileObjectRepository;
-import com.workforcehub.file.storage.StorageObjectResource;
-import com.workforcehub.file.storage.StorageProviderRegistry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,29 +40,26 @@ import java.util.List;
 public class FileCenterService {
 
     private final JdbcTemplate jdbcTemplate;
-    private final StorageProviderRegistry storageProviderRegistry;
     private final FileUploadTicketService fileUploadTicketService;
     private final FileUploadConfirmService fileUploadConfirmService;
-    private final DownloadTicketExecutionService downloadTicketExecutionService;
+    private final FileDownloadService fileDownloadService;
     private final StorageUsageLedgerService storageUsageLedgerService;
     private final FileObjectRepository fileObjectRepository;
     private final AttachmentRefRepository attachmentRefRepository;
     private final FileQuotaPolicyService fileQuotaPolicyService;
 
     public FileCenterService(JdbcTemplate jdbcTemplate,
-                             StorageProviderRegistry storageProviderRegistry,
                              FileUploadTicketService fileUploadTicketService,
                              FileUploadConfirmService fileUploadConfirmService,
-                             DownloadTicketExecutionService downloadTicketExecutionService,
+                             FileDownloadService fileDownloadService,
                              StorageUsageLedgerService storageUsageLedgerService,
                              FileObjectRepository fileObjectRepository,
                              AttachmentRefRepository attachmentRefRepository,
                              FileQuotaPolicyService fileQuotaPolicyService) {
         this.jdbcTemplate = jdbcTemplate;
-        this.storageProviderRegistry = storageProviderRegistry;
         this.fileUploadTicketService = fileUploadTicketService;
         this.fileUploadConfirmService = fileUploadConfirmService;
-        this.downloadTicketExecutionService = downloadTicketExecutionService;
+        this.fileDownloadService = fileDownloadService;
         this.storageUsageLedgerService = storageUsageLedgerService;
         this.fileObjectRepository = fileObjectRepository;
         this.attachmentRefRepository = attachmentRefRepository;
@@ -88,81 +82,12 @@ public class FileCenterService {
         return fileUploadConfirmService.confirmAdminUpload(request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public DownloadTicketResponse createEmployeeDownloadTicket(Long attachmentRefId, CreateDownloadTicketRequest request) {
-        Long userId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
-            throw new BizException(403, "无权访问该文件");
-        }
-        if (attachment.deletedAt() != null || attachment.isDeleted() != 0) {
-            throw new BizException(409, "文件已删除");
-        }
-        if (!"SINGLE".equalsIgnoreCase(request.getDownloadType())) {
-            throw new BizException(400, "第一版仅支持单文件下载");
-        }
-
-        Long ticketId = IdWorker.getId();
-        String ticketNo = "DL" + ticketId;
-        LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
-        String downloadUrl = "/api/employee/files/download/" + ticketNo;
-        jdbcTemplate.update("""
-            INSERT INTO sys_download_ticket
-                (id, ticket_no, attachment_ref_id, requester_type, requester_id,
-                 download_type, download_url, reason, expire_at, status)
-            VALUES
-                (?, ?, ?, 'USER', ?, 'SINGLE', ?, ?, ?, 'ACTIVE')
-            """,
-            ticketId,
-            ticketNo,
-            attachmentRefId,
-            userId,
-            downloadUrl,
-            blankToNull(request.getReason()),
-            expireAt
-        );
-
-        DownloadTicketResponse response = new DownloadTicketResponse();
-        response.setDownloadTicketId(ticketId);
-        response.setTicketNo(ticketNo);
-        response.setDownloadUrl(downloadUrl);
-        response.setExpireAt(expireAt);
-        response.setFileName(attachment.displayName());
-        response.setFileSize(attachment.fileSize());
-        audit("USER", userId, "FILE_DOWNLOAD_TICKET_CREATED", "DOWNLOAD_TICKET", ticketId, "SUCCESS",
-            "{\"attachmentRefId\":%s}".formatted(attachmentRefId));
-        return response;
+        return fileDownloadService.createEmployeeDownloadTicket(attachmentRefId, request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public DownloadFileResult downloadEmployeeFile(String ticketNo) {
-        Long userId = CurrentUserHolder.requireUserId();
-        DownloadTicketRow ticket = getDownloadTicketOrThrow(ticketNo);
-        if (!"USER".equals(ticket.requesterType()) || !userId.equals(ticket.requesterId())) {
-            throw new BizException(403, "无权使用该下载票据");
-        }
-        if (!"ACTIVE".equals(ticket.status())) {
-            throw new BizException(409, "下载票据已使用或已失效");
-        }
-        if (ticket.expireAt().isBefore(LocalDateTime.now())) {
-            downloadTicketExecutionService.expireActiveTicket(ticket.id());
-            throw new BizException(410, "下载链接已过期，请重新申请");
-        }
-
-        DownloadAttachmentRow attachment = attachmentRefRepository.getDownloadAttachmentOrThrow(ticket.attachmentRefId());
-        if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
-            throw new BizException(403, "无权访问该文件");
-        }
-        if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
-            throw new BizException(409, "文件已删除");
-        }
-
-        downloadTicketExecutionService.claimActiveTicket(ticket.id());
-        StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
-            .loadObject(attachment.bucketName(), attachment.objectKey());
-        audit("USER", userId, "FILE_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
-            "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
-        return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
+        return fileDownloadService.downloadEmployeeFile(ticketNo);
     }
 
     public PageResult<AdminFileResponse> listAdminFiles(long pageNo, long pageSize, boolean recycleBin) {
@@ -205,77 +130,12 @@ public class FileCenterService {
         return PageResult.of(safePageNo, safePageSize, total == null ? 0L : total, rows);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public DownloadTicketResponse createAdminDownloadTicket(Long attachmentRefId, CreateDownloadTicketRequest request) {
-        Long adminId = CurrentUserHolder.requireUserId();
-        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        ensureAdminFileAttachment(attachment);
-        if (attachment.deletedAt() != null || attachment.isDeleted() != 0) {
-            throw new BizException(409, "文件已删除");
-        }
-        if (!"SINGLE".equalsIgnoreCase(request.getDownloadType())) {
-            throw new BizException(400, "第一版仅支持单文件下载");
-        }
-
-        Long ticketId = IdWorker.getId();
-        String ticketNo = "DL" + ticketId;
-        LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
-        String downloadUrl = "/api/admin/files/download/" + ticketNo;
-        jdbcTemplate.update("""
-            INSERT INTO sys_download_ticket
-                (id, ticket_no, attachment_ref_id, requester_type, requester_id,
-                 download_type, download_url, reason, expire_at, status)
-            VALUES
-                (?, ?, ?, 'ADMIN', ?, 'SINGLE', ?, ?, ?, 'ACTIVE')
-            """,
-            ticketId,
-            ticketNo,
-            attachmentRefId,
-            adminId,
-            downloadUrl,
-            blankToNull(request.getReason()),
-            expireAt
-        );
-
-        DownloadTicketResponse response = new DownloadTicketResponse();
-        response.setDownloadTicketId(ticketId);
-        response.setTicketNo(ticketNo);
-        response.setDownloadUrl(downloadUrl);
-        response.setExpireAt(expireAt);
-        response.setFileName(attachment.displayName());
-        response.setFileSize(attachment.fileSize());
-        audit("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_TICKET_CREATED", "DOWNLOAD_TICKET", ticketId, "SUCCESS",
-            "{\"attachmentRefId\":%s}".formatted(attachmentRefId));
-        return response;
+        return fileDownloadService.createAdminDownloadTicket(attachmentRefId, request);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public DownloadFileResult downloadAdminFile(String ticketNo) {
-        Long adminId = CurrentUserHolder.requireUserId();
-        DownloadTicketRow ticket = getDownloadTicketOrThrow(ticketNo);
-        if (!"ADMIN".equals(ticket.requesterType()) || !adminId.equals(ticket.requesterId())) {
-            throw new BizException(403, "无权使用该下载票据");
-        }
-        if (!"ACTIVE".equals(ticket.status())) {
-            throw new BizException(409, "下载票据已使用或已失效");
-        }
-        if (ticket.expireAt().isBefore(LocalDateTime.now())) {
-            downloadTicketExecutionService.expireActiveTicket(ticket.id());
-            throw new BizException(410, "下载链接已过期，请重新申请");
-        }
-
-        DownloadAttachmentRow attachment = attachmentRefRepository.getDownloadAttachmentOrThrow(ticket.attachmentRefId());
-        ensureAdminDownloadAttachment(attachment);
-        if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
-            throw new BizException(409, "文件已删除");
-        }
-
-        downloadTicketExecutionService.claimActiveTicket(ticket.id());
-        StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
-            .loadObject(attachment.bucketName(), attachment.objectKey());
-        audit("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
-            "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
-        return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
+        return fileDownloadService.downloadAdminFile(ticketNo);
     }
 
     public QuotaResponse getEmployeeQuota() {
@@ -562,12 +422,6 @@ public class FileCenterService {
         }
     }
 
-    private void ensureAdminDownloadAttachment(DownloadAttachmentRow attachment) {
-        if (!"ADMIN_FILE".equals(attachment.ownerType()) || !"ADMIN".equals(attachment.uploaderType())) {
-            throw new BizException(403, "后台接口仅允许治理后台文件");
-        }
-    }
-
     private void audit(String operatorType, Long operatorId, String actionType,
                        String targetType, Long targetId, String result, String detailJson) {
         jdbcTemplate.update("""
@@ -613,45 +467,5 @@ public class FileCenterService {
         response.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
         return response;
     }
-
-    private DownloadTicketRow getDownloadTicketOrThrow(String ticketNo) {
-        List<DownloadTicketRow> rows = jdbcTemplate.query("""
-            SELECT id, ticket_no, attachment_ref_id, requester_type, requester_id,
-                   download_type, expire_at, status
-            FROM sys_download_ticket
-            WHERE ticket_no = ? AND is_deleted = 0
-            """,
-            (rs, rowNum) -> new DownloadTicketRow(
-                rs.getLong("id"),
-                rs.getString("ticket_no"),
-                rs.getLong("attachment_ref_id"),
-                rs.getString("requester_type"),
-                rs.getLong("requester_id"),
-                rs.getString("download_type"),
-                rs.getTimestamp("expire_at").toLocalDateTime(),
-                rs.getString("status")
-            ),
-            ticketNo
-        );
-        if (rows.isEmpty()) {
-            throw new BizException(404, "下载票据不存在");
-        }
-        return rows.get(0);
-    }
-
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
-    }
-
-    private record DownloadTicketRow(
-        Long id,
-        String ticketNo,
-        Long attachmentRefId,
-        String requesterType,
-        Long requesterId,
-        String downloadType,
-        LocalDateTime expireAt,
-        String status
-    ) {}
 
 }

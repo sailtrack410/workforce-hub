@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-05-06 module-file 下载服务拆分
+
+### 改动背景
+
+上传票据申请和上传确认已经拆出，`FileCenterService` 中剩余的下载链路仍然包含下载票据签发、下载票据状态校验、过期处理、票据消费、物理对象读取和下载审计。后续群文件、文档文件、审批附件和知识库文件都会需要下载能力，如果继续把下载逻辑留在主服务里，文件生命周期和下载授权会继续耦合。
+
+本轮继续做行为不变拆分：只迁移“下载票据与下载执行”职责，不改接口契约、不改 DDL、不改变员工端和后台端响应结构。
+
+### 本次处理
+
+- 新增 `FileDownloadService`，集中处理员工端和后台端下载票据创建、下载票据消费和物理对象读取
+- 将员工端下载票据签发、下载权限校验、单文件下载限制和审计动作迁入新服务
+- 将后台端下载票据签发、后台治理文件边界校验、真实下载执行和审计动作迁入新服务
+- 将下载票据读取、过期票据失效、已消费票据阻断、下载前附件/文件删除状态校验迁入新服务
+- `FileCenterService` 的四个下载入口改为委托调用，继续保留后台列表、回收站生命周期、配额门面和清理编排
+- 扩展 `ModuleFileServiceBoundaryTest`，用结构测试约束下载链路必须由独立服务承接
+- `FileCenterService` 从 `657` 行降到 `471` 行，新增 `FileDownloadService` `264` 行
+
+### 验证记录
+
+- 红灯验证：`mvn -Dtest=ModuleFileServiceBoundaryTest test`，因 `FileDownloadService` 不存在失败
+- 结构绿灯：`mvn -Dtest=ModuleFileServiceBoundaryTest test`，2 个结构用例通过
+- 下载相关回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest test`，33 个文件 API 用例通过
+- 文件模块完整回归：`mvn -Dtest=ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleFileServiceBoundaryTest test`，40 个文件模块用例通过
+
+### 意义
+
+- 下载票据和下载执行有了独立服务边界，后续接群文件、文档文件、知识库文件时可以围绕下载授权扩展，而不是继续改主服务
+- `FileCenterService` 进一步收敛为薄门面和生命周期编排器，后续拆 `FileLifecycleService` 的风险更小
+- 下载链路中的票据过期、票据消费和物理对象读取集中维护，更适合后续加入下载水印、审计增强、限速或外链下载策略
+
+---
+
 ## 2026-05-06 module-file 上传确认服务拆分
 
 ### 改动背景
