@@ -52,6 +52,7 @@
 - `第42审_b425dc2之后至4bf06e6合并复核.md`
 - `第43审_module-attendance打卡事实可信边界修复审查.md`
 - `第44审_module-attendance请假分钟级覆盖修复审查.md`
+- `第45审_module-leave余额调整幂等指纹修复审查.md`
 
 维护约定：
 

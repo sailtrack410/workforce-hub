@@ -103,6 +103,37 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
     }
 
     @Test
+    @DisplayName("审批扣减幂等键被非审批扣减流水占用时应拒绝")
+    void workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        seedAdminAdjustmentWithSourceTxnKey(leaveTypeId, "WORKFLOW_REQUEST:" + scenario.requestId());
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/approve", scenario.managerTask().getId())
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "同意，请安排好交接"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("幂等键已被不同假期扣减操作使用"));
+
+        assertNotNull(runtimeService.createProcessInstanceQuery()
+            .processInstanceId(scenario.processInstanceId())
+            .singleResult(), "扣减幂等冲突时 Flowable 流程应保持待审批");
+        assertEquals(900, availableMinutes(leaveTypeId));
+        assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
+        assertEquals("IN_APPROVAL", workflowRequestStatus(scenario.requestId()));
+    }
+
+    @Test
     @DisplayName("请假审批通过后应重算当天考勤为请假结果而不是缺卡异常")
     void approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -382,6 +413,29 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             """, accountId, availableMinutes, availableMinutes);
     }
 
+    private void seedAdminAdjustmentWithSourceTxnKey(long leaveTypeId, String sourceTxnKey) {
+        Long accountId = jdbcTemplate.queryForObject("""
+            SELECT id
+            FROM lv_account
+            WHERE user_id = ? AND leave_type_id = ?
+            LIMIT 1
+            """, Long.class, EMPLOYEE_USER_ID, leaveTypeId);
+        assertNotNull(accountId, "测试前应已初始化假期账户");
+        jdbcTemplate.update("""
+            UPDATE lv_account
+            SET available_minutes = 900,
+                version = version + 1
+            WHERE id = ?
+            """, accountId);
+        jdbcTemplate.update("""
+            INSERT INTO lv_account_txn
+                (id, account_id, txn_type, change_minutes, balance_after,
+                 source_type, source_id, source_txn_key, effective_at)
+            VALUES
+                (9503, ?, 'ADJUST', -60, 900, 'ADMIN', 8001, ?, NOW())
+            """, accountId, sourceTxnKey);
+    }
+
     private void seedAttendanceRuleForEmployee() {
         jdbcTemplate.update("""
             INSERT INTO att_work_calendar
@@ -497,6 +551,14 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             FROM wf_request
             """, Long.class);
         return count == null ? 0L : count;
+    }
+
+    private String workflowRequestStatus(long requestId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT status
+            FROM wf_request
+            WHERE id = ?
+            """, String.class, requestId);
     }
 
     private int availableMinutes(long leaveTypeId) {

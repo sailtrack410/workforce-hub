@@ -135,3 +135,50 @@
 
 - leave 模块从“能告诉考勤当天有没有请假”升级为“能告诉考勤当天哪些时间段已经请假”，支撑小时假和半天假的真实计算。
 - 该 SPI 以后也可以给 Agent、月报和异常申诉复用，避免各模块重复拼 workflow 明细 SQL。
+
+## 2026-05-08 余额调整幂等键绑定操作指纹
+
+### 背景
+
+第 42 审 `3-3` 指出，管理员余额调整只按 `sourceTxnKey` 查已有流水，命中后直接回放旧账户结果，没有校验本次请求是否仍是同一个员工、同一个假种、同一个调整分钟数。调用方一旦复用同一个幂等键发起不同余额调整，接口会返回成功但不调整目标账户，形成静默错账。
+
+本轮不新增数据库字段，先用现有流水和账户数据组成最小操作指纹。余额调整指纹为 `source_type + txn_type + userId + leaveTypeId + changeMinutes`；审批扣减指纹额外绑定 `sourceId=requestId`。
+
+### 本次处理
+
+- `LeaveService.adjustAccount()` 在命中已有 `sourceTxnKey` 后，不再无条件回放旧账户结果。
+- 新增 `ensureAdjustmentIdempotencyFingerprint()`，校验既有流水必须是 `ADMIN/ADJUST`，且既有账户的 `userId`、`leaveTypeId` 与本次请求一致，既有流水的 `changeMinutes` 也与本次请求一致。
+- 指纹一致时继续回放已有账户结果，保证真正重复请求不会重复写流水或重复增加余额。
+- 指纹不一致时返回 `code=409` 和 `幂等键已被不同余额调整操作使用`，不创建新账户、不写新流水、不调整余额。
+- `deductForWorkflowApproval()` 命中 `WORKFLOW_REQUEST:{requestId}` 时同样校验既有流水必须是 `WORKFLOW_REQUEST/DEDUCT`，并绑定申请人、假种、扣减分钟数和 `requestId`。
+- 审批扣减幂等键被管理员调整或其他扣减操作占用时返回 `code=409` 和 `幂等键已被不同假期扣减操作使用`，审批事务回滚，流程保持待审批。
+- `ModuleLeaveApiIntegrationTest` 新增 `adjustmentSourceTxnKeyShouldRejectDifferentOperationFingerprint`，覆盖同键不同分钟数、不同员工、不同假种三类冲突。
+- `ModuleLeaveWorkflowIntegrationTest` 新增 `workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint`，覆盖审批扣减幂等键被非扣减流水占用时不能静默跳过扣减。
+- 测试 helper 的 `availableMinutes()` 改为无账户返回 0，便于明确断言错误目标账户没有被创建或调整。
+
+### 红绿记录
+
+- 红灯：`mvn -Dtest=ModuleLeaveApiIntegrationTest#adjustmentSourceTxnKeyShouldRejectDifferentOperationFingerprint test` 首次运行失败，第二次用同一 `sourceTxnKey` 调整不同分钟数时实际返回 `code=0`。
+- 绿灯：补齐指纹校验后，同一测试通过，三类冲突均返回 `409`。
+- 红灯：`mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint test` 首次运行失败，`WORKFLOW_REQUEST:{requestId}` 被管理员调整流水占用后审批仍返回 `code=0`。
+- 绿灯：补齐审批扣减指纹校验后，同一测试通过，冲突时流程保持待审批，既有管理员调整后的余额保持不变。
+- 回归：`mvn -Dtest=ModuleLeaveApiIntegrationTest test` 通过，原重复同 payload 幂等回放仍生效。
+- 组合回归：`mvn -Dtest=ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest test` 通过，审批扣减和请假考勤联动未受影响。
+
+### 当前完成范围增量
+
+- 管理员余额调整幂等键不再只是“字符串去重”，而是绑定到具体余额调整操作。
+- 同一幂等键复用到不同员工、不同假种或不同分钟数时会被显式拒绝，避免静默错账。
+- workflow 审批扣减幂等键不再被非扣减流水静默吞掉，避免流程通过但余额未扣。
+- `lv_account_txn` 仍保持第一版结构，现有字段已能支撑当前校验口径。
+
+### 暂未覆盖
+
+- 独立的 `operation_fingerprint` 字段和历史账本指纹补偿脚本。
+- 余额冻结、解冻、发放、结转、过期清零等更多流水类型的统一幂等模型。
+- 管理员余额调整操作审计详情和后台查询页。
+
+### 意义
+
+- leave 账本从“重复请求不重复写”升级为“重复请求必须语义相同才回放”，更符合账本类接口的幂等要求。
+- 该规则后续可以沉淀到 `LeaveAccountLedgerService`，统一约束调整、发放、扣减、冻结和解冻等余额流水。

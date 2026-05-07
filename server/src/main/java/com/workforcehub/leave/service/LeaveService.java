@@ -73,6 +73,7 @@ public class LeaveService implements LeaveQueryService {
         LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
         if (existingTxn != null) {
             LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
+            ensureAdjustmentIdempotencyFingerprint(existingTxn, existingAccount, request);
             return toAccountResponse(existingAccount, existingTxn.txnType(), existingTxn.changeMinutes());
         }
 
@@ -140,6 +141,15 @@ public class LeaveService implements LeaveQueryService {
         String sourceTxnKey = SOURCE_TYPE_WORKFLOW_REQUEST + ":" + requestId;
         LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
         if (existingTxn != null) {
+            LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
+            ensureWorkflowDeductIdempotencyFingerprint(
+                existingTxn,
+                existingAccount,
+                userId,
+                leaveTypeId,
+                durationMinutes,
+                requestId
+            );
             return;
         }
         LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
@@ -231,6 +241,36 @@ public class LeaveService implements LeaveQueryService {
             throw new BizException(400, "假种状态仅支持 ACTIVE/INACTIVE");
         }
         return normalized;
+    }
+
+    private void ensureAdjustmentIdempotencyFingerprint(LeaveAccountTxnRow existingTxn,
+                                                        LeaveAccountRow existingAccount,
+                                                        AdjustLeaveAccountRequest request) {
+        boolean sameFingerprint = TXN_TYPE_ADJUST.equals(existingTxn.txnType())
+            && SOURCE_TYPE_ADMIN.equals(existingTxn.sourceType())
+            && existingTxn.changeMinutes().equals(request.getChangeMinutes())
+            && existingAccount.userId().equals(request.getUserId())
+            && existingAccount.leaveTypeId().equals(request.getLeaveTypeId());
+        if (!sameFingerprint) {
+            throw new BizException(409, "幂等键已被不同余额调整操作使用");
+        }
+    }
+
+    private void ensureWorkflowDeductIdempotencyFingerprint(LeaveAccountTxnRow existingTxn,
+                                                            LeaveAccountRow existingAccount,
+                                                            Long userId,
+                                                            Long leaveTypeId,
+                                                            int durationMinutes,
+                                                            Long requestId) {
+        boolean sameFingerprint = TXN_TYPE_DEDUCT.equals(existingTxn.txnType())
+            && SOURCE_TYPE_WORKFLOW_REQUEST.equals(existingTxn.sourceType())
+            && requestId.equals(existingTxn.sourceId())
+            && existingTxn.changeMinutes().equals(-durationMinutes)
+            && existingAccount.userId().equals(userId)
+            && existingAccount.leaveTypeId().equals(leaveTypeId);
+        if (!sameFingerprint) {
+            throw new BizException(409, "幂等键已被不同假期扣减操作使用");
+        }
     }
 
     private String trimToNull(String value) {

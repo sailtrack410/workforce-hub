@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
+    private static final long MANAGER_USER_ID = 2002L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -119,6 +120,29 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
         assertEquals(1L, txnCount(EMPLOYEE_USER_ID, leaveTypeId, "ADJUST", 480));
     }
 
+    @Test
+    @DisplayName("后台余额调整幂等键被不同操作参数复用时应拒绝")
+    void adjustmentSourceTxnKeyShouldRejectDifferentOperationFingerprint() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        String sourceTxnKey = "fingerprint-" + suffix;
+        long annualLeaveTypeId = createLeaveType(adminSession, "ANNUAL_FP_" + suffix, "年假指纹-" + suffix);
+        long sickLeaveTypeId = createLeaveType(adminSession, "SICK_FP_" + suffix, "病假指纹-" + suffix);
+
+        adjustBalance(adminSession, annualLeaveTypeId, 480, sourceTxnKey);
+
+        adjustBalance(adminSession, EMPLOYEE_USER_ID, annualLeaveTypeId, 960, sourceTxnKey, 409);
+        adjustBalance(adminSession, MANAGER_USER_ID, annualLeaveTypeId, 480, sourceTxnKey, 409);
+        adjustBalance(adminSession, EMPLOYEE_USER_ID, sickLeaveTypeId, 480, sourceTxnKey, 409);
+
+        assertEquals(480, availableMinutes(EMPLOYEE_USER_ID, annualLeaveTypeId));
+        assertEquals(0, availableMinutes(MANAGER_USER_ID, annualLeaveTypeId));
+        assertEquals(0, availableMinutes(EMPLOYEE_USER_ID, sickLeaveTypeId));
+        assertEquals(1L, txnCount(EMPLOYEE_USER_ID, annualLeaveTypeId, "ADJUST", 480));
+        assertEquals(0L, accountCount(MANAGER_USER_ID, annualLeaveTypeId));
+        assertEquals(0L, accountCount(EMPLOYEE_USER_ID, sickLeaveTypeId));
+    }
+
     private long createLeaveType(Cookie adminSession, String leaveCode, String leaveName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/admin/leave/types")
                 .cookie(adminSession)
@@ -141,6 +165,15 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
                                long leaveTypeId,
                                int changeMinutes,
                                String sourceTxnKey) throws Exception {
+        adjustBalance(adminSession, EMPLOYEE_USER_ID, leaveTypeId, changeMinutes, sourceTxnKey, 0);
+    }
+
+    private void adjustBalance(Cookie adminSession,
+                               long userId,
+                               long leaveTypeId,
+                               int changeMinutes,
+                               String sourceTxnKey,
+                               int expectedCode) throws Exception {
         mockMvc.perform(post("/api/admin/leave/accounts/adjustments")
                 .cookie(adminSession)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -152,9 +185,9 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "幂等调整",
                       "sourceTxnKey": "%s"
                     }
-                    """.formatted(EMPLOYEE_USER_ID, leaveTypeId, changeMinutes, sourceTxnKey)))
+                    """.formatted(userId, leaveTypeId, changeMinutes, sourceTxnKey)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(0));
+            .andExpect(jsonPath("$.code").value(expectedCode));
     }
 
     private Cookie loginAdmin() throws Exception {
@@ -221,9 +254,12 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private int availableMinutes(long userId, long leaveTypeId) {
         Integer minutes = jdbcTemplate.queryForObject("""
-            SELECT available_minutes
-            FROM lv_account
-            WHERE user_id = ? AND leave_type_id = ?
+            SELECT COALESCE((
+                SELECT available_minutes
+                FROM lv_account
+                WHERE user_id = ? AND leave_type_id = ?
+                LIMIT 1
+            ), 0)
             """, Integer.class, userId, leaveTypeId);
         return minutes == null ? 0 : minutes;
     }

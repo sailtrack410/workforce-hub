@@ -167,7 +167,7 @@ Cookie: SESSION=...
 | `leaveTypeId` | `long` | 是 | 假种 ID，必须启用 |
 | `changeMinutes` | `int` | 是 | 调整分钟数，正数增加，负数扣减，不能为 0 |
 | `reason` | `string` | 否 | 调整原因，最长 512 字符 |
-| `sourceTxnKey` | `string` | 否 | 幂等键，最长 128 字符；相同键重复调用不重复写流水 |
+| `sourceTxnKey` | `string` | 否 | 幂等键，最长 128 字符；相同键且同一操作指纹重复调用不重复写流水 |
 
 示例：
 
@@ -209,7 +209,8 @@ Cookie: SESSION=...
 - 若账户不存在，自动创建 `lv_account`。
 - 更新 `lv_account.available_minutes`。
 - 写入 `lv_account_txn`，`txn_type=ADJUST`、`source_type=ADMIN`。
-- 若 `sourceTxnKey` 已存在，直接回放已有流水对应账户结果，不重复增加余额。
+- 若 `sourceTxnKey` 已存在，只有既有流水为 `source_type=ADMIN`、`txn_type=ADJUST`，且 `userId`、`leaveTypeId`、`changeMinutes` 与本次请求一致时，才回放已有流水对应账户结果，不重复增加余额。
+- 若同一个 `sourceTxnKey` 被不同员工、不同假种、不同调整分钟数或非管理员调整流水复用，返回 `code=409`，不创建新账户、不写新流水、不调整余额。
 - 调整后余额不能小于 0。
 
 ---
@@ -285,6 +286,8 @@ Cookie: SESSION=...
   - `source_type=WORKFLOW_REQUEST`
   - `source_id=wf_request.id`
   - `source_txn_key=WORKFLOW_REQUEST:{requestId}`
+- 若 `source_txn_key=WORKFLOW_REQUEST:{requestId}` 已存在，只有既有流水为 `source_type=WORKFLOW_REQUEST`、`txn_type=DEDUCT`，且 `source_id`、申请人、假种、扣减分钟数与当前审批一致时，才视为已扣减并幂等返回。
+- 若该幂等键被管理员调整或其他扣减操作占用，返回 `code=409`，审批事务回滚，流程保持待审批状态。
 - 扣减失败时审批不会进入错误终态。
 - 扣减成功、审批状态更新为 `APPROVED` 后，同一事务内触发考勤日结果重算。
 
@@ -320,6 +323,8 @@ Cookie: SESSION=...
 | `200` | `404` | `假种不存在` | 假种不存在 |
 | `200` | `409` | `假种编码已存在` | 创建假种编码重复 |
 | `200` | `409` | `假种已停用` | 调整或扣减停用假种 |
+| `200` | `409` | `幂等键已被不同余额调整操作使用` | 余额调整 `sourceTxnKey` 被不同操作指纹复用 |
+| `200` | `409` | `幂等键已被不同假期扣减操作使用` | 审批扣减 `source_txn_key` 被其他流水占用 |
 
 ---
 
