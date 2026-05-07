@@ -63,3 +63,37 @@
 - 请假审批从“流程可跑通”进入“会影响真实业务余额”的阶段。
 - `lv_account_txn` 已经成为余额变化的审计来源，后续做年假规则、Agent 合规判断和报表统计时有可追溯基础。
 - workflow 与 leave 的边界清晰：workflow 负责流程状态，leave 负责余额规则和流水。
+
+## 2026-05-07 请假审批通过后对外提供考勤覆盖查询
+
+### 背景
+
+考勤侧进入请假联动节点后，需要在日结果计算时判断某个员工某一天是否存在已批准请假。为了避免 `module-attendance` 直接依赖 workflow 内部 Repository，本轮把“已批准请假覆盖日期查询”放到 `LeaveQueryService` 中，由 `module-leave` 统一对外提供。
+
+### 本次处理
+
+- `LeaveQueryService` 新增 `hasApprovedLeaveOnDate(Long userId, LocalDate workDate)`。
+- `LeaveService` 实现该接口，并委托 `LeaveRepository` 查询 `wf_request` 与 `wf_req_leave`。
+- `LeaveRepository.hasApprovedLeaveOnDate()` 只统计 `biz_type=LEAVE`、`status=APPROVED`、未删除且日期范围覆盖 `workDate` 的申请。
+- `module-attendance` 通过该 SPI 判断请假覆盖，不直接读取 workflow 明细服务。
+
+### 红绿记录
+
+- 红灯：`ModuleLeaveWorkflowIntegrationTest.approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult` 首次运行时，审批通过后考勤日结果没有生成 `LEAVE`。
+- 绿灯：补齐查询 SPI 和考勤重算接入后，审批通过请假可以把覆盖日期日结果重算为 `LEAVE`。
+
+### 当前完成范围增量
+
+- 假期模块不仅负责余额，也成为“已批准请假事实”的对外查询边界。
+- 考勤模块能用 `LeaveQueryService` 判断请假覆盖日期。
+
+### 暂未覆盖
+
+- 半天假、小时假和分钟级覆盖比例。
+- 多天请假跨休息日、节假日时的扣减和考勤过滤。
+- 提交冻结余额、审批通过转扣减、驳回解冻。
+
+### 意义
+
+- 请假事实查询从 workflow 内部表结构中抽象出来，降低考勤、Agent 后续接入时对流程内部实现的耦合。
+- 后续如果新增销假、请假变更、请假撤回后返还等能力，可以继续在 `LeaveQueryService` 上扩展统一查询语义。

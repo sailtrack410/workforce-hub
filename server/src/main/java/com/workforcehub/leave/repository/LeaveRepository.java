@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -236,6 +237,21 @@ public class LeaveRepository {
             ), 0)
             """, Integer.class, userId, leaveTypeId);
         return minutes == null ? 0 : minutes;
+    }
+
+    public boolean hasApprovedLeaveOnDate(Long userId, LocalDate workDate) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM wf_request wr
+            JOIN wf_req_leave wrl ON wrl.request_id = wr.id
+            WHERE wr.applicant_user_id = ?
+              AND wr.biz_type = 'LEAVE'
+              AND wr.status = 'APPROVED'
+              AND DATE(wrl.start_at) <= ?
+              AND DATE(wrl.end_at) >= ?
+              AND wr.is_deleted = 0
+            """, Long.class, userId, workDate, workDate);
+        return count != null && count > 0;
     }
 
     private String accountSelectSql() {

@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-leave` 假期账户接口测试用例 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 假种创建、余额调整、员工余额查询、workflow 余额校验与扣减 |
+| 适用范围 | 假种创建、余额调整、员工余额查询、workflow 余额校验与扣减、审批通过联动考勤重算 |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版自动化测试已落地 |
+| 当前状态 | 第一版自动化测试已落地，已覆盖审批通过扣减余额和联动考勤日结果重算 |
 
 ---
 
@@ -24,6 +24,7 @@
 - 验证请假提交前余额不足会被拦截，且不生成审批申请。
 - 验证余额足够时可以提交审批。
 - 验证审批通过后扣减余额并写 `DEDUCT` 流水。
+- 验证审批通过后触发考勤重算，把覆盖日期的日结果识别为 `LEAVE`。
 - 验证审批驳回不扣减余额。
 - 验证新 `lv_` 表会被普通集成测试和 workflow 集成测试基线清理，避免测试污染。
 
@@ -83,6 +84,7 @@
 | `LV-WF-002` | P0 | `POST /api/employee/workflow/leave-requests` | 余额足够时可以提交请假 | 张三余额 960 分钟；流程模板已发布 | 请假 480 分钟 | HTTP `200`；`code=0`；返回 `IN_APPROVAL` 和 Flowable 实例 ID |
 | `LV-WF-003` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` | 审批通过扣减余额 | `LV-WF-002` 成功；李四已登录 | 审批通过 | 余额从 960 扣到 480；写入 `txn_type=DEDUCT`、`change_minutes=-480`、`source_type=WORKFLOW_REQUEST` |
 | `LV-WF-004` | P0 | `POST /api/employee/workflow/tasks/{taskId}/reject` | 审批驳回不扣减余额 | 张三余额 960 分钟；请假已提交 | 审批驳回 | 余额仍为 960；不写 `DEDUCT` 流水 |
+| `LV-WF-005` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` + `GET /api/employee/attendance/daily-results` | 审批通过联动考勤日结果为请假 | 张三有有效考勤组；张三提交 `2026-05-07` 请假；李四为直属审批人 | 李四审批通过后，张三查询 `2026-05-07` 日结果 | 日结果 `resultStatus=LEAVE`；`absenceMinutes=0`；`exceptionFlag=false`；当天无 `att_exception` |
 
 ---
 
@@ -95,6 +97,7 @@ cd server
 mvn -Dtest=ModuleLeaveApiIntegrationTest test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest test
 mvn -Dtest=ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleWorkflowFlowableIntegrationTest test
+mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult test
 ```
 
 建议进入下一节点前执行：
@@ -112,6 +115,7 @@ mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWri
 - 年假规则按工龄自动发放。
 - 结转、过期清零和自动发放任务。
 - 节假日、排班、考勤日历对扣减分钟数的影响。
+- 半天假、小时假与考勤打卡结果的分钟级合并。
 - 提交时冻结余额，审批通过转扣减，驳回或撤回解冻。
 - 管理员查询全部员工假期账户列表。
 - 员工余额流水明细查询。

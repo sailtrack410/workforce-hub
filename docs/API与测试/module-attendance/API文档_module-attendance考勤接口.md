@@ -9,7 +9,7 @@
 | 适用范围 | 工作日历、班次、考勤组、考勤组成员、排班、员工打卡、日结果、异常查询 |
 | 对应模块 | `server/module-attendance` |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版考勤基础配置、排班覆盖、排班变更重算、打卡、日结果计算和异常识别已实现；补卡审批联动、请假影响考勤待后续迭代 |
+| 当前状态 | 第一版考勤基础配置、排班覆盖、排班变更重算、打卡、日结果计算、异常识别、请假审批通过联动日结果重算已实现；补卡审批联动、半天假精细合并待后续迭代 |
 
 ---
 
@@ -36,6 +36,7 @@
 内部能力：
 
 - `AttendanceService` 实现 `AttendanceQueryService`，后续 Agent 可通过 SPI 查询日结果与月度异常。
+- `AttendanceService` 实现 `AttendanceRecalculationService`，workflow/leave 等外部业务事件可通过 SPI 触发指定员工指定日期的日结果重算。
 
 ---
 
@@ -94,6 +95,7 @@ http://localhost:8080
 | `NORMAL` | 正常 |
 | `ABNORMAL` | 异常 |
 | `NO_RULE` | 无有效考勤规则 |
+| `LEAVE` | 已批准请假覆盖 |
 
 ### 4.4 exceptionType
 
@@ -523,8 +525,10 @@ Cookie: SESSION=...
 - 打卡后会重算当天 `att_daily_result`。
 - 第一版按当天最早 `ON_DUTY` 和最晚 `OFF_DUTY` 计算。
 - 如果当天存在有效排班，日结果使用排班班次；否则使用考勤组默认班次。
+- 如果当天存在已审批通过的请假申请覆盖，日结果重算时写入 `resultStatus=LEAVE`，迟到、早退、缺勤和工时均归零，并清理当天已有异常。
 - 同一日重复打卡会重算日结果，并先清理旧异常再重建异常，避免异常重复累计。
-- 当前计算不扣午休，不处理节假日、请假、补卡、外勤定位和跨天班次。
+- 第一版请假覆盖按日期判断，只要已批准请假与考勤日期重叠即按整日请假处理；暂不做半天假、小时假和打卡记录的分钟级合并。
+- 当前计算不扣午休，不处理节假日、补卡、外勤定位和跨天班次。
 
 ---
 
@@ -569,6 +573,7 @@ Cookie: SESSION=...
 
 - 只能查询当前登录员工自己的日结果。
 - 查询跨度不能超过 63 天。
+- 请假审批通过后会由 workflow 侧触发重算；员工查询该日期日结果时可看到 `resultStatus=LEAVE`。
 
 ---
 
@@ -621,11 +626,38 @@ Cookie: SESSION=...
 
 ---
 
-## 六、当前未覆盖
+## 六、审批联动规则
+
+### 6.1 请假审批通过联动日结果
+
+直属上级审批通过请假申请后：
+
+- `WorkflowService` 在审批事务内调用 `AttendanceRecalculationService.recalculateDailyResultForExternalEvent(userId, workDate)`。
+- 重算日期范围为请假开始日期到结束日期，包含首尾日期。
+- `AttendanceService` 在日结果计算时通过 `LeaveQueryService.hasApprovedLeaveOnDate(userId, workDate)` 判断是否存在已审批通过请假。
+- 命中已批准请假时，日结果写入：
+  - `resultStatus=LEAVE`
+  - `lateMinutes=0`
+  - `earlyLeaveMinutes=0`
+  - `absenceMinutes=0`
+  - `workMinutes=0`
+  - `exceptionFlag=false`
+- 已存在的 `att_exception` 会被清理，避免请假通过后仍显示缺卡或迟到早退。
+
+### 6.2 当前边界
+
+- 第一版只按日期覆盖判断请假，不按分钟计算请假覆盖比例。
+- 第一版不区分上午半天、下午半天和小时假；这些场景会暂时按整日 `LEAVE` 展示。
+- 如果员工该日期没有有效考勤组，日结果仍可能是 `NO_RULE`，不会强行写成 `LEAVE`。
+- 补卡审批通过后的打卡修正和二次重算待后续节点实现。
+
+---
+
+## 七、当前未覆盖
 
 - 特殊班次模板、批量排班和排班变更历史。
 - `att_work_calendar_day` 工作日、休息日、节假日明细。
-- 请假通过后把日结果识别为请假而非缺勤。
+- 半天假、小时假与打卡结果的分钟级合并。
 - 补卡申请审批通过后修正打卡记录和异常。
 - 外勤、定位、IP、人脸设备校验。
 - 管理员异常治理列表与忽略异常。

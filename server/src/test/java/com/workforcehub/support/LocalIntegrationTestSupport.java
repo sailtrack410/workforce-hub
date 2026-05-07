@@ -105,6 +105,20 @@ public abstract class LocalIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM sys_upload_ticket");
             jdbcTemplate.execute("DELETE FROM sys_attachment_ref");
             jdbcTemplate.execute("DELETE FROM sys_file_object");
+            jdbcTemplate.execute("DELETE FROM sys_todo_item");
+            deleteIfExists(jdbcTemplate, "wf_request_attachment");
+            jdbcTemplate.execute("DELETE FROM wf_task_action");
+            jdbcTemplate.execute("DELETE FROM wf_cc_record");
+            jdbcTemplate.execute("DELETE FROM wf_urge_record");
+            jdbcTemplate.execute("DELETE FROM wf_req_leave");
+            jdbcTemplate.execute("DELETE FROM wf_req_timeoff");
+            jdbcTemplate.execute("DELETE FROM wf_req_overtime");
+            jdbcTemplate.execute("DELETE FROM wf_req_clock_correction");
+            jdbcTemplate.execute("DELETE FROM wf_req_hr_change");
+            jdbcTemplate.execute("DELETE FROM wf_request");
+            jdbcTemplate.execute("DELETE FROM wf_template_version");
+            jdbcTemplate.execute("DELETE FROM wf_template");
+            jdbcTemplate.execute("DELETE FROM wf_process_type");
             jdbcTemplate.execute("DELETE FROM att_exception");
             jdbcTemplate.execute("DELETE FROM att_daily_result");
             jdbcTemplate.execute("DELETE FROM att_punch_record");
@@ -129,6 +143,17 @@ public abstract class LocalIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM admin_user");
         } finally {
             jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+        }
+    }
+
+    private void deleteIfExists(JdbcTemplate jdbcTemplate, String tableName) {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+            """, Integer.class, tableName);
+        if (count != null && count > 0) {
+            jdbcTemplate.execute("DELETE FROM " + tableName);
         }
     }
 

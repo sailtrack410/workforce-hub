@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -92,6 +93,32 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
         assertEquals(1L, leaveDeductTxnCount(leaveTypeId));
         assertEquals(-480, leaveDeductChangeMinutes(scenario.requestId()));
         assertEquals(480, leaveDeductBalanceAfter(scenario.requestId()));
+    }
+
+    @Test
+    @DisplayName("请假审批通过后应重算当天考勤为请假结果而不是缺卡异常")
+    void approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+        seedAttendanceRuleForEmployee();
+
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        approveManagerTask(managerSession, scenario.managerTask().getId());
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-07")
+                .param("endDate", "2026-05-07"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("LEAVE"))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(false))
+            .andExpect(jsonPath("$.data[0].absenceMinutes").value(0));
+
+        assertEquals(1L, dailyResultCount("LEAVE"));
+        assertEquals(0L, attendanceExceptionCount());
     }
 
     @Test
@@ -213,6 +240,44 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             """, accountId, availableMinutes, availableMinutes);
     }
 
+    private void seedAttendanceRuleForEmployee() {
+        jdbcTemplate.update("""
+            INSERT INTO att_work_calendar
+                (id, calendar_code, calendar_name, calendar_type, status)
+            VALUES
+                (9601, 'CAL_LEAVE_ATT', '请假考勤日历', 'STANDARD', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_shift
+                (id, shift_code, shift_name, cross_day_flag, required_punch_count, status)
+            VALUES
+                (9602, 'SHIFT_LEAVE_ATT', '请假考勤班次', 0, 2, 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_shift_segment
+                (id, shift_id, segment_no, start_time, end_time,
+                 on_duty_punch_start, on_duty_punch_end,
+                 off_duty_punch_start, off_duty_punch_end)
+            VALUES
+                (9603, 9602, 1, '09:00:00', '18:00:00',
+                 '08:00:00', '10:00:00',
+                 '17:00:00', '19:00:00')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_group
+                (id, group_code, group_name, calendar_id, default_shift_id,
+                 late_grace_minutes, early_leave_grace_minutes, status)
+            VALUES
+                (9604, 'GROUP_LEAVE_ATT', '请假考勤组', 9601, 9602, 0, 0, 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_group_member
+                (id, group_id, user_id, effective_from, effective_to, source_type, status)
+            VALUES
+                (9605, 9604, ?, '2026-05-01', NULL, 'MANUAL', 'ACTIVE')
+            """, EMPLOYEE_USER_ID);
+    }
+
     private String leaveRequestJson(long leaveTypeId) {
         return """
             {
@@ -303,6 +368,30 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
               AND source_id = ?
             """, Integer.class, requestId);
         return minutes == null ? 0 : minutes;
+    }
+
+    private long dailyResultCount(String resultStatus) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_daily_result
+            WHERE user_id = ?
+              AND work_date = '2026-05-07'
+              AND result_status = ?
+              AND absence_minutes = 0
+              AND exception_flag = 0
+            """, Long.class, EMPLOYEE_USER_ID, resultStatus);
+        return count == null ? 0L : count;
+    }
+
+    private long attendanceExceptionCount() {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = '2026-05-07'
+            """, Long.class, EMPLOYEE_USER_ID);
+        return count == null ? 0L : count;
     }
 
     private record LeaveApprovalScenario(

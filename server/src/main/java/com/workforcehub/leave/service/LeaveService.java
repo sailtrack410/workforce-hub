@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -179,6 +180,11 @@ public class LeaveService implements LeaveQueryService {
     @Override
     public int getAvailableMinutes(Long userId, Long leaveTypeId) {
         return leaveRepository.getAvailableMinutes(userId, leaveTypeId);
+    }
+
+    @Override
+    public boolean hasApprovedLeaveOnDate(Long userId, LocalDate workDate) {
+        return leaveRepository.hasApprovedLeaveOnDate(userId, workDate);
     }
 
     private LeaveTypeResponse toLeaveTypeResponse(LeaveTypeRow row) {

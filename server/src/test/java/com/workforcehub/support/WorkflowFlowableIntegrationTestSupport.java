@@ -105,6 +105,16 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM sys_upload_ticket");
             jdbcTemplate.execute("DELETE FROM sys_attachment_ref");
             jdbcTemplate.execute("DELETE FROM sys_file_object");
+            jdbcTemplate.execute("DELETE FROM att_exception");
+            jdbcTemplate.execute("DELETE FROM att_daily_result");
+            jdbcTemplate.execute("DELETE FROM att_punch_record");
+            jdbcTemplate.execute("DELETE FROM att_schedule");
+            jdbcTemplate.execute("DELETE FROM att_group_member");
+            jdbcTemplate.execute("DELETE FROM att_group");
+            jdbcTemplate.execute("DELETE FROM att_shift_segment");
+            jdbcTemplate.execute("DELETE FROM att_shift");
+            jdbcTemplate.execute("DELETE FROM att_work_calendar_day");
+            jdbcTemplate.execute("DELETE FROM att_work_calendar");
             deleteIfExists(jdbcTemplate, "wf_request_attachment");
             jdbcTemplate.execute("DELETE FROM wf_task_action");
             jdbcTemplate.execute("DELETE FROM wf_cc_record");

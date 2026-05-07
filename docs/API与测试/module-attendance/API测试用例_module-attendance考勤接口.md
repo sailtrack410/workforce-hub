@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-attendance` 考勤接口测试用例 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 考勤基础配置、排班覆盖、排班变更重算、打卡、日结果、异常识别、直属上级团队查询 |
+| 适用范围 | 考勤基础配置、排班覆盖、排班变更重算、打卡、日结果、异常识别、请假审批通过联动重算、直属上级团队查询 |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次、排班变更重算和缺卡专项保护 |
+| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次、排班变更重算、缺卡专项保护和请假审批通过联动考勤重算 |
 
 ---
 
@@ -30,11 +30,13 @@
 - 验证同一员工同一天重复创建有效排班会被拒绝。
 - 验证管理员修改已有排班后，会触发已有日结果重算。
 - 验证只有上班卡时会生成 `MISS_PUNCH` 缺卡异常。
+- 验证请假审批通过后，会把覆盖日期的考勤日结果重算为 `LEAVE`，并清理缺卡异常。
 - 验证测试基线会清理 `att_` 表，避免跨测试污染。
 
 当前已落地自动化测试类：
 
 - `ModuleAttendanceApiIntegrationTest`
+- `ModuleLeaveWorkflowIntegrationTest`
 
 ---
 
@@ -97,6 +99,12 @@
 | `ATT-API-018` | P0 | `PUT /api/admin/attendance/schedules/{scheduleId}` | 修改排班触发已有日结果重算 | 张三按 `10:00-19:00` 排班打卡且日结果为正常 | 把同一天排班改为 `09:00-18:00` | HTTP `200`；`code=0`；日结果 `shiftId` 变为新班次；`resultStatus=ABNORMAL`；`lateMinutes=60`；`exceptionFlag=true` |
 | `ATT-API-019` | P0 | `POST /api/employee/attendance/punch` | 只有上班卡生成缺卡异常 | 张三已命中考勤组 | 只提交 `ON_DUTY` 打卡 | 日结果 `resultStatus=ABNORMAL`；`absenceMinutes=270`；异常列表返回 1 条 `MISS_PUNCH` |
 
+## 5.3 请假审批联动考勤重算
+
+| 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ATT-WF-001` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` | 请假审批通过后重算当天考勤为请假结果 | 张三有有效考勤组；张三提交 `2026-05-07` 请假；李四为直属审批人 | 李四审批通过请假任务 | 请假申请进入 `APPROVED`；张三 `2026-05-07` 日结果为 `LEAVE`；`absenceMinutes=0`；`exceptionFlag=false`；当天异常数为 0 |
+
 ---
 
 ## 六、验证命令
@@ -106,6 +114,8 @@
 ```bash
 cd server
 mvn -Dtest=ModuleAttendanceApiIntegrationTest test
+mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult test
+mvn -Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test
 ```
 
 建议进入下一节点前执行：
@@ -122,5 +132,5 @@ mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWri
 
 - 独立 `ModuleAttendanceCalculationIntegrationTest`。
 - 补卡申请审批通过后修正异常。
-- 假期请假通过后考勤日结果识别为请假而非缺勤。
+- 半天假、小时假与实际打卡结果的分钟级合并。
 - 多实例部署下高并发考勤组成员重叠写入的分布式锁或数据库锁表治理。

@@ -28,6 +28,8 @@ import com.workforcehub.attendance.repository.PunchRecordRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.spi.AttendanceQueryService;
+import com.workforcehub.spi.AttendanceRecalculationService;
+import com.workforcehub.spi.LeaveQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -49,7 +51,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * module-attendance 第一版考勤服务。
  */
 @Service
-public class AttendanceService implements AttendanceQueryService {
+public class AttendanceService implements AttendanceQueryService, AttendanceRecalculationService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_INACTIVE = "INACTIVE";
@@ -58,6 +60,7 @@ public class AttendanceService implements AttendanceQueryService {
     private static final String RESULT_NORMAL = "NORMAL";
     private static final String RESULT_ABNORMAL = "ABNORMAL";
     private static final String RESULT_NO_RULE = "NO_RULE";
+    private static final String RESULT_LEAVE = "LEAVE";
     private static final String EXCEPTION_LATE = "LATE";
     private static final String EXCEPTION_EARLY_LEAVE = "EARLY_LEAVE";
     private static final String EXCEPTION_MISS_PUNCH = "MISS_PUNCH";
@@ -66,12 +69,15 @@ public class AttendanceService implements AttendanceQueryService {
     private static final String SOURCE_TEMPLATE = "TEMPLATE";
 
     private final AttendanceRepository attendanceRepository;
+    private final LeaveQueryService leaveQueryService;
     private final TransactionTemplate transactionTemplate;
     private final ConcurrentMap<Long, ReentrantLock> membershipLocks = new ConcurrentHashMap<>();
 
     public AttendanceService(AttendanceRepository attendanceRepository,
+                             LeaveQueryService leaveQueryService,
                              TransactionTemplate transactionTemplate) {
         this.attendanceRepository = attendanceRepository;
+        this.leaveQueryService = leaveQueryService;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -337,6 +343,12 @@ public class AttendanceService implements AttendanceQueryService {
         return value;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void recalculateDailyResultForExternalEvent(Long userId, LocalDate workDate) {
+        recalculateDailyResult(userId, workDate);
+    }
+
     private AttendanceDailyResultRow recalculateDailyResult(Long userId, LocalDate workDate) {
         AttendanceGroupRow group = attendanceRepository.getEffectiveGroupForUpdate(userId, workDate);
         if (group == null) {
@@ -349,6 +361,23 @@ public class AttendanceService implements AttendanceQueryService {
         AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
         LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
         LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
+        if (leaveQueryService.hasApprovedLeaveOnDate(userId, workDate)) {
+            AttendanceDailyResultRow row = upsertDailyResult(
+                userId,
+                workDate,
+                scheduleId,
+                group.groupId(),
+                shiftId,
+                RESULT_LEAVE,
+                0,
+                0,
+                0,
+                0,
+                false
+            );
+            attendanceRepository.deleteExceptionsByDailyResultId(row.dailyResultId());
+            return attendanceRepository.getDailyResult(userId, workDate);
+        }
 
         int lateMinutes = calculateLateMinutes(firstPunchAt, shift.startTime(), group.lateGraceMinutes());
         int earlyLeaveMinutes = calculateEarlyLeaveMinutes(lastPunchAt, shift.endTime(), group.earlyLeaveGraceMinutes());

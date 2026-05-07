@@ -152,8 +152,53 @@
 - 批量排班、排班复制和模板排班。
 - 排班停用后的产品语义还需要在前端和业务说明中明确：当前实现会使日结果回退到考勤组默认班次。
 - 工作日历日明细、节假日和休息日。
-- 请假通过后考勤日结果识别为请假而非缺勤。
 - 补卡申请审批通过后修正打卡记录和异常。
 - 管理员异常治理列表、忽略异常和处理流水。
 - 外勤、定位、IP、人脸设备校验。
 - 多实例部署下考勤组成员区间重叠写入的分布式锁或数据库锁表治理。
+
+## 2026-05-07 请假审批通过后联动考勤日结果重算
+
+### 背景
+
+第 40 审把“请假通过后影响考勤日结果”列为下一批 P1。当前 `module-leave` 已经能在 workflow 审批通过后扣减假期余额，但考勤侧如果没有联动，员工请假获批后仍可能因为没有打卡而显示缺卡或异常。这会让假期、审批和考勤三套数据互相冲突，因此本轮优先补齐审批通过后的日结果重算。
+
+### 本次处理
+
+- 新增 `AttendanceRecalculationService` SPI，由 `AttendanceService` 实现。
+- `WorkflowService` 在直属上级审批通过请假后，按请假开始日期到结束日期逐日调用考勤重算。
+- `LeaveQueryService` 新增 `hasApprovedLeaveOnDate(userId, workDate)`，由 `LeaveService` 通过 `wf_request` 与 `wf_req_leave` 查询已批准请假覆盖。
+- `AttendanceService` 日结果计算时优先识别已批准请假，命中后写入 `resultStatus=LEAVE`。
+- 命中请假覆盖时，迟到、早退、缺勤、工时均归零，`exceptionFlag=false`，并清理该日已有 `att_exception`。
+- `WorkflowFlowableIntegrationTestSupport` 补充 `att_` 表清理，避免 workflow 专用测试污染考勤数据。
+- `LocalIntegrationTestSupport` 补充 workflow 表清理，因为普通考勤测试已经会读取已批准 workflow 请假状态。
+- 在 `ModuleLeaveWorkflowIntegrationTest` 中新增审批通过联动考勤重算集成测试。
+- 更新 `module-attendance` 与 `module-leave` API 文档、测试用例、开发日志和后续开发计划。
+
+### 红绿记录
+
+- 红灯：新增 `approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult` 后，请假审批通过后查询 `GET /api/employee/attendance/daily-results` 返回空结果，说明审批通过没有触发考勤重算。
+- 绿灯：补齐 `AttendanceRecalculationService`、`LeaveQueryService.hasApprovedLeaveOnDate` 和 workflow 审批通过后逐日重算后，该用例通过。
+- 回归绿灯：`mvn -Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test` 通过，确认请假联动没有破坏考勤既有接口测试。
+
+### 当前完成范围增量
+
+- 请假审批通过后会触发覆盖日期的考勤日结果重算。
+- 已批准请假覆盖的日期会生成或更新为 `LEAVE` 日结果。
+- 已批准请假覆盖日期不再保留缺卡、迟到、早退异常。
+- workflow 与 attendance 通过 `AttendanceRecalculationService` 解耦，workflow 不直接依赖考勤内部 Repository。
+- attendance 与 leave 通过 `LeaveQueryService` 查询已批准请假，考勤计算不直接读取 workflow 内部服务。
+
+### 暂未覆盖
+
+- 半天假、小时假与实际打卡结果的分钟级合并。
+- 多天请假中的节假日、休息日过滤。
+- 补卡申请审批通过后修正打卡记录和异常。
+- 同一员工同一天来自打卡、排班、请假、补卡的统一重算锁。
+- 日结果重算服务、排班服务、打卡服务的进一步拆分。
+
+### 意义
+
+- 请假、假期余额、审批和考勤从“各自闭环”进入第一版跨模块一致性闭环。
+- `LEAVE` 日结果让员工端、领导端和后续 Agent 可以直接识别已批准请假日，不再把获批请假误判为缺卡异常。
+- 外部事件触发考勤重算的 SPI 已建立，后续补卡审批、排班批量调整、日历变更可以复用同一扩展方向。

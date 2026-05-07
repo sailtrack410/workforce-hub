@@ -48,6 +48,7 @@
 - `第38审_module-attendance第一版考勤闭环审查.md`
 - `第39审_module-attendance排班覆盖与缺卡专项审查.md`
 - `第40审_module-attendance排班变更重算审查.md`
+- `第41审_module-attendance请假审批联动考勤重算审查.md`
 
 维护约定：
 
