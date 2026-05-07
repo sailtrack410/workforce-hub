@@ -74,3 +74,44 @@
 - 考勤模块从空目录进入可运行闭环，为后续补卡、请假影响考勤、考勤统计和 Agent 异常提醒提供数据基础。
 - 考勤归属通过生效区间建模，能承接后续调岗、调部门和分公司组织变化。
 - `AttendanceQueryService` 让 Agent 查询考勤不需要直接依赖考勤内部 Repository，模块边界更清晰。
+
+## 2026-05-07 排班覆盖默认班次与缺卡专项保护
+
+### 背景
+
+第 38 审指出，第一版日结果虽然读取了 `att_schedule.id`，但还没有用排班班次覆盖考勤组默认班次；同时缺卡逻辑已有实现但缺少专项测试保护。这两个点会直接影响考勤结果可信度，因此作为 `module-attendance` 第二批的最小可测节点优先处理。
+
+### 本次处理
+
+- 新增后台排班接口：`POST /api/admin/attendance/schedules`。
+- 新增 `CreateAttendanceScheduleRequest`、`AttendanceScheduleResponse` 和 `AttendanceScheduleRow`。
+- 创建排班时校验员工可用、班次启用、可选工作日历启用。
+- 同一员工同一天已有 `ACTIVE` 排班时返回 `code=409`，避免同日多个有效排班。
+- 补充重复创建有效排班测试，固定同一员工同一天重复排班的 `409` 语义。
+- 日结果计算改为优先读取当天有效排班；命中排班时使用排班 `shift_id`，未命中时回退考勤组默认班次。
+- 补充排班覆盖默认班次集成测试，验证 `10:00-19:00` 排班不会被 `09:00-18:00` 默认班次误判为迟到和早退。
+- 补充缺卡专项测试，验证只有上班卡时生成 `MISS_PUNCH` 异常。
+- 更新 `module-attendance` API 文档和测试用例。
+
+### 红绿记录
+
+- 红灯：新增 `scheduleShouldOverrideDefaultGroupShiftWhenCalculatingDailyResult` 后，`POST /api/admin/attendance/schedules` 返回 `404`。
+- 绿灯：补齐排班接口、排班写入和日结果排班优先逻辑后，该用例通过。
+- 绿灯：新增 `duplicateActiveScheduleShouldBeRejected` 后，事务内员工行锁和重复排班检查已满足预期，用例通过。
+- 绿灯：新增 `missingOffDutyPunchShouldCreateMissPunchException` 后，现有缺卡逻辑已满足预期，用例通过并形成回归保护。
+
+### 当前完成范围增量
+
+- 管理员可以为员工创建单日排班。
+- 日结果计算已支持“排班班次优先，考勤组默认班次兜底”。
+- 只有上班卡会生成缺卡异常和 `MISS_PUNCH` 异常记录。
+
+### 暂未覆盖
+
+- 排班修改、停用、批量排班和排班变更历史。
+- 工作日历日明细、节假日和休息日。
+- 请假通过后考勤日结果识别为请假而非缺勤。
+- 补卡申请审批通过后修正打卡记录和异常。
+- 管理员异常治理列表、忽略异常和处理流水。
+- 外勤、定位、IP、人脸设备校验。
+- 多实例部署下考勤组成员区间重叠写入的分布式锁或数据库锁表治理。

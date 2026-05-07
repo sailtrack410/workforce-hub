@@ -6,16 +6,16 @@
 | --- | --- |
 | 文档名称 | `module-attendance` 考勤接口 API 文档 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 工作日历、班次、考勤组、考勤组成员、员工打卡、日结果、异常查询 |
+| 适用范围 | 工作日历、班次、考勤组、考勤组成员、排班、员工打卡、日结果、异常查询 |
 | 对应模块 | `server/module-attendance` |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版考勤基础配置、打卡、日结果计算和异常识别已实现；排班、补卡审批联动、请假影响考勤待后续迭代 |
+| 当前状态 | 第一版考勤基础配置、排班覆盖、打卡、日结果计算和异常识别已实现；补卡审批联动、请假影响考勤待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `4` 个后台接口、`4` 个员工端接口。
+当前已实现 `5` 个后台接口、`4` 个员工端接口。
 
 后台接口：
 
@@ -23,6 +23,7 @@
 - `POST /api/admin/attendance/shifts`
 - `POST /api/admin/attendance/groups`
 - `POST /api/admin/attendance/groups/{groupId}/members`
+- `POST /api/admin/attendance/schedules`
 
 员工端接口：
 
@@ -327,9 +328,65 @@ Cookie: SESSION=...
 - 第一版在单实例内按员工维度加应用锁，并在事务内复查重叠区间，避免同一员工并发写入重叠归属。
 - 如果后续改成多实例部署，需要升级为数据库锁表或 Redis 分布式锁，不能继续只依赖 JVM 内存锁。
 
+## 5.5 创建员工排班
+
+```http
+POST /api/admin/attendance/schedules
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `userId` | `long` | 是 | 员工 ID，必须存在且未离职 |
+| `workDate` | `date` | 是 | 排班日期 |
+| `shiftId` | `long` | 是 | 启用状态班次 |
+| `calendarId` | `long` | 否 | 工作日历 ID，传入时必须启用 |
+| `scheduleSource` | `string` | 是 | `MANUAL`、`AUTO` 或 `TEMPLATE` |
+
+示例：
+
+```json
+{
+  "userId": 2003,
+  "workDate": "2026-05-10",
+  "shiftId": 2052160000000000002,
+  "calendarId": 2052160000000000001,
+  "scheduleSource": "MANUAL"
+}
+```
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "scheduleId": 2052160000000000005,
+    "userId": 2003,
+    "workDate": "2026-05-10",
+    "shiftId": 2052160000000000002,
+    "calendarId": 2052160000000000001,
+    "scheduleSource": "MANUAL",
+    "status": "ACTIVE"
+  },
+  "requestId": "..."
+}
+```
+
+### 业务规则
+
+- 同一员工同一天只能有一条 `ACTIVE` 排班。
+- 排班班次必须存在且启用。
+- 传入工作日历时，工作日历必须存在且启用。
+- 日结果计算时优先使用当天有效排班班次；未命中排班时才使用考勤组默认班次。
+
 ---
 
-## 5.5 员工打卡
+## 5.6 员工打卡
 
 ```http
 POST /api/employee/attendance/punch
@@ -378,6 +435,7 @@ Cookie: SESSION=...
       "dailyResultId": 2052160000000000006,
       "userId": 2003,
       "workDate": "2026-05-07",
+      "scheduleId": null,
       "groupId": 2052160000000000003,
       "shiftId": 2052160000000000002,
       "resultStatus": "ABNORMAL",
@@ -398,12 +456,13 @@ Cookie: SESSION=...
 - 打卡前会重新校验数据库中的员工主档状态和账号状态；员工离职、账号停用或主档停用后，即使旧 Session 未过期也不能继续打卡。
 - 打卡后会重算当天 `att_daily_result`。
 - 第一版按当天最早 `ON_DUTY` 和最晚 `OFF_DUTY` 计算。
+- 如果当天存在有效排班，日结果使用排班班次；否则使用考勤组默认班次。
 - 同一日重复打卡会重算日结果，并先清理旧异常再重建异常，避免异常重复累计。
-- 当前计算不扣午休，不处理节假日、请假、补卡、外勤和排班覆盖。
+- 当前计算不扣午休，不处理节假日、请假、补卡、外勤定位和跨天班次。
 
 ---
 
-## 5.6 员工查询自己的日结果
+## 5.7 员工查询自己的日结果
 
 ```http
 GET /api/employee/attendance/daily-results?startDate=2026-05-07&endDate=2026-05-07
@@ -447,7 +506,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.7 员工查询自己的异常
+## 5.8 员工查询自己的异常
 
 ```http
 GET /api/employee/attendance/exceptions?startDate=2026-05-08&endDate=2026-05-08
@@ -482,7 +541,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.8 直属上级查询团队日结果
+## 5.9 直属上级查询团队日结果
 
 ```http
 GET /api/employee/attendance/team/daily-results?userId=2003&startDate=2026-05-07&endDate=2026-05-07
@@ -498,7 +557,7 @@ Cookie: SESSION=...
 
 ## 六、当前未覆盖
 
-- `att_schedule` 排班接口与特殊班次覆盖。
+- 特殊班次模板、批量排班和排班变更历史。
 - `att_work_calendar_day` 工作日、休息日、节假日明细。
 - 请假通过后把日结果识别为请假而非缺勤。
 - 补卡申请审批通过后修正打卡记录和异常。

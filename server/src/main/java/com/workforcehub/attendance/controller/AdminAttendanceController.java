@@ -4,9 +4,11 @@ import com.workforcehub.attendance.dto.AddAttendanceGroupMemberRequest;
 import com.workforcehub.attendance.dto.AttendanceCalendarResponse;
 import com.workforcehub.attendance.dto.AttendanceGroupMemberResponse;
 import com.workforcehub.attendance.dto.AttendanceGroupResponse;
+import com.workforcehub.attendance.dto.AttendanceScheduleResponse;
 import com.workforcehub.attendance.dto.AttendanceShiftResponse;
 import com.workforcehub.attendance.dto.CreateAttendanceCalendarRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceGroupRequest;
+import com.workforcehub.attendance.dto.CreateAttendanceScheduleRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceShiftRequest;
 import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.response.R;
@@ -52,5 +54,11 @@ public class AdminAttendanceController {
     public R<AttendanceGroupMemberResponse> addGroupMember(@PathVariable Long groupId,
                                                            @Valid @RequestBody AddAttendanceGroupMemberRequest request) {
         return R.ok(attendanceService.addGroupMember(groupId, request));
+    }
+
+    @PostMapping("/schedules")
+    public R<AttendanceScheduleResponse> createSchedule(
+            @Valid @RequestBody CreateAttendanceScheduleRequest request) {
+        return R.ok(attendanceService.createSchedule(request));
     }
 }

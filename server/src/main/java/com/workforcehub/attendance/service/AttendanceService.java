@@ -7,9 +7,11 @@ import com.workforcehub.attendance.dto.AttendanceDailyResultResponse;
 import com.workforcehub.attendance.dto.AttendanceExceptionResponse;
 import com.workforcehub.attendance.dto.AttendanceGroupMemberResponse;
 import com.workforcehub.attendance.dto.AttendanceGroupResponse;
+import com.workforcehub.attendance.dto.AttendanceScheduleResponse;
 import com.workforcehub.attendance.dto.AttendanceShiftResponse;
 import com.workforcehub.attendance.dto.CreateAttendanceCalendarRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceGroupRequest;
+import com.workforcehub.attendance.dto.CreateAttendanceScheduleRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceShiftRequest;
 import com.workforcehub.attendance.dto.CreatePunchRecordRequest;
 import com.workforcehub.attendance.dto.PunchRecordResponse;
@@ -19,6 +21,7 @@ import com.workforcehub.attendance.repository.AttendanceExceptionRow;
 import com.workforcehub.attendance.repository.AttendanceGroupMemberRow;
 import com.workforcehub.attendance.repository.AttendanceGroupRow;
 import com.workforcehub.attendance.repository.AttendanceRepository;
+import com.workforcehub.attendance.repository.AttendanceScheduleRow;
 import com.workforcehub.attendance.repository.AttendanceShiftRow;
 import com.workforcehub.attendance.repository.PunchRecordRow;
 import com.workforcehub.common.exception.BizException;
@@ -57,6 +60,9 @@ public class AttendanceService implements AttendanceQueryService {
     private static final String EXCEPTION_LATE = "LATE";
     private static final String EXCEPTION_EARLY_LEAVE = "EARLY_LEAVE";
     private static final String EXCEPTION_MISS_PUNCH = "MISS_PUNCH";
+    private static final String SOURCE_MANUAL = "MANUAL";
+    private static final String SOURCE_AUTO = "AUTO";
+    private static final String SOURCE_TEMPLATE = "TEMPLATE";
 
     private final AttendanceRepository attendanceRepository;
     private final TransactionTemplate transactionTemplate;
@@ -181,6 +187,33 @@ public class AttendanceService implements AttendanceQueryService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public AttendanceScheduleResponse createSchedule(CreateAttendanceScheduleRequest request) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        attendanceRepository.lockActiveUserOrThrow(request.getUserId());
+        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(request.getShiftId());
+        ensureActive(shift.status(), "班次已停用");
+        if (request.getCalendarId() != null) {
+            AttendanceCalendarRow calendar = attendanceRepository.getCalendarOrThrow(request.getCalendarId());
+            ensureActive(calendar.status(), "工作日历已停用");
+        }
+        if (attendanceRepository.existsActiveSchedule(request.getUserId(), request.getWorkDate())) {
+            throw new BizException(409, "员工当天已存在有效排班");
+        }
+
+        Long scheduleId = IdWorker.getId();
+        attendanceRepository.insertSchedule(
+            scheduleId,
+            request.getUserId(),
+            request.getWorkDate(),
+            shift.shiftId(),
+            request.getCalendarId(),
+            normalizeScheduleSource(request.getScheduleSource()),
+            operatorId
+        );
+        return toScheduleResponse(attendanceRepository.getScheduleOrThrow(scheduleId));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public PunchRecordResponse punch(CreatePunchRecordRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         ensureCanPunch(userId);
@@ -283,8 +316,10 @@ public class AttendanceService implements AttendanceQueryService {
             return upsertDailyResult(userId, workDate, null, null, null, RESULT_NO_RULE, 0, 0, 0, 0, true);
         }
 
-        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(group.defaultShiftId());
-        Long scheduleId = attendanceRepository.getScheduleId(userId, workDate);
+        AttendanceScheduleRow schedule = attendanceRepository.getActiveSchedule(userId, workDate);
+        Long scheduleId = schedule == null ? null : schedule.scheduleId();
+        Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
+        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
         LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
         LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
 
@@ -300,7 +335,7 @@ public class AttendanceService implements AttendanceQueryService {
             workDate,
             scheduleId,
             group.groupId(),
-            shift.shiftId(),
+            shiftId,
             resultStatus,
             lateMinutes,
             earlyLeaveMinutes,
@@ -516,6 +551,18 @@ public class AttendanceService implements AttendanceQueryService {
         return response;
     }
 
+    private AttendanceScheduleResponse toScheduleResponse(AttendanceScheduleRow row) {
+        AttendanceScheduleResponse response = new AttendanceScheduleResponse();
+        response.setScheduleId(row.scheduleId());
+        response.setUserId(row.userId());
+        response.setWorkDate(row.workDate());
+        response.setShiftId(row.shiftId());
+        response.setCalendarId(row.calendarId());
+        response.setScheduleSource(row.scheduleSource());
+        response.setStatus(row.status());
+        return response;
+    }
+
     private PunchRecordResponse toPunchResponse(PunchRecordRow row, AttendanceDailyResultRow dailyResult) {
         PunchRecordResponse response = new PunchRecordResponse();
         response.setPunchRecordId(row.punchRecordId());
@@ -588,6 +635,14 @@ public class AttendanceService implements AttendanceQueryService {
 
     private String normalizeSourceType(String value) {
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeScheduleSource(String value) {
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!SOURCE_MANUAL.equals(normalized) && !SOURCE_AUTO.equals(normalized) && !SOURCE_TEMPLATE.equals(normalized)) {
+            throw new BizException(400, "排班来源仅支持 MANUAL/AUTO/TEMPLATE");
+        }
+        return normalized;
     }
 
     private void ensureActive(String status, String message) {

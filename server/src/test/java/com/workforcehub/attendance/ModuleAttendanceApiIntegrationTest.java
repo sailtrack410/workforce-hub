@@ -226,6 +226,110 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("管理员排班后，日结果计算应优先使用排班班次而不是考勤组默认班次")
+    void scheduleShouldOverrideDefaultGroupShiftWhenCalculatingDailyResult() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_SCH_" + suffix, "排班日历-" + suffix);
+        long defaultShiftId = createShift(adminSession, "SHIFT_DEF_" + suffix, "默认班次-" + suffix);
+        long scheduledShiftId = createShift(
+            adminSession,
+            "SHIFT_SCH_" + suffix,
+            "排班班次-" + suffix,
+            "10:00:00",
+            "19:00:00"
+        );
+        long groupId = createGroup(adminSession, "GROUP_SCH_" + suffix, "排班考勤组-" + suffix, calendarId, defaultShiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        MvcResult scheduleResult = mockMvc.perform(post("/api/admin/attendance/schedules")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "userId": %d,
+                      "workDate": "2026-05-10",
+                      "shiftId": %d,
+                      "calendarId": %d,
+                      "scheduleSource": "MANUAL"
+                    }
+                    """.formatted(EMPLOYEE_USER_ID, scheduledShiftId, calendarId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.scheduleId").isNumber())
+            .andExpect(jsonPath("$.data.shiftId").value(scheduledShiftId))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        punch(employeeSession, "2026-05-10T10:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-10T19:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.dailyResult.scheduleId").value(scheduleId))
+            .andExpect(jsonPath("$.data.dailyResult.shiftId").value(scheduledShiftId))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("NORMAL"))
+            .andExpect(jsonPath("$.data.dailyResult.exceptionFlag").value(false))
+            .andExpect(jsonPath("$.data.dailyResult.workMinutes").value(540));
+
+        assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-05-10"));
+    }
+
+    @Test
+    @DisplayName("同一员工同一天重复创建有效排班时应返回冲突")
+    void duplicateActiveScheduleShouldBeRejected() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_DUP_SCH_" + suffix, "重复排班日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_DUP_SCH_" + suffix, "重复排班班次-" + suffix);
+
+        createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-12", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-12", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("员工当天已存在有效排班"));
+    }
+
+    @Test
+    @DisplayName("只有上班卡时应生成缺卡异常")
+    void missingOffDutyPunchShouldCreateMissPunchException() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_MISS_" + suffix, "缺卡日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_MISS_" + suffix, "缺卡班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_MISS_" + suffix, "缺卡考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-11T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("ABNORMAL"))
+            .andExpect(jsonPath("$.data.dailyResult.absenceMinutes").value(270))
+            .andExpect(jsonPath("$.data.dailyResult.exceptionFlag").value(true));
+
+        mockMvc.perform(get("/api/employee/attendance/exceptions")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-11")
+                .param("endDate", "2026-05-11"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].exceptionType").value("MISS_PUNCH"));
+
+        assertEquals(1L, exceptionCount(EMPLOYEE_USER_ID, "2026-05-11"));
+    }
+
+    @Test
     @DisplayName("员工登录后被离职时，旧会话也不能继续打卡")
     void offboardedEmployeeShouldNotPunchWithExistingSession() throws Exception {
         Cookie adminSession = loginAdmin();
@@ -309,6 +413,14 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private long createShift(Cookie adminSession, String shiftCode, String shiftName) throws Exception {
+        return createShift(adminSession, shiftCode, shiftName, "09:00:00", "18:00:00");
+    }
+
+    private long createShift(Cookie adminSession,
+                             String shiftCode,
+                             String shiftName,
+                             String startTime,
+                             String endTime) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/admin/attendance/shifts")
                 .cookie(adminSession)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -316,15 +428,15 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                     {
                       "shiftCode": "%s",
                       "shiftName": "%s",
-                      "startTime": "09:00:00",
-                      "endTime": "18:00:00",
+                      "startTime": "%s",
+                      "endTime": "%s",
                       "onDutyPunchStart": "08:00:00",
                       "onDutyPunchEnd": "10:00:00",
                       "offDutyPunchStart": "17:00:00",
                       "offDutyPunchEnd": "19:00:00",
                       "status": "ACTIVE"
                     }
-                    """.formatted(shiftCode, shiftName)))
+                    """.formatted(shiftCode, shiftName, startTime, endTime)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.shiftId").isNumber())
@@ -393,6 +505,25 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                       "deviceId": "test-device"
                     }
                     """.formatted(punchAt, punchType)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createSchedule(Cookie adminSession,
+                                                                              long userId,
+                                                                              String workDate,
+                                                                              long shiftId,
+                                                                              long calendarId) throws Exception {
+        return mockMvc.perform(post("/api/admin/attendance/schedules")
+            .cookie(adminSession)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "userId": %d,
+                  "workDate": "%s",
+                  "shiftId": %d,
+                  "calendarId": %d,
+                  "scheduleSource": "MANUAL"
+                }
+                """.formatted(userId, workDate, shiftId, calendarId)));
     }
 
     private Cookie loginAdmin() throws Exception {

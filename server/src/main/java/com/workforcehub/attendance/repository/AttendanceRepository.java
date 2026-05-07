@@ -330,6 +330,59 @@ public class AttendanceRepository {
         return rows.get(0);
     }
 
+    public boolean existsActiveSchedule(Long userId, LocalDate workDate) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_schedule
+            WHERE user_id = ?
+              AND work_date = ?
+              AND status = 'ACTIVE'
+            """, Long.class, userId, workDate);
+        return count != null && count > 0;
+    }
+
+    public void insertSchedule(Long scheduleId,
+                               Long userId,
+                               LocalDate workDate,
+                               Long shiftId,
+                               Long calendarId,
+                               String scheduleSource,
+                               Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO att_schedule
+                (id, user_id, work_date, shift_id, calendar_id,
+                 schedule_source, operator_id, status, created_by, updated_by)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)
+            """,
+            scheduleId,
+            userId,
+            workDate,
+            shiftId,
+            calendarId,
+            scheduleSource,
+            operatorId,
+            operatorId,
+            operatorId
+        );
+    }
+
+    public AttendanceScheduleRow getScheduleOrThrow(Long scheduleId) {
+        List<AttendanceScheduleRow> rows = jdbcTemplate.query("""
+            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
+            FROM att_schedule
+            WHERE id = ?
+            LIMIT 1
+            """,
+            this::mapSchedule,
+            scheduleId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "排班不存在");
+        }
+        return rows.get(0);
+    }
+
     public AttendanceGroupRow getEffectiveGroupForUpdate(Long userId, LocalDate workDate) {
         List<AttendanceGroupRow> rows = jdbcTemplate.query("""
             SELECT g.id, g.group_code, g.group_name, g.calendar_id, g.default_shift_id,
@@ -364,6 +417,22 @@ public class AttendanceRepository {
             LIMIT 1
             """,
             (rs, rowNum) -> rs.getLong("id"),
+            userId,
+            workDate
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public AttendanceScheduleRow getActiveSchedule(Long userId, LocalDate workDate) {
+        List<AttendanceScheduleRow> rows = jdbcTemplate.query("""
+            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
+            FROM att_schedule
+            WHERE user_id = ?
+              AND work_date = ?
+              AND status = 'ACTIVE'
+            LIMIT 1
+            """,
+            this::mapSchedule,
             userId,
             workDate
         );
@@ -669,6 +738,18 @@ public class AttendanceRepository {
             rs.getDate("effective_from").toLocalDate(),
             localDate(rs, "effective_to"),
             rs.getString("source_type"),
+            rs.getString("status")
+        );
+    }
+
+    private AttendanceScheduleRow mapSchedule(ResultSet rs, int rowNum) throws SQLException {
+        return new AttendanceScheduleRow(
+            rs.getLong("id"),
+            rs.getLong("user_id"),
+            rs.getDate("work_date").toLocalDate(),
+            rs.getLong("shift_id"),
+            rs.getObject("calendar_id", Long.class),
+            rs.getString("schedule_source"),
             rs.getString("status")
         );
     }
