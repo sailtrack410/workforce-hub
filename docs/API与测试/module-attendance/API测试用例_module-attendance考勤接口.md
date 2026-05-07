@@ -31,6 +31,9 @@
 - 验证管理员修改已有排班后，会触发已有日结果重算。
 - 验证只有上班卡时会生成 `MISS_PUNCH` 缺卡异常。
 - 验证请假审批通过后，会把覆盖日期的考勤日结果重算为 `LEAVE`，并清理缺卡异常。
+- 验证员工实时打卡使用服务端接收时间，不信任客户端历史 `punchAt`。
+- 验证员工实时打卡不要求客户端传入 `punchAt`。
+- 验证员工实时打卡拒绝 `MANUAL` 等受控来源伪造。
 - 验证测试基线会清理 `att_` 表，避免跨测试污染。
 
 当前已落地自动化测试类：
@@ -78,8 +81,8 @@
 | `ATT-API-002` | P0 | `POST /api/admin/attendance/shifts` | 管理员创建班次 | 管理员已登录 | `09:00:00-18:00:00` | HTTP `200`；`code=0`；返回 `shiftId` 和班段时间 |
 | `ATT-API-003` | P0 | `POST /api/admin/attendance/groups` | 管理员创建考勤组 | 日历、班次已创建 | 绑定日历和默认班次 | HTTP `200`；`code=0`；返回 `groupId` |
 | `ATT-API-004` | P0 | `POST /api/admin/attendance/groups/{groupId}/members` | 添加考勤组成员 | 考勤组已创建 | `userId=2003`、`effectiveFrom=2026-05-01` | HTTP `200`；`code=0`；返回成员记录 |
-| `ATT-API-005` | P0 | `POST /api/employee/attendance/punch` | 员工上班打卡 | 张三已登录且命中考勤组 | `punchAt=2026-05-07T09:00:00`、`ON_DUTY` | HTTP `200`；`code=0`；写入 `att_punch_record` |
-| `ATT-API-006` | P0 | `POST /api/employee/attendance/punch` | 员工下班打卡后生成正常日结果 | `ATT-API-005` 成功 | `punchAt=2026-05-07T18:00:00`、`OFF_DUTY` | HTTP `200`；`dailyResult.resultStatus=NORMAL`；`workMinutes=540`；`exceptionFlag=false` |
+| `ATT-API-005` | P0 | `POST /api/employee/attendance/punch` | 员工上班打卡 | 张三已登录且命中考勤组 | `ON_DUTY`、`sourceType=PC` | HTTP `200`；`code=0`；按服务端接收时间写入 `att_punch_record` |
+| `ATT-API-006` | P0 | `POST /api/employee/attendance/punch` | 员工下班打卡后生成正常日结果 | `ATT-API-005` 成功 | `OFF_DUTY`、`sourceType=PC` | HTTP `200`；`dailyResult.resultStatus=NORMAL`；`workMinutes=540`；`exceptionFlag=false` |
 | `ATT-API-007` | P0 | `GET /api/employee/attendance/daily-results` | 员工查询自己的日结果 | 正常上下班已打卡 | `startDate=endDate=2026-05-07` | 返回 1 条本人日结果；状态为 `NORMAL` |
 | `ATT-API-008` | P0 | `GET /api/employee/attendance/team/daily-results` | 直属上级查询直属下级日结果 | 李四已登录；张三有日结果 | `userId=2003` | 返回张三日结果 |
 
@@ -98,6 +101,9 @@
 | `ATT-API-017` | P0 | `POST /api/admin/attendance/schedules` | 重复排班拒绝 | 张三当天已有 `ACTIVE` 排班 | 再次创建同一员工同一天排班 | HTTP `200`；`code=409`；`message=员工当天已存在有效排班` |
 | `ATT-API-018` | P0 | `PUT /api/admin/attendance/schedules/{scheduleId}` | 修改排班触发已有日结果重算 | 张三按 `10:00-19:00` 排班打卡且日结果为正常 | 把同一天排班改为 `09:00-18:00` | HTTP `200`；`code=0`；日结果 `shiftId` 变为新班次；`resultStatus=ABNORMAL`；`lateMinutes=60`；`exceptionFlag=true` |
 | `ATT-API-019` | P0 | `POST /api/employee/attendance/punch` | 只有上班卡生成缺卡异常 | 张三已命中考勤组 | 只提交 `ON_DUTY` 打卡 | 日结果 `resultStatus=ABNORMAL`；`absenceMinutes=270`；异常列表返回 1 条 `MISS_PUNCH` |
+| `ATT-API-020` | P0 | `POST /api/employee/attendance/punch` | 员工实时打卡不信任客户端历史时间 | 服务端当前时间为 `2026-05-14T10:30:00`；请求体传 `punchAt=2026-05-07T09:00:00` | `ON_DUTY`、`sourceType=PC` | HTTP `200`；响应 `data.punchAt=2026-05-14T10:30:00`；`2026-05-07` 没有打卡记录；`2026-05-14` 有 1 条打卡记录 |
+| `ATT-API-021` | P0 | `POST /api/employee/attendance/punch` | 员工实时打卡不要求客户端时间 | 服务端当前时间为 `2026-05-15T09:05:00` | 请求体不传 `punchAt`，只传 `ON_DUTY`、`sourceType=PC` | HTTP `200`；响应 `data.punchAt=2026-05-15T09:05:00`；写入当天打卡记录 |
+| `ATT-API-022` | P0 | `POST /api/employee/attendance/punch` | 员工实时打卡拒绝受控来源伪造 | 张三已登录 | `ON_DUTY`、`sourceType=MANUAL` | HTTP `200`；`code=400`；`message=员工实时打卡来源仅支持 APP/PC`；不写入打卡记录 |
 
 ## 5.3 请假审批联动考勤重算
 
@@ -114,6 +120,7 @@
 ```bash
 cd server
 mvn -Dtest=ModuleAttendanceApiIntegrationTest test
+mvn -Dtest=ModuleAttendanceApiIntegrationTest#employeePunchShouldAllowMissingClientPunchAt,ModuleAttendanceApiIntegrationTest#employeePunchShouldUseServerReceivedTimeInsteadOfClientPunchAt,ModuleAttendanceApiIntegrationTest#employeePunchShouldRejectControlledManualSourceType test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test
 ```

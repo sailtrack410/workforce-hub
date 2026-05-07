@@ -466,9 +466,9 @@ Cookie: SESSION=...
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `punchAt` | `datetime` | 是 | 打卡时间 |
+| `punchAt` | `datetime` | 否 | 兼容字段；员工实时打卡不信任该字段，实际落库时间以服务端接收时间为准 |
 | `punchType` | `string` | 是 | `ON_DUTY` 或 `OFF_DUTY` |
-| `sourceType` | `string` | 是 | 来源，如 `PC`、`APP` |
+| `sourceType` | `string` | 是 | 员工实时打卡来源，只允许 `PC`、`APP` |
 | `locationText` | `string` | 否 | 位置描述，最多 256 字符 |
 | `ipAddress` | `string` | 否 | IP 地址，最多 64 字符 |
 | `deviceId` | `string` | 否 | 设备 ID，最多 128 字符 |
@@ -477,7 +477,6 @@ Cookie: SESSION=...
 
 ```json
 {
-  "punchAt": "2026-05-07T09:00:00",
   "punchType": "ON_DUTY",
   "sourceType": "PC",
   "locationText": "杭州总部",
@@ -495,7 +494,7 @@ Cookie: SESSION=...
   "data": {
     "punchRecordId": 2052160000000000005,
     "userId": 2003,
-    "punchAt": "2026-05-07T09:00:00",
+    "punchAt": "2026-05-07T09:00:03",
     "punchType": "ON_DUTY",
     "sourceType": "PC",
     "status": "NORMAL",
@@ -521,6 +520,8 @@ Cookie: SESSION=...
 ### 业务规则
 
 - 打卡用户固定取当前员工会话，不允许客户端传 `userId`。
+- 员工实时打卡固定使用服务端接收时间写入 `att_punch_record.punch_at`，客户端 `punchAt` 仅作为兼容字段保留，不参与可信事实计算。
+- 员工实时打卡来源只允许 `APP` 和 `PC`；`MANUAL`、`AUTO`、`TEMPLATE` 等受控来源只能由后台、审批或系统任务等专用入口产生。
 - 打卡前会重新校验数据库中的员工主档状态和账号状态；员工离职、账号停用或主档停用后，即使旧 Session 未过期也不能继续打卡。
 - 打卡后会重算当天 `att_daily_result`。
 - 第一版按当天最早 `ON_DUTY` 和最晚 `OFF_DUTY` 计算。
@@ -528,7 +529,7 @@ Cookie: SESSION=...
 - 如果当天存在已审批通过的请假申请覆盖，日结果重算时写入 `resultStatus=LEAVE`，迟到、早退、缺勤和工时均归零，并清理当天已有异常。
 - 同一日重复打卡会重算日结果，并先清理旧异常再重建异常，避免异常重复累计。
 - 第一版请假覆盖按日期判断，只要已批准请假与考勤日期重叠即按整日请假处理；暂不做半天假、小时假和打卡记录的分钟级合并。
-- 当前计算不扣午休，不处理节假日、补卡、外勤定位和跨天班次。
+- 当前计算不扣午休，不处理节假日、补卡、外勤定位、设备签名和跨天班次。
 
 ---
 

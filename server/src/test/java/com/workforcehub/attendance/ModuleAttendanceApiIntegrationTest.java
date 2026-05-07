@@ -2,19 +2,23 @@ package com.workforcehub.attendance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.support.FixedClockTestConfiguration;
 import com.workforcehub.support.LocalIntegrationTestSupport;
+import com.workforcehub.support.MutableTestClock;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -40,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("api")
+@Import(FixedClockTestConfiguration.class)
 class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
@@ -53,6 +58,9 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private MutableTestClock mutableTestClock;
 
     @Test
     @DisplayName("后台配置考勤基础数据后，员工应能打卡并生成正常日结果，直属上级应能查询团队结果")
@@ -400,16 +408,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));
 
-        mockMvc.perform(post("/api/employee/attendance/punch")
-                .cookie(employeeSession)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {
-                      "punchAt": "2026-05-09T09:00:00",
-                      "punchType": "ON_DUTY",
-                      "sourceType": "PC"
-                    }
-                    """))
+        punch(employeeSession, "2026-05-09T09:00:00", "ON_DUTY")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));
 
@@ -449,6 +448,88 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.message").value("员工当前状态不允许打卡"));
 
         assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-09"));
+    }
+
+    @Test
+    @DisplayName("员工实时打卡不应信任客户端传入的历史打卡时间")
+    void employeePunchShouldUseServerReceivedTimeInsteadOfClientPunchAt() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        mutableTestClock.setTime(LocalDateTime.of(2026, 5, 14, 10, 30));
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_TRUST_" + suffix, "可信打卡日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_TRUST_" + suffix, "可信打卡班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_TRUST_" + suffix, "可信打卡考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchAt": "2026-05-07T09:00:00",
+                      "punchType": "ON_DUTY",
+                      "sourceType": "PC"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.punchAt").value("2026-05-14T10:30:00"));
+
+        assertEquals(0L, punchCount(EMPLOYEE_USER_ID, "2026-05-07"));
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-14"));
+    }
+
+    @Test
+    @DisplayName("员工实时打卡不应要求客户端传入打卡时间")
+    void employeePunchShouldAllowMissingClientPunchAt() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        mutableTestClock.setTime(LocalDateTime.of(2026, 5, 15, 9, 5));
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_NO_CLIENT_TIME_" + suffix, "无客户端时间日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_NO_CLIENT_TIME_" + suffix, "无客户端时间班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_NO_CLIENT_TIME_" + suffix, "无客户端时间考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchType": "ON_DUTY",
+                      "sourceType": "PC"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.punchAt").value("2026-05-15T09:05:00"));
+
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-15"));
+    }
+
+    @Test
+    @DisplayName("员工实时打卡不应允许伪造受控来源")
+    void employeePunchShouldRejectControlledManualSourceType() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchAt": "2026-05-07T09:00:00",
+                      "punchType": "ON_DUTY",
+                      "sourceType": "MANUAL"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("员工实时打卡来源仅支持 APP/PC"));
     }
 
     private long createCalendar(Cookie adminSession, String calendarCode, String calendarName) throws Exception {
@@ -550,6 +631,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     private org.springframework.test.web.servlet.ResultActions punch(Cookie employeeSession,
                                                                      String punchAt,
                                                                      String punchType) throws Exception {
+        mutableTestClock.setTime(LocalDateTime.parse(punchAt));
         return mockMvc.perform(post("/api/employee/attendance/punch")
                 .cookie(employeeSession)
                 .contentType(MediaType.APPLICATION_JSON)

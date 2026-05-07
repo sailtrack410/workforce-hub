@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -64,20 +65,25 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
     private static final String EXCEPTION_LATE = "LATE";
     private static final String EXCEPTION_EARLY_LEAVE = "EARLY_LEAVE";
     private static final String EXCEPTION_MISS_PUNCH = "MISS_PUNCH";
+    private static final String SOURCE_APP = "APP";
+    private static final String SOURCE_PC = "PC";
     private static final String SOURCE_MANUAL = "MANUAL";
     private static final String SOURCE_AUTO = "AUTO";
     private static final String SOURCE_TEMPLATE = "TEMPLATE";
 
     private final AttendanceRepository attendanceRepository;
     private final LeaveQueryService leaveQueryService;
+    private final Clock clock;
     private final TransactionTemplate transactionTemplate;
     private final ConcurrentMap<Long, ReentrantLock> membershipLocks = new ConcurrentHashMap<>();
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              LeaveQueryService leaveQueryService,
+                             Clock clock,
                              TransactionTemplate transactionTemplate) {
         this.attendanceRepository = attendanceRepository;
         this.leaveQueryService = leaveQueryService;
+        this.clock = clock;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -251,12 +257,13 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         Long userId = CurrentUserHolder.requireUserId();
         ensureCanPunch(userId);
         String punchType = normalizePunchType(request.getPunchType());
-        String sourceType = normalizeSourceType(request.getSourceType());
+        String sourceType = normalizeEmployeePunchSourceType(request.getSourceType());
+        LocalDateTime punchAt = LocalDateTime.now(clock);
         Long punchRecordId = IdWorker.getId();
         attendanceRepository.insertPunchRecord(
             punchRecordId,
             userId,
-            request.getPunchAt(),
+            punchAt,
             punchType,
             sourceType,
             trimToNull(request.getLocationText()),
@@ -264,7 +271,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             trimToNull(request.getDeviceId())
         );
 
-        AttendanceDailyResultRow dailyResult = recalculateDailyResult(userId, request.getPunchAt().toLocalDate());
+        AttendanceDailyResultRow dailyResult = recalculateDailyResult(userId, punchAt.toLocalDate());
         return toPunchResponse(attendanceRepository.getPunchRecordOrThrow(punchRecordId), dailyResult);
     }
 
@@ -691,6 +698,14 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
 
     private String normalizeSourceType(String value) {
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeEmployeePunchSourceType(String value) {
+        String normalized = normalizeSourceType(value);
+        if (!SOURCE_APP.equals(normalized) && !SOURCE_PC.equals(normalized)) {
+            throw new BizException(400, "员工实时打卡来源仅支持 APP/PC");
+        }
+        return normalized;
     }
 
     private String normalizeScheduleSource(String value) {

@@ -202,3 +202,42 @@
 - 请假、假期余额、审批和考勤从“各自闭环”进入第一版跨模块一致性闭环。
 - `LEAVE` 日结果让员工端、领导端和后续 Agent 可以直接识别已批准请假日，不再把获批请假误判为缺卡异常。
 - 外部事件触发考勤重算的 SPI 已建立，后续补卡审批、排班批量调整、日历变更可以复用同一扩展方向。
+
+## 2026-05-07 第42审3-1打卡事实可信边界修复
+
+### 背景
+
+第 42 审指出，员工实时打卡接口信任客户端 `punchAt` 和 `sourceType`。这会让员工通过接口伪造历史或未来打卡事实，也可能把员工端来源伪造成 `MANUAL`。由于考勤结果后续会进入月报、异常处理、审批和可能的薪资扣款，这个边界必须先收口。
+
+### 本次处理
+
+- 新增 `TimeConfig`，统一提供生产环境 `Clock` Bean。
+- `AttendanceService.punch()` 改为使用 `LocalDateTime.now(clock)` 作为实时打卡落库时间，不再使用客户端 `punchAt` 作为可信事实。
+- `CreatePunchRecordRequest.punchAt` 改为兼容字段，不再必填；员工端可以只提交打卡类型和来源。
+- 员工实时打卡来源收口为 `APP`、`PC`，拒绝 `MANUAL` 等后台、审批或系统任务专用来源。
+- 补充 `MutableTestClock` 和 `FixedClockTestConfiguration`，让考勤集成测试可以稳定模拟服务端接收时间。
+- 补充三个回归测试：客户端历史 `punchAt` 不生效、缺省客户端 `punchAt` 仍可打卡、员工端伪造 `MANUAL` 被拒绝。
+- 更新 `module-attendance` API 文档和测试用例，明确实时打卡以服务端时间为准。
+
+### 红绿记录
+
+- 红灯：新增 `employeePunchShouldAllowMissingClientPunchAt` 后，请求不传 `punchAt` 返回 `400`，错误为 `打卡时间不能为空`。
+- 绿灯：移除 `punchAt` 必填校验后，`employeePunchShouldAllowMissingClientPunchAt`、`employeePunchShouldUseServerReceivedTimeInsteadOfClientPunchAt`、`employeePunchShouldRejectControlledManualSourceType` 通过。
+- 回归绿灯：`mvn -Dtest=ModuleAttendanceApiIntegrationTest test` 通过，确认打卡可信边界改动没有破坏考勤既有接口测试。
+
+### 当前完成范围增量
+
+- 第 42 审 `3-1` 员工打卡事实可信边界已收口。
+- 员工实时打卡事实时间由服务端产生，客户端时间不能直接改写考勤日。
+- 员工实时打卡来源具备员工端白名单，受控来源不再由员工端直接写入。
+
+### 暂未覆盖
+
+- 补卡审批入口尚未实现，历史打卡修正仍需后续通过审批闭环落地。
+- 外勤定位、IP 白名单、设备签名、人脸核验尚未实现，当前只收口时间和来源可信边界。
+- 服务端时钟依赖运行环境时间，生产部署需要 NTP 或容器宿主机时间同步保障。
+
+### 意义
+
+- 考勤打卡从“客户端自报事实”调整为“服务端生成事实”，后续月度统计、异常处理和 Agent 风险判断才有可信数据基础。
+- `Clock` 抽象让时间相关测试可控，后续补卡、排班、跨日和日历计算可以继续用稳定测试方式覆盖边界。

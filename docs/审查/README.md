@@ -49,6 +49,8 @@
 - `第39审_module-attendance排班覆盖与缺卡专项审查.md`
 - `第40审_module-attendance排班变更重算审查.md`
 - `第41审_module-attendance请假审批联动考勤重算审查.md`
+- `第42审_b425dc2之后至4bf06e6合并复核.md`
+- `第43审_module-attendance打卡事实可信边界修复审查.md`
 
 维护约定：
 
