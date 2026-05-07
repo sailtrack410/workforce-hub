@@ -290,3 +290,45 @@
 - 请假、审批和考勤从“日期级粗联动”升级为“区间级可计算联动”，避免部分时段请假污染整日考勤结果。
 - `LeaveQueryService` 对外暴露的是业务事实区间，不再是无法表达半天假和小时假的布尔值，后续 Agent、月报和异常申诉可以基于更准确的数据继续扩展。
 - 这次修复保留整段请假的 `LEAVE` 语义，同时让部分请假回到 `NORMAL/ABNORMAL` 的真实日结果模型，逻辑边界更自洽。
+
+## 2026-05-08 第42审3-4排班唯一模型修复
+
+### 背景
+
+第 42 审指出，`att_schedule` 数据库唯一键是 `user_id + work_date`，但服务层创建排班时只检查 `ACTIVE` 排班。这样管理员把某天排班改为 `INACTIVE` 后，再次新增同员工同日期排班，服务层会认为没有有效排班并继续插入，最终撞到数据库唯一键并返回 `500`。这是接口语义和数据模型不一致的问题，继续做批量排班、补卡和月报前需要先收口。
+
+### 本次处理
+
+- 明确第一版排班模型：一名员工一天只有一条 `att_schedule` 记录。
+- `INACTIVE` 表示停用该排班，不表示释放当天排班位置。
+- 需要恢复或改班时，管理员应通过 `PUT /api/admin/attendance/schedules/{scheduleId}` 修改原记录，而不是新增第二条记录。
+- `AttendanceRepository.existsActiveSchedule()` 调整为 `existsSchedule()`，按 `userId + workDate` 检查任意状态排班。
+- `AttendanceService.createSchedule()` 在插入前按唯一模型提前返回业务 `409`。
+- 冲突文案统一为 `员工当天已存在排班，请通过修改原排班恢复或改班`，避免前端误以为只有有效排班才冲突。
+- `ModuleAttendanceApiIntegrationTest` 新增 `inactiveScheduleShouldStillRejectCreateForSameUserDate`，覆盖停用后重复创建不会落到数据库重复键异常。
+- 同步更新 `module-attendance` API 文档、测试用例、开发日志和后续开发计划。
+
+### 红绿记录
+
+- 红灯：新增 `inactiveScheduleShouldStillRejectCreateForSameUserDate` 后，停用旧排班再新增同日排班触发 MySQL `att_schedule.uk_user_date` 重复键，接口返回 `500`。
+- 绿灯：创建排班改为检查任意状态排班后，该用例返回 `code=409`，数据库仍只有 1 条排班且状态保持 `INACTIVE`。
+- 绿灯：同步运行 `duplicateActiveScheduleShouldBeRejected`，确认已有 `ACTIVE` 重复排班仍返回同一业务冲突。
+
+### 当前完成范围增量
+
+- 第 42 审 `3-4` 排班状态与唯一键语义冲突已收口。
+- 排班创建接口不再把数据库唯一键异常暴露为系统 `500`。
+- API 契约、测试用例和数据模型说明已统一为“员工单日一条排班记录”。
+
+### 暂未覆盖
+
+- 排班变更历史、版本号和审计流水。
+- 批量排班、排班复制和模板排班。
+- 同一员工同一天来自打卡、排班、请假、补卡的统一重算锁。
+- 多实例部署下排班创建与修改的跨实例锁治理。
+
+### 意义
+
+- 排班状态、接口行为和数据库唯一键现在表达同一套业务规则，后续前端不需要猜测停用后是否能新增。
+- 管理员误操作会得到清晰业务提示，不再变成系统内部错误。
+- 保持原地修改模型后，后续要补排班历史时可以明确新增版本表或变更流水，而不是让多条同日排班混在主表中。

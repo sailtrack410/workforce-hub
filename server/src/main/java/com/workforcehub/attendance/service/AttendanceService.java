@@ -211,8 +211,8 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             AttendanceCalendarRow calendar = attendanceRepository.getCalendarOrThrow(request.getCalendarId());
             ensureActive(calendar.status(), "工作日历已停用");
         }
-        if (attendanceRepository.existsActiveSchedule(request.getUserId(), request.getWorkDate())) {
-            throw new BizException(409, "员工当天已存在有效排班");
+        if (attendanceRepository.existsSchedule(request.getUserId(), request.getWorkDate())) {
+            throw new BizException(409, "员工当天已存在排班，请通过修改原排班恢复或改班");
         }
 
         Long scheduleId = IdWorker.getId();

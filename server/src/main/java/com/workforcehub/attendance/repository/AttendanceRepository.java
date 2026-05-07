@@ -330,13 +330,12 @@ public class AttendanceRepository {
         return rows.get(0);
     }
 
-    public boolean existsActiveSchedule(Long userId, LocalDate workDate) {
+    public boolean existsSchedule(Long userId, LocalDate workDate) {
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
             FROM att_schedule
             WHERE user_id = ?
               AND work_date = ?
-              AND status = 'ACTIVE'
             """, Long.class, userId, workDate);
         return count != null && count > 0;
     }

@@ -302,7 +302,45 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
         createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-12", shiftId, calendarId)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(409))
-            .andExpect(jsonPath("$.message").value("员工当天已存在有效排班"));
+            .andExpect(jsonPath("$.message").value("员工当天已存在排班，请通过修改原排班恢复或改班"));
+    }
+
+    @Test
+    @DisplayName("已停用排班仍占用员工单日排班唯一模型，不能通过新增绕过")
+    void inactiveScheduleShouldStillRejectCreateForSameUserDate() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_INACT_SCH_" + suffix, "停用排班日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_INACT_SCH_" + suffix, "停用排班班次-" + suffix);
+
+        MvcResult scheduleResult = createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-16", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        mockMvc.perform(put("/api/admin/attendance/schedules/{scheduleId}", scheduleId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shiftId": %d,
+                      "calendarId": %d,
+                      "scheduleSource": "MANUAL",
+                      "status": "INACTIVE"
+                    }
+                    """.formatted(shiftId, calendarId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("INACTIVE"));
+
+        createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-16", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("员工当天已存在排班，请通过修改原排班恢复或改班"));
+
+        assertEquals(1L, scheduleCount(EMPLOYEE_USER_ID, "2026-05-16"));
+        assertEquals("INACTIVE", scheduleStatus(scheduleId));
     }
 
     @Test
@@ -728,6 +766,24 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
               AND work_date = ?
             """, Long.class, userId, workDate);
         return count == null ? 0L : count;
+    }
+
+    private long scheduleCount(long userId, String workDate) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_schedule
+            WHERE user_id = ?
+              AND work_date = ?
+            """, Long.class, userId, workDate);
+        return count == null ? 0L : count;
+    }
+
+    private String scheduleStatus(long scheduleId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM att_schedule WHERE id = ?",
+            String.class,
+            scheduleId
+        );
     }
 
     private long activeGroupMemberCount(long userId) {
