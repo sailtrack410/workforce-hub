@@ -39,6 +39,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -368,7 +370,16 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
         LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
         LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
-        if (leaveQueryService.hasApprovedLeaveOnDate(userId, workDate)) {
+        List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods =
+            leaveQueryService.listApprovedLeavePeriodsOnDate(userId, workDate);
+        int requiredWorkMinutes = minutesBetween(shift.startTime(), shift.endTime());
+        int approvedLeaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(
+            approvedLeavePeriods,
+            workDate,
+            shift.startTime(),
+            shift.endTime()
+        );
+        if (approvedLeaveCoveredMinutes >= requiredWorkMinutes) {
             AttendanceDailyResultRow row = upsertDailyResult(
                 userId,
                 workDate,
@@ -386,9 +397,28 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             return attendanceRepository.getDailyResult(userId, workDate);
         }
 
-        int lateMinutes = calculateLateMinutes(firstPunchAt, shift.startTime(), group.lateGraceMinutes());
-        int earlyLeaveMinutes = calculateEarlyLeaveMinutes(lastPunchAt, shift.endTime(), group.earlyLeaveGraceMinutes());
-        int absenceMinutes = calculateAbsenceMinutes(firstPunchAt, lastPunchAt, shift.startTime(), shift.endTime());
+        int lateMinutes = calculateLateMinutes(
+            firstPunchAt,
+            workDate,
+            shift.startTime(),
+            group.lateGraceMinutes(),
+            approvedLeavePeriods
+        );
+        int earlyLeaveMinutes = calculateEarlyLeaveMinutes(
+            lastPunchAt,
+            workDate,
+            shift.endTime(),
+            group.earlyLeaveGraceMinutes(),
+            approvedLeavePeriods
+        );
+        int absenceMinutes = calculateAbsenceMinutes(
+            firstPunchAt,
+            lastPunchAt,
+            workDate,
+            shift.startTime(),
+            shift.endTime(),
+            approvedLeavePeriods
+        );
         int workMinutes = calculateWorkMinutes(firstPunchAt, lastPunchAt);
         boolean exceptionFlag = lateMinutes > 0 || earlyLeaveMinutes > 0 || absenceMinutes > 0;
         String resultStatus = exceptionFlag ? RESULT_ABNORMAL : RESULT_NORMAL;
@@ -490,39 +520,133 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
     }
 
     private int calculateLateMinutes(LocalDateTime firstPunchAt,
+                                     LocalDate workDate,
                                      LocalTime startTime,
-                                     int graceMinutes) {
+                                     int graceMinutes,
+                                     List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
         if (firstPunchAt == null) {
             return 0;
         }
-        LocalDateTime expected = LocalDateTime.of(firstPunchAt.toLocalDate(), startTime).plusMinutes(graceMinutes);
-        return firstPunchAt.isAfter(expected) ? minutesBetween(expected, firstPunchAt) : 0;
+        LocalDateTime expected = LocalDateTime.of(workDate, startTime).plusMinutes(graceMinutes);
+        if (!firstPunchAt.isAfter(expected)) {
+            return 0;
+        }
+        int rawLateMinutes = minutesBetween(expected, firstPunchAt);
+        int leaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, expected, firstPunchAt);
+        return Math.max(0, rawLateMinutes - leaveCoveredMinutes);
     }
 
     private int calculateEarlyLeaveMinutes(LocalDateTime lastPunchAt,
+                                           LocalDate workDate,
                                            LocalTime endTime,
-                                           int graceMinutes) {
+                                           int graceMinutes,
+                                           List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
         if (lastPunchAt == null) {
             return 0;
         }
-        LocalDateTime expected = LocalDateTime.of(lastPunchAt.toLocalDate(), endTime).minusMinutes(graceMinutes);
-        return lastPunchAt.isBefore(expected) ? minutesBetween(lastPunchAt, expected) : 0;
+        LocalDateTime expected = LocalDateTime.of(workDate, endTime).minusMinutes(graceMinutes);
+        if (!lastPunchAt.isBefore(expected)) {
+            return 0;
+        }
+        int rawEarlyLeaveMinutes = minutesBetween(lastPunchAt, expected);
+        int leaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, lastPunchAt, expected);
+        return Math.max(0, rawEarlyLeaveMinutes - leaveCoveredMinutes);
     }
 
     private int calculateAbsenceMinutes(LocalDateTime firstPunchAt,
                                         LocalDateTime lastPunchAt,
+                                        LocalDate workDate,
                                         LocalTime startTime,
-                                        LocalTime endTime) {
+                                        LocalTime endTime,
+                                        List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
+        int rawAbsenceMinutes;
         if (firstPunchAt == null && lastPunchAt == null) {
-            return minutesBetween(startTime, endTime);
+            rawAbsenceMinutes = minutesBetween(startTime, endTime);
+            return Math.max(0, rawAbsenceMinutes - calculateApprovedLeaveCoveredMinutes(
+                approvedLeavePeriods,
+                workDate,
+                startTime,
+                endTime
+            ));
         }
         if (firstPunchAt == null) {
-            return minutesBetween(startTime, endTime) / 2;
+            rawAbsenceMinutes = minutesBetween(startTime, endTime) / 2;
+            return Math.max(0, rawAbsenceMinutes - calculateApprovedLeaveCoveredMinutes(
+                approvedLeavePeriods,
+                workDate,
+                startTime,
+                startTime.plusMinutes(rawAbsenceMinutes)
+            ));
         }
         if (lastPunchAt == null) {
-            return minutesBetween(startTime, endTime) / 2;
+            rawAbsenceMinutes = minutesBetween(startTime, endTime) / 2;
+            return Math.max(0, rawAbsenceMinutes - calculateApprovedLeaveCoveredMinutes(
+                approvedLeavePeriods,
+                workDate,
+                endTime.minusMinutes(rawAbsenceMinutes),
+                endTime
+            ));
         }
         return 0;
+    }
+
+    private int calculateApprovedLeaveCoveredMinutes(List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods,
+                                                     LocalDate workDate,
+                                                     LocalTime startTime,
+                                                     LocalTime endTime) {
+        if (approvedLeavePeriods.isEmpty() || !endTime.isAfter(startTime)) {
+            return 0;
+        }
+        LocalDateTime expectedStart = LocalDateTime.of(workDate, startTime);
+        LocalDateTime expectedEnd = LocalDateTime.of(workDate, endTime);
+        return calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, expectedStart, expectedEnd);
+    }
+
+    private int calculateApprovedLeaveCoveredMinutes(List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods,
+                                                     LocalDateTime expectedStart,
+                                                     LocalDateTime expectedEnd) {
+        if (approvedLeavePeriods.isEmpty() || !expectedEnd.isAfter(expectedStart)) {
+            return 0;
+        }
+        List<TimeRange> coveredRanges = approvedLeavePeriods.stream()
+            .map(period -> overlapRange(period, expectedStart, expectedEnd))
+            .filter(range -> range != null)
+            .sorted(Comparator.comparing(TimeRange::startAt))
+            .toList();
+        if (coveredRanges.isEmpty()) {
+            return 0;
+        }
+        List<TimeRange> mergedRanges = new ArrayList<>();
+        for (TimeRange range : coveredRanges) {
+            if (mergedRanges.isEmpty()) {
+                mergedRanges.add(range);
+                continue;
+            }
+            TimeRange last = mergedRanges.get(mergedRanges.size() - 1);
+            if (!range.startAt().isAfter(last.endAt())) {
+                LocalDateTime mergedEnd = range.endAt().isAfter(last.endAt()) ? range.endAt() : last.endAt();
+                mergedRanges.set(mergedRanges.size() - 1, new TimeRange(last.startAt(), mergedEnd));
+                continue;
+            }
+            mergedRanges.add(range);
+        }
+        return mergedRanges.stream()
+            .mapToInt(range -> minutesBetween(range.startAt(), range.endAt()))
+            .sum();
+    }
+
+    private TimeRange overlapRange(LeaveQueryService.ApprovedLeavePeriod period,
+                                   LocalDateTime expectedStart,
+                                   LocalDateTime expectedEnd) {
+        LocalDateTime overlapStart = period.startAt().isAfter(expectedStart) ? period.startAt() : expectedStart;
+        LocalDateTime overlapEnd = period.endAt().isBefore(expectedEnd) ? period.endAt() : expectedEnd;
+        if (!overlapEnd.isAfter(overlapStart)) {
+            return null;
+        }
+        return new TimeRange(overlapStart, overlapEnd);
+    }
+
+    private record TimeRange(LocalDateTime startAt, LocalDateTime endAt) {
     }
 
     private int calculateWorkMinutes(LocalDateTime firstPunchAt, LocalDateTime lastPunchAt) {

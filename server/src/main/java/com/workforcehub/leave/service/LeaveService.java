@@ -183,8 +183,8 @@ public class LeaveService implements LeaveQueryService {
     }
 
     @Override
-    public boolean hasApprovedLeaveOnDate(Long userId, LocalDate workDate) {
-        return leaveRepository.hasApprovedLeaveOnDate(userId, workDate);
+    public List<ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate) {
+        return leaveRepository.listApprovedLeavePeriodsOnDate(userId, workDate);
     }
 
     private LeaveTypeResponse toLeaveTypeResponse(LeaveTypeRow row) {

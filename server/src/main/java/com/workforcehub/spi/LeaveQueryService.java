@@ -1,6 +1,7 @@
 package com.workforcehub.spi;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -28,11 +29,14 @@ public interface LeaveQueryService {
     int getAvailableMinutes(Long userId, Long leaveTypeId);
 
     /**
-     * 判断用户某天是否存在已审批通过的请假覆盖。
+     * 查询用户某天已审批通过请假覆盖的时间段。
      *
      * @param userId 用户ID
      * @param workDate 考勤日期
-     * @return 存在已批准请假返回 true
+     * @return 已批准请假时间段，无覆盖返回空列表
      */
-    boolean hasApprovedLeaveOnDate(Long userId, LocalDate workDate);
+    List<ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate);
+
+    record ApprovedLeavePeriod(LocalDateTime startAt, LocalDateTime endAt) {
+    }
 }

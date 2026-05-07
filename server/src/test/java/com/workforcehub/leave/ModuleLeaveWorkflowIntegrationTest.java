@@ -2,6 +2,8 @@ package com.workforcehub.leave;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.support.FixedClockTestConfiguration;
+import com.workforcehub.support.MutableTestClock;
 import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
 import com.workforcehub.support.WorkflowFlowableTestConfiguration;
 import jakarta.servlet.http.Cookie;
@@ -21,6 +23,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDateTime;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -36,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("api")
-@Import(WorkflowFlowableTestConfiguration.class)
+@Import({WorkflowFlowableTestConfiguration.class, FixedClockTestConfiguration.class})
 class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
@@ -56,6 +60,9 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private MutableTestClock mutableTestClock;
 
     @Test
     @DisplayName("员工请假余额不足时应在提交阶段被拦截且不生成审批申请")
@@ -122,6 +129,125 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
     }
 
     @Test
+    @DisplayName("小时假审批通过后只应抵扣实际覆盖的缺勤分钟")
+    void approvedHourlyLeaveShouldOnlyOffsetCoveredAbsenceMinutes() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+        seedAttendanceRuleForEmployee();
+
+        LeaveApprovalScenario scenario = submitLeaveRequest(
+            employeeSession,
+            leaveTypeId,
+            "2026-05-07 09:00:00",
+            "2026-05-07 10:00:00",
+            60,
+            "上午临时请假一小时"
+        );
+        approveManagerTask(managerSession, scenario.managerTask().getId());
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-07")
+                .param("endDate", "2026-05-07"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
+            .andExpect(jsonPath("$.data[0].absenceMinutes").value(480));
+
+        assertEquals(1L, attendanceExceptionCount());
+    }
+
+    @Test
+    @DisplayName("重叠小时假审批通过后不应重复抵扣同一段缺勤")
+    void overlappingApprovedHourlyLeavesShouldNotDoubleOffsetAbsenceMinutes() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+        seedAttendanceRuleForEmployee();
+
+        LeaveApprovalScenario firstScenario = submitLeaveRequest(
+            employeeSession,
+            leaveTypeId,
+            "2026-05-07 09:00:00",
+            "2026-05-07 10:00:00",
+            60,
+            "上午临时请假一小时"
+        );
+        approveManagerTask(managerSession, firstScenario.managerTask().getId());
+        LeaveApprovalScenario secondScenario = submitLeaveRequest(
+            employeeSession,
+            leaveTypeId,
+            "2026-05-07 09:30:00",
+            "2026-05-07 10:30:00",
+            60,
+            "继续请假一小时"
+        );
+        approveManagerTask(managerSession, secondScenario.managerTask().getId());
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-07")
+                .param("endDate", "2026-05-07"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
+            .andExpect(jsonPath("$.data[0].absenceMinutes").value(450));
+
+        assertEquals(1L, attendanceExceptionCount());
+    }
+
+    @Test
+    @DisplayName("小时假审批通过后应抵扣对应迟到和早退窗口")
+    void approvedHourlyLeaveShouldOffsetLateAndEarlyWindows() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+        seedAttendanceRuleForEmployee();
+
+        LeaveApprovalScenario morningScenario = submitLeaveRequest(
+            employeeSession,
+            leaveTypeId,
+            "2026-05-07 09:00:00",
+            "2026-05-07 10:00:00",
+            60,
+            "上午请假一小时"
+        );
+        approveManagerTask(managerSession, morningScenario.managerTask().getId());
+        LeaveApprovalScenario eveningScenario = submitLeaveRequest(
+            employeeSession,
+            leaveTypeId,
+            "2026-05-07 17:00:00",
+            "2026-05-07 18:00:00",
+            60,
+            "下午请假一小时"
+        );
+        approveManagerTask(managerSession, eveningScenario.managerTask().getId());
+
+        punch(employeeSession, "2026-05-07T10:00:00", "ON_DUTY");
+        punch(employeeSession, "2026-05-07T17:00:00", "OFF_DUTY");
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-07")
+                .param("endDate", "2026-05-07"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(false))
+            .andExpect(jsonPath("$.data[0].lateMinutes").value(0))
+            .andExpect(jsonPath("$.data[0].earlyLeaveMinutes").value(0))
+            .andExpect(jsonPath("$.data[0].absenceMinutes").value(0));
+
+        assertEquals(0L, attendanceExceptionCount());
+    }
+
+    @Test
     @DisplayName("请假审批驳回后不应扣减假期余额")
     void rejectedLeaveRequestShouldNotDeductBalance() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -148,10 +274,26 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
     }
 
     private LeaveApprovalScenario submitLeaveRequest(Cookie employeeSession, long leaveTypeId) throws Exception {
+        return submitLeaveRequest(
+            employeeSession,
+            leaveTypeId,
+            "2026-05-07 09:00:00",
+            "2026-05-07 18:00:00",
+            480,
+            "家中有事请假一天"
+        );
+    }
+
+    private LeaveApprovalScenario submitLeaveRequest(Cookie employeeSession,
+                                                     long leaveTypeId,
+                                                     String startAt,
+                                                     String endAt,
+                                                     int durationMinutes,
+                                                     String reason) throws Exception {
         MvcResult submitResult = mockMvc.perform(post("/api/employee/workflow/leave-requests")
                 .cookie(employeeSession)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(leaveRequestJson(leaveTypeId)))
+                .content(leaveRequestJson(leaveTypeId, startAt, endAt, durationMinutes, reason)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
@@ -279,15 +421,44 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
     }
 
     private String leaveRequestJson(long leaveTypeId) {
+        return leaveRequestJson(
+            leaveTypeId,
+            "2026-05-07 09:00:00",
+            "2026-05-07 18:00:00",
+            480,
+            "家中有事请假一天"
+        );
+    }
+
+    private String leaveRequestJson(long leaveTypeId,
+                                    String startAt,
+                                    String endAt,
+                                    int durationMinutes,
+                                    String reason) {
         return """
             {
               "leaveTypeId": %d,
-              "startAt": "2026-05-07 09:00:00",
-              "endAt": "2026-05-07 18:00:00",
-              "durationMinutes": 480,
-              "reason": "家中有事请假一天"
+              "startAt": "%s",
+              "endAt": "%s",
+              "durationMinutes": %d,
+              "reason": "%s"
             }
-            """.formatted(leaveTypeId);
+            """.formatted(leaveTypeId, startAt, endAt, durationMinutes, reason);
+    }
+
+    private void punch(Cookie employeeSession, String punchAt, String punchType) throws Exception {
+        mutableTestClock.setTime(LocalDateTime.parse(punchAt));
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchType": "%s",
+                      "sourceType": "PC"
+                    }
+                    """.formatted(punchType)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
     }
 
     private Cookie loginEmployee() throws Exception {

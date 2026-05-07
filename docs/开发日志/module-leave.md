@@ -97,3 +97,41 @@
 
 - 请假事实查询从 workflow 内部表结构中抽象出来，降低考勤、Agent 后续接入时对流程内部实现的耦合。
 - 后续如果新增销假、请假变更、请假撤回后返还等能力，可以继续在 `LeaveQueryService` 上扩展统一查询语义。
+
+## 2026-05-08 已批准请假区间查询升级
+
+### 背景
+
+第 42 审 `3-2` 指出，考勤侧使用 `hasApprovedLeaveOnDate(userId, workDate)` 只能知道当天是否存在已批准请假，无法区分整日请假、半天假和小时假。由于 workflow 请假明细已经保存 `start_at/end_at` 和分钟级时长，leave 对外 SPI 继续返回布尔值会把考勤计算锁死在日期级豁免模型上。
+
+### 本次处理
+
+- `LeaveQueryService` 将 `hasApprovedLeaveOnDate()` 替换为 `listApprovedLeavePeriodsOnDate()`。
+- 新增 `ApprovedLeavePeriod(startAt, endAt)` 作为跨模块查询结果，明确对外提供已批准请假事实区间。
+- `LeaveRepository` 查询 `wf_request` 与 `wf_req_leave`，只返回 `biz_type=LEAVE`、`status=APPROVED`、未删除且与目标日期有交集的请假区间。
+- 查询条件从 `DATE(start_at) <= workDate <= DATE(end_at)` 改为 `start_at < nextDayStart AND end_at > dayStart`，避免对列套函数，也能表达跨日区间与目标日期的交集。
+- `LeaveService` 继续作为 SPI 实现方，考勤侧不直接读取 workflow 或 leave 内部表。
+
+### 红绿记录
+
+- 红灯：`approvedHourlyLeaveShouldOnlyOffsetCoveredAbsenceMinutes` 证明布尔覆盖会把 `09:00-10:00` 小时假误算为整日 `LEAVE`。
+- 绿灯：区间查询接入考勤计算后，小时假只抵扣实际覆盖分钟。
+- 红灯：`overlappingApprovedHourlyLeavesShouldNotDoubleOffsetAbsenceMinutes` 证明两段重叠小时假不能按简单分钟求和。
+- 绿灯：考勤侧合并区间后，重叠部分只抵扣一次。
+
+### 当前完成范围增量
+
+- `module-leave` 对外提供已批准请假区间，不再只提供日期级布尔判断。
+- `module-attendance` 可以基于 leave SPI 完成整段 `LEAVE` 和部分请假分钟抵扣两类计算。
+- 跨模块边界仍保持在 SPI 层，未引入 attendance 对 workflow Repository 的直接依赖。
+
+### 暂未覆盖
+
+- 请假变更、销假、撤回后返还对已批准区间查询的影响。
+- 节假日、休息日和工作日历对请假扣减分钟数的精细过滤。
+- 提交冻结余额、审批通过转扣减、驳回或撤回解冻。
+
+### 意义
+
+- leave 模块从“能告诉考勤当天有没有请假”升级为“能告诉考勤当天哪些时间段已经请假”，支撑小时假和半天假的真实计算。
+- 该 SPI 以后也可以给 Agent、月报和异常申诉复用，避免各模块重复拼 workflow 明细 SQL。

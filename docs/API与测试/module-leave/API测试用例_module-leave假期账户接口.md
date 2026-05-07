@@ -8,7 +8,7 @@
 | 文档版本 | `v0.1` |
 | 适用范围 | 假种创建、余额调整、员工余额查询、workflow 余额校验与扣减、审批通过联动考勤重算 |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版自动化测试已落地，已覆盖审批通过扣减余额和联动考勤日结果重算 |
+| 当前状态 | 第一版自动化测试已落地，已覆盖审批通过扣减余额、联动考勤日结果重算和已批准请假分钟级考勤覆盖 |
 
 ---
 
@@ -24,7 +24,9 @@
 - 验证请假提交前余额不足会被拦截，且不生成审批申请。
 - 验证余额足够时可以提交审批。
 - 验证审批通过后扣减余额并写 `DEDUCT` 流水。
-- 验证审批通过后触发考勤重算，把覆盖日期的日结果识别为 `LEAVE`。
+- 验证审批通过后触发考勤重算，整段班次请假识别为 `LEAVE`。
+- 验证小时假只抵扣实际覆盖的迟到、早退或缺勤分钟。
+- 验证重叠小时假不重复抵扣同一段考勤窗口。
 - 验证审批驳回不扣减余额。
 - 验证新 `lv_` 表会被普通集成测试和 workflow 集成测试基线清理，避免测试污染。
 
@@ -85,6 +87,9 @@
 | `LV-WF-003` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` | 审批通过扣减余额 | `LV-WF-002` 成功；李四已登录 | 审批通过 | 余额从 960 扣到 480；写入 `txn_type=DEDUCT`、`change_minutes=-480`、`source_type=WORKFLOW_REQUEST` |
 | `LV-WF-004` | P0 | `POST /api/employee/workflow/tasks/{taskId}/reject` | 审批驳回不扣减余额 | 张三余额 960 分钟；请假已提交 | 审批驳回 | 余额仍为 960；不写 `DEDUCT` 流水 |
 | `LV-WF-005` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` + `GET /api/employee/attendance/daily-results` | 审批通过联动考勤日结果为请假 | 张三有有效考勤组；张三提交 `2026-05-07` 请假；李四为直属审批人 | 李四审批通过后，张三查询 `2026-05-07` 日结果 | 日结果 `resultStatus=LEAVE`；`absenceMinutes=0`；`exceptionFlag=false`；当天无 `att_exception` |
+| `LV-WF-006` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` + `GET /api/employee/attendance/daily-results` | 小时假审批通过后只抵扣实际缺勤分钟 | 张三有有效考勤组；张三提交 `09:00-10:00` 小时假且当天无打卡 | 李四审批通过后查询日结果 | 日结果 `resultStatus=ABNORMAL`；`absenceMinutes=480`；不会按整日 `LEAVE` 处理 |
+| `LV-WF-007` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` + `GET /api/employee/attendance/daily-results` | 重叠小时假不重复抵扣同一段缺勤 | 张三提交 `09:00-10:00`、`09:30-10:30` 两段小时假且当天无打卡 | 两段请假均审批通过 | 合并覆盖 90 分钟；`absenceMinutes=450` |
+| `LV-WF-008` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` + `POST /api/employee/attendance/punch` | 小时假抵扣迟到和早退窗口 | 张三提交 `09:00-10:00`、`17:00-18:00` 两段小时假；实际 `10:00` 上班、`17:00` 下班 | 请假审批通过后员工打卡 | 日结果 `resultStatus=NORMAL`；迟到、早退、缺勤均为 0 |
 
 ---
 
@@ -98,6 +103,7 @@ mvn -Dtest=ModuleLeaveApiIntegrationTest test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest test
 mvn -Dtest=ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleWorkflowFlowableIntegrationTest test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult test
+mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedHourlyLeaveShouldOnlyOffsetCoveredAbsenceMinutes,ModuleLeaveWorkflowIntegrationTest#overlappingApprovedHourlyLeavesShouldNotDoubleOffsetAbsenceMinutes,ModuleLeaveWorkflowIntegrationTest#approvedHourlyLeaveShouldOffsetLateAndEarlyWindows test
 ```
 
 建议进入下一节点前执行：
@@ -115,7 +121,6 @@ mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWri
 - 年假规则按工龄自动发放。
 - 结转、过期清零和自动发放任务。
 - 节假日、排班、考勤日历对扣减分钟数的影响。
-- 半天假、小时假与考勤打卡结果的分钟级合并。
 - 提交时冻结余额，审批通过转扣减，驳回或撤回解冻。
 - 管理员查询全部员工假期账户列表。
 - 员工余额流水明细查询。

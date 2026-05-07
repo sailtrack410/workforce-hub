@@ -1,10 +1,12 @@
 package com.workforcehub.leave.repository;
 
 import com.workforcehub.common.exception.BizException;
+import com.workforcehub.spi.LeaveQueryService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -239,19 +241,28 @@ public class LeaveRepository {
         return minutes == null ? 0 : minutes;
     }
 
-    public boolean hasApprovedLeaveOnDate(Long userId, LocalDate workDate) {
-        Long count = jdbcTemplate.queryForObject("""
-            SELECT COUNT(*)
+    public List<LeaveQueryService.ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate) {
+        LocalDateTime dayStart = workDate.atStartOfDay();
+        LocalDateTime nextDayStart = workDate.plusDays(1).atStartOfDay();
+        return jdbcTemplate.query("""
+            SELECT wrl.start_at, wrl.end_at
             FROM wf_request wr
             JOIN wf_req_leave wrl ON wrl.request_id = wr.id
             WHERE wr.applicant_user_id = ?
               AND wr.biz_type = 'LEAVE'
               AND wr.status = 'APPROVED'
-              AND DATE(wrl.start_at) <= ?
-              AND DATE(wrl.end_at) >= ?
+              AND wrl.start_at < ?
+              AND wrl.end_at > ?
               AND wr.is_deleted = 0
-            """, Long.class, userId, workDate, workDate);
-        return count != null && count > 0;
+            """,
+            (rs, rowNum) -> new LeaveQueryService.ApprovedLeavePeriod(
+                rs.getTimestamp("start_at").toLocalDateTime(),
+                rs.getTimestamp("end_at").toLocalDateTime()
+            ),
+            userId,
+            Timestamp.valueOf(nextDayStart),
+            Timestamp.valueOf(dayStart)
+        );
     }
 
     private String accountSelectSql() {
