@@ -47,6 +47,7 @@
 - `第37审_第31审之后至b425dc2复核.md`
 - `第38审_module-attendance第一版考勤闭环审查.md`
 - `第39审_module-attendance排班覆盖与缺卡专项审查.md`
+- `第40审_module-attendance排班变更重算审查.md`
 
 维护约定：
 

@@ -9,13 +9,13 @@
 | 适用范围 | 工作日历、班次、考勤组、考勤组成员、排班、员工打卡、日结果、异常查询 |
 | 对应模块 | `server/module-attendance` |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版考勤基础配置、排班覆盖、打卡、日结果计算和异常识别已实现；补卡审批联动、请假影响考勤待后续迭代 |
+| 当前状态 | 第一版考勤基础配置、排班覆盖、排班变更重算、打卡、日结果计算和异常识别已实现；补卡审批联动、请假影响考勤待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `5` 个后台接口、`4` 个员工端接口。
+当前已实现 `6` 个后台接口、`4` 个员工端接口。
 
 后台接口：
 
@@ -24,6 +24,7 @@
 - `POST /api/admin/attendance/groups`
 - `POST /api/admin/attendance/groups/{groupId}/members`
 - `POST /api/admin/attendance/schedules`
+- `PUT /api/admin/attendance/schedules/{scheduleId}`
 
 员工端接口：
 
@@ -386,7 +387,72 @@ Cookie: SESSION=...
 
 ---
 
-## 5.6 员工打卡
+## 5.6 修改员工排班
+
+```http
+PUT /api/admin/attendance/schedules/{scheduleId}
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 路径参数
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `scheduleId` | `long` | 是 | 排班 ID |
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `shiftId` | `long` | 是 | 启用状态班次 |
+| `calendarId` | `long` | 否 | 工作日历 ID，传入时必须启用 |
+| `scheduleSource` | `string` | 是 | `MANUAL`、`AUTO` 或 `TEMPLATE` |
+| `status` | `string` | 是 | `ACTIVE` 或 `INACTIVE` |
+
+示例：
+
+```json
+{
+  "shiftId": 2052160000000000008,
+  "calendarId": 2052160000000000001,
+  "scheduleSource": "MANUAL",
+  "status": "ACTIVE"
+}
+```
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "scheduleId": 2052160000000000005,
+    "userId": 2003,
+    "workDate": "2026-05-10",
+    "shiftId": 2052160000000000008,
+    "calendarId": 2052160000000000001,
+    "scheduleSource": "MANUAL",
+    "status": "ACTIVE"
+  },
+  "requestId": "..."
+}
+```
+
+### 业务规则
+
+- 排班不存在时返回 `code=404`。
+- 修改排班时会锁定原排班记录和员工主档，避免同一员工排班变更与打卡计算交叉写入。
+- 新班次必须存在且启用。
+- 传入工作日历时，工作日历必须存在且启用。
+- 如果该员工该日期已有 `att_daily_result`，修改排班后会在同一事务内重算日结果和异常。
+- 当排班改为 `INACTIVE` 后，日结果重算会回退到考勤组默认班次。
+- 第一版为原地修改模型，不保留排班变更历史；如果后续需要审计历史，应补版本表或变更流水。
+
+---
+
+## 5.7 员工打卡
 
 ```http
 POST /api/employee/attendance/punch
@@ -462,7 +528,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.7 员工查询自己的日结果
+## 5.8 员工查询自己的日结果
 
 ```http
 GET /api/employee/attendance/daily-results?startDate=2026-05-07&endDate=2026-05-07
@@ -506,7 +572,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.8 员工查询自己的异常
+## 5.9 员工查询自己的异常
 
 ```http
 GET /api/employee/attendance/exceptions?startDate=2026-05-08&endDate=2026-05-08
@@ -541,7 +607,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.9 直属上级查询团队日结果
+## 5.10 直属上级查询团队日结果
 
 ```http
 GET /api/employee/attendance/team/daily-results?userId=2003&startDate=2026-05-07&endDate=2026-05-07

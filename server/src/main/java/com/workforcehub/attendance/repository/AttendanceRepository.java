@@ -383,6 +383,49 @@ public class AttendanceRepository {
         return rows.get(0);
     }
 
+    public AttendanceScheduleRow getScheduleForUpdateOrThrow(Long scheduleId) {
+        List<AttendanceScheduleRow> rows = jdbcTemplate.query("""
+            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
+            FROM att_schedule
+            WHERE id = ?
+            LIMIT 1
+            FOR UPDATE
+            """,
+            this::mapSchedule,
+            scheduleId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "排班不存在");
+        }
+        return rows.get(0);
+    }
+
+    public void updateSchedule(Long scheduleId,
+                               Long shiftId,
+                               Long calendarId,
+                               String scheduleSource,
+                               String status,
+                               Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE att_schedule
+            SET shift_id = ?,
+                calendar_id = ?,
+                schedule_source = ?,
+                status = ?,
+                operator_id = ?,
+                updated_by = ?
+            WHERE id = ?
+            """,
+            shiftId,
+            calendarId,
+            scheduleSource,
+            status,
+            operatorId,
+            operatorId,
+            scheduleId
+        );
+    }
+
     public AttendanceGroupRow getEffectiveGroupForUpdate(Long userId, LocalDate workDate) {
         List<AttendanceGroupRow> rows = jdbcTemplate.query("""
             SELECT g.id, g.group_code, g.group_name, g.calendar_id, g.default_shift_id,

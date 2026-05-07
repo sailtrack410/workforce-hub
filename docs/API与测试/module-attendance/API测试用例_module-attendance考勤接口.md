@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-attendance` 考勤接口测试用例 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 考勤基础配置、排班覆盖、打卡、日结果、异常识别、直属上级团队查询 |
+| 适用范围 | 考勤基础配置、排班覆盖、排班变更重算、打卡、日结果、异常识别、直属上级团队查询 |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次和缺卡专项保护 |
+| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次、排班变更重算和缺卡专项保护 |
 
 ---
 
@@ -28,6 +28,7 @@
 - 验证员工登录后被离职，旧 Session 也不能继续打卡。
 - 验证管理员排班后，日结果计算优先使用排班班次而不是考勤组默认班次。
 - 验证同一员工同一天重复创建有效排班会被拒绝。
+- 验证管理员修改已有排班后，会触发已有日结果重算。
 - 验证只有上班卡时会生成 `MISS_PUNCH` 缺卡异常。
 - 验证测试基线会清理 `att_` 表，避免跨测试污染。
 
@@ -93,7 +94,8 @@
 | `ATT-API-015` | P0 | `POST /api/admin/attendance/schedules` | 管理员创建排班 | 张三已加入考勤组；存在默认班次和另一个排班班次 | `workDate=2026-05-10`、`shiftId=排班班次` | HTTP `200`；`code=0`；返回 `scheduleId` |
 | `ATT-API-016` | P0 | `POST /api/employee/attendance/punch` | 排班班次覆盖考勤组默认班次 | `ATT-API-015` 成功 | 张三按排班班次 `10:00-19:00` 打上下班卡 | 日结果 `scheduleId` 为排班 ID，`shiftId` 为排班班次，`resultStatus=NORMAL` |
 | `ATT-API-017` | P0 | `POST /api/admin/attendance/schedules` | 重复排班拒绝 | 张三当天已有 `ACTIVE` 排班 | 再次创建同一员工同一天排班 | HTTP `200`；`code=409`；`message=员工当天已存在有效排班` |
-| `ATT-API-018` | P0 | `POST /api/employee/attendance/punch` | 只有上班卡生成缺卡异常 | 张三已命中考勤组 | 只提交 `ON_DUTY` 打卡 | 日结果 `resultStatus=ABNORMAL`；`absenceMinutes=270`；异常列表返回 1 条 `MISS_PUNCH` |
+| `ATT-API-018` | P0 | `PUT /api/admin/attendance/schedules/{scheduleId}` | 修改排班触发已有日结果重算 | 张三按 `10:00-19:00` 排班打卡且日结果为正常 | 把同一天排班改为 `09:00-18:00` | HTTP `200`；`code=0`；日结果 `shiftId` 变为新班次；`resultStatus=ABNORMAL`；`lateMinutes=60`；`exceptionFlag=true` |
+| `ATT-API-019` | P0 | `POST /api/employee/attendance/punch` | 只有上班卡生成缺卡异常 | 张三已命中考勤组 | 只提交 `ON_DUTY` 打卡 | 日结果 `resultStatus=ABNORMAL`；`absenceMinutes=270`；异常列表返回 1 条 `MISS_PUNCH` |
 
 ---
 

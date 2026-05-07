@@ -10,11 +10,13 @@ import com.workforcehub.attendance.dto.CreateAttendanceCalendarRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceGroupRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceScheduleRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceShiftRequest;
+import com.workforcehub.attendance.dto.UpdateAttendanceScheduleRequest;
 import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.response.R;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -60,5 +62,11 @@ public class AdminAttendanceController {
     public R<AttendanceScheduleResponse> createSchedule(
             @Valid @RequestBody CreateAttendanceScheduleRequest request) {
         return R.ok(attendanceService.createSchedule(request));
+    }
+
+    @PutMapping("/schedules/{scheduleId}")
+    public R<AttendanceScheduleResponse> updateSchedule(@PathVariable Long scheduleId,
+                                                        @Valid @RequestBody UpdateAttendanceScheduleRequest request) {
+        return R.ok(attendanceService.updateSchedule(scheduleId, request));
     }
 }

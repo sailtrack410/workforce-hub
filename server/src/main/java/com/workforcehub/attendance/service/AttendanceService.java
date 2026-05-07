@@ -15,6 +15,7 @@ import com.workforcehub.attendance.dto.CreateAttendanceScheduleRequest;
 import com.workforcehub.attendance.dto.CreateAttendanceShiftRequest;
 import com.workforcehub.attendance.dto.CreatePunchRecordRequest;
 import com.workforcehub.attendance.dto.PunchRecordResponse;
+import com.workforcehub.attendance.dto.UpdateAttendanceScheduleRequest;
 import com.workforcehub.attendance.repository.AttendanceCalendarRow;
 import com.workforcehub.attendance.repository.AttendanceDailyResultRow;
 import com.workforcehub.attendance.repository.AttendanceExceptionRow;
@@ -210,6 +211,32 @@ public class AttendanceService implements AttendanceQueryService {
             normalizeScheduleSource(request.getScheduleSource()),
             operatorId
         );
+        return toScheduleResponse(attendanceRepository.getScheduleOrThrow(scheduleId));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public AttendanceScheduleResponse updateSchedule(Long scheduleId, UpdateAttendanceScheduleRequest request) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        AttendanceScheduleRow existing = attendanceRepository.getScheduleForUpdateOrThrow(scheduleId);
+        attendanceRepository.lockActiveUserOrThrow(existing.userId());
+        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(request.getShiftId());
+        ensureActive(shift.status(), "班次已停用");
+        if (request.getCalendarId() != null) {
+            AttendanceCalendarRow calendar = attendanceRepository.getCalendarOrThrow(request.getCalendarId());
+            ensureActive(calendar.status(), "工作日历已停用");
+        }
+
+        attendanceRepository.updateSchedule(
+            scheduleId,
+            shift.shiftId(),
+            request.getCalendarId(),
+            normalizeScheduleSource(request.getScheduleSource()),
+            normalizeStatus(request.getStatus()),
+            operatorId
+        );
+        if (attendanceRepository.getDailyResult(existing.userId(), existing.workDate()) != null) {
+            recalculateDailyResult(existing.userId(), existing.workDate());
+        }
         return toScheduleResponse(attendanceRepository.getScheduleOrThrow(scheduleId));
     }
 

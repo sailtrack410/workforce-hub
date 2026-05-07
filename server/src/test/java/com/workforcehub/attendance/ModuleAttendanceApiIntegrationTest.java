@@ -298,6 +298,64 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("管理员修改已有排班后，应重算已有日结果")
+    void updatingScheduleShouldRecalculateExistingDailyResult() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_UP_SCH_" + suffix, "改排日历-" + suffix);
+        long defaultShiftId = createShift(adminSession, "SHIFT_UP_DEF_" + suffix, "改排默认班次-" + suffix);
+        long firstShiftId = createShift(adminSession, "SHIFT_UP_A_" + suffix, "改排班次A-" + suffix, "10:00:00", "19:00:00");
+        long secondShiftId = createShift(adminSession, "SHIFT_UP_B_" + suffix, "改排班次B-" + suffix, "09:00:00", "18:00:00");
+        long groupId = createGroup(adminSession, "GROUP_UP_SCH_" + suffix, "改排考勤组-" + suffix, calendarId, defaultShiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        MvcResult scheduleResult = createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-13", firstShiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        punch(employeeSession, "2026-05-13T10:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-13T19:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("NORMAL"))
+            .andExpect(jsonPath("$.data.dailyResult.shiftId").value(firstShiftId));
+
+        mockMvc.perform(put("/api/admin/attendance/schedules/{scheduleId}", scheduleId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shiftId": %d,
+                      "calendarId": %d,
+                      "scheduleSource": "MANUAL",
+                      "status": "ACTIVE"
+                    }
+                    """.formatted(secondShiftId, calendarId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.shiftId").value(secondShiftId));
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-13")
+                .param("endDate", "2026-05-13"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].scheduleId").value(scheduleId))
+            .andExpect(jsonPath("$.data[0].shiftId").value(secondShiftId))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+            .andExpect(jsonPath("$.data[0].lateMinutes").value(60))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(true));
+    }
+
+    @Test
     @DisplayName("只有上班卡时应生成缺卡异常")
     void missingOffDutyPunchShouldCreateMissPunchException() throws Exception {
         Cookie adminSession = loginAdmin();
