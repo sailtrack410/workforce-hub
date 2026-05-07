@@ -1,0 +1,118 @@
+# API 测试用例 module-attendance 考勤接口
+
+## 一、文档信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 文档名称 | `module-attendance` 考勤接口测试用例 |
+| 文档版本 | `v0.1` |
+| 适用范围 | 考勤基础配置、打卡、日结果、异常识别、直属上级团队查询 |
+| 发布日期 | `2026-05-07` |
+| 当前状态 | 第一版自动化测试已落地 |
+
+---
+
+## 二、测试目标
+
+本轮测试目标：
+
+- 验证管理员可以创建工作日历、班次和考勤组。
+- 验证管理员可以添加考勤组成员。
+- 验证同一员工考勤组生效区间重叠会被拒绝。
+- 验证员工打卡写入 `att_punch_record`。
+- 验证正常上下班生成正常日结果。
+- 验证迟到、早退生成异常日结果和 `att_exception`。
+- 验证员工只能通过员工端查询自己的考勤数据。
+- 验证直属上级可以查询直属下级日结果。
+- 验证同一员工并发添加重叠考勤组成员时只能成功一条。
+- 验证员工登录后被离职，旧 Session 也不能继续打卡。
+- 验证测试基线会清理 `att_` 表，避免跨测试污染。
+
+当前已落地自动化测试类：
+
+- `ModuleAttendanceApiIntegrationTest`
+
+---
+
+## 三、测试环境建议
+
+| 项目 | 建议值 |
+| --- | --- |
+| 服务地址 | 默认 `http://localhost:8080` |
+| JDK | `17` |
+| MySQL | `workforce_hub_test` |
+| Redis | 已启动，用于会话 |
+| 会话模式 | Spring Session + Redis |
+
+---
+
+## 四、测试数据
+
+| 类型 | 登录名 | 密码 | 用途 |
+| --- | --- | --- | --- |
+| 管理员 | `admin.demo` | `Admin@123456` | 创建考勤基础数据 |
+| 员工账号 | `zhangsan.employee` | `Employee@123456` | 打卡、查询自己的考勤 |
+| 直属上级 | `lisi.manager` | `Employee@123456` | 查询直属下级考勤 |
+
+组织关系：
+
+- 张三 `userId=2003`。
+- 李四 `userId=2002`。
+- 张三的 `managerUserId=2002`。
+
+---
+
+## 五、测试用例明细
+
+## 5.1 考勤基础配置与正常打卡
+
+| 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ATT-API-001` | P0 | `POST /api/admin/attendance/calendars` | 管理员创建工作日历 | 管理员已登录 | `calendarType=STANDARD`、`status=ACTIVE` | HTTP `200`；`code=0`；返回 `calendarId` |
+| `ATT-API-002` | P0 | `POST /api/admin/attendance/shifts` | 管理员创建班次 | 管理员已登录 | `09:00:00-18:00:00` | HTTP `200`；`code=0`；返回 `shiftId` 和班段时间 |
+| `ATT-API-003` | P0 | `POST /api/admin/attendance/groups` | 管理员创建考勤组 | 日历、班次已创建 | 绑定日历和默认班次 | HTTP `200`；`code=0`；返回 `groupId` |
+| `ATT-API-004` | P0 | `POST /api/admin/attendance/groups/{groupId}/members` | 添加考勤组成员 | 考勤组已创建 | `userId=2003`、`effectiveFrom=2026-05-01` | HTTP `200`；`code=0`；返回成员记录 |
+| `ATT-API-005` | P0 | `POST /api/employee/attendance/punch` | 员工上班打卡 | 张三已登录且命中考勤组 | `punchAt=2026-05-07T09:00:00`、`ON_DUTY` | HTTP `200`；`code=0`；写入 `att_punch_record` |
+| `ATT-API-006` | P0 | `POST /api/employee/attendance/punch` | 员工下班打卡后生成正常日结果 | `ATT-API-005` 成功 | `punchAt=2026-05-07T18:00:00`、`OFF_DUTY` | HTTP `200`；`dailyResult.resultStatus=NORMAL`；`workMinutes=540`；`exceptionFlag=false` |
+| `ATT-API-007` | P0 | `GET /api/employee/attendance/daily-results` | 员工查询自己的日结果 | 正常上下班已打卡 | `startDate=endDate=2026-05-07` | 返回 1 条本人日结果；状态为 `NORMAL` |
+| `ATT-API-008` | P0 | `GET /api/employee/attendance/team/daily-results` | 直属上级查询直属下级日结果 | 李四已登录；张三有日结果 | `userId=2003` | 返回张三日结果 |
+
+## 5.2 考勤归属与异常识别
+
+| 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ATT-API-009` | P0 | `POST /api/admin/attendance/groups/{groupId}/members` | 考勤组成员生效区间重叠拒绝 | 张三已有 `2026-05-01` 到 `2026-05-31` 成员关系 | 再添加 `2026-05-15` 起生效关系 | HTTP `200`；`code=409`；`message=员工考勤组生效区间重叠`；数据库只保留 1 条 ACTIVE 关系 |
+| `ATT-API-010` | P0 | `POST /api/employee/attendance/punch` | 迟到打卡 | 张三已命中考勤组 | `2026-05-08T09:20:00`、`ON_DUTY` | 写入打卡记录；日结果可被重算 |
+| `ATT-API-011` | P0 | `POST /api/employee/attendance/punch` | 早退打卡后生成异常 | `ATT-API-010` 成功 | `2026-05-08T17:40:00`、`OFF_DUTY` | `resultStatus=ABNORMAL`；`lateMinutes=20`；`earlyLeaveMinutes=20`；`exceptionFlag=true` |
+| `ATT-API-012` | P0 | `GET /api/employee/attendance/exceptions` | 员工查询自己的异常 | `ATT-API-011` 成功 | `startDate=endDate=2026-05-08` | 返回 2 条异常，类型分别为 `LATE` 和 `EARLY_LEAVE` |
+| `ATT-API-013` | P0 | `POST /api/admin/attendance/groups/{groupId}/members` | 并发添加重叠考勤组成员只成功一条 | 8 个线程同时为张三添加 `2026-06-01` 起长期生效归属 | 相同员工、不同考勤组、重叠区间 | 最终只有 1 条 `code=0`；数据库只保留 1 条 ACTIVE 关系 |
+| `ATT-API-014` | P0 | `POST /api/employee/attendance/punch` | 离职后旧会话不能继续打卡 | 张三先登录并打上班卡，后台随后把张三流转到 `OFFBOARDED` | 使用旧员工 Session 打下班卡 | HTTP `200`；`code=403`；`message=员工当前状态不允许打卡`；当天只保留离职前 1 条打卡记录 |
+
+---
+
+## 六、验证命令
+
+当前已通过命令：
+
+```bash
+cd server
+mvn -Dtest=ModuleAttendanceApiIntegrationTest test
+```
+
+建议进入下一节点前执行：
+
+```bash
+cd server
+mvn -DskipTests compile
+mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest,ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test
+```
+
+---
+
+## 七、当前未覆盖
+
+- 独立 `ModuleAttendanceCalculationIntegrationTest`。
+- 补卡申请审批通过后修正异常。
+- 假期请假通过后考勤日结果识别为请假而非缺勤。
+- 排班覆盖默认班次。
+- 多实例部署下高并发考勤组成员重叠写入的分布式锁或数据库锁表治理。
