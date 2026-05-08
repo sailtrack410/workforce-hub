@@ -45,6 +45,30 @@ export interface WorkflowTaskActionRequest {
   comment?: string;
 }
 
+export interface WorkflowTodoResponse {
+  todoId: number;
+  requestId: number;
+  taskId: string;
+  title: string;
+  summary: string;
+  status: string;
+  priority?: string | null;
+  createdAt?: string | null;
+}
+
+export interface WorkflowRequestSummaryResponse {
+  requestId: number;
+  requestNo: string;
+  bizType: string;
+  bizId: number;
+  title: string;
+  status: string;
+  currentStepKey?: string | null;
+  currentStepName?: string | null;
+  submittedAt?: string | null;
+  finishedAt?: string | null;
+}
+
 export interface LeaveRequestCreateRequest {
   leaveTypeId: number;
   startAt: string;

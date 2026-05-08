@@ -13,7 +13,9 @@ import type {
   PageResult,
   UnknownRecord,
   WorkflowRequestListQuery,
+  WorkflowRequestSummaryResponse,
   WorkflowTaskActionRequest,
+  WorkflowTodoResponse,
 } from './types';
 
 export function createEmployeeApi(client: ApiClient = defaultApiClient) {
@@ -34,8 +36,8 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
     workflow: {
       submitLeaveRequest: (request: LeaveRequestCreateRequest) => client.post<UnknownRecord>('/api/employee/workflow/leave-requests', request),
       submitClockCorrectionRequest: (request: ClockCorrectionRequestCreateRequest) => client.post<UnknownRecord>('/api/employee/workflow/clock-correction-requests', request),
-      todos: () => client.get<UnknownRecord[]>('/api/employee/workflow/todos'),
-      requests: (query: WorkflowRequestListQuery = {}) => client.get<PageResult<UnknownRecord>>('/api/employee/workflow/requests', { query }),
+      todos: () => client.get<WorkflowTodoResponse[]>('/api/employee/workflow/todos'),
+      requests: (query: WorkflowRequestListQuery = {}) => client.get<PageResult<WorkflowRequestSummaryResponse>>('/api/employee/workflow/requests', { query }),
       approveTask: (taskId: string, request: WorkflowTaskActionRequest) => client.post<UnknownRecord>(`/api/employee/workflow/tasks/${encodeURIComponent(taskId)}/approve`, request),
       rejectTask: (taskId: string, request: WorkflowTaskActionRequest) => client.post<UnknownRecord>(`/api/employee/workflow/tasks/${encodeURIComponent(taskId)}/reject`, request),
       withdrawRequest: (requestId: number, request: { reason?: string }) => client.post<UnknownRecord>(`/api/employee/workflow/requests/${requestId}/withdraw`, request),
