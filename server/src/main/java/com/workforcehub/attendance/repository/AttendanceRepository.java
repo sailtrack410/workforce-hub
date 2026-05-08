@@ -589,7 +589,7 @@ public class AttendanceRepository {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    public void insertDailyResult(Long dailyResultId,
+    public void upsertDailyResult(Long dailyResultId,
                                   Long userId,
                                   LocalDate workDate,
                                   Long scheduleId,
@@ -609,6 +609,17 @@ public class AttendanceRepository {
                  work_minutes, exception_flag, calculated_at)
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                schedule_id = VALUES(schedule_id),
+                group_id = VALUES(group_id),
+                shift_id = VALUES(shift_id),
+                result_status = VALUES(result_status),
+                late_minutes = VALUES(late_minutes),
+                early_leave_minutes = VALUES(early_leave_minutes),
+                absence_minutes = VALUES(absence_minutes),
+                work_minutes = VALUES(work_minutes),
+                exception_flag = VALUES(exception_flag),
+                calculated_at = VALUES(calculated_at)
             """,
             dailyResultId,
             userId,

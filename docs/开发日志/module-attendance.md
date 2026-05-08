@@ -332,3 +332,43 @@
 - 排班状态、接口行为和数据库唯一键现在表达同一套业务规则，后续前端不需要猜测停用后是否能新增。
 - 管理员误操作会得到清晰业务提示，不再变成系统内部错误。
 - 保持原地修改模型后，后续要补排班历史时可以明确新增版本表或变更流水，而不是让多条同日排班混在主表中。
+
+## 2026-05-08 第42审3-5日结果原子upsert修复
+
+### 背景
+
+第 42 审指出，`AttendanceService.upsertDailyResult()` 采用“先 `SELECT ... FOR UPDATE`，查不到再 `INSERT`”的写入方式。在有考勤组的场景下，`getEffectiveGroupForUpdate()` 会先锁住考勤组成员行，能够降低同一员工同一天并发重算的概率；但员工当天没有有效考勤组时，系统仍会写入 `NO_RULE` 日结果，这条路径没有稳定的 `userId + workDate` 锁，多个事务同时重算时会竞争 `att_daily_result.uk_user_date`。
+
+### 本次处理
+
+- `AttendanceRepository.insertDailyResult()` 改为 `upsertDailyResult()`。
+- 日结果写入改用 MySQL `INSERT ... ON DUPLICATE KEY UPDATE`，以 `uk_user_date(user_id, work_date)` 作为原子化边界。
+- `AttendanceService.upsertDailyResult()` 不再先查 `getDailyResultForUpdate()` 再分支插入或更新，而是统一调用仓储原子 upsert 后读取结果。
+- 保留原有 `getDailyResultForUpdate()` 和 `updateDailyResult()`，后续如果拆计算服务或做强行锁定读取仍可复用；当前日结果写入主路径不再依赖它们。
+- `ModuleAttendanceApiIntegrationTest` 新增 `concurrentNoRuleDailyResultRecalculationShouldCreateOnlyOneRow`，通过 8 个线程同时触发无考勤组日期的外部重算，验证只生成一条 `NO_RULE` 日结果。
+- 同步更新 `module-attendance` API 文档、测试用例、开发日志和后续开发计划。
+
+### 红绿记录
+
+- 红灯：新增 `concurrentNoRuleDailyResultRecalculationShouldCreateOnlyOneRow` 后，8 个线程同时重算 `2026-07-01`，其中一个事务在插入 `att_daily_result` 时触发 `CannotAcquireLockException: Deadlock found when trying to get lock`。
+- 绿灯：日结果写入改为数据库原子 upsert 后，该并发用例通过，最终只有 1 条 `NO_RULE` 日结果。
+- 绿灯：完整 `ModuleAttendanceApiIntegrationTest` 回归通过，确认打卡、排班、缺卡、请假联动和可信时间边界未回退。
+
+### 当前完成范围增量
+
+- 第 42 审 `3-5` 日结果并发 upsert 风险已收口。
+- 无考勤组 `NO_RULE` 日结果重算不再依赖“查不到再插入”的竞态路径。
+- `att_daily_result` 写入语义与数据库唯一键 `userId + workDate` 保持一致。
+
+### 暂未覆盖
+
+- 补卡审批通过后的打卡事实修正和二次重算。
+- 独立 `AttendanceCalculationService` 拆分。
+- 月度汇总、节假日、跨天班次下的重算边界。
+- 多实例部署下考勤组成员重叠写入的分布式锁或数据库锁表治理。
+
+### 意义
+
+- 日结果从“应用层判断插入或更新”升级为“数据库唯一键原子化写入”，降低并发打卡、审批联动和外部事件重算下的死锁与重复键风险。
+- `NO_RULE` 作为无考勤规则的明确结果仍然保留，但不会因为没有考勤组锁而成为不稳定写入路径。
+- 后续做补卡、月报和 Agent 异常分析时，可以基于更稳定的单日结果表继续扩展。

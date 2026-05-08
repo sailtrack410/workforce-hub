@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-attendance` 考勤接口测试用例 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 考勤基础配置、排班覆盖、排班唯一模型、排班变更重算、打卡、日结果、异常识别、请假审批通过联动重算、直属上级团队查询 |
+| 适用范围 | 考勤基础配置、排班覆盖、排班唯一模型、排班变更重算、日结果原子 upsert、打卡、异常识别、请假审批通过联动重算、直属上级团队查询 |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次、排班唯一模型、排班变更重算、缺卡专项保护、请假审批通过联动考勤重算和请假分钟级覆盖抵扣 |
+| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次、排班唯一模型、排班变更重算、日结果原子 upsert、缺卡专项保护、请假审批通过联动考勤重算和请假分钟级覆盖抵扣 |
 
 ---
 
@@ -33,6 +33,7 @@
 - 验证请假审批通过后，整段班次覆盖会把考勤日结果重算为 `LEAVE`，并清理缺卡异常。
 - 验证小时假审批通过后，只抵扣实际覆盖的迟到、早退或缺勤分钟，不把整天误算为 `LEAVE`。
 - 验证重叠小时假会先合并覆盖区间，不重复抵扣同一段缺勤。
+- 验证无考勤组 `NO_RULE` 日结果并发重算时，只生成一条 `att_daily_result`。
 - 验证员工实时打卡使用服务端接收时间，不信任客户端历史 `punchAt`。
 - 验证员工实时打卡不要求客户端传入 `punchAt`。
 - 验证员工实时打卡拒绝 `MANUAL` 等受控来源伪造。
@@ -107,6 +108,7 @@
 | `ATT-API-021` | P0 | `POST /api/employee/attendance/punch` | 员工实时打卡不信任客户端历史时间 | 服务端当前时间为 `2026-05-14T10:30:00`；请求体传 `punchAt=2026-05-07T09:00:00` | `ON_DUTY`、`sourceType=PC` | HTTP `200`；响应 `data.punchAt=2026-05-14T10:30:00`；`2026-05-07` 没有打卡记录；`2026-05-14` 有 1 条打卡记录 |
 | `ATT-API-022` | P0 | `POST /api/employee/attendance/punch` | 员工实时打卡不要求客户端时间 | 服务端当前时间为 `2026-05-15T09:05:00` | 请求体不传 `punchAt`，只传 `ON_DUTY`、`sourceType=PC` | HTTP `200`；响应 `data.punchAt=2026-05-15T09:05:00`；写入当天打卡记录 |
 | `ATT-API-023` | P0 | `POST /api/employee/attendance/punch` | 员工实时打卡拒绝受控来源伪造 | 张三已登录 | `ON_DUTY`、`sourceType=MANUAL` | HTTP `200`；`code=400`；`message=员工实时打卡来源仅支持 APP/PC`；不写入打卡记录 |
+| `ATT-API-024` | P0 | `AttendanceRecalculationService.recalculateDailyResultForExternalEvent` | 无考勤组日结果并发重算原子 upsert | 张三当天没有有效考勤组 | 8 个线程同时重算 `2026-07-01` | 不抛死锁或重复键异常；数据库只有 1 条日结果；`resultStatus=NO_RULE` |
 
 ## 5.3 请假审批联动考勤重算
 
@@ -126,6 +128,7 @@
 ```bash
 cd server
 mvn -Dtest=ModuleAttendanceApiIntegrationTest test
+mvn -Dtest=ModuleAttendanceApiIntegrationTest#concurrentNoRuleDailyResultRecalculationShouldCreateOnlyOneRow test
 mvn -Dtest=ModuleAttendanceApiIntegrationTest#inactiveScheduleShouldStillRejectCreateForSameUserDate,ModuleAttendanceApiIntegrationTest#duplicateActiveScheduleShouldBeRejected test
 mvn -Dtest=ModuleAttendanceApiIntegrationTest#employeePunchShouldAllowMissingClientPunchAt,ModuleAttendanceApiIntegrationTest#employeePunchShouldUseServerReceivedTimeInsteadOfClientPunchAt,ModuleAttendanceApiIntegrationTest#employeePunchShouldRejectControlledManualSourceType test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult test

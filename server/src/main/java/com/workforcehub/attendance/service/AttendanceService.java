@@ -451,29 +451,11 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                                        int absenceMinutes,
                                                        int workMinutes,
                                                        boolean exceptionFlag) {
-        AttendanceDailyResultRow existing = attendanceRepository.getDailyResultForUpdate(userId, workDate);
         LocalDateTime calculatedAt = LocalDateTime.now();
-        if (existing == null) {
-            Long dailyResultId = IdWorker.getId();
-            attendanceRepository.insertDailyResult(
-                dailyResultId,
-                userId,
-                workDate,
-                scheduleId,
-                groupId,
-                shiftId,
-                resultStatus,
-                lateMinutes,
-                earlyLeaveMinutes,
-                absenceMinutes,
-                workMinutes,
-                exceptionFlag,
-                calculatedAt
-            );
-            return attendanceRepository.getDailyResult(userId, workDate);
-        }
-        attendanceRepository.updateDailyResult(
-            existing.dailyResultId(),
+        attendanceRepository.upsertDailyResult(
+            IdWorker.getId(),
+            userId,
+            workDate,
             scheduleId,
             groupId,
             shiftId,

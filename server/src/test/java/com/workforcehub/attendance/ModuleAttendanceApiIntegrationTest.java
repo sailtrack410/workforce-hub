@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.support.FixedClockTestConfiguration;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import com.workforcehub.support.MutableTestClock;
+import com.workforcehub.spi.AttendanceRecalculationService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +62,9 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private MutableTestClock mutableTestClock;
+
+    @Autowired
+    private AttendanceRecalculationService attendanceRecalculationService;
 
     @Test
     @DisplayName("后台配置考勤基础数据后，员工应能打卡并生成正常日结果，直属上级应能查询团队结果")
@@ -191,6 +195,40 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
 
             assertEquals(1L, successCount);
             assertEquals(1L, activeGroupMemberCount(EMPLOYEE_USER_ID));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("无考勤组并发重算日结果时也只能生成一条NO_RULE结果")
+    void concurrentNoRuleDailyResultRecalculationShouldCreateOnlyOneRow() throws Exception {
+        int workerCount = 8;
+        CountDownLatch ready = new CountDownLatch(workerCount);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (int i = 0; i < workerCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(start.await(5, TimeUnit.SECONDS), "并发重算启动超时");
+                    attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+                        EMPLOYEE_USER_ID,
+                        java.time.LocalDate.parse("2026-07-01")
+                    );
+                    return null;
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "并发重算准备超时");
+            start.countDown();
+
+            for (Future<Void> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+
+            assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-07-01"));
+            assertEquals("NO_RULE", dailyResultStatus(EMPLOYEE_USER_ID, "2026-07-01"));
         } finally {
             executor.shutdownNow();
         }
@@ -766,6 +804,15 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
               AND work_date = ?
             """, Long.class, userId, workDate);
         return count == null ? 0L : count;
+    }
+
+    private String dailyResultStatus(long userId, String workDate) {
+        return jdbcTemplate.queryForObject("""
+            SELECT result_status
+            FROM att_daily_result
+            WHERE user_id = ?
+              AND work_date = ?
+            """, String.class, userId, workDate);
     }
 
     private long scheduleCount(long userId, String workDate) {
