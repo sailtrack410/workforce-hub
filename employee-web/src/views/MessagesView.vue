@@ -19,8 +19,10 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { SectionAction, SectionFilter, SectionId } from '../stores/shell';
 import { navItems, sectionFilters, shellUser, useShellStore } from '../stores/shell';
+import { useSessionStore } from '../stores/session';
 
 const shell = useShellStore();
+const session = useSessionStore();
 const draft = ref('');
 const searchOpen = ref(true);
 const resizing = ref(false);
@@ -43,6 +45,8 @@ const activeTodo = computed(() => shell.activeTodo);
 const activeFile = computed(() => shell.activeFile);
 const activeWorkbench = computed(() => shell.activeWorkbench);
 const activeProfile = computed(() => shell.activeProfile);
+const currentUserName = computed(() => session.displayName || shellUser.name);
+const currentUserShortName = computed(() => session.shortName || shellUser.shortName);
 const detailVisible = computed(() => shell.detailOpen);
 const listWidth = computed(() => `${shell.listWidth}px`);
 const mobileStage = computed(() => shell.mobileView);
@@ -162,6 +166,9 @@ function handleKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown);
+  if (!session.initialized) {
+    void session.loadCurrentUser();
+  }
 });
 
 onBeforeUnmount(() => {
@@ -202,7 +209,7 @@ onBeforeUnmount(() => {
       </nav>
 
       <button class="rail-user" type="button">
-        {{ shellUser.shortName }}
+        {{ currentUserShortName }}
       </button>
     </aside>
 
