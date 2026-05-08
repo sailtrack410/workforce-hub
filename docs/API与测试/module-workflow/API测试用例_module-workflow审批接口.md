@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-workflow` 审批接口测试用例 |
 | 文档版本 | `v0.1` |
-| 适用范围 | Flowable 请假直属上级审批闭环、后台模板治理和 Agent 预审入口 |
+| 适用范围 | Flowable 请假直属上级审批闭环、补卡直属上级审批闭环、后台模板治理和 Agent 预审入口 |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | Flowable 请假直属上级审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理、Agent 预审入口和假期余额联动已落地；完整 Agent 平台待后续补充 |
+| 当前状态 | Flowable 请假直属上级审批闭环、补卡直属上级审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理、Agent 预审入口、假期余额联动和补卡审批联动考勤重算已落地；完整 Agent 平台待后续补充 |
 
 ---
 
@@ -47,6 +47,10 @@
 - 验证 Agent 预审驳回后直接终止申请，不启动 Flowable。
 - 验证 Agent 回调任务 ID 必须匹配申请上的 `agent_pre_review_task_id`。
 - 验证没有 Agent 任务时保持原直属上级审批流程。
+- 验证员工提交补卡申请后生成 `wf_request` 与 `wf_req_clock_correction`。
+- 验证补卡申请详情返回 `clockCorrection` 明细。
+- 验证补卡申请审批通过后写入 `source_type=MANUAL` 的考勤打卡事实。
+- 验证补卡审批通过后触发同日考勤日结果重算，缺卡异常被清理。
 
 当前已落地自动化测试类：
 
@@ -94,6 +98,11 @@
 - Agent 预审驳回回调后直接置为 `REJECTED`。
 - Agent 预审回调任务 ID 不匹配时拒绝回写。
 - Agent 触发器返回 `null` 时保持原人工审批链路。
+- 补卡申请提交。
+- 补卡申请头与补卡明细关系校验。
+- 补卡申请详情查询。
+- 补卡直属上级审批通过。
+- 补卡审批通过后人工补卡打卡事实写入和考勤日结果重算。
 
 当前尚未自动化覆盖：
 
@@ -138,8 +147,12 @@
 - `wf_process_type.process_code=LEAVE`
 - `wf_template.template_code=LEAVE_MANAGER_APPROVAL`
 - `wf_template_version.flowable_definition_key=leave_manager_approval`
+- `wf_process_type.process_code=CLOCK_CORRECTION`
+- `wf_template.template_code=CLOCK_CORRECTION_MANAGER_APPROVAL`
+- `wf_template_version.flowable_definition_key=clock_correction_manager_approval`
 - `lv_type.leave_code=ANNUAL_LEAVE`
 - Flowable 自动部署流程定义 `leave_manager_approval`
+- Flowable 自动部署流程定义 `clock_correction_manager_approval`
 
 ---
 
@@ -166,6 +179,10 @@
 | `WF-DETAIL-001` | P1 | `GET /api/employee/workflow/requests/{requestId}` | 参与人查询请假申请详情 | 张三已提交请假；李四是待办处理人 | 无 | HTTP `200`；返回申请状态、当前节点、请假理由、请假时长 |
 | `WF-ACTION-001` | P1 | `GET /api/employee/workflow/requests/{requestId}/actions` | 查询审批轨迹 | 审批通过后 | 无 | HTTP `200`；返回 `APPROVE` 动作、处理人、处理意见、前后状态 |
 | `WF-LIST-001` | P1 | `GET /api/employee/workflow/requests` | 查询我的申请列表 | 张三已提交请假申请 | `pageNo=1&pageSize=20` | HTTP `200`；`total=1`；列表返回张三自己的申请；李四登录查询时 `total=0` |
+| `WF-CLOCK-001` | P0 | `POST /api/employee/workflow/clock-correction-requests` | 员工提交补卡申请 | 张三已登录；张三有直属上级；已发布补卡流程模板 | `targetDate=2026-05-16`、`missingPunchType=OFF_DUTY`、`expectedPunchAt=2026-05-16 18:00:00` | HTTP `200`；`code=0`；返回 `requestId`、`requestNo`、`IN_APPROVAL`、`flowableProcessInstanceId` |
+| `WF-CLOCK-002` | P0 | 数据库断言 | 补卡申请头与补卡明细关系正确 | `WF-CLOCK-001` 成功 | 查询 `wf_request` 与 `wf_req_clock_correction` | `wf_request.biz_type=CLOCK_CORRECTION`；`wf_request.biz_id = wf_req_clock_correction.id`；`wf_req_clock_correction.request_id = wf_request.id` |
+| `WF-CLOCK-003` | P1 | `GET /api/employee/workflow/requests/{requestId}` | 参与人查询补卡申请详情 | 张三已提交补卡；李四是待办处理人 | 无 | HTTP `200`；返回 `bizType=CLOCK_CORRECTION`、`clockCorrection.targetDate`、`clockCorrection.missingPunchType`、`clockCorrection.expectedPunchAt` |
+| `WF-CLOCK-004` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` | 补卡审批通过后修正考勤 | 张三只有上班卡且日结果为缺卡异常；张三提交下班补卡；李四为直属审批人 | 李四审批通过补卡任务 | 申请进入 `APPROVED`；写入 1 条 `source_type=MANUAL` 下班卡；同日日结果重算为 `NORMAL`；`MISS_PUNCH` 异常数为 0 |
 | `WF-FILE-001` | P1 | `POST /api/employee/workflow/leave-requests` | 提交请假时绑定本人附件 | 张三已有有效 `PERSONAL_FILE` 附件引用 | 请求体传 `attachmentRefIds` | HTTP `200`；创建 `WF_REQUEST` 业务附件引用；`wf_request_attachment` 指向业务附件引用；详情返回业务附件 |
 | `WF-FILE-002` | P1 | `POST /api/employee/workflow/leave-requests` | 不能绑定他人附件 | 张三登录；传入李四上传的附件引用 | 请求体传他人 `attachmentRefIds` | HTTP `200`；`code=403`；提示 `无权使用该附件引用` |
 | `WF-FILE-003` | P1 | `POST /api/employee/workflow/leave-requests` | 不能绑定已删除附件 | 张三登录；传入已删除附件引用 | 请求体传已删除 `attachmentRefIds` | HTTP `200`；`code=404`；提示 `附件引用不存在` |
@@ -228,6 +245,7 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#leaveRequestShouldRejectInvalid
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#participantShouldDownloadWorkflowAttachmentWithTicket test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#workflowAttachmentDownloadShouldRecheckLatestScanStatus test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test
 mvn -Dtest=ModuleWorkflowAdminApiIntegrationTest test
 mvn -Dtest=ModuleWorkflowAgentPreReviewIntegrationTest test
@@ -246,6 +264,7 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrati
 
 - `wf_request.status` 与 Flowable 运行态是否一致。
 - `wf_request.biz_id` 是否始终指向业务明细表主键，而不是申请头 ID。
+- `wf_request.biz_type` 是否驱动不同业务明细和审批通过后的副作用；补卡不能复用请假扣余额逻辑。
 - `sys_todo_item.source_id` 当前使用 `wf_request.id`，查询 taskId 时需通过 Flowable 运行任务反查。
 - 审批动作与业务状态更新必须在同一服务层事务中完成。
 - 不允许前端或后台绕过 `module-workflow` 直接操作 Flowable 任务。

@@ -3,11 +3,12 @@ package com.workforcehub.workflow.controller;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.response.R;
 import com.workforcehub.file.controller.FileDownloadResponseFactory;
+import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
-import com.workforcehub.workflow.dto.LeaveRequestCreateResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestCreateResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
 import com.workforcehub.workflow.dto.WorkflowRequestStatusResponse;
@@ -49,9 +50,15 @@ public class EmployeeWorkflowController {
     }
 
     @PostMapping("/leave-requests")
-    public R<LeaveRequestCreateResponse> submitLeaveRequest(
+    public R<WorkflowRequestCreateResponse> submitLeaveRequest(
             @Valid @RequestBody LeaveRequestCreateRequest request) {
         return R.ok(workflowService.submitLeaveRequest(request));
+    }
+
+    @PostMapping("/clock-correction-requests")
+    public R<WorkflowRequestCreateResponse> submitClockCorrectionRequest(
+            @Valid @RequestBody ClockCorrectionRequestCreateRequest request) {
+        return R.ok(workflowService.submitClockCorrectionRequest(request));
     }
 
     @GetMapping("/todos")

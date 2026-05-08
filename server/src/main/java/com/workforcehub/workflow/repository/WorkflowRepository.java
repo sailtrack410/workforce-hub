@@ -3,6 +3,7 @@ package com.workforcehub.workflow.repository;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.file.repository.DownloadAttachmentRow;
+import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
 import java.sql.Timestamp;
+import java.sql.Date;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,7 +69,8 @@ public class WorkflowRepository {
 
     public void insertWorkflowRequest(Long requestId,
                                       String requestNo,
-                                      Long leaveDetailId,
+                                      String bizType,
+                                      Long bizId,
                                       Long applicantUserId,
                                       Long applicantDeptId,
                                       Long applicantPositionId,
@@ -79,12 +82,13 @@ public class WorkflowRepository {
                  applicant_position_id, title, template_version_id, status,
                  current_step_key, current_step_name, submitted_at, created_by, updated_by)
             VALUES
-                (?, ?, 'LEAVE', ?, ?, ?, ?, ?, ?, 'IN_APPROVAL',
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL',
                  'manager_approval', '直属上级审批', NOW(), ?, ?)
             """,
             requestId,
             requestNo,
-            leaveDetailId,
+            bizType,
+            bizId,
             applicantUserId,
             applicantDeptId,
             applicantPositionId,
@@ -92,6 +96,24 @@ public class WorkflowRepository {
             templateVersionId,
             applicantUserId,
             applicantUserId
+        );
+    }
+
+    public void insertClockCorrectionDetail(Long detailId,
+                                            Long requestId,
+                                            ClockCorrectionRequestCreateRequest request) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_req_clock_correction
+                (id, request_id, target_date, missing_punch_type, expected_punch_at, reason)
+            VALUES
+                (?, ?, ?, ?, ?, ?)
+            """,
+            detailId,
+            requestId,
+            Date.valueOf(request.getTargetDate()),
+            request.getMissingPunchType(),
+            Timestamp.valueOf(request.getExpectedPunchAt()),
+            request.getReason()
         );
     }
 
@@ -192,7 +214,7 @@ public class WorkflowRepository {
 
     public WorkflowRequestRow getRequestByIdForUpdateOrThrow(Long requestId) {
         List<WorkflowRequestRow> rows = jdbcTemplate.query("""
-            SELECT wr.id, wr.request_no, wr.status, wr.title, wr.applicant_user_id,
+            SELECT wr.id, wr.request_no, wr.biz_type, wr.status, wr.title, wr.applicant_user_id,
                    wr.flowable_process_instance_id, wr.agent_pre_review_task_id
             FROM wf_request wr
             WHERE wr.id = ?
@@ -309,7 +331,7 @@ public class WorkflowRepository {
 
     public WorkflowRequestRow getRequestByTaskIdOrThrow(String taskId) {
         List<WorkflowRequestRow> rows = jdbcTemplate.query("""
-            SELECT wr.id, wr.request_no, wr.status, wr.title, wr.applicant_user_id,
+            SELECT wr.id, wr.request_no, wr.biz_type, wr.status, wr.title, wr.applicant_user_id,
                    wr.flowable_process_instance_id, wr.agent_pre_review_task_id
             FROM wf_request wr
             JOIN ACT_RU_TASK art ON art.PROC_INST_ID_ = wr.flowable_process_instance_id
@@ -410,7 +432,7 @@ public class WorkflowRepository {
 
     public WorkflowRequestRow getRequestByIdOrThrow(Long requestId) {
         List<WorkflowRequestRow> rows = jdbcTemplate.query("""
-            SELECT wr.id, wr.request_no, wr.status, wr.title, wr.applicant_user_id,
+            SELECT wr.id, wr.request_no, wr.biz_type, wr.status, wr.title, wr.applicant_user_id,
                    wr.flowable_process_instance_id, wr.agent_pre_review_task_id
             FROM wf_request wr
             WHERE wr.id = ?
@@ -492,6 +514,24 @@ public class WorkflowRepository {
                 rs.getTimestamp("start_at").toLocalDateTime(),
                 rs.getTimestamp("end_at").toLocalDateTime(),
                 rs.getInt("duration_minutes"),
+                rs.getString("reason")
+            ),
+            requestId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public WorkflowClockCorrectionDetailRow getClockCorrectionDetailByRequestId(Long requestId) {
+        List<WorkflowClockCorrectionDetailRow> rows = jdbcTemplate.query("""
+            SELECT target_date, missing_punch_type, expected_punch_at, reason
+            FROM wf_req_clock_correction
+            WHERE request_id = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowClockCorrectionDetailRow(
+                rs.getDate("target_date").toLocalDate(),
+                rs.getString("missing_punch_type"),
+                rs.getTimestamp("expected_punch_at").toLocalDateTime(),
                 rs.getString("reason")
             ),
             requestId
@@ -830,6 +870,7 @@ public class WorkflowRepository {
         return new WorkflowRequestRow(
             rs.getLong("id"),
             rs.getString("request_no"),
+            rs.getString("biz_type"),
             rs.getString("status"),
             rs.getString("title"),
             rs.getLong("applicant_user_id"),

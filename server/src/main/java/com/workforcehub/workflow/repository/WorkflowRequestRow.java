@@ -6,6 +6,7 @@ package com.workforcehub.workflow.repository;
 public record WorkflowRequestRow(
     Long id,
     String requestNo,
+    String bizType,
     String status,
     String title,
     Long applicantUserId,

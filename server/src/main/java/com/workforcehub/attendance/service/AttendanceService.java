@@ -27,6 +27,7 @@ import com.workforcehub.attendance.repository.AttendanceShiftRow;
 import com.workforcehub.attendance.repository.PunchRecordRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.spi.AttendanceClockCorrectionService;
 import com.workforcehub.spi.AttendanceQueryService;
 import com.workforcehub.spi.AttendanceRecalculationService;
 import com.workforcehub.spi.LeaveQueryService;
@@ -54,7 +55,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * module-attendance 第一版考勤服务。
  */
 @Service
-public class AttendanceService implements AttendanceQueryService, AttendanceRecalculationService {
+public class AttendanceService implements AttendanceQueryService, AttendanceRecalculationService, AttendanceClockCorrectionService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_INACTIVE = "INACTIVE";
@@ -356,6 +357,34 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
     @Transactional(rollbackFor = Exception.class)
     public void recalculateDailyResultForExternalEvent(Long userId, LocalDate workDate) {
         recalculateDailyResult(userId, workDate);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void applyApprovedClockCorrection(Long userId,
+                                             LocalDate targetDate,
+                                             String punchType,
+                                             LocalDateTime expectedPunchAt,
+                                             Long requestId,
+                                             Long approverUserId) {
+        ensureCanPunch(userId);
+        String normalizedPunchType = normalizePunchType(punchType);
+        if (!targetDate.equals(expectedPunchAt.toLocalDate())) {
+            throw new BizException(400, "补卡时间必须落在补卡日期内");
+        }
+        if (!attendanceRepository.existsNormalPunchRecord(userId, expectedPunchAt, normalizedPunchType)) {
+            attendanceRepository.insertPunchRecord(
+                IdWorker.getId(),
+                userId,
+                expectedPunchAt,
+                normalizedPunchType,
+                SOURCE_MANUAL,
+                "审批补卡 requestId=" + requestId,
+                null,
+                null
+            );
+        }
+        recalculateDailyResult(userId, targetDate);
     }
 
     private AttendanceDailyResultRow recalculateDailyResult(Long userId, LocalDate workDate) {

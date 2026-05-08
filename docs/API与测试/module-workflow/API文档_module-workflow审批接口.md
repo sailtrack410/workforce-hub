@@ -6,18 +6,19 @@
 | --- | --- |
 | 文档名称 | `module-workflow` 审批接口 API 文档 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 请假申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权、轨迹与后台流程模板治理 |
+| 适用范围 | 请假申请提交、补卡申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权、轨迹与后台流程模板治理 |
 | 对应模块 | `server/module-workflow` |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理、Agent 预审入口和假期余额联动已实现；完整 Agent 平台待后续迭代 |
+| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理、Agent 预审入口、假期余额联动和补卡审批联动考勤重算已实现；完整 Agent 平台待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `10` 个员工端接口、`6` 个后台流程模板治理接口，以及 workflow 侧 Agent 预审 SPI 回调入口。
+当前已实现 `11` 个员工端接口、`6` 个后台流程模板治理接口，以及 workflow 侧 Agent 预审 SPI 回调入口。
 
 - `POST /api/employee/workflow/leave-requests`
+- `POST /api/employee/workflow/clock-correction-requests`
 - `GET /api/employee/workflow/todos`
 - `GET /api/employee/workflow/requests`
 - `POST /api/employee/workflow/tasks/{taskId}/approve`
@@ -227,7 +228,68 @@ Cookie: SESSION=...
 
 ---
 
-## 5.2 查询当前员工审批待办
+## 5.2 提交补卡申请
+
+```http
+POST /api/employee/workflow/clock-correction-requests
+Content-Type: application/json
+Cookie: SESSION=...
+```
+
+### 请求体
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `targetDate` | `string` | 是 | 补卡考勤日期，格式 `yyyy-MM-dd` |
+| `missingPunchType` | `string` | 是 | 缺卡类型，仅支持 `ON_DUTY`、`OFF_DUTY` |
+| `expectedPunchAt` | `string` | 是 | 申请补写的打卡时间，格式 `yyyy-MM-dd HH:mm:ss`，日期必须等于 `targetDate` |
+| `reason` | `string` | 是 | 补卡原因，最长 512 字符 |
+| `attachmentRefIds` | `array<long>` | 否 | 补卡证明附件引用 ID，最多 10 个；必须是当前申请人拥有且未删除的个人附件 |
+
+示例：
+
+```json
+{
+  "targetDate": "2026-05-16",
+  "missingPunchType": "OFF_DUTY",
+  "expectedPunchAt": "2026-05-16 18:00:00",
+  "reason": "下班时网络异常，补下班卡",
+  "attachmentRefIds": [9601]
+}
+```
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "requestId": 2052500000000000001,
+    "requestNo": "WF-CLOCK_CORRECTION-20260508235011-2052500000000000000",
+    "status": "IN_APPROVAL",
+    "flowableProcessInstanceId": "151a826b-4c1f-11f1-8afb-e6db54dfb665"
+  },
+  "requestId": "f02351bbb11640468dc6f758f8afde95"
+}
+```
+
+### 落库与审批语义
+
+- 写入 `wf_request`，`biz_type=CLOCK_CORRECTION`。
+- 写入 `wf_req_clock_correction`。
+- `wf_request.biz_id` 指向 `wf_req_clock_correction.id`。
+- `wf_req_clock_correction.request_id` 回指 `wf_request.id`。
+- 员工必须存在直属上级，补卡第一版进入直属上级审批流程 `clock_correction_manager_approval`。
+- 附件绑定语义与请假申请一致：提交时把本人 `PERSONAL_FILE` 附件克隆为 `WF_REQUEST` 业务附件引用。
+- 审批通过前不写入 `att_punch_record`，避免未批准补卡提前影响考勤结果。
+- 直属上级审批通过后，workflow 通过 `AttendanceClockCorrectionService` 通知考勤模块写入 `source_type=MANUAL` 的补卡打卡事实，并触发同日 `att_daily_result` 重算。
+- 补卡写入以 `userId + expectedPunchAt + missingPunchType + status=NORMAL` 做幂等判断，重复审批回调不会重复生成同一条人工补卡事实。
+- 审批驳回或撤回时不写入人工补卡打卡，也不触发补卡重算。
+
+---
+
+## 5.3 查询当前员工审批待办
 
 ```http
 GET /api/employee/workflow/todos
@@ -264,7 +326,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.3 查询我的申请列表
+## 5.4 查询我的申请列表
 
 ```http
 GET /api/employee/workflow/requests?pageNo=1&pageSize=20&status=IN_APPROVAL&bizType=LEAVE
@@ -278,7 +340,7 @@ Cookie: SESSION=...
 | `pageNo` | `long` | 否 | 页码，默认 `1`，最小 `1` |
 | `pageSize` | `long` | 否 | 每页数量，默认 `20`，最大 `100` |
 | `status` | `string` | 否 | 申请状态过滤 |
-| `bizType` | `string` | 否 | 业务类型过滤，当前请假为 `LEAVE` |
+| `bizType` | `string` | 否 | 业务类型过滤，当前支持 `LEAVE`、`CLOCK_CORRECTION` |
 
 ### 成功响应
 
@@ -317,7 +379,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.4 审批通过
+## 5.5 审批通过
 
 ```http
 POST /api/employee/workflow/tasks/{taskId}/approve
@@ -363,7 +425,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.5 审批驳回
+## 5.6 审批驳回
 
 ```http
 POST /api/employee/workflow/tasks/{taskId}/reject
@@ -401,7 +463,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.6 申请撤回
+## 5.7 申请撤回
 
 ```http
 POST /api/employee/workflow/requests/{requestId}/withdraw
@@ -439,7 +501,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.7 查询申请详情
+## 5.8 查询申请详情
 
 ```http
 GET /api/employee/workflow/requests/{requestId}
@@ -452,7 +514,7 @@ Cookie: SESSION=...
 | --- | --- | --- |
 | `requestId` | `long` | 申请 ID |
 | `requestNo` | `string` | 申请编号 |
-| `bizType` | `string` | 业务类型，当前为 `LEAVE` |
+| `bizType` | `string` | 业务类型，当前支持 `LEAVE`、`CLOCK_CORRECTION` |
 | `bizId` | `long` | 业务明细 ID |
 | `applicantUserId` | `long` | 申请人用户 ID |
 | `title` | `string` | 申请标题 |
@@ -463,7 +525,17 @@ Cookie: SESSION=...
 | `submittedAt` | `string` | 提交时间 |
 | `finishedAt` | `string/null` | 完成时间 |
 | `leave` | `object/null` | 请假明细 |
+| `clockCorrection` | `object/null` | 补卡明细 |
 | `attachments` | `array` | 审批申请附件列表，返回 `WF_REQUEST` 业务附件引用 |
+
+### 补卡明细字段
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `targetDate` | `string` | 补卡考勤日期 |
+| `missingPunchType` | `string` | 缺卡类型，`ON_DUTY` 或 `OFF_DUTY` |
+| `expectedPunchAt` | `string` | 审批通过后要写入的人工补卡时间 |
+| `reason` | `string` | 补卡原因 |
 
 ### 附件字段
 
@@ -484,7 +556,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.8 查询审批轨迹
+## 5.9 查询审批轨迹
 
 ```http
 GET /api/employee/workflow/requests/{requestId}/actions
@@ -547,7 +619,7 @@ Agent 预审轨迹示例：
 
 ---
 
-## 5.9 创建审批附件下载票据
+## 5.10 创建审批附件下载票据
 
 ```http
 POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets
@@ -609,7 +681,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.10 使用审批附件下载票据下载文件
+## 5.11 使用审批附件下载票据下载文件
 
 ```http
 GET /api/employee/workflow/attachments/download/{ticketNo}
@@ -647,7 +719,7 @@ Content-Disposition: attachment; filename*=UTF-8''%E8%AF%B7%E5%81%87%E8%AF%81%E6
 
 ---
 
-## 5.11 创建流程类型
+## 5.12 创建流程类型
 
 ```http
 POST /api/admin/workflow/process-types
@@ -683,7 +755,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.12 创建流程模板
+## 5.13 创建流程模板
 
 ```http
 POST /api/admin/workflow/templates
@@ -708,7 +780,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.13 创建流程模板版本草稿
+## 5.14 创建流程模板版本草稿
 
 ```http
 POST /api/admin/workflow/templates/{templateId}/versions
@@ -743,7 +815,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.14 发布流程模板版本
+## 5.15 发布流程模板版本
 
 ```http
 POST /api/admin/workflow/template-versions/{versionId}/publish
@@ -775,7 +847,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.15 查询流程模板与版本
+## 5.16 查询流程模板与版本
 
 ```http
 GET /api/admin/workflow/templates?processCode=LEAVE
@@ -814,6 +886,7 @@ Cookie: SESSION=...
 | `200` | `403` | `无权查看该审批申请` | 非参与人查看申请详情或轨迹 |
 | `200` | `403` | `无权使用该附件引用` | 提交申请时引用了他人附件或非个人附件 |
 | `200` | `403` | `无权使用该下载票据` | 当前用户不是票据申请人 |
+| `200` | `404` | `补卡申请明细不存在` | 补卡审批通过时申请头缺少补卡明细 |
 | `200` | `404` | `附件引用不存在` | 附件引用不存在、已删除或物理文件已删除 |
 | `200` | `404` | `审批附件不存在` | 下载票据申请的附件不属于该审批申请 |
 | `200` | `404` | `下载票据不存在` | 下载票据编号不存在 |
@@ -829,6 +902,8 @@ Cookie: SESSION=...
 | `200` | `409` | `流程模板版本号已存在` | 同一模板下重复创建版本号 |
 | `200` | `409` | `只有草稿版本可以发布` | 重复发布或发布非草稿版本 |
 | `200` | `410` | `下载链接已过期，请重新申请` | 下载票据超过有效期 |
+| `400` | `400` | `补卡类型仅支持 ON_DUTY/OFF_DUTY` | 补卡申请传入不支持的缺卡类型 |
+| `400` | `400` | `补卡时间必须落在补卡日期内` | 补卡时间与补卡日期不一致 |
 | `404` | `404` | `假种不存在或已停用` | 业务对象不存在 |
 | `500` | `500` | `Flowable 未生成直属上级审批任务` | 引擎或流程定义异常 |
 
@@ -840,6 +915,7 @@ Cookie: SESSION=...
 - 第一版支持提交时绑定已有个人附件，并克隆为 `WF_REQUEST` 业务引用。
 - 第一版支持审批参与人为审批附件创建短期下载票据，并按一次性票据状态机下载原文件。
 - 第一版详情返回请假明细和审批申请业务附件。
+- 第一版详情返回补卡明细；补卡审批通过后通过 `AttendanceClockCorrectionService` 写入考勤人工补卡事实并重算同日结果。
 - 第一版支持后台维护流程类型、流程模板和模板版本草稿，并发布绑定已部署 Flowable 定义。
 - 第一版支持 workflow 侧 Agent 预审入口：提交后可进入 `PENDING_REVIEW`，Agent 回调通过或转人工后进入 Flowable，Agent 回调驳回后直接终止。
 - Agent 回调必须匹配 `wf_request.agent_pre_review_task_id`，避免错误任务串写申请结果。

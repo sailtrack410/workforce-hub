@@ -507,6 +507,18 @@ public class AttendanceRepository {
         );
     }
 
+    public boolean existsNormalPunchRecord(Long userId, LocalDateTime punchAt, String punchType) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_punch_record
+            WHERE user_id = ?
+              AND punch_at = ?
+              AND punch_type = ?
+              AND status = 'NORMAL'
+            """, Long.class, userId, punchAt, punchType);
+        return count != null && count > 0;
+    }
+
     public PunchRecordRow getPunchRecordOrThrow(Long punchRecordId) {
         List<PunchRecordRow> rows = jdbcTemplate.query("""
             SELECT id, user_id, punch_at, punch_type, source_type, status

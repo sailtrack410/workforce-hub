@@ -341,3 +341,48 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - Agent 预审回调具备基础并发幂等保护，后续接真实任务重试和消息重复投递时不会重复启动审批流。
 - 流程模板版本治理的“发布快照”语义和运行时启动行为一致，历史发布版本不会被同 Key 新部署静默改写。
 - 请假时长从客户端自报字段变成后端可信校验字段，为后续假期余额扣减和 Agent 规则判断打基础。
+
+## 2026-05-08 补卡申请审批闭环
+
+### 背景
+
+考勤侧已经有缺卡异常和日结果重算能力，但 workflow 还只能提交请假申请。补卡不能直接复用请假流程语义：它不扣假期余额，也不写 `wf_req_leave`，审批通过后的副作用是写入考勤人工打卡事实并重算当天结果。因此本轮把 `CLOCK_CORRECTION` 作为独立业务类型接入 workflow。
+
+### 本次处理
+
+- 新增员工端接口 `POST /api/employee/workflow/clock-correction-requests`。
+- 新增补卡 BPMN `clock_correction_manager_approval`，第一版仍采用直属上级单节点审批。
+- 新增 `ClockCorrectionRequestCreateRequest`、`WorkflowClockCorrectionDetailResponse`、`WorkflowClockCorrectionDetailRow`。
+- `WorkflowRepository.insertWorkflowRequest(...)` 从固定 `LEAVE` 改为传入 `bizType`，让申请头可以承载多业务类型。
+- 补卡提交写入 `wf_request.biz_type=CLOCK_CORRECTION`，`wf_request.biz_id=wf_req_clock_correction.id`。
+- 申请详情新增 `clockCorrection` 明细返回。
+- 审批通过逻辑按 `wf_request.biz_type` 分支：请假走余额扣减和请假考勤重算，补卡走 `AttendanceClockCorrectionService`，避免补卡误触发请假扣减。
+- 申请提交响应类从 `LeaveRequestCreateResponse` 收口为 `WorkflowRequestCreateResponse`，避免补卡接口返回请假命名的 DTO。
+- `ModuleWorkflowFlowableIntegrationTest` 新增补卡审批闭环用例，验证提交、详情、审批通过、Flowable 结束、业务状态和考勤副作用。
+- 同步更新 workflow API 文档、测试用例、开发日志和后续开发计划。
+
+### 红绿记录
+
+- 红灯：新增 `approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult` 后，补卡提交接口返回 `404`。
+- 绿灯：补齐 Controller、Service、Repository、DTO、BPMN 和考勤 SPI 后，目标用例通过。
+- 回归绿灯：`mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test` 通过，确认补卡新增业务类型没有破坏原请假审批、撤回、附件和下载票据能力。
+
+### 当前完成范围增量
+
+- workflow 支持 `LEAVE` 与 `CLOCK_CORRECTION` 两类申请头。
+- 补卡申请可以提交、查看详情、进入直属上级审批和审批通过。
+- 审批通过后的业务副作用由 `bizType` 驱动，不再把所有申请默认当作请假。
+- workflow 与 attendance 通过 SPI 连接，workflow 不直接写考勤表。
+
+### 暂未覆盖
+
+- 补卡 Agent 预审规则，例如超期补卡、频繁补卡、缺少附件自动驳回。
+- 补卡次数限制、可申请窗口和后台规则配置。
+- 多业务类型审批列表的前端展示细化。
+- Flowable `ACT_*` 表结构纳入 Flyway 的生产治理终态。
+
+### 意义
+
+- workflow 从“请假专用审批”推进到“可承载多业务申请的审批底座”。
+- `bizType + bizId` 的申请头模型开始真正发挥作用，后续加加班、外出、调休、HR 变更不需要重建审批主干。
+- 补卡闭环把考勤异常、审批和日结果重算串起来，形成员工端高频场景的可演示链路。

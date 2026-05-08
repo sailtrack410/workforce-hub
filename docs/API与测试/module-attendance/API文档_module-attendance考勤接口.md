@@ -9,7 +9,7 @@
 | 适用范围 | 工作日历、班次、考勤组、考勤组成员、排班、员工打卡、日结果、异常查询 |
 | 对应模块 | `server/module-attendance` |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版考勤基础配置、排班覆盖、排班唯一模型、排班变更重算、日结果原子 upsert、打卡、异常识别、请假审批通过联动日结果重算、请假分钟级覆盖抵扣已实现；补卡审批联动、节假日和工作日历精细过滤待后续迭代 |
+| 当前状态 | 第一版考勤基础配置、排班覆盖、排班唯一模型、排班变更重算、日结果原子 upsert、打卡、异常识别、请假审批通过联动日结果重算、请假分钟级覆盖抵扣、补卡审批通过后人工打卡写入与重算已实现；节假日和工作日历精细过滤待后续迭代 |
 
 ---
 
@@ -37,6 +37,7 @@
 
 - `AttendanceService` 实现 `AttendanceQueryService`，后续 Agent 可通过 SPI 查询日结果与月度异常。
 - `AttendanceService` 实现 `AttendanceRecalculationService`，workflow/leave 等外部业务事件可通过 SPI 触发指定员工指定日期的日结果重算。
+- `AttendanceService` 实现 `AttendanceClockCorrectionService`，workflow 补卡审批通过后可通过 SPI 写入人工补卡打卡事实并重算同日结果。
 
 ---
 
@@ -653,12 +654,29 @@ Cookie: SESSION=...
 - 当已批准请假只覆盖部分时段时，考勤会在迟到窗口、早退窗口和缺勤窗口内按分钟抵扣请假覆盖，不会把整天强制改成 `LEAVE`。
 - 多个已批准请假区间会先按时间合并再计算覆盖分钟，重叠部分只抵扣一次。
 
-### 6.2 当前边界
+### 6.2 补卡审批通过联动打卡事实与日结果
+
+直属上级审批通过补卡申请后：
+
+- `WorkflowService` 根据 `wf_request.biz_type=CLOCK_CORRECTION` 读取 `wf_req_clock_correction` 明细。
+- workflow 通过 `AttendanceClockCorrectionService.applyApprovedClockCorrection(...)` 调用考勤模块。
+- 考勤模块校验员工仍可打卡，并校验 `expectedPunchAt` 日期必须等于 `targetDate`。
+- 如果同一员工、同一补卡时间、同一打卡类型已经存在 `NORMAL` 打卡记录，则不重复写入，保证审批副作用幂等。
+- 如果不存在同一打卡事实，则写入 `att_punch_record`：
+  - `punch_type=ON_DUTY` 或 `OFF_DUTY`
+  - `source_type=MANUAL`
+  - `status=NORMAL`
+  - `remark` 记录审批申请 ID
+- 写入或确认打卡事实后，考勤模块触发 `targetDate` 日结果重算。
+- 重算继续复用日结果原子 upsert，最终以 `att_daily_result.uk_user_date(user_id, work_date)` 保证同员工同日只有一条结果。
+- 审批驳回或撤回不会写入补卡事实，也不会触发补卡重算。
+
+### 6.3 当前边界
 
 - 第一版请假分钟级覆盖只在已有班次的当天内计算，不处理跨天班次。
 - 第一版考勤缺勤仍按“无卡整段缺勤、缺一张卡半段缺勤”的简化模型，部分请假只在这些缺勤窗口里抵扣。
 - 如果员工该日期没有有效考勤组，日结果仍可能是 `NO_RULE`，不会强行写成 `LEAVE`。
-- 补卡审批通过后的打卡修正和二次重算待后续节点实现。
+- 第一版补卡只支持审批通过后补写 `ON_DUTY/OFF_DUTY` 人工打卡，不支持管理员直接改卡、补卡次数限制、补卡窗口限制和异常申诉处理流水。
 
 ---
 
@@ -666,7 +684,7 @@ Cookie: SESSION=...
 
 - 特殊班次模板、批量排班和排班变更历史。
 - `att_work_calendar_day` 工作日、休息日、节假日明细。
-- 补卡申请审批通过后修正打卡记录和异常。
+- 管理员补卡规则治理、补卡次数限制和异常申诉处理流水。
 - 外勤、定位、IP、人脸设备校验。
 - 管理员异常治理列表与忽略异常。
 - 多实例部署下考勤组成员区间重叠的分布式锁或数据库锁表治理。

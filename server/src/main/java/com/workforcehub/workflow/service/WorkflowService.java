@@ -18,12 +18,15 @@ import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.leave.service.LeaveService;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
+import com.workforcehub.spi.AttendanceClockCorrectionService;
 import com.workforcehub.spi.AttendanceRecalculationService;
 import com.workforcehub.spi.WorkflowAgentPreReviewTrigger;
 import com.workforcehub.spi.WorkflowAgentResultCallback;
+import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
-import com.workforcehub.workflow.dto.LeaveRequestCreateResponse;
+import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowLeaveDetailResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestCreateResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestAttachmentResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
@@ -35,6 +38,7 @@ import com.workforcehub.workflow.dto.WorkflowTaskActionResponse;
 import com.workforcehub.workflow.dto.WorkflowTaskRejectRequest;
 import com.workforcehub.workflow.dto.WorkflowTodoResponse;
 import com.workforcehub.workflow.repository.WorkflowAttachmentRow;
+import com.workforcehub.workflow.repository.WorkflowClockCorrectionDetailRow;
 import com.workforcehub.workflow.repository.WorkflowLeaveDetailRow;
 import com.workforcehub.workflow.repository.WorkflowRepository;
 import com.workforcehub.workflow.repository.WorkflowRequestDetailRow;
@@ -72,9 +76,13 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
     private static final String LEAVE_PROCESS_CODE = "LEAVE";
     private static final String LEAVE_BIZ_TYPE = "LEAVE";
+    private static final String CLOCK_CORRECTION_PROCESS_CODE = "CLOCK_CORRECTION";
+    private static final String CLOCK_CORRECTION_BIZ_TYPE = "CLOCK_CORRECTION";
     private static final String STATUS_PENDING_REVIEW = "PENDING_REVIEW";
     private static final String STATUS_IN_APPROVAL = "IN_APPROVAL";
     private static final String STATUS_REJECTED = "REJECTED";
+    private static final String PUNCH_TYPE_ON_DUTY = "ON_DUTY";
+    private static final String PUNCH_TYPE_OFF_DUTY = "OFF_DUTY";
     private static final LocalTime LUNCH_BREAK_START = LocalTime.of(12, 0);
     private static final LocalTime LUNCH_BREAK_END = LocalTime.of(13, 0);
     private static final DateTimeFormatter REQUEST_NO_TIME_FORMATTER =
@@ -88,6 +96,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private final DownloadTicketExecutionService downloadTicketExecutionService;
     private final LeaveService leaveService;
     private final AttendanceRecalculationService attendanceRecalculationService;
+    private final AttendanceClockCorrectionService attendanceClockCorrectionService;
     private final ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider;
     private final ObjectMapper objectMapper;
 
@@ -99,6 +108,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                            DownloadTicketExecutionService downloadTicketExecutionService,
                            LeaveService leaveService,
                            AttendanceRecalculationService attendanceRecalculationService,
+                           AttendanceClockCorrectionService attendanceClockCorrectionService,
                            ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider,
                            ObjectMapper objectMapper) {
         this.workflowRepository = workflowRepository;
@@ -109,12 +119,13 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         this.downloadTicketExecutionService = downloadTicketExecutionService;
         this.leaveService = leaveService;
         this.attendanceRecalculationService = attendanceRecalculationService;
+        this.attendanceClockCorrectionService = attendanceClockCorrectionService;
         this.agentPreReviewTriggerProvider = agentPreReviewTriggerProvider;
         this.objectMapper = objectMapper;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public LeaveRequestCreateResponse submitLeaveRequest(LeaveRequestCreateRequest request) {
+    public WorkflowRequestCreateResponse submitLeaveRequest(LeaveRequestCreateRequest request) {
         Long applicantUserId = CurrentUserHolder.requireUserId();
         validateLeaveRequest(request);
         OrgUserDetailResponse applicant = orgDirectoryService.getUserDetail(applicantUserId);
@@ -131,6 +142,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         workflowRepository.insertWorkflowRequest(
             requestId,
             requestNo,
+            LEAVE_BIZ_TYPE,
             leaveDetailId,
             applicantUserId,
             applicant.getPrimaryDeptId(),
@@ -144,7 +156,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         Long agentTaskId = triggerAgentPreReview(requestId, leaveDetailId, applicantUserId);
         if (agentTaskId != null) {
             workflowRepository.markPendingAgentPreReview(requestId, agentTaskId, applicantUserId);
-            LeaveRequestCreateResponse response = new LeaveRequestCreateResponse();
+            WorkflowRequestCreateResponse response = new WorkflowRequestCreateResponse();
             response.setRequestId(requestId);
             response.setRequestNo(requestNo);
             response.setStatus(STATUS_PENDING_REVIEW);
@@ -161,7 +173,55 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             applicantUserId
         );
 
-        LeaveRequestCreateResponse response = new LeaveRequestCreateResponse();
+        WorkflowRequestCreateResponse response = new WorkflowRequestCreateResponse();
+        response.setRequestId(requestId);
+        response.setRequestNo(requestNo);
+        response.setStatus(STATUS_IN_APPROVAL);
+        response.setFlowableProcessInstanceId(processInstanceId);
+        return response;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public WorkflowRequestCreateResponse submitClockCorrectionRequest(ClockCorrectionRequestCreateRequest request) {
+        Long applicantUserId = CurrentUserHolder.requireUserId();
+        String missingPunchType = normalizePunchType(request.getMissingPunchType());
+        validateClockCorrectionRequest(request);
+        OrgUserDetailResponse applicant = orgDirectoryService.getUserDetail(applicantUserId);
+        if (applicant.getManagerUserId() == null) {
+            throw new BizException(400, "当前员工没有直属上级，无法发起补卡审批");
+        }
+
+        WorkflowTemplateVersionRow templateVersion =
+            workflowRepository.getPublishedTemplateVersion(CLOCK_CORRECTION_PROCESS_CODE);
+        String title = applicant.getRealName() + "的补卡申请";
+        String requestNo = buildRequestNo(CLOCK_CORRECTION_BIZ_TYPE);
+        Long requestId = IdWorker.getId();
+        Long detailId = IdWorker.getId();
+        workflowRepository.insertWorkflowRequest(
+            requestId,
+            requestNo,
+            CLOCK_CORRECTION_BIZ_TYPE,
+            detailId,
+            applicantUserId,
+            applicant.getPrimaryDeptId(),
+            applicant.getPositionId(),
+            title,
+            templateVersion.id()
+        );
+        request.setMissingPunchType(missingPunchType);
+        workflowRepository.insertClockCorrectionDetail(detailId, requestId, request);
+        bindAttachments(requestId, applicantUserId, request.getAttachmentRefIds());
+
+        String processInstanceId = startHumanApproval(
+            requestId,
+            title,
+            request.getReason(),
+            applicant,
+            templateVersion,
+            applicantUserId
+        );
+
+        WorkflowRequestCreateResponse response = new WorkflowRequestCreateResponse();
         response.setRequestId(requestId);
         response.setRequestNo(requestNo);
         response.setStatus(STATUS_IN_APPROVAL);
@@ -216,10 +276,12 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         }
         WorkflowTemplateVersionRow templateVersion = workflowRepository.getTemplateVersionByRequestId(requestId);
         WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(requestId);
+        WorkflowClockCorrectionDetailRow clockCorrection =
+            workflowRepository.getClockCorrectionDetailByRequestId(requestId);
         startHumanApproval(
             requestId,
             workflowRequest.title(),
-            leaveDetail == null ? null : leaveDetail.reason(),
+            requestSummary(leaveDetail, clockCorrection),
             applicant,
             templateVersion,
             agentTaskId
@@ -352,8 +414,9 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         ensureRequestParticipant(requestId, userId);
         WorkflowRequestDetailRow row = workflowRepository.getRequestDetailOrThrow(requestId);
         WorkflowLeaveDetailRow leave = workflowRepository.getLeaveDetailByRequestId(requestId);
+        WorkflowClockCorrectionDetailRow clockCorrection = workflowRepository.getClockCorrectionDetailByRequestId(requestId);
         List<WorkflowAttachmentRow> attachments = workflowRepository.listAttachmentsByRequestId(requestId);
-        return toRequestDetailResponse(row, leave, attachments);
+        return toRequestDetailResponse(row, leave, clockCorrection, attachments);
     }
 
     public List<WorkflowTaskActionResponse> listRequestActions(Long requestId) {
@@ -463,19 +526,29 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         }
 
         WorkflowLeaveDetailRow approvedLeaveDetail = null;
+        WorkflowClockCorrectionDetailRow approvedClockCorrectionDetail = null;
         if ("APPROVE".equals(actionType)) {
-            WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(workflowRequest.id());
-            if (leaveDetail == null) {
-                throw new BizException(404, "请假申请明细不存在");
+            if (LEAVE_BIZ_TYPE.equals(workflowRequest.bizType())) {
+                WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(workflowRequest.id());
+                if (leaveDetail == null) {
+                    throw new BizException(404, "请假申请明细不存在");
+                }
+                approvedLeaveDetail = leaveDetail;
+                leaveService.deductForWorkflowApproval(
+                    workflowRequest.applicantUserId(),
+                    leaveDetail.leaveTypeId(),
+                    leaveDetail.durationMinutes(),
+                    workflowRequest.id(),
+                    approverUserId
+                );
+            } else if (CLOCK_CORRECTION_BIZ_TYPE.equals(workflowRequest.bizType())) {
+                WorkflowClockCorrectionDetailRow clockCorrectionDetail =
+                    workflowRepository.getClockCorrectionDetailByRequestId(workflowRequest.id());
+                if (clockCorrectionDetail == null) {
+                    throw new BizException(404, "补卡申请明细不存在");
+                }
+                approvedClockCorrectionDetail = clockCorrectionDetail;
             }
-            approvedLeaveDetail = leaveDetail;
-            leaveService.deductForWorkflowApproval(
-                workflowRequest.applicantUserId(),
-                leaveDetail.leaveTypeId(),
-                leaveDetail.durationMinutes(),
-                workflowRequest.id(),
-                approverUserId
-            );
         }
         workflowRepository.insertTaskAction(
             workflowRequest.id(),
@@ -491,6 +564,16 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         workflowRepository.closePendingTodo(workflowRequest.id(), approverUserId);
         if (approvedLeaveDetail != null) {
             recalculateAttendanceForApprovedLeave(workflowRequest.applicantUserId(), approvedLeaveDetail);
+        }
+        if (approvedClockCorrectionDetail != null) {
+            attendanceClockCorrectionService.applyApprovedClockCorrection(
+                workflowRequest.applicantUserId(),
+                approvedClockCorrectionDetail.targetDate(),
+                approvedClockCorrectionDetail.missingPunchType(),
+                approvedClockCorrectionDetail.expectedPunchAt(),
+                workflowRequest.id(),
+                approverUserId
+            );
         }
         return statusResponse(workflowRequest.id(), afterStatus);
     }
@@ -584,6 +667,12 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         );
     }
 
+    private void validateClockCorrectionRequest(ClockCorrectionRequestCreateRequest request) {
+        if (!request.getTargetDate().equals(request.getExpectedPunchAt().toLocalDate())) {
+            throw new BizException(400, "补卡时间必须落在补卡日期内");
+        }
+    }
+
     private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
         long durationMinutes = Duration.between(startAt, endAt).toMinutes();
         LocalDate currentDate = startAt.toLocalDate();
@@ -631,6 +720,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
     private WorkflowRequestDetailResponse toRequestDetailResponse(WorkflowRequestDetailRow row,
                                                                   WorkflowLeaveDetailRow leave,
+                                                                  WorkflowClockCorrectionDetailRow clockCorrection,
                                                                   List<WorkflowAttachmentRow> attachments) {
         WorkflowRequestDetailResponse response = new WorkflowRequestDetailResponse();
         response.setRequestId(row.id());
@@ -653,6 +743,15 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             leaveResponse.setDurationMinutes(leave.durationMinutes());
             leaveResponse.setReason(leave.reason());
             response.setLeave(leaveResponse);
+        }
+        if (clockCorrection != null) {
+            WorkflowClockCorrectionDetailResponse clockCorrectionResponse =
+                new WorkflowClockCorrectionDetailResponse();
+            clockCorrectionResponse.setTargetDate(clockCorrection.targetDate());
+            clockCorrectionResponse.setMissingPunchType(clockCorrection.missingPunchType());
+            clockCorrectionResponse.setExpectedPunchAt(clockCorrection.expectedPunchAt());
+            clockCorrectionResponse.setReason(clockCorrection.reason());
+            response.setClockCorrection(clockCorrectionResponse);
         }
         response.setAttachments(attachments.stream()
             .map(this::toAttachmentResponse)
@@ -697,8 +796,31 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     }
 
     private String buildRequestNo() {
-        return "WF-LEAVE-" + java.time.LocalDateTime.now().format(REQUEST_NO_TIME_FORMATTER)
+        return buildRequestNo(LEAVE_BIZ_TYPE);
+    }
+
+    private String buildRequestNo(String bizType) {
+        return "WF-" + bizType + "-" + java.time.LocalDateTime.now().format(REQUEST_NO_TIME_FORMATTER)
             + "-" + IdWorker.getIdStr();
+    }
+
+    private String requestSummary(WorkflowLeaveDetailRow leaveDetail,
+                                  WorkflowClockCorrectionDetailRow clockCorrection) {
+        if (leaveDetail != null) {
+            return leaveDetail.reason();
+        }
+        if (clockCorrection != null) {
+            return clockCorrection.reason();
+        }
+        return null;
+    }
+
+    private String normalizePunchType(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase();
+        if (!PUNCH_TYPE_ON_DUTY.equals(normalized) && !PUNCH_TYPE_OFF_DUTY.equals(normalized)) {
+            throw new BizException(400, "补卡类型仅支持 ON_DUTY/OFF_DUTY");
+        }
+        return normalized;
     }
 
     private String blankToNull(String value) {

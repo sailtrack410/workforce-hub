@@ -372,3 +372,51 @@
 - 日结果从“应用层判断插入或更新”升级为“数据库唯一键原子化写入”，降低并发打卡、审批联动和外部事件重算下的死锁与重复键风险。
 - `NO_RULE` 作为无考勤规则的明确结果仍然保留，但不会因为没有考勤组锁而成为不稳定写入路径。
 - 后续做补卡、月报和 Agent 异常分析时，可以基于更稳定的单日结果表继续扩展。
+
+## 2026-05-08 补卡审批通过后联动考勤重算
+
+### 背景
+
+员工实时打卡已经改为服务端生成事实时间，不能再允许员工端直接提交历史打卡时间。历史漏打卡必须通过审批闭环落地：员工提交补卡申请，直属上级审批通过后，系统才写入人工补卡打卡事实并重算当天日结果。这样既能保留考勤事实可信边界，也能让缺卡异常有正式修正路径。
+
+### 本次处理
+
+- 新增 `AttendanceClockCorrectionService` SPI，由 `AttendanceService` 实现。
+- `AttendanceService.applyApprovedClockCorrection(...)` 作为补卡审批通过后的唯一考勤写入口。
+- 补卡落地前复用员工可打卡状态校验，避免离职、停用员工继续被写入新考勤事实。
+- 补卡时间必须落在补卡日期内，避免跨日补卡污染错误考勤日。
+- 补卡通过后写入 `att_punch_record`，`source_type=MANUAL`，`status=NORMAL`，备注记录审批申请 ID。
+- 补卡写入前按 `userId + expectedPunchAt + punchType + status=NORMAL` 判断是否已有同一打卡事实，避免重复回调或重复执行生成重复补卡记录。
+- 写入或确认补卡事实后，立即调用同日 `recalculateDailyResult(...)`，复用日结果原子 upsert 和异常重建逻辑。
+- `ModuleWorkflowFlowableIntegrationTest` 新增补卡审批闭环测试，覆盖只有上班卡时的缺卡异常、提交补下班卡、直属上级审批、人工补卡写入、日结果变回正常、`MISS_PUNCH` 异常清理。
+- 同步更新 `module-attendance` API 文档、测试用例、开发日志和后续开发计划。
+
+### 红绿记录
+
+- 红灯：新增 `approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult` 后，`POST /api/employee/workflow/clock-correction-requests` 返回 `404`，确认补卡申请入口不存在。
+- 绿灯：补齐 workflow 补卡申请、BPMN、补卡明细读写和 `AttendanceClockCorrectionService` 后，该用例通过。
+- 绿灯：`mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test` 通过，确认补卡审批没有破坏已有请假、附件、审批、撤回和下载票据流程。
+- 绿灯：`mvn -Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test` 通过，确认请假联动和考勤接口回归未回退。
+
+### 当前完成范围增量
+
+- 补卡申请审批通过后可以写入人工补卡事实。
+- 补卡通过后会触发同日考勤日结果重算。
+- 缺下班卡场景可从 `ABNORMAL + MISS_PUNCH` 修正为 `NORMAL`。
+- 员工实时打卡仍不信任客户端历史时间，历史修正统一走审批。
+- attendance 与 workflow 通过 `AttendanceClockCorrectionService` 解耦，workflow 不直接写考勤 Repository。
+
+### 暂未覆盖
+
+- 管理员补卡规则治理，例如每月补卡次数、补卡可申请窗口、超期禁止。
+- 考勤异常申诉、忽略、关闭和处理流水。
+- 补卡审批驳回后的异常状态联动展示。
+- 独立 `AttendanceCalculationService` 拆分。
+- 月度汇总、节假日、跨天班次下的重算边界。
+- 多实例部署下考勤组成员重叠写入的分布式锁或数据库锁表治理。
+
+### 意义
+
+- 考勤从“发现缺卡异常”推进到“通过审批修正异常”的第一版闭环。
+- 补卡事实来源被明确区分为 `MANUAL`，和员工实时 `APP/PC` 打卡事实分开，后续审计、异常申诉和 Agent 风险判断有清晰依据。
+- 补卡复用日结果原子 upsert 和异常重建路径，避免另起一套容易分叉的考勤计算逻辑。

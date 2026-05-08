@@ -2,6 +2,8 @@ package com.workforcehub.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.support.FixedClockTestConfiguration;
+import com.workforcehub.support.MutableTestClock;
 import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
 import com.workforcehub.support.WorkflowFlowableTestConfiguration;
 import jakarta.servlet.http.Cookie;
@@ -24,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDateTime;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,6 +35,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -44,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("api")
-@Import(WorkflowFlowableTestConfiguration.class)
+@Import({WorkflowFlowableTestConfiguration.class, FixedClockTestConfiguration.class})
 class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
@@ -67,6 +71,9 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private MutableTestClock mutableTestClock;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
@@ -106,6 +113,88 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         assertEquals("APPROVED", requestStatus(scenario.requestId()));
         assertEquals(1L, actionCount(scenario.requestId(), "APPROVE", MANAGER_USER_ID));
         assertEquals(0L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+    }
+
+    @Test
+    @DisplayName("补卡申请审批通过后应写入人工补卡打卡并重算考勤日结果")
+    void approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        seedAttendanceRuleForEmployee();
+        seedClockCorrectionWorkflowDefinition();
+        punch(employeeSession, "2026-05-16T09:00:00", "ON_DUTY");
+        assertEquals("ABNORMAL", dailyResultStatus(EMPLOYEE_USER_ID, "2026-05-16"));
+        assertEquals(1L, exceptionCount(EMPLOYEE_USER_ID, "2026-05-16", "MISS_PUNCH"));
+
+        MvcResult submitResult = mockMvc.perform(post("/api/employee/workflow/clock-correction-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetDate": "2026-05-16",
+                      "missingPunchType": "OFF_DUTY",
+                      "expectedPunchAt": "2026-05-16 18:00:00",
+                      "reason": "下班时网络异常，补下班卡"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").isNumber())
+            .andExpect(jsonPath("$.data.requestNo").isString())
+            .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
+            .andExpect(jsonPath("$.data.flowableProcessInstanceId").isString())
+            .andReturn();
+
+        JsonNode submitData = data(submitResult);
+        long requestId = submitData.get("requestId").asLong();
+        String processInstanceId = submitData.get("flowableProcessInstanceId").asText();
+        Task managerTask = taskService.createTaskQuery()
+            .processInstanceId(processInstanceId)
+            .taskAssignee(String.valueOf(MANAGER_USER_ID))
+            .singleResult();
+        assertNotNull(managerTask, "补卡申请应生成直属上级审批任务");
+        assertEquals(requestBizId(requestId), clockCorrectionDetailId(requestId));
+
+        mockMvc.perform(get("/api/employee/workflow/requests/{requestId}", requestId)
+                .cookie(managerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.bizType").value("CLOCK_CORRECTION"))
+            .andExpect(jsonPath("$.data.clockCorrection.targetDate").value("2026-05-16"))
+            .andExpect(jsonPath("$.data.clockCorrection.missingPunchType").value("OFF_DUTY"))
+            .andExpect(jsonPath("$.data.clockCorrection.expectedPunchAt").value("2026-05-16T18:00:00"));
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/approve", managerTask.getId())
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "核实后同意补卡"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").value(requestId))
+            .andExpect(jsonPath("$.data.status").value("APPROVED"));
+
+        assertNull(runtimeService.createProcessInstanceQuery()
+            .processInstanceId(processInstanceId)
+            .singleResult(), "补卡审批通过后 Flowable 流程实例应结束");
+        assertEquals("APPROVED", requestStatus(requestId));
+        assertEquals(1L, manualPunchCount(EMPLOYEE_USER_ID, "2026-05-16", "OFF_DUTY"));
+        assertEquals("NORMAL", dailyResultStatus(EMPLOYEE_USER_ID, "2026-05-16"));
+        assertEquals(0L, exceptionCount(EMPLOYEE_USER_ID, "2026-05-16", "MISS_PUNCH"));
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-16")
+                .param("endDate", "2026-05-16"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(false))
+            .andExpect(jsonPath("$.data[0].workMinutes").value(540));
     }
 
     @Test
@@ -661,6 +750,27 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
             """);
     }
 
+    private void seedClockCorrectionWorkflowDefinition() {
+        jdbcTemplate.update("""
+            INSERT INTO wf_process_type
+                (id, process_code, process_name, biz_type, status)
+            VALUES
+                (9111, 'CLOCK_CORRECTION', '补卡流程', 'CLOCK_CORRECTION', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template
+                (id, process_type_id, template_code, template_name, status)
+            VALUES
+                (9211, 9111, 'CLOCK_CORRECTION_MANAGER_APPROVAL', '补卡直属上级审批', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template_version
+                (id, template_id, version_no, flowable_definition_key, status, published_by, published_at, effective_from)
+            VALUES
+                (9311, 9211, 1, 'clock_correction_manager_approval', 'PUBLISHED', 8001, NOW(), DATE_SUB(NOW(), INTERVAL 1 DAY))
+            """);
+    }
+
     private Long seedAnnualLeaveType() {
         long leaveTypeId = 9401L;
         jdbcTemplate.update("""
@@ -844,6 +954,14 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         );
     }
 
+    private Long clockCorrectionDetailId(long requestId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT id FROM wf_req_clock_correction WHERE request_id = ?",
+            Long.class,
+            requestId
+        );
+    }
+
     private Long actionCount(long requestId, String actionType, long actorId) {
         return jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
@@ -878,6 +996,91 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
             FROM sys_audit_log
             WHERE operator_type = ? AND operator_id = ? AND action_type = ?
             """, Long.class, operatorType, operatorId, actionType);
+    }
+
+    private void seedAttendanceRuleForEmployee() {
+        jdbcTemplate.update("""
+            INSERT INTO att_work_calendar
+                (id, calendar_code, calendar_name, calendar_type, status)
+            VALUES
+                (9701, 'CAL_CLOCK_CORRECTION', '补卡考勤日历', 'STANDARD', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_shift
+                (id, shift_code, shift_name, cross_day_flag, required_punch_count, status)
+            VALUES
+                (9702, 'SHIFT_CLOCK_CORRECTION', '补卡考勤班次', 0, 2, 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_shift_segment
+                (id, shift_id, segment_no, start_time, end_time,
+                 on_duty_punch_start, on_duty_punch_end,
+                 off_duty_punch_start, off_duty_punch_end)
+            VALUES
+                (9703, 9702, 1, '09:00:00', '18:00:00',
+                 '08:00:00', '10:00:00',
+                 '17:00:00', '19:00:00')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_group
+                (id, group_code, group_name, calendar_id, default_shift_id,
+                 late_grace_minutes, early_leave_grace_minutes, status)
+            VALUES
+                (9704, 'GROUP_CLOCK_CORRECTION', '补卡考勤组', 9701, 9702, 0, 0, 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO att_group_member
+                (id, group_id, user_id, effective_from, effective_to, source_type, status)
+            VALUES
+                (9705, 9704, ?, '2026-05-01', NULL, 'MANUAL', 'ACTIVE')
+            """, EMPLOYEE_USER_ID);
+    }
+
+    private void punch(Cookie employeeSession, String punchAt, String punchType) throws Exception {
+        mutableTestClock.setTime(LocalDateTime.parse(punchAt));
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchAt": "%s",
+                      "punchType": "%s",
+                      "sourceType": "PC"
+                    }
+                    """.formatted(punchAt, punchType)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+    }
+
+    private String dailyResultStatus(long userId, String workDate) {
+        return jdbcTemplate.queryForObject("""
+            SELECT result_status
+            FROM att_daily_result
+            WHERE user_id = ? AND work_date = ?
+            """, String.class, userId, workDate);
+    }
+
+    private Long exceptionCount(long userId, String workDate, String exceptionType) {
+        return jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+              AND ae.exception_type = ?
+            """, Long.class, userId, workDate, exceptionType);
+    }
+
+    private Long manualPunchCount(long userId, String workDate, String punchType) {
+        return jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_punch_record
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = ?
+              AND source_type = 'MANUAL'
+              AND status = 'NORMAL'
+            """, Long.class, userId, workDate, punchType);
     }
 
     private record LeaveApprovalScenario(

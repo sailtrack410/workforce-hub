@@ -24,5 +24,6 @@ public class WorkflowRequestDetailResponse {
     private LocalDateTime submittedAt;
     private LocalDateTime finishedAt;
     private WorkflowLeaveDetailResponse leave;
+    private WorkflowClockCorrectionDetailResponse clockCorrection;
     private List<WorkflowRequestAttachmentResponse> attachments = List.of();
 }

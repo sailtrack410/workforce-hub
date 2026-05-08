@@ -55,6 +55,7 @@
 - `第45审_module-leave余额调整幂等指纹修复审查.md`
 - `第46审_module-attendance排班唯一模型修复审查.md`
 - `第47审_module-attendance日结果原子upsert修复审查.md`
+- `第48审_module-attendance补卡审批闭环审查.md`
 
 维护约定：
 

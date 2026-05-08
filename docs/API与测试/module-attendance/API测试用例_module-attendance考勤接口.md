@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-attendance` 考勤接口测试用例 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 考勤基础配置、排班覆盖、排班唯一模型、排班变更重算、日结果原子 upsert、打卡、异常识别、请假审批通过联动重算、直属上级团队查询 |
+| 适用范围 | 考勤基础配置、排班覆盖、排班唯一模型、排班变更重算、日结果原子 upsert、打卡、异常识别、请假审批通过联动重算、补卡审批通过联动重算、直属上级团队查询 |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次、排班唯一模型、排班变更重算、日结果原子 upsert、缺卡专项保护、请假审批通过联动考勤重算和请假分钟级覆盖抵扣 |
+| 当前状态 | 第一版自动化测试已落地，已补排班覆盖默认班次、排班唯一模型、排班变更重算、日结果原子 upsert、缺卡专项保护、请假审批通过联动考勤重算、请假分钟级覆盖抵扣和补卡审批通过联动考勤重算 |
 
 ---
 
@@ -37,6 +37,7 @@
 - 验证员工实时打卡使用服务端接收时间，不信任客户端历史 `punchAt`。
 - 验证员工实时打卡不要求客户端传入 `punchAt`。
 - 验证员工实时打卡拒绝 `MANUAL` 等受控来源伪造。
+- 验证补卡审批通过后写入人工补卡打卡事实并重算同日日结果。
 - 验证测试基线会清理 `att_` 表，避免跨测试污染。
 
 当前已落地自动化测试类：
@@ -119,6 +120,12 @@
 | `ATT-WF-003` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` + `GET /api/employee/attendance/daily-results` | 重叠小时假不重复抵扣缺勤 | 张三提交 `09:00-10:00` 和 `09:30-10:30` 两段小时假且当天无打卡 | 两段请假均审批通过 | 合并覆盖 90 分钟；日结果 `absenceMinutes=450`，不是重复抵扣后的 420 |
 | `ATT-WF-004` | P0 | `POST /api/employee/workflow/tasks/{taskId}/approve` + `POST /api/employee/attendance/punch` | 小时假抵扣迟到和早退窗口 | 张三提交 `09:00-10:00`、`17:00-18:00` 两段小时假；实际 `10:00` 上班、`17:00` 下班 | 请假审批通过后员工打上下班卡 | 日结果 `resultStatus=NORMAL`；`lateMinutes=0`；`earlyLeaveMinutes=0`；`absenceMinutes=0`；当天无异常 |
 
+## 5.4 补卡审批联动考勤重算
+
+| 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ATT-WF-005` | P0 | `POST /api/employee/workflow/clock-correction-requests` + `POST /api/employee/workflow/tasks/{taskId}/approve` + `GET /api/employee/attendance/daily-results` | 补卡审批通过后修正缺卡异常 | 张三有有效考勤组；张三当天只有上班卡，日结果为 `ABNORMAL` 且存在 `MISS_PUNCH`；补卡流程模板已发布 | 张三提交 `OFF_DUTY` 补卡，李四审批通过 | 写入 1 条 `source_type=MANUAL` 下班卡；日结果重算为 `NORMAL`；`exceptionFlag=false`；`workMinutes=540`；当天 `MISS_PUNCH` 异常数为 0 |
+
 ---
 
 ## 六、验证命令
@@ -133,6 +140,7 @@ mvn -Dtest=ModuleAttendanceApiIntegrationTest#inactiveScheduleShouldStillRejectC
 mvn -Dtest=ModuleAttendanceApiIntegrationTest#employeePunchShouldAllowMissingClientPunchAt,ModuleAttendanceApiIntegrationTest#employeePunchShouldUseServerReceivedTimeInsteadOfClientPunchAt,ModuleAttendanceApiIntegrationTest#employeePunchShouldRejectControlledManualSourceType test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest#approvedHourlyLeaveShouldOnlyOffsetCoveredAbsenceMinutes,ModuleLeaveWorkflowIntegrationTest#overlappingApprovedHourlyLeavesShouldNotDoubleOffsetAbsenceMinutes,ModuleLeaveWorkflowIntegrationTest#approvedHourlyLeaveShouldOffsetLateAndEarlyWindows test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest test
 mvn -Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test
 ```
@@ -150,7 +158,7 @@ mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWri
 ## 七、当前未覆盖
 
 - 独立 `ModuleAttendanceCalculationIntegrationTest`。
-- 补卡申请审批通过后修正异常。
+- 管理员补卡规则治理、补卡次数限制和异常申诉处理流水。
 - 跨天班次下的请假分钟级覆盖。
 - 工作日历、节假日和休息日对请假覆盖与考勤日结果的精细影响。
 - 多实例部署下高并发考勤组成员重叠写入的分布式锁或数据库锁表治理。
