@@ -11,6 +11,18 @@ npm test
 npm run build
 ```
 
+## 本地联调
+
+员工端 API 基础层位于 `src/api/`，默认使用服务端 Session Cookie，所有请求都会带 `credentials: "include"`。
+
+本地前后端分端口联调时，可以在 `employee-web/.env.local` 配置：
+
+```bash
+VITE_API_BASE_URL=http://localhost:8080
+```
+
+当前页面仍以静态展示数据为主；真实接口先通过 `src/api/employee.ts` 统一收口，后续页面接入时禁止在 Vue 组件里直接散写 `fetch`。
+
 ## 仓库边界
 
 - `src/`、`index.html`、`package.json`、`package-lock.json` 和配置文件属于正式源码。
