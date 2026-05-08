@@ -9,6 +9,16 @@
 
 # Build outputs
 server/target/
+employee-web/node_modules/
+employee-web/dist/
+employee-web/file-dist/
+employee-web/*.tsbuildinfo
+employee-web/vite.config.js
+employee-web/vite.config.d.ts
+
+# Local verification screenshots
+employee-web-*.png
+workforce-hub-*.png
 
 # Local declaration materials
 docs/申报材料/
