@@ -68,4 +68,17 @@ describe('createEmployeeApi', () => {
       ['post', '/api/employee/files/42/download-tickets', { downloadType: 'PERSONAL_FILE', reason: '查看材料' }],
     ]);
   });
+
+  it('maps IM conversations and messages to backend IM controller', async () => {
+    const { client, calls } = createSpyClient();
+    const api = createEmployeeApi(client);
+
+    await api.im.conversations();
+    await api.im.messages(7001);
+
+    expect(calls).toEqual([
+      ['get', '/api/employee/im/conversations', undefined],
+      ['get', '/api/employee/im/conversations/7001/messages', undefined],
+    ]);
+  });
 });

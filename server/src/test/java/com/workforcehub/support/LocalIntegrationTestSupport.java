@@ -135,6 +135,10 @@ public abstract class LocalIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM lv_policy");
             jdbcTemplate.execute("DELETE FROM lv_type");
             jdbcTemplate.execute("DELETE FROM hr_employee_event");
+            jdbcTemplate.execute("DELETE FROM im_message");
+            jdbcTemplate.execute("DELETE FROM im_group_profile");
+            jdbcTemplate.execute("DELETE FROM im_conversation_member");
+            jdbcTemplate.execute("DELETE FROM im_conversation");
             jdbcTemplate.execute("DELETE FROM auth_user_account");
             jdbcTemplate.execute("DELETE FROM org_department_leader");
             jdbcTemplate.execute("DELETE FROM org_user");

@@ -69,6 +69,38 @@ export interface WorkflowRequestSummaryResponse {
   finishedAt?: string | null;
 }
 
+export interface ImMessageResponse {
+  messageId: number;
+  conversationId: number;
+  seqNo: number;
+  senderType: string;
+  senderId: number;
+  messageType: string;
+  contentJson: string;
+  contentText: string;
+  quotedMessageId?: number | null;
+  status: string;
+  sentAt?: string | null;
+}
+
+export interface ImConversationSummaryResponse {
+  conversationId: number;
+  conversationType: string;
+  conversationKey?: string | null;
+  title?: string | null;
+  avatarFileId?: number | null;
+  boundAgentId?: number | null;
+  lastMessageSeq: number;
+  lastReadSeq: number;
+  unreadCount: number;
+  lastMessage?: ImMessageResponse | null;
+  lastMessageAt?: string | null;
+  status: string;
+  pin: boolean;
+  mute: boolean;
+  memberRole: string;
+}
+
 export interface LeaveRequestCreateRequest {
   leaveTypeId: number;
   startAt: string;

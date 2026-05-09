@@ -7,6 +7,8 @@ import type {
   CreateUploadTicketRequest,
   CurrentUserResponse,
   FileTrashRequest,
+  ImConversationSummaryResponse,
+  ImMessageResponse,
   LeaveRequestCreateRequest,
   LoginRequest,
   LoginResponse,
@@ -55,6 +57,12 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
     },
     leave: {
       accounts: () => client.get<UnknownRecord[]>('/api/employee/leave/accounts'),
+    },
+    im: {
+      conversations: () => client.get<ImConversationSummaryResponse[]>('/api/employee/im/conversations'),
+      messages: (conversationId: number) => (
+        client.get<ImMessageResponse[]>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages`)
+      ),
     },
     files: {
       createUploadTicket: (request: CreateUploadTicketRequest) => client.post<UnknownRecord>('/api/employee/files/upload-tickets', request),
