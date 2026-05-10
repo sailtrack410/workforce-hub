@@ -5,7 +5,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 测试类 | `ModuleAgentApiIntegrationTest`、`ModuleAgentTaskTimeoutIntegrationTest` |
-| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/人工确认超时手动扫描，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
+| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/任务工具调用明细/任务审计轨迹/人工确认超时手动扫描，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
 | 运行前提 | 本地 MySQL、Redis 可用；测试使用 `LocalIntegrationTestSupport` 自动建库、迁移和装载组织种子数据 |
 | 数据库变更 | 本轮无新增迁移，测试依赖 V1 已存在 `agt_*` 表 |
 
@@ -17,12 +17,12 @@
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_task_query_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_task_trace_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 预期结果：
 
-- 18 个用例全部通过。
+- 19 个用例全部通过。
 - 空库可执行 V1 到 V11 的 Flyway 迁移。
 - `LocalIntegrationTestSupport` 每个用例前清理 `agt_*` 与相关业务表。
 
@@ -37,7 +37,7 @@ mvn -DskipTests compile
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_task_query_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_task_trace_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 该命令用于验证 Agent 对认证、组织和 IM 群成员关系的依赖没有破坏既有模块。
@@ -66,6 +66,7 @@ env TEST_DB_NAME=workforce_hub_agent_task_query_regression mvn -Dtest=ModuleAuth
 | AGT-016 | P1 | 后台手动触发超时扫描显式传空批次 | `batchSize:null` 按默认批次处理，不返回 500 |
 | AGT-017 | P0 | 后台分页筛选并查看 Agent 任务详情 | `GET /api/admin/agent-tasks` 支持按状态、Agent、触发人和上下文过滤，详情接口返回同一任务 |
 | AGT-018 | P1 | 后台任务查询非法状态 | `status=UNKNOWN_STATUS` 返回 `code=400`、`message=Agent任务状态不支持` |
+| AGT-019 | P0 | 后台查看任务工具调用明细和审计轨迹 | `GET /api/admin/agent-tasks/{taskId}/tool-calls` 返回工具调用明细，`GET /api/admin/agent-tasks/{taskId}/audits` 返回状态审计 |
 
 ---
 
@@ -213,6 +214,16 @@ env TEST_DB_NAME=workforce_hub_agent_task_query_regression mvn -Dtest=ModuleAuth
 - 接口返回 `code=400`。
 - 错误信息为 `Agent任务状态不支持`。
 
+### AGT-019 后台任务工具调用明细和审计轨迹
+
+- 构造一个 `WAITING_HUMAN_CONFIRM` 任务，再由触发人确认继续执行。
+- 后台调用 `GET /api/admin/agent-tasks/{taskId}/tool-calls`。
+- 返回 1 条工具调用明细，包含 `toolCode`、`toolName`、`toolType`、`riskLevel`、`approvalStatus`、`resultStatus`、`requestPayloadJson`、`responsePayloadJson` 和 `calledAt`。
+- `requestPayloadJson`、`responsePayloadJson` 按 JSON 内容断言，不依赖 MySQL JSON 字符串空格格式。
+- 后台调用 `GET /api/admin/agent-tasks/{taskId}/audits`。
+- 返回 `TASK_CREATED`、`TASK_WAITING_HUMAN_CONFIRM`、`TASK_HUMAN_CONFIRMED`、`TASK_RUNNING`、`TASK_SUCCEEDED` 五条审计轨迹。
+- `TASK_WAITING_HUMAN_CONFIRM` 的 `riskFlag=true`。
+
 ---
 
 ## 5. 手工验证示例
@@ -236,6 +247,8 @@ env TEST_DB_NAME=workforce_hub_agent_task_query_regression mvn -Dtest=ModuleAuth
 15. 如任务超过 `waiting_deadline_at` 仍无人处理，后台调用：`POST /api/admin/agent-tasks/timeout-scan`
 16. 后台排查任务状态：`GET /api/admin/agent-tasks?status=SUCCEEDED&pageNo=1&pageSize=20`
 17. 后台查看任务详情：`GET /api/admin/agent-tasks/{taskId}`
+18. 后台查看任务工具调用明细：`GET /api/admin/agent-tasks/{taskId}/tool-calls`
+19. 后台查看任务审计轨迹：`GET /api/admin/agent-tasks/{taskId}/audits`
 
 ### 5.2 排查 SQL
 
@@ -258,7 +271,7 @@ WHERE task_id = ?;
 ## 6. 当前未覆盖但后续必须补的测试
 
 - 人工确认超时扫描的定时触发、批次记录和多实例并发。
-- 后台 Agent 版本回滚、重新启用、工具查询、ACL 查询、任务工具调用明细和审计轨迹。
+- 后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和运行指标。
 - workflow 预审真实触发和回调。
 - IM 会话 Agent 触发和回复回写。
 - 知识库绑定空间 ACL。

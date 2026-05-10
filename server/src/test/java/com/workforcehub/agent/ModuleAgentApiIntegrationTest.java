@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -252,6 +253,68 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(400))
             .andExpect(jsonPath("$.message").value("Agent任务状态不支持"));
+    }
+
+    @Test
+    @DisplayName("后台应能查看Agent任务工具调用明细和审计轨迹")
+    void adminShouldGetAgentTaskToolCallsAndAudits() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(
+            adminSession,
+            employeeSession,
+            "TASK_TRACE_AGENT",
+            "ORG_GET_USER_SUMMARY",
+            "组织用户摘要",
+            "SPI",
+            "{\"userId\":2003}"
+        );
+
+        mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/confirm", taskId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "approved": true,
+                      "comment": "确认继续执行"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+
+        mockMvc.perform(get("/api/admin/agent-tasks/{taskId}/tool-calls", taskId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].taskId").value(taskId))
+            .andExpect(jsonPath("$.data[0].toolCode").value("ORG_GET_USER_SUMMARY"))
+            .andExpect(jsonPath("$.data[0].toolName").value("组织用户摘要"))
+            .andExpect(jsonPath("$.data[0].toolType").value("SPI"))
+            .andExpect(jsonPath("$.data[0].riskLevel").value("HIGH"))
+            .andExpect(jsonPath("$.data[0].readOnlyFlag").value(false))
+            .andExpect(jsonPath("$.data[0].approvalStatus").value("APPROVED"))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data[0].requestPayloadJson").value(containsString("\"userId\"")))
+            .andExpect(jsonPath("$.data[0].requestPayloadJson").value(containsString("2003")))
+            .andExpect(jsonPath("$.data[0].responsePayloadJson").isString())
+            .andExpect(jsonPath("$.data[0].calledAt").isString());
+
+        mockMvc.perform(get("/api/admin/agent-tasks/{taskId}/audits", taskId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.length()").value(5))
+            .andExpect(jsonPath("$.data[0].taskId").value(taskId))
+            .andExpect(jsonPath("$.data[0].actionType").value("TASK_CREATED"))
+            .andExpect(jsonPath("$.data[0].riskFlag").value(false))
+            .andExpect(jsonPath("$.data[1].actionType").value("TASK_WAITING_HUMAN_CONFIRM"))
+            .andExpect(jsonPath("$.data[1].riskFlag").value(true))
+            .andExpect(jsonPath("$.data[2].actionType").value("TASK_HUMAN_CONFIRMED"))
+            .andExpect(jsonPath("$.data[3].actionType").value("TASK_RUNNING"))
+            .andExpect(jsonPath("$.data[4].actionType").value("TASK_SUCCEEDED"))
+            .andExpect(jsonPath("$.data[4].occurredAt").isString());
     }
 
     @Test

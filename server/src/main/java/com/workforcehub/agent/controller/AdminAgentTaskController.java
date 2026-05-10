@@ -1,6 +1,8 @@
 package com.workforcehub.agent.controller;
 
+import com.workforcehub.agent.dto.AdminAgentTaskAuditResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.AgentTaskListQuery;
 import com.workforcehub.agent.dto.AgentTaskTimeoutScanRequest;
 import com.workforcehub.agent.dto.AgentTaskTimeoutScanResponse;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 后台 Agent 任务治理接口。
@@ -40,6 +44,16 @@ public class AdminAgentTaskController {
     @GetMapping("/{taskId}")
     public R<AdminAgentTaskResponse> getTask(@PathVariable Long taskId) {
         return R.ok(agentService.getAdminAgentTask(taskId));
+    }
+
+    @GetMapping("/{taskId}/tool-calls")
+    public R<List<AdminAgentTaskToolCallResponse>> listTaskToolCalls(@PathVariable Long taskId) {
+        return R.ok(agentService.listAdminAgentTaskToolCalls(taskId));
+    }
+
+    @GetMapping("/{taskId}/audits")
+    public R<List<AdminAgentTaskAuditResponse>> listTaskAudits(@PathVariable Long taskId) {
+        return R.ok(agentService.listAdminAgentTaskAudits(taskId));
     }
 
     @PostMapping("/timeout-scan")

@@ -2,7 +2,9 @@ package com.workforcehub.agent.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.dto.AdminAgentTaskAuditResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.CancelAgentTaskRequest;
 import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
 import com.workforcehub.agent.dto.AgentAclResponse;
@@ -23,7 +25,9 @@ import com.workforcehub.agent.repository.AgentAclRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.agent.repository.AgentTaskQueryCriteria;
+import com.workforcehub.agent.repository.AdminAgentTaskAuditRow;
 import com.workforcehub.agent.repository.AdminAgentTaskRow;
+import com.workforcehub.agent.repository.AdminAgentTaskToolCallRow;
 import com.workforcehub.agent.repository.AgentPendingToolCallRow;
 import com.workforcehub.agent.repository.AgentTaskRow;
 import com.workforcehub.agent.repository.AgentToolBindingRow;
@@ -104,6 +108,20 @@ public class AgentService {
 
     public AdminAgentTaskResponse getAdminAgentTask(Long taskId) {
         return toAdminTaskResponse(agentRepository.getAdminAgentTaskOrThrow(taskId));
+    }
+
+    public List<AdminAgentTaskToolCallResponse> listAdminAgentTaskToolCalls(Long taskId) {
+        agentRepository.getAdminAgentTaskOrThrow(taskId);
+        return agentRepository.listAdminAgentTaskToolCalls(taskId).stream()
+            .map(this::toAdminTaskToolCallResponse)
+            .toList();
+    }
+
+    public List<AdminAgentTaskAuditResponse> listAdminAgentTaskAudits(Long taskId) {
+        agentRepository.getAdminAgentTaskOrThrow(taskId);
+        return agentRepository.listAdminAgentTaskAudits(taskId).stream()
+            .map(this::toAdminTaskAuditResponse)
+            .toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -657,6 +675,37 @@ public class AgentService {
         response.setErrorMessage(row.errorMessage());
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
+        return response;
+    }
+
+    private AdminAgentTaskToolCallResponse toAdminTaskToolCallResponse(AdminAgentTaskToolCallRow row) {
+        AdminAgentTaskToolCallResponse response = new AdminAgentTaskToolCallResponse();
+        response.setLogId(row.id());
+        response.setTaskId(row.taskId());
+        response.setToolId(row.toolId());
+        response.setToolCode(row.toolCode());
+        response.setToolName(row.toolName());
+        response.setToolType(row.toolType());
+        response.setRiskLevel(row.riskLevel());
+        response.setReadOnlyFlag(row.readOnlyFlag());
+        response.setRequestPayloadJson(row.requestPayloadJson());
+        response.setResponsePayloadJson(row.responsePayloadJson());
+        response.setApprovalStatus(row.approvalStatus());
+        response.setResultStatus(row.resultStatus());
+        response.setCalledAt(row.calledAt());
+        return response;
+    }
+
+    private AdminAgentTaskAuditResponse toAdminTaskAuditResponse(AdminAgentTaskAuditRow row) {
+        AdminAgentTaskAuditResponse response = new AdminAgentTaskAuditResponse();
+        response.setAuditId(row.id());
+        response.setTaskId(row.taskId());
+        response.setActionType(row.actionType());
+        response.setTargetType(row.targetType());
+        response.setTargetId(row.targetId());
+        response.setDecisionSummary(row.decisionSummary());
+        response.setRiskFlag(row.riskFlag());
+        response.setOccurredAt(row.occurredAt());
         return response;
     }
 

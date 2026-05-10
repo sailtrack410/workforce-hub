@@ -1,5 +1,55 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 后台任务工具调用明细与审计轨迹
+
+### 背景
+
+后台任务列表和详情已经能定位任务状态、触发主体、上下文和工具调用数量，但管理员排查 `FAILED`、`WAITING_HUMAN_CONFIRM`、`REJECTED`、`CANCELLED` 等任务时仍缺少两类关键证据：具体调用了哪些工具，以及任务状态为什么发生变化。为了让后续 workflow、IM 和运行监控接入时有可追溯基础，本轮补齐任务明细子资源。
+
+### 本轮完成内容
+
+- 新增后台 Agent 任务工具调用明细接口：`GET /api/admin/agent-tasks/{taskId}/tool-calls`。
+- 新增后台 Agent 任务审计轨迹接口：`GET /api/admin/agent-tasks/{taskId}/audits`。
+- 新增响应 DTO：
+  - `AdminAgentTaskToolCallResponse`
+  - `AdminAgentTaskAuditResponse`
+- 新增仓储查询行对象：
+  - `AdminAgentTaskToolCallRow`
+  - `AdminAgentTaskAuditRow`
+- 工具调用明细返回工具编码、工具名称、工具类型、风险等级、只读标记、请求载荷、响应载荷、审批状态、执行结果和调用时间。
+- 审计轨迹返回动作类型、目标对象、决策摘要、风险标记和发生时间。
+- 两个明细接口都会先校验任务存在，不存在时保持 `code=404`、`message=Agent任务不存在`。
+
+### 本轮修复的自审问题
+
+- 明细接口继续放在 `AdminAgentTaskController`，作为任务详情子资源，不回塞到 Agent 定义治理 Controller。
+- 工具调用查询使用 `LEFT JOIN agt_tool`，避免历史工具被软删除后调用日志从排查结果中消失。
+- 明细列表按 `called_at ASC, id ASC` 排序，审计轨迹按 `occurred_at ASC, id ASC` 排序，保证后台能按时间还原任务流转。
+- 测试对 JSON 载荷只断言关键内容，不依赖 MySQL JSON 字符串空格格式。
+
+### 验证记录
+
+- 红灯：`env TEST_DB_NAME=workforce_hub_agent_task_trace_red mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldGetAgentTaskToolCallsAndAudits test`
+  - 结果：失败，`GET /api/admin/agent-tasks/{taskId}/tool-calls` 未实现，返回 404。
+- 绿灯：`env TEST_DB_NAME=workforce_hub_agent_task_trace_green2 mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldGetAgentTaskToolCallsAndAudits test`
+  - 结果：通过，覆盖工具调用明细和 `TASK_CREATED -> TASK_WAITING_HUMAN_CONFIRM -> TASK_HUMAN_CONFIRMED -> TASK_RUNNING -> TASK_SUCCEEDED` 审计轨迹。
+- 编译验证：`mvn -DskipTests compile`
+  - 结果：通过。
+- 模块回归：`env TEST_DB_NAME=workforce_hub_agent_task_trace_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，19 个 Agent 用例全部通过。
+- 跨模块回归：`env TEST_DB_NAME=workforce_hub_agent_task_trace_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，60 个认证、组织、IM、Agent 相关用例全部通过。
+
+### 数据库说明
+
+本轮没有新增 Flyway 迁移，继续复用 `V1__init_schema.sql` 已存在的 `agt_task`、`agt_tool`、`agt_tool_call_log`、`agt_audit_log` 表。
+
+### 后续待补
+
+- 增加任务运行指标、失败原因聚合和后台告警入口。
+- 真实工具接入前补请求/响应载荷脱敏策略，避免后台明细接口暴露敏感业务数据。
+- 接入人工确认超时扫描的定时触发、批次记录和多实例并发控制。
+
 ## 2026-05-11 Agent 后台任务查询与详情
 
 ### 背景
@@ -54,7 +104,7 @@
 
 ### 后续待补
 
-- 增加任务工具调用明细和审计轨迹查询接口。
+- 任务工具调用明细和审计轨迹查询接口已在后续节点补齐。
 - 增加任务运行指标、失败原因聚合和后台告警入口。
 - 任务量增长后再根据慢查询补充组合索引。
 
@@ -109,7 +159,7 @@
 - 接入统一定时调度，让超时扫描可周期自动执行。
 - 增加 job run 表或后台操作审计，记录每次扫描批次、耗时、命中数和异常明细。
 - 多实例部署时补分布式锁或基于数据库的抢占策略。
-- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
+- 后台 Agent 任务查询、工具调用明细和审计轨迹已在后续节点补齐。
 
 ## 2026-05-11 Agent 后台列表、详情与停用基础治理
 
@@ -154,7 +204,7 @@
 
 ### 后续待补
 
-- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
+- 后台 Agent 任务查询、工具调用明细和审计轨迹已在后续节点补齐。
 - 增加版本回滚、重新启用、软删除和工具/ACL 查询接口。
 - 定义停用 Agent 时已等待确认任务的处理策略：保持等待、自动取消或升级给管理员。
 - 接入 `AgentTaskTimeoutJobService` 的定时触发或后台治理入口。
@@ -208,7 +258,7 @@
 - 接入统一调度或后台治理入口，让 `AgentTaskTimeoutJobService` 可被生产环境周期触发或管理员手动触发。
 - 如进入多实例部署，需要补分布式锁或 job run 表，记录扫描批次、耗时、命中数和失败明细。
 - 后续接入 workflow/IM 后，需要定义超时取消是否同步回写业务上下文或通知触发人。
-- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
+- 后台 Agent 任务查询、工具调用明细和审计轨迹已在后续节点补齐。
 
 ## 2026-05-11 Agent 人工确认继续、拒绝与取消闭环
 
@@ -267,7 +317,7 @@
 
 ### 后续待补
 
-- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
+- 后台 Agent 任务查询、工具调用明细和审计轨迹已在后续节点补齐。
 - 接入 `AgentTaskTimeoutJobService` 的定时触发或后台治理入口。
 - 接入 `WorkflowAgentPreReviewTrigger` 和 `WorkflowAgentResultCallback`，把 workflow 侧预审 SPI 接到真实 Agent 任务。
 - 接入 `ImAgentTriggerService` 和 `ImAgentResultCallback`，把会话 Agent 回复写回 IM。

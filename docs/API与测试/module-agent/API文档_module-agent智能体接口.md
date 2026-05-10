@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
 | 数据库变更 | 本轮无新增迁移，使用 `V1__init_schema.sql` 已存在的 `agt_*` 表 |
 
-当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。后台任务查询已提供分页列表和详情入口；人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
+当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。后台任务查询已提供分页列表、详情、工具调用明细和审计轨迹入口；人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
 
 ---
 
@@ -322,7 +322,7 @@
 - 默认按 `agt_task.created_at DESC, agt_task.id DESC` 排序。
 - `status` 和 `triggeredByType` 会做枚举校验，不支持的值返回 `code=400`。
 - `toolCallCount` 按 `agt_tool_call_log.task_id` 聚合统计。
-- 当前第一版只返回任务基本信息和工具调用数量；工具调用明细、审计轨迹和运行指标后续单独设计，避免任务列表响应过重。
+- 当前第一版列表只返回任务基本信息和工具调用数量；工具调用明细和审计轨迹使用任务详情子资源查询，运行指标后续单独设计，避免任务列表响应过重。
 
 ### 3.11 查询 Agent 任务详情
 
@@ -330,7 +330,79 @@
 
 返回单个 `AdminAgentTaskResponse`，字段同任务列表项。不存在时返回 `code=404`、`message=Agent任务不存在`。
 
-### 3.12 手动触发人工确认超时扫描
+### 3.12 查询 Agent 任务工具调用明细
+
+`GET /api/admin/agent-tasks/{taskId}/tool-calls`
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "logId": 2053541069610795009,
+      "taskId": 2053541069606600706,
+      "toolId": 2053541069141032961,
+      "toolCode": "ORG_GET_USER_SUMMARY",
+      "toolName": "组织用户摘要",
+      "toolType": "SPI",
+      "riskLevel": "HIGH",
+      "readOnlyFlag": false,
+      "requestPayloadJson": "{\"userId\": 2003}",
+      "responsePayloadJson": "{\"status\":\"SUCCESS\"}",
+      "approvalStatus": "APPROVED",
+      "resultStatus": "SUCCESS",
+      "calledAt": "2026-05-11T02:23:18"
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+处理规则：
+
+- 任务不存在时返回 `code=404`、`message=Agent任务不存在`。
+- 按 `calledAt ASC, logId ASC` 排序，便于还原工具调用顺序。
+- `requestPayloadJson`、`responsePayloadJson` 按数据库 JSON 格式返回；调用方不应依赖字符串空格格式。
+- 工具信息使用 `LEFT JOIN agt_tool` 返回，避免历史工具被软删除后工具调用日志从排查结果中消失。
+- 第一版不做敏感字段脱敏；后续接入真实工具前必须补工具响应脱敏策略。
+
+### 3.13 查询 Agent 任务审计轨迹
+
+`GET /api/admin/agent-tasks/{taskId}/audits`
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "auditId": 2053541069606600707,
+      "taskId": 2053541069606600706,
+      "actionType": "TASK_CREATED",
+      "targetType": "TASK",
+      "targetId": 2053541069606600706,
+      "decisionSummary": "Agent任务已创建",
+      "riskFlag": false,
+      "occurredAt": "2026-05-11T02:23:18"
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+处理规则：
+
+- 任务不存在时返回 `code=404`、`message=Agent任务不存在`。
+- 按 `occurredAt ASC, auditId ASC` 排序，便于还原状态流转。
+- `riskFlag=true` 表示该审计动作涉及高风险或人工确认风险点，例如 `TASK_WAITING_HUMAN_CONFIRM`。
+- 第一版只返回任务维度审计；后台操作者、IP、耗时、运行指标后续在运行治理节点补。
+
+### 3.14 手动触发人工确认超时扫描
 
 `POST /api/admin/agent-tasks/timeout-scan`
 
@@ -586,7 +658,7 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 
 ## 7. 后续扩展点
 
-- 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询、任务工具调用明细和审计轨迹接口。
+- 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和运行指标接口。
 - 增加人工确认超时扫描的定时触发、批次记录、多实例并发控制和升级处理。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。

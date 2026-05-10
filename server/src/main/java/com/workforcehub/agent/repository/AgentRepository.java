@@ -642,6 +642,44 @@ public class AgentRepository {
         return rows.get(0);
     }
 
+    public List<AdminAgentTaskToolCallRow> listAdminAgentTaskToolCalls(Long taskId) {
+        return jdbcTemplate.query("""
+            SELECT log.id,
+                   log.task_id,
+                   log.tool_id,
+                   tool.tool_code,
+                   tool.tool_name,
+                   tool.tool_type,
+                   tool.risk_level,
+                   tool.read_only_flag,
+                   log.request_payload_json,
+                   log.response_payload_json,
+                   log.approval_status,
+                   log.result_status,
+                   log.called_at
+            FROM agt_tool_call_log log
+            LEFT JOIN agt_tool tool ON tool.id = log.tool_id
+            WHERE log.task_id = ?
+            ORDER BY log.called_at ASC, log.id ASC
+            """, this::mapAdminTaskToolCall, taskId);
+    }
+
+    public List<AdminAgentTaskAuditRow> listAdminAgentTaskAudits(Long taskId) {
+        return jdbcTemplate.query("""
+            SELECT id,
+                   task_id,
+                   action_type,
+                   target_type,
+                   target_id,
+                   decision_summary,
+                   risk_flag,
+                   occurred_at
+            FROM agt_audit_log
+            WHERE task_id = ?
+            ORDER BY occurred_at ASC, id ASC
+            """, this::mapAdminTaskAudit, taskId);
+    }
+
     private boolean exists(String sql, Object... args) {
         Long count = jdbcTemplate.queryForObject(sql, Long.class, args);
         return count != null && count > 0;
@@ -874,6 +912,37 @@ public class AgentRepository {
             rs.getString("error_message"),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
+        );
+    }
+
+    private AdminAgentTaskToolCallRow mapAdminTaskToolCall(ResultSet rs, int rowNum) throws SQLException {
+        return new AdminAgentTaskToolCallRow(
+            rs.getLong("id"),
+            rs.getLong("task_id"),
+            rs.getLong("tool_id"),
+            rs.getString("tool_code"),
+            rs.getString("tool_name"),
+            rs.getString("tool_type"),
+            rs.getString("risk_level"),
+            rs.getInt("read_only_flag") == 1,
+            rs.getString("request_payload_json"),
+            rs.getString("response_payload_json"),
+            rs.getString("approval_status"),
+            rs.getString("result_status"),
+            rs.getTimestamp("called_at").toLocalDateTime()
+        );
+    }
+
+    private AdminAgentTaskAuditRow mapAdminTaskAudit(ResultSet rs, int rowNum) throws SQLException {
+        return new AdminAgentTaskAuditRow(
+            rs.getLong("id"),
+            rs.getLong("task_id"),
+            rs.getString("action_type"),
+            rs.getString("target_type"),
+            rs.getObject("target_id", Long.class),
+            rs.getString("decision_summary"),
+            rs.getInt("risk_flag") == 1,
+            rs.getTimestamp("occurred_at").toLocalDateTime()
         );
     }
 
