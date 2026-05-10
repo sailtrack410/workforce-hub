@@ -71,7 +71,7 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
         registry.add("spring.autoconfigure.exclude", () -> FLOWABLE_WORKFLOW_TEST_EXCLUDES);
         registry.add("workforce.workflow.enabled", () -> "true");
         registry.add("logging.level.com.workforcehub", () -> "info");
-        registry.add("flowable.database-schema-update", () -> "true");
+        registry.add("flowable.database-schema-update", () -> "false");
         registry.add("flowable.async-executor-activate", () -> "false");
     }
 

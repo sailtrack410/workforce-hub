@@ -391,3 +391,39 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - workflow 从“请假专用审批”推进到“可承载多业务申请的审批底座”。
 - `bizType + bizId` 的申请头模型开始真正发挥作用，后续加加班、外出、调休、HR 变更不需要重建审批主干。
 - 补卡闭环把考勤异常、审批和日结果重算串起来，形成员工端高频场景的可演示链路。
+
+## 2026-05-11 Flowable 引擎表纳入 Flyway 治理
+
+### 背景
+
+前面多轮审查都把 Flowable `ACT_*` 表治理列为生产化待办。之前开发环境依赖 `flowable.database-schema-update=true` 自动建表，虽然便于早期接入，但会绕过 Flyway，导致不同环境的表结构来源不一致，也不利于后续容器化交付和生产回滚。
+
+### 本次处理
+
+- 新增 `V11__init_flowable_process_schema.sql`，把 Flowable 7.0.1 Process Engine 需要的 `ACT_*` 与 `FLW_*` 初始化 SQL 纳入主业务库 Flyway 迁移。
+- `application.yml` 将 `flowable.database-schema-update` 默认值改为 `false`，只允许临时诊断旧库时显式打开。
+- workflow 专用集成测试基线同样关闭 Flowable 自动改库，用真实 Flyway 初始化后的表结构启动流程引擎。
+- V11 对三类数据库状态做了明确治理：
+  - 空库：创建完整 Flowable 引擎表。
+  - 旧开发库：如果 32 张必需 Flowable 表齐全，且 `schema.version=7.0.1.1`，则只记录 V11 已执行，不重复建表。
+  - 半成品库或版本不匹配库：迁移阶段直接失败，提示先人工修复数据库，避免应用启动后才暴露隐性结构缺口。
+- V11 开头和结尾都使用 `DROP PROCEDURE IF EXISTS` 清理临时过程，避免失败重试时被残留过程卡住。
+
+### 验证
+
+- `env TEST_DB_NAME=workforce_hub_flowable_flyway_final mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#employeeLeaveRequestShouldBeApprovedByManagerWithFlowable test`
+- `env TEST_DB_NAME=workforce_hub_flowable_partial mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#employeeLeaveRequestShouldBeApprovedByManagerWithFlowable test`
+- `mvn -Dtest=ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest test`
+
+### 结果
+
+- 全新库可以从 V1 到 V11 一次性执行，Flowable 自动改库关闭时仍能启动真实流程引擎并跑通请假审批闭环。
+- 只预置部分 Flowable 表的半成品库会在 V11 迁移阶段失败，错误信息为 `Partial Flowable schema detected before Flyway V11 migration`。
+- 重建默认测试库后，workflow 三类集成测试 25 个用例全部通过。
+- 本轮把 `module-workflow` 的数据库治理边界从“阶段性自动建表”收口为“Flyway 统一管理”。
+
+### 仍需关注
+
+- 未提交迁移在本机反复打磨时，已执行过旧版迁移的测试库可能出现 Flyway checksum mismatch；本轮提交前已重建默认测试库并完成回归。
+- 后续升级 Flowable 版本时，不能修改 V11，必须新增 V12+ 增量迁移。
+- 完整 `module-agent` 的任务调度、工具绑定、后台治理和审批页展示仍是下一阶段重点。

@@ -93,14 +93,11 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 # ==================== Flowable ====================
-# 阶段性边界（截至 module-auth 阶段）：
-#   - 主业务库（69 张业务表）由 Flyway 统一管理
-#   - Flowable 引擎内置表（act_*）暂时由 Flowable 自管，通过环境变量控制
-#   - 计划：进入 module-workflow 阶段时把 Flowable 初始化 SQL 拷入 Flyway，
-#     并把 FLOWABLE_DB_SCHEMA_UPDATE 改为 false
-# 默认开发环境为 true 便于联调，生产环境部署需显式置为 false
+# Flowable BPMN 引擎表（ACT_* / FLW_*）已通过 Flyway V11 纳入主库迁移。
+# 默认禁止 Flowable 自动改库，避免绕过 Flyway 造成环境结构漂移。
+# 仅在临时本地诊断旧库结构时，才允许显式设置 FLOWABLE_DB_SCHEMA_UPDATE=true。
 flowable:
-  database-schema-update: ${FLOWABLE_DB_SCHEMA_UPDATE:true}
+  database-schema-update: ${FLOWABLE_DB_SCHEMA_UPDATE:false}
   async-executor-activate: true
   history-level: audit
 
