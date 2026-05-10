@@ -1,5 +1,53 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 后台列表、详情与停用基础治理
+
+### 背景
+
+`module-agent` 已经具备后台创建、版本、工具、ACL、发布和员工端使用能力，但后台还缺少最基本的查询与停用入口。没有这些入口，管理员只能通过数据库确认 Agent 状态，也无法在发现配置错误、工具风险或业务终止时快速下线 Agent。
+
+### 本轮完成内容
+
+- 新增后台 Agent 分页列表接口：`GET /api/admin/agents`。
+- 新增后台 Agent 详情接口：`GET /api/admin/agents/{agentId}`。
+- 新增后台 Agent 停用接口：`POST /api/admin/agents/{agentId}/disable`。
+- 停用后：
+  - `agt_agent.status` 更新为 `INACTIVE`。
+  - 后台详情继续可查，便于管理员确认状态。
+  - 员工端 Agent 列表不再展示该 Agent。
+  - 员工端创建任务返回 `code=409`、`message=Agent未发布或未启用`。
+- 员工创建任务的校验顺序调整为：先判断 Agent 发布和启用状态，再判断员工 ACL。这样已停用 Agent 的错误语义稳定为“未启用”，而不是被 ACL 查询过滤后误报“无权使用”。
+
+### 本轮修复的自审问题
+
+- 原后台 Controller 只有 `POST /api/admin/agents`，`GET /api/admin/agents` 会落到不支持方法异常，且被全局异常包装为 500。现在已有明确列表接口。
+- 停用不应清空 `published_version_id`，否则后台无法区分“未发布草稿”和“曾发布但被下线”；本轮只更新 `status=INACTIVE`。
+- 本轮没有把任务查询、版本回滚和停用时等待任务处理塞进同一批，避免后台治理节点过大。
+
+### 验证记录
+
+- 红灯：`env TEST_DB_NAME=workforce_hub_agent_admin_red mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldListGetAndDisablePublishedAgent test`
+  - 结果：失败，`GET /api/admin/agents` 未实现，返回方法不支持并被包装为 500。
+- 绿灯：`env TEST_DB_NAME=workforce_hub_agent_admin_green mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldListGetAndDisablePublishedAgent test`
+  - 结果：通过，覆盖后台列表、详情、停用和员工侧停用效果。
+- 模块回归：`env TEST_DB_NAME=workforce_hub_agent_admin_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，14 个 Agent 用例全部通过。
+- 编译验证：`mvn -DskipTests compile`
+  - 结果：通过。
+- 跨模块回归：`env TEST_DB_NAME=workforce_hub_agent_admin_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，55 个用例全部通过。
+
+### 数据库说明
+
+本轮没有新增 Flyway 迁移，继续复用 `V1__init_schema.sql` 已存在的 `agt_agent.status`、`updated_by` 等字段。
+
+### 后续待补
+
+- 增加后台 Agent 任务查询接口，便于查看等待、超时、失败、取消等任务状态。
+- 增加版本回滚、重新启用、软删除和工具/ACL 查询接口。
+- 定义停用 Agent 时已等待确认任务的处理策略：保持等待、自动取消或升级给管理员。
+- 接入 `AgentTaskTimeoutJobService` 的定时触发或后台治理入口。
+
 ## 2026-05-11 Agent 人工确认超时扫描服务
 
 ### 背景
@@ -108,7 +156,7 @@
 
 ### 后续待补
 
-- 增加后台 Agent 列表、详情、停用和任务查询接口。
+- 增加后台 Agent 任务查询接口。
 - 接入 `AgentTaskTimeoutJobService` 的定时触发或后台治理入口。
 - 接入 `WorkflowAgentPreReviewTrigger` 和 `WorkflowAgentResultCallback`，把 workflow 侧预审 SPI 接到真实 Agent 任务。
 - 接入 `ImAgentTriggerService` 和 `ImAgentResultCallback`，把会话 Agent 回复写回 IM。

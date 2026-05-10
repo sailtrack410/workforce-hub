@@ -144,6 +144,33 @@ public class AgentRepository {
             """, versionId, operatorId, agentId);
     }
 
+    public long countAgents() {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM agt_agent
+            WHERE is_deleted = 0
+            """, Long.class);
+        return count == null ? 0L : count;
+    }
+
+    public List<AgentRow> pageAgents(long offset, long limit) {
+        return jdbcTemplate.query(agentSelectSql() + """
+            WHERE aa.is_deleted = 0
+            ORDER BY aa.created_at DESC, aa.id DESC
+            LIMIT ? OFFSET ?
+            """, this::mapAgent, limit, offset);
+    }
+
+    public void disableAgent(Long agentId, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_agent
+            SET status = 'INACTIVE',
+                updated_by = ?
+            WHERE id = ?
+              AND is_deleted = 0
+            """, operatorId, agentId);
+    }
+
     public Long insertTask(Long taskId,
                            Long agentId,
                            Long versionId,

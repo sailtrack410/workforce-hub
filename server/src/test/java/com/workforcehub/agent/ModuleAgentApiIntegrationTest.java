@@ -110,6 +110,68 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("后台应能查询Agent列表、详情并停用已发布Agent")
+    void adminShouldListGetAndDisablePublishedAgent() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedAgentWithoutTool(adminSession, "ADMIN_MANAGED_AGENT", "后台治理助手");
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        mockMvc.perform(get("/api/admin/agents")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list", hasSize(1)))
+            .andExpect(jsonPath("$.data.list[0].agentId").value(agentId))
+            .andExpect(jsonPath("$.data.list[0].agentCode").value("ADMIN_MANAGED_AGENT"))
+            .andExpect(jsonPath("$.data.list[0].status").value("ACTIVE"));
+
+        mockMvc.perform(get("/api/admin/agents/{agentId}", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.agentId").value(agentId))
+            .andExpect(jsonPath("$.data.agentName").value("后台治理助手"))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/admin/agents/{agentId}/disable", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.agentId").value(agentId))
+            .andExpect(jsonPath("$.data.status").value("INACTIVE"));
+
+        mockMvc.perform(get("/api/admin/agents/{agentId}", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("INACTIVE"));
+
+        mockMvc.perform(get("/api/employee/agents")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(0)));
+
+        mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "inputPayloadJson": "{\\"query\\":\\"停用后不应执行\\"}"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("Agent未发布或未启用"));
+    }
+
+    @Test
     @DisplayName("员工不能看到或使用未授权Agent")
     void employeeShouldNotUseAgentWithoutAcl() throws Exception {
         Cookie adminSession = loginAdmin();

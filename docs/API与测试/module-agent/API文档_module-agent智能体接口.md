@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、版本、工具、ACL、发布，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
 | 数据库变更 | 本轮无新增迁移，使用 `V1__init_schema.sql` 已存在的 `agt_*` 表 |
 
-当前第一批不是完整 Agent 平台，暂不包含任务列表、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。人工确认超时扫描已落为服务能力，但还没有挂 `@Scheduled` 或后台手动触发接口。
+当前第一批不是完整 Agent 平台，暂不包含任务列表、版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。人工确认超时扫描已落为服务能力，但还没有挂 `@Scheduled` 或后台手动触发接口。
 
 ---
 
@@ -101,7 +101,63 @@
 | `agentType` | 是 | `QA`、`PRE_REVIEW`、`REMINDER`、`AUTOMATION` |
 | `identityMode` | 否 | 默认 `SYSTEM_IDENTITY`，也支持 `USER_DELEGATED` |
 
-### 3.2 创建 Agent 版本
+### 3.2 查询 Agent 列表
+
+`GET /api/admin/agents?pageNo=1&pageSize=20`
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "agentId": 2053519959787827201,
+        "agentCode": "ORG_HELPER",
+        "agentName": "组织助手",
+        "agentType": "QA",
+        "identityMode": "SYSTEM_IDENTITY",
+        "publishedVersionId": 2053519959880101889,
+        "status": "ACTIVE"
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+分页规则：
+
+| 参数 | 说明 |
+| --- | --- |
+| `pageNo` | 默认 1，小于 1 时按 1 处理 |
+| `pageSize` | 默认 20，小于 1 时按 1 处理，大于 100 时按 100 处理 |
+| 排序 | 按 `created_at DESC, id DESC` |
+
+### 3.3 查询 Agent 详情
+
+`GET /api/admin/agents/{agentId}`
+
+返回 `AgentResponse`。不存在或已删除时返回 `code=404`、`message=Agent不存在`。
+
+### 3.4 停用 Agent
+
+`POST /api/admin/agents/{agentId}/disable`
+
+处理规则：
+
+- 只把 `agt_agent.status` 更新为 `INACTIVE`。
+- 不清空 `published_version_id`。
+- 后台详情继续可查。
+- 员工端 Agent 列表不再展示。
+- 员工端创建任务返回 `code=409`、`message=Agent未发布或未启用`。
+
+### 3.5 创建 Agent 版本
 
 `POST /api/admin/agents/{agentId}/versions`
 
@@ -125,7 +181,7 @@
 | `systemPrompt` | 否 | 最大 8192 字符 |
 | `workflowConfigJson` | 否 | 必须是合法 JSON 字符串 |
 
-### 3.3 创建工具
+### 3.6 创建工具
 
 `POST /api/admin/agents/tools`
 
@@ -154,7 +210,7 @@
 | `readOnlyFlag` | 否 | 是否只读 |
 | `status` | 否 | 默认 `ACTIVE` |
 
-### 3.4 绑定版本工具
+### 3.7 绑定版本工具
 
 `POST /api/admin/agents/versions/{versionId}/tools`
 
@@ -180,7 +236,7 @@
 | `riskControlJson` | 否 | 合法 JSON 字符串 |
 | `status` | 否 | 默认 `ACTIVE` |
 
-### 3.5 授予 Agent ACL
+### 3.8 授予 Agent ACL
 
 `POST /api/admin/agents/{agentId}/acl`
 
@@ -200,7 +256,7 @@
 - `GROUP` 的 `subjectId` 使用群聊 `im_conversation.id`。
 - `GROUP` ACL 只对 `im_conversation.status=ACTIVE`、`im_conversation.conversation_type=GROUP`、`im_group_profile.status=ACTIVE` 且 `im_conversation_member.status=ACTIVE` 的成员生效。
 
-### 3.6 发布 Agent 版本
+### 3.9 发布 Agent 版本
 
 `POST /api/admin/agents/versions/{versionId}/publish`
 
@@ -407,6 +463,7 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 | 未登录 | 200/401 | 401 | 取决于安全链路拦截点 |
 | 员工无权使用 Agent | 200 | 403 | 不创建任务 |
 | Agent 未发布或未启用 | 200 | 409 | 不创建任务 |
+| 后台查询不存在的 Agent | 200 | 404 | `Agent不存在` |
 | 工具未绑定当前版本 | 200 | 403 | 不创建任务 |
 | 输入 JSON 不合法 | 200 | 400 | 不创建任务 |
 | 业务型工具执行失败 | 200 | 0 | 创建任务，任务状态为 `FAILED` |
@@ -420,7 +477,7 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 
 ## 7. 后续扩展点
 
-- 增加后台 Agent 列表、详情、停用、回滚和任务查询接口。
+- 增加后台 Agent 版本回滚、重新启用、任务查询、工具查询和 ACL 查询接口。
 - 增加人工确认超时扫描的定时触发、后台手动触发和升级处理。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。

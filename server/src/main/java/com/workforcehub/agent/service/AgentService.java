@@ -26,6 +26,7 @@ import com.workforcehub.agent.repository.AgentToolBindingRow;
 import com.workforcehub.agent.repository.AgentToolRow;
 import com.workforcehub.agent.repository.AgentVersionRow;
 import com.workforcehub.common.exception.BizException;
+import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +64,20 @@ public class AgentService {
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
         this.toolExecutionService = toolExecutionService;
+    }
+
+    public PageResult<AgentResponse> pageAdminAgents(long pageNo, long pageSize) {
+        long safePageNo = Math.max(pageNo, 1L);
+        long safePageSize = Math.min(Math.max(pageSize, 1L), 100L);
+        long total = agentRepository.countAgents();
+        List<AgentResponse> rows = agentRepository.pageAgents((safePageNo - 1) * safePageSize, safePageSize).stream()
+            .map(this::toAgentResponse)
+            .toList();
+        return PageResult.of(safePageNo, safePageSize, total, rows);
+    }
+
+    public AgentResponse getAdminAgent(Long agentId) {
+        return toAgentResponse(agentRepository.getAgentOrThrow(agentId));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -182,6 +197,14 @@ public class AgentService {
         return toAgentResponse(agentRepository.getAgentOrThrow(version.agentId()));
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public AgentResponse disableAgent(Long agentId) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        agentRepository.getAgentOrThrow(agentId);
+        agentRepository.disableAgent(agentId, operatorId);
+        return toAgentResponse(agentRepository.getAgentOrThrow(agentId));
+    }
+
     public List<AgentResponse> listCurrentEmployeeAgents() {
         Long userId = CurrentUserHolder.requireUserId();
         return agentRepository.listUsableAgentsForUser(userId).stream()
@@ -193,11 +216,11 @@ public class AgentService {
     public AgentTaskResponse createCurrentEmployeeTask(Long agentId, CreateAgentTaskRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
-        if (!agentRepository.canUseAgent(agentId, userId)) {
-            throw new BizException(403, "无权使用该Agent");
-        }
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
             throw new BizException(409, "Agent未发布或未启用");
+        }
+        if (!agentRepository.canUseAgent(agentId, userId)) {
+            throw new BizException(403, "无权使用该Agent");
         }
         normalizeJson(request.getInputPayloadJson(), "输入载荷不是合法JSON");
         String triggerType = normalizeIn(request.getTriggerType(), TRIGGER_TYPES, "触发类型不支持");

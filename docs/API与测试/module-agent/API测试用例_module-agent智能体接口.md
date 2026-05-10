@@ -5,7 +5,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 测试类 | `ModuleAgentApiIntegrationTest`、`ModuleAgentTaskTimeoutIntegrationTest` |
-| 当前覆盖 | 后台创建/版本/工具/绑定/ACL/发布，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
+| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
 | 运行前提 | 本地 MySQL、Redis 可用；测试使用 `LocalIntegrationTestSupport` 自动建库、迁移和装载组织种子数据 |
 | 数据库变更 | 本轮无新增迁移，测试依赖 V1 已存在 `agt_*` 表 |
 
@@ -17,12 +17,12 @@
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_timeout_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_admin_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 预期结果：
 
-- 13 个用例全部通过。
+- 14 个用例全部通过。
 - 空库可执行 V1 到 V11 的 Flyway 迁移。
 - `LocalIntegrationTestSupport` 每个用例前清理 `agt_*` 与相关业务表。
 
@@ -37,7 +37,7 @@ mvn -DskipTests compile
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_admin_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 该命令用于验证 Agent 对认证、组织和 IM 群成员关系的依赖没有破坏既有模块。
@@ -61,6 +61,7 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 | AGT-011 | P0 | 待确认工具绑定失效后确认继续 | 返回 `code=409`，任务保持 `WAITING_HUMAN_CONFIRM`，避免误成功 |
 | AGT-012 | P0 | 已超过确认截止时间的等待任务被扫描 | 服务返回取消数量 1，任务进入 `CANCELLED`，工具日志为 `TIMEOUT/CANCELLED`，写入 `TASK_TIMEOUT_CANCELLED` |
 | AGT-013 | P0 | 未超过确认截止时间的等待任务被扫描 | 服务返回取消数量 0，任务保持 `WAITING_HUMAN_CONFIRM`，工具日志保持 `PENDING/WAITING_CONFIRM` |
+| AGT-014 | P0 | 后台查询 Agent 列表、详情并停用已发布 Agent | 列表和详情返回 Agent；停用后状态为 `INACTIVE`；员工不可见且创建任务返回 `code=409` |
 
 ---
 
@@ -162,6 +163,16 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 - `agt_tool_call_log.result_status=WAITING_CONFIRM`。
 - 不写入 `TASK_TIMEOUT_CANCELLED` 审计。
 
+### AGT-014 后台基础治理
+
+- `GET /api/admin/agents?pageNo=1&pageSize=20` 返回分页结构。
+- `data.total=1`，`data.list[0].agentCode` 为本次创建的 Agent 编码。
+- `GET /api/admin/agents/{agentId}` 返回 Agent 详情。
+- `POST /api/admin/agents/{agentId}/disable` 返回 `data.status=INACTIVE`。
+- 停用后后台详情仍可查询到 `status=INACTIVE`。
+- 停用后员工端 `GET /api/employee/agents` 不再返回该 Agent。
+- 停用后员工端 `POST /api/employee/agents/{agentId}/tasks` 返回 `code=409`、`message=Agent未发布或未启用`。
+
 ---
 
 ## 5. 手工验证示例
@@ -171,15 +182,18 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 1. 后台登录：`POST /api/admin/auth/login`
 2. 创建工具：`POST /api/admin/agents/tools`
 3. 创建 Agent：`POST /api/admin/agents`
-4. 创建版本：`POST /api/admin/agents/{agentId}/versions`
-5. 绑定工具：`POST /api/admin/agents/versions/{versionId}/tools`
-6. 授权员工或群组：`POST /api/admin/agents/{agentId}/acl`
-7. 发布版本：`POST /api/admin/agents/versions/{versionId}/publish`
-8. 员工登录后查询：`GET /api/employee/agents`
-9. 员工创建任务：`POST /api/employee/agents/{agentId}/tasks`
-10. 如任务进入等待确认，员工确认继续或拒绝：`POST /api/employee/agent-tasks/{taskId}/confirm`
-11. 如业务上下文终止，员工取消任务：`POST /api/employee/agent-tasks/{taskId}/cancel`
-12. 如任务超过 `waiting_deadline_at` 仍无人处理，后端调度或后台入口调用 `AgentTaskTimeoutJobService#cancelExpiredWaitingTasks`
+4. 后台查询列表：`GET /api/admin/agents`
+5. 后台查询详情：`GET /api/admin/agents/{agentId}`
+6. 创建版本：`POST /api/admin/agents/{agentId}/versions`
+7. 绑定工具：`POST /api/admin/agents/versions/{versionId}/tools`
+8. 授权员工或群组：`POST /api/admin/agents/{agentId}/acl`
+9. 发布版本：`POST /api/admin/agents/versions/{versionId}/publish`
+10. 员工登录后查询：`GET /api/employee/agents`
+11. 员工创建任务：`POST /api/employee/agents/{agentId}/tasks`
+12. 如任务进入等待确认，员工确认继续或拒绝：`POST /api/employee/agent-tasks/{taskId}/confirm`
+13. 如业务上下文终止，员工取消任务：`POST /api/employee/agent-tasks/{taskId}/cancel`
+14. 如需要下线 Agent，后台调用：`POST /api/admin/agents/{agentId}/disable`
+15. 如任务超过 `waiting_deadline_at` 仍无人处理，后端调度或后台入口调用 `AgentTaskTimeoutJobService#cancelExpiredWaitingTasks`
 
 ### 5.2 排查 SQL
 
@@ -202,7 +216,7 @@ WHERE task_id = ?;
 ## 6. 当前未覆盖但后续必须补的测试
 
 - 人工确认超时扫描的定时触发、后台手动触发、批次记录和多实例并发。
-- 后台 Agent 列表、详情、停用、版本回滚。
+- 后台 Agent 版本回滚、重新启用、任务查询、工具查询和 ACL 查询。
 - workflow 预审真实触发和回调。
 - IM 会话 Agent 触发和回复回写。
 - 知识库绑定空间 ACL。
