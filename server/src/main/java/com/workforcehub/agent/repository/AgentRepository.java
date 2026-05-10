@@ -505,6 +505,45 @@ public class AgentRepository {
         finishTask(taskId, "CANCELLED", null, operatorId);
     }
 
+    public List<AgentExpiredTaskRow> listExpiredWaitingTasks(LocalDateTime now, int limit) {
+        return jdbcTemplate.query("""
+            SELECT id
+            FROM agt_task
+            WHERE status = 'WAITING_HUMAN_CONFIRM'
+              AND waiting_deadline_at IS NOT NULL
+              AND waiting_deadline_at <= ?
+            ORDER BY waiting_deadline_at ASC, id ASC
+            LIMIT ?
+            """, (rs, rowNum) -> new AgentExpiredTaskRow(rs.getLong("id")), now, limit);
+    }
+
+    public boolean cancelExpiredWaitingTask(Long taskId, LocalDateTime now, String responsePayloadJson) {
+        int taskUpdated = jdbcTemplate.update("""
+            UPDATE agt_task
+            SET status = 'CANCELLED',
+                finished_at = NOW(),
+                error_message = '人工确认超时，任务已取消',
+                updated_by = NULL
+            WHERE id = ?
+              AND status = 'WAITING_HUMAN_CONFIRM'
+              AND waiting_deadline_at IS NOT NULL
+              AND waiting_deadline_at <= ?
+            """, taskId, now);
+        if (taskUpdated != 1) {
+            return false;
+        }
+        jdbcTemplate.update("""
+            UPDATE agt_tool_call_log
+            SET approval_status = 'TIMEOUT',
+                result_status = 'CANCELLED',
+                response_payload_json = CAST(? AS JSON)
+            WHERE task_id = ?
+              AND approval_status = 'PENDING'
+              AND result_status = 'WAITING_CONFIRM'
+            """, responsePayloadJson, taskId);
+        return true;
+    }
+
     private boolean exists(String sql, Object... args) {
         Long count = jdbcTemplate.queryForObject(sql, Long.class, args);
         return count != null && count > 0;

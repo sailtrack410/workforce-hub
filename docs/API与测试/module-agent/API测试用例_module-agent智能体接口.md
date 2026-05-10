@@ -4,8 +4,8 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 测试类 | `ModuleAgentApiIntegrationTest` |
-| 当前覆盖 | 后台创建/版本/工具/绑定/ACL/发布，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留 |
+| 测试类 | `ModuleAgentApiIntegrationTest`、`ModuleAgentTaskTimeoutIntegrationTest` |
+| 当前覆盖 | 后台创建/版本/工具/绑定/ACL/发布，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
 | 运行前提 | 本地 MySQL、Redis 可用；测试使用 `LocalIntegrationTestSupport` 自动建库、迁移和装载组织种子数据 |
 | 数据库变更 | 本轮无新增迁移，测试依赖 V1 已存在 `agt_*` 表 |
 
@@ -17,12 +17,12 @@
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_confirm_full2 mvn -Dtest=ModuleAgentApiIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_timeout_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 预期结果：
 
-- 11 个用例全部通过。
+- 13 个用例全部通过。
 - 空库可执行 V1 到 V11 的 Flyway 迁移。
 - `LocalIntegrationTestSupport` 每个用例前清理 `agt_*` 与相关业务表。
 
@@ -37,7 +37,7 @@ mvn -DskipTests compile
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 该命令用于验证 Agent 对认证、组织和 IM 群成员关系的依赖没有破坏既有模块。
@@ -59,6 +59,8 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 | AGT-009 | P0 | 人工拒绝继续执行 | 任务进入 `REJECTED`，待确认工具日志为 `REJECTED`，工具不执行 |
 | AGT-010 | P0 | 人工取消任务 | 非触发人返回 `code=403`；触发人取消后任务进入 `CANCELLED` |
 | AGT-011 | P0 | 待确认工具绑定失效后确认继续 | 返回 `code=409`，任务保持 `WAITING_HUMAN_CONFIRM`，避免误成功 |
+| AGT-012 | P0 | 已超过确认截止时间的等待任务被扫描 | 服务返回取消数量 1，任务进入 `CANCELLED`，工具日志为 `TIMEOUT/CANCELLED`，写入 `TASK_TIMEOUT_CANCELLED` |
+| AGT-013 | P0 | 未超过确认截止时间的等待任务被扫描 | 服务返回取消数量 0，任务保持 `WAITING_HUMAN_CONFIRM`，工具日志保持 `PENDING/WAITING_CONFIRM` |
 
 ---
 
@@ -137,6 +139,29 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 - 待确认工具日志保持 `PENDING/WAITING_CONFIRM`。
 - 不写入 `TASK_SUCCEEDED` 审计。
 
+### AGT-012 人工确认超时扫描取消
+
+- 测试类：`ModuleAgentTaskTimeoutIntegrationTest`。
+- 构造 `WAITING_HUMAN_CONFIRM` 任务后，把 `agt_task.waiting_deadline_at` 调整为当前时间之前。
+- 调用 `AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(10)`。
+- 断言返回值为 `1`。
+- `agt_task.status=CANCELLED`。
+- `agt_task.error_message=人工确认超时，任务已取消`。
+- `agt_tool_call_log.approval_status=TIMEOUT`。
+- `agt_tool_call_log.result_status=CANCELLED`。
+- `agt_tool_call_log.response_payload_json` 包含 `人工确认超时`。
+- `agt_audit_log` 包含 `TASK_TIMEOUT_CANCELLED`。
+
+### AGT-013 未超时等待任务保护
+
+- 构造 `WAITING_HUMAN_CONFIRM` 任务后不调整截止时间。
+- 调用 `AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(10)`。
+- 断言返回值为 `0`。
+- `agt_task.status` 保持 `WAITING_HUMAN_CONFIRM`。
+- `agt_tool_call_log.approval_status=PENDING`。
+- `agt_tool_call_log.result_status=WAITING_CONFIRM`。
+- 不写入 `TASK_TIMEOUT_CANCELLED` 审计。
+
 ---
 
 ## 5. 手工验证示例
@@ -154,6 +179,7 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 9. 员工创建任务：`POST /api/employee/agents/{agentId}/tasks`
 10. 如任务进入等待确认，员工确认继续或拒绝：`POST /api/employee/agent-tasks/{taskId}/confirm`
 11. 如业务上下文终止，员工取消任务：`POST /api/employee/agent-tasks/{taskId}/cancel`
+12. 如任务超过 `waiting_deadline_at` 仍无人处理，后端调度或后台入口调用 `AgentTaskTimeoutJobService#cancelExpiredWaitingTasks`
 
 ### 5.2 排查 SQL
 
@@ -175,7 +201,7 @@ WHERE task_id = ?;
 
 ## 6. 当前未覆盖但后续必须补的测试
 
-- 人工确认超时扫描和超时取消。
+- 人工确认超时扫描的定时触发、后台手动触发、批次记录和多实例并发。
 - 后台 Agent 列表、详情、停用、版本回滚。
 - workflow 预审真实触发和回调。
 - IM 会话 Agent 触发和回复回写。
