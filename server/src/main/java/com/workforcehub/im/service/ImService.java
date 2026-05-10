@@ -6,11 +6,14 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.im.dto.CreateGroupConversationRequest;
+import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
+import com.workforcehub.im.dto.ImConversationMemberResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
 import com.workforcehub.im.dto.UpdateReadPositionRequest;
+import com.workforcehub.im.repository.ImConversationMemberRow;
 import com.workforcehub.im.repository.ImConversationSummaryRow;
 import com.workforcehub.im.repository.ImMessageRow;
 import com.workforcehub.im.repository.ImRepository;
@@ -117,6 +120,40 @@ public class ImService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public List<ImConversationMemberResponse> addCurrentEmployeeGroupMembers(Long conversationId,
+                                                                             GroupMemberUserIdsRequest request) {
+        Long ownerUserId = CurrentUserHolder.requireUserId();
+        ensureCanManageCustomGroup(conversationId, ownerUserId);
+        Set<Long> normalizedMemberIds = normalizeGroupMemberIds(ownerUserId, request.getMemberUserIds());
+        if (normalizedMemberIds.isEmpty()) {
+            throw new BizException(400, "至少选择1名要添加的成员");
+        }
+        if (imRepository.countActiveOrgUsers(normalizedMemberIds) != normalizedMemberIds.size()) {
+            throw new BizException(404, "目标成员不存在或不可加入群聊");
+        }
+        for (Long memberUserId : normalizedMemberIds) {
+            imRepository.upsertUserMember(IdWorker.getId(), conversationId, memberUserId, "MEMBER", "OWNER_INVITE");
+        }
+        return listActiveConversationMemberResponses(conversationId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<ImConversationMemberResponse> removeCurrentEmployeeGroupMembers(Long conversationId,
+                                                                                GroupMemberUserIdsRequest request) {
+        Long ownerUserId = CurrentUserHolder.requireUserId();
+        ensureCanManageCustomGroup(conversationId, ownerUserId);
+        Set<Long> normalizedMemberIds = normalizeUserIds(request.getMemberUserIds());
+        if (normalizedMemberIds.contains(ownerUserId)) {
+            throw new BizException(400, "群主不能把自己移出群聊");
+        }
+        if (normalizedMemberIds.isEmpty()) {
+            throw new BizException(400, "至少选择1名要移出的成员");
+        }
+        imRepository.markUserMembersLeft(conversationId, normalizedMemberIds);
+        return listActiveConversationMemberResponses(conversationId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public ImMessageResponse sendCurrentEmployeeMessage(Long conversationId, SendImMessageRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         ensureCanAccessConversation(conversationId, userId);
@@ -192,6 +229,16 @@ public class ImService {
         return response;
     }
 
+    private ImConversationMemberResponse toConversationMemberResponse(ImConversationMemberRow row) {
+        ImConversationMemberResponse response = new ImConversationMemberResponse();
+        response.setMemberId(row.memberId());
+        response.setMemberType(row.memberType());
+        response.setMemberRole(row.memberRole());
+        response.setStatus(row.status());
+        response.setJoinedAt(row.joinedAt());
+        return response;
+    }
+
     private Long createPrivateConversation(ImUserRelationRow currentUser,
                                            ImUserRelationRow targetUser,
                                            String conversationKey) {
@@ -217,6 +264,37 @@ public class ImService {
             normalized.add(memberUserId);
         }
         return normalized;
+    }
+
+    private Set<Long> normalizeUserIds(List<Long> userIds) {
+        Set<Long> normalized = new LinkedHashSet<>();
+        for (Long userId : userIds) {
+            if (userId == null) {
+                continue;
+            }
+            normalized.add(userId);
+        }
+        return normalized;
+    }
+
+    private void ensureCanManageCustomGroup(Long conversationId, Long userId) {
+        if (!imRepository.existsActiveCustomGroupConversation(conversationId)) {
+            if (imRepository.existsConversation(conversationId)) {
+                throw new BizException(400, "仅自定义群聊支持成员治理");
+            }
+            throw new BizException(404, "群聊不存在");
+        }
+        String memberRole = imRepository.findActiveUserMemberRole(conversationId, userId).orElse(null);
+        if (!"OWNER".equals(memberRole)) {
+            throw new BizException(403, "只有群主可以管理群成员");
+        }
+    }
+
+    private List<ImConversationMemberResponse> listActiveConversationMemberResponses(Long conversationId) {
+        return imRepository.listActiveUserMembers(conversationId)
+            .stream()
+            .map(this::toConversationMemberResponse)
+            .toList();
     }
 
     private boolean hasDirectManagerRelation(ImUserRelationRow currentUser, ImUserRelationRow targetUser) {

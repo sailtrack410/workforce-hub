@@ -151,6 +151,119 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.message").value("目标成员不存在或不可加入群聊"));
     }
 
+    @Test
+    @DisplayName("群主应能拉人进入自定义群聊")
+    void ownerShouldAddMembersToCustomGroupConversation() throws Exception {
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/members", 7301L)
+                .cookie(ownerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memberUserIds": [2004]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(3)))
+            .andExpect(jsonPath("$.data[?(@.memberId == 2004)].memberRole").value("MEMBER"));
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation_member WHERE conversation_id = 7301 AND member_id = ? AND status = 'ACTIVE'",
+            Long.class,
+            OTHER_EMPLOYEE_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("群主应能移出普通群成员")
+    void ownerShouldRemoveMemberFromCustomGroupConversation() throws Exception {
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/members/remove", 7301L)
+                .cookie(ownerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memberUserIds": [2002]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data[0].memberRole").value("OWNER"));
+
+        assertEquals("LEFT", jdbcTemplate.queryForObject(
+            "SELECT status FROM im_conversation_member WHERE conversation_id = 7301 AND member_id = ?",
+            String.class,
+            MANAGER_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("普通成员不能治理群成员")
+    void normalMemberShouldNotManageGroupMembers() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/members", 7301L)
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memberUserIds": [2004]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("只有群主可以管理群成员"));
+    }
+
+    @Test
+    @DisplayName("群主不能把自己移出群聊")
+    void ownerShouldNotRemoveSelfFromGroupConversation() throws Exception {
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/members/remove", 7301L)
+                .cookie(ownerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memberUserIds": [2003]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("群主不能把自己移出群聊"));
+    }
+
+    private void seedCustomGroup() {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation
+                (id, conversation_type, title, last_message_seq, status, created_by, updated_by, is_deleted)
+            VALUES
+                (7301, 'GROUP', '项目推进群', 0, 'ACTIVE', 2003, 2003, 0)
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO im_group_profile
+                (id, conversation_id, group_type, owner_user_id, status, created_by, updated_by)
+            VALUES
+                (7302, 7301, 'CUSTOM', 2003, 'ACTIVE', 2003, 2003)
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation_member
+                (id, conversation_id, member_type, member_id, member_role, join_source, last_read_seq, status)
+            VALUES
+                (7303, 7301, 'USER', ?, 'OWNER', 'CREATE', 0, 'ACTIVE'),
+                (7304, 7301, 'USER', ?, 'MEMBER', 'CREATE', 0, 'ACTIVE')
+            """, EMPLOYEE_USER_ID, MANAGER_USER_ID);
+    }
+
     private Cookie loginEmployee(String loginName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)

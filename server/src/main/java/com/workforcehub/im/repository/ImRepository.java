@@ -158,6 +158,66 @@ public class ImRepository {
         return count != null && count > 0;
     }
 
+    public boolean existsActiveCustomGroupConversation(Long conversationId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM im_conversation c
+            JOIN im_group_profile g ON g.conversation_id = c.id
+            WHERE c.id = ?
+              AND c.conversation_type = 'GROUP'
+              AND c.status = 'ACTIVE'
+              AND c.is_deleted = 0
+              AND g.group_type = 'CUSTOM'
+              AND g.status = 'ACTIVE'
+            """, Long.class, conversationId);
+        return count != null && count > 0;
+    }
+
+    public Optional<String> findActiveUserMemberRole(Long conversationId, Long userId) {
+        return jdbcTemplate.query("""
+            SELECT member_role
+            FROM im_conversation_member
+            WHERE conversation_id = ?
+              AND member_type = 'USER'
+              AND member_id = ?
+              AND status = 'ACTIVE'
+            """,
+            (rs, rowNum) -> rs.getString("member_role"),
+            conversationId,
+            userId
+        ).stream().findFirst();
+    }
+
+    public List<ImConversationMemberRow> listActiveUserMembers(Long conversationId) {
+        return jdbcTemplate.query("""
+            SELECT member_id,
+                   member_type,
+                   member_role,
+                   status,
+                   joined_at
+            FROM im_conversation_member
+            WHERE conversation_id = ?
+              AND member_type = 'USER'
+              AND status = 'ACTIVE'
+            ORDER BY CASE member_role
+                         WHEN 'OWNER' THEN 0
+                         WHEN 'ADMIN' THEN 1
+                         ELSE 2
+                     END,
+                     joined_at ASC,
+                     id ASC
+            """,
+            (rs, rowNum) -> new ImConversationMemberRow(
+                rs.getLong("member_id"),
+                rs.getString("member_type"),
+                rs.getString("member_role"),
+                rs.getString("status"),
+                rs.getTimestamp("joined_at") == null ? null : rs.getTimestamp("joined_at").toLocalDateTime()
+            ),
+            conversationId
+        );
+    }
+
     public List<ImMessageRow> listMessages(Long conversationId, Long beforeSeq, int size) {
         if (beforeSeq == null) {
             return jdbcTemplate.query("""
@@ -339,6 +399,56 @@ public class ImRepository {
             memberRole,
             joinSource
         );
+    }
+
+    public void upsertUserMember(Long memberRowId,
+                                 Long conversationId,
+                                 Long userId,
+                                 String memberRole,
+                                 String joinSource) {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation_member
+                (id, conversation_id, member_type, member_id, member_role, join_source, last_read_seq, status)
+            VALUES
+                (?, ?, 'USER', ?, ?, ?, 0, 'ACTIVE')
+            ON DUPLICATE KEY UPDATE
+                member_role = ?,
+                join_source = ?,
+                joined_at = IF(left_at IS NOT NULL, CURRENT_TIMESTAMP, joined_at),
+                status = 'ACTIVE',
+                left_at = NULL
+            """,
+            memberRowId,
+            conversationId,
+            userId,
+            memberRole,
+            joinSource,
+            memberRole,
+            joinSource
+        );
+    }
+
+    public void markUserMembersLeft(Long conversationId, Set<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", userIds.stream().map(ignored -> "?").toList());
+        Object[] args = new Object[userIds.size() + 1];
+        args[0] = conversationId;
+        int index = 1;
+        for (Long userId : userIds) {
+            args[index++] = userId;
+        }
+        jdbcTemplate.update("""
+            UPDATE im_conversation_member
+            SET status = 'LEFT',
+                left_at = CURRENT_TIMESTAMP
+            WHERE conversation_id = ?
+              AND member_type = 'USER'
+              AND status = 'ACTIVE'
+              AND member_role <> 'OWNER'
+              AND member_id IN (%s)
+            """.formatted(placeholders), args);
     }
 
     public void updateConversationLastMessage(Long conversationId,

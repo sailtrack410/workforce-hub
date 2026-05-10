@@ -2,6 +2,8 @@ package com.workforcehub.im.controller;
 
 import com.workforcehub.common.response.R;
 import com.workforcehub.im.dto.CreateGroupConversationRequest;
+import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
+import com.workforcehub.im.dto.ImConversationMemberResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
@@ -49,6 +51,22 @@ public class EmployeeImController {
         @Valid @RequestBody CreateGroupConversationRequest request
     ) {
         return R.ok(imService.createCurrentEmployeeGroupConversation(request));
+    }
+
+    @PostMapping("/group-conversations/{conversationId}/members")
+    public R<List<ImConversationMemberResponse>> addGroupMembers(
+        @PathVariable Long conversationId,
+        @Valid @RequestBody GroupMemberUserIdsRequest request
+    ) {
+        return R.ok(imService.addCurrentEmployeeGroupMembers(conversationId, request));
+    }
+
+    @PostMapping("/group-conversations/{conversationId}/members/remove")
+    public R<List<ImConversationMemberResponse>> removeGroupMembers(
+        @PathVariable Long conversationId,
+        @Valid @RequestBody GroupMemberUserIdsRequest request
+    ) {
+        return R.ok(imService.removeCurrentEmployeeGroupMembers(conversationId, request));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
