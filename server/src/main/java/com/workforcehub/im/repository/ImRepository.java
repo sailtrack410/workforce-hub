@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * module-im 第一版 JDBC 仓储。
@@ -60,6 +61,58 @@ public class ImRepository {
             this::mapConversationSummary,
             userId
         );
+    }
+
+    public Optional<ImConversationSummaryRow> findConversationSummaryForUser(Long conversationId, Long userId) {
+        return jdbcTemplate.query(conversationSummarySelectSql() + """
+            WHERE m.member_type = 'USER'
+              AND m.member_id = ?
+              AND m.status = 'ACTIVE'
+              AND c.id = ?
+              AND c.status = 'ACTIVE'
+              AND c.is_deleted = 0
+            """,
+            this::mapConversationSummary,
+            userId,
+            conversationId
+        ).stream().findFirst();
+    }
+
+    public Optional<ImUserRelationRow> findActiveOrgUser(Long userId) {
+        return jdbcTemplate.query("""
+            SELECT id AS user_id,
+                   real_name,
+                   manager_user_id,
+                   employment_status,
+                   status
+            FROM org_user
+            WHERE id = ?
+              AND status = 'ACTIVE'
+              AND employment_status IN ('PROBATION', 'ACTIVE', 'PENDING_OFFBOARD')
+              AND is_deleted = 0
+            """,
+            (rs, rowNum) -> new ImUserRelationRow(
+                rs.getLong("user_id"),
+                rs.getString("real_name"),
+                nullableLong(rs, "manager_user_id"),
+                rs.getString("employment_status"),
+                rs.getString("status")
+            ),
+            userId
+        ).stream().findFirst();
+    }
+
+    public Optional<Long> findActiveConversationIdByKey(String conversationKey) {
+        return jdbcTemplate.query("""
+            SELECT id
+            FROM im_conversation
+            WHERE conversation_key = ?
+              AND status = 'ACTIVE'
+              AND is_deleted = 0
+            """,
+            (rs, rowNum) -> rs.getLong("id"),
+            conversationKey
+        ).stream().findFirst();
     }
 
     public boolean existsActiveUserMembership(Long conversationId, Long userId) {
@@ -149,6 +202,44 @@ public class ImRepository {
         );
     }
 
+    public void insertPrivateConversation(Long conversationId,
+                                          String conversationKey,
+                                          String title,
+                                          Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation
+                (id, conversation_type, conversation_key, title, last_message_seq,
+                 status, created_by, updated_by, is_deleted)
+            VALUES
+                (?, 'PRIVATE', ?, ?, 0, 'ACTIVE', ?, ?, 0)
+            """,
+            conversationId,
+            conversationKey,
+            title,
+            operatorId,
+            operatorId
+        );
+    }
+
+    public void insertUserMember(Long memberRowId,
+                                 Long conversationId,
+                                 Long userId,
+                                 String memberRole,
+                                 String joinSource) {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation_member
+                (id, conversation_id, member_type, member_id, member_role, join_source, last_read_seq, status)
+            VALUES
+                (?, ?, 'USER', ?, ?, ?, 0, 'ACTIVE')
+            """,
+            memberRowId,
+            conversationId,
+            userId,
+            memberRole,
+            joinSource
+        );
+    }
+
     public void updateConversationLastMessage(Long conversationId,
                                               Long lastMessageSeq,
                                               Long lastMessageId,
@@ -185,6 +276,37 @@ public class ImRepository {
             conversationId,
             userId
         );
+    }
+
+    private String conversationSummarySelectSql() {
+        return """
+            SELECT c.id AS conversation_id,
+                   c.conversation_type,
+                   c.conversation_key,
+                   c.title,
+                   c.avatar_file_id,
+                   c.bound_agent_id,
+                   c.last_message_seq,
+                   m.last_read_seq,
+                   GREATEST(c.last_message_seq - m.last_read_seq, 0) AS unread_count,
+                   c.last_message_at,
+                   c.status,
+                   m.pin_flag,
+                   m.mute_flag,
+                   m.member_role,
+                   lm.id AS last_message_id,
+                   lm.seq_no AS last_message_seq_no,
+                   lm.sender_type AS last_message_sender_type,
+                   lm.sender_id AS last_message_sender_id,
+                   lm.message_type AS last_message_type,
+                   CAST(lm.content_json AS CHAR) AS last_message_content_json,
+                   lm.quoted_message_id AS last_message_quoted_message_id,
+                   lm.status AS last_message_status,
+                   lm.sent_at AS last_message_sent_at
+            FROM im_conversation_member m
+            JOIN im_conversation c ON c.id = m.conversation_id
+            LEFT JOIN im_message lm ON lm.id = c.last_message_id
+            """;
     }
 
     private ImConversationSummaryRow mapConversationSummary(ResultSet rs, int rowNum) throws SQLException {

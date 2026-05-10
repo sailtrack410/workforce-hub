@@ -8,9 +8,11 @@ import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
+import com.workforcehub.im.dto.StartPrivateConversationRequest;
 import com.workforcehub.im.repository.ImConversationSummaryRow;
 import com.workforcehub.im.repository.ImMessageRow;
 import com.workforcehub.im.repository.ImRepository;
+import com.workforcehub.im.repository.ImUserRelationRow;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -53,6 +55,31 @@ public class ImService {
             .stream()
             .map(this::toMessageResponse)
             .toList();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImConversationSummaryResponse startCurrentEmployeePrivateConversation(StartPrivateConversationRequest request) {
+        Long currentUserId = CurrentUserHolder.requireUserId();
+        Long targetUserId = request.getTargetUserId();
+        if (currentUserId.equals(targetUserId)) {
+            throw new BizException(400, "不能和自己发起私聊");
+        }
+
+        ImUserRelationRow currentUser = imRepository.findActiveOrgUser(currentUserId)
+            .orElseThrow(() -> new BizException(403, "当前员工不可发起私聊"));
+        ImUserRelationRow targetUser = imRepository.findActiveOrgUser(targetUserId)
+            .orElseThrow(() -> new BizException(404, "目标用户不存在"));
+        if (!hasDirectManagerRelation(currentUser, targetUser)) {
+            throw new BizException(403, "只能和直属上级或直属下级发起私聊");
+        }
+
+        String conversationKey = privateConversationKey(currentUserId, targetUserId);
+        Long conversationId = imRepository.findActiveConversationIdByKey(conversationKey)
+            .orElseGet(() -> createPrivateConversation(currentUser, targetUser, conversationKey));
+
+        return imRepository.findConversationSummaryForUser(conversationId, currentUserId)
+            .map(this::toConversationSummaryResponse)
+            .orElseThrow(() -> new BizException(500, "私聊会话创建失败"));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -115,6 +142,43 @@ public class ImService {
         response.setMemberRole(row.memberRole());
         response.setLastMessage(row.lastMessage() == null ? null : toMessageResponse(row.lastMessage()));
         return response;
+    }
+
+    private Long createPrivateConversation(ImUserRelationRow currentUser,
+                                           ImUserRelationRow targetUser,
+                                           String conversationKey) {
+        Long conversationId = IdWorker.getId();
+        String title = privateConversationTitle(currentUser, targetUser);
+        imRepository.insertPrivateConversation(
+            conversationId,
+            conversationKey,
+            title,
+            currentUser.userId()
+        );
+        imRepository.insertUserMember(IdWorker.getId(), conversationId, currentUser.userId(), "MEMBER", "DIRECT_RELATION");
+        imRepository.insertUserMember(IdWorker.getId(), conversationId, targetUser.userId(), "MEMBER", "DIRECT_RELATION");
+        return conversationId;
+    }
+
+    private boolean hasDirectManagerRelation(ImUserRelationRow currentUser, ImUserRelationRow targetUser) {
+        return targetUser.userId().equals(currentUser.managerUserId())
+            || currentUser.userId().equals(targetUser.managerUserId());
+    }
+
+    private String privateConversationKey(Long firstUserId, Long secondUserId) {
+        long minUserId = Math.min(firstUserId, secondUserId);
+        long maxUserId = Math.max(firstUserId, secondUserId);
+        return "PRIVATE:%d:%d".formatted(minUserId, maxUserId);
+    }
+
+    private String privateConversationTitle(ImUserRelationRow firstUser, ImUserRelationRow secondUser) {
+        if (secondUser.userId().equals(firstUser.managerUserId())) {
+            return "%s与%s".formatted(firstUser.realName(), secondUser.realName());
+        }
+        if (firstUser.userId().equals(secondUser.managerUserId())) {
+            return "%s与%s".formatted(secondUser.realName(), firstUser.realName());
+        }
+        return "%s与%s".formatted(secondUser.realName(), firstUser.realName());
     }
 
     private ImMessageResponse toMessageResponse(ImMessageRow row) {

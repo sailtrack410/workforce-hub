@@ -163,6 +163,112 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         ));
     }
 
+    @Test
+    @DisplayName("员工应能和直属上级发起私聊")
+    void employeeShouldStartPrivateConversationWithDirectManager() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+
+        mockMvc.perform(post("/api/employee/im/private-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetUserId": 2002
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationType").value("PRIVATE"))
+            .andExpect(jsonPath("$.data.conversationKey").value("PRIVATE:2002:2003"))
+            .andExpect(jsonPath("$.data.title").value("张三与李四"))
+            .andExpect(jsonPath("$.data.lastMessageSeq").value(0))
+            .andExpect(jsonPath("$.data.lastReadSeq").value(0))
+            .andExpect(jsonPath("$.data.unreadCount").value(0))
+            .andExpect(jsonPath("$.data.memberRole").value("MEMBER"));
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation WHERE conversation_key = 'PRIVATE:2002:2003'",
+            Long.class
+        ));
+        assertEquals(2L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation_member WHERE conversation_id IN (SELECT id FROM im_conversation WHERE conversation_key = 'PRIVATE:2002:2003')",
+            Long.class
+        ));
+    }
+
+    @Test
+    @DisplayName("领导应能和直属下级发起私聊")
+    void managerShouldStartPrivateConversationWithDirectSubordinate() throws Exception {
+        Cookie managerSession = loginEmployee("lisi.manager");
+
+        mockMvc.perform(post("/api/employee/im/private-conversations")
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetUserId": 2003
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationType").value("PRIVATE"))
+            .andExpect(jsonPath("$.data.conversationKey").value("PRIVATE:2002:2003"))
+            .andExpect(jsonPath("$.data.title").value("张三与李四"));
+    }
+
+    @Test
+    @DisplayName("无直属关系员工不能发起私聊")
+    void employeeShouldNotStartPrivateConversationWithoutDirectRelation() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+
+        mockMvc.perform(post("/api/employee/im/private-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetUserId": 2004
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("只能和直属上级或直属下级发起私聊"));
+
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation WHERE conversation_key = 'PRIVATE:2003:2004'",
+            Long.class
+        ));
+    }
+
+    @Test
+    @DisplayName("重复发起私聊应复用已有会话")
+    void startingExistingPrivateConversationShouldReuseConversation() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+
+        mockMvc.perform(post("/api/employee/im/private-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetUserId": 2002
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationId").value(7001))
+            .andExpect(jsonPath("$.data.conversationKey").value("PRIVATE:2002:2003"))
+            .andExpect(jsonPath("$.data.lastMessageSeq").value(2));
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation WHERE conversation_key = 'PRIVATE:2002:2003'",
+            Long.class
+        ));
+        assertEquals(2L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation_member WHERE conversation_id = 7001",
+            Long.class
+        ));
+    }
+
     private void seedPrivateConversation() {
         jdbcTemplate.update("""
             INSERT INTO im_conversation

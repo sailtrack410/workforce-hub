@@ -4,6 +4,7 @@ import com.workforcehub.common.response.R;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
+import com.workforcehub.im.dto.StartPrivateConversationRequest;
 import com.workforcehub.im.service.ImService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +32,13 @@ public class EmployeeImController {
     @GetMapping("/conversations")
     public R<List<ImConversationSummaryResponse>> conversations() {
         return R.ok(imService.listCurrentEmployeeConversations());
+    }
+
+    @PostMapping("/private-conversations")
+    public R<ImConversationSummaryResponse> startPrivateConversation(
+        @Valid @RequestBody StartPrivateConversationRequest request
+    ) {
+        return R.ok(imService.startCurrentEmployeePrivateConversation(request));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
