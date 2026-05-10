@@ -5,7 +5,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 测试类 | `ModuleAgentApiIntegrationTest` |
-| 当前覆盖 | 后台创建/版本/工具/绑定/ACL/发布，员工 Agent 列表，任务创建，工具调用，人工确认等待，失败任务保留 |
+| 当前覆盖 | 后台创建/版本/工具/绑定/ACL/发布，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留 |
 | 运行前提 | 本地 MySQL、Redis 可用；测试使用 `LocalIntegrationTestSupport` 自动建库、迁移和装载组织种子数据 |
 | 数据库变更 | 本轮无新增迁移，测试依赖 V1 已存在 `agt_*` 表 |
 
@@ -17,12 +17,12 @@
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_full_green2 mvn -Dtest=ModuleAgentApiIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_confirm_full2 mvn -Dtest=ModuleAgentApiIntegrationTest test
 ```
 
 预期结果：
 
-- 7 个用例全部通过。
+- 11 个用例全部通过。
 - 空库可执行 V1 到 V11 的 Flyway 迁移。
 - `LocalIntegrationTestSupport` 每个用例前清理 `agt_*` 与相关业务表。
 
@@ -55,6 +55,10 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 | AGT-005 | P0 | 业务型工具执行失败 | 返回 `code=0`，任务 `FAILED`，写入失败工具日志和 `TASK_FAILED` 审计 |
 | AGT-006 | P0 | 高风险工具绑定为人工确认 | 任务进入 `WAITING_HUMAN_CONFIRM`，工具不执行，日志为等待确认 |
 | AGT-007 | P0 | `GROUP` ACL 授权 | 活跃群成员可见并可创建任务；非群成员不可见且不能使用 |
+| AGT-008 | P0 | 人工确认继续执行 | 任务进入 `RUNNING` 后执行待确认工具，最终 `SUCCEEDED` |
+| AGT-009 | P0 | 人工拒绝继续执行 | 任务进入 `REJECTED`，待确认工具日志为 `REJECTED`，工具不执行 |
+| AGT-010 | P0 | 人工取消任务 | 非触发人返回 `code=403`；触发人取消后任务进入 `CANCELLED` |
+| AGT-011 | P0 | 待确认工具绑定失效后确认继续 | 返回 `code=409`，任务保持 `WAITING_HUMAN_CONFIRM`，避免误成功 |
 
 ---
 
@@ -101,6 +105,38 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 - 员工必须存在活跃 `im_conversation_member` 记录才能看到和使用 Agent。
 - 非群成员访问同一 Agent 返回 `code=403`。
 
+### AGT-008 人工确认继续执行
+
+- `POST /api/employee/agent-tasks/{taskId}/confirm` 请求 `approved=true`。
+- 任务触发人才能操作该任务。
+- `agt_task.status=SUCCEEDED`。
+- `agt_tool_call_log.approval_status=APPROVED`。
+- `agt_tool_call_log.result_status=SUCCESS`。
+- `agt_audit_log` 包含 `TASK_HUMAN_CONFIRMED`、`TASK_RUNNING`、`TASK_SUCCEEDED`。
+
+### AGT-009 人工拒绝继续执行
+
+- `POST /api/employee/agent-tasks/{taskId}/confirm` 请求 `approved=false`。
+- `agt_task.status=REJECTED`。
+- `agt_tool_call_log.approval_status=REJECTED`。
+- `agt_tool_call_log.result_status=REJECTED`。
+- 不写入 `TASK_RUNNING` 审计。
+
+### AGT-010 人工取消任务
+
+- 非任务触发人调用取消接口返回 `code=403`。
+- 任务触发人调用取消接口后，`agt_task.status=CANCELLED`。
+- `agt_tool_call_log.approval_status=CANCELLED`。
+- `agt_tool_call_log.result_status=CANCELLED`。
+- `agt_audit_log` 包含 `TASK_CANCELLED`。
+
+### AGT-011 待确认工具绑定失效保护
+
+- 人工确认继续执行前，如果待确认工具绑定被停用，接口返回 `code=409`。
+- `agt_task.status` 保持 `WAITING_HUMAN_CONFIRM`。
+- 待确认工具日志保持 `PENDING/WAITING_CONFIRM`。
+- 不写入 `TASK_SUCCEEDED` 审计。
+
 ---
 
 ## 5. 手工验证示例
@@ -116,6 +152,8 @@ env TEST_DB_NAME=workforce_hub_agent_regression mvn -Dtest=ModuleAuthApiIntegrat
 7. 发布版本：`POST /api/admin/agents/versions/{versionId}/publish`
 8. 员工登录后查询：`GET /api/employee/agents`
 9. 员工创建任务：`POST /api/employee/agents/{agentId}/tasks`
+10. 如任务进入等待确认，员工确认继续或拒绝：`POST /api/employee/agent-tasks/{taskId}/confirm`
+11. 如业务上下文终止，员工取消任务：`POST /api/employee/agent-tasks/{taskId}/cancel`
 
 ### 5.2 排查 SQL
 
@@ -137,7 +175,7 @@ WHERE task_id = ?;
 
 ## 6. 当前未覆盖但后续必须补的测试
 
-- 人工确认继续执行、人工驳回、超时取消。
+- 人工确认超时扫描和超时取消。
 - 后台 Agent 列表、详情、停用、版本回滚。
 - workflow 预审真实触发和回调。
 - IM 会话 Agent 触发和回复回写。

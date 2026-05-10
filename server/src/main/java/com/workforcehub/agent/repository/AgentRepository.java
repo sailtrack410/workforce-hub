@@ -313,6 +313,18 @@ public class AgentRepository {
         return rows.get(0);
     }
 
+    public AgentTaskRow getTaskForUpdateOrThrow(Long taskId) {
+        List<AgentTaskRow> rows = jdbcTemplate.query(taskSelectSql() + """
+            WHERE id = ?
+            LIMIT 1
+            FOR UPDATE
+            """, this::mapTask, taskId);
+        if (rows.isEmpty()) {
+            throw new BizException(404, "Agent任务不存在");
+        }
+        return rows.get(0);
+    }
+
     public List<AgentRow> listUsableAgentsForUser(Long userId) {
         return jdbcTemplate.query(agentSelectSql() + """
             WHERE aa.status = 'ACTIVE'
@@ -411,6 +423,86 @@ public class AgentRepository {
             taskId
         );
         return count == null ? 0 : count;
+    }
+
+    public List<AgentPendingToolCallRow> listPendingToolCalls(Long taskId) {
+        return jdbcTemplate.query("""
+            SELECT log.id,
+                   log.task_id,
+                   log.tool_id,
+                   log.request_payload_json,
+                   at.tool_code,
+                   at.tool_name,
+                   at.tool_type,
+                   at.risk_level,
+                   at.read_only_flag,
+                   aat.approval_mode
+            FROM agt_tool_call_log log
+            JOIN agt_task task ON task.id = log.task_id
+            JOIN agt_agent_tool aat ON aat.agent_version_id = task.agent_version_id
+                                    AND aat.tool_id = log.tool_id
+            JOIN agt_tool at ON at.id = log.tool_id
+            WHERE log.task_id = ?
+              AND log.approval_status = 'PENDING'
+              AND log.result_status = 'WAITING_CONFIRM'
+              AND aat.permission_mode = 'ALLOWED'
+              AND aat.status = 'ACTIVE'
+              AND at.status = 'ACTIVE'
+              AND at.is_deleted = 0
+            ORDER BY log.called_at ASC, log.id ASC
+            """, this::mapPendingToolCall, taskId);
+    }
+
+    public void markToolCallApprovedSuccess(Long logId, String responsePayloadJson) {
+        jdbcTemplate.update("""
+            UPDATE agt_tool_call_log
+            SET approval_status = 'APPROVED',
+                result_status = 'SUCCESS',
+                response_payload_json = CAST(? AS JSON),
+                called_at = NOW()
+            WHERE id = ?
+              AND approval_status = 'PENDING'
+              AND result_status = 'WAITING_CONFIRM'
+            """, responsePayloadJson, logId);
+    }
+
+    public void markToolCallApprovedFailed(Long logId, String responsePayloadJson) {
+        jdbcTemplate.update("""
+            UPDATE agt_tool_call_log
+            SET approval_status = 'APPROVED',
+                result_status = 'FAILED',
+                response_payload_json = CAST(? AS JSON),
+                called_at = NOW()
+            WHERE id = ?
+              AND approval_status = 'PENDING'
+              AND result_status = 'WAITING_CONFIRM'
+            """, responsePayloadJson, logId);
+    }
+
+    public void rejectWaitingTask(Long taskId, String responsePayloadJson, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_tool_call_log
+            SET approval_status = 'REJECTED',
+                result_status = 'REJECTED',
+                response_payload_json = CAST(? AS JSON)
+            WHERE task_id = ?
+              AND approval_status = 'PENDING'
+              AND result_status = 'WAITING_CONFIRM'
+            """, responsePayloadJson, taskId);
+        finishTask(taskId, "REJECTED", null, operatorId);
+    }
+
+    public void cancelWaitingTask(Long taskId, String responsePayloadJson, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_tool_call_log
+            SET approval_status = 'CANCELLED',
+                result_status = 'CANCELLED',
+                response_payload_json = CAST(? AS JSON)
+            WHERE task_id = ?
+              AND approval_status = 'PENDING'
+              AND result_status = 'WAITING_CONFIRM'
+            """, responsePayloadJson, taskId);
+        finishTask(taskId, "CANCELLED", null, operatorId);
     }
 
     private boolean exists(String sql, Object... args) {
@@ -561,6 +653,21 @@ public class AgentRepository {
             rs.getString("error_message"),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
+        );
+    }
+
+    private AgentPendingToolCallRow mapPendingToolCall(ResultSet rs, int rowNum) throws SQLException {
+        return new AgentPendingToolCallRow(
+            rs.getLong("id"),
+            rs.getLong("task_id"),
+            rs.getLong("tool_id"),
+            rs.getString("request_payload_json"),
+            rs.getString("tool_code"),
+            rs.getString("tool_name"),
+            rs.getString("tool_type"),
+            rs.getString("risk_level"),
+            rs.getInt("read_only_flag") == 1,
+            rs.getString("approval_mode")
         );
     }
 }

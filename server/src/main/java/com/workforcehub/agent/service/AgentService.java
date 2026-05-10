@@ -1,8 +1,9 @@
 package com.workforcehub.agent.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.dto.CancelAgentTaskRequest;
+import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
 import com.workforcehub.agent.dto.AgentAclResponse;
 import com.workforcehub.agent.dto.AgentResponse;
 import com.workforcehub.agent.dto.AgentTaskResponse;
@@ -19,22 +20,17 @@ import com.workforcehub.agent.dto.GrantAgentAclRequest;
 import com.workforcehub.agent.repository.AgentAclRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
+import com.workforcehub.agent.repository.AgentPendingToolCallRow;
 import com.workforcehub.agent.repository.AgentTaskRow;
 import com.workforcehub.agent.repository.AgentToolBindingRow;
 import com.workforcehub.agent.repository.AgentToolRow;
 import com.workforcehub.agent.repository.AgentVersionRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
-import com.workforcehub.spi.AttendanceQueryService;
-import com.workforcehub.spi.KnowledgeSearchService;
-import com.workforcehub.spi.LeaveQueryService;
-import com.workforcehub.spi.OrgQueryService;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -59,23 +55,14 @@ public class AgentService {
 
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
-    private final OrgQueryService orgQueryService;
-    private final ObjectProvider<LeaveQueryService> leaveQueryServiceProvider;
-    private final ObjectProvider<AttendanceQueryService> attendanceQueryServiceProvider;
-    private final ObjectProvider<KnowledgeSearchService> knowledgeSearchServiceProvider;
+    private final AgentToolExecutionService toolExecutionService;
 
     public AgentService(AgentRepository agentRepository,
                         ObjectMapper objectMapper,
-                        OrgQueryService orgQueryService,
-                        ObjectProvider<LeaveQueryService> leaveQueryServiceProvider,
-                        ObjectProvider<AttendanceQueryService> attendanceQueryServiceProvider,
-                        ObjectProvider<KnowledgeSearchService> knowledgeSearchServiceProvider) {
+                        AgentToolExecutionService toolExecutionService) {
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
-        this.orgQueryService = orgQueryService;
-        this.leaveQueryServiceProvider = leaveQueryServiceProvider;
-        this.attendanceQueryServiceProvider = attendanceQueryServiceProvider;
-        this.knowledgeSearchServiceProvider = knowledgeSearchServiceProvider;
+        this.toolExecutionService = toolExecutionService;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -271,6 +258,69 @@ public class AgentService {
         return toTaskResponse(agentRepository.getTaskOrThrow(taskId));
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public AgentTaskResponse confirmCurrentEmployeeTask(Long taskId, ConfirmAgentTaskRequest request) {
+        Long userId = CurrentUserHolder.requireUserId();
+        AgentTaskRow task = getWaitingTaskForCurrentUser(taskId, userId);
+        if (Boolean.FALSE.equals(request.getApproved())) {
+            String summary = safeSummary(request.getComment());
+            agentRepository.rejectWaitingTask(
+                task.id(),
+                writeJson(Map.of("status", "REJECTED", "comment", summary == null ? "" : summary)),
+                userId
+            );
+            audit(task.id(), "TASK_HUMAN_REJECTED", "AGENT_TASK", task.id(), summary, true);
+            return toTaskResponse(agentRepository.getTaskOrThrow(task.id()));
+        }
+        List<AgentPendingToolCallRow> pendingToolCalls = agentRepository.listPendingToolCalls(task.id());
+        if (pendingToolCalls.isEmpty()) {
+            throw new BizException(409, "Agent任务没有可继续执行的待确认工具");
+        }
+        agentRepository.markTaskRunning(task.id(), userId);
+        audit(task.id(), "TASK_HUMAN_CONFIRMED", "AGENT_TASK", task.id(), safeSummary(request.getComment()), true);
+        audit(task.id(), "TASK_RUNNING", "AGENT_TASK", task.id(), "人工确认后继续执行", false);
+        try {
+            for (AgentPendingToolCallRow pendingToolCall : pendingToolCalls) {
+                executePendingToolCall(pendingToolCall);
+            }
+            agentRepository.finishTask(task.id(), "SUCCEEDED", null, userId);
+            audit(task.id(), "TASK_SUCCEEDED", "AGENT_TASK", task.id(), "Agent任务执行成功", false);
+        } catch (BizException e) {
+            String errorMessage = safeSummary(e.getMessage());
+            agentRepository.finishTask(task.id(), "FAILED", errorMessage, userId);
+            audit(task.id(), "TASK_FAILED", "AGENT_TASK", task.id(), errorMessage, true);
+        }
+        return toTaskResponse(agentRepository.getTaskOrThrow(task.id()));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public AgentTaskResponse cancelCurrentEmployeeTask(Long taskId, CancelAgentTaskRequest request) {
+        Long userId = CurrentUserHolder.requireUserId();
+        AgentTaskRow task = getWaitingTaskForCurrentUser(taskId, userId);
+        String reason = safeSummary(request.getReason());
+        agentRepository.cancelWaitingTask(
+            task.id(),
+            writeJson(Map.of("status", "CANCELLED", "reason", reason == null ? "" : reason)),
+            userId
+        );
+        audit(task.id(), "TASK_CANCELLED", "AGENT_TASK", task.id(), reason, true);
+        return toTaskResponse(agentRepository.getTaskOrThrow(task.id()));
+    }
+
+    private AgentTaskRow getWaitingTaskForCurrentUser(Long taskId, Long userId) {
+        AgentTaskRow task = agentRepository.getTaskForUpdateOrThrow(taskId);
+        if (!"USER".equals(task.triggeredByType()) || !userId.equals(task.triggeredById())) {
+            throw new BizException(403, "无权操作该Agent任务");
+        }
+        if (!"WAITING_HUMAN_CONFIRM".equals(task.status())) {
+            throw new BizException(409, "只有等待人工确认的Agent任务可以操作");
+        }
+        if (task.waitingDeadlineAt() != null && task.waitingDeadlineAt().isBefore(LocalDateTime.now())) {
+            throw new BizException(409, "Agent任务人工确认已超时");
+        }
+        return task;
+    }
+
     private List<AgentToolCallRequest> safeToolCalls(CreateAgentTaskRequest request) {
         return request.getToolCalls() == null ? List.of() : request.getToolCalls();
     }
@@ -287,7 +337,7 @@ public class AgentService {
 
     private void executeAndLogToolCall(Long taskId, PreparedToolCall call) {
         try {
-            String responsePayload = executeTool(call.binding(), call.requestPayloadJson());
+            String responsePayload = toolExecutionService.execute(call.binding(), call.requestPayloadJson());
             agentRepository.insertToolCallLog(
                 IdWorker.getId(),
                 taskId,
@@ -315,89 +365,35 @@ public class AgentService {
         }
     }
 
-    private String executeTool(AgentToolBindingRow binding, String requestPayloadJson) {
-        if ("CONNECTOR".equals(binding.toolType())) {
-            throw new BizException(501, "连接器工具执行器尚未接入");
-        }
-        JsonNode payload = readJson(requestPayloadJson);
-        Object result = switch (binding.toolCode()) {
-            case "ORG_GET_USER_SUMMARY" -> orgQueryService.getUserSummary(requiredLong(payload, "userId"));
-            case "ORG_GET_DEPT_SUMMARY" -> orgQueryService.getDeptSummary(requiredLong(payload, "deptId"));
-            case "ORG_GET_MANAGER_USER_ID" -> Map.of("managerUserId", orgQueryService.getManagerUserId(requiredLong(payload, "userId")));
-            case "LEAVE_GET_BALANCES" -> requireLeaveService().getLeaveBalances(requiredLong(payload, "userId"));
-            case "LEAVE_GET_AVAILABLE_MINUTES" -> Map.of(
-                "availableMinutes",
-                requireLeaveService().getAvailableMinutes(requiredLong(payload, "userId"), requiredLong(payload, "leaveTypeId"))
-            );
-            case "ATTENDANCE_GET_DAILY_RESULT" -> requireAttendanceService().getDailyResult(
-                requiredLong(payload, "userId"),
-                LocalDate.parse(requiredText(payload, "workDate"))
-            );
-            case "ATTENDANCE_GET_MONTHLY_EXCEPTIONS" -> requireAttendanceService().getMonthlyExceptions(
-                requiredLong(payload, "userId"),
-                requiredText(payload, "yearMonth")
-            );
-            case "KNOWLEDGE_SEARCH_CHUNKS" -> requireKnowledgeSearchService().searchChunks(
-                requiredLong(payload, "spaceId"),
-                requiredText(payload, "query"),
-                optionalInt(payload, "topK", 5)
-            );
-            default -> throw new BizException(400, "暂不支持该SPI工具执行");
-        };
-        return writeJson(Map.of("status", "SUCCESS", "result", result == null ? Map.of() : result));
-    }
-
-    private LeaveQueryService requireLeaveService() {
-        LeaveQueryService service = leaveQueryServiceProvider.getIfAvailable();
-        if (service == null) {
-            throw new BizException(501, "假期查询工具未接入");
-        }
-        return service;
-    }
-
-    private AttendanceQueryService requireAttendanceService() {
-        AttendanceQueryService service = attendanceQueryServiceProvider.getIfAvailable();
-        if (service == null) {
-            throw new BizException(501, "考勤查询工具未接入");
-        }
-        return service;
-    }
-
-    private KnowledgeSearchService requireKnowledgeSearchService() {
-        KnowledgeSearchService service = knowledgeSearchServiceProvider.getIfAvailable();
-        if (service == null) {
-            throw new BizException(501, "知识库检索工具未接入");
-        }
-        return service;
-    }
-
-    private JsonNode readJson(String value) {
+    private void executePendingToolCall(AgentPendingToolCallRow pendingToolCall) {
+        AgentToolBindingRow binding = new AgentToolBindingRow(
+            null,
+            null,
+            pendingToolCall.toolId(),
+            pendingToolCall.toolCode(),
+            pendingToolCall.toolName(),
+            pendingToolCall.toolType(),
+            pendingToolCall.riskLevel(),
+            pendingToolCall.readOnlyFlag(),
+            pendingToolCall.approvalMode(),
+            "ACTIVE",
+            null,
+            null
+        );
         try {
-            return objectMapper.readTree(StringUtils.hasText(value) ? value : "{}");
-        } catch (Exception e) {
-            throw new BizException(400, "JSON解析失败");
+            String responsePayload = toolExecutionService.execute(binding, pendingToolCall.requestPayloadJson());
+            agentRepository.markToolCallApprovedSuccess(pendingToolCall.logId(), responsePayload);
+        } catch (BizException e) {
+            String errorMessage = safeSummary(e.getMessage());
+            agentRepository.markToolCallApprovedFailed(
+                pendingToolCall.logId(),
+                writeJson(Map.of(
+                    "status", "FAILED",
+                    "errorMessage", errorMessage == null ? "工具执行失败" : errorMessage
+                ))
+            );
+            throw e;
         }
-    }
-
-    private Long requiredLong(JsonNode payload, String fieldName) {
-        JsonNode node = payload.get(fieldName);
-        if (node == null || !node.canConvertToLong()) {
-            throw new BizException(400, fieldName + "不能为空");
-        }
-        return node.asLong();
-    }
-
-    private String requiredText(JsonNode payload, String fieldName) {
-        JsonNode node = payload.get(fieldName);
-        if (node == null || !StringUtils.hasText(node.asText())) {
-            throw new BizException(400, fieldName + "不能为空");
-        }
-        return node.asText().trim();
-    }
-
-    private int optionalInt(JsonNode payload, String fieldName, int defaultValue) {
-        JsonNode node = payload.get(fieldName);
-        return node == null || !node.canConvertToInt() ? defaultValue : node.asInt();
     }
 
     private void audit(Long taskId,

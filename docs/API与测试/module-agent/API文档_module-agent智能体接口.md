@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、版本、工具、ACL、发布，员工端 Agent 列表与任务创建 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、版本、工具、ACL、发布，员工端 Agent 列表、任务创建、人工确认继续、拒绝和取消 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
 | 数据库变更 | 本轮无新增迁移，使用 `V1__init_schema.sql` 已存在的 `agt_*` 表 |
 
-当前第一批不是完整 Agent 平台，暂不包含任务列表、人工确认继续执行、会话 Agent 结果回写、workflow 真实触发器、定时任务和后台运行监控。
+当前第一批不是完整 Agent 平台，暂不包含任务列表、人工确认超时扫描、会话 Agent 结果回写、workflow 真实触发器、定时任务和后台运行监控。
 
 ---
 
@@ -46,6 +46,10 @@
 - 未绑定到当前发布版本的工具不能调用，任务创建前返回 `403`，不写 `agt_task`。
 - `approvalMode=AUTO` 的 `SPI` 工具会同步执行。
 - `approvalMode=REQUIRE_CONFIRM` 的工具会让任务进入 `WAITING_HUMAN_CONFIRM`，不执行工具。
+- `WAITING_HUMAN_CONFIRM` 任务只能由任务触发员工继续、拒绝或取消。
+- 人工同意继续后，任务恢复为 `RUNNING`，执行仍有效的待确认工具，成功后进入 `SUCCEEDED`。
+- 人工拒绝后，任务进入 `REJECTED`；人工取消后，任务进入 `CANCELLED`。
+- 如果待确认工具绑定已失效或没有可继续执行的待确认工具，确认继续会返回 `409`，任务保持等待状态。
 - `CONNECTOR` 工具第一批只允许定义和绑定；如果配置为 `AUTO` 执行，会生成 `FAILED` 任务并返回 `连接器工具执行器尚未接入`。
 - 业务型工具执行失败时，接口仍返回 `code=0`，任务状态为 `FAILED`，并写入 `agt_tool_call_log` 和 `agt_audit_log`。
 
@@ -287,6 +291,74 @@
 | `toolCalls[].toolCode` | 是 | 工具编码 |
 | `toolCalls[].requestPayloadJson` | 否 | 合法 JSON 字符串 |
 
+### 4.3 人工确认 Agent 任务
+
+`POST /api/employee/agent-tasks/{taskId}/confirm`
+
+请求：
+
+```json
+{
+  "approved": true,
+  "comment": "确认继续执行"
+}
+```
+
+同意继续后的响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "taskId": 2053523932464738306,
+    "status": "SUCCEEDED",
+    "toolCallCount": 1,
+    "startedAt": "2026-05-11T01:17:31",
+    "finishedAt": "2026-05-11T01:17:31"
+  },
+  "requestId": "..."
+}
+```
+
+拒绝继续的请求：
+
+```json
+{
+  "approved": false,
+  "comment": "不同意继续执行"
+}
+```
+
+拒绝后任务进入 `REJECTED`，待确认工具日志写入 `approval_status=REJECTED`、`result_status=REJECTED`。
+
+字段约束：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `approved` | 是 | `true` 表示继续执行，`false` 表示人工拒绝 |
+| `comment` | 否 | 最大 512 字符，会写入 Agent 审计摘要或工具响应摘要 |
+
+### 4.4 取消 Agent 任务
+
+`POST /api/employee/agent-tasks/{taskId}/cancel`
+
+请求：
+
+```json
+{
+  "reason": "当前业务已结束，无需继续执行"
+}
+```
+
+取消后任务进入 `CANCELLED`，待确认工具日志写入 `approval_status=CANCELLED`、`result_status=CANCELLED`。
+
+字段约束：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `reason` | 是 | 最大 512 字符，会写入 Agent 审计摘要和工具响应摘要 |
+
 ---
 
 ## 5. 当前内置 SPI 工具编码
@@ -315,13 +387,16 @@
 | 输入 JSON 不合法 | 200 | 400 | 不创建任务 |
 | 业务型工具执行失败 | 200 | 0 | 创建任务，任务状态为 `FAILED` |
 | 高风险/需确认工具 | 200 | 0 | 创建任务，任务状态为 `WAITING_HUMAN_CONFIRM` |
+| 他人确认或取消任务 | 200 | 403 | 只有任务触发员工可操作 |
+| 非等待人工确认状态操作 | 200 | 409 | 只有 `WAITING_HUMAN_CONFIRM` 可确认或取消 |
+| 无可继续执行待确认工具 | 200 | 409 | 绑定失效或待确认日志缺失时拒绝误成功 |
 
 ---
 
 ## 7. 后续扩展点
 
 - 增加后台 Agent 列表、详情、停用、回滚和任务查询接口。
-- 增加人工确认继续执行/驳回接口。
+- 增加人工确认超时扫描和升级处理。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。
 - 接入任务异步执行、重试、超时扫描、运行指标和告警。

@@ -282,6 +282,168 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("等待人工确认的任务被确认后应继续执行待确认工具")
+    void waitingTaskShouldContinueAfterHumanConfirmation() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(
+            adminSession,
+            employeeSession,
+            "CONFIRM_CONTINUE_AGENT",
+            "ORG_GET_USER_SUMMARY",
+            "组织用户摘要",
+            "SPI",
+            "{\"userId\":2003}"
+        );
+
+        mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/confirm", taskId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "approved": true,
+                      "comment": "确认继续执行"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("SUCCEEDED"))
+            .andExpect(jsonPath("$.data.toolCallCount").value(1));
+
+        assertEquals("SUCCEEDED", taskStatus(taskId));
+        assertEquals("APPROVED", toolCallApprovalStatus(taskId));
+        assertEquals("SUCCESS", toolCallResultStatus(taskId));
+        assertTrue(toolResponsePayload(taskId).contains("张三"));
+        assertEquals(1L, auditCount(taskId, "TASK_HUMAN_CONFIRMED"));
+        assertEquals(1L, auditCount(taskId, "TASK_RUNNING"));
+        assertEquals(1L, auditCount(taskId, "TASK_SUCCEEDED"));
+    }
+
+    @Test
+    @DisplayName("等待人工确认的任务被拒绝后应终止且不执行工具")
+    void waitingTaskShouldRejectWithoutExecutingTool() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(
+            adminSession,
+            employeeSession,
+            "CONFIRM_REJECT_AGENT",
+            "ORG_GET_USER_SUMMARY",
+            "组织用户摘要",
+            "SPI",
+            "{\"userId\":2003}"
+        );
+
+        mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/confirm", taskId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "approved": false,
+                      "comment": "不同意继续执行"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("REJECTED"))
+            .andExpect(jsonPath("$.data.toolCallCount").value(1));
+
+        assertEquals("REJECTED", taskStatus(taskId));
+        assertEquals("REJECTED", toolCallApprovalStatus(taskId));
+        assertEquals("REJECTED", toolCallResultStatus(taskId));
+        assertTrue(toolResponsePayload(taskId).contains("不同意继续执行"));
+        assertEquals(1L, auditCount(taskId, "TASK_HUMAN_REJECTED"));
+        assertEquals(0L, auditCount(taskId, "TASK_RUNNING"));
+    }
+
+    @Test
+    @DisplayName("待确认工具绑定失效后不能把任务误确认为成功")
+    void waitingTaskShouldNotSucceedWhenPendingToolBindingIsInactive() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(
+            adminSession,
+            employeeSession,
+            "CONFIRM_INACTIVE_BINDING_AGENT",
+            "ORG_GET_USER_SUMMARY",
+            "组织用户摘要",
+            "SPI",
+            "{\"userId\":2003}"
+        );
+        jdbcTemplate.update("""
+            UPDATE agt_agent_tool aat
+            JOIN agt_task task ON task.agent_version_id = aat.agent_version_id
+            SET aat.status = 'INACTIVE'
+            WHERE task.id = ?
+            """, taskId);
+
+        mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/confirm", taskId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "approved": true,
+                      "comment": "确认继续执行"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("Agent任务没有可继续执行的待确认工具"));
+
+        assertEquals("WAITING_HUMAN_CONFIRM", taskStatus(taskId));
+        assertEquals("PENDING", toolCallApprovalStatus(taskId));
+        assertEquals("WAITING_CONFIRM", toolCallResultStatus(taskId));
+        assertEquals(0L, auditCount(taskId, "TASK_SUCCEEDED"));
+    }
+
+    @Test
+    @DisplayName("等待人工确认的任务只能由触发人取消")
+    void waitingTaskShouldOnlyBeCancelledByTriggerUser() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        Cookie otherEmployeeSession = loginEmployee("wangwu.employee");
+        long taskId = createWaitingTask(
+            adminSession,
+            employeeSession,
+            "CONFIRM_CANCEL_AGENT",
+            "CONNECTOR_WRITE_BACK",
+            "连接器写入",
+            "CONNECTOR",
+            "{\"action\":\"write\"}"
+        );
+
+        mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/cancel", taskId)
+                .cookie(otherEmployeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "他人不能取消"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权操作该Agent任务"));
+
+        mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/cancel", taskId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "当前业务已结束，无需继续执行"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+
+        assertEquals("CANCELLED", taskStatus(taskId));
+        assertEquals("CANCELLED", toolCallApprovalStatus(taskId));
+        assertEquals("CANCELLED", toolCallResultStatus(taskId));
+        assertTrue(toolResponsePayload(taskId).contains("当前业务已结束"));
+        assertEquals(1L, auditCount(taskId, "TASK_CANCELLED"));
+    }
+
+    @Test
     @DisplayName("群组 ACL 应按当前活跃群成员控制 Agent 可见和使用")
     void groupAclShouldAuthorizeOnlyActiveGroupMembers() throws Exception {
         Cookie adminSession = loginAdmin();
@@ -337,6 +499,43 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
             .andExpect(jsonPath("$.message").value("无权使用该Agent"));
+    }
+
+    private long createWaitingTask(Cookie adminSession,
+                                   Cookie employeeSession,
+                                   String agentCode,
+                                   String toolCode,
+                                   String toolName,
+                                   String toolType,
+                                   String requestPayloadJson) throws Exception {
+        long toolId = createTool(adminSession, toolCode, toolName, toolType, "HIGH", false);
+        long agentId = createAgent(adminSession, agentCode, "待确认助手", "AUTOMATION");
+        long versionId = createVersion(adminSession, agentId, 1);
+        bindTool(adminSession, versionId, toolId, "REQUIRE_CONFIRM");
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        publishVersion(adminSession, versionId);
+
+        MvcResult taskResult = mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "inputPayloadJson": "{\\"query\\":\\"执行待确认任务\\"}",
+                      "toolCalls": [
+                        {
+                          "toolCode": "%s",
+                          "requestPayloadJson": "%s"
+                        }
+                      ]
+                    }
+                    """.formatted(toolCode, escapeJsonString(requestPayloadJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("WAITING_HUMAN_CONFIRM"))
+            .andReturn();
+        return data(taskResult).get("taskId").asLong();
     }
 
     private long createPublishedAgentWithoutTool(Cookie adminSession, String agentCode, String agentName) throws Exception {
@@ -534,6 +733,22 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
         return payload == null ? "" : payload;
     }
 
+    private String toolCallApprovalStatus(long taskId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT approval_status
+            FROM agt_tool_call_log
+            WHERE task_id = ?
+            """, String.class, taskId);
+    }
+
+    private String toolCallResultStatus(long taskId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT result_status
+            FROM agt_tool_call_log
+            WHERE task_id = ?
+            """, String.class, taskId);
+    }
+
     private long auditCount(long taskId, String actionType) {
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
@@ -541,5 +756,9 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             WHERE task_id = ? AND action_type = ?
             """, Long.class, taskId, actionType);
         return count == null ? 0L : count;
+    }
+
+    private String escapeJsonString(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
