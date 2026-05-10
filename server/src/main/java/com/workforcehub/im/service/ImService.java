@@ -2,16 +2,22 @@ package com.workforcehub.im.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
+import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.repository.ImConversationSummaryRow;
 import com.workforcehub.im.repository.ImMessageRow;
 import com.workforcehub.im.repository.ImRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * module-im 员工端会话读取服务。
@@ -49,6 +55,48 @@ public class ImService {
             .toList();
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public ImMessageResponse sendCurrentEmployeeMessage(Long conversationId, SendImMessageRequest request) {
+        Long userId = CurrentUserHolder.requireUserId();
+        ensureCanAccessConversation(conversationId, userId);
+        Long lastSeq = imRepository.lockActiveConversationAndGetLastSeq(conversationId);
+        if (lastSeq == null) {
+            throw new BizException(404, "会话不存在");
+        }
+
+        String messageType = normalizeMessageType(request.getMessageType());
+        String text = request.getText().trim();
+        Long seqNo = lastSeq + 1;
+        Long messageId = IdWorker.getId();
+        LocalDateTime sentAt = LocalDateTime.now();
+        String contentJson = buildTextContentJson(text);
+        imRepository.insertMessage(
+            messageId,
+            conversationId,
+            seqNo,
+            "USER",
+            userId,
+            messageType,
+            contentJson,
+            sentAt
+        );
+        imRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, userId);
+        imRepository.updateMemberLastReadSeq(conversationId, userId, seqNo);
+
+        return toMessageResponse(new ImMessageRow(
+            messageId,
+            conversationId,
+            seqNo,
+            "USER",
+            userId,
+            messageType,
+            contentJson,
+            null,
+            "NORMAL",
+            sentAt
+        ));
+    }
+
     private ImConversationSummaryResponse toConversationSummaryResponse(ImConversationSummaryRow row) {
         ImConversationSummaryResponse response = new ImConversationSummaryResponse();
         response.setConversationId(row.conversationId());
@@ -83,6 +131,35 @@ public class ImService {
         response.setStatus(row.status());
         response.setSentAt(row.sentAt());
         return response;
+    }
+
+    private void ensureCanAccessConversation(Long conversationId, Long userId) {
+        if (imRepository.existsActiveUserMembership(conversationId, userId)) {
+            return;
+        }
+        if (imRepository.existsConversation(conversationId)) {
+            throw new BizException(403, "无权访问该会话");
+        }
+        throw new BizException(404, "会话不存在");
+    }
+
+    private String normalizeMessageType(String messageType) {
+        if (!StringUtils.hasText(messageType)) {
+            return "TEXT";
+        }
+        String normalized = messageType.trim().toUpperCase();
+        if (!"TEXT".equals(normalized)) {
+            throw new BizException(400, "当前仅支持发送文本消息");
+        }
+        return normalized;
+    }
+
+    private String buildTextContentJson(String text) {
+        try {
+            return objectMapper.writeValueAsString(Map.of("text", text));
+        } catch (Exception e) {
+            throw new BizException(500, "消息内容序列化失败");
+        }
     }
 
     private String extractText(String contentJson) {

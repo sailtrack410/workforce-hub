@@ -75,10 +75,20 @@ describe('createEmployeeApi', () => {
 
     await api.im.conversations();
     await api.im.messages(7001);
+    await api.im.sendMessage(7001, {
+      messageType: 'TEXT',
+      text: '我下午两点同步。',
+      clientMessageId: 'client-msg-001',
+    });
 
     expect(calls).toEqual([
       ['get', '/api/employee/im/conversations', undefined],
       ['get', '/api/employee/im/conversations/7001/messages', undefined],
+      ['post', '/api/employee/im/conversations/7001/messages', {
+        messageType: 'TEXT',
+        text: '我下午两点同步。',
+        clientMessageId: 'client-msg-001',
+      }],
     ]);
   });
 });

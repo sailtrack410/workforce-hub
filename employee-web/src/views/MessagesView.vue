@@ -19,9 +19,11 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { SectionAction, SectionFilter, SectionId } from '../stores/shell';
 import { navItems, sectionFilters, shellUser, useShellStore } from '../stores/shell';
+import { useImStore } from '../stores/im';
 import { useSessionStore } from '../stores/session';
 
 const shell = useShellStore();
+const im = useImStore();
 const session = useSessionStore();
 const draft = ref('');
 const searchOpen = ref(true);
@@ -108,8 +110,22 @@ function selectNav(section: SectionId) {
   shell.setMobileView('list');
 }
 
+async function syncConversationMessages(id: string) {
+  const conversationId = Number(id);
+  if (!Number.isSafeInteger(conversationId)) return;
+  if (!session.user && !session.loading) {
+    await session.loadCurrentUser();
+  }
+  await im.loadMessages(conversationId, session.user?.userId);
+  const messages = im.messagesByConversation[id];
+  if (messages?.length) {
+    shell.mergeBackendMessages(id, messages);
+  }
+}
+
 function selectConversation(id: string) {
   shell.selectItem('messages', id);
+  void syncConversationMessages(id);
 }
 
 function backToList() {
@@ -124,11 +140,29 @@ function closeDetail() {
   shell.setDetailOpen(false);
 }
 
-function sendMessage() {
+async function sendMessage() {
   const text = draft.value.trim();
   if (!text) return;
-  shell.appendMessage(text);
-  draft.value = '';
+  if (im.messageSending) return;
+  const conversationId = Number(shell.active.messages);
+  if (!Number.isSafeInteger(conversationId)) {
+    showToast('当前会话暂未接入真实发送。');
+    return;
+  }
+  try {
+    if (!session.user && !session.loading) {
+      await session.loadCurrentUser();
+    }
+    await im.sendMessage(conversationId, text, session.user?.userId);
+    const conversationKey = String(conversationId);
+    const messages = im.messagesByConversation[conversationKey];
+    if (messages?.length) {
+      shell.mergeBackendMessages(conversationKey, messages);
+    }
+    draft.value = '';
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '消息发送失败，请稍后重试。');
+  }
 }
 
 function inputValue(event: Event) {
@@ -166,9 +200,15 @@ function handleKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown);
-  if (!session.initialized) {
-    void session.loadCurrentUser();
-  }
+  const currentUserReady = session.initialized
+    ? Promise.resolve()
+    : session.loadCurrentUser().catch(() => undefined);
+  void currentUserReady.then(() => im.loadConversations()).then(() => {
+    if (im.conversations.length) {
+      shell.mergeBackendConversations(im.conversations);
+      void syncConversationMessages(shell.active.messages);
+    }
+  });
 });
 
 onBeforeUnmount(() => {
@@ -473,10 +513,17 @@ onBeforeUnmount(() => {
               v-model="draft"
               type="text"
               placeholder="输入消息，支持 @Agent"
+              :disabled="im.messageSending"
               @keydown.enter.prevent="sendMessage"
             />
           </div>
-          <button class="send-button" type="button" aria-label="发送" @click="sendMessage">
+          <button
+            class="send-button"
+            type="button"
+            :disabled="im.messageSending"
+            :aria-label="im.messageSending ? '发送中' : '发送'"
+            @click="sendMessage"
+          >
             <Send :size="18" />
           </button>
         </footer>

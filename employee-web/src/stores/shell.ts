@@ -32,10 +32,12 @@ export interface SectionMeta {
 
 export interface ConversationMessage {
   id: string;
+  type?: 'text' | 'process-card';
   author: string;
   role: string;
   body: string;
   side?: 'left' | 'right' | 'system';
+  time?: string;
 }
 
 export interface ConversationCard {
@@ -942,6 +944,24 @@ export const useShellStore = defineStore('employee-shell', {
     },
     setListWidth(width: number) {
       this.listWidth = Math.max(260, Math.min(480, Math.round(width)));
+    },
+    mergeBackendConversations(backendConversations: ConversationRecord[]) {
+      if (!backendConversations.length) return;
+      const backendIds = new Set(backendConversations.map((item) => item.id));
+      const fallbackConversations = conversations.filter((item) => !backendIds.has(item.id));
+      this.conversations = [...backendConversations, ...fallbackConversations];
+      if (!backendIds.has(this.active.messages)) {
+        this.active.messages = this.conversations[0]?.id ?? this.active.messages;
+      }
+    },
+    mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
+      const conversation = this.conversations.find((item) => item.id === conversationId);
+      if (!conversation || !backendMessages.length) return;
+      conversation.messages = backendMessages;
+      const latestMessage = backendMessages[backendMessages.length - 1];
+      conversation.subtitle = latestMessage.body;
+      conversation.meta = latestMessage.time || conversation.meta;
+      conversation.unread = 0;
     },
     appendMessage(text: string) {
       const conversation = this.activeConversation;

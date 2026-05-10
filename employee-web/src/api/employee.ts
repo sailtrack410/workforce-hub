@@ -13,6 +13,7 @@ import type {
   LoginRequest,
   LoginResponse,
   PageResult,
+  SendImMessageRequest,
   UnknownRecord,
   WorkflowRequestListQuery,
   WorkflowRequestSummaryResponse,
@@ -62,6 +63,9 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
       conversations: () => client.get<ImConversationSummaryResponse[]>('/api/employee/im/conversations'),
       messages: (conversationId: number) => (
         client.get<ImMessageResponse[]>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages`)
+      ),
+      sendMessage: (conversationId: number, request: SendImMessageRequest) => (
+        client.post<ImMessageResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages`, request)
       ),
     },
     files: {

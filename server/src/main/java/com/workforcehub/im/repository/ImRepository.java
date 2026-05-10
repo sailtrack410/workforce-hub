@@ -6,6 +6,8 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -104,6 +106,84 @@ public class ImRepository {
             """,
             MESSAGE_ROW_MAPPER,
             conversationId
+        );
+    }
+
+    public Long lockActiveConversationAndGetLastSeq(Long conversationId) {
+        List<Long> rows = jdbcTemplate.query("""
+            SELECT last_message_seq
+            FROM im_conversation
+            WHERE id = ?
+              AND status = 'ACTIVE'
+              AND is_deleted = 0
+            FOR UPDATE
+            """,
+            (rs, rowNum) -> rs.getLong("last_message_seq"),
+            conversationId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public void insertMessage(Long messageId,
+                              Long conversationId,
+                              Long seqNo,
+                              String senderType,
+                              Long senderId,
+                              String messageType,
+                              String contentJson,
+                              LocalDateTime sentAt) {
+        jdbcTemplate.update("""
+            INSERT INTO im_message
+                (id, conversation_id, seq_no, sender_type, sender_id, message_type, content_json, status, sent_at)
+            VALUES
+                (?, ?, ?, ?, ?, ?, CAST(? AS JSON), 'NORMAL', ?)
+            """,
+            messageId,
+            conversationId,
+            seqNo,
+            senderType,
+            senderId,
+            messageType,
+            contentJson,
+            Timestamp.valueOf(sentAt)
+        );
+    }
+
+    public void updateConversationLastMessage(Long conversationId,
+                                              Long lastMessageSeq,
+                                              Long lastMessageId,
+                                              LocalDateTime lastMessageAt,
+                                              Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE im_conversation
+            SET last_message_seq = ?,
+                last_message_id = ?,
+                last_message_at = ?,
+                updated_by = ?
+            WHERE id = ?
+              AND status = 'ACTIVE'
+              AND is_deleted = 0
+            """,
+            lastMessageSeq,
+            lastMessageId,
+            Timestamp.valueOf(lastMessageAt),
+            operatorId,
+            conversationId
+        );
+    }
+
+    public void updateMemberLastReadSeq(Long conversationId, Long userId, Long lastReadSeq) {
+        jdbcTemplate.update("""
+            UPDATE im_conversation_member
+            SET last_read_seq = GREATEST(last_read_seq, ?)
+            WHERE conversation_id = ?
+              AND member_type = 'USER'
+              AND member_id = ?
+              AND status = 'ACTIVE'
+            """,
+            lastReadSeq,
+            conversationId,
+            userId
         );
     }
 

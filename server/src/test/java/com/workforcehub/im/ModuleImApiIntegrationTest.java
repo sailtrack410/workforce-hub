@@ -13,6 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -97,6 +98,69 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
             .andExpect(jsonPath("$.message").value("无权访问该会话"));
+    }
+
+    @Test
+    @DisplayName("员工应能向自己参与的会话发送文本消息并更新会话最后消息")
+    void employeeShouldSendTextMessageToJoinedConversation() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", 7001L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "我下午两点同步。",
+                      "clientMessageId": "client-msg-001"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationId").value(7001))
+            .andExpect(jsonPath("$.data.seqNo").value(3))
+            .andExpect(jsonPath("$.data.senderType").value("USER"))
+            .andExpect(jsonPath("$.data.senderId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data.messageType").value("TEXT"))
+            .andExpect(jsonPath("$.data.contentText").value("我下午两点同步。"))
+            .andExpect(jsonPath("$.data.status").value("NORMAL"));
+
+        assertEquals(3L, jdbcTemplate.queryForObject(
+            "SELECT last_message_seq FROM im_conversation WHERE id = 7001",
+            Long.class
+        ));
+        assertEquals(3L, jdbcTemplate.queryForObject(
+            "SELECT last_read_seq FROM im_conversation_member WHERE conversation_id = 7001 AND member_id = ?",
+            Long.class,
+            EMPLOYEE_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("员工不能向未加入会话发送消息")
+    void employeeShouldNotSendMessageToUnjoinedConversation() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedOtherConversation();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", 7002L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "不应写入",
+                      "clientMessageId": "client-msg-forbidden"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权访问该会话"));
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_message WHERE conversation_id = 7002",
+            Long.class
+        ));
     }
 
     private void seedPrivateConversation() {

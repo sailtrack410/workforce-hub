@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
 import { employeeApi } from '../api';
-import type { ImConversationSummaryResponse, ImMessageResponse } from '../api';
+import type { ImConversationSummaryResponse, ImMessageResponse, SendImMessageRequest } from '../api';
 import type { ConversationMessage, ConversationRecord, ConversationTone } from './shell';
 
 export interface EmployeeImApi {
   conversations(): Promise<ImConversationSummaryResponse[]>;
   messages(conversationId: number): Promise<ImMessageResponse[]>;
+  sendMessage(conversationId: number, request: SendImMessageRequest): Promise<ImMessageResponse>;
 }
 
 export const useImStore = defineStore('employee-im', {
@@ -14,6 +15,7 @@ export const useImStore = defineStore('employee-im', {
     messagesByConversation: {} as Record<string, ConversationMessage[]>,
     loading: false,
     messageLoading: false,
+    messageSending: false,
     error: '',
     loadedAt: null as string | null,
   }),
@@ -31,16 +33,41 @@ export const useImStore = defineStore('employee-im', {
         this.loading = false;
       }
     },
-    async loadMessages(conversationId: number, imApi: EmployeeImApi = employeeApi.im) {
+    async loadMessages(conversationId: number, currentUserId?: number, imApi: EmployeeImApi = employeeApi.im) {
       this.messageLoading = true;
       this.error = '';
       try {
         const messages = await imApi.messages(conversationId);
-        this.messagesByConversation[String(conversationId)] = messages.map(mapImMessageToConversationMessage);
+        this.messagesByConversation[String(conversationId)] = messages
+          .map((message) => mapImMessageToConversationMessage(message, currentUserId));
       } catch (error) {
         this.error = error instanceof Error ? error.message : '消息加载失败';
       } finally {
         this.messageLoading = false;
+      }
+    },
+    async sendMessage(conversationId: number, text: string, currentUserId?: number, imApi: EmployeeImApi = employeeApi.im) {
+      const normalizedText = text.trim();
+      if (!normalizedText) return null;
+      this.messageSending = true;
+      this.error = '';
+      try {
+        const message = await imApi.sendMessage(conversationId, {
+          messageType: 'TEXT',
+          text: normalizedText,
+        });
+        const record = mapImMessageToConversationMessage(message, currentUserId);
+        const key = String(conversationId);
+        this.messagesByConversation[key] = [
+          ...(this.messagesByConversation[key] ?? []),
+          record,
+        ];
+        return record;
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : '消息发送失败';
+        throw error;
+      } finally {
+        this.messageSending = false;
       }
     },
   },
@@ -81,16 +108,22 @@ export function mapImConversationToRecord(conversation: ImConversationSummaryRes
   };
 }
 
-export function mapImMessageToConversationMessage(message: ImMessageResponse): ConversationMessage {
+export function mapImMessageToConversationMessage(message: ImMessageResponse, currentUserId?: number): ConversationMessage {
+  const sentByCurrentUser = currentUserId !== undefined && message.senderType === 'USER' && message.senderId === currentUserId;
   return {
     id: String(message.messageId),
     type: message.messageType === 'CARD' ? 'process-card' : 'text',
-    author: authorOfMessage(message),
+    author: sentByCurrentUser ? '我' : authorOfMessage(message),
     role: `${message.senderType} · ${message.messageType}`,
     body: message.contentText || parseTextFromContentJson(message.contentJson) || '[非文本消息]',
-    side: message.senderType === 'SYSTEM' ? 'system' : 'left',
+    side: resolveMessageSide(message, sentByCurrentUser),
     time: formatConversationTime(message.sentAt),
   };
+}
+
+function resolveMessageSide(message: ImMessageResponse, sentByCurrentUser: boolean): ConversationMessage['side'] {
+  if (message.senderType === 'SYSTEM') return 'system';
+  return sentByCurrentUser ? 'right' : 'left';
 }
 
 function normalizeConversationKind(conversationType: string): ConversationRecord['kind'] {

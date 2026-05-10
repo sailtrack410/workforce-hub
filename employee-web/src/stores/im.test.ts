@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import type { ImConversationSummaryResponse, ImMessageResponse } from '../api';
+import type { ImConversationSummaryResponse, ImMessageResponse, SendImMessageRequest } from '../api';
 import { mapImConversationToRecord, mapImMessageToConversationMessage, useImStore, type EmployeeImApi } from './im';
 
 const message: ImMessageResponse = {
@@ -39,6 +39,15 @@ function createImApi(): EmployeeImApi {
   return {
     conversations: () => Promise.resolve([conversation]),
     messages: () => Promise.resolve([message]),
+    sendMessage: () => Promise.resolve({
+      ...message,
+      messageId: 7103,
+      seqNo: 3,
+      senderId: 2003,
+      contentJson: '{"text":"我下午两点同步。"}',
+      contentText: '我下午两点同步。',
+      sentAt: '2026-05-09T10:12:00',
+    }),
   };
 }
 
@@ -67,7 +76,7 @@ describe('IM store', () => {
   });
 
   it('maps backend message into shell message record', () => {
-    const record = mapImMessageToConversationMessage(message);
+    const record = mapImMessageToConversationMessage(message, 2003);
 
     expect(record).toMatchObject({
       id: '7102',
@@ -79,15 +88,64 @@ describe('IM store', () => {
     });
   });
 
+  it('maps current user messages to the right side', () => {
+    const record = mapImMessageToConversationMessage({
+      ...message,
+      messageId: 7101,
+      senderId: 2003,
+      contentText: '我上午可以处理补卡。',
+    }, 2003);
+
+    expect(record).toMatchObject({
+      id: '7101',
+      author: '我',
+      body: '我上午可以处理补卡。',
+      side: 'right',
+    });
+  });
+
   it('loads conversations and messages from employee IM API', async () => {
     const im = useImStore();
 
     await im.loadConversations(createImApi());
-    await im.loadMessages(7001, createImApi());
+    await im.loadMessages(7001, 2003, createImApi());
 
     expect(im.loading).toBe(false);
     expect(im.messageLoading).toBe(false);
     expect(im.conversations.map((item) => item.id)).toEqual(['7001']);
     expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7102']);
+  });
+
+  it('sends text message and appends mapped backend response', async () => {
+    const im = useImStore();
+    const requests: SendImMessageRequest[] = [];
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      sendMessage: (_conversationId, request) => {
+        requests.push(request);
+        return Promise.resolve({
+          ...message,
+          messageId: 7103,
+          seqNo: 3,
+          senderId: 2003,
+          contentJson: '{"text":"我下午两点同步。"}',
+          contentText: '我下午两点同步。',
+          sentAt: '2026-05-09T10:12:00',
+        });
+      },
+    };
+
+    im.messagesByConversation['7001'] = [mapImMessageToConversationMessage(message, 2003)];
+    const sent = await im.sendMessage(7001, '我下午两点同步。', 2003, imApi);
+
+    expect(requests).toEqual([{ messageType: 'TEXT', text: '我下午两点同步。' }]);
+    expect(sent).toMatchObject({
+      id: '7103',
+      author: '我',
+      body: '我下午两点同步。',
+      side: 'right',
+    });
+    expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7102', '7103']);
+    expect(im.messageSending).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { useShellStore } from './shell';
+import { useShellStore, type ConversationMessage, type ConversationRecord } from './shell';
 
 describe('useShellStore', () => {
   beforeEach(() => {
@@ -47,6 +47,53 @@ describe('useShellStore', () => {
     shell.setFilter('todos', '未处理');
 
     expect(shell.filteredTodos.map((item) => item.id)).toEqual(['todo-attendance']);
+  });
+
+  it('merges loaded backend conversations while preserving static fallback data', () => {
+    const shell = useShellStore();
+    const backendConversation: ConversationRecord = {
+      ...shell.conversations[0],
+      id: '7001',
+      title: '张三与李四',
+      subtitle: '下午同步一下排班。',
+      status: 'ACTIVE',
+      flow: '私聊',
+    };
+
+    shell.mergeBackendConversations([backendConversation]);
+
+    expect(shell.conversations[0]).toMatchObject({
+      id: '7001',
+      title: '张三与李四',
+      flow: '私聊',
+    });
+    expect(shell.conversations.some((item) => item.id === 'leave-approval')).toBe(true);
+    expect(shell.active.messages).toBe('7001');
+  });
+
+  it('merges loaded backend messages into the active conversation', () => {
+    const shell = useShellStore();
+    const backendConversation: ConversationRecord = {
+      ...shell.conversations[0],
+      id: '7001',
+      title: '张三与李四',
+      messages: [],
+    };
+    const backendMessages: ConversationMessage[] = [
+      {
+        id: '7101',
+        author: '用户 2003',
+        role: 'USER · TEXT',
+        body: '我上午可以处理补卡。',
+        side: 'left',
+      },
+    ];
+
+    shell.mergeBackendConversations([backendConversation]);
+    shell.mergeBackendMessages('7001', backendMessages);
+
+    expect(shell.activeConversation.messages).toEqual(backendMessages);
+    expect(shell.activeConversation.subtitle).toBe('我上午可以处理补卡。');
   });
 
   it('returns empty filtered results without changing active item', () => {

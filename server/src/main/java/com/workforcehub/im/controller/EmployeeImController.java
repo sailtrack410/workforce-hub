@@ -3,9 +3,13 @@ package com.workforcehub.im.controller;
 import com.workforcehub.common.response.R;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
+import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.service.ImService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,5 +36,11 @@ public class EmployeeImController {
     @GetMapping("/conversations/{conversationId}/messages")
     public R<List<ImMessageResponse>> messages(@PathVariable Long conversationId) {
         return R.ok(imService.listCurrentEmployeeMessages(conversationId));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages")
+    public R<ImMessageResponse> sendMessage(@PathVariable Long conversationId,
+                                            @Valid @RequestBody SendImMessageRequest request) {
+        return R.ok(imService.sendCurrentEmployeeMessage(conversationId, request));
     }
 }

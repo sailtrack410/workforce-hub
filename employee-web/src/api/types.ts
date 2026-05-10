@@ -83,6 +83,12 @@ export interface ImMessageResponse {
   sentAt?: string | null;
 }
 
+export interface SendImMessageRequest {
+  messageType?: 'TEXT';
+  text: string;
+  clientMessageId?: string;
+}
+
 export interface ImConversationSummaryResponse {
   conversationId: number;
   conversationType: string;
