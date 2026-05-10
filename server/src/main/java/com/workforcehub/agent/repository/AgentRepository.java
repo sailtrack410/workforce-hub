@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -571,6 +572,76 @@ public class AgentRepository {
         return true;
     }
 
+    public long countAdminAgentTasks(AgentTaskQueryCriteria criteria) {
+        List<Object> params = new ArrayList<>();
+        String sql = """
+            SELECT COUNT(*)
+            FROM agt_task task
+            JOIN agt_agent agent ON agent.id = task.agent_id
+            """ + adminTaskWhereSql(criteria, params);
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, params.toArray());
+        return count == null ? 0L : count;
+    }
+
+    public List<AdminAgentTaskRow> pageAdminAgentTasks(AgentTaskQueryCriteria criteria, long offset, long limit) {
+        List<Object> params = new ArrayList<>();
+        String sql = adminTaskSelectSql()
+            + adminTaskWhereSql(criteria, params)
+            + """
+            GROUP BY task.id,
+                     task.agent_id,
+                     agent.agent_code,
+                     agent.agent_name,
+                     task.agent_version_id,
+                     task.trigger_type,
+                     task.context_type,
+                     task.context_id,
+                     task.triggered_by_type,
+                     task.triggered_by_id,
+                     task.waiting_deadline_at,
+                     task.status,
+                     task.started_at,
+                     task.finished_at,
+                     task.error_message,
+                     task.created_at,
+                     task.updated_at
+            ORDER BY task.created_at DESC, task.id DESC
+            LIMIT ? OFFSET ?
+            """;
+        params.add(limit);
+        params.add(offset);
+        return jdbcTemplate.query(sql, this::mapAdminTask, params.toArray());
+    }
+
+    public AdminAgentTaskRow getAdminAgentTaskOrThrow(Long taskId) {
+        List<AdminAgentTaskRow> rows = jdbcTemplate.query(adminTaskSelectSql() + """
+            WHERE task.id = ?
+              AND agent.is_deleted = 0
+            GROUP BY task.id,
+                     task.agent_id,
+                     agent.agent_code,
+                     agent.agent_name,
+                     task.agent_version_id,
+                     task.trigger_type,
+                     task.context_type,
+                     task.context_id,
+                     task.triggered_by_type,
+                     task.triggered_by_id,
+                     task.waiting_deadline_at,
+                     task.status,
+                     task.started_at,
+                     task.finished_at,
+                     task.error_message,
+                     task.created_at,
+                     task.updated_at
+            LIMIT 1
+            """, this::mapAdminTask, taskId);
+        if (rows.isEmpty()) {
+            throw new BizException(404, "Agent任务不存在");
+        }
+        return rows.get(0);
+    }
+
     private boolean exists(String sql, Object... args) {
         Long count = jdbcTemplate.queryForObject(sql, Long.class, args);
         return count != null && count > 0;
@@ -626,6 +697,67 @@ public class AgentRepository {
                    started_at, finished_at, error_message, created_at, updated_at
             FROM agt_task
             """;
+    }
+
+    private String adminTaskSelectSql() {
+        return """
+            SELECT task.id,
+                   task.agent_id,
+                   agent.agent_code,
+                   agent.agent_name,
+                   task.agent_version_id,
+                   task.trigger_type,
+                   task.context_type,
+                   task.context_id,
+                   task.triggered_by_type,
+                   task.triggered_by_id,
+                   task.waiting_deadline_at,
+                   task.status,
+                   task.started_at,
+                   task.finished_at,
+                   task.error_message,
+                   task.created_at,
+                   task.updated_at,
+                   COUNT(log.id) AS tool_call_count
+            FROM agt_task task
+            JOIN agt_agent agent ON agent.id = task.agent_id
+            LEFT JOIN agt_tool_call_log log ON log.task_id = task.id
+            """;
+    }
+
+    private String adminTaskWhereSql(AgentTaskQueryCriteria criteria, List<Object> params) {
+        StringBuilder where = new StringBuilder("""
+            WHERE agent.is_deleted = 0
+            """);
+        if (criteria.status() != null) {
+            where.append("  AND task.status = ?\n");
+            params.add(criteria.status());
+        }
+        if (criteria.agentId() != null) {
+            where.append("  AND task.agent_id = ?\n");
+            params.add(criteria.agentId());
+        }
+        if (criteria.triggeredByType() != null) {
+            where.append("  AND task.triggered_by_type = ?\n");
+            params.add(criteria.triggeredByType());
+        }
+        if (criteria.triggeredById() != null) {
+            where.append("  AND task.triggered_by_id = ?\n");
+            params.add(criteria.triggeredById());
+        }
+        if (criteria.contextType() != null) {
+            where.append("  AND task.context_type = ?\n");
+            params.add(criteria.contextType());
+        }
+        if (criteria.createdFrom() != null) {
+            where.append("  AND task.created_at >= ?\n");
+            params.add(criteria.createdFrom());
+        }
+        if (criteria.createdTo() != null) {
+            where.append("  AND task.created_at <= ?\n");
+            params.add(criteria.createdTo());
+        }
+        return where.toString();
     }
 
     private AgentRow mapAgent(ResultSet rs, int rowNum) throws SQLException {
@@ -714,6 +846,29 @@ public class AgentRepository {
             rs.getObject("triggered_by_id", Long.class),
             rs.getTimestamp("waiting_deadline_at") == null ? null : rs.getTimestamp("waiting_deadline_at").toLocalDateTime(),
             rs.getString("status"),
+            rs.getTimestamp("started_at") == null ? null : rs.getTimestamp("started_at").toLocalDateTime(),
+            rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime(),
+            rs.getString("error_message"),
+            rs.getTimestamp("created_at").toLocalDateTime(),
+            rs.getTimestamp("updated_at").toLocalDateTime()
+        );
+    }
+
+    private AdminAgentTaskRow mapAdminTask(ResultSet rs, int rowNum) throws SQLException {
+        return new AdminAgentTaskRow(
+            rs.getLong("id"),
+            rs.getLong("agent_id"),
+            rs.getString("agent_code"),
+            rs.getString("agent_name"),
+            rs.getLong("agent_version_id"),
+            rs.getString("trigger_type"),
+            rs.getString("context_type"),
+            rs.getObject("context_id", Long.class),
+            rs.getString("triggered_by_type"),
+            rs.getObject("triggered_by_id", Long.class),
+            rs.getString("status"),
+            rs.getInt("tool_call_count"),
+            rs.getTimestamp("waiting_deadline_at") == null ? null : rs.getTimestamp("waiting_deadline_at").toLocalDateTime(),
             rs.getTimestamp("started_at") == null ? null : rs.getTimestamp("started_at").toLocalDateTime(),
             rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime(),
             rs.getString("error_message"),

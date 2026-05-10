@@ -1,5 +1,63 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 后台任务查询与详情
+
+### 背景
+
+后台已经能创建、发布、停用 Agent，也能手动触发人工确认超时扫描，但管理员仍缺少任务可观测入口。任务一旦进入 `FAILED`、`WAITING_HUMAN_CONFIRM`、`CANCELLED` 等状态，只能通过数据库排查，不利于后续接入 workflow、IM 和运行监控。
+
+### 本轮完成内容
+
+- 新增后台 Agent 任务列表接口：`GET /api/admin/agent-tasks`。
+- 新增后台 Agent 任务详情接口：`GET /api/admin/agent-tasks/{taskId}`。
+- 新增查询 DTO：`AgentTaskListQuery`。
+- 新增后台任务响应 DTO：`AdminAgentTaskResponse`。
+- 新增仓储查询行对象和条件对象：`AdminAgentTaskRow`、`AgentTaskQueryCriteria`。
+- 支持筛选条件：
+  - `status`
+  - `agentId`
+  - `triggeredByType`
+  - `triggeredById`
+  - `contextType`
+  - `createdFrom`
+  - `createdTo`
+- 列表项返回 Agent 编码、Agent 名称、任务状态、触发主体、上下文、时间字段和 `toolCallCount`。
+- 本轮不新增任务工具调用明细、审计轨迹、运行指标接口，避免任务查询节点膨胀。
+
+### 本轮修复的自审问题
+
+- 任务查询接口放在 `AdminAgentTaskController`，没有继续塞进 `AdminAgentController`。
+- `status`、`triggeredByType` 使用服务层枚举校验，不把任意字符串直接作为查询语义。
+- 查询 SQL 使用参数化参数；动态 SQL 只拼接固定条件片段。
+- `toolCallCount` 使用 `LEFT JOIN agt_tool_call_log` 聚合统计，并显式 `GROUP BY` 任务与 Agent 字段，避免 MySQL 严格模式下聚合不确定。
+- 本轮没有新增索引迁移；先复用已有 `agt_task` 索引，后续如果任务量上来再按慢查询补 `created_at`、`triggered_by` 等组合索引。
+
+### 验证记录
+
+- 红灯：`env TEST_DB_NAME=workforce_hub_agent_task_query_red mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldListAndGetAgentTasks test`
+  - 结果：失败，`GET /api/admin/agent-tasks` 未实现，返回 404。
+- 绿灯：`env TEST_DB_NAME=workforce_hub_agent_task_query_green mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldListAndGetAgentTasks test`
+  - 结果：通过，覆盖任务分页筛选和详情查询。
+- 边界测试：`env TEST_DB_NAME=workforce_hub_agent_task_query_invalid_status mvn -Dtest=ModuleAgentApiIntegrationTest#adminTaskListShouldRejectUnsupportedStatus test`
+  - 结果：通过，非法任务状态返回 `code=400`。
+- 编译验证：`mvn -DskipTests compile`
+  - 结果：通过。
+- 模块回归：`env TEST_DB_NAME=workforce_hub_agent_task_query_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，18 个 Agent 用例全部通过。
+- 跨模块回归：`env TEST_DB_NAME=workforce_hub_agent_task_query_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，59 个用例全部通过。
+- 测试执行注意：本地集成测试会在每个用例前清理 `workforce:test:session*`、`auth:login:fail:*`、`auth:email:*` 等 Redis key；模块回归和跨模块回归不要用多个 Maven 进程并行跑，否则会出现会话或登录失败计数被其他测试进程清理的假失败。
+
+### 数据库说明
+
+本轮没有新增 Flyway 迁移，继续复用 `V1__init_schema.sql` 已存在的 `agt_task`、`agt_agent`、`agt_tool_call_log` 表。
+
+### 后续待补
+
+- 增加任务工具调用明细和审计轨迹查询接口。
+- 增加任务运行指标、失败原因聚合和后台告警入口。
+- 任务量增长后再根据慢查询补充组合索引。
+
 ## 2026-05-11 Agent 后台手动触发人工确认超时扫描
 
 ### 背景
@@ -51,7 +109,7 @@
 - 接入统一定时调度，让超时扫描可周期自动执行。
 - 增加 job run 表或后台操作审计，记录每次扫描批次、耗时、命中数和异常明细。
 - 多实例部署时补分布式锁或基于数据库的抢占策略。
-- 增加后台 Agent 任务查询接口，便于管理员查看等待、超时、取消等状态。
+- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
 
 ## 2026-05-11 Agent 后台列表、详情与停用基础治理
 
@@ -96,7 +154,7 @@
 
 ### 后续待补
 
-- 增加后台 Agent 任务查询接口，便于查看等待、超时、失败、取消等任务状态。
+- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
 - 增加版本回滚、重新启用、软删除和工具/ACL 查询接口。
 - 定义停用 Agent 时已等待确认任务的处理策略：保持等待、自动取消或升级给管理员。
 - 接入 `AgentTaskTimeoutJobService` 的定时触发或后台治理入口。
@@ -150,7 +208,7 @@
 - 接入统一调度或后台治理入口，让 `AgentTaskTimeoutJobService` 可被生产环境周期触发或管理员手动触发。
 - 如进入多实例部署，需要补分布式锁或 job run 表，记录扫描批次、耗时、命中数和失败明细。
 - 后续接入 workflow/IM 后，需要定义超时取消是否同步回写业务上下文或通知触发人。
-- 增加后台 Agent 任务查询接口，便于管理员查看等待、超时、取消等状态。
+- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
 
 ## 2026-05-11 Agent 人工确认继续、拒绝与取消闭环
 
@@ -209,7 +267,7 @@
 
 ### 后续待补
 
-- 增加后台 Agent 任务查询接口。
+- 后台 Agent 任务查询已在后续节点补齐，下一步关注任务工具调用明细和审计轨迹。
 - 接入 `AgentTaskTimeoutJobService` 的定时触发或后台治理入口。
 - 接入 `WorkflowAgentPreReviewTrigger` 和 `WorkflowAgentResultCallback`，把 workflow 侧预审 SPI 接到真实 Agent 任务。
 - 接入 `ImAgentTriggerService` 和 `ImAgentResultCallback`，把会话 Agent 回复写回 IM。

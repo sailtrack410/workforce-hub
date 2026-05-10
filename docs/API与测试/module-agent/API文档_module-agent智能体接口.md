@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
 | 数据库变更 | 本轮无新增迁移，使用 `V1__init_schema.sql` 已存在的 `agt_*` 表 |
 
-当前第一批不是完整 Agent 平台，暂不包含任务列表、版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
+当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。后台任务查询已提供分页列表和详情入口；人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
 
 ---
 
@@ -262,7 +262,75 @@
 
 响应中的 `data.publishedVersionId` 应等于本次发布版本 ID，`data.status` 应为 `ACTIVE`。
 
-### 3.10 手动触发人工确认超时扫描
+### 3.10 查询 Agent 任务列表
+
+`GET /api/admin/agent-tasks?pageNo=1&pageSize=20&status=SUCCEEDED`
+
+支持查询参数：
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `pageNo` | 否 | 默认 1，最小 1 |
+| `pageSize` | 否 | 默认 20，最小 1，最大 100 |
+| `status` | 否 | `PENDING`、`RUNNING`、`SUCCEEDED`、`FAILED`、`WAITING_HUMAN_CONFIRM`、`REJECTED`、`CANCELLED` |
+| `agentId` | 否 | Agent ID |
+| `triggeredByType` | 否 | `USER`、`ADMIN`、`SYSTEM`、`WORKFLOW`、`TIMER`、`EVENT` |
+| `triggeredById` | 否 | 触发主体 ID |
+| `contextType` | 否 | 业务上下文类型 |
+| `createdFrom` | 否 | 创建时间下限，ISO 时间格式，例如 `2026-05-11T00:00:00` |
+| `createdTo` | 否 | 创建时间上限，ISO 时间格式，例如 `2026-05-11T23:59:59` |
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "taskId": 2053536255426392066,
+        "agentId": 2053536255078264833,
+        "agentCode": "TASK_QUERY_AGENT",
+        "agentName": "任务查询助手",
+        "agentVersionId": 2053536255170539521,
+        "triggerType": "MANUAL",
+        "contextType": "USER_QUERY",
+        "contextId": 2003,
+        "triggeredByType": "USER",
+        "triggeredById": 2003,
+        "status": "SUCCEEDED",
+        "toolCallCount": 0,
+        "waitingDeadlineAt": null,
+        "startedAt": "2026-05-11T02:02:50",
+        "finishedAt": "2026-05-11T02:02:50",
+        "errorMessage": null,
+        "createdAt": "2026-05-11T02:02:50",
+        "updatedAt": "2026-05-11T02:02:50"
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+处理规则：
+
+- 默认按 `agt_task.created_at DESC, agt_task.id DESC` 排序。
+- `status` 和 `triggeredByType` 会做枚举校验，不支持的值返回 `code=400`。
+- `toolCallCount` 按 `agt_tool_call_log.task_id` 聚合统计。
+- 当前第一版只返回任务基本信息和工具调用数量；工具调用明细、审计轨迹和运行指标后续单独设计，避免任务列表响应过重。
+
+### 3.11 查询 Agent 任务详情
+
+`GET /api/admin/agent-tasks/{taskId}`
+
+返回单个 `AdminAgentTaskResponse`，字段同任务列表项。不存在时返回 `code=404`、`message=Agent任务不存在`。
+
+### 3.12 手动触发人工确认超时扫描
 
 `POST /api/admin/agent-tasks/timeout-scan`
 
@@ -518,7 +586,7 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 
 ## 7. 后续扩展点
 
-- 增加后台 Agent 版本回滚、重新启用、任务查询、工具查询和 ACL 查询接口。
+- 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询、任务工具调用明细和审计轨迹接口。
 - 增加人工确认超时扫描的定时触发、批次记录、多实例并发控制和升级处理。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。

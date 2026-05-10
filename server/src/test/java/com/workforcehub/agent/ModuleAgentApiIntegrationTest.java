@@ -172,6 +172,89 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("后台应能分页筛选并查看Agent任务详情")
+    void adminShouldListAndGetAgentTasks() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedAgentWithoutTool(adminSession, "TASK_QUERY_AGENT", "任务查询助手");
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        MvcResult taskResult = mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "contextId": 2003,
+                      "inputPayloadJson": "{\\"query\\":\\"后台任务查询验证\\"}"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("SUCCEEDED"))
+            .andReturn();
+        long taskId = data(taskResult).get("taskId").asLong();
+
+        mockMvc.perform(get("/api/admin/agent-tasks")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20")
+                .param("status", "SUCCEEDED")
+                .param("agentId", String.valueOf(agentId))
+                .param("triggeredById", String.valueOf(EMPLOYEE_USER_ID))
+                .param("contextType", "USER_QUERY"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.pageNo").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(20))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list", hasSize(1)))
+            .andExpect(jsonPath("$.data.list[0].taskId").value(taskId))
+            .andExpect(jsonPath("$.data.list[0].agentId").value(agentId))
+            .andExpect(jsonPath("$.data.list[0].agentCode").value("TASK_QUERY_AGENT"))
+            .andExpect(jsonPath("$.data.list[0].agentName").value("任务查询助手"))
+            .andExpect(jsonPath("$.data.list[0].agentVersionId").isNumber())
+            .andExpect(jsonPath("$.data.list[0].triggerType").value("MANUAL"))
+            .andExpect(jsonPath("$.data.list[0].contextType").value("USER_QUERY"))
+            .andExpect(jsonPath("$.data.list[0].contextId").value(2003))
+            .andExpect(jsonPath("$.data.list[0].triggeredByType").value("USER"))
+            .andExpect(jsonPath("$.data.list[0].triggeredById").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data.list[0].status").value("SUCCEEDED"))
+            .andExpect(jsonPath("$.data.list[0].toolCallCount").value(0));
+
+        mockMvc.perform(get("/api/admin/agent-tasks/{taskId}", taskId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.taskId").value(taskId))
+            .andExpect(jsonPath("$.data.agentCode").value("TASK_QUERY_AGENT"))
+            .andExpect(jsonPath("$.data.triggeredById").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+
+        mockMvc.perform(get("/api/admin/agent-tasks")
+                .cookie(adminSession)
+                .param("status", "WAITING_HUMAN_CONFIRM"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(0))
+            .andExpect(jsonPath("$.data.list").isEmpty());
+    }
+
+    @Test
+    @DisplayName("后台查询Agent任务时不支持非法任务状态")
+    void adminTaskListShouldRejectUnsupportedStatus() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(get("/api/admin/agent-tasks")
+                .cookie(adminSession)
+                .param("status", "UNKNOWN_STATUS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("Agent任务状态不支持"));
+    }
+
+    @Test
     @DisplayName("员工不能看到或使用未授权Agent")
     void employeeShouldNotUseAgentWithoutAcl() throws Exception {
         Cookie adminSession = loginAdmin();

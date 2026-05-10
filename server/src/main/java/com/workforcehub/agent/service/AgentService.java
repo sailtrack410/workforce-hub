@@ -2,10 +2,12 @@ package com.workforcehub.agent.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.dto.AdminAgentTaskResponse;
 import com.workforcehub.agent.dto.CancelAgentTaskRequest;
 import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
 import com.workforcehub.agent.dto.AgentAclResponse;
 import com.workforcehub.agent.dto.AgentResponse;
+import com.workforcehub.agent.dto.AgentTaskListQuery;
 import com.workforcehub.agent.dto.AgentTaskResponse;
 import com.workforcehub.agent.dto.AgentToolBindingResponse;
 import com.workforcehub.agent.dto.AgentToolCallRequest;
@@ -20,6 +22,8 @@ import com.workforcehub.agent.dto.GrantAgentAclRequest;
 import com.workforcehub.agent.repository.AgentAclRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
+import com.workforcehub.agent.repository.AgentTaskQueryCriteria;
+import com.workforcehub.agent.repository.AdminAgentTaskRow;
 import com.workforcehub.agent.repository.AgentPendingToolCallRow;
 import com.workforcehub.agent.repository.AgentTaskRow;
 import com.workforcehub.agent.repository.AgentToolBindingRow;
@@ -52,6 +56,9 @@ public class AgentService {
     private static final Set<String> SUBJECT_TYPES = Set.of("USER", "DEPARTMENT", "GROUP", "ADMIN_USER");
     private static final Set<String> PERMISSIONS = Set.of("visible", "use", "manage");
     private static final Set<String> TRIGGER_TYPES = Set.of("MANUAL", "CONVERSATION", "WORKFLOW", "TIMER", "EVENT");
+    private static final Set<String> TASK_STATUSES = Set.of("PENDING", "RUNNING", "SUCCEEDED", "FAILED",
+        "WAITING_HUMAN_CONFIRM", "REJECTED", "CANCELLED");
+    private static final Set<String> TRIGGERED_BY_TYPES = Set.of("USER", "ADMIN", "SYSTEM", "WORKFLOW", "TIMER", "EVENT");
     private static final Set<String> APPROVAL_MODES = Set.of("AUTO", "REQUIRE_CONFIRM");
 
     private final AgentRepository agentRepository;
@@ -78,6 +85,25 @@ public class AgentService {
 
     public AgentResponse getAdminAgent(Long agentId) {
         return toAgentResponse(agentRepository.getAgentOrThrow(agentId));
+    }
+
+    public PageResult<AdminAgentTaskResponse> pageAdminAgentTasks(AgentTaskListQuery query) {
+        long safePageNo = Math.max(query.getPageNo(), 1L);
+        long safePageSize = Math.min(Math.max(query.getPageSize(), 1L), 100L);
+        AgentTaskQueryCriteria criteria = toTaskQueryCriteria(query);
+        long total = agentRepository.countAdminAgentTasks(criteria);
+        List<AdminAgentTaskResponse> rows = agentRepository.pageAdminAgentTasks(
+                criteria,
+                (safePageNo - 1) * safePageSize,
+                safePageSize
+            ).stream()
+            .map(this::toAdminTaskResponse)
+            .toList();
+        return PageResult.of(safePageNo, safePageSize, total, rows);
+    }
+
+    public AdminAgentTaskResponse getAdminAgentTask(Long taskId) {
+        return toAdminTaskResponse(agentRepository.getAdminAgentTaskOrThrow(taskId));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -489,6 +515,29 @@ public class AgentService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
+    private AgentTaskQueryCriteria toTaskQueryCriteria(AgentTaskListQuery query) {
+        return new AgentTaskQueryCriteria(
+            normalizeOptionalIn(query.getStatus(), TASK_STATUSES, "Agent任务状态不支持"),
+            query.getAgentId(),
+            normalizeOptionalIn(query.getTriggeredByType(), TRIGGERED_BY_TYPES, "触发主体类型不支持"),
+            query.getTriggeredById(),
+            trimToNull(query.getContextType()),
+            query.getCreatedFrom(),
+            query.getCreatedTo()
+        );
+    }
+
+    private String normalizeOptionalIn(String value, Set<String> allowed, String message) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(normalized)) {
+            throw new BizException(400, message);
+        }
+        return normalized;
+    }
+
     private String safeSummary(String value) {
         if (!StringUtils.hasText(value)) {
             return null;
@@ -579,6 +628,29 @@ public class AgentService {
         response.setContextId(row.contextId());
         response.setStatus(row.status());
         response.setToolCallCount(agentRepository.countToolCalls(row.id()));
+        response.setWaitingDeadlineAt(row.waitingDeadlineAt());
+        response.setStartedAt(row.startedAt());
+        response.setFinishedAt(row.finishedAt());
+        response.setErrorMessage(row.errorMessage());
+        response.setCreatedAt(row.createdAt());
+        response.setUpdatedAt(row.updatedAt());
+        return response;
+    }
+
+    private AdminAgentTaskResponse toAdminTaskResponse(AdminAgentTaskRow row) {
+        AdminAgentTaskResponse response = new AdminAgentTaskResponse();
+        response.setTaskId(row.id());
+        response.setAgentId(row.agentId());
+        response.setAgentCode(row.agentCode());
+        response.setAgentName(row.agentName());
+        response.setAgentVersionId(row.agentVersionId());
+        response.setTriggerType(row.triggerType());
+        response.setContextType(row.contextType());
+        response.setContextId(row.contextId());
+        response.setTriggeredByType(row.triggeredByType());
+        response.setTriggeredById(row.triggeredById());
+        response.setStatus(row.status());
+        response.setToolCallCount(row.toolCallCount());
         response.setWaitingDeadlineAt(row.waitingDeadlineAt());
         response.setStartedAt(row.startedAt());
         response.setFinishedAt(row.finishedAt());
