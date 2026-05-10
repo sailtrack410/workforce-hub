@@ -88,6 +88,41 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工应能按 beforeSeq 和 size 分页读取更早消息")
+    void employeeShouldListMessagesByBeforeSeqAndSize() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversationWithFourMessages();
+
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", 7001L)
+                .queryParam("beforeSeq", "4")
+                .queryParam("size", "2")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(2)))
+            .andExpect(jsonPath("$.data[0].seqNo").value(2))
+            .andExpect(jsonPath("$.data[0].contentText").value("第二条消息。"))
+            .andExpect(jsonPath("$.data[1].seqNo").value(3))
+            .andExpect(jsonPath("$.data[1].contentText").value("第三条消息。"));
+    }
+
+    @Test
+    @DisplayName("员工读取消息分页 size 应限制在服务端上限内")
+    void employeeMessagePageSizeShouldBeCappedByServerLimit() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversationWithFourMessages();
+
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", 7001L)
+                .queryParam("size", "200")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(4)))
+            .andExpect(jsonPath("$.data[0].seqNo").value(1))
+            .andExpect(jsonPath("$.data[3].seqNo").value(4));
+    }
+
+    @Test
     @DisplayName("员工不能读取未加入会话的消息")
     void employeeShouldNotReadMessagesOfUnjoinedConversation() throws Exception {
         Cookie employeeSession = loginEmployee("zhangsan.employee");
@@ -396,6 +431,33 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                 (7101, 7001, 1, 'USER', ?, 'TEXT', JSON_OBJECT('text', '我上午可以处理补卡。'), 'NORMAL', '2026-05-09 10:00:00'),
                 (7102, 7001, 2, 'USER', ?, 'TEXT', JSON_OBJECT('text', '下午同步一下排班。'), 'NORMAL', '2026-05-09 10:10:00')
             """, EMPLOYEE_USER_ID, MANAGER_USER_ID);
+    }
+
+    private void seedPrivateConversationWithFourMessages() {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation
+                (id, conversation_type, conversation_key, title, last_message_seq,
+                 last_message_id, last_message_at, status, created_by, updated_by, is_deleted)
+            VALUES
+                (7001, 'PRIVATE', 'PRIVATE:2002:2003', '张三与李四', 4,
+                 7104, '2026-05-09 10:15:00', 'ACTIVE', 2003, 2003, 0)
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation_member
+                (id, conversation_id, member_type, member_id, member_role, last_read_seq, status)
+            VALUES
+                (7201, 7001, 'USER', ?, 'MEMBER', 1, 'ACTIVE'),
+                (7202, 7001, 'USER', ?, 'MEMBER', 4, 'ACTIVE')
+            """, EMPLOYEE_USER_ID, MANAGER_USER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO im_message
+                (id, conversation_id, seq_no, sender_type, sender_id, message_type, content_json, status, sent_at)
+            VALUES
+                (7101, 7001, 1, 'USER', ?, 'TEXT', JSON_OBJECT('text', '第一条消息。'), 'NORMAL', '2026-05-09 10:00:00'),
+                (7102, 7001, 2, 'USER', ?, 'TEXT', JSON_OBJECT('text', '第二条消息。'), 'NORMAL', '2026-05-09 10:05:00'),
+                (7103, 7001, 3, 'USER', ?, 'TEXT', JSON_OBJECT('text', '第三条消息。'), 'NORMAL', '2026-05-09 10:10:00'),
+                (7104, 7001, 4, 'USER', ?, 'TEXT', JSON_OBJECT('text', '第四条消息。'), 'NORMAL', '2026-05-09 10:15:00')
+            """, EMPLOYEE_USER_ID, MANAGER_USER_ID, EMPLOYEE_USER_ID, MANAGER_USER_ID);
     }
 
     private void seedOtherConversation() {

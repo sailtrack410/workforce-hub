@@ -140,25 +140,60 @@ public class ImRepository {
         return count != null && count > 0;
     }
 
-    public List<ImMessageRow> listMessages(Long conversationId) {
+    public List<ImMessageRow> listMessages(Long conversationId, Long beforeSeq, int size) {
+        if (beforeSeq == null) {
+            return jdbcTemplate.query("""
+                SELECT *
+                FROM (
+                    SELECT id AS message_id,
+                           conversation_id,
+                           seq_no,
+                           sender_type,
+                           sender_id,
+                           message_type,
+                           CAST(content_json AS CHAR) AS content_json,
+                           quoted_message_id,
+                           status,
+                           sent_at
+                    FROM im_message
+                    WHERE conversation_id = ?
+                      AND status <> 'DELETED'
+                    ORDER BY seq_no DESC
+                    LIMIT ?
+                ) latest_page
+                ORDER BY seq_no ASC
+                """,
+                MESSAGE_ROW_MAPPER,
+                conversationId,
+                size
+            );
+        }
         return jdbcTemplate.query("""
-            SELECT id AS message_id,
-                   conversation_id,
-                   seq_no,
-                   sender_type,
-                   sender_id,
-                   message_type,
-                   CAST(content_json AS CHAR) AS content_json,
-                   quoted_message_id,
-                   status,
-                   sent_at
-            FROM im_message
-            WHERE conversation_id = ?
-              AND status <> 'DELETED'
+            SELECT *
+            FROM (
+                SELECT id AS message_id,
+                       conversation_id,
+                       seq_no,
+                       sender_type,
+                       sender_id,
+                       message_type,
+                       CAST(content_json AS CHAR) AS content_json,
+                       quoted_message_id,
+                       status,
+                       sent_at
+                FROM im_message
+                WHERE conversation_id = ?
+                  AND seq_no < ?
+                  AND status <> 'DELETED'
+                ORDER BY seq_no DESC
+                LIMIT ?
+            ) previous_page
             ORDER BY seq_no ASC
             """,
             MESSAGE_ROW_MAPPER,
-            conversationId
+            conversationId,
+            beforeSeq,
+            size
         );
     }
 

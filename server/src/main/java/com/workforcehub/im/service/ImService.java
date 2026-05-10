@@ -28,6 +28,9 @@ import java.util.Map;
 @Service
 public class ImService {
 
+    private static final int DEFAULT_MESSAGE_PAGE_SIZE = 50;
+    private static final int MAX_MESSAGE_PAGE_SIZE = 100;
+
     private final ImRepository imRepository;
     private final ObjectMapper objectMapper;
 
@@ -44,7 +47,7 @@ public class ImService {
             .toList();
     }
 
-    public List<ImMessageResponse> listCurrentEmployeeMessages(Long conversationId) {
+    public List<ImMessageResponse> listCurrentEmployeeMessages(Long conversationId, Long beforeSeq, Integer size) {
         Long userId = CurrentUserHolder.requireUserId();
         if (!imRepository.existsActiveUserMembership(conversationId, userId)) {
             if (imRepository.existsConversation(conversationId)) {
@@ -52,7 +55,7 @@ public class ImService {
             }
             throw new BizException(404, "会话不存在");
         }
-        return imRepository.listMessages(conversationId)
+        return imRepository.listMessages(conversationId, beforeSeq, normalizeMessagePageSize(size))
             .stream()
             .map(this::toMessageResponse)
             .toList();
@@ -210,6 +213,16 @@ public class ImService {
         response.setStatus(row.status());
         response.setSentAt(row.sentAt());
         return response;
+    }
+
+    private int normalizeMessagePageSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_MESSAGE_PAGE_SIZE;
+        }
+        if (size <= 0) {
+            throw new BizException(400, "分页大小必须大于0");
+        }
+        return Math.min(size, MAX_MESSAGE_PAGE_SIZE);
     }
 
     private void ensureCanAccessConversation(Long conversationId, Long userId) {

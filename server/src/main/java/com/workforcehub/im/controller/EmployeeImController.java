@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -43,8 +44,10 @@ public class EmployeeImController {
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
-    public R<List<ImMessageResponse>> messages(@PathVariable Long conversationId) {
-        return R.ok(imService.listCurrentEmployeeMessages(conversationId));
+    public R<List<ImMessageResponse>> messages(@PathVariable Long conversationId,
+                                                @RequestParam(required = false) Long beforeSeq,
+                                                @RequestParam(required = false) Integer size) {
+        return R.ok(imService.listCurrentEmployeeMessages(conversationId, beforeSeq, size));
     }
 
     @PostMapping("/conversations/{conversationId}/messages")
