@@ -177,6 +177,19 @@ public class ImRepository {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
+    public Optional<Long> findActiveConversationLastMessageSeq(Long conversationId) {
+        return jdbcTemplate.query("""
+            SELECT last_message_seq
+            FROM im_conversation
+            WHERE id = ?
+              AND status = 'ACTIVE'
+              AND is_deleted = 0
+            """,
+            (rs, rowNum) -> rs.getLong("last_message_seq"),
+            conversationId
+        ).stream().findFirst();
+    }
+
     public void insertMessage(Long messageId,
                               Long conversationId,
                               Long seqNo,

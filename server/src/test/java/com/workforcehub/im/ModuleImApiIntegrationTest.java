@@ -269,6 +269,110 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         ));
     }
 
+    @Test
+    @DisplayName("员工应能更新自己参与会话的已读位点并刷新未读数")
+    void employeeShouldUpdateReadPositionOfJoinedConversation() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/read-position", 7001L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "lastReadSeq": 2
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationId").value(7001))
+            .andExpect(jsonPath("$.data.lastReadSeq").value(2))
+            .andExpect(jsonPath("$.data.unreadCount").value(0));
+
+        assertEquals(2L, jdbcTemplate.queryForObject(
+            "SELECT last_read_seq FROM im_conversation_member WHERE conversation_id = 7001 AND member_id = ?",
+            Long.class,
+            EMPLOYEE_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("员工更新已读位点不能倒退")
+    void employeeReadPositionShouldNotMoveBackward() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/read-position", 7001L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "lastReadSeq": 0
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.lastReadSeq").value(1))
+            .andExpect(jsonPath("$.data.unreadCount").value(1));
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT last_read_seq FROM im_conversation_member WHERE conversation_id = 7001 AND member_id = ?",
+            Long.class,
+            EMPLOYEE_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("员工更新已读位点不能超过会话最新消息序号")
+    void employeeReadPositionShouldBeCappedByLastMessageSeq() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/read-position", 7001L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "lastReadSeq": 999
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.lastReadSeq").value(2))
+            .andExpect(jsonPath("$.data.unreadCount").value(0));
+
+        assertEquals(2L, jdbcTemplate.queryForObject(
+            "SELECT last_read_seq FROM im_conversation_member WHERE conversation_id = 7001 AND member_id = ?",
+            Long.class,
+            EMPLOYEE_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("员工不能更新未加入会话的已读位点")
+    void employeeShouldNotUpdateReadPositionOfUnjoinedConversation() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedOtherConversation();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/read-position", 7002L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "lastReadSeq": 1
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权访问该会话"));
+
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT last_read_seq FROM im_conversation_member WHERE conversation_id = 7002 AND member_id = ?",
+            Long.class,
+            OTHER_EMPLOYEE_USER_ID
+        ));
+    }
+
     private void seedPrivateConversation() {
         jdbcTemplate.update("""
             INSERT INTO im_conversation

@@ -5,6 +5,7 @@ import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
+import com.workforcehub.im.dto.UpdateReadPositionRequest;
 import com.workforcehub.im.service.ImService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,5 +51,11 @@ public class EmployeeImController {
     public R<ImMessageResponse> sendMessage(@PathVariable Long conversationId,
                                             @Valid @RequestBody SendImMessageRequest request) {
         return R.ok(imService.sendCurrentEmployeeMessage(conversationId, request));
+    }
+
+    @PostMapping("/conversations/{conversationId}/read-position")
+    public R<ImConversationSummaryResponse> updateReadPosition(@PathVariable Long conversationId,
+                                                               @Valid @RequestBody UpdateReadPositionRequest request) {
+        return R.ok(imService.updateCurrentEmployeeReadPosition(conversationId, request));
     }
 }

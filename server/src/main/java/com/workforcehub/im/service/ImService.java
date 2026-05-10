@@ -9,6 +9,7 @@ import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
+import com.workforcehub.im.dto.UpdateReadPositionRequest;
 import com.workforcehub.im.repository.ImConversationSummaryRow;
 import com.workforcehub.im.repository.ImMessageRow;
 import com.workforcehub.im.repository.ImRepository;
@@ -122,6 +123,20 @@ public class ImService {
             "NORMAL",
             sentAt
         ));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImConversationSummaryResponse updateCurrentEmployeeReadPosition(Long conversationId,
+                                                                           UpdateReadPositionRequest request) {
+        Long userId = CurrentUserHolder.requireUserId();
+        ensureCanAccessConversation(conversationId, userId);
+        Long lastMessageSeq = imRepository.findActiveConversationLastMessageSeq(conversationId)
+            .orElseThrow(() -> new BizException(404, "会话不存在"));
+        Long safeReadSeq = Math.min(request.getLastReadSeq(), lastMessageSeq);
+        imRepository.updateMemberLastReadSeq(conversationId, userId, safeReadSeq);
+        return imRepository.findConversationSummaryForUser(conversationId, userId)
+            .map(this::toConversationSummaryResponse)
+            .orElseThrow(() -> new BizException(500, "已读位点更新失败"));
     }
 
     private ImConversationSummaryResponse toConversationSummaryResponse(ImConversationSummaryRow row) {
