@@ -192,6 +192,7 @@
 | `WF-FILE-DL-004` | P0 | `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets` | 非参与人不能创建审批附件下载票据 | 王五不是申请人也不是审批参与人 | 申请下载 | HTTP `200`；`code=403`；提示 `无权查看该审批申请` |
 | `WF-FILE-DL-005` | P0 | `POST /api/employee/workflow/requests/{requestId}/attachments/{attachmentRefId}/download-tickets` | 非本申请附件不能创建下载票据 | 张三登录；传入未绑定到该申请的附件引用 | 申请下载 | HTTP `200`；`code=404`；提示 `审批附件不存在` |
 | `WF-FILE-DL-006` | P1 | `GET /api/employee/workflow/attachments/download/{ticketNo}` | 票据创建后扫描失败不能下载 | 李四已创建审批附件下载票据；文件对象最新 `scan_status=FAILED` | 下载票据编号 | HTTP `200`；`code=409`；提示 `附件安全扫描未通过`；票据仍为 `ACTIVE` |
+| `WF-FILE-DL-007` | P0 | `POST /api/employee/files/{attachmentRefId}/download-tickets` | 审批附件不能走普通个人文件下载入口 | 张三提交带附件请假；拿到克隆后的 `WF_REQUEST` 附件引用 | 使用普通文件接口申请下载票据 | HTTP `200`；`code=403`；提示 `员工端文件接口仅允许下载个人文件` |
 
 ## 5.2 后台流程模板治理
 
@@ -243,6 +244,7 @@ mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#employeeShouldListOwnWorkflowRe
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#leaveRequestShouldBindOwnedAttachmentRefs test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#leaveRequestShouldRejectInvalidAttachmentRefs test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#participantShouldDownloadWorkflowAttachmentWithTicket test
+mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#workflowAttachmentShouldNotUseEmployeePersonalFileDownloadEndpoint test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#workflowAttachmentDownloadShouldRecheckLatestScanStatus test
 mvn -Dtest=ModuleWorkflowFlowableIntegrationTest#approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult test

@@ -148,7 +148,9 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
   - `WORKFLOW_ATTACHMENT_DOWNLOAD_TICKET_CREATED`
   - `WORKFLOW_ATTACHMENT_DOWNLOAD_EXECUTED`
 - `ModuleWorkflowFlowableIntegrationTest` 新增审批附件下载正向用例，覆盖创建票据、下载原文件、票据变为 `USED`、审计写入。
+- `ModuleWorkflowFlowableIntegrationTest` 新增普通个人文件下载入口隔离用例，覆盖 `WF_REQUEST` 附件不能绕过 workflow 授权入口开票。
 - `ModuleWorkflowFlowableIntegrationTest` 新增授权负例，覆盖非参与人和非本申请附件不能创建下载票据。
+- `FileDownloadService` 员工端普通下载入口补充 `owner_type=PERSONAL_FILE` 边界校验，避免申请人用个人文件下载接口下载审批归档附件。
 - API 文档和测试用例同步补齐审批附件下载接口、错误码、票据状态和验证命令。
 
 ### 红绿记录
@@ -158,7 +160,9 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - 回归补充：新增 `nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment`，覆盖王五作为非参与人返回 `code=403`，以及未绑定到该申请的附件返回 `code=404`；该用例通过。
 - 红灯：新增 `workflowAttachmentDownloadShouldRecheckLatestScanStatus` 后，票据创建后把文件对象扫描状态改为 `FAILED`，下载仍返回文件流，暴露下载执行没有二次读取最新扫描状态。
 - 绿灯：下载对象行补充 `scan_status`，`WorkflowService.downloadAttachment` 执行前再次校验扫描状态；该用例通过，且安全拦截时票据保持 `ACTIVE`。
-- 回归：`mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test` 通过，11 个 workflow 用例全部通过。
+- 红灯：新增 `workflowAttachmentShouldNotUseEmployeePersonalFileDownloadEndpoint` 后，申请人可用 `/api/employee/files/{attachmentRefId}/download-tickets` 为 `WF_REQUEST` 附件创建普通下载票据，暴露普通个人文件入口缺少 ownerType 边界。
+- 绿灯：`FileDownloadService` 员工端创建票据和下载执行均校验 `owner_type=PERSONAL_FILE`，该用例通过。
+- 回归：`mvn -Dtest=ModuleWorkflowFlowableIntegrationTest test` 通过，15 个 workflow 用例全部通过。
 
 ### 当前完成范围
 
@@ -170,6 +174,7 @@ Flowable 请假直属上级审批闭环已经跑通，但 `module-workflow` 仍�
 - 下载执行时再次校验文件对象最新安全扫描状态，扫描失败不会返回原文件。
 - 非参与人不能创建审批附件下载票据。
 - 非本申请附件不能创建审批附件下载票据。
+- 审批附件不能通过员工端普通个人文件下载入口绕过 workflow 授权开票。
 - 下载票据创建和下载执行均写入审计。
 
 ### 暂未覆盖

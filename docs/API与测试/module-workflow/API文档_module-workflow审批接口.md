@@ -673,6 +673,7 @@ Cookie: SESSION=...
 - 当前登录员工必须是该审批申请参与人。
 - `attachmentRefId` 必须满足 `wf_request_attachment.request_id = requestId`。
 - 附件引用必须满足 `sys_attachment_ref.owner_type = WF_REQUEST` 且 `owner_id = requestId`。
+- `WF_REQUEST` 审批附件不能使用 `/api/employee/files/{attachmentRefId}/download-tickets` 普通个人文件入口创建票据，必须走 workflow 授权入口。
 - 附件引用、物理文件对象不能被删除。
 - 安全扫描失败的附件不能创建下载票据。
 - 写入 `sys_download_ticket`，`requester_type=USER`、`requester_id=当前登录员工`、`status=ACTIVE`。

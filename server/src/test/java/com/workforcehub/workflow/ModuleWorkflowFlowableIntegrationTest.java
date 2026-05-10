@@ -496,6 +496,34 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     }
 
     @Test
+    @DisplayName("审批附件不能绕过workflow授权入口走普通个人文件下载")
+    void workflowAttachmentShouldNotUseEmployeePersonalFileDownloadEndpoint() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        long sourceAttachmentRefId = seedPersonalAttachmentRef(
+            EMPLOYEE_USER_ID,
+            "请假证明.pdf",
+            0,
+            false,
+            "workflow-attachment-personal-endpoint-content"
+        );
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, List.of(sourceAttachmentRefId));
+        long workflowAttachmentRefId = workflowAttachmentRefId(scenario.requestId(), sourceAttachmentRefId);
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/download-tickets", workflowAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "尝试绕过审批附件授权入口"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("员工端文件接口仅允许下载个人文件"));
+    }
+
+    @Test
     @DisplayName("非参与人或非本申请附件不能申请审批附件下载票据")
     void nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment() throws Exception {
         Cookie employeeSession = loginEmployee();

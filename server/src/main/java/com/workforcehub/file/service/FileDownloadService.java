@@ -48,6 +48,7 @@ public class FileDownloadService {
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
         }
+        ensureEmployeePersonalFileAttachment(attachment);
         if (attachment.deletedAt() != null || attachment.isDeleted() != 0) {
             throw new BizException(409, "文件已删除");
         }
@@ -106,6 +107,7 @@ public class FileDownloadService {
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
         }
+        ensureEmployeePersonalFileAttachment(attachment);
         if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
             throw new BizException(409, "文件已删除");
         }
@@ -194,6 +196,18 @@ public class FileDownloadService {
     private void ensureAdminFileAttachment(AttachmentRow attachment) {
         if (!"ADMIN_FILE".equals(attachment.ownerType()) || !"ADMIN".equals(attachment.uploaderType())) {
             throw new BizException(403, "后台接口仅允许治理后台文件");
+        }
+    }
+
+    private void ensureEmployeePersonalFileAttachment(AttachmentRow attachment) {
+        if (!"PERSONAL_FILE".equals(attachment.ownerType())) {
+            throw new BizException(403, "员工端文件接口仅允许下载个人文件");
+        }
+    }
+
+    private void ensureEmployeePersonalFileAttachment(DownloadAttachmentRow attachment) {
+        if (!"PERSONAL_FILE".equals(attachment.ownerType())) {
+            throw new BizException(403, "员工端文件接口仅允许下载个人文件");
         }
     }
 
