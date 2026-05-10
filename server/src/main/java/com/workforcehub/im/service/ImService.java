@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.im.dto.CreateGroupConversationRequest;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
@@ -19,8 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * module-im 员工端会话读取服务。
@@ -84,6 +87,33 @@ public class ImService {
         return imRepository.findConversationSummaryForUser(conversationId, currentUserId)
             .map(this::toConversationSummaryResponse)
             .orElseThrow(() -> new BizException(500, "私聊会话创建失败"));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImConversationSummaryResponse createCurrentEmployeeGroupConversation(CreateGroupConversationRequest request) {
+        Long ownerUserId = CurrentUserHolder.requireUserId();
+        imRepository.findActiveOrgUser(ownerUserId)
+            .orElseThrow(() -> new BizException(403, "当前员工不可创建群聊"));
+
+        String title = request.getTitle().trim();
+        Set<Long> normalizedMemberIds = normalizeGroupMemberIds(ownerUserId, request.getMemberUserIds());
+        if (normalizedMemberIds.isEmpty()) {
+            throw new BizException(400, "群聊至少需要选择1名其他成员");
+        }
+        if (imRepository.countActiveOrgUsers(normalizedMemberIds) != normalizedMemberIds.size()) {
+            throw new BizException(404, "目标成员不存在或不可加入群聊");
+        }
+
+        Long conversationId = IdWorker.getId();
+        imRepository.insertGroupConversation(conversationId, title, ownerUserId);
+        imRepository.insertGroupProfile(IdWorker.getId(), conversationId, "CUSTOM", ownerUserId, ownerUserId);
+        imRepository.insertUserMember(IdWorker.getId(), conversationId, ownerUserId, "OWNER", "CREATE");
+        for (Long memberUserId : normalizedMemberIds) {
+            imRepository.insertUserMember(IdWorker.getId(), conversationId, memberUserId, "MEMBER", "CREATE");
+        }
+        return imRepository.findConversationSummaryForUser(conversationId, ownerUserId)
+            .map(this::toConversationSummaryResponse)
+            .orElseThrow(() -> new BizException(500, "群聊创建失败"));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -176,6 +206,17 @@ public class ImService {
         imRepository.insertUserMember(IdWorker.getId(), conversationId, currentUser.userId(), "MEMBER", "DIRECT_RELATION");
         imRepository.insertUserMember(IdWorker.getId(), conversationId, targetUser.userId(), "MEMBER", "DIRECT_RELATION");
         return conversationId;
+    }
+
+    private Set<Long> normalizeGroupMemberIds(Long ownerUserId, List<Long> memberUserIds) {
+        Set<Long> normalized = new LinkedHashSet<>();
+        for (Long memberUserId : memberUserIds) {
+            if (memberUserId == null || ownerUserId.equals(memberUserId)) {
+                continue;
+            }
+            normalized.add(memberUserId);
+        }
+        return normalized;
     }
 
     private boolean hasDirectManagerRelation(ImUserRelationRow currentUser, ImUserRelationRow targetUser) {

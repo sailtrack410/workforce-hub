@@ -1,6 +1,7 @@
 package com.workforcehub.im.controller;
 
 import com.workforcehub.common.response.R;
+import com.workforcehub.im.dto.CreateGroupConversationRequest;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
@@ -41,6 +42,13 @@ public class EmployeeImController {
         @Valid @RequestBody StartPrivateConversationRequest request
     ) {
         return R.ok(imService.startCurrentEmployeePrivateConversation(request));
+    }
+
+    @PostMapping("/group-conversations")
+    public R<ImConversationSummaryResponse> createGroupConversation(
+        @Valid @RequestBody CreateGroupConversationRequest request
+    ) {
+        return R.ok(imService.createCurrentEmployeeGroupConversation(request));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")

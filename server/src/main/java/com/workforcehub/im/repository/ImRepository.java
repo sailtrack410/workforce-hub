@@ -10,6 +10,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * module-im 第一版 JDBC 仓储。
@@ -113,6 +114,23 @@ public class ImRepository {
             (rs, rowNum) -> rs.getLong("id"),
             conversationKey
         ).stream().findFirst();
+    }
+
+    public long countActiveOrgUsers(Set<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return 0;
+        }
+        String placeholders = String.join(",", userIds.stream().map(ignored -> "?").toList());
+        Object[] args = userIds.toArray();
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM org_user
+            WHERE id IN (%s)
+              AND status = 'ACTIVE'
+              AND employment_status IN ('PROBATION', 'ACTIVE', 'PENDING_OFFBOARD')
+              AND is_deleted = 0
+            """.formatted(placeholders), Long.class, args);
+        return count == null ? 0 : count;
     }
 
     public boolean existsActiveUserMembership(Long conversationId, Long userId) {
@@ -264,6 +282,41 @@ public class ImRepository {
             conversationId,
             conversationKey,
             title,
+            operatorId,
+            operatorId
+        );
+    }
+
+    public void insertGroupConversation(Long conversationId, String title, Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation
+                (id, conversation_type, title, last_message_seq,
+                 status, created_by, updated_by, is_deleted)
+            VALUES
+                (?, 'GROUP', ?, 0, 'ACTIVE', ?, ?, 0)
+            """,
+            conversationId,
+            title,
+            operatorId,
+            operatorId
+        );
+    }
+
+    public void insertGroupProfile(Long groupProfileId,
+                                   Long conversationId,
+                                   String groupType,
+                                   Long ownerUserId,
+                                   Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO im_group_profile
+                (id, conversation_id, group_type, owner_user_id, status, created_by, updated_by)
+            VALUES
+                (?, ?, ?, ?, 'ACTIVE', ?, ?)
+            """,
+            groupProfileId,
+            conversationId,
+            groupType,
+            ownerUserId,
             operatorId,
             operatorId
         );
