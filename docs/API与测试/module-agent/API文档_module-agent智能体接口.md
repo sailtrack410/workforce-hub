@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
 | 数据库变更 | 本轮无新增迁移，使用 `V1__init_schema.sql` 已存在的 `agt_*` 表 |
 
-当前第一批不是完整 Agent 平台，暂不包含任务列表、版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。人工确认超时扫描已落为服务能力，但还没有挂 `@Scheduled` 或后台手动触发接口。
+当前第一批不是完整 Agent 平台，暂不包含任务列表、版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
 
 ---
 
@@ -262,6 +262,46 @@
 
 响应中的 `data.publishedVersionId` 应等于本次发布版本 ID，`data.status` 应为 `ACTIVE`。
 
+### 3.10 手动触发人工确认超时扫描
+
+`POST /api/admin/agent-tasks/timeout-scan`
+
+请求：
+
+```json
+{
+  "batchSize": 10
+}
+```
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "cancelledCount": 1
+  },
+  "requestId": "..."
+}
+```
+
+字段约束：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `batchSize` | 否 | 默认 100，最小 1，最大 500；显式传 `null` 时按默认 100 处理 |
+
+处理规则：
+
+- 扫描 `agt_task.status=WAITING_HUMAN_CONFIRM` 且 `waiting_deadline_at <= now` 的任务。
+- 按 `waiting_deadline_at ASC, id ASC` 批量处理。
+- 命中任务进入 `CANCELLED`，错误摘要为 `人工确认超时，任务已取消`。
+- 待确认工具日志更新为 `approval_status=TIMEOUT`、`result_status=CANCELLED`。
+- 每个实际取消成功的任务写入 `TASK_TIMEOUT_CANCELLED` 审计。
+- 取消时再次校验任务状态和截止时间，避免并发扫描重复写审计。
+
 ---
 
 ## 4. 员工端接口
@@ -418,7 +458,7 @@
 
 ### 4.5 人工确认超时扫描服务
 
-当前没有对外 HTTP API。后端内部服务为：
+后台 HTTP 入口为 `POST /api/admin/agent-tasks/timeout-scan`，后端内部服务为：
 
 ```java
 AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
@@ -437,7 +477,7 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 | 审计动作 | `TASK_TIMEOUT_CANCELLED` |
 | 并发边界 | 取消时再次校验任务状态和截止时间，只有实际更新成功才写审计 |
 
-后续可把该服务挂到统一调度器、后台手动扫描接口或生产化 job run 记录中。
+后续可把该服务挂到统一调度器或生产化 job run 记录中。
 
 ---
 
@@ -471,14 +511,15 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 | 他人确认或取消任务 | 200 | 403 | 只有任务触发员工可操作 |
 | 非等待人工确认状态操作 | 200 | 409 | 只有 `WAITING_HUMAN_CONFIRM` 可确认或取消 |
 | 无可继续执行待确认工具 | 200 | 409 | 绑定失效或待确认日志缺失时拒绝误成功 |
-| 人工确认超时扫描 | 内部服务 | - | 超过 `waiting_deadline_at` 的等待任务转为 `CANCELLED` |
+| 人工确认超时扫描 | 200 | 0 | 超过 `waiting_deadline_at` 的等待任务转为 `CANCELLED` |
+| 超时扫描批次不合法 | 200 | 400 | `batchSize` 小于 1 或大于 500 |
 
 ---
 
 ## 7. 后续扩展点
 
 - 增加后台 Agent 版本回滚、重新启用、任务查询、工具查询和 ACL 查询接口。
-- 增加人工确认超时扫描的定时触发、后台手动触发和升级处理。
+- 增加人工确认超时扫描的定时触发、批次记录、多实例并发控制和升级处理。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。
 - 接入任务异步执行、重试、超时扫描、运行指标和告警。

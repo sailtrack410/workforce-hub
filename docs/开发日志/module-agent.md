@@ -1,5 +1,58 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 后台手动触发人工确认超时扫描
+
+### 背景
+
+上一批已经把 `AgentTaskTimeoutJobService#cancelExpiredWaitingTasks` 做成服务能力，但生产使用时不能只靠代码内部调用。管理员需要在定时调度未接入前，能通过后台 API 手动收口已经超过 `waiting_deadline_at` 的等待人工确认任务。
+
+### 本轮完成内容
+
+- 新增后台 Agent 任务治理接口：`POST /api/admin/agent-tasks/timeout-scan`。
+- 新增请求 DTO：`AgentTaskTimeoutScanRequest`。
+- 新增响应 DTO：`AgentTaskTimeoutScanResponse`。
+- 接口调用已有 `AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(batchSize)`，返回 `cancelledCount`。
+- `batchSize` 规则：
+  - 默认 100。
+  - 最小 1。
+  - 最大 500。
+  - 显式传 `null` 时按默认 100 处理，避免空指针 500。
+- 本轮不引入 `@Scheduled`、分布式锁或 job run 表，先补后台可操作入口。
+
+### 本轮修复的自审问题
+
+- 最初测试路径写成 `/api/admin/agents/tasks/timeout-scan`，与员工端任务资源 `/api/employee/agent-tasks` 不一致。已校准为 `/api/admin/agent-tasks/timeout-scan`。
+- 自审发现 `batchSize:null` 会在 Controller 拆箱时触发 `NullPointerException`，导致接口返回 500。已把默认值兜底收进 `AgentTaskTimeoutScanRequest#safeBatchSize()`。
+- 后台任务治理接口独立为 `AdminAgentTaskController`，避免继续把任务治理能力塞进 `AdminAgentController`。
+
+### 验证记录
+
+- 红灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_admin_red2 mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#adminShouldTriggerTimeoutScanManually test`
+  - 结果：失败，`POST /api/admin/agent-tasks/timeout-scan` 未实现，返回 404。
+- 绿灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_admin_green mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#adminShouldTriggerTimeoutScanManually test`
+  - 结果：通过，后台手动触发后过期等待任务进入 `CANCELLED`。
+- 边界红灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_admin_null_red mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#adminTimeoutScanShouldUseDefaultBatchSizeWhenBatchSizeIsNull test`
+  - 结果：失败，`batchSize:null` 触发空指针并返回 500。
+- 边界绿灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_admin_null_green mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#adminTimeoutScanShouldUseDefaultBatchSizeWhenBatchSizeIsNull test`
+  - 结果：通过，显式传空批次时使用默认批次并取消过期任务。
+- 模块回归：`env TEST_DB_NAME=workforce_hub_agent_timeout_admin_full2 mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，16 个 Agent 用例全部通过。
+- 编译验证：`mvn -DskipTests compile`
+  - 结果：通过。
+- 跨模块回归：`env TEST_DB_NAME=workforce_hub_agent_timeout_admin_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，57 个用例全部通过。
+
+### 数据库说明
+
+本轮没有新增 Flyway 迁移，继续复用 `V1__init_schema.sql` 已存在的 `agt_task.waiting_deadline_at`、`agt_tool_call_log`、`agt_audit_log` 等字段和表。
+
+### 后续待补
+
+- 接入统一定时调度，让超时扫描可周期自动执行。
+- 增加 job run 表或后台操作审计，记录每次扫描批次、耗时、命中数和异常明细。
+- 多实例部署时补分布式锁或基于数据库的抢占策略。
+- 增加后台 Agent 任务查询接口，便于管理员查看等待、超时、取消等状态。
+
 ## 2026-05-11 Agent 后台列表、详情与停用基础治理
 
 ### 背景

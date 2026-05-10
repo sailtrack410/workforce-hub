@@ -87,6 +87,64 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
         assertEquals(0L, auditCount(taskId, "TASK_TIMEOUT_CANCELLED"));
     }
 
+    @Test
+    @DisplayName("后台应能手动触发等待人工确认任务超时扫描")
+    void adminShouldTriggerTimeoutScanManually() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(adminSession, employeeSession);
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET waiting_deadline_at = ?
+            WHERE id = ?
+            """, LocalDateTime.now().minusMinutes(1), taskId);
+
+        mockMvc.perform(post("/api/admin/agent-tasks/timeout-scan")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "batchSize": 10
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.cancelledCount").value(1));
+
+        assertEquals("CANCELLED", taskStatus(taskId));
+        assertEquals("人工确认超时，任务已取消", taskErrorMessage(taskId));
+        assertEquals("TIMEOUT", toolCallApprovalStatus(taskId));
+        assertEquals("CANCELLED", toolCallResultStatus(taskId));
+        assertEquals(1L, auditCount(taskId, "TASK_TIMEOUT_CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("后台手动触发超时扫描显式传空批次时应使用默认批次")
+    void adminTimeoutScanShouldUseDefaultBatchSizeWhenBatchSizeIsNull() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(adminSession, employeeSession);
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET waiting_deadline_at = ?
+            WHERE id = ?
+            """, LocalDateTime.now().minusMinutes(1), taskId);
+
+        mockMvc.perform(post("/api/admin/agent-tasks/timeout-scan")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "batchSize": null
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.cancelledCount").value(1));
+
+        assertEquals("CANCELLED", taskStatus(taskId));
+    }
+
     private long createWaitingTask(Cookie adminSession, Cookie employeeSession) throws Exception {
         long toolId = createTool(adminSession);
         long agentId = createAgent(adminSession);
