@@ -184,6 +184,23 @@ public class LeaveRepository {
         );
     }
 
+    public void updateAccountBalances(Long accountId, int availableMinutes, int frozenMinutes, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE lv_account
+            SET available_minutes = ?,
+                frozen_minutes = ?,
+                version = version + 1,
+                updated_by = ?
+            WHERE id = ?
+              AND status = 'ACTIVE'
+            """,
+            availableMinutes,
+            frozenMinutes,
+            operatorId,
+            accountId
+        );
+    }
+
     public void insertAccountTxn(Long txnId,
                                  Long accountId,
                                  String txnType,

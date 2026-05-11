@@ -152,6 +152,13 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         );
         workflowRepository.insertLeaveDetail(leaveDetailId, requestId, request);
         bindAttachments(requestId, applicantUserId, request.getAttachmentRefIds());
+        leaveService.freezeForWorkflowSubmission(
+            applicantUserId,
+            request.getLeaveTypeId(),
+            request.getDurationMinutes(),
+            requestId,
+            applicantUserId
+        );
 
         Long agentTaskId = triggerAgentPreReview(requestId, leaveDetailId, applicantUserId);
         if (agentTaskId != null) {
@@ -238,8 +245,14 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void onPreReviewRejected(Long requestId, Long agentTaskId, String decisionJson) {
+        terminateAgentPreReview(requestId, agentTaskId, decisionJson);
+    }
+
+
+    private void terminateAgentPreReview(Long requestId, Long agentTaskId, String decisionJson) {
         WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdForUpdateOrThrow(requestId);
         ensurePendingAgentPreReview(workflowRequest, agentTaskId);
+        releaseFrozenLeaveIfNeeded(workflowRequest, STATUS_REJECTED, agentTaskId);
         workflowRepository.insertAgentPreReviewAction(
             requestId,
             agentTaskId,
@@ -393,6 +406,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         if (!STATUS_IN_APPROVAL.equals(workflowRequest.status())) {
             throw new BizException(400, "当前申请状态不允许撤回");
         }
+        releaseFrozenLeaveIfNeeded(workflowRequest, "WITHDRAWN", applicantUserId);
 
         workflowRepository.insertTaskAction(
             workflowRequest.id(),
@@ -534,7 +548,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                     throw new BizException(404, "请假申请明细不存在");
                 }
                 approvedLeaveDetail = leaveDetail;
-                leaveService.deductForWorkflowApproval(
+                leaveService.consumeFrozenForWorkflowApproval(
                     workflowRequest.applicantUserId(),
                     leaveDetail.leaveTypeId(),
                     leaveDetail.durationMinutes(),
@@ -549,6 +563,8 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                 }
                 approvedClockCorrectionDetail = clockCorrectionDetail;
             }
+        } else if ("REJECT".equals(actionType) && LEAVE_BIZ_TYPE.equals(workflowRequest.bizType())) {
+            releaseFrozenLeaveIfNeeded(workflowRequest, afterStatus, approverUserId);
         }
         workflowRepository.insertTaskAction(
             workflowRequest.id(),
@@ -576,6 +592,24 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             );
         }
         return statusResponse(workflowRequest.id(), afterStatus);
+    }
+
+    private void releaseFrozenLeaveIfNeeded(WorkflowRequestRow workflowRequest, String terminalStatus, Long operatorId) {
+        if (!LEAVE_BIZ_TYPE.equals(workflowRequest.bizType())) {
+            return;
+        }
+        WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(workflowRequest.id());
+        if (leaveDetail == null) {
+            throw new BizException(404, "请假申请明细不存在");
+        }
+        leaveService.releaseFrozenForWorkflowTerminal(
+            workflowRequest.applicantUserId(),
+            leaveDetail.leaveTypeId(),
+            leaveDetail.durationMinutes(),
+            workflowRequest.id(),
+            terminalStatus,
+            operatorId
+        );
     }
 
     private void recalculateAttendanceForApprovedLeave(Long userId, WorkflowLeaveDetailRow leaveDetail) {

@@ -91,15 +91,46 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
         seedLeaveAccount(leaveTypeId, 960);
 
         LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        assertEquals(480, availableMinutes(leaveTypeId));
+        assertEquals(480, frozenMinutes(leaveTypeId));
+        assertEquals(1L, leaveWorkflowTxnCount(leaveTypeId, "FREEZE"));
+
         approveManagerTask(managerSession, scenario.managerTask().getId());
 
         assertNull(runtimeService.createProcessInstanceQuery()
             .processInstanceId(scenario.processInstanceId())
             .singleResult(), "审批通过后 Flowable 流程实例应结束");
         assertEquals(480, availableMinutes(leaveTypeId));
+        assertEquals(0, frozenMinutes(leaveTypeId));
         assertEquals(1L, leaveDeductTxnCount(leaveTypeId));
         assertEquals(-480, leaveDeductChangeMinutes(scenario.requestId()));
         assertEquals(480, leaveDeductBalanceAfter(scenario.requestId()));
+    }
+
+    @Test
+    @DisplayName("请假提交后应冻结余额并阻止超额重复提交")
+    void submittedLeaveRequestShouldFreezeBalanceBeforeApproval() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 720);
+
+        submitLeaveRequest(employeeSession, leaveTypeId);
+
+        assertEquals(240, availableMinutes(leaveTypeId));
+        assertEquals(480, frozenMinutes(leaveTypeId));
+        assertEquals(1L, leaveWorkflowTxnCount(leaveTypeId, "FREEZE"));
+
+        mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(leaveTypeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("假期余额不足"));
+
+        assertEquals(1L, workflowRequestCount());
+        assertEquals(240, availableMinutes(leaveTypeId));
+        assertEquals(480, frozenMinutes(leaveTypeId));
     }
 
     @Test
@@ -129,6 +160,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             .processInstanceId(scenario.processInstanceId())
             .singleResult(), "扣减幂等冲突时 Flowable 流程应保持待审批");
         assertEquals(900, availableMinutes(leaveTypeId));
+        assertEquals(480, frozenMinutes(leaveTypeId));
         assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
         assertEquals("IN_APPROVAL", workflowRequestStatus(scenario.requestId()));
     }
@@ -287,6 +319,8 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
         seedLeaveAccount(leaveTypeId, 960);
 
         LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        assertEquals(480, availableMinutes(leaveTypeId));
+        assertEquals(480, frozenMinutes(leaveTypeId));
 
         mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/reject", scenario.managerTask().getId())
                 .cookie(managerSession)
@@ -301,7 +335,38 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             .andExpect(jsonPath("$.data.status").value("REJECTED"));
 
         assertEquals(960, availableMinutes(leaveTypeId));
+        assertEquals(0, frozenMinutes(leaveTypeId));
         assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
+        assertEquals(1L, leaveWorkflowTxnCount(leaveTypeId, "UNFREEZE"));
+    }
+
+    @Test
+    @DisplayName("请假申请撤回后应释放已冻结余额")
+    void withdrawnLeaveRequestShouldReleaseFrozenBalance() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        assertEquals(480, availableMinutes(leaveTypeId));
+        assertEquals(480, frozenMinutes(leaveTypeId));
+
+        mockMvc.perform(post("/api/employee/workflow/requests/{requestId}/withdraw", scenario.requestId())
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "计划有变，取消请假"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("WITHDRAWN"));
+
+        assertEquals(960, availableMinutes(leaveTypeId));
+        assertEquals(0, frozenMinutes(leaveTypeId));
+        assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
+        assertEquals(1L, leaveWorkflowTxnCount(leaveTypeId, "UNFREEZE"));
     }
 
     private LeaveApprovalScenario submitLeaveRequest(Cookie employeeSession, long leaveTypeId) throws Exception {
@@ -570,16 +635,29 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
         return minutes == null ? 0 : minutes;
     }
 
+    private int frozenMinutes(long leaveTypeId) {
+        Integer minutes = jdbcTemplate.queryForObject("""
+            SELECT frozen_minutes
+            FROM lv_account
+            WHERE user_id = ? AND leave_type_id = ?
+            """, Integer.class, EMPLOYEE_USER_ID, leaveTypeId);
+        return minutes == null ? 0 : minutes;
+    }
+
     private long leaveDeductTxnCount(long leaveTypeId) {
+        return leaveWorkflowTxnCount(leaveTypeId, "DEDUCT");
+    }
+
+    private long leaveWorkflowTxnCount(long leaveTypeId, String txnType) {
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
             FROM lv_account_txn lat
             JOIN lv_account la ON la.id = lat.account_id
             WHERE la.user_id = ?
               AND la.leave_type_id = ?
-              AND lat.txn_type = 'DEDUCT'
+              AND lat.txn_type = ?
               AND lat.source_type = 'WORKFLOW_REQUEST'
-            """, Long.class, EMPLOYEE_USER_ID, leaveTypeId);
+            """, Long.class, EMPLOYEE_USER_ID, leaveTypeId, txnType);
         return count == null ? 0L : count;
     }
 
@@ -589,6 +667,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             FROM lv_account_txn
             WHERE source_type = 'WORKFLOW_REQUEST'
               AND source_id = ?
+              AND txn_type = 'DEDUCT'
             """, Integer.class, requestId);
         return minutes == null ? 0 : minutes;
     }
@@ -599,6 +678,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             FROM lv_account_txn
             WHERE source_type = 'WORKFLOW_REQUEST'
               AND source_id = ?
+              AND txn_type = 'DEDUCT'
             """, Integer.class, requestId);
         return minutes == null ? 0 : minutes;
     }

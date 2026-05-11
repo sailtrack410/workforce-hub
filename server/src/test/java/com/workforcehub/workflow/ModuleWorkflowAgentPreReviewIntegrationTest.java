@@ -165,6 +165,8 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
         assertNull(processInstanceId(requestId), "Agent 预审驳回不应启动 Flowable 流程实例");
         assertEquals(0L, pendingTodoCount(requestId, MANAGER_USER_ID));
         assertEquals(1L, actionCount(requestId, "AGENT_PRE_REVIEW", "REJECTED"));
+        assertEquals(9600, availableMinutes(leaveTypeId));
+        assertEquals(0, frozenMinutes(leaveTypeId));
 
         mockMvc.perform(get("/api/employee/workflow/requests/{requestId}/actions", requestId)
                 .cookie(employeeSession))
@@ -456,5 +458,23 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
               AND after_status = ?
             """, Long.class, requestId, actionType, afterStatus);
         return count == null ? 0L : count;
+    }
+
+    private int availableMinutes(long leaveTypeId) {
+        Integer minutes = jdbcTemplate.queryForObject("""
+            SELECT available_minutes
+            FROM lv_account
+            WHERE user_id = ? AND leave_type_id = ?
+            """, Integer.class, EMPLOYEE_USER_ID, leaveTypeId);
+        return minutes == null ? 0 : minutes;
+    }
+
+    private int frozenMinutes(long leaveTypeId) {
+        Integer minutes = jdbcTemplate.queryForObject("""
+            SELECT frozen_minutes
+            FROM lv_account
+            WHERE user_id = ? AND leave_type_id = ?
+            """, Integer.class, EMPLOYEE_USER_ID, leaveTypeId);
+        return minutes == null ? 0 : minutes;
     }
 }

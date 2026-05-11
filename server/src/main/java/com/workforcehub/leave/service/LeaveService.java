@@ -34,6 +34,8 @@ public class LeaveService implements LeaveQueryService {
     private static final String STATUS_INACTIVE = "INACTIVE";
     private static final String TXN_TYPE_ADJUST = "ADJUST";
     private static final String TXN_TYPE_DEDUCT = "DEDUCT";
+    private static final String TXN_TYPE_FREEZE = "FREEZE";
+    private static final String TXN_TYPE_UNFREEZE = "UNFREEZE";
     private static final String SOURCE_TYPE_ADMIN = "ADMIN";
     private static final String SOURCE_TYPE_WORKFLOW_REQUEST = "WORKFLOW_REQUEST";
 
@@ -126,19 +128,64 @@ public class LeaveService implements LeaveQueryService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void deductForWorkflowApproval(Long userId,
-                                          Long leaveTypeId,
-                                          int durationMinutes,
-                                          Long requestId,
-                                          Long operatorId) {
+    public void freezeForWorkflowSubmission(Long userId,
+                                            Long leaveTypeId,
+                                            int durationMinutes,
+                                            Long requestId,
+                                            Long operatorId) {
         LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
         if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
             return;
         }
-        if (durationMinutes <= 0) {
-            throw new BizException(400, "请假时长必须大于0");
+        ensurePositiveDuration(durationMinutes);
+        String sourceTxnKey = workflowFreezeSourceTxnKey(requestId);
+        LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
+        if (existingTxn != null) {
+            LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
+            ensureWorkflowFreezeIdempotencyFingerprint(
+                existingTxn,
+                existingAccount,
+                userId,
+                leaveTypeId,
+                durationMinutes,
+                requestId
+            );
+            return;
         }
-        String sourceTxnKey = SOURCE_TYPE_WORKFLOW_REQUEST + ":" + requestId;
+
+        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
+        if (account == null || account.availableMinutes() < durationMinutes) {
+            throw new BizException(400, "假期余额不足");
+        }
+
+        int availableAfter = account.availableMinutes() - durationMinutes;
+        int frozenAfter = account.frozenMinutes() + durationMinutes;
+        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId);
+        leaveRepository.insertAccountTxn(
+            IdWorker.getId(),
+            account.accountId(),
+            TXN_TYPE_FREEZE,
+            -durationMinutes,
+            availableAfter,
+            SOURCE_TYPE_WORKFLOW_REQUEST,
+            requestId,
+            sourceTxnKey,
+            LocalDateTime.now()
+        );
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void consumeFrozenForWorkflowApproval(Long userId,
+                                                 Long leaveTypeId,
+                                                 int durationMinutes,
+                                                 Long requestId,
+                                                 Long operatorId) {
+        LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
+        if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
+            return;
+        }
+        ensurePositiveDuration(durationMinutes);
+        String sourceTxnKey = workflowDeductSourceTxnKey(requestId);
         LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
         if (existingTxn != null) {
             LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
@@ -153,18 +200,84 @@ public class LeaveService implements LeaveQueryService {
             return;
         }
         LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
-        if (account == null || account.availableMinutes() < durationMinutes) {
+        if (account == null) {
             throw new BizException(400, "假期余额不足");
         }
 
-        int balanceAfter = account.availableMinutes() - durationMinutes;
-        leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId);
+        LeaveAccountTxnRow freezeTxn = leaveRepository.getTxnBySourceTxnKey(workflowFreezeSourceTxnKey(requestId));
+        int balanceAfter;
+        if (account.frozenMinutes() >= durationMinutes) {
+            balanceAfter = account.availableMinutes();
+            leaveRepository.updateAccountBalances(
+                account.accountId(),
+                account.availableMinutes(),
+                account.frozenMinutes() - durationMinutes,
+                operatorId
+            );
+        } else if (freezeTxn == null && account.availableMinutes() >= durationMinutes) {
+            balanceAfter = account.availableMinutes() - durationMinutes;
+            leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId);
+        } else {
+            throw new BizException(400, "冻结假期余额不足");
+        }
         leaveRepository.insertAccountTxn(
             IdWorker.getId(),
             account.accountId(),
             TXN_TYPE_DEDUCT,
             -durationMinutes,
             balanceAfter,
+            SOURCE_TYPE_WORKFLOW_REQUEST,
+            requestId,
+            sourceTxnKey,
+            LocalDateTime.now()
+        );
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void releaseFrozenForWorkflowTerminal(Long userId,
+                                                 Long leaveTypeId,
+                                                 int durationMinutes,
+                                                 Long requestId,
+                                                 String terminalStatus,
+                                                 Long operatorId) {
+        LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
+        if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
+            return;
+        }
+        ensurePositiveDuration(durationMinutes);
+        LeaveAccountTxnRow freezeTxn = leaveRepository.getTxnBySourceTxnKey(workflowFreezeSourceTxnKey(requestId));
+        if (freezeTxn == null) {
+            return;
+        }
+        String sourceTxnKey = workflowUnfreezeSourceTxnKey(requestId, terminalStatus);
+        LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
+        if (existingTxn != null) {
+            LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
+            ensureWorkflowUnfreezeIdempotencyFingerprint(
+                existingTxn,
+                existingAccount,
+                userId,
+                leaveTypeId,
+                durationMinutes,
+                requestId
+            );
+            return;
+        }
+
+        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
+        if (account == null || account.frozenMinutes() < durationMinutes) {
+            throw new BizException(400, "冻结假期余额不足");
+        }
+
+        int availableAfter = account.availableMinutes() + durationMinutes;
+        int frozenAfter = account.frozenMinutes() - durationMinutes;
+        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId);
+        leaveRepository.insertAccountTxn(
+            IdWorker.getId(),
+            account.accountId(),
+            TXN_TYPE_UNFREEZE,
+            durationMinutes,
+            availableAfter,
             SOURCE_TYPE_WORKFLOW_REQUEST,
             requestId,
             sourceTxnKey,
@@ -271,6 +384,59 @@ public class LeaveService implements LeaveQueryService {
         if (!sameFingerprint) {
             throw new BizException(409, "幂等键已被不同假期扣减操作使用");
         }
+    }
+
+    private void ensureWorkflowFreezeIdempotencyFingerprint(LeaveAccountTxnRow existingTxn,
+                                                            LeaveAccountRow existingAccount,
+                                                            Long userId,
+                                                            Long leaveTypeId,
+                                                            int durationMinutes,
+                                                            Long requestId) {
+        boolean sameFingerprint = TXN_TYPE_FREEZE.equals(existingTxn.txnType())
+            && SOURCE_TYPE_WORKFLOW_REQUEST.equals(existingTxn.sourceType())
+            && requestId.equals(existingTxn.sourceId())
+            && existingTxn.changeMinutes().equals(-durationMinutes)
+            && existingAccount.userId().equals(userId)
+            && existingAccount.leaveTypeId().equals(leaveTypeId);
+        if (!sameFingerprint) {
+            throw new BizException(409, "幂等键已被不同假期冻结操作使用");
+        }
+    }
+
+    private void ensureWorkflowUnfreezeIdempotencyFingerprint(LeaveAccountTxnRow existingTxn,
+                                                              LeaveAccountRow existingAccount,
+                                                              Long userId,
+                                                              Long leaveTypeId,
+                                                              int durationMinutes,
+                                                              Long requestId) {
+        boolean sameFingerprint = TXN_TYPE_UNFREEZE.equals(existingTxn.txnType())
+            && SOURCE_TYPE_WORKFLOW_REQUEST.equals(existingTxn.sourceType())
+            && requestId.equals(existingTxn.sourceId())
+            && existingTxn.changeMinutes().equals(durationMinutes)
+            && existingAccount.userId().equals(userId)
+            && existingAccount.leaveTypeId().equals(leaveTypeId);
+        if (!sameFingerprint) {
+            throw new BizException(409, "幂等键已被不同假期解冻操作使用");
+        }
+    }
+
+    private void ensurePositiveDuration(int durationMinutes) {
+        if (durationMinutes <= 0) {
+            throw new BizException(400, "请假时长必须大于0");
+        }
+    }
+
+    private String workflowDeductSourceTxnKey(Long requestId) {
+        return SOURCE_TYPE_WORKFLOW_REQUEST + ":" + requestId;
+    }
+
+    private String workflowFreezeSourceTxnKey(Long requestId) {
+        return SOURCE_TYPE_WORKFLOW_REQUEST + ":" + requestId + ":FREEZE";
+    }
+
+    private String workflowUnfreezeSourceTxnKey(Long requestId, String terminalStatus) {
+        String status = StringUtils.hasText(terminalStatus) ? terminalStatus.trim().toUpperCase(Locale.ROOT) : "TERMINAL";
+        return SOURCE_TYPE_WORKFLOW_REQUEST + ":" + requestId + ":UNFREEZE:" + status;
     }
 
     private String trimToNull(String value) {
