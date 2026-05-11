@@ -29,6 +29,7 @@ import com.workforcehub.agent.repository.AgentAclRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.agent.repository.AgentTaskQueryCriteria;
+import com.workforcehub.agent.repository.AgentTaskTimeoutRepository;
 import com.workforcehub.agent.repository.AgentTaskTimeoutRunQueryCriteria;
 import com.workforcehub.agent.repository.AdminAgentTaskAuditRow;
 import com.workforcehub.agent.repository.AdminAgentTaskFailureSummaryRow;
@@ -76,13 +77,16 @@ public class AgentService {
     private static final Set<String> TIMEOUT_RUN_STATUSES = Set.of("RUNNING", "SUCCESS", "SKIPPED", "FAILED");
 
     private final AgentRepository agentRepository;
+    private final AgentTaskTimeoutRepository timeoutRepository;
     private final ObjectMapper objectMapper;
     private final AgentToolExecutionService toolExecutionService;
 
     public AgentService(AgentRepository agentRepository,
+                        AgentTaskTimeoutRepository timeoutRepository,
                         ObjectMapper objectMapper,
                         AgentToolExecutionService toolExecutionService) {
         this.agentRepository = agentRepository;
+        this.timeoutRepository = timeoutRepository;
         this.objectMapper = objectMapper;
         this.toolExecutionService = toolExecutionService;
     }
@@ -134,8 +138,8 @@ public class AgentService {
         long safePageNo = Math.max(query.getPageNo(), 1L);
         long safePageSize = Math.min(Math.max(query.getPageSize(), 1L), 100L);
         AgentTaskTimeoutRunQueryCriteria criteria = toTimeoutRunQueryCriteria(query);
-        long total = agentRepository.countAdminAgentTaskTimeoutRuns(criteria);
-        List<AdminAgentTaskTimeoutRunResponse> rows = agentRepository.pageAdminAgentTaskTimeoutRuns(
+        long total = timeoutRepository.countAdminAgentTaskTimeoutRuns(criteria);
+        List<AdminAgentTaskTimeoutRunResponse> rows = timeoutRepository.pageAdminAgentTaskTimeoutRuns(
                 criteria,
                 (safePageNo - 1) * safePageSize,
                 safePageSize

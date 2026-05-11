@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AgentTaskTimeoutScanResponse;
 import com.workforcehub.agent.repository.AgentExpiredTaskRow;
 import com.workforcehub.agent.repository.AgentRepository;
+import com.workforcehub.agent.repository.AgentTaskTimeoutRepository;
 import com.workforcehub.common.exception.BizException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,17 +35,20 @@ public class AgentTaskTimeoutJobService {
     private static final Set<String> TRIGGER_TYPES = Set.of("SERVICE", "MANUAL", "SCHEDULED");
 
     private final AgentRepository agentRepository;
+    private final AgentTaskTimeoutRepository timeoutRepository;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final int scheduledBatchSize;
     private final boolean scheduledEnabled;
 
     public AgentTaskTimeoutJobService(AgentRepository agentRepository,
+                                      AgentTaskTimeoutRepository timeoutRepository,
                                       ObjectMapper objectMapper,
                                       TransactionTemplate transactionTemplate,
                                       @Value("${workforce.agent.timeout-scan.batch-size:100}") int scheduledBatchSize,
                                       @Value("${workforce.agent.timeout-scan.enabled:true}") boolean scheduledEnabled) {
         this.agentRepository = agentRepository;
+        this.timeoutRepository = timeoutRepository;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
         this.scheduledBatchSize = scheduledBatchSize;
@@ -107,10 +111,10 @@ public class AgentTaskTimeoutJobService {
                                                LocalDateTime startedAt) {
         LocalDateTime lockUntil = startedAt.plusMinutes(5);
         Boolean acquired = transactionTemplate.execute(status -> {
-            agentRepository.createTaskTimeoutJobRun(jobRunId, triggerType, safeBatchSize, ownerId, startedAt);
+            timeoutRepository.createTaskTimeoutJobRun(jobRunId, triggerType, safeBatchSize, ownerId, startedAt);
 
-            if (!agentRepository.tryAcquireJobLock(LOCK_NAME, ownerId, startedAt, lockUntil)) {
-                agentRepository.finishTaskTimeoutJobRun(jobRunId, "SKIPPED", 0L, 0L, 1L, "已有实例正在执行Agent超时扫描");
+            if (!timeoutRepository.tryAcquireJobLock(LOCK_NAME, ownerId, startedAt, lockUntil)) {
+                timeoutRepository.finishTaskTimeoutJobRun(jobRunId, "SKIPPED", 0L, 0L, 1L, "已有实例正在执行Agent超时扫描");
                 return false;
             }
             return true;
@@ -125,14 +129,14 @@ public class AgentTaskTimeoutJobService {
                               long skippedCount,
                               String errorMessage) {
         transactionTemplate.executeWithoutResult(statusHolder ->
-            agentRepository.finishTaskTimeoutJobRun(jobRunId, status, scannedCount, cancelledCount, skippedCount, errorMessage)
+            timeoutRepository.finishTaskTimeoutJobRun(jobRunId, status, scannedCount, cancelledCount, skippedCount, errorMessage)
         );
     }
 
     private void releaseLockQuietly(String ownerId) {
         try {
             transactionTemplate.executeWithoutResult(status ->
-                agentRepository.releaseJobLock(LOCK_NAME, ownerId, LocalDateTime.now())
+                timeoutRepository.releaseJobLock(LOCK_NAME, ownerId, LocalDateTime.now())
             );
         } catch (RuntimeException e) {
             log.warn("Agent人工确认超时扫描锁释放失败，ownerId={}", ownerId, e);
@@ -144,12 +148,12 @@ public class AgentTaskTimeoutJobService {
             "status", "CANCELLED",
             "reason", TIMEOUT_SUMMARY
         ));
-        List<AgentExpiredTaskRow> expiredTasks = agentRepository.listExpiredWaitingTasks(now, safeBatchSize);
+        List<AgentExpiredTaskRow> expiredTasks = timeoutRepository.listExpiredWaitingTasks(now, safeBatchSize);
         ScanStats stats = new ScanStats();
         stats.scannedCount = expiredTasks.size();
         long cancelledCount = 0L;
         for (AgentExpiredTaskRow expiredTask : expiredTasks) {
-            if (agentRepository.cancelExpiredWaitingTask(expiredTask.taskId(), now, timeoutPayload)) {
+            if (timeoutRepository.cancelExpiredWaitingTask(expiredTask.taskId(), now, timeoutPayload)) {
                 agentRepository.insertAuditLog(
                     IdWorker.getId(),
                     expiredTask.taskId(),
