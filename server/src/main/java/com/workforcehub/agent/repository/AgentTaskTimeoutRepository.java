@@ -24,14 +24,18 @@ public class AgentTaskTimeoutRepository {
 
     public List<AgentExpiredTaskRow> listExpiredWaitingTasks(LocalDateTime now, int limit) {
         return jdbcTemplate.query("""
-            SELECT id
+            SELECT id, context_type, context_id
             FROM agt_task
             WHERE status = 'WAITING_HUMAN_CONFIRM'
               AND waiting_deadline_at IS NOT NULL
               AND waiting_deadline_at <= ?
             ORDER BY waiting_deadline_at ASC, id ASC
             LIMIT ?
-            """, (rs, rowNum) -> new AgentExpiredTaskRow(rs.getLong("id")), now, limit);
+            """, (rs, rowNum) -> new AgentExpiredTaskRow(
+                rs.getLong("id"),
+                rs.getString("context_type"),
+                rs.getObject("context_id", Long.class)
+            ), now, limit);
     }
 
     public boolean cancelExpiredWaitingTask(Long taskId, LocalDateTime now, String responsePayloadJson) {

@@ -248,6 +248,11 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         terminateAgentPreReview(requestId, agentTaskId, decisionJson);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void onPreReviewTimeout(Long requestId, Long agentTaskId, String decisionJson) {
+        terminateAgentPreReview(requestId, agentTaskId, decisionJson);
+    }
 
     private void terminateAgentPreReview(Long requestId, Long agentTaskId, String decisionJson) {
         WorkflowRequestRow workflowRequest = workflowRepository.getRequestByIdForUpdateOrThrow(requestId);

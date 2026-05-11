@@ -7,8 +7,10 @@ import com.workforcehub.agent.repository.AgentExpiredTaskRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentTaskTimeoutRepository;
 import com.workforcehub.common.exception.BizException;
+import com.workforcehub.spi.WorkflowAgentResultCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -32,10 +34,12 @@ public class AgentTaskTimeoutJobService {
     private static final int MAX_BATCH_SIZE = 500;
     private static final String LOCK_NAME = "AGENT_TASK_TIMEOUT_SCAN";
     private static final String TIMEOUT_SUMMARY = "人工确认超时，任务已取消";
+    private static final String WF_REQUEST_CONTEXT_TYPE = "WF_REQUEST";
     private static final Set<String> TRIGGER_TYPES = Set.of("SERVICE", "MANUAL", "SCHEDULED");
 
     private final AgentRepository agentRepository;
     private final AgentTaskTimeoutRepository timeoutRepository;
+    private final ObjectProvider<WorkflowAgentResultCallback> workflowAgentResultCallbackProvider;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final int scheduledBatchSize;
@@ -43,12 +47,14 @@ public class AgentTaskTimeoutJobService {
 
     public AgentTaskTimeoutJobService(AgentRepository agentRepository,
                                       AgentTaskTimeoutRepository timeoutRepository,
+                                      ObjectProvider<WorkflowAgentResultCallback> workflowAgentResultCallbackProvider,
                                       ObjectMapper objectMapper,
                                       TransactionTemplate transactionTemplate,
                                       @Value("${workforce.agent.timeout-scan.batch-size:100}") int scheduledBatchSize,
                                       @Value("${workforce.agent.timeout-scan.enabled:true}") boolean scheduledEnabled) {
         this.agentRepository = agentRepository;
         this.timeoutRepository = timeoutRepository;
+        this.workflowAgentResultCallbackProvider = workflowAgentResultCallbackProvider;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
         this.scheduledBatchSize = scheduledBatchSize;
@@ -145,6 +151,7 @@ public class AgentTaskTimeoutJobService {
 
     private ScanStats cancelExpiredWaitingTasksInTransaction(int safeBatchSize, LocalDateTime now) {
         String timeoutPayload = writeJson(Map.of(
+            "decision", "TIMEOUT",
             "status", "CANCELLED",
             "reason", TIMEOUT_SUMMARY
         ));
@@ -163,11 +170,22 @@ public class AgentTaskTimeoutJobService {
                     TIMEOUT_SUMMARY,
                     true
                 );
+                notifyWorkflowPreReviewTimeout(expiredTask, timeoutPayload);
                 cancelledCount++;
             }
         }
         stats.cancelledCount = cancelledCount;
         return stats;
+    }
+
+    private void notifyWorkflowPreReviewTimeout(AgentExpiredTaskRow expiredTask, String timeoutPayload) {
+        if (!WF_REQUEST_CONTEXT_TYPE.equals(expiredTask.contextType()) || expiredTask.contextId() == null) {
+            return;
+        }
+        WorkflowAgentResultCallback callback = workflowAgentResultCallbackProvider.getIfAvailable();
+        if (callback != null) {
+            callback.onPreReviewTimeout(expiredTask.contextId(), expiredTask.taskId(), timeoutPayload);
+        }
     }
 
     private int normalizeBatchSize(int batchSize) {

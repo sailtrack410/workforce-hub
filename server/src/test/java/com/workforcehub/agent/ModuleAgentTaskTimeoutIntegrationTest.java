@@ -3,6 +3,7 @@ package com.workforcehub.agent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.scheduler.AgentTaskTimeoutJobService;
+import com.workforcehub.spi.WorkflowAgentResultCallback;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("api")
+@Import(ModuleAgentTaskTimeoutIntegrationTest.TestWorkflowAgentCallbackConfiguration.class)
 class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
@@ -51,6 +57,9 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
 
     @Autowired
     private AgentTaskTimeoutJobService timeoutJobService;
+
+    @Autowired
+    private RecordingWorkflowAgentResultCallback workflowCallback;
 
     @Test
     @DisplayName("等待人工确认任务超过截止时间后应自动取消并写入审计")
@@ -73,6 +82,32 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
         assertEquals("CANCELLED", toolCallResultStatus(taskId));
         assertTrue(toolResponsePayload(taskId).contains("人工确认超时"));
         assertEquals(1L, auditCount(taskId, "TASK_TIMEOUT_CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("关联审批申请的Agent超时任务取消后应回调workflow收口预审")
+    void workflowPreReviewWaitingTaskShouldNotifyWorkflowWhenTimeoutCancelled() throws Exception {
+        workflowCallback.reset();
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(adminSession, employeeSession);
+        long requestId = 990001L;
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET context_type = 'WF_REQUEST',
+                context_id = ?,
+                waiting_deadline_at = ?
+            WHERE id = ?
+            """, requestId, LocalDateTime.now().minusMinutes(1), taskId);
+
+        long cancelledCount = timeoutJobService.cancelExpiredWaitingTasks(10);
+
+        assertEquals(1L, cancelledCount);
+        assertEquals("CANCELLED", taskStatus(taskId));
+        assertEquals(requestId, workflowCallback.requestId);
+        assertEquals(taskId, workflowCallback.agentTaskId);
+        assertTrue(workflowCallback.decisionJson.contains("\"decision\":\"TIMEOUT\""));
+        assertTrue(workflowCallback.decisionJson.contains("人工确认超时"));
     }
 
     @Test
@@ -527,5 +562,50 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
             WHERE job_run_id = ?
             """, Long.class, jobRunId);
         return count == null ? 0L : count;
+    }
+
+    @TestConfiguration
+    static class TestWorkflowAgentCallbackConfiguration {
+
+        @Bean
+        @Primary
+        RecordingWorkflowAgentResultCallback recordingWorkflowAgentResultCallback() {
+            return new RecordingWorkflowAgentResultCallback();
+        }
+    }
+
+    static class RecordingWorkflowAgentResultCallback implements WorkflowAgentResultCallback {
+
+        private Long requestId;
+        private Long agentTaskId;
+        private String decisionJson;
+
+        @Override
+        public void onPreReviewApproved(Long requestId, Long agentTaskId, String decisionJson) {
+            throw new UnsupportedOperationException("本测试只验证超时回调");
+        }
+
+        @Override
+        public void onPreReviewRejected(Long requestId, Long agentTaskId, String decisionJson) {
+            throw new UnsupportedOperationException("本测试只验证超时回调");
+        }
+
+        @Override
+        public void onPreReviewTimeout(Long requestId, Long agentTaskId, String decisionJson) {
+            this.requestId = requestId;
+            this.agentTaskId = agentTaskId;
+            this.decisionJson = decisionJson;
+        }
+
+        @Override
+        public void onPreReviewToHuman(Long requestId, Long agentTaskId, String decisionJson) {
+            throw new UnsupportedOperationException("本测试只验证超时回调");
+        }
+
+        private void reset() {
+            this.requestId = null;
+            this.agentTaskId = null;
+            this.decisionJson = null;
+        }
     }
 }

@@ -25,6 +25,15 @@ public interface WorkflowAgentResultCallback {
     void onPreReviewRejected(Long requestId, Long agentTaskId, String decisionJson);
 
     /**
+     * Agent 预审等待人工确认超时
+     *
+     * @param requestId 申请单ID
+     * @param agentTaskId Agent任务ID
+     * @param decisionJson 结构化超时结论JSON
+     */
+    void onPreReviewTimeout(Long requestId, Long agentTaskId, String decisionJson);
+
+    /**
      * Agent 预审转人工
      *
      * @param requestId 申请单ID

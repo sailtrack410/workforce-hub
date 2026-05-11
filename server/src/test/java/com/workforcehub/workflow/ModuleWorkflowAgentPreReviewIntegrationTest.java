@@ -180,6 +180,38 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
     }
 
     @Test
+    @DisplayName("Agent预审超时回调后应终止申请且不启动Flowable")
+    void agentTimeoutCallbackShouldRejectRequestWithoutHumanTask() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Long leaveTypeId = seedWorkflowAndLeaveType();
+        long requestId = submitLeaveRequest(employeeSession, leaveTypeId, 480, "等待预审超时");
+
+        workflowAgentResultCallback.onPreReviewTimeout(
+            requestId,
+            AGENT_TASK_ID,
+            "{\"decision\":\"TIMEOUT\",\"status\":\"CANCELLED\",\"reason\":\"人工确认超时，任务已取消\"}"
+        );
+
+        assertEquals("REJECTED", requestStatus(requestId));
+        assertNull(processInstanceId(requestId), "Agent 预审超时不应启动 Flowable 流程实例");
+        assertEquals(0L, pendingTodoCount(requestId, MANAGER_USER_ID));
+        assertEquals(1L, actionCount(requestId, "AGENT_PRE_REVIEW", "REJECTED"));
+        assertEquals(9600, availableMinutes(leaveTypeId));
+        assertEquals(0, frozenMinutes(leaveTypeId));
+
+        mockMvc.perform(get("/api/employee/workflow/requests/{requestId}/actions", requestId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].actorType").value("AGENT"))
+            .andExpect(jsonPath("$.data[0].actorId").value(AGENT_TASK_ID))
+            .andExpect(jsonPath("$.data[0].actionType").value("AGENT_PRE_REVIEW"))
+            .andExpect(jsonPath("$.data[0].afterStatus").value("REJECTED"))
+            .andExpect(jsonPath("$.data[0].agentDecisionJson")
+                .value("{\"decision\":\"TIMEOUT\",\"reason\":\"人工确认超时，任务已取消\",\"status\":\"CANCELLED\"}"));
+    }
+
+    @Test
     @DisplayName("Agent预审回调必须匹配提交时生成的Agent任务ID")
     void agentCallbackShouldMatchPendingAgentTaskId() throws Exception {
         Cookie employeeSession = loginEmployee();
