@@ -6,6 +6,7 @@ import com.workforcehub.agent.dto.AdminAgentTaskAuditResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskFailureSummaryResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskMetricsResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskTimeoutRunResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.CancelAgentTaskRequest;
 import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
@@ -13,6 +14,7 @@ import com.workforcehub.agent.dto.AgentAclResponse;
 import com.workforcehub.agent.dto.AgentResponse;
 import com.workforcehub.agent.dto.AgentTaskListQuery;
 import com.workforcehub.agent.dto.AgentTaskResponse;
+import com.workforcehub.agent.dto.AgentTaskTimeoutRunQuery;
 import com.workforcehub.agent.dto.AgentToolBindingResponse;
 import com.workforcehub.agent.dto.AgentToolCallRequest;
 import com.workforcehub.agent.dto.AgentToolResponse;
@@ -27,10 +29,12 @@ import com.workforcehub.agent.repository.AgentAclRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.agent.repository.AgentTaskQueryCriteria;
+import com.workforcehub.agent.repository.AgentTaskTimeoutRunQueryCriteria;
 import com.workforcehub.agent.repository.AdminAgentTaskAuditRow;
 import com.workforcehub.agent.repository.AdminAgentTaskFailureSummaryRow;
 import com.workforcehub.agent.repository.AdminAgentTaskMetricsRow;
 import com.workforcehub.agent.repository.AdminAgentTaskRow;
+import com.workforcehub.agent.repository.AdminAgentTaskTimeoutRunRow;
 import com.workforcehub.agent.repository.AdminAgentTaskToolCallRow;
 import com.workforcehub.agent.repository.AgentPendingToolCallRow;
 import com.workforcehub.agent.repository.AgentTaskRow;
@@ -68,6 +72,8 @@ public class AgentService {
         "WAITING_HUMAN_CONFIRM", "REJECTED", "CANCELLED");
     private static final Set<String> TRIGGERED_BY_TYPES = Set.of("USER", "ADMIN", "SYSTEM", "WORKFLOW", "TIMER", "EVENT");
     private static final Set<String> APPROVAL_MODES = Set.of("AUTO", "REQUIRE_CONFIRM");
+    private static final Set<String> TIMEOUT_RUN_TRIGGER_TYPES = Set.of("SERVICE", "MANUAL", "SCHEDULED");
+    private static final Set<String> TIMEOUT_RUN_STATUSES = Set.of("RUNNING", "SUCCESS", "SKIPPED", "FAILED");
 
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
@@ -122,6 +128,21 @@ public class AgentService {
         return agentRepository.listAdminAgentTaskFailureSummary().stream()
             .map(this::toAdminTaskFailureSummaryResponse)
             .toList();
+    }
+
+    public PageResult<AdminAgentTaskTimeoutRunResponse> pageAdminAgentTaskTimeoutRuns(AgentTaskTimeoutRunQuery query) {
+        long safePageNo = Math.max(query.getPageNo(), 1L);
+        long safePageSize = Math.min(Math.max(query.getPageSize(), 1L), 100L);
+        AgentTaskTimeoutRunQueryCriteria criteria = toTimeoutRunQueryCriteria(query);
+        long total = agentRepository.countAdminAgentTaskTimeoutRuns(criteria);
+        List<AdminAgentTaskTimeoutRunResponse> rows = agentRepository.pageAdminAgentTaskTimeoutRuns(
+                criteria,
+                (safePageNo - 1) * safePageSize,
+                safePageSize
+            ).stream()
+            .map(this::toAdminTaskTimeoutRunResponse)
+            .toList();
+        return PageResult.of(safePageNo, safePageSize, total, rows);
     }
 
     public List<AdminAgentTaskToolCallResponse> listAdminAgentTaskToolCalls(Long taskId) {
@@ -559,6 +580,15 @@ public class AgentService {
         );
     }
 
+    private AgentTaskTimeoutRunQueryCriteria toTimeoutRunQueryCriteria(AgentTaskTimeoutRunQuery query) {
+        return new AgentTaskTimeoutRunQueryCriteria(
+            normalizeOptionalIn(query.getTriggerType(), TIMEOUT_RUN_TRIGGER_TYPES, "Agent超时扫描触发类型不支持"),
+            normalizeOptionalIn(query.getStatus(), TIMEOUT_RUN_STATUSES, "Agent超时扫描批次状态不支持"),
+            query.getStartedFrom(),
+            query.getStartedTo()
+        );
+    }
+
     private String normalizeOptionalIn(String value, Set<String> allowed, String message) {
         if (!StringUtils.hasText(value)) {
             return null;
@@ -734,6 +764,24 @@ public class AgentService {
         response.setToolCallCount(row.toolCallCount());
         response.setFirstOccurredAt(row.firstOccurredAt());
         response.setLastOccurredAt(row.lastOccurredAt());
+        return response;
+    }
+
+    private AdminAgentTaskTimeoutRunResponse toAdminTaskTimeoutRunResponse(AdminAgentTaskTimeoutRunRow row) {
+        AdminAgentTaskTimeoutRunResponse response = new AdminAgentTaskTimeoutRunResponse();
+        response.setJobRunId(row.jobRunId());
+        response.setTriggerType(row.triggerType());
+        response.setStatus(row.status());
+        response.setBatchSize(row.batchSize());
+        response.setScannedCount(row.scannedCount());
+        response.setCancelledCount(row.cancelledCount());
+        response.setSkippedCount(row.skippedCount());
+        response.setLockOwner(row.lockOwner());
+        response.setErrorMessage(row.errorMessage());
+        response.setStartedAt(row.startedAt());
+        response.setFinishedAt(row.finishedAt());
+        response.setCreatedAt(row.createdAt());
+        response.setUpdatedAt(row.updatedAt());
         return response;
     }
 

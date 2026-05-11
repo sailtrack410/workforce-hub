@@ -1,5 +1,60 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 后台超时扫描批次查询
+
+### 背景
+
+上一轮已经把人工确认超时扫描升级为生产化任务，并把每次运行写入 `agt_task_timeout_job_run`。但管理员如果想确认最近是否扫描成功、是否被锁跳过、扫描了多少任务，仍然需要直接查数据库。这个缺口会影响后台可观测性，也会让超时扫描失败排查依赖开发人员介入。
+
+### 本轮完成内容
+
+- 新增后台超时扫描批次查询接口：`GET /api/admin/agent-tasks/timeout-scan-runs`。
+- 新增查询 DTO：`AgentTaskTimeoutRunQuery`。
+- 新增响应 DTO：`AdminAgentTaskTimeoutRunResponse`。
+- 新增仓储查询条件和行对象：
+  - `AgentTaskTimeoutRunQueryCriteria`
+  - `AdminAgentTaskTimeoutRunRow`
+- 支持按 `triggerType`、`status`、`startedFrom`、`startedTo` 筛选。
+- 批次列表返回 `jobRunId`、触发方式、批次状态、批次大小、扫描数、取消数、跳过数、锁持有者、错误摘要和起止时间。
+- 路由放在 `/api/admin/agent-tasks/timeout-scan-runs`，并显式置于 `/{taskId}` 前面，避免静态路径被任务详情动态路由误吞。
+
+### 本轮修复的自审问题
+
+- 上一轮第 61 审指出 `agt_task_timeout_job_run` 只有表和写入，没有后台查询入口。本轮补齐只读分页查询，管理员不再需要直接查库才能看扫描批次。
+- `triggerType` 和 `status` 在服务层做白名单校验，避免任意字符串进入查询语义。
+- 查询 SQL 使用参数化参数，动态 SQL 只拼接固定条件片段。
+- 本轮不新增 Flyway 迁移，继续复用 V12 已有 `agt_task_timeout_job_run`。
+- 本轮不做失败告警、长期等待升级策略和统一任务运行中心，避免查询节点膨胀。
+
+### 验证记录
+
+- 红灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_runs_red mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#adminShouldListTimeoutScanRuns test`
+  - 结果：失败，`/api/admin/agent-tasks/timeout-scan-runs` 被 `/{taskId}` 误吞并返回 500。
+- 绿灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_runs_green mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#adminShouldListTimeoutScanRuns test`
+  - 结果：通过，覆盖手动扫描后按 `MANUAL/SUCCESS` 查询批次记录。
+- 非法状态：`env TEST_DB_NAME=workforce_hub_agent_timeout_runs_invalid mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#adminTimeoutScanRunListShouldRejectUnsupportedStatus test`
+  - 结果：通过，非法批次状态返回 `code=400`、`message=Agent超时扫描批次状态不支持`。
+- 编译验证：`mvn -DskipTests compile`
+  - 结果：通过，JDK 17.0.18 下编译成功。
+- 超时扫描专项：`env TEST_DB_NAME=workforce_hub_agent_timeout_runs_full mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，10 个用例，0 失败。
+- Agent 模块回归：`env TEST_DB_NAME=workforce_hub_agent_timeout_runs_agent mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，26 个用例，0 失败。
+- 跨模块回归：`env TEST_DB_NAME=workforce_hub_agent_timeout_runs_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，67 个用例，0 失败。
+- 差异格式检查：`git diff --check`
+  - 结果：通过，未发现空白错误。
+
+### 数据库说明
+
+本轮没有新增 Flyway 迁移，继续复用 `V12__add_agent_timeout_job_records.sql` 已创建的 `agt_task_timeout_job_run`。
+
+### 后续待补
+
+- 增加超时扫描失败告警和后台通知。
+- 增加长期等待任务升级策略，例如提醒触发人、直属上级或管理员介入。
+- 等 `file/workflow/agent` 都有后台任务运行记录后，再评估是否抽出统一 `sys_job_run` 和通用任务运行中心。
+
 ## 2026-05-11 Agent 人工确认超时扫描生产化
 
 ### 背景
@@ -46,7 +101,7 @@
 
 ### 后续待补
 
-- 增加后台批次记录查询入口，让管理员不进数据库也能查看近期扫描结果。
+- 后台批次记录查询入口已在后续节点补齐。
 - 增加扫描失败告警和长期等待任务升级策略。
 - 等任务量增长后评估是否需要对 `agt_task.waiting_deadline_at/status` 增加更贴合超时扫描的组合索引。
 
@@ -97,7 +152,7 @@
 
 - 为运行指标增加时间范围、Agent、触发来源等筛选条件。
 - 为失败聚合增加稳定失败分类码，避免长期依赖自然语言错误信息聚合。
-- 接入后台告警入口和人工确认超时扫描批次记录查询。
+- 接入后台告警入口；人工确认超时扫描批次记录查询已在后续节点补齐。
 
 ## 2026-05-11 Agent 后台任务工具调用明细与审计轨迹
 

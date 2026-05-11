@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、任务运行指标、失败聚合、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级/定时人工确认超时扫描 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、任务运行指标、失败聚合、人工确认超时手动扫描、超时扫描批次查询，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级/定时人工确认超时扫描 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
 | 数据库变更 | 新增 `V12__add_agent_timeout_job_records.sql`，增加 `sys_job_lock` 和 `agt_task_timeout_job_run` |
 
-当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器和后台告警监控。后台任务查询已提供分页列表、详情、工具调用明细、审计轨迹、运行指标和失败聚合入口；人工确认超时扫描已提供服务调用、后台手动触发、定时触发、数据库锁互斥和批次运行记录。
+当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器和后台告警监控。后台任务查询已提供分页列表、详情、工具调用明细、审计轨迹、运行指标和失败聚合入口；人工确认超时扫描已提供服务调用、后台手动触发、定时触发、数据库锁互斥、批次运行记录和后台批次查询。
 
 ---
 
@@ -520,6 +520,61 @@
 - 每次手动扫描都会写入 `agt_task_timeout_job_run` 批次记录。
 - 如果 `sys_job_lock` 中存在未过期的 `AGENT_TASK_TIMEOUT_SCAN` 锁，接口返回 `jobStatus=SKIPPED`，不取消任务。
 
+### 3.17 查询人工确认超时扫描批次
+
+`GET /api/admin/agent-tasks/timeout-scan-runs?pageNo=1&pageSize=20&triggerType=MANUAL&status=SUCCESS`
+
+支持查询参数：
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `pageNo` | 否 | 默认 1，最小 1 |
+| `pageSize` | 否 | 默认 20，最小 1，最大 100 |
+| `triggerType` | 否 | `SERVICE`、`MANUAL`、`SCHEDULED` |
+| `status` | 否 | `RUNNING`、`SUCCESS`、`SKIPPED`、`FAILED` |
+| `startedFrom` | 否 | 扫描开始时间下限，ISO 时间格式，例如 `2026-05-11T00:00:00` |
+| `startedTo` | 否 | 扫描开始时间上限，ISO 时间格式，例如 `2026-05-11T23:59:59` |
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "jobRunId": "AGT-TIMEOUT-2055520000000000001",
+        "triggerType": "MANUAL",
+        "status": "SUCCESS",
+        "batchSize": 10,
+        "scannedCount": 1,
+        "cancelledCount": 1,
+        "skippedCount": 0,
+        "lockOwner": "agent-timeout-2055520000000000001",
+        "errorMessage": null,
+        "startedAt": "2026-05-11T08:43:28",
+        "finishedAt": "2026-05-11T08:43:28",
+        "createdAt": "2026-05-11T08:43:28",
+        "updatedAt": "2026-05-11T08:43:28"
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+处理规则：
+
+- 默认按 `started_at DESC, id DESC` 排序，优先展示最近扫描批次。
+- `triggerType` 和 `status` 会做枚举校验，不支持的值返回 `code=400`。
+- 该接口只读查询 `agt_task_timeout_job_run`，不触发扫描、不修改任务、不释放锁。
+- `status=SKIPPED` 表示本次扫描未拿到 `AGENT_TASK_TIMEOUT_SCAN` 锁，任务不会被取消。
+- `status=FAILED` 表示扫描批次执行异常，`errorMessage` 只保留截断后的错误摘要，详细堆栈应看服务日志。
+
 ---
 
 ## 4. 员工端接口
@@ -774,6 +829,7 @@ AgentTaskTimeoutJobService#runTimeoutScan(String triggerType, int batchSize)
 | 无可继续执行待确认工具 | 200 | 409 | 绑定失效或待确认日志缺失时拒绝误成功 |
 | 人工确认超时扫描 | 200 | 0 | 超过 `waiting_deadline_at` 的等待任务转为 `CANCELLED` |
 | 超时扫描批次不合法 | 200 | 400 | `batchSize` 小于 1 或大于 500 |
+| 超时扫描批次查询非法筛选 | 200 | 400 | 不支持的 `triggerType` 或 `status` |
 | 后台任务指标/失败聚合 | 200 | 0 | 只读统计，不修改任务和日志 |
 
 ---
@@ -781,7 +837,7 @@ AgentTaskTimeoutJobService#runTimeoutScan(String triggerType, int batchSize)
 ## 8. 后续扩展点
 
 - 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和告警入口。
-- 增加人工确认超时扫描失败告警、长期等待任务升级处理和后台批次记录查询入口。
+- 增加人工确认超时扫描失败告警和长期等待任务升级处理。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。
 - 接入任务异步执行、重试、超时扫描、运行指标细化和告警。

@@ -787,6 +787,44 @@ public class AgentRepository {
             """, this::mapAdminTaskFailureSummary);
     }
 
+    public long countAdminAgentTaskTimeoutRuns(AgentTaskTimeoutRunQueryCriteria criteria) {
+        List<Object> params = new ArrayList<>();
+        String sql = """
+            SELECT COUNT(*)
+            FROM agt_task_timeout_job_run run
+            """ + timeoutRunWhereSql(criteria, params);
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, params.toArray());
+        return count == null ? 0L : count;
+    }
+
+    public List<AdminAgentTaskTimeoutRunRow> pageAdminAgentTaskTimeoutRuns(AgentTaskTimeoutRunQueryCriteria criteria,
+                                                                          long offset,
+                                                                          long limit) {
+        List<Object> params = new ArrayList<>();
+        String sql = """
+            SELECT job_run_id,
+                   trigger_type,
+                   status,
+                   batch_size,
+                   scanned_count,
+                   cancelled_count,
+                   skipped_count,
+                   lock_owner,
+                   error_message,
+                   started_at,
+                   finished_at,
+                   created_at,
+                   updated_at
+            FROM agt_task_timeout_job_run run
+            """ + timeoutRunWhereSql(criteria, params) + """
+            ORDER BY started_at DESC, id DESC
+            LIMIT ? OFFSET ?
+            """;
+        params.add(limit);
+        params.add(offset);
+        return jdbcTemplate.query(sql, this::mapAdminTaskTimeoutRun, params.toArray());
+    }
+
     public List<AdminAgentTaskToolCallRow> listAdminAgentTaskToolCalls(Long taskId) {
         return jdbcTemplate.query("""
             SELECT log.id,
@@ -943,6 +981,29 @@ public class AgentRepository {
         return where.toString();
     }
 
+    private String timeoutRunWhereSql(AgentTaskTimeoutRunQueryCriteria criteria, List<Object> params) {
+        StringBuilder where = new StringBuilder("""
+            WHERE 1 = 1
+            """);
+        if (criteria.triggerType() != null) {
+            where.append("  AND run.trigger_type = ?\n");
+            params.add(criteria.triggerType());
+        }
+        if (criteria.status() != null) {
+            where.append("  AND run.status = ?\n");
+            params.add(criteria.status());
+        }
+        if (criteria.startedFrom() != null) {
+            where.append("  AND run.started_at >= ?\n");
+            params.add(criteria.startedFrom());
+        }
+        if (criteria.startedTo() != null) {
+            where.append("  AND run.started_at <= ?\n");
+            params.add(criteria.startedTo());
+        }
+        return where.toString();
+    }
+
     private AgentRow mapAgent(ResultSet rs, int rowNum) throws SQLException {
         return new AgentRow(
             rs.getLong("id"),
@@ -1084,6 +1145,24 @@ public class AgentRepository {
             rs.getLong("tool_call_count"),
             rs.getTimestamp("first_occurred_at") == null ? null : rs.getTimestamp("first_occurred_at").toLocalDateTime(),
             rs.getTimestamp("last_occurred_at") == null ? null : rs.getTimestamp("last_occurred_at").toLocalDateTime()
+        );
+    }
+
+    private AdminAgentTaskTimeoutRunRow mapAdminTaskTimeoutRun(ResultSet rs, int rowNum) throws SQLException {
+        return new AdminAgentTaskTimeoutRunRow(
+            rs.getString("job_run_id"),
+            rs.getString("trigger_type"),
+            rs.getString("status"),
+            rs.getInt("batch_size"),
+            rs.getLong("scanned_count"),
+            rs.getLong("cancelled_count"),
+            rs.getLong("skipped_count"),
+            rs.getString("lock_owner"),
+            rs.getString("error_message"),
+            rs.getTimestamp("started_at").toLocalDateTime(),
+            rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime(),
+            rs.getTimestamp("created_at").toLocalDateTime(),
+            rs.getTimestamp("updated_at").toLocalDateTime()
         );
     }
 

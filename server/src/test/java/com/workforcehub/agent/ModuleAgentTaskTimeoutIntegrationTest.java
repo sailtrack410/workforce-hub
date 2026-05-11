@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -244,6 +245,50 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
         assertEquals("WAITING_HUMAN_CONFIRM", taskStatus(taskId));
         assertEquals(0L, timeoutJobRunCount("SCHEDULED", "SUCCESS"));
         assertEquals(0L, timeoutJobRunCount("SCHEDULED", "SKIPPED"));
+    }
+
+    @Test
+    @DisplayName("后台应能分页查询人工确认超时扫描批次记录")
+    void adminShouldListTimeoutScanRuns() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(adminSession, employeeSession);
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET waiting_deadline_at = ?
+            WHERE id = ?
+            """, LocalDateTime.now().minusMinutes(1), taskId);
+        JsonNode scanResult = timeoutScanResult("MANUAL", 10);
+
+        mockMvc.perform(get("/api/admin/agent-tasks/timeout-scan-runs")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "10")
+                .param("triggerType", "MANUAL")
+                .param("status", "SUCCESS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].jobRunId").value(scanResult.get("jobRunId").asText()))
+            .andExpect(jsonPath("$.data.list[0].triggerType").value("MANUAL"))
+            .andExpect(jsonPath("$.data.list[0].status").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.list[0].batchSize").value(10))
+            .andExpect(jsonPath("$.data.list[0].scannedCount").value(1))
+            .andExpect(jsonPath("$.data.list[0].cancelledCount").value(1))
+            .andExpect(jsonPath("$.data.list[0].skippedCount").value(0));
+    }
+
+    @Test
+    @DisplayName("后台查询人工确认超时扫描批次时应拒绝非法状态")
+    void adminTimeoutScanRunListShouldRejectUnsupportedStatus() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(get("/api/admin/agent-tasks/timeout-scan-runs")
+                .cookie(adminSession)
+                .param("status", "UNKNOWN_STATUS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("Agent超时扫描批次状态不支持"));
     }
 
     private long createWaitingTask(Cookie adminSession, Cookie employeeSession) throws Exception {

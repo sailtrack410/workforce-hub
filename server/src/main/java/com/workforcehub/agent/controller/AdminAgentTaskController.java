@@ -4,8 +4,10 @@ import com.workforcehub.agent.dto.AdminAgentTaskAuditResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskFailureSummaryResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskMetricsResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskTimeoutRunResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.AgentTaskListQuery;
+import com.workforcehub.agent.dto.AgentTaskTimeoutRunQuery;
 import com.workforcehub.agent.dto.AgentTaskTimeoutScanRequest;
 import com.workforcehub.agent.dto.AgentTaskTimeoutScanResponse;
 import com.workforcehub.agent.scheduler.AgentTaskTimeoutJobService;
@@ -51,6 +53,12 @@ public class AdminAgentTaskController {
     @GetMapping("/failure-summary")
     public R<List<AdminAgentTaskFailureSummaryResponse>> failureSummary() {
         return R.ok(agentService.listAdminAgentTaskFailureSummary());
+    }
+
+    @GetMapping("/timeout-scan-runs")
+    public R<PageResult<AdminAgentTaskTimeoutRunResponse>> listTimeoutScanRuns(
+            @Valid AgentTaskTimeoutRunQuery query) {
+        return R.ok(agentService.pageAdminAgentTaskTimeoutRuns(query));
     }
 
     @GetMapping("/{taskId}")
