@@ -67,7 +67,7 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("spring.data.redis.host", () -> env("REDIS_HOST", "localhost"));
         registry.add("spring.data.redis.port", () -> env("REDIS_PORT", "6379"));
         registry.add("spring.data.redis.password", () -> env("REDIS_PASSWORD", ""));
-        registry.add("spring.session.redis.namespace", () -> "workforce:test:session");
+        registry.add("spring.session.redis.namespace", LocalIntegrationTestSupport::testSessionRedisNamespace);
         registry.add("spring.autoconfigure.exclude", LocalIntegrationTestSupport::resolveAutoConfigurationExcludes);
         registry.add("workforce.workflow.enabled", () -> "false");
         registry.add("spring.mail.host", () -> env("MAIL_HOST", "localhost"));
@@ -88,7 +88,7 @@ public abstract class LocalIntegrationTestSupport {
     }
 
     private void resetRedisState() {
-        deleteKeys("workforce:test:session*");
+        deleteKeys(testSessionRedisNamespace() + "*");
         deleteKeys("auth:login:fail:*");
         deleteKeys("auth:email:*");
     }
@@ -208,6 +208,10 @@ public abstract class LocalIntegrationTestSupport {
             return FLOWABLE_TEST_EXCLUDES;
         }
         return existing + "," + FLOWABLE_TEST_EXCLUDES;
+    }
+
+    private static String testSessionRedisNamespace() {
+        return "workforce:test:session:" + env("TEST_DB_NAME", "workforce_hub_test");
     }
 
     private void deleteKeys(String pattern) {

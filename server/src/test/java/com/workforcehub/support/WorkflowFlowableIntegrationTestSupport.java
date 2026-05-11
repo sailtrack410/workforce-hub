@@ -14,6 +14,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -64,7 +65,7 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
         registry.add("spring.data.redis.host", () -> env("REDIS_HOST", "localhost"));
         registry.add("spring.data.redis.port", () -> env("REDIS_PORT", "6379"));
         registry.add("spring.data.redis.password", () -> env("REDIS_PASSWORD", ""));
-        registry.add("spring.session.redis.namespace", () -> "workforce:test:session");
+        registry.add("spring.session.redis.namespace", WorkflowFlowableIntegrationTestSupport::testSessionRedisNamespace);
         registry.add("spring.mail.host", () -> env("MAIL_HOST", "localhost"));
         registry.add("spring.mail.port", () -> env("MAIL_PORT", "1025"));
         registry.add("management.health.mail.enabled", () -> "false");
@@ -87,7 +88,7 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
     }
 
     private void resetRedisState() {
-        deleteKeys("workforce:test:session*");
+        deleteKeys(testSessionRedisNamespace() + "*");
         deleteKeys("auth:login:fail:*");
         deleteKeys("auth:email:*");
     }
@@ -143,9 +144,41 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM org_position");
             jdbcTemplate.execute("DELETE FROM org_department");
             jdbcTemplate.execute("DELETE FROM admin_user");
+            resetFlowableRuntimeAndHistoryTables(jdbcTemplate);
         } finally {
             jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
         }
+    }
+
+    private void resetFlowableRuntimeAndHistoryTables(JdbcTemplate jdbcTemplate) {
+        List.of(
+            "ACT_RU_VARIABLE",
+            "ACT_RU_IDENTITYLINK",
+            "ACT_RU_TASK",
+            "ACT_RU_JOB",
+            "ACT_RU_TIMER_JOB",
+            "ACT_RU_SUSPENDED_JOB",
+            "ACT_RU_DEADLETTER_JOB",
+            "ACT_RU_HISTORY_JOB",
+            "ACT_RU_EXTERNAL_JOB",
+            "ACT_RU_ENTITYLINK",
+            "ACT_RU_EVENT_SUBSCR",
+            "ACT_RU_ACTINST",
+            "ACT_RU_EXECUTION",
+            "FLW_RU_BATCH_PART",
+            "FLW_RU_BATCH",
+            "ACT_HI_VARINST",
+            "ACT_HI_IDENTITYLINK",
+            "ACT_HI_TASKINST",
+            "ACT_HI_TSK_LOG",
+            "ACT_HI_ENTITYLINK",
+            "ACT_HI_ACTINST",
+            "ACT_HI_DETAIL",
+            "ACT_HI_COMMENT",
+            "ACT_HI_ATTACHMENT",
+            "ACT_HI_PROCINST",
+            "ACT_EVT_LOG"
+        ).forEach(tableName -> deleteIfExists(jdbcTemplate, tableName));
     }
 
     private void deleteIfExists(JdbcTemplate jdbcTemplate, String tableName) {
@@ -185,6 +218,10 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
             return primary;
         }
         return env(fallbackKey, defaultValue);
+    }
+
+    private static String testSessionRedisNamespace() {
+        return "workforce:test:session:" + env("TEST_DB_NAME", "workforce_hub_test");
     }
 
     private void deleteKeys(String pattern) {
