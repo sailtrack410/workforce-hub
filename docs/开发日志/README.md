@@ -16,6 +16,8 @@
   - 假种、假期账户、余额流水与请假审批扣减闭环
 - `module-attendance.md`
   - 考勤基础配置、员工打卡、日结果计算与异常识别闭环
+- `module-im.md`
+  - IM 会话、消息、群治理、WebSocket 与 IM x Agent 集成推进记录
 - `module-agent.md`
   - Agent 治理、授权、任务、工具调用与审计第一批闭环
 - `工程与基础设施.md`

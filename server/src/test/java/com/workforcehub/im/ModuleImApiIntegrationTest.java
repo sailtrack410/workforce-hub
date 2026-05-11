@@ -3,6 +3,7 @@ package com.workforcehub.im;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.im.websocket.ImWebSocketSessionRegistry;
+import com.workforcehub.spi.ImAgentReplyResult;
 import com.workforcehub.spi.ImAgentResultCallback;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
@@ -450,20 +451,30 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andReturn();
         long conversationId = data(conversationResult).get("conversationId").asLong();
 
-        imAgentResultCallback.sendAgentMessage(
+        imAgentResultCallback.onAgentReply(new ImAgentReplyResult(
             conversationId,
+            null,
             agentId,
             880071L,
             "TEXT",
-            "{\"text\":\"第一次回写\"}"
-        );
-        imAgentResultCallback.sendAgentMessage(
+            "{\"text\":\"第一次回写\"}",
+            "SUCCEEDED",
+            null,
+            null,
+            "agent-task-880071"
+        ));
+        imAgentResultCallback.onAgentReply(new ImAgentReplyResult(
             conversationId,
+            null,
             agentId,
             880071L,
             "TEXT",
-            "{\"text\":\"重复回写不应新建消息\"}"
-        );
+            "{\"text\":\"重复回写不应新建消息\"}",
+            "SUCCEEDED",
+            null,
+            null,
+            "agent-task-880071"
+        ));
 
         assertEquals(1L, jdbcTemplate.queryForObject("""
             SELECT COUNT(*)

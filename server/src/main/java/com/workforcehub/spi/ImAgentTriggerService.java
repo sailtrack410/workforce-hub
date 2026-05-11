@@ -16,14 +16,10 @@ public interface ImAgentTriggerService {
     ImAgentDescriptor requireUsableAgent(Long agentId, Long userId);
 
     /**
-     * 在会话中触发 Agent 回复
+     * 在会话中触发 Agent 回复。
      *
-     * @param conversationId 会话ID
-     * @param agentId Agent ID
-     * @param senderId 发送人ID
-     * @param senderType 发送人类型
-     * @param messageContent 消息内容JSON
-     * @return Agent 任务ID
+     * @param command 触发命令
+     * @return Agent 任务触发结果
      */
-    Long triggerConversationReply(Long conversationId, Long agentId, Long senderId, String senderType, String messageContent);
+    ImAgentTriggerResult triggerConversationReply(ImAgentTriggerCommand command);
 }

@@ -38,6 +38,8 @@ import com.workforcehub.im.repository.ImUserRelationRow;
 import com.workforcehub.im.websocket.ImWebSocketEvent;
 import com.workforcehub.im.websocket.ImWebSocketPushService;
 import com.workforcehub.spi.ImAgentDescriptor;
+import com.workforcehub.spi.ImAgentReplyResult;
+import com.workforcehub.spi.ImAgentTriggerCommand;
 import com.workforcehub.spi.ImAgentResultCallback;
 import com.workforcehub.spi.ImAgentTriggerService;
 import org.slf4j.Logger;
@@ -432,21 +434,30 @@ public class ImService implements ImAgentResultCallback {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void sendAgentMessage(Long conversationId,
-                                 Long agentId,
-                                 Long agentTaskId,
-                                 String messageType,
-                                 String contentJson) {
+    public void onAgentReply(ImAgentReplyResult result) {
+        if (result == null) {
+            throw new BizException(400, "Agent回复结果不能为空");
+        }
+        Long conversationId = result.conversationId();
+        Long agentId = result.agentId();
+        Long agentTaskId = result.agentTaskId();
         if (!imRepository.existsActiveAgentConversation(conversationId, agentId)) {
             throw new BizException(403, "Agent无权写入该会话");
+        }
+        if ("FAILED".equals(result.status())) {
+            writeAgentFailureSystemMessage(conversationId, agentId);
+            return;
+        }
+        if (!"SUCCEEDED".equals(result.status())) {
+            throw new BizException(400, "Agent回复状态不支持");
         }
         Long lastSeq = imRepository.lockActiveConversationAndGetLastSeq(conversationId);
         if (lastSeq == null) {
             throw new BizException(404, "会话不存在");
         }
-        String normalizedMessageType = normalizeAgentMessageType(messageType);
-        String normalizedContentJson = normalizeAgentContentJson(contentJson, agentTaskId);
-        String clientMessageId = agentMessageClientId(agentTaskId);
+        String normalizedMessageType = normalizeAgentMessageType(result.messageType());
+        String normalizedContentJson = normalizeAgentContentJson(result.contentJson(), agentTaskId);
+        String clientMessageId = agentMessageClientId(result);
         if (clientMessageId != null && imRepository.findMessageByClientMessageId(
             conversationId,
             AGENT_SENDER_TYPE,
@@ -1072,6 +1083,13 @@ public class ImService implements ImAgentResultCallback {
         return agentTaskId == null ? null : "agent-task-" + agentTaskId;
     }
 
+    private String agentMessageClientId(ImAgentReplyResult result) {
+        if (StringUtils.hasText(result.idempotencyKey())) {
+            return result.idempotencyKey().trim();
+        }
+        return agentMessageClientId(result.agentTaskId());
+    }
+
     private void triggerAgentReplyAfterCommitIfNeeded(ImMessageResponse userMessage) {
         if (!USER_SENDER_TYPE.equals(userMessage.getSenderType())
             || !"TEXT".equals(userMessage.getMessageType())) {
@@ -1084,13 +1102,17 @@ public class ImService implements ImAgentResultCallback {
         Runnable trigger = () -> {
             try {
                 ImAgentTriggerService triggerService = requireImAgentTriggerService();
-                triggerService.triggerConversationReply(
+                triggerService.triggerConversationReply(new ImAgentTriggerCommand(
                     userMessage.getConversationId(),
+                    userMessage.getMessageId(),
                     agentId,
                     userMessage.getSenderId(),
                     userMessage.getSenderType(),
-                    buildAgentInputContentJson(userMessage)
-                );
+                    buildAgentInputContentJson(userMessage),
+                    null,
+                    agentTriggerIdempotencyKey(userMessage.getMessageId()),
+                    "{}"
+                ));
             } catch (Exception e) {
                 log.warn("IM Agent 会话触发失败 conversationId={} messageId={}",
                     userMessage.getConversationId(),
@@ -1110,6 +1132,10 @@ public class ImService implements ImAgentResultCallback {
             return;
         }
         trigger.run();
+    }
+
+    private String agentTriggerIdempotencyKey(Long sourceMessageId) {
+        return sourceMessageId == null ? null : "im-message-" + sourceMessageId;
     }
 
     private String buildAgentInputContentJson(ImMessageResponse userMessage) {

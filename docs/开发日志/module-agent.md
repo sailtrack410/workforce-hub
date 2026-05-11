@@ -1,5 +1,37 @@
 # module-agent 开发日志
 
+## 2026-05-11 IM x Agent SPI 命令对象化
+
+### 背景
+
+IM 会话 Agent 第一版用散参数 SPI 完成演示闭环，但真实模型异步执行需要把来源消息、任务、请求、幂等键和失败类型显式串起来。否则 Agent 后续切换到异步模型调用时，任务状态、IM 消息幂等和失败可见性会继续依赖隐式 JSON 字段。
+
+### 本轮完成内容
+
+- `AgentService` 实现新的 `ImAgentTriggerService.triggerConversationReply(ImAgentTriggerCommand command)`。
+- `createConversationReplyTask` 改为从命令对象读取 `conversationId`、`agentId`、`triggerUserId` 和 `messageContentJson`。
+- 触发结果改为返回 `ImAgentTriggerResult`，显式包含 `agentTaskId`、`status` 和 `idempotencyKey`。
+- Agent 回复 IM 时改为构造 `ImAgentReplyResult` 并调用 `ImAgentResultCallback.onAgentReply(...)`。
+- 当前仍保留同步 mock 回复，不在本轮引入真实模型客户端。
+
+### 本轮边界
+
+- 不改变 `agt_task` 表结构。
+- 不改变任务状态流转，当前会话 Agent 任务仍同步从 `PENDING` 进入 `RUNNING` 并完成为 `SUCCEEDED`。
+- 不新增模型配置和外部 HTTP 调用。
+- 不新增 outbox。
+
+### 验证记录
+
+- 编译：`mvn -DskipTests compile`
+  - 结果：通过，JDK 17.0.18 下 294 个源文件编译成功。
+
+### 后续待补
+
+- 下一节点拆出 `AgentTaskExecutionService` 或 `AgentConversationService`，把会话 Agent 执行从 `AgentService` 主门面中剥离。
+- 真实模型接入后，任务应先落 `RUNNING`，模型成功后回写 `SUCCEEDED`，模型失败后回写 `FAILED` 并通知 IM。
+- 失败分类应对齐 `CONFIG_MISSING`、`AUTH_FAILED`、`TIMEOUT`、`RATE_LIMITED`、`PROVIDER_ERROR`、`INVALID_RESPONSE`、`UNKNOWN`。
+
 ## 2026-05-11 Agent 后台超时扫描批次查询
 
 ### 背景

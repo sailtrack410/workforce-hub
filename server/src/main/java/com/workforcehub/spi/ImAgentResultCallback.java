@@ -7,13 +7,9 @@ package com.workforcehub.spi;
 public interface ImAgentResultCallback {
 
     /**
-     * Agent 回复消息到会话
+     * Agent 回复消息到会话。
      *
-     * @param conversationId 会话ID
-     * @param agentId Agent ID
-     * @param agentTaskId Agent 任务ID
-     * @param messageType 消息类型
-     * @param contentJson 消息内容JSON
+     * @param result Agent 回复结果
      */
-    void sendAgentMessage(Long conversationId, Long agentId, Long agentTaskId, String messageType, String contentJson);
+    void onAgentReply(ImAgentReplyResult result);
 }
