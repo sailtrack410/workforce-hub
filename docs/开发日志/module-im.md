@@ -1,5 +1,34 @@
 # module-im 开发日志
 
+## 2026-05-11 IM Agent 会话服务拆分
+
+### 背景
+
+真实模型异步执行和 WebSocket outbox 进入前，`ImService` 已经同时承担会话列表、消息发送、附件下载、编辑撤回、群治理、Agent 触发、Agent 回写和失败提示。继续直接叠加 outbox 会让事务边界和失败补偿混在主服务里，后续风险会放大。
+
+### 本轮完成内容
+
+- 新增 `ImAgentConversationService`，专门负责 Agent 会话创建、员工消息 afterCommit 触发 Agent、Agent 成功回写、Agent 失败系统提示。
+- `ImService.startCurrentEmployeeAgentConversation(...)` 改为委托新服务，员工端接口路径不变。
+- `ImService.sendCurrentEmployeeMessage(...)` 发送成功后改为委托新服务触发 Agent 回复，原先只处理 `USER + TEXT + AGENT会话` 的触发规则不变。
+- `ImAgentResultCallback` 实现从 `ImService` 移到 `ImAgentConversationService`，跨模块回写入口更贴近 Agent 会话子域。
+- 保持 `IM_AGENT_MESSAGE_CREATED` 与 `IM_AGENT_REPLY_FAILED` 现有推送行为不变，outbox 仍留在后续节点。
+
+### 本轮边界
+
+- 本轮只做服务拆分，不新增 Flyway 迁移。
+- 本轮不接真实模型，Agent 回复仍由 `module-agent` 当前同步 mock 任务产出。
+- 本轮不改员工端 IM API 响应结构，不改 WebSocket 事件结构。
+
+### 验证记录
+
+- 编译：`cd server && mvn -DskipTests compile`
+  - 结果：通过，JDK 17.0.18 下 296 个源文件编译成功。
+- IM/Agent 回归：`cd server && env TEST_DB_NAME=workforce_hub_service_split_im_agent mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过，89 个用例全部通过。
+- 基础回归：`cd server && env TEST_DB_NAME=workforce_hub_service_split_base mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest,ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test`
+  - 结果：通过，112 个用例全部通过。
+
 ## 2026-05-11 IM x Agent SPI 命令对象化
 
 ### 背景

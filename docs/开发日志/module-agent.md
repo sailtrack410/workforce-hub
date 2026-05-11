@@ -1,5 +1,33 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 会话任务执行服务拆分
+
+### 背景
+
+真实大模型接入前，`AgentService` 同时承担后台治理、员工任务、工具调用确认、IM 会话任务创建、mock 回复生成和 IM 回写。模型执行改成异步后，任务状态流、模型调用、失败回写和重试会继续膨胀，因此需要先把会话任务执行边界拆出来。
+
+### 本轮完成内容
+
+- 新增 `AgentTaskExecutionService`，承接 IM 会话触发后的 Agent 任务创建、`PENDING -> RUNNING -> SUCCEEDED/FAILED` 状态推进、审计写入、mock 回复生成和 IM 成功回写。
+- `AgentService.triggerConversationReply(ImAgentTriggerCommand command)` 保留 SPI 门面职责，只校验命令和触发人类型，然后委托执行服务。
+- 继续保留 `agent-task-{taskId}` 作为 Agent 回复消息幂等键。
+- 继续保留当前同步 mock 回复文案和审计动作，不在本轮引入外部模型、异步线程或任务队列。
+
+### 本轮边界
+
+- 本轮只拆执行服务，不新增数据库表或 Flyway 迁移。
+- 本轮不改变后台 Agent 任务、工具调用、人工确认、超时扫描接口行为。
+- 本轮不引入真实模型配置，模型接入在下一节点单独完成。
+
+### 验证记录
+
+- 编译：`cd server && mvn -DskipTests compile`
+  - 结果：通过，JDK 17.0.18 下 296 个源文件编译成功。
+- IM/Agent 回归：`cd server && env TEST_DB_NAME=workforce_hub_service_split_im_agent mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过，89 个用例全部通过。
+- 基础回归：`cd server && env TEST_DB_NAME=workforce_hub_service_split_base mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest,ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test`
+  - 结果：通过，112 个用例全部通过。
+
 ## 2026-05-11 IM x Agent SPI 命令对象化
 
 ### 背景

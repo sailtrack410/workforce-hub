@@ -1,7 +1,6 @@
 package com.workforcehub.agent.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AdminAgentTaskAuditResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskFailureSummaryResponse;
@@ -47,14 +46,10 @@ import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.spi.ImAgentDescriptor;
-import com.workforcehub.spi.ImAgentReplyResult;
-import com.workforcehub.spi.ImAgentResultCallback;
 import com.workforcehub.spi.ImAgentTriggerCommand;
 import com.workforcehub.spi.ImAgentTriggerResult;
 import com.workforcehub.spi.ImAgentTriggerService;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -89,18 +84,18 @@ public class AgentService implements ImAgentTriggerService {
     private final AgentTaskTimeoutRepository timeoutRepository;
     private final ObjectMapper objectMapper;
     private final AgentToolExecutionService toolExecutionService;
-    private final ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider;
+    private final AgentTaskExecutionService agentTaskExecutionService;
 
     public AgentService(AgentRepository agentRepository,
                         AgentTaskTimeoutRepository timeoutRepository,
                         ObjectMapper objectMapper,
                         AgentToolExecutionService toolExecutionService,
-                        ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider) {
+                        AgentTaskExecutionService agentTaskExecutionService) {
         this.agentRepository = agentRepository;
         this.timeoutRepository = timeoutRepository;
         this.objectMapper = objectMapper;
         this.toolExecutionService = toolExecutionService;
-        this.imAgentResultCallbackProvider = imAgentResultCallbackProvider;
+        this.agentTaskExecutionService = agentTaskExecutionService;
     }
 
     public PageResult<AgentResponse> pageAdminAgents(long pageNo, long pageSize) {
@@ -320,7 +315,6 @@ public class AgentService implements ImAgentTriggerService {
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public ImAgentTriggerResult triggerConversationReply(ImAgentTriggerCommand command) {
         if (command == null) {
             throw new BizException(400, "Agent会话触发命令不能为空");
@@ -328,7 +322,7 @@ public class AgentService implements ImAgentTriggerService {
         if (!"USER".equals(command.triggerSenderType())) {
             throw new BizException(400, "仅支持员工消息触发会话Agent");
         }
-        AgentTaskResponse response = createConversationReplyTask(command);
+        AgentTaskResponse response = agentTaskExecutionService.createConversationReplyTask(command);
         return new ImAgentTriggerResult(response.getTaskId(), response.getStatus(), command.idempotencyKey());
     }
 
@@ -399,96 +393,6 @@ public class AgentService implements ImAgentTriggerService {
             audit(taskId, "TASK_FAILED", "AGENT_TASK", taskId, errorMessage, true);
         }
         return toTaskResponse(agentRepository.getTaskOrThrow(taskId));
-    }
-
-    private AgentTaskResponse createConversationReplyTask(ImAgentTriggerCommand command) {
-        Long conversationId = command.conversationId();
-        Long agentId = command.agentId();
-        Long senderId = command.triggerUserId();
-        AgentRow agent = agentRepository.getAgentOrThrow(agentId);
-        if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
-            throw new BizException(409, "Agent未发布或未启用");
-        }
-        if (!agentRepository.canUseAgent(agentId, senderId)) {
-            throw new BizException(403, "无权使用该Agent");
-        }
-        String normalizedMessageContent = normalizeJson(command.messageContentJson(), "会话Agent输入内容不是合法JSON");
-        Long taskId = IdWorker.getId();
-        agentRepository.insertTask(
-            taskId,
-            agent.id(),
-            agent.publishedVersionId(),
-            "CONVERSATION",
-            "IM_CONVERSATION",
-            conversationId,
-            "USER",
-            senderId,
-            "PENDING",
-            null,
-            senderId
-        );
-        audit(taskId, "TASK_CREATED", "AGENT", agent.id(), "IM会话触发Agent任务", false);
-        agentRepository.markTaskRunning(taskId, senderId);
-        audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "Agent会话任务开始执行", false);
-        try {
-            // 第一版会话 Agent 不接外部模型，先产出可演示、可审计的同步回复。
-            agentRepository.finishTask(taskId, "SUCCEEDED", null, senderId);
-            audit(taskId, "TASK_SUCCEEDED", "AGENT_TASK", taskId, "Agent会话任务执行成功", false);
-            notifyImAgentSucceeded(command, agent, taskId, normalizedMessageContent);
-        } catch (BizException e) {
-            String errorMessage = safeSummary(e.getMessage());
-            agentRepository.finishTask(taskId, "FAILED", errorMessage, senderId);
-            audit(taskId, "TASK_FAILED", "AGENT_TASK", taskId, errorMessage, true);
-        }
-        return toTaskResponse(agentRepository.getTaskOrThrow(taskId));
-    }
-
-    private void notifyImAgentSucceeded(ImAgentTriggerCommand command,
-                                        AgentRow agent,
-                                        Long taskId,
-                                        String messageContent) {
-        ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
-        if (callback == null) {
-            throw new BizException(501, "IM Agent结果回写服务未接入");
-        }
-        callback.onAgentReply(new ImAgentReplyResult(
-            command.conversationId(),
-            command.sourceMessageId(),
-            agent.id(),
-            taskId,
-            "TEXT",
-            writeJson(Map.of(
-                "text", buildConversationReplyText(agent, messageContent),
-                "agentTaskId", taskId,
-                "agentCode", agent.agentCode()
-            )),
-            "SUCCEEDED",
-            null,
-            null,
-            agentMessageIdempotencyKey(taskId)
-        ));
-    }
-
-    private String agentMessageIdempotencyKey(Long taskId) {
-        return taskId == null ? null : "agent-task-" + taskId;
-    }
-
-    private String buildConversationReplyText(AgentRow agent, String messageContent) {
-        String text = extractTextFromMessageContent(messageContent);
-        if (!StringUtils.hasText(text)) {
-            return "%s 已收到你的消息，当前演示环境已完成会话任务闭环。".formatted(agent.agentName());
-        }
-        return "%s 已收到：%s".formatted(agent.agentName(), text);
-    }
-
-    private String extractTextFromMessageContent(String messageContent) {
-        try {
-            JsonNode node = objectMapper.readTree(messageContent);
-            JsonNode textNode = node.get("text");
-            return textNode == null || textNode.isNull() ? "" : safeSummary(textNode.asText(""));
-        } catch (Exception e) {
-            return "";
-        }
     }
 
     @Transactional(rollbackFor = Exception.class)
