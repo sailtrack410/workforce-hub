@@ -4,7 +4,7 @@
 
 审查规范：
 
-- `审查规范_大厂级严格版.md`
+- `审查规范.md`
 
 当前清单：
 
@@ -56,6 +56,34 @@
 - `第46审_module-attendance排班唯一模型修复审查.md`
 - `第47审_module-attendance日结果原子upsert修复审查.md`
 - `第48审_module-attendance补卡审批闭环审查.md`
+- `第49审_employee-web前端工程化与原型边界审查.md`
+- `第50审_employee-web前端收口与module-im接口接入审查.md`
+- `第51审_module-workflow审批附件普通下载入口隔离审查.md`
+- `第52审_module-workflow_Flowable表结构Flyway治理审查.md`
+- `第53审_module-agent第一批治理与任务工具闭环审查.md`
+- `第54审_module-agent人工确认动作闭环审查.md`
+- `第55审_module-agent人工确认超时扫描审查.md`
+- `第56审_module-agent后台基础治理接口审查.md`
+- `第57审_module-agent后台手动超时扫描接口审查.md`
+- `第58审_module-agent后台任务查询接口审查.md`
+- `第59审_module-agent后台任务明细与审计轨迹审查.md`
+- `第60审_module-agent后台运行指标与失败聚合审查.md`
+- `第61审_module-agent人工确认超时扫描生产化审查.md`
+- `第62审_module-agent后台超时扫描批次查询审查.md`
+- `第63审_module-agent后台治理提交串合并复核.md`
+- `第63审_module-file至module-agent全期集成复盘审查.md`
+- `第64审_module-im会话闭环后端收口审查.md`
+- `第65审_module-im附件消息后端闭环审查.md`
+- `第66审_module-im消息编辑撤回后端闭环审查.md`
+- `第67审_module-im会话列表分页后端闭环审查.md`
+- `第68审_module-im最小实时推送后端闭环审查.md`
+- `第69审_module-im群治理后端闭环审查.md`
+- `第70审_module-im实时推送安全边界收口审查.md`
+- `第71审_module-im会话Agent入口后端闭环审查.md`
+- `第72审_module-im会话Agent回写幂等与失败可见性审查.md`
+- `第73审_module-im会话详情后端闭环审查.md`
+- `第74审_module-im会话成员展示名后端闭环审查.md`
+- `第75审_module-im会话偏好设置后端闭环审查.md`
 
 维护约定：
 
