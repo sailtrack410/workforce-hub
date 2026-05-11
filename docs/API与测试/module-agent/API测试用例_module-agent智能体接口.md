@@ -5,7 +5,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 测试类 | `ModuleAgentApiIntegrationTest`、`ModuleAgentTaskTimeoutIntegrationTest` |
-| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/任务工具调用明细/任务审计轨迹/人工确认超时手动扫描，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
+| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/任务工具调用明细/任务审计轨迹/任务运行指标/失败聚合/人工确认超时手动扫描，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
 | 运行前提 | 本地 MySQL、Redis 可用；测试使用 `LocalIntegrationTestSupport` 自动建库、迁移和装载组织种子数据 |
 | 数据库变更 | 本轮无新增迁移，测试依赖 V1 已存在 `agt_*` 表 |
 
@@ -17,12 +17,12 @@
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_task_trace_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_metrics_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 预期结果：
 
-- 19 个用例全部通过。
+- 20 个用例全部通过。
 - 空库可执行 V1 到 V11 的 Flyway 迁移。
 - `LocalIntegrationTestSupport` 每个用例前清理 `agt_*` 与相关业务表。
 
@@ -37,7 +37,7 @@ mvn -DskipTests compile
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_task_trace_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_metrics_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 该命令用于验证 Agent 对认证、组织和 IM 群成员关系的依赖没有破坏既有模块。
@@ -67,6 +67,7 @@ env TEST_DB_NAME=workforce_hub_agent_task_trace_regression mvn -Dtest=ModuleAuth
 | AGT-017 | P0 | 后台分页筛选并查看 Agent 任务详情 | `GET /api/admin/agent-tasks` 支持按状态、Agent、触发人和上下文过滤，详情接口返回同一任务 |
 | AGT-018 | P1 | 后台任务查询非法状态 | `status=UNKNOWN_STATUS` 返回 `code=400`、`message=Agent任务状态不支持` |
 | AGT-019 | P0 | 后台查看任务工具调用明细和审计轨迹 | `GET /api/admin/agent-tasks/{taskId}/tool-calls` 返回工具调用明细，`GET /api/admin/agent-tasks/{taskId}/audits` 返回状态审计 |
+| AGT-020 | P0 | 后台查看任务运行指标和失败聚合 | `GET /api/admin/agent-tasks/metrics` 返回任务状态和工具调用统计，`GET /api/admin/agent-tasks/failure-summary` 返回失败原因聚合 |
 
 ---
 
@@ -224,6 +225,16 @@ env TEST_DB_NAME=workforce_hub_agent_task_trace_regression mvn -Dtest=ModuleAuth
 - 返回 `TASK_CREATED`、`TASK_WAITING_HUMAN_CONFIRM`、`TASK_HUMAN_CONFIRMED`、`TASK_RUNNING`、`TASK_SUCCEEDED` 五条审计轨迹。
 - `TASK_WAITING_HUMAN_CONFIRM` 的 `riskFlag=true`。
 
+### AGT-020 后台任务运行指标和失败聚合
+
+- 构造 1 个成功任务、1 个失败任务和 1 个等待人工确认任务。
+- 后台调用 `GET /api/admin/agent-tasks/metrics`。
+- 返回 `totalTaskCount=3`、`succeededTaskCount=1`、`failedTaskCount=1`、`waitingHumanConfirmTaskCount=1`。
+- 返回 `totalToolCallCount=2`、`failedToolCallCount=1`。
+- 后台调用 `GET /api/admin/agent-tasks/failure-summary`。
+- 返回 1 条失败原因，`errorMessage=暂不支持该SPI工具执行`、`taskCount=1`、`toolCallCount=1`。
+- 该用例同时覆盖 `/metrics`、`/failure-summary` 两个静态路由不会被 `/{taskId}` 误吞。
+
 ---
 
 ## 5. 手工验证示例
@@ -249,6 +260,8 @@ env TEST_DB_NAME=workforce_hub_agent_task_trace_regression mvn -Dtest=ModuleAuth
 17. 后台查看任务详情：`GET /api/admin/agent-tasks/{taskId}`
 18. 后台查看任务工具调用明细：`GET /api/admin/agent-tasks/{taskId}/tool-calls`
 19. 后台查看任务审计轨迹：`GET /api/admin/agent-tasks/{taskId}/audits`
+20. 后台查看运行指标：`GET /api/admin/agent-tasks/metrics`
+21. 后台查看失败聚合：`GET /api/admin/agent-tasks/failure-summary`
 
 ### 5.2 排查 SQL
 
@@ -271,7 +284,7 @@ WHERE task_id = ?;
 ## 6. 当前未覆盖但后续必须补的测试
 
 - 人工确认超时扫描的定时触发、批次记录和多实例并发。
-- 后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和运行指标。
+- 后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和告警入口。
 - workflow 预审真实触发和回调。
 - IM 会话 Agent 触发和回复回写。
 - 知识库绑定空间 ACL。

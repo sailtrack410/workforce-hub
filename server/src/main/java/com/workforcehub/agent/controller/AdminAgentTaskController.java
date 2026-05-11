@@ -1,6 +1,8 @@
 package com.workforcehub.agent.controller;
 
 import com.workforcehub.agent.dto.AdminAgentTaskAuditResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskFailureSummaryResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskMetricsResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.AgentTaskListQuery;
@@ -39,6 +41,16 @@ public class AdminAgentTaskController {
     @GetMapping
     public R<PageResult<AdminAgentTaskResponse>> listTasks(@Valid AgentTaskListQuery query) {
         return R.ok(agentService.pageAdminAgentTasks(query));
+    }
+
+    @GetMapping("/metrics")
+    public R<AdminAgentTaskMetricsResponse> metrics() {
+        return R.ok(agentService.getAdminAgentTaskMetrics());
+    }
+
+    @GetMapping("/failure-summary")
+    public R<List<AdminAgentTaskFailureSummaryResponse>> failureSummary() {
+        return R.ok(agentService.listAdminAgentTaskFailureSummary());
     }
 
     @GetMapping("/{taskId}")

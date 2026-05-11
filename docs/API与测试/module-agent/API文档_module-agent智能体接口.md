@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、任务运行指标、失败聚合、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
 | 数据库变更 | 本轮无新增迁移，使用 `V1__init_schema.sql` 已存在的 `agt_*` 表 |
 
-当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台运行监控。后台任务查询已提供分页列表、详情、工具调用明细和审计轨迹入口；人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
+当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台告警监控。后台任务查询已提供分页列表、详情、工具调用明细、审计轨迹、运行指标和失败聚合入口；人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
 
 ---
 
@@ -400,9 +400,76 @@
 - 任务不存在时返回 `code=404`、`message=Agent任务不存在`。
 - 按 `occurredAt ASC, auditId ASC` 排序，便于还原状态流转。
 - `riskFlag=true` 表示该审计动作涉及高风险或人工确认风险点，例如 `TASK_WAITING_HUMAN_CONFIRM`。
-- 第一版只返回任务维度审计；后台操作者、IP、耗时、运行指标后续在运行治理节点补。
+- 第一版只返回任务维度审计；后台操作者、IP、导出记录和告警联动后续在运行治理节点补。
 
-### 3.14 手动触发人工确认超时扫描
+### 3.14 查询 Agent 任务运行指标
+
+`GET /api/admin/agent-tasks/metrics`
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "totalTaskCount": 3,
+    "pendingTaskCount": 0,
+    "runningTaskCount": 0,
+    "succeededTaskCount": 1,
+    "failedTaskCount": 1,
+    "waitingHumanConfirmTaskCount": 1,
+    "rejectedTaskCount": 0,
+    "cancelledTaskCount": 0,
+    "totalToolCallCount": 2,
+    "failedToolCallCount": 1,
+    "averageFinishedDurationMillis": 0,
+    "lastTaskCreatedAt": "2026-05-11T02:41:08"
+  },
+  "requestId": "..."
+}
+```
+
+处理规则：
+
+- 第一版统计所有未删除 Agent 下的任务，不新增筛选参数，后续可按时间范围、Agent、触发来源细化。
+- 任务状态数量直接按 `agt_task.status` 汇总。
+- `totalToolCallCount` 和 `failedToolCallCount` 基于 `agt_tool_call_log` 汇总。
+- `averageFinishedDurationMillis` 只统计已有 `started_at` 和 `finished_at` 的任务；没有已完成任务时返回 0。
+- `/metrics` 是静态子资源，必须优先于 `/{taskId}` 路由匹配，避免被任务详情路由误解析为任务 ID。
+
+### 3.15 查询 Agent 任务失败聚合
+
+`GET /api/admin/agent-tasks/failure-summary`
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "errorMessage": "暂不支持该SPI工具执行",
+      "taskCount": 1,
+      "toolCallCount": 1,
+      "firstOccurredAt": "2026-05-11T02:41:08",
+      "lastOccurredAt": "2026-05-11T02:41:08"
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+处理规则：
+
+- 第一版只统计 `agt_task.status=FAILED` 的任务。
+- 按 `errorMessage` 聚合，空错误归为 `UNKNOWN`。
+- `toolCallCount` 只统计同任务下 `result_status=FAILED` 的工具调用。
+- 默认返回前 20 个失败原因，按 `taskCount DESC, lastOccurredAt DESC, errorMessage ASC` 排序。
+- 后续如果任务量增大，再补时间范围、Agent 维度和失败分类码，避免靠自然语言错误信息长期聚合。
+
+### 3.16 手动触发人工确认超时扫描
 
 `POST /api/admin/agent-tasks/timeout-scan`
 
@@ -653,14 +720,15 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 | 无可继续执行待确认工具 | 200 | 409 | 绑定失效或待确认日志缺失时拒绝误成功 |
 | 人工确认超时扫描 | 200 | 0 | 超过 `waiting_deadline_at` 的等待任务转为 `CANCELLED` |
 | 超时扫描批次不合法 | 200 | 400 | `batchSize` 小于 1 或大于 500 |
+| 后台任务指标/失败聚合 | 200 | 0 | 只读统计，不修改任务和日志 |
 
 ---
 
 ## 7. 后续扩展点
 
-- 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和运行指标接口。
+- 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和告警入口。
 - 增加人工确认超时扫描的定时触发、批次记录、多实例并发控制和升级处理。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。
-- 接入任务异步执行、重试、超时扫描、运行指标和告警。
+- 接入任务异步执行、重试、超时扫描、运行指标细化和告警。
 - 接入工具参数 Schema 校验、敏感数据脱敏和更细的风险控制策略。

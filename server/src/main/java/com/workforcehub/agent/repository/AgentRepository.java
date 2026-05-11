@@ -642,6 +642,65 @@ public class AgentRepository {
         return rows.get(0);
     }
 
+    public AdminAgentTaskMetricsRow getAdminAgentTaskMetrics() {
+        AdminAgentTaskMetricsRow metrics = jdbcTemplate.queryForObject("""
+            SELECT COUNT(task.id) AS total_task_count,
+                   COALESCE(SUM(CASE WHEN task.status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending_task_count,
+                   COALESCE(SUM(CASE WHEN task.status = 'RUNNING' THEN 1 ELSE 0 END), 0) AS running_task_count,
+                   COALESCE(SUM(CASE WHEN task.status = 'SUCCEEDED' THEN 1 ELSE 0 END), 0) AS succeeded_task_count,
+                   COALESCE(SUM(CASE WHEN task.status = 'FAILED' THEN 1 ELSE 0 END), 0) AS failed_task_count,
+                   COALESCE(SUM(CASE WHEN task.status = 'WAITING_HUMAN_CONFIRM' THEN 1 ELSE 0 END), 0) AS waiting_human_confirm_task_count,
+                   COALESCE(SUM(CASE WHEN task.status = 'REJECTED' THEN 1 ELSE 0 END), 0) AS rejected_task_count,
+                   COALESCE(SUM(CASE WHEN task.status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled_task_count,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM agt_tool_call_log log
+                       JOIN agt_task log_task ON log_task.id = log.task_id
+                       JOIN agt_agent log_agent ON log_agent.id = log_task.agent_id
+                       WHERE log_agent.is_deleted = 0
+                   ), 0) AS total_tool_call_count,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM agt_tool_call_log log
+                       JOIN agt_task log_task ON log_task.id = log.task_id
+                       JOIN agt_agent log_agent ON log_agent.id = log_task.agent_id
+                       WHERE log.result_status = 'FAILED'
+                         AND log_agent.is_deleted = 0
+                   ), 0) AS failed_tool_call_count,
+                   CAST(COALESCE(AVG(CASE
+                       WHEN task.started_at IS NOT NULL AND task.finished_at IS NOT NULL
+                       THEN TIMESTAMPDIFF(MICROSECOND, task.started_at, task.finished_at) / 1000
+                       ELSE NULL
+                   END), 0) AS SIGNED) AS average_finished_duration_millis,
+                   MAX(task.created_at) AS last_task_created_at
+            FROM agt_task task
+            JOIN agt_agent agent ON agent.id = task.agent_id
+            WHERE agent.is_deleted = 0
+            """, this::mapAdminTaskMetrics);
+        return metrics == null ? new AdminAgentTaskMetricsRow(
+            0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, null
+        ) : metrics;
+    }
+
+    public List<AdminAgentTaskFailureSummaryRow> listAdminAgentTaskFailureSummary() {
+        return jdbcTemplate.query("""
+            SELECT COALESCE(NULLIF(task.error_message, ''), 'UNKNOWN') AS error_message,
+                   COUNT(DISTINCT task.id) AS task_count,
+                   COUNT(log.id) AS tool_call_count,
+                   MIN(COALESCE(task.finished_at, task.updated_at, task.created_at)) AS first_occurred_at,
+                   MAX(COALESCE(task.finished_at, task.updated_at, task.created_at)) AS last_occurred_at
+            FROM agt_task task
+            JOIN agt_agent agent ON agent.id = task.agent_id
+            LEFT JOIN agt_tool_call_log log ON log.task_id = task.id
+                                             AND log.result_status = 'FAILED'
+            WHERE task.status = 'FAILED'
+              AND agent.is_deleted = 0
+            GROUP BY COALESCE(NULLIF(task.error_message, ''), 'UNKNOWN')
+            ORDER BY task_count DESC, last_occurred_at DESC, error_message ASC
+            LIMIT 20
+            """, this::mapAdminTaskFailureSummary);
+    }
+
     public List<AdminAgentTaskToolCallRow> listAdminAgentTaskToolCalls(Long taskId) {
         return jdbcTemplate.query("""
             SELECT log.id,
@@ -912,6 +971,33 @@ public class AgentRepository {
             rs.getString("error_message"),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
+        );
+    }
+
+    private AdminAgentTaskMetricsRow mapAdminTaskMetrics(ResultSet rs, int rowNum) throws SQLException {
+        return new AdminAgentTaskMetricsRow(
+            rs.getLong("total_task_count"),
+            rs.getLong("pending_task_count"),
+            rs.getLong("running_task_count"),
+            rs.getLong("succeeded_task_count"),
+            rs.getLong("failed_task_count"),
+            rs.getLong("waiting_human_confirm_task_count"),
+            rs.getLong("rejected_task_count"),
+            rs.getLong("cancelled_task_count"),
+            rs.getLong("total_tool_call_count"),
+            rs.getLong("failed_tool_call_count"),
+            rs.getLong("average_finished_duration_millis"),
+            rs.getTimestamp("last_task_created_at") == null ? null : rs.getTimestamp("last_task_created_at").toLocalDateTime()
+        );
+    }
+
+    private AdminAgentTaskFailureSummaryRow mapAdminTaskFailureSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new AdminAgentTaskFailureSummaryRow(
+            rs.getString("error_message"),
+            rs.getLong("task_count"),
+            rs.getLong("tool_call_count"),
+            rs.getTimestamp("first_occurred_at") == null ? null : rs.getTimestamp("first_occurred_at").toLocalDateTime(),
+            rs.getTimestamp("last_occurred_at") == null ? null : rs.getTimestamp("last_occurred_at").toLocalDateTime()
         );
     }
 

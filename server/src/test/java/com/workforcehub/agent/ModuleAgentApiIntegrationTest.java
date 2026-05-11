@@ -318,6 +318,93 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("后台应能查看Agent任务运行指标和失败聚合")
+    void adminShouldGetAgentTaskMetricsAndFailureSummary() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long successAgentId = createPublishedAgentWithoutTool(adminSession, "METRICS_SUCCESS_AGENT", "指标成功助手");
+        grantAcl(adminSession, successAgentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", successAgentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "inputPayloadJson": "{\\"query\\":\\"成功任务\\"}"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+
+        long failedToolId = createTool(adminSession, "METRICS_UNKNOWN_SPI_TOOL", "指标未知SPI工具", "SPI", "READONLY", true);
+        long failedAgentId = createAgent(adminSession, "METRICS_FAILED_AGENT", "指标失败助手", "QA");
+        long failedVersionId = createVersion(adminSession, failedAgentId, 1);
+        bindTool(adminSession, failedVersionId, failedToolId, "AUTO");
+        grantAcl(adminSession, failedAgentId, "USER", EMPLOYEE_USER_ID, "use");
+        publishVersion(adminSession, failedVersionId);
+        mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", failedAgentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "inputPayloadJson": "{\\"query\\":\\"失败任务\\"}",
+                      "toolCalls": [
+                        {
+                          "toolCode": "METRICS_UNKNOWN_SPI_TOOL",
+                          "requestPayloadJson": "{\\"userId\\":2003}"
+                        }
+                      ]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("FAILED"));
+
+        createWaitingTask(
+            adminSession,
+            employeeSession,
+            "METRICS_WAITING_AGENT",
+            "METRICS_CONNECTOR_WRITE_BACK",
+            "指标连接器写入",
+            "CONNECTOR",
+            "{\"action\":\"write\"}"
+        );
+
+        mockMvc.perform(get("/api/admin/agent-tasks/metrics")
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.totalTaskCount").value(3))
+            .andExpect(jsonPath("$.data.succeededTaskCount").value(1))
+            .andExpect(jsonPath("$.data.failedTaskCount").value(1))
+            .andExpect(jsonPath("$.data.waitingHumanConfirmTaskCount").value(1))
+            .andExpect(jsonPath("$.data.cancelledTaskCount").value(0))
+            .andExpect(jsonPath("$.data.rejectedTaskCount").value(0))
+            .andExpect(jsonPath("$.data.runningTaskCount").value(0))
+            .andExpect(jsonPath("$.data.pendingTaskCount").value(0))
+            .andExpect(jsonPath("$.data.totalToolCallCount").value(2))
+            .andExpect(jsonPath("$.data.failedToolCallCount").value(1))
+            .andExpect(jsonPath("$.data.averageFinishedDurationMillis").isNumber())
+            .andExpect(jsonPath("$.data.lastTaskCreatedAt").isString());
+
+        mockMvc.perform(get("/api/admin/agent-tasks/failure-summary")
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].errorMessage").value("暂不支持该SPI工具执行"))
+            .andExpect(jsonPath("$.data[0].taskCount").value(1))
+            .andExpect(jsonPath("$.data[0].toolCallCount").value(1))
+            .andExpect(jsonPath("$.data[0].firstOccurredAt").isString())
+            .andExpect(jsonPath("$.data[0].lastOccurredAt").isString());
+    }
+
+    @Test
     @DisplayName("员工不能看到或使用未授权Agent")
     void employeeShouldNotUseAgentWithoutAcl() throws Exception {
         Cookie adminSession = loginAdmin();

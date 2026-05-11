@@ -3,6 +3,8 @@ package com.workforcehub.agent.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AdminAgentTaskAuditResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskFailureSummaryResponse;
+import com.workforcehub.agent.dto.AdminAgentTaskMetricsResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.CancelAgentTaskRequest;
@@ -26,6 +28,8 @@ import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.agent.repository.AgentTaskQueryCriteria;
 import com.workforcehub.agent.repository.AdminAgentTaskAuditRow;
+import com.workforcehub.agent.repository.AdminAgentTaskFailureSummaryRow;
+import com.workforcehub.agent.repository.AdminAgentTaskMetricsRow;
 import com.workforcehub.agent.repository.AdminAgentTaskRow;
 import com.workforcehub.agent.repository.AdminAgentTaskToolCallRow;
 import com.workforcehub.agent.repository.AgentPendingToolCallRow;
@@ -108,6 +112,16 @@ public class AgentService {
 
     public AdminAgentTaskResponse getAdminAgentTask(Long taskId) {
         return toAdminTaskResponse(agentRepository.getAdminAgentTaskOrThrow(taskId));
+    }
+
+    public AdminAgentTaskMetricsResponse getAdminAgentTaskMetrics() {
+        return toAdminTaskMetricsResponse(agentRepository.getAdminAgentTaskMetrics());
+    }
+
+    public List<AdminAgentTaskFailureSummaryResponse> listAdminAgentTaskFailureSummary() {
+        return agentRepository.listAdminAgentTaskFailureSummary().stream()
+            .map(this::toAdminTaskFailureSummaryResponse)
+            .toList();
     }
 
     public List<AdminAgentTaskToolCallResponse> listAdminAgentTaskToolCalls(Long taskId) {
@@ -693,6 +707,33 @@ public class AgentService {
         response.setApprovalStatus(row.approvalStatus());
         response.setResultStatus(row.resultStatus());
         response.setCalledAt(row.calledAt());
+        return response;
+    }
+
+    private AdminAgentTaskMetricsResponse toAdminTaskMetricsResponse(AdminAgentTaskMetricsRow row) {
+        AdminAgentTaskMetricsResponse response = new AdminAgentTaskMetricsResponse();
+        response.setTotalTaskCount(row.totalTaskCount());
+        response.setPendingTaskCount(row.pendingTaskCount());
+        response.setRunningTaskCount(row.runningTaskCount());
+        response.setSucceededTaskCount(row.succeededTaskCount());
+        response.setFailedTaskCount(row.failedTaskCount());
+        response.setWaitingHumanConfirmTaskCount(row.waitingHumanConfirmTaskCount());
+        response.setRejectedTaskCount(row.rejectedTaskCount());
+        response.setCancelledTaskCount(row.cancelledTaskCount());
+        response.setTotalToolCallCount(row.totalToolCallCount());
+        response.setFailedToolCallCount(row.failedToolCallCount());
+        response.setAverageFinishedDurationMillis(row.averageFinishedDurationMillis());
+        response.setLastTaskCreatedAt(row.lastTaskCreatedAt());
+        return response;
+    }
+
+    private AdminAgentTaskFailureSummaryResponse toAdminTaskFailureSummaryResponse(AdminAgentTaskFailureSummaryRow row) {
+        AdminAgentTaskFailureSummaryResponse response = new AdminAgentTaskFailureSummaryResponse();
+        response.setErrorMessage(row.errorMessage());
+        response.setTaskCount(row.taskCount());
+        response.setToolCallCount(row.toolCallCount());
+        response.setFirstOccurredAt(row.firstOccurredAt());
+        response.setLastOccurredAt(row.lastOccurredAt());
         return response;
     }
 

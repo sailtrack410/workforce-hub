@@ -1,5 +1,54 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 后台任务运行指标与失败聚合
+
+### 背景
+
+后台已经能查看任务列表、详情、工具调用明细和审计轨迹，但管理员仍需要一个更轻的总览入口判断当前 Agent 任务整体健康度。否则排查失败任务时只能逐页翻列表，无法快速判断失败集中在哪类错误、工具调用失败数量是否异常。
+
+### 本轮完成内容
+
+- 新增后台 Agent 任务运行指标接口：`GET /api/admin/agent-tasks/metrics`。
+- 新增后台 Agent 任务失败聚合接口：`GET /api/admin/agent-tasks/failure-summary`。
+- 新增响应 DTO：
+  - `AdminAgentTaskMetricsResponse`
+  - `AdminAgentTaskFailureSummaryResponse`
+- 新增仓储查询行对象：
+  - `AdminAgentTaskMetricsRow`
+  - `AdminAgentTaskFailureSummaryRow`
+- 运行指标返回任务总量、各状态数量、工具调用总数、失败工具调用数、已完成任务平均耗时和最近任务创建时间。
+- 失败聚合按 `errorMessage` 汇总失败任务数量、失败工具调用数量和首次/最近发生时间。
+
+### 本轮修复的自审问题
+
+- 红灯阶段发现 `/api/admin/agent-tasks/metrics` 会被 `/{taskId}` 路由误吞，导致 `metrics` 转 Long 失败并返回 500。已新增明确静态路由 `/metrics` 和 `/failure-summary`。
+- 运行指标不直接 `LEFT JOIN agt_tool_call_log` 后再 `COUNT(task.id)`，避免一个任务多个工具调用时放大任务数量。
+- 失败聚合只统计 `task.status=FAILED`，并且只把 `result_status=FAILED` 的工具日志计入失败工具调用数。
+- 本轮不新增筛选参数和索引迁移，先做全局只读总览，后续按使用情况补时间范围、Agent 维度和失败分类码。
+
+### 验证记录
+
+- 红灯：`env TEST_DB_NAME=workforce_hub_agent_metrics_red mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldGetAgentTaskMetricsAndFailureSummary test`
+  - 结果：失败，`GET /api/admin/agent-tasks/metrics` 被 `/{taskId}` 路由误解析，返回 500。
+- 绿灯：`env TEST_DB_NAME=workforce_hub_agent_metrics_green mvn -Dtest=ModuleAgentApiIntegrationTest#adminShouldGetAgentTaskMetricsAndFailureSummary test`
+  - 结果：通过，覆盖成功、失败、等待人工确认三类任务的指标统计和失败原因聚合。
+- 编译：`mvn -DskipTests compile`
+  - 结果：通过，JDK 17.0.18 下编译成功。
+- Agent 模块回归：`env TEST_DB_NAME=workforce_hub_agent_metrics_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，20 个用例，0 失败。
+- 跨模块回归：`env TEST_DB_NAME=workforce_hub_agent_metrics_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，61 个用例，0 失败。
+
+### 数据库说明
+
+本轮没有新增 Flyway 迁移，继续复用 `V1__init_schema.sql` 已存在的 `agt_task`、`agt_agent`、`agt_tool_call_log` 表。
+
+### 后续待补
+
+- 为运行指标增加时间范围、Agent、触发来源等筛选条件。
+- 为失败聚合增加稳定失败分类码，避免长期依赖自然语言错误信息聚合。
+- 接入后台告警入口、人工确认超时扫描定时调度、批次记录和多实例并发控制。
+
 ## 2026-05-11 Agent 后台任务工具调用明细与审计轨迹
 
 ### 背景
