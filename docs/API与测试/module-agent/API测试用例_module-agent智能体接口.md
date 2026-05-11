@@ -5,9 +5,9 @@
 | 项目 | 说明 |
 | --- | --- |
 | 测试类 | `ModuleAgentApiIntegrationTest`、`ModuleAgentTaskTimeoutIntegrationTest` |
-| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/任务工具调用明细/任务审计轨迹/任务运行指标/失败聚合/人工确认超时手动扫描，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描 |
+| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/任务工具调用明细/任务审计轨迹/任务运行指标/失败聚合/人工确认超时手动扫描，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描、批次记录、锁跳过和定时入口 |
 | 运行前提 | 本地 MySQL、Redis 可用；测试使用 `LocalIntegrationTestSupport` 自动建库、迁移和装载组织种子数据 |
-| 数据库变更 | 本轮无新增迁移，测试依赖 V1 已存在 `agt_*` 表 |
+| 数据库变更 | 本轮新增 `V12__add_agent_timeout_job_records.sql`，测试依赖 `sys_job_lock` 和 `agt_task_timeout_job_run` |
 
 ---
 
@@ -17,13 +17,13 @@
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_metrics_full mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_timeout_prod_agent mvn -Dtest=ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 预期结果：
 
-- 20 个用例全部通过。
-- 空库可执行 V1 到 V11 的 Flyway 迁移。
+- 24 个用例全部通过。
+- 空库可执行 V1 到 V12 的 Flyway 迁移。
 - `LocalIntegrationTestSupport` 每个用例前清理 `agt_*` 与相关业务表。
 
 ### 2.2 编译验证
@@ -37,7 +37,7 @@ mvn -DskipTests compile
 
 ```bash
 cd server
-env TEST_DB_NAME=workforce_hub_agent_metrics_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
+env TEST_DB_NAME=workforce_hub_agent_timeout_prod_regression mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest test
 ```
 
 该命令用于验证 Agent 对认证、组织和 IM 群成员关系的依赖没有破坏既有模块。
@@ -68,6 +68,9 @@ env TEST_DB_NAME=workforce_hub_agent_metrics_regression mvn -Dtest=ModuleAuthApi
 | AGT-018 | P1 | 后台任务查询非法状态 | `status=UNKNOWN_STATUS` 返回 `code=400`、`message=Agent任务状态不支持` |
 | AGT-019 | P0 | 后台查看任务工具调用明细和审计轨迹 | `GET /api/admin/agent-tasks/{taskId}/tool-calls` 返回工具调用明细，`GET /api/admin/agent-tasks/{taskId}/audits` 返回状态审计 |
 | AGT-020 | P0 | 后台查看任务运行指标和失败聚合 | `GET /api/admin/agent-tasks/metrics` 返回任务状态和工具调用统计，`GET /api/admin/agent-tasks/failure-summary` 返回失败原因聚合 |
+| AGT-021 | P0 | 生产化超时扫描生成批次记录 | `runTimeoutScan("SCHEDULED", 10)` 返回运行摘要，并写入 `agt_task_timeout_job_run` |
+| AGT-022 | P0 | 生产化超时扫描拿不到锁时跳过 | `sys_job_lock` 存在未过期锁时返回 `jobStatus=SKIPPED`，不取消等待任务 |
+| AGT-023 | P1 | 定时入口在测试环境禁用后无副作用 | `scheduledTimeoutScan()` 在测试基线下不写批次、不取消任务 |
 
 ---
 
@@ -235,6 +238,35 @@ env TEST_DB_NAME=workforce_hub_agent_metrics_regression mvn -Dtest=ModuleAuthApi
 - 返回 1 条失败原因，`errorMessage=暂不支持该SPI工具执行`、`taskCount=1`、`toolCallCount=1`。
 - 该用例同时覆盖 `/metrics`、`/failure-summary` 两个静态路由不会被 `/{taskId}` 误吞。
 
+### AGT-021 生产化超时扫描批次记录
+
+- 构造 `WAITING_HUMAN_CONFIRM` 任务后，把 `agt_task.waiting_deadline_at` 调整为当前时间之前。
+- 调用 `AgentTaskTimeoutJobService#runTimeoutScan("SCHEDULED", 10)`。
+- 返回 `jobRunId`，格式以 `AGT-TIMEOUT-` 开头。
+- 返回 `triggerType=SCHEDULED`、`jobStatus=SUCCESS`、`batchSize=10`。
+- 返回 `scannedCount=1`、`cancelledCount=1`、`skippedCount=0`。
+- `agt_task.status=CANCELLED`。
+- `agt_task_timeout_job_run` 中存在对应 `SCHEDULED/SUCCESS` 批次记录。
+- 批次记录的 `cancelled_count=1`。
+
+### AGT-022 生产化超时扫描锁跳过
+
+- 构造 `WAITING_HUMAN_CONFIRM` 任务后，把 `agt_task.waiting_deadline_at` 调整为当前时间之前。
+- 预置 `sys_job_lock.lock_name=AGENT_TASK_TIMEOUT_SCAN`，且 `locked_until` 晚于当前时间。
+- 调用 `AgentTaskTimeoutJobService#runTimeoutScan("SCHEDULED", 10)`。
+- 返回 `jobStatus=SKIPPED`、`scannedCount=0`、`cancelledCount=0`、`skippedCount=1`。
+- 任务仍保持 `WAITING_HUMAN_CONFIRM`。
+- 不写入 `TASK_TIMEOUT_CANCELLED` 审计。
+- `agt_task_timeout_job_run` 中存在对应 `SCHEDULED/SKIPPED` 批次记录。
+
+### AGT-023 定时入口测试环境禁用
+
+- 测试基线设置 `workforce.agent.timeout-scan.enabled=false`。
+- 构造已过期 `WAITING_HUMAN_CONFIRM` 任务。
+- 调用 `AgentTaskTimeoutJobService#scheduledTimeoutScan()`。
+- 任务仍保持 `WAITING_HUMAN_CONFIRM`。
+- 不写入 `SCHEDULED/SUCCESS` 或 `SCHEDULED/SKIPPED` 批次记录。
+
 ---
 
 ## 5. 手工验证示例
@@ -262,6 +294,7 @@ env TEST_DB_NAME=workforce_hub_agent_metrics_regression mvn -Dtest=ModuleAuthApi
 19. 后台查看任务审计轨迹：`GET /api/admin/agent-tasks/{taskId}/audits`
 20. 后台查看运行指标：`GET /api/admin/agent-tasks/metrics`
 21. 后台查看失败聚合：`GET /api/admin/agent-tasks/failure-summary`
+22. 生产环境由定时任务自动执行人工确认超时扫描，必要时用后台手动扫描补偿
 
 ### 5.2 排查 SQL
 
@@ -277,14 +310,23 @@ GROUP BY task.id, task.status, task.error_message;
 SELECT *
 FROM agt_audit_log
 WHERE task_id = ?;
+
+SELECT job_run_id, trigger_type, status, batch_size, scanned_count, cancelled_count, skipped_count, error_message, started_at, finished_at
+FROM agt_task_timeout_job_run
+ORDER BY started_at DESC
+LIMIT 20;
+
+SELECT lock_name, owner_id, locked_at, locked_until
+FROM sys_job_lock
+WHERE lock_name = 'AGENT_TASK_TIMEOUT_SCAN';
 ```
 
 ---
 
 ## 6. 当前未覆盖但后续必须补的测试
 
-- 人工确认超时扫描的定时触发、批次记录和多实例并发。
 - 后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和告警入口。
+- 后台人工确认超时扫描批次记录查询和失败告警。
 - workflow 预审真实触发和回调。
 - IM 会话 Agent 触发和回复回写。
 - 知识库绑定空间 ACL。

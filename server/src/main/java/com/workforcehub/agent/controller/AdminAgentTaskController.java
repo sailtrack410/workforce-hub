@@ -71,8 +71,6 @@ public class AdminAgentTaskController {
     @PostMapping("/timeout-scan")
     public R<AgentTaskTimeoutScanResponse> triggerTimeoutScan(
             @Valid @RequestBody AgentTaskTimeoutScanRequest request) {
-        return R.ok(AgentTaskTimeoutScanResponse.of(
-            timeoutJobService.cancelExpiredWaitingTasks(request.safeBatchSize())
-        ));
+        return R.ok(timeoutJobService.runTimeoutScan("MANUAL", request.safeBatchSize()));
     }
 }

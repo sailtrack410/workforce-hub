@@ -74,6 +74,7 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("spring.mail.port", () -> env("MAIL_PORT", "1025"));
         registry.add("management.health.mail.enabled", () -> "false");
         registry.add("logging.level.com.workforcehub", () -> "info");
+        registry.add("workforce.agent.timeout-scan.enabled", () -> "false");
     }
 
     @BeforeEach
@@ -99,6 +100,8 @@ public abstract class LocalIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM sys_download_ticket");
             jdbcTemplate.execute("DELETE FROM sys_file_cleanup_job_detail");
             jdbcTemplate.execute("DELETE FROM sys_file_cleanup_job_run");
+            deleteIfExists(jdbcTemplate, "agt_task_timeout_job_run");
+            deleteIfExists(jdbcTemplate, "sys_job_lock");
             jdbcTemplate.execute("DELETE FROM sys_audit_log");
             jdbcTemplate.execute("DELETE FROM sys_storage_usage");
             jdbcTemplate.execute("DELETE FROM sys_storage_quota_policy");

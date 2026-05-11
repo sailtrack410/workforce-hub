@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、任务运行指标、失败聚合、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级人工确认超时扫描 |
+| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、任务运行指标、失败聚合、人工确认超时手动扫描，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级/定时人工确认超时扫描 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
-| 数据库变更 | 本轮无新增迁移，使用 `V1__init_schema.sql` 已存在的 `agt_*` 表 |
+| 数据库变更 | 新增 `V12__add_agent_timeout_job_records.sql`，增加 `sys_job_lock` 和 `agt_task_timeout_job_run` |
 
-当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器、定时任务入口和后台告警监控。后台任务查询已提供分页列表、详情、工具调用明细、审计轨迹、运行指标和失败聚合入口；人工确认超时扫描已落为服务能力，并提供后台手动触发入口；后续仍需补周期调度、多实例并发控制和生产化批次记录。
+当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器和后台告警监控。后台任务查询已提供分页列表、详情、工具调用明细、审计轨迹、运行指标和失败聚合入口；人工确认超时扫描已提供服务调用、后台手动触发、定时触发、数据库锁互斥和批次运行记录。
 
 ---
 
@@ -488,7 +488,16 @@
   "code": 0,
   "message": "ok",
   "data": {
-    "cancelledCount": 1
+    "jobRunId": "AGT-TIMEOUT-2055520000000000001",
+    "triggerType": "MANUAL",
+    "jobStatus": "SUCCESS",
+    "batchSize": 10,
+    "scannedCount": 1,
+    "cancelledCount": 1,
+    "skippedCount": 0,
+    "errorMessage": null,
+    "startedAt": "2026-05-11T08:43:28",
+    "finishedAt": "2026-05-11T08:43:28"
   },
   "requestId": "..."
 }
@@ -508,6 +517,8 @@
 - 待确认工具日志更新为 `approval_status=TIMEOUT`、`result_status=CANCELLED`。
 - 每个实际取消成功的任务写入 `TASK_TIMEOUT_CANCELLED` 审计。
 - 取消时再次校验任务状态和截止时间，避免并发扫描重复写审计。
+- 每次手动扫描都会写入 `agt_task_timeout_job_run` 批次记录。
+- 如果 `sys_job_lock` 中存在未过期的 `AGENT_TASK_TIMEOUT_SCAN` 锁，接口返回 `jobStatus=SKIPPED`，不取消任务。
 
 ---
 
@@ -669,6 +680,7 @@
 
 ```java
 AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
+AgentTaskTimeoutJobService#runTimeoutScan(String triggerType, int batchSize)
 ```
 
 处理规则：
@@ -682,9 +694,19 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 | 任务错误摘要 | `人工确认超时，任务已取消` |
 | 工具日志 | `approval_status=TIMEOUT`，`result_status=CANCELLED` |
 | 审计动作 | `TASK_TIMEOUT_CANCELLED` |
-| 并发边界 | 取消时再次校验任务状态和截止时间，只有实际更新成功才写审计 |
+| 批次记录 | `agt_task_timeout_job_run` 记录运行编号、触发方式、状态、批次大小、扫描数、取消数、跳过数和错误摘要 |
+| 并发边界 | `sys_job_lock` 按 `lock_name=AGENT_TASK_TIMEOUT_SCAN` 做数据库互斥；取消时再次校验任务状态和截止时间，只有实际更新成功才写审计 |
+| 定时入口 | `scheduledTimeoutScan()` 使用 `@Scheduled`，默认初始延迟 60 秒、固定延迟 60 秒 |
+| 测试环境 | 集成测试基线通过 `workforce.agent.timeout-scan.enabled=false` 关闭定时副作用，测试用例显式调用服务入口 |
 
-后续可把该服务挂到统一调度器或生产化 job run 记录中。
+相关配置：
+
+| 配置项 | 环境变量 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `workforce.agent.timeout-scan.enabled` | `AGENT_TIMEOUT_SCAN_ENABLED` | `true` | 是否启用定时扫描 |
+| `workforce.agent.timeout-scan.batch-size` | `AGENT_TIMEOUT_SCAN_BATCH_SIZE` | `100` | 定时扫描批次大小 |
+| `workforce.agent.timeout-scan.fixed-delay-ms` | `AGENT_TIMEOUT_SCAN_FIXED_DELAY_MS` | `60000` | 两次定时扫描之间的固定延迟 |
+| `workforce.agent.timeout-scan.initial-delay-ms` | `AGENT_TIMEOUT_SCAN_INITIAL_DELAY_MS` | `60000` | 应用启动后的首次扫描延迟 |
 
 ---
 
@@ -703,7 +725,39 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 
 ---
 
-## 6. 错误码与任务状态
+## 6. 新增数据表
+
+### 6.1 `sys_job_lock`
+
+用于后台任务互斥，当前第一批被 Agent 人工确认超时扫描使用。
+
+| 字段 | 说明 |
+| --- | --- |
+| `lock_name` | 锁名称，Agent 超时扫描使用 `AGENT_TASK_TIMEOUT_SCAN` |
+| `owner_id` | 当前锁持有者 |
+| `locked_at` | 加锁时间 |
+| `locked_until` | 锁过期时间 |
+
+### 6.2 `agt_task_timeout_job_run`
+
+用于记录每次人工确认超时扫描批次。
+
+| 字段 | 说明 |
+| --- | --- |
+| `job_run_id` | 运行编号，格式 `AGT-TIMEOUT-{id}` |
+| `trigger_type` | `SERVICE`、`MANUAL`、`SCHEDULED` |
+| `status` | `RUNNING`、`SUCCESS`、`SKIPPED`、`FAILED` |
+| `batch_size` | 本批批次大小 |
+| `scanned_count` | 本批扫描到的过期等待任务数 |
+| `cancelled_count` | 本批成功取消任务数 |
+| `skipped_count` | 因锁或其他原因跳过次数 |
+| `lock_owner` | 本次运行锁持有者 |
+| `error_message` | 失败或跳过原因 |
+| `started_at` / `finished_at` | 开始和结束时间 |
+
+---
+
+## 7. 错误码与任务状态
 
 | 场景 | HTTP | `code` | 说明 |
 | --- | --- | --- | --- |
@@ -724,10 +778,10 @@ AgentTaskTimeoutJobService#cancelExpiredWaitingTasks(int batchSize)
 
 ---
 
-## 7. 后续扩展点
+## 8. 后续扩展点
 
 - 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和告警入口。
-- 增加人工确认超时扫描的定时触发、批次记录、多实例并发控制和升级处理。
+- 增加人工确认超时扫描失败告警、长期等待任务升级处理和后台批次记录查询入口。
 - 接入 workflow 预审触发器与回调。
 - 接入 IM 会话 Agent 触发与回复回写。
 - 接入任务异步执行、重试、超时扫描、运行指标细化和告警。

@@ -12,15 +12,18 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -109,6 +112,11 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.jobRunId").isString())
+            .andExpect(jsonPath("$.data.triggerType").value("MANUAL"))
+            .andExpect(jsonPath("$.data.jobStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.batchSize").value(10))
+            .andExpect(jsonPath("$.data.scannedCount").value(1))
             .andExpect(jsonPath("$.data.cancelledCount").value(1));
 
         assertEquals("CANCELLED", taskStatus(taskId));
@@ -116,6 +124,7 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
         assertEquals("TIMEOUT", toolCallApprovalStatus(taskId));
         assertEquals("CANCELLED", toolCallResultStatus(taskId));
         assertEquals(1L, auditCount(taskId, "TASK_TIMEOUT_CANCELLED"));
+        assertEquals(1L, timeoutJobRunCount("MANUAL", "SUCCESS"));
     }
 
     @Test
@@ -143,6 +152,98 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
             .andExpect(jsonPath("$.data.cancelledCount").value(1));
 
         assertEquals("CANCELLED", taskStatus(taskId));
+    }
+
+    @Test
+    @DisplayName("生产化超时扫描应生成批次记录并返回运行摘要")
+    void timeoutScanShouldCreateJobRunRecordAndReturnSummary() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(adminSession, employeeSession);
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET waiting_deadline_at = ?
+            WHERE id = ?
+            """, LocalDateTime.now().minusMinutes(1), taskId);
+
+        JsonNode result = timeoutScanResult("SCHEDULED", 10);
+
+        assertTrue(result.get("jobRunId").asText().startsWith("AGT-TIMEOUT-"));
+        assertEquals("SCHEDULED", result.get("triggerType").asText());
+        assertEquals("SUCCESS", result.get("jobStatus").asText());
+        assertEquals(10, result.get("batchSize").asInt());
+        assertEquals(1L, result.get("scannedCount").asLong());
+        assertEquals(1L, result.get("cancelledCount").asLong());
+        assertEquals(0L, result.get("skippedCount").asLong());
+        assertEquals("CANCELLED", taskStatus(taskId));
+        assertEquals(1L, timeoutJobRunCount("SCHEDULED", "SUCCESS"));
+        assertEquals(1L, timeoutJobRunCancelledCount(result.get("jobRunId").asText()));
+    }
+
+    @Test
+    @DisplayName("生产化超时扫描拿不到锁时应跳过并记录批次")
+    void timeoutScanShouldSkipWhenAnotherInstanceHoldsLock() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(adminSession, employeeSession);
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET waiting_deadline_at = ?
+            WHERE id = ?
+            """, LocalDateTime.now().minusMinutes(1), taskId);
+        jdbcTemplate.update("""
+            INSERT INTO sys_job_lock
+                (lock_name, owner_id, locked_at, locked_until)
+            VALUES
+                ('AGENT_TASK_TIMEOUT_SCAN', 'other-node', ?, ?)
+            """, LocalDateTime.now(), LocalDateTime.now().plusMinutes(5));
+
+        JsonNode result = timeoutScanResult("SCHEDULED", 10);
+
+        assertTrue(result.get("jobRunId").asText().startsWith("AGT-TIMEOUT-"));
+        assertEquals("SCHEDULED", result.get("triggerType").asText());
+        assertEquals("SKIPPED", result.get("jobStatus").asText());
+        assertEquals(0L, result.get("scannedCount").asLong());
+        assertEquals(0L, result.get("cancelledCount").asLong());
+        assertEquals(1L, result.get("skippedCount").asLong());
+        assertEquals("WAITING_HUMAN_CONFIRM", taskStatus(taskId));
+        assertEquals(0L, auditCount(taskId, "TASK_TIMEOUT_CANCELLED"));
+        assertEquals(1L, timeoutJobRunCount("SCHEDULED", "SKIPPED"));
+    }
+
+    @Test
+    @DisplayName("超时扫描服务应暴露真实定时入口")
+    void timeoutScanServiceShouldExposeScheduledEntry() {
+        Method scheduledMethod;
+        try {
+            scheduledMethod = AgentTaskTimeoutJobService.class.getDeclaredMethod("scheduledTimeoutScan");
+        } catch (NoSuchMethodException e) {
+            fail("AgentTaskTimeoutJobService 应提供 scheduledTimeoutScan 定时入口");
+            return;
+        }
+        Scheduled scheduled = scheduledMethod.getAnnotation(Scheduled.class);
+        assertNotNull(scheduled, "scheduledTimeoutScan 必须标记 @Scheduled");
+        assertEquals("${workforce.agent.timeout-scan.fixed-delay-ms:60000}", scheduled.fixedDelayString());
+        assertEquals("${workforce.agent.timeout-scan.initial-delay-ms:60000}", scheduled.initialDelayString());
+    }
+
+    @Test
+    @DisplayName("测试环境关闭定时超时扫描时调用定时入口不应产生副作用")
+    void scheduledTimeoutScanShouldSkipWhenDisabledInTestProfile() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long taskId = createWaitingTask(adminSession, employeeSession);
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET waiting_deadline_at = ?
+            WHERE id = ?
+            """, LocalDateTime.now().minusMinutes(1), taskId);
+
+        timeoutJobService.scheduledTimeoutScan();
+
+        assertEquals("WAITING_HUMAN_CONFIRM", taskStatus(taskId));
+        assertEquals(0L, timeoutJobRunCount("SCHEDULED", "SUCCESS"));
+        assertEquals(0L, timeoutJobRunCount("SCHEDULED", "SKIPPED"));
     }
 
     private long createWaitingTask(Cookie adminSession, Cookie employeeSession) throws Exception {
@@ -311,6 +412,18 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
     }
 
+    private JsonNode timeoutScanResult(String triggerType, int batchSize) throws Exception {
+        Method method;
+        try {
+            method = timeoutJobService.getClass().getMethod("runTimeoutScan", String.class, int.class);
+        } catch (NoSuchMethodException e) {
+            fail("AgentTaskTimeoutJobService 应提供 runTimeoutScan(triggerType, batchSize) 生产化扫描入口");
+            return objectMapper.createObjectNode();
+        }
+        Object response = method.invoke(timeoutJobService, triggerType, batchSize);
+        return objectMapper.valueToTree(response);
+    }
+
     private String taskStatus(long taskId) {
         return jdbcTemplate.queryForObject("SELECT status FROM agt_task WHERE id = ?", String.class, taskId);
     }
@@ -350,6 +463,24 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
             FROM agt_audit_log
             WHERE task_id = ? AND action_type = ?
             """, Long.class, taskId, actionType);
+        return count == null ? 0L : count;
+    }
+
+    private long timeoutJobRunCount(String triggerType, String status) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM agt_task_timeout_job_run
+            WHERE trigger_type = ? AND status = ?
+            """, Long.class, triggerType, status);
+        return count == null ? 0L : count;
+    }
+
+    private long timeoutJobRunCancelledCount(String jobRunId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT cancelled_count
+            FROM agt_task_timeout_job_run
+            WHERE job_run_id = ?
+            """, Long.class, jobRunId);
         return count == null ? 0L : count;
     }
 }

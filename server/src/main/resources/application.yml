@@ -101,6 +101,15 @@ flowable:
   async-executor-activate: true
   history-level: audit
 
+# ==================== Workforce Hub 业务配置 ====================
+workforce:
+  agent:
+    timeout-scan:
+      enabled: ${AGENT_TIMEOUT_SCAN_ENABLED:true}
+      batch-size: ${AGENT_TIMEOUT_SCAN_BATCH_SIZE:100}
+      fixed-delay-ms: ${AGENT_TIMEOUT_SCAN_FIXED_DELAY_MS:60000}
+      initial-delay-ms: ${AGENT_TIMEOUT_SCAN_INITIAL_DELAY_MS:60000}
+
 # ==================== MinIO ====================
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}

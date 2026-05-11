@@ -2,15 +2,23 @@ package com.workforcehub.agent.scheduler;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.dto.AgentTaskTimeoutScanResponse;
 import com.workforcehub.agent.repository.AgentExpiredTaskRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.common.exception.BizException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Agent 等待人工确认任务的超时收口服务。
@@ -18,26 +26,127 @@ import java.util.Map;
 @Service
 public class AgentTaskTimeoutJobService {
 
+    private static final Logger log = LoggerFactory.getLogger(AgentTaskTimeoutJobService.class);
+
     private static final int MAX_BATCH_SIZE = 500;
+    private static final String LOCK_NAME = "AGENT_TASK_TIMEOUT_SCAN";
     private static final String TIMEOUT_SUMMARY = "人工确认超时，任务已取消";
+    private static final Set<String> TRIGGER_TYPES = Set.of("SERVICE", "MANUAL", "SCHEDULED");
 
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
+    private final int scheduledBatchSize;
+    private final boolean scheduledEnabled;
 
-    public AgentTaskTimeoutJobService(AgentRepository agentRepository, ObjectMapper objectMapper) {
+    public AgentTaskTimeoutJobService(AgentRepository agentRepository,
+                                      ObjectMapper objectMapper,
+                                      TransactionTemplate transactionTemplate,
+                                      @Value("${workforce.agent.timeout-scan.batch-size:100}") int scheduledBatchSize,
+                                      @Value("${workforce.agent.timeout-scan.enabled:true}") boolean scheduledEnabled) {
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
+        this.scheduledBatchSize = scheduledBatchSize;
+        this.scheduledEnabled = scheduledEnabled;
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public long cancelExpiredWaitingTasks(int batchSize) {
+        return runTimeoutScan("SERVICE", batchSize).getCancelledCount();
+    }
+
+    public AgentTaskTimeoutScanResponse runTimeoutScan(String triggerType, int batchSize) {
         int safeBatchSize = normalizeBatchSize(batchSize);
-        LocalDateTime now = LocalDateTime.now();
+        String normalizedTriggerType = normalizeTriggerType(triggerType);
+        LocalDateTime startedAt = LocalDateTime.now();
+        String jobRunId = "AGT-TIMEOUT-" + IdWorker.getId();
+        String ownerId = "agent-timeout-" + UUID.randomUUID();
+
+        if (!createJobRunAndAcquireLock(jobRunId, ownerId, normalizedTriggerType, safeBatchSize, startedAt)) {
+            String message = "已有实例正在执行Agent超时扫描";
+            return buildResponse(jobRunId, normalizedTriggerType, "SKIPPED", safeBatchSize, 0L, 0L, 1L, message, startedAt);
+        }
+
+        ScanStats stats = new ScanStats();
+        try {
+            ScanStats result = transactionTemplate.execute(status ->
+                cancelExpiredWaitingTasksInTransaction(safeBatchSize, startedAt)
+            );
+            stats = result == null ? stats : result;
+            finishJobRun(jobRunId, "SUCCESS", stats.scannedCount, stats.cancelledCount, 0L, null);
+            return buildResponse(jobRunId, normalizedTriggerType, "SUCCESS", safeBatchSize, stats.scannedCount, stats.cancelledCount, 0L, null, startedAt);
+        } catch (RuntimeException e) {
+            String errorMessage = safeSummary(e.getMessage());
+            log.warn("Agent人工确认超时扫描批次失败，jobRunId={}", jobRunId, e);
+            finishJobRun(jobRunId, "FAILED", stats.scannedCount, stats.cancelledCount, 0L, errorMessage);
+            return buildResponse(jobRunId, normalizedTriggerType, "FAILED", safeBatchSize, stats.scannedCount, stats.cancelledCount, 0L, errorMessage, startedAt);
+        } finally {
+            releaseLockQuietly(ownerId);
+        }
+    }
+
+    @Scheduled(
+        fixedDelayString = "${workforce.agent.timeout-scan.fixed-delay-ms:60000}",
+        initialDelayString = "${workforce.agent.timeout-scan.initial-delay-ms:60000}"
+    )
+    public void scheduledTimeoutScan() {
+        if (!scheduledEnabled) {
+            return;
+        }
+        try {
+            runTimeoutScan("SCHEDULED", scheduledBatchSize);
+        } catch (RuntimeException e) {
+            log.warn("Agent人工确认超时定时扫描失败", e);
+        }
+    }
+
+    private boolean createJobRunAndAcquireLock(String jobRunId,
+                                               String ownerId,
+                                               String triggerType,
+                                               int safeBatchSize,
+                                               LocalDateTime startedAt) {
+        LocalDateTime lockUntil = startedAt.plusMinutes(5);
+        Boolean acquired = transactionTemplate.execute(status -> {
+            agentRepository.createTaskTimeoutJobRun(jobRunId, triggerType, safeBatchSize, ownerId, startedAt);
+
+            if (!agentRepository.tryAcquireJobLock(LOCK_NAME, ownerId, startedAt, lockUntil)) {
+                agentRepository.finishTaskTimeoutJobRun(jobRunId, "SKIPPED", 0L, 0L, 1L, "已有实例正在执行Agent超时扫描");
+                return false;
+            }
+            return true;
+        });
+        return Boolean.TRUE.equals(acquired);
+    }
+
+    private void finishJobRun(String jobRunId,
+                              String status,
+                              long scannedCount,
+                              long cancelledCount,
+                              long skippedCount,
+                              String errorMessage) {
+        transactionTemplate.executeWithoutResult(statusHolder ->
+            agentRepository.finishTaskTimeoutJobRun(jobRunId, status, scannedCount, cancelledCount, skippedCount, errorMessage)
+        );
+    }
+
+    private void releaseLockQuietly(String ownerId) {
+        try {
+            transactionTemplate.executeWithoutResult(status ->
+                agentRepository.releaseJobLock(LOCK_NAME, ownerId, LocalDateTime.now())
+            );
+        } catch (RuntimeException e) {
+            log.warn("Agent人工确认超时扫描锁释放失败，ownerId={}", ownerId, e);
+        }
+    }
+
+    private ScanStats cancelExpiredWaitingTasksInTransaction(int safeBatchSize, LocalDateTime now) {
         String timeoutPayload = writeJson(Map.of(
             "status", "CANCELLED",
             "reason", TIMEOUT_SUMMARY
         ));
         List<AgentExpiredTaskRow> expiredTasks = agentRepository.listExpiredWaitingTasks(now, safeBatchSize);
+        ScanStats stats = new ScanStats();
+        stats.scannedCount = expiredTasks.size();
         long cancelledCount = 0L;
         for (AgentExpiredTaskRow expiredTask : expiredTasks) {
             if (agentRepository.cancelExpiredWaitingTask(expiredTask.taskId(), now, timeoutPayload)) {
@@ -53,7 +162,8 @@ public class AgentTaskTimeoutJobService {
                 cancelledCount++;
             }
         }
-        return cancelledCount;
+        stats.cancelledCount = cancelledCount;
+        return stats;
     }
 
     private int normalizeBatchSize(int batchSize) {
@@ -63,11 +173,55 @@ public class AgentTaskTimeoutJobService {
         return Math.min(batchSize, MAX_BATCH_SIZE);
     }
 
+    private String normalizeTriggerType(String triggerType) {
+        String normalized = StringUtils.hasText(triggerType) ? triggerType.trim().toUpperCase() : "SERVICE";
+        if (!TRIGGER_TYPES.contains(normalized)) {
+            throw new BizException(400, "Agent超时扫描触发类型不支持");
+        }
+        return normalized;
+    }
+
+    private AgentTaskTimeoutScanResponse buildResponse(String jobRunId,
+                                                       String triggerType,
+                                                       String jobStatus,
+                                                       int batchSize,
+                                                       long scannedCount,
+                                                       long cancelledCount,
+                                                       long skippedCount,
+                                                       String errorMessage,
+                                                       LocalDateTime startedAt) {
+        AgentTaskTimeoutScanResponse response = new AgentTaskTimeoutScanResponse();
+        response.setJobRunId(jobRunId);
+        response.setTriggerType(triggerType);
+        response.setJobStatus(jobStatus);
+        response.setBatchSize(batchSize);
+        response.setScannedCount(scannedCount);
+        response.setCancelledCount(cancelledCount);
+        response.setSkippedCount(skippedCount);
+        response.setErrorMessage(errorMessage);
+        response.setStartedAt(startedAt);
+        response.setFinishedAt(LocalDateTime.now());
+        return response;
+    }
+
+    private String safeSummary(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "Agent超时扫描失败";
+        }
+        String trimmed = value.trim();
+        return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;
+    }
+
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
             throw new BizException(500, "JSON序列化失败");
         }
+    }
+
+    private static class ScanStats {
+        private long scannedCount;
+        private long cancelledCount;
     }
 }

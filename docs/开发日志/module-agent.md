@@ -1,5 +1,55 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 人工确认超时扫描生产化
+
+### 背景
+
+上一轮后台已能手动触发人工确认超时扫描，但生产环境不能只依赖人工按钮。过期等待任务需要周期自动收口，并且每次扫描要能被追踪；如果未来出现多实例部署，也不能让多个实例同时取消同一批任务。
+
+### 本轮完成内容
+
+- 新增 Flyway 迁移 `V12__add_agent_timeout_job_records.sql`。
+- 新增 `sys_job_lock`，作为后台任务数据库互斥锁。
+- 新增 `agt_task_timeout_job_run`，记录每次 Agent 人工确认超时扫描批次。
+- `AgentTaskTimeoutJobService` 新增生产化入口 `runTimeoutScan(triggerType, batchSize)`。
+- `AgentTaskTimeoutJobService` 新增 `@Scheduled` 定时入口 `scheduledTimeoutScan()`。
+- 后台手动扫描接口返回完整运行摘要：`jobRunId`、`triggerType`、`jobStatus`、`batchSize`、`scannedCount`、`cancelledCount`、`skippedCount`、`errorMessage`、`startedAt`、`finishedAt`。
+- `application.yml` 新增 `workforce.agent.timeout-scan.*` 配置，支持环境变量控制启停、批次大小和定时间隔。
+- 集成测试基线关闭定时副作用，避免长回归中后台定时任务抢跑影响断言。
+
+### 本轮修复的自审问题
+
+- 原手动扫描只返回 `cancelledCount`，无法区分“扫描到多少、取消多少、是否被锁跳过”。本轮改为返回批次运行摘要。
+- 原服务没有生产化批次记录，排查时只能看任务终态。本轮新增 `agt_task_timeout_job_run`。
+- 原服务没有任务级互斥，多实例下可能同时扫描同一批等待任务。现在使用 `sys_job_lock` 抢占，拿不到锁时记录 `SKIPPED` 批次。
+- 自审发现把抢锁、扫描和释放放在同一个大事务里会让其他实例等待事务提交，不利于快速跳过。最终拆成“创建批次并抢锁”、“扫描取消”、“完成批次并释放锁”三个事务边界。
+- 自审发现测试环境注册 `@Scheduled` 后可能在长回归中产生隐性副作用。现在测试基线设置 `workforce.agent.timeout-scan.enabled=false`，并补充禁用保护用例。
+- 移除过时的 `AgentTaskTimeoutScanResponse.of(long)`，避免后续调用方误以为响应只有取消数量。
+
+### 验证记录
+
+- 红灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_prod_red mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#timeoutScanShouldCreateJobRunRecordAndReturnSummary test`
+  - 结果：失败，`AgentTaskTimeoutJobService#runTimeoutScan(String,int)` 尚不存在。
+- 绿灯：`env TEST_DB_NAME=workforce_hub_agent_timeout_prod_green mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#timeoutScanShouldCreateJobRunRecordAndReturnSummary test`
+  - 结果：通过，覆盖批次记录和运行摘要。
+- 锁跳过与定时入口：`env TEST_DB_NAME=workforce_hub_agent_timeout_prod_more mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest#timeoutScanShouldSkipWhenAnotherInstanceHoldsLock,ModuleAgentTaskTimeoutIntegrationTest#timeoutScanServiceShouldExposeScheduledEntry test`
+  - 结果：通过，覆盖锁占用时跳过和 `@Scheduled` 入口。
+- 超时扫描专项：`env TEST_DB_NAME=workforce_hub_agent_timeout_prod_full mvn -Dtest=ModuleAgentTaskTimeoutIntegrationTest test`
+  - 结果：通过，8 个用例，0 失败。
+
+### 数据库说明
+
+本轮新增 `V12__add_agent_timeout_job_records.sql`：
+
+- `sys_job_lock`：后台任务互斥锁，当前用于 `AGENT_TASK_TIMEOUT_SCAN`。
+- `agt_task_timeout_job_run`：Agent 人工确认超时扫描批次记录，记录触发方式、状态、扫描数、取消数、跳过数、错误摘要和起止时间。
+
+### 后续待补
+
+- 增加后台批次记录查询入口，让管理员不进数据库也能查看近期扫描结果。
+- 增加扫描失败告警和长期等待任务升级策略。
+- 等任务量增长后评估是否需要对 `agt_task.waiting_deadline_at/status` 增加更贴合超时扫描的组合索引。
+
 ## 2026-05-11 Agent 后台任务运行指标与失败聚合
 
 ### 背景
@@ -47,7 +97,7 @@
 
 - 为运行指标增加时间范围、Agent、触发来源等筛选条件。
 - 为失败聚合增加稳定失败分类码，避免长期依赖自然语言错误信息聚合。
-- 接入后台告警入口、人工确认超时扫描定时调度、批次记录和多实例并发控制。
+- 接入后台告警入口和人工确认超时扫描批次记录查询。
 
 ## 2026-05-11 Agent 后台任务工具调用明细与审计轨迹
 
@@ -97,7 +147,7 @@
 
 - 增加任务运行指标、失败原因聚合和后台告警入口。
 - 真实工具接入前补请求/响应载荷脱敏策略，避免后台明细接口暴露敏感业务数据。
-- 接入人工确认超时扫描的定时触发、批次记录和多实例并发控制。
+- 人工确认超时扫描的定时触发、批次记录和多实例数据库锁控制已在后续生产化节点补齐。
 
 ## 2026-05-11 Agent 后台任务查询与详情
 

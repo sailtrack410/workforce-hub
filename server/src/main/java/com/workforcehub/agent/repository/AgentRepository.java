@@ -1,5 +1,6 @@
 package com.workforcehub.agent.repository;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -570,6 +571,91 @@ public class AgentRepository {
               AND result_status = 'WAITING_CONFIRM'
             """, responsePayloadJson, taskId);
         return true;
+    }
+
+    public void createTaskTimeoutJobRun(String jobRunId,
+                                        String triggerType,
+                                        int batchSize,
+                                        String lockOwner,
+                                        LocalDateTime startedAt) {
+        jdbcTemplate.update("""
+            INSERT INTO agt_task_timeout_job_run
+                (id, job_run_id, trigger_type, status, batch_size, lock_owner, started_at)
+            VALUES
+                (?, ?, ?, 'RUNNING', ?, ?, ?)
+            """,
+            IdWorker.getId(),
+            jobRunId,
+            triggerType,
+            batchSize,
+            lockOwner,
+            startedAt
+        );
+    }
+
+    public void finishTaskTimeoutJobRun(String jobRunId,
+                                        String status,
+                                        long scannedCount,
+                                        long cancelledCount,
+                                        long skippedCount,
+                                        String errorMessage) {
+        jdbcTemplate.update("""
+            UPDATE agt_task_timeout_job_run
+            SET status = ?,
+                scanned_count = ?,
+                cancelled_count = ?,
+                skipped_count = ?,
+                error_message = ?,
+                finished_at = NOW()
+            WHERE job_run_id = ?
+            """,
+            status,
+            scannedCount,
+            cancelledCount,
+            skippedCount,
+            errorMessage,
+            jobRunId
+        );
+    }
+
+    public boolean tryAcquireJobLock(String lockName, String ownerId, LocalDateTime now, LocalDateTime lockedUntil) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_job_lock
+                (lock_name, owner_id, locked_at, locked_until)
+            VALUES
+                (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                owner_id = IF(locked_until <= ?, ?, owner_id),
+                locked_at = IF(locked_until <= ?, ?, locked_at),
+                locked_until = IF(locked_until <= ?, ?, locked_until)
+            """,
+            lockName,
+            ownerId,
+            now,
+            lockedUntil,
+            now,
+            ownerId,
+            now,
+            now,
+            now,
+            lockedUntil
+        );
+        String currentOwner = jdbcTemplate.queryForObject(
+            "SELECT owner_id FROM sys_job_lock WHERE lock_name = ?",
+            String.class,
+            lockName
+        );
+        return ownerId.equals(currentOwner);
+    }
+
+    public void releaseJobLock(String lockName, String ownerId, LocalDateTime now) {
+        jdbcTemplate.update("""
+            UPDATE sys_job_lock
+            SET locked_until = ?,
+                updated_at = NOW()
+            WHERE lock_name = ?
+              AND owner_id = ?
+            """, now, lockName, ownerId);
     }
 
     public long countAdminAgentTasks(AgentTaskQueryCriteria criteria) {
