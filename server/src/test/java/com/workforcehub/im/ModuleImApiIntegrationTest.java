@@ -6,7 +6,11 @@ import com.workforcehub.im.websocket.ImWebSocketSessionRegistry;
 import com.workforcehub.spi.ImAgentReplyResult;
 import com.workforcehub.spi.ImAgentResultCallback;
 import com.workforcehub.support.LocalIntegrationTestSupport;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,10 +22,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,6 +59,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     private static final long MANAGER_USER_ID = 2002L;
     private static final long EMPLOYEE_USER_ID = 2003L;
     private static final long OTHER_EMPLOYEE_USER_ID = 2004L;
+    private static HttpServer modelServer;
+    private static String modelBaseUrl;
 
     @Autowired
     private MockMvc mockMvc;
@@ -70,6 +79,26 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
+
+    @BeforeAll
+    static void startModelServer() throws IOException {
+        modelServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        modelServer.createContext("/v1/chat/completions", ModuleImApiIntegrationTest::handleModelRequest);
+        modelServer.start();
+        modelBaseUrl = "http://127.0.0.1:" + modelServer.getAddress().getPort() + "/v1";
+    }
+
+    @AfterAll
+    static void stopModelServer() {
+        if (modelServer != null) {
+            modelServer.stop(0);
+        }
+    }
+
+    @DynamicPropertySource
+    static void registerAgentModelProperties(DynamicPropertyRegistry registry) {
+        registry.add("workforce.agent.model.enabled", () -> "true");
+    }
 
     @Test
     @DisplayName("员工应只能看到自己参与的活跃会话并返回最后消息和未读数")
@@ -395,6 +424,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.seqNo").value(1))
             .andExpect(jsonPath("$.data.senderType").value("USER"));
 
+        awaitMessageCount(conversationId, 2L);
         mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", conversationId)
                 .cookie(employeeSession))
             .andExpect(status().isOk())
@@ -406,7 +436,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[1].seqNo").value(2))
             .andExpect(jsonPath("$.data[1].senderType").value("AGENT"))
             .andExpect(jsonPath("$.data[1].senderId").value(agentId))
-            .andExpect(jsonPath("$.data[1].contentText").value("IM问答助手 已收到：帮我总结今天待办"));
+            .andExpect(jsonPath("$.data[1].contentText").value("模型回复：帮我总结今天待办"));
 
         assertEquals(2L, jdbcTemplate.queryForObject(
             "SELECT last_message_seq FROM im_conversation WHERE id = ?",
@@ -428,6 +458,68 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         ));
         assertSocketEvent(employeeSocket, "IM_MESSAGE_CREATED", conversationId);
         assertSocketEvent(employeeSocket, "IM_AGENT_MESSAGE_CREATED", conversationId);
+        unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
+    }
+
+    @Test
+    @DisplayName("Agent模型配置缺失时应失败任务并向会话写入系统提示")
+    void agentModelMissingConfigShouldFailTaskAndWriteSystemMessage() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedAgentWithoutTool(
+            adminSession,
+            "IM_MODEL_MISSING_AGENT",
+            "配置缺失助手",
+            "{\"provider\":\"openai-compatible\",\"model\":\"stub-chat\"}"
+        );
+        grantAgentAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        CapturingWebSocketSession employeeSocket = registerSocket(EMPLOYEE_USER_ID);
+
+        MvcResult conversationResult = mockMvc.perform(post("/api/employee/im/agent-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentId": %d
+                    }
+                    """.formatted(agentId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long conversationId = data(conversationResult).get("conversationId").asLong();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "模型配置缺失时要失败可见",
+                      "clientMessageId": "client-msg-agent-model-missing"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.seqNo").value(1));
+
+        awaitMessageCount(conversationId, 2L);
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(2)))
+            .andExpect(jsonPath("$.data[0].senderType").value("USER"))
+            .andExpect(jsonPath("$.data[1].senderType").value("SYSTEM"))
+            .andExpect(jsonPath("$.data[1].contentText").value("Agent 暂时无法回复，请稍后再试"));
+
+        awaitTaskStatus(agentId, conversationId, "FAILED");
+        assertEquals("Agent模型配置缺失", jdbcTemplate.queryForObject("""
+            SELECT error_message
+            FROM agt_task
+            WHERE agent_id = ?
+              AND context_id = ?
+            """, String.class, agentId, conversationId));
+        assertSocketEvent(employeeSocket, "IM_AGENT_REPLY_FAILED", conversationId);
         unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
     }
 
@@ -498,6 +590,75 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             FROM im_message
             WHERE conversation_id = ?
               AND sender_type = 'AGENT'
+            """, String.class, conversationId));
+    }
+
+    @Test
+    @DisplayName("Agent失败结果重复回写同一任务时应保持系统提示幂等")
+    void repeatedAgentFailureCallbackShouldReuseExistingSystemMessage() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedAgentWithoutTool(adminSession, "IM_FAIL_IDEMPOTENT_AGENT", "失败幂等助手");
+        grantAgentAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        MvcResult conversationResult = mockMvc.perform(post("/api/employee/im/agent-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentId": %d
+                    }
+                    """.formatted(agentId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long conversationId = data(conversationResult).get("conversationId").asLong();
+
+        imAgentResultCallback.onAgentReply(new ImAgentReplyResult(
+            conversationId,
+            null,
+            agentId,
+            880072L,
+            null,
+            null,
+            "FAILED",
+            "TIMEOUT",
+            "第一次失败",
+            "agent-task-880072"
+        ));
+        imAgentResultCallback.onAgentReply(new ImAgentReplyResult(
+            conversationId,
+            null,
+            agentId,
+            880072L,
+            null,
+            null,
+            "FAILED",
+            "TIMEOUT",
+            "重复失败不应新建系统提示",
+            "agent-task-880072"
+        ));
+
+        assertEquals(1L, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM im_message
+            WHERE conversation_id = ?
+              AND sender_type = 'SYSTEM'
+              AND sender_id = 0
+              AND client_message_id = 'agent-task-880072'
+            """,
+            Long.class,
+            conversationId
+        ));
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT last_message_seq FROM im_conversation WHERE id = ?",
+            Long.class,
+            conversationId
+        ));
+        assertEquals("Agent 暂时无法回复，请稍后再试", jdbcTemplate.queryForObject("""
+            SELECT JSON_UNQUOTE(JSON_EXTRACT(content_json, '$.text'))
+            FROM im_message
+            WHERE conversation_id = ?
+              AND sender_type = 'SYSTEM'
             """, String.class, conversationId));
     }
 
@@ -1723,8 +1884,22 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private long createPublishedAgentWithoutTool(Cookie adminSession, String agentCode, String agentName) throws Exception {
+        return createPublishedAgentWithoutTool(
+            adminSession,
+            agentCode,
+            agentName,
+            """
+            {"provider":"openai-compatible","baseUrl":"%s","apiKey":"test-key","model":"stub-chat"}
+            """.formatted(modelBaseUrl).trim()
+        );
+    }
+
+    private long createPublishedAgentWithoutTool(Cookie adminSession,
+                                                 String agentCode,
+                                                 String agentName,
+                                                 String modelConfigJson) throws Exception {
         long agentId = createAgent(adminSession, agentCode, agentName);
-        long versionId = createAgentVersion(adminSession, agentId);
+        long versionId = createAgentVersion(adminSession, agentId, modelConfigJson);
         publishAgentVersion(adminSession, versionId);
         return agentId;
     }
@@ -1747,18 +1922,18 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         return data(result).get("agentId").asLong();
     }
 
-    private long createAgentVersion(Cookie adminSession, long agentId) throws Exception {
+    private long createAgentVersion(Cookie adminSession, long agentId, String modelConfigJson) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/admin/agents/{agentId}/versions", agentId)
                 .cookie(adminSession)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
                       "versionNo": 1,
-                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"im-agent-test\\"}",
+                      "modelConfigJson": %s,
                       "systemPrompt": "你是IM会话助手。",
                       "workflowConfigJson": "{\\"mode\\":\\"conversation-demo\\"}"
                     }
-                    """))
+                    """.formatted(objectMapper.writeValueAsString(modelConfigJson))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
@@ -1815,6 +1990,44 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             }
         }
         assertTrue(matched, "应收到 IM WebSocket 事件: " + eventType);
+    }
+
+    private void awaitMessageCount(Long conversationId, Long expectedCount) throws Exception {
+        awaitCondition(() -> expectedCount.equals(jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_message WHERE conversation_id = ?",
+            Long.class,
+            conversationId
+        )), "等待IM消息数量达到 " + expectedCount);
+    }
+
+    private void awaitTaskStatus(Long agentId, Long conversationId, String expectedStatus) throws Exception {
+        awaitCondition(() -> expectedStatus.equals(jdbcTemplate.queryForObject("""
+            SELECT status
+            FROM agt_task
+            WHERE agent_id = ?
+              AND context_id = ?
+            """, String.class, agentId, conversationId)), "等待Agent任务状态变为 " + expectedStatus);
+    }
+
+    private void awaitCondition(CheckedBooleanSupplier condition, String message) throws Exception {
+        long deadline = System.currentTimeMillis() + 5000L;
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            Thread.sleep(50L);
+        }
+        assertTrue(condition.getAsBoolean(), message);
+    }
+
+    private static void handleModelRequest(HttpExchange exchange) throws IOException {
+        byte[] body = """
+            {"choices":[{"message":{"content":"模型回复：帮我总结今天待办"}}]}
+            """.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
     }
 
     private Cookie loginEmployee(String loginName) throws Exception {
@@ -1933,5 +2146,11 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         public void close(org.springframework.web.socket.CloseStatus status) {
             open = false;
         }
+    }
+
+    @FunctionalInterface
+    private interface CheckedBooleanSupplier {
+
+        boolean getAsBoolean() throws Exception;
     }
 }

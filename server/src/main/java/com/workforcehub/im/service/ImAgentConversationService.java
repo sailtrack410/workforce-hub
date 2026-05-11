@@ -96,7 +96,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
             throw new BizException(403, "Agent无权写入该会话");
         }
         if ("FAILED".equals(result.status())) {
-            writeAgentFailureSystemMessage(conversationId, agentId);
+            writeAgentFailureSystemMessage(conversationId, agentId, agentFailureMessageClientId(result));
             return;
         }
         if (!"SUCCEEDED".equals(result.status())) {
@@ -186,7 +186,11 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                     userMessage.getMessageId(),
                     e
                 );
-                writeAgentFailureSystemMessage(userMessage.getConversationId(), agentId);
+                writeAgentFailureSystemMessage(
+                    userMessage.getConversationId(),
+                    agentId,
+                    agentFailureMessageClientId(userMessage.getMessageId())
+                );
             }
         };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -346,6 +350,17 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         return sourceMessageId == null ? null : "im-message-" + sourceMessageId;
     }
 
+    private String agentFailureMessageClientId(ImAgentReplyResult result) {
+        if (StringUtils.hasText(result.idempotencyKey())) {
+            return result.idempotencyKey().trim();
+        }
+        return agentMessageClientId(result.agentTaskId());
+    }
+
+    private String agentFailureMessageClientId(Long sourceMessageId) {
+        return sourceMessageId == null ? null : "agent-trigger-failure-" + sourceMessageId;
+    }
+
     private String buildAgentInputContentJson(ImMessageResponse userMessage) {
         try {
             return objectMapper.writeValueAsString(Map.of(
@@ -360,28 +375,44 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         }
     }
 
-    private void writeAgentFailureSystemMessage(Long conversationId, Long agentId) {
+    private void writeAgentFailureSystemMessage(Long conversationId, Long agentId, String clientMessageId) {
         try {
             transactionTemplate.executeWithoutResult(status -> {
                 Long lastSeq = imRepository.lockActiveConversationAndGetLastSeq(conversationId);
                 if (lastSeq == null) {
                     throw new BizException(404, "会话不存在");
                 }
+                if (StringUtils.hasText(clientMessageId)
+                    && imRepository.findMessageByClientMessageId(
+                        conversationId,
+                        SYSTEM_SENDER_TYPE,
+                        SYSTEM_SENDER_ID,
+                        clientMessageId
+                    ).isPresent()) {
+                    return;
+                }
                 Long seqNo = lastSeq + 1;
                 Long messageId = IdWorker.getId();
                 LocalDateTime sentAt = LocalDateTime.now();
                 String contentJson = buildSystemContentJson("Agent 暂时无法回复，请稍后再试");
-                imRepository.insertMessage(
-                    messageId,
-                    conversationId,
-                    seqNo,
-                    SYSTEM_SENDER_TYPE,
-                    SYSTEM_SENDER_ID,
-                    "SYSTEM",
-                    null,
-                    contentJson,
-                    sentAt
-                );
+                try {
+                    imRepository.insertMessage(
+                        messageId,
+                        conversationId,
+                        seqNo,
+                        SYSTEM_SENDER_TYPE,
+                        SYSTEM_SENDER_ID,
+                        "SYSTEM",
+                        clientMessageId,
+                        contentJson,
+                        sentAt
+                    );
+                } catch (DuplicateKeyException e) {
+                    if (StringUtils.hasText(clientMessageId)) {
+                        return;
+                    }
+                    throw e;
+                }
                 imRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, agentId);
                 ImMessageResponse response = toMessageResponse(new ImMessageRow(
                     messageId,

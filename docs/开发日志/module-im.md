@@ -1,5 +1,35 @@
 # module-im 开发日志
 
+## 2026-05-11 IM Agent 真实模型回写与失败幂等
+
+### 背景
+
+Agent 会话任务切换为真实模型异步执行后，IM 侧不能再假设回写会同步完成。成功回复、失败提示和 WebSocket 推送都必须能承受模型执行延迟、失败和重复回调。
+
+### 本轮完成内容
+
+- `ModuleImApiIntegrationTest` 增加本地 JDK HTTP stub，覆盖 OpenAI 兼容 `/v1/chat/completions` 成功回复。
+- 员工在 Agent 会话发消息后，IM 列表等待异步模型任务回写真实模型文本，不再断言旧 mock 文案。
+- 增加模型配置缺失用例，验证 Agent 任务进入 `FAILED`，IM 会话写入系统提示并推送 `IM_AGENT_REPLY_FAILED`。
+- 成功 Agent 回复继续使用 `agent-task-{taskId}` 作为 `client_message_id`，重复成功回写不重复写消息。
+- 失败 Agent 回写也使用同一幂等键写入系统提示，重复失败回写不重复生成系统消息。
+- Agent 触发阶段失败使用 `agent-trigger-failure-{sourceMessageId}` 作为系统提示幂等键。
+
+### 本轮边界
+
+- 本轮仍保留当前 WebSocket 事务后直接推送方式，可靠 outbox 在下一节点单独实现。
+- 失败提示文案仍为统一用户可见文案，不把模型供应商错误原文暴露给员工端。
+- 本轮不新增 IM 表结构，复用 V13 的 `im_message.client_message_id` 唯一约束。
+
+### 验证记录
+
+- 编译与测试编译：`cd server && mvn -DskipTests compile test-compile`
+  - 结果：通过，302 个主源码和 25 个测试源码编译成功。
+- IM/Agent 回归：`cd server && env TEST_DB_NAME=workforce_hub_real_model_im_agent mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过，91 个用例全部通过。
+- 基础回归：`cd server && env TEST_DB_NAME=workforce_hub_real_model_base mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest,ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test`
+  - 结果：通过，112 个用例全部通过。
+
 ## 2026-05-11 IM Agent 会话服务拆分
 
 ### 背景

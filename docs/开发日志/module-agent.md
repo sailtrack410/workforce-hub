@@ -1,5 +1,43 @@
 # module-agent 开发日志
 
+## 2026-05-11 Agent 真实模型会话执行接入
+
+### 背景
+
+IM x Agent 演示链路此前已经可以创建会话任务并回写消息，但回复仍来自同步 mock 规则。前端要接入完整会话闭环时，后端必须先把 Agent 会话任务升级成真实模型异步执行路径，并让模型失败通过既有 IM 失败提示链路可见。
+
+### 本轮完成内容
+
+- 新增 `agent.model` 包，提供 OpenAI 兼容 Chat Completions 客户端：
+  - `AgentModelClient`
+  - `AgentModelRequest`
+  - `AgentModelResponse`
+  - `AgentModelException`
+  - `AgentModelProperties`
+  - `OpenAiCompatibleAgentModelClient`
+- `AgentTaskExecutionService` 创建 IM 会话任务后先写入 `PENDING`，事务提交后通过 `agentExecutor` 异步执行。
+- 执行线程把任务推进为 `RUNNING`，调用模型客户端成功后写 `SUCCEEDED` 并回写 IM Agent 消息。
+- 模型配置缺失、认证失败、超时、限流、服务异常、响应不可解析等错误会写入 `FAILED`，并通过 `ImAgentResultCallback` 回写失败结果。
+- 保留 `agent-task-{taskId}` 作为成功与失败回写的幂等键，避免模型回调重试时重复生成 IM 消息。
+- `application.yml` 与 `.env.example` 增加 `workforce.agent.model.*` / `AGENT_MODEL_*` 配置，默认关闭真实模型，部署时必须显式开启和配置。
+
+### 本轮边界
+
+- 本轮只替换 IM 会话 Agent 任务的回复生成方式，不改后台人工任务、工具调用确认和超时扫描行为。
+- 第一版只发送当前用户消息和 Agent 版本系统提示，不做多轮上下文、工具调用、RAG 或知识库引用。
+- 代码不内置 mock fallback；模型未启用或配置缺失时任务失败并写入 IM 系统提示。
+- 本轮不新增 Flyway 迁移，继续复用 `agt_task` 和 V13 已有 IM 消息幂等键。
+
+### 验证记录
+
+- 编译与测试编译：`cd server && mvn -DskipTests compile test-compile`
+  - 结果：通过，302 个主源码和 25 个测试源码编译成功。
+- IM/Agent 回归：`cd server && env TEST_DB_NAME=workforce_hub_real_model_im_agent mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过，91 个用例全部通过。
+- 基础回归：`cd server && env TEST_DB_NAME=workforce_hub_real_model_base mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest,ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test`
+  - 结果：通过，112 个用例全部通过。
+- 说明：曾尝试将 IM/Agent 回归与基础回归并行执行，基础回归在 JUnit 发现阶段 0 用例失败；这是同一 `target/` 目录并发 Maven 进程污染导致，随后单独重跑通过。
+
 ## 2026-05-11 Agent 会话任务执行服务拆分
 
 ### 背景

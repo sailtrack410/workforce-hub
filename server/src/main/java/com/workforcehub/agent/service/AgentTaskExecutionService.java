@@ -4,20 +4,33 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AgentTaskResponse;
+import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.AgentModelException;
+import com.workforcehub.agent.model.AgentModelRequest;
+import com.workforcehub.agent.model.AgentModelResponse;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.agent.repository.AgentTaskRow;
+import com.workforcehub.agent.repository.AgentVersionRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.spi.ImAgentReplyResult;
 import com.workforcehub.spi.ImAgentResultCallback;
 import com.workforcehub.spi.ImAgentTriggerCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 /**
  * Agent 任务执行服务。
@@ -25,16 +38,27 @@ import java.util.Map;
 @Service
 public class AgentTaskExecutionService {
 
+    private static final Logger log = LoggerFactory.getLogger(AgentTaskExecutionService.class);
+
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
+    private final AgentModelClient agentModelClient;
     private final ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider;
+    private final Executor agentExecutor;
+    private final TransactionTemplate transactionTemplate;
 
     public AgentTaskExecutionService(AgentRepository agentRepository,
                                      ObjectMapper objectMapper,
-                                     ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider) {
+                                     AgentModelClient agentModelClient,
+                                     ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider,
+                                     @Qualifier("agentExecutor") Executor agentExecutor,
+                                     PlatformTransactionManager transactionManager) {
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
+        this.agentModelClient = agentModelClient;
         this.imAgentResultCallbackProvider = imAgentResultCallbackProvider;
+        this.agentExecutor = agentExecutor;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
@@ -65,25 +89,106 @@ public class AgentTaskExecutionService {
             senderId
         );
         audit(taskId, "TASK_CREATED", "AGENT", agent.id(), "IM会话触发Agent任务", false);
-        agentRepository.markTaskRunning(taskId, senderId);
-        audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "Agent会话任务开始执行", false);
-        try {
-            // 第一版会话 Agent 不接外部模型，先产出可演示、可审计的同步回复。
-            agentRepository.finishTask(taskId, "SUCCEEDED", null, senderId);
-            audit(taskId, "TASK_SUCCEEDED", "AGENT_TASK", taskId, "Agent会话任务执行成功", false);
-            notifyImAgentSucceeded(command, agent, taskId, normalizedMessageContent);
-        } catch (BizException e) {
-            String errorMessage = safeSummary(e.getMessage());
-            agentRepository.finishTask(taskId, "FAILED", errorMessage, senderId);
-            audit(taskId, "TASK_FAILED", "AGENT_TASK", taskId, errorMessage, true);
-        }
+        scheduleConversationExecution(taskId, command);
         return toTaskResponse(agentRepository.getTaskOrThrow(taskId));
+    }
+
+    private void scheduleConversationExecution(Long taskId, ImAgentTriggerCommand command) {
+        Runnable execution = () -> agentExecutor.execute(() -> executeConversationReplyTask(taskId, command));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    execution.run();
+                }
+            });
+            return;
+        }
+        execution.run();
+    }
+
+    private void executeConversationReplyTask(Long taskId, ImAgentTriggerCommand command) {
+        ConversationExecutionContext context = startConversationExecution(taskId, command);
+        if (context == null) {
+            return;
+        }
+        try {
+            AgentModelResponse modelResponse = agentModelClient.generateReply(new AgentModelRequest(
+                context.agent().id(),
+                taskId,
+                context.agent().agentName(),
+                context.version().systemPrompt(),
+                extractTextFromMessageContent(context.messageContent()),
+                context.version().modelConfigJson()
+            ));
+            finishConversationSucceeded(command, context, modelResponse);
+        } catch (AgentModelException e) {
+            finishConversationFailed(command, context, e.failureType(), e.getMessage());
+        } catch (Exception e) {
+            finishConversationFailed(command, context, "UNKNOWN", e.getMessage());
+        }
+    }
+
+    private ConversationExecutionContext startConversationExecution(Long taskId, ImAgentTriggerCommand command) {
+        return transactionTemplate.execute(status -> {
+            AgentTaskRow task = agentRepository.getTaskOrThrow(taskId);
+            if (!"PENDING".equals(task.status())) {
+                return null;
+            }
+            AgentRow agent = agentRepository.getAgentOrThrow(task.agentId());
+            AgentVersionRow version = agentRepository.getVersionOrThrow(task.agentVersionId());
+            agentRepository.markTaskRunning(taskId, command.triggerUserId());
+            audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "Agent会话任务开始执行", false);
+            return new ConversationExecutionContext(
+                taskId,
+                agent,
+                version,
+                normalizeJson(command.messageContentJson(), "会话Agent输入内容不是合法JSON")
+            );
+        });
+    }
+
+    private void finishConversationSucceeded(ImAgentTriggerCommand command,
+                                             ConversationExecutionContext context,
+                                             AgentModelResponse modelResponse) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                agentRepository.finishTask(context.taskId(), "SUCCEEDED", null, command.triggerUserId());
+                audit(context.taskId(), "TASK_SUCCEEDED", "AGENT_TASK",
+                    context.taskId(), "Agent会话任务执行成功", false);
+                notifyImAgentSucceeded(command, context.agent(), context.taskId(), modelResponse.text());
+            });
+        } catch (Exception e) {
+            finishConversationFailed(command, context, "UNKNOWN", e.getMessage());
+        }
+    }
+
+    private void finishConversationFailed(ImAgentTriggerCommand command,
+                                          ConversationExecutionContext context,
+                                          String failureType,
+                                          String failureMessage) {
+        Long taskId = context.taskId();
+        String safeFailureType = StringUtils.hasText(failureType) ? failureType : "UNKNOWN";
+        String errorMessage = safeSummary(failureMessage);
+        transactionTemplate.executeWithoutResult(status -> {
+            agentRepository.finishTask(taskId, "FAILED", errorMessage, command.triggerUserId());
+            audit(taskId, "TASK_FAILED", "AGENT_TASK", taskId, errorMessage, true);
+        });
+        try {
+            notifyImAgentFailed(command, context.agent(), taskId, safeFailureType, errorMessage);
+        } catch (Exception e) {
+            log.warn("Agent会话失败结果回写IM失败 taskId={} conversationId={}",
+                taskId,
+                command.conversationId(),
+                e
+            );
+        }
     }
 
     private void notifyImAgentSucceeded(ImAgentTriggerCommand command,
                                         AgentRow agent,
                                         Long taskId,
-                                        String messageContent) {
+                                        String replyText) {
         ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
         if (callback == null) {
             throw new BizException(501, "IM Agent结果回写服务未接入");
@@ -95,7 +200,7 @@ public class AgentTaskExecutionService {
             taskId,
             "TEXT",
             writeJson(Map.of(
-                "text", buildConversationReplyText(agent, messageContent),
+                "text", safeReplyText(replyText),
                 "agentTaskId", taskId,
                 "agentCode", agent.agentCode()
             )),
@@ -106,16 +211,38 @@ public class AgentTaskExecutionService {
         ));
     }
 
+    private void notifyImAgentFailed(ImAgentTriggerCommand command,
+                                     AgentRow agent,
+                                     Long taskId,
+                                     String failureType,
+                                     String failureMessage) {
+        ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
+        if (callback == null) {
+            throw new BizException(501, "IM Agent结果回写服务未接入");
+        }
+        callback.onAgentReply(new ImAgentReplyResult(
+            command.conversationId(),
+            command.sourceMessageId(),
+            agent.id(),
+            taskId,
+            null,
+            null,
+            "FAILED",
+            failureType,
+            failureMessage,
+            agentMessageIdempotencyKey(taskId)
+        ));
+    }
+
     private String agentMessageIdempotencyKey(Long taskId) {
         return taskId == null ? null : "agent-task-" + taskId;
     }
 
-    private String buildConversationReplyText(AgentRow agent, String messageContent) {
-        String text = extractTextFromMessageContent(messageContent);
-        if (!StringUtils.hasText(text)) {
-            return "%s 已收到你的消息，当前演示环境已完成会话任务闭环。".formatted(agent.agentName());
+    private String safeReplyText(String replyText) {
+        if (!StringUtils.hasText(replyText)) {
+            throw new AgentModelException("INVALID_RESPONSE", "模型服务返回内容为空");
         }
-        return "%s 已收到：%s".formatted(agent.agentName(), text);
+        return replyText.trim();
     }
 
     private String extractTextFromMessageContent(String messageContent) {
@@ -189,5 +316,13 @@ public class AgentTaskExecutionService {
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
+    }
+
+    private record ConversationExecutionContext(
+        Long taskId,
+        AgentRow agent,
+        AgentVersionRow version,
+        String messageContent
+    ) {
     }
 }

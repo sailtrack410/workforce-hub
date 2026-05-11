@@ -107,6 +107,14 @@ workforce:
     websocket:
       allowed-origin-patterns: ${IM_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
   agent:
+    model:
+      enabled: ${AGENT_MODEL_ENABLED:false}
+      base-url: ${AGENT_MODEL_BASE_URL:}
+      api-key: ${AGENT_MODEL_API_KEY:}
+      model: ${AGENT_MODEL_NAME:}
+      timeout: ${AGENT_MODEL_TIMEOUT:30s}
+      max-tokens: ${AGENT_MODEL_MAX_TOKENS:1024}
+      temperature: ${AGENT_MODEL_TEMPERATURE:0.2}
     timeout-scan:
       enabled: ${AGENT_TIMEOUT_SCAN_ENABLED:true}
       batch-size: ${AGENT_TIMEOUT_SCAN_BATCH_SIZE:100}
