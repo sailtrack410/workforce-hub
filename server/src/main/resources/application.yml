@@ -103,6 +103,9 @@ flowable:
 
 # ==================== Workforce Hub 业务配置 ====================
 workforce:
+  im:
+    websocket:
+      allowed-origin-patterns: ${IM_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
   agent:
     timeout-scan:
       enabled: ${AGENT_TIMEOUT_SCAN_ENABLED:true}

@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +38,135 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Test
+    @DisplayName("群成员应能读取自己所在群聊的成员列表")
+    void groupMemberShouldListMembersOfJoinedGroupConversation() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/members", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(2)))
+            .andExpect(jsonPath("$.data[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data[0].displayName").value("张三"))
+            .andExpect(jsonPath("$.data[0].memberRole").value("OWNER"))
+            .andExpect(jsonPath("$.data[1].memberId").value(MANAGER_USER_ID))
+            .andExpect(jsonPath("$.data[1].displayName").value("李四"))
+            .andExpect(jsonPath("$.data[1].memberRole").value("MEMBER"));
+    }
+
+    @Test
+    @DisplayName("非群成员不能读取群聊成员列表")
+    void nonMemberShouldNotListMembersOfGroupConversation() throws Exception {
+        Cookie nonMemberSession = loginEmployee("wangwu.employee");
+        seedCustomGroup();
+
+        mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/members", 7301L)
+                .cookie(nonMemberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权访问该群聊"));
+    }
+
+    @Test
+    @DisplayName("群成员应能读取群资料和公告")
+    void groupMemberShouldReadGroupProfile() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/profile", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationId").value(7301))
+            .andExpect(jsonPath("$.data.title").value("项目推进群"))
+            .andExpect(jsonPath("$.data.groupType").value("CUSTOM"))
+            .andExpect(jsonPath("$.data.ownerUserId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data.noticeText").value("第一版公告"))
+            .andExpect(jsonPath("$.data.currentMemberRole").value("MEMBER"));
+    }
+
+    @Test
+    @DisplayName("群成员应能通过会话详情读取群资料和成员")
+    void groupMemberShouldReadGroupConversationDetail() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversation.conversationId").value(7301))
+            .andExpect(jsonPath("$.data.conversation.conversationType").value("GROUP"))
+            .andExpect(jsonPath("$.data.conversation.title").value("项目推进群"))
+            .andExpect(jsonPath("$.data.members", hasSize(2)))
+            .andExpect(jsonPath("$.data.members[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data.members[0].displayName").value("张三"))
+            .andExpect(jsonPath("$.data.members[0].memberRole").value("OWNER"))
+            .andExpect(jsonPath("$.data.members[1].memberId").value(MANAGER_USER_ID))
+            .andExpect(jsonPath("$.data.members[1].displayName").value("李四"))
+            .andExpect(jsonPath("$.data.groupProfile.conversationId").value(7301))
+            .andExpect(jsonPath("$.data.groupProfile.noticeText").value("第一版公告"))
+            .andExpect(jsonPath("$.data.groupProfile.currentMemberRole").value("MEMBER"));
+    }
+
+    @Test
+    @DisplayName("群主应能维护群名称和公告")
+    void ownerShouldUpdateGroupProfile() throws Exception {
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/profile", 7301L)
+                .cookie(ownerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "title": "项目推进群-后端",
+                      "noticeText": "今天先完成会话闭环"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.title").value("项目推进群-后端"))
+            .andExpect(jsonPath("$.data.noticeText").value("今天先完成会话闭环"))
+            .andExpect(jsonPath("$.data.currentMemberRole").value("OWNER"));
+
+        assertEquals("项目推进群-后端", jdbcTemplate.queryForObject(
+            "SELECT title FROM im_conversation WHERE id = 7301",
+            String.class
+        ));
+        assertEquals("今天先完成会话闭环", jdbcTemplate.queryForObject(
+            "SELECT notice_text FROM im_group_profile WHERE conversation_id = 7301",
+            String.class
+        ));
+    }
+
+    @Test
+    @DisplayName("普通成员不能维护群资料")
+    void normalMemberShouldNotUpdateGroupProfile() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/profile", 7301L)
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "title": "普通成员不应修改"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("只有群主可以管理群成员"));
+
+        assertEquals("项目推进群", jdbcTemplate.queryForObject(
+            "SELECT title FROM im_conversation WHERE id = 7301",
+            String.class
+        ));
+    }
 
     @Test
     @DisplayName("员工应能创建自定义群聊并自动成为群主")
@@ -242,12 +372,153 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.message").value("群主不能把自己移出群聊"));
     }
 
+    @Test
+    @DisplayName("普通成员应能主动退群")
+    void normalMemberShouldLeaveGroupConversation() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/leave", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].memberId").value(EMPLOYEE_USER_ID));
+
+        assertEquals("LEFT", jdbcTemplate.queryForObject(
+            "SELECT status FROM im_conversation_member WHERE conversation_id = 7301 AND member_id = ?",
+            String.class,
+            MANAGER_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("群主不能直接退群")
+    void ownerShouldNotLeaveGroupConversation() throws Exception {
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/leave", 7301L)
+                .cookie(ownerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("群主不能直接退群，请先解散群聊或转让群主"));
+
+        assertEquals("ACTIVE", jdbcTemplate.queryForObject(
+            "SELECT status FROM im_conversation_member WHERE conversation_id = 7301 AND member_id = ?",
+            String.class,
+            EMPLOYEE_USER_ID
+        ));
+    }
+
+    @Test
+    @DisplayName("群主应能解散自定义群聊")
+    void ownerShouldDismissCustomGroupConversation() throws Exception {
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/dismiss", 7301L)
+                .cookie(ownerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        assertEquals("DISMISSED", jdbcTemplate.queryForObject(
+            "SELECT status FROM im_conversation WHERE id = 7301",
+            String.class
+        ));
+        assertEquals("DISMISSED", jdbcTemplate.queryForObject(
+            "SELECT status FROM im_group_profile WHERE conversation_id = 7301",
+            String.class
+        ));
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation_member WHERE conversation_id = 7301 AND status = 'ACTIVE'",
+            Long.class
+        ));
+
+        mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/members", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("仅群聊支持成员列表"));
+    }
+
+    @Test
+    @DisplayName("普通成员不能解散群聊")
+    void normalMemberShouldNotDismissGroupConversation() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/dismiss", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("只有群主可以管理群成员"));
+
+        assertEquals("ACTIVE", jdbcTemplate.queryForObject(
+            "SELECT status FROM im_conversation WHERE id = 7301",
+            String.class
+        ));
+    }
+
+    @Test
+    @DisplayName("同群成员应能发起私聊")
+    void groupMembersShouldStartPrivateConversationWithEachOther() throws Exception {
+        Cookie memberSession = loginEmployee("zhangsan.employee");
+        seedCustomGroupWithCoworkerOnly();
+
+        mockMvc.perform(post("/api/employee/im/private-conversations")
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetUserId": 2004
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationType").value("PRIVATE"))
+            .andExpect(jsonPath("$.data.conversationKey").value("PRIVATE:2003:2004"))
+            .andExpect(jsonPath("$.data.memberRole").value("MEMBER"));
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation WHERE conversation_key = 'PRIVATE:2003:2004'",
+            Long.class
+        ));
+        assertEquals(2L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_conversation_member WHERE conversation_id IN (SELECT id FROM im_conversation WHERE conversation_key = 'PRIVATE:2003:2004')",
+            Long.class
+        ));
+    }
+
     private void seedCustomGroup() {
         jdbcTemplate.update("""
             INSERT INTO im_conversation
                 (id, conversation_type, title, last_message_seq, status, created_by, updated_by, is_deleted)
             VALUES
                 (7301, 'GROUP', '项目推进群', 0, 'ACTIVE', 2003, 2003, 0)
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO im_group_profile
+                (id, conversation_id, group_type, owner_user_id, notice_text, status, created_by, updated_by)
+            VALUES
+                (7302, 7301, 'CUSTOM', 2003, '第一版公告', 'ACTIVE', 2003, 2003)
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation_member
+                (id, conversation_id, member_type, member_id, member_role, join_source, last_read_seq, status)
+            VALUES
+                (7303, 7301, 'USER', ?, 'OWNER', 'CREATE', 0, 'ACTIVE'),
+                (7304, 7301, 'USER', ?, 'MEMBER', 'CREATE', 0, 'ACTIVE')
+            """, EMPLOYEE_USER_ID, MANAGER_USER_ID);
+    }
+
+    private void seedCustomGroupWithCoworkerOnly() {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation
+                (id, conversation_type, title, last_message_seq, status, created_by, updated_by, is_deleted)
+            VALUES
+                (7301, 'GROUP', '同组协作群', 0, 'ACTIVE', 2003, 2003, 0)
             """);
         jdbcTemplate.update("""
             INSERT INTO im_group_profile
@@ -261,7 +532,7 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             VALUES
                 (7303, 7301, 'USER', ?, 'OWNER', 'CREATE', 0, 'ACTIVE'),
                 (7304, 7301, 'USER', ?, 'MEMBER', 'CREATE', 0, 'ACTIVE')
-            """, EMPLOYEE_USER_ID, MANAGER_USER_ID);
+            """, EMPLOYEE_USER_ID, OTHER_EMPLOYEE_USER_ID);
     }
 
     private Cookie loginEmployee(String loginName) throws Exception {

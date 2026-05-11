@@ -12,6 +12,7 @@ public class ImConversationMemberResponse {
 
     private Long memberId;
     private String memberType;
+    private String displayName;
     private String memberRole;
     private String status;
     private LocalDateTime joinedAt;

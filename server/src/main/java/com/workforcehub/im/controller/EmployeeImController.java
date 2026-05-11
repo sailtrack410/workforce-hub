@@ -1,16 +1,28 @@
 package com.workforcehub.im.controller;
 
 import com.workforcehub.common.response.R;
+import com.workforcehub.file.controller.FileDownloadResponseFactory;
+import com.workforcehub.file.dto.CreateDownloadTicketRequest;
+import com.workforcehub.file.dto.DownloadFileResult;
+import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.im.dto.CreateGroupConversationRequest;
+import com.workforcehub.im.dto.EditImMessageRequest;
 import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
+import com.workforcehub.im.dto.ImConversationDetailResponse;
 import com.workforcehub.im.dto.ImConversationMemberResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
+import com.workforcehub.im.dto.ImGroupProfileResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
+import com.workforcehub.im.dto.StartAgentConversationRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
+import com.workforcehub.im.dto.UpdateConversationPreferenceRequest;
+import com.workforcehub.im.dto.UpdateGroupConversationRequest;
 import com.workforcehub.im.dto.UpdateReadPositionRequest;
 import com.workforcehub.im.service.ImService;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,14 +41,19 @@ import java.util.List;
 public class EmployeeImController {
 
     private final ImService imService;
+    private final FileDownloadResponseFactory downloadResponseFactory;
 
-    public EmployeeImController(ImService imService) {
+    public EmployeeImController(ImService imService,
+                                FileDownloadResponseFactory downloadResponseFactory) {
         this.imService = imService;
+        this.downloadResponseFactory = downloadResponseFactory;
     }
 
     @GetMapping("/conversations")
-    public R<List<ImConversationSummaryResponse>> conversations() {
-        return R.ok(imService.listCurrentEmployeeConversations());
+    public R<List<ImConversationSummaryResponse>> conversations(@RequestParam(required = false) String beforeLastMessageAt,
+                                                                @RequestParam(required = false) Long beforeConversationId,
+                                                                @RequestParam(required = false) Integer size) {
+        return R.ok(imService.listCurrentEmployeeConversations(beforeLastMessageAt, beforeConversationId, size));
     }
 
     @PostMapping("/private-conversations")
@@ -51,6 +68,36 @@ public class EmployeeImController {
         @Valid @RequestBody CreateGroupConversationRequest request
     ) {
         return R.ok(imService.createCurrentEmployeeGroupConversation(request));
+    }
+
+    @PostMapping("/agent-conversations")
+    public R<ImConversationSummaryResponse> startAgentConversation(
+        @Valid @RequestBody StartAgentConversationRequest request
+    ) {
+        return R.ok(imService.startCurrentEmployeeAgentConversation(request));
+    }
+
+    @GetMapping("/conversations/{conversationId}")
+    public R<ImConversationDetailResponse> conversationDetail(@PathVariable Long conversationId) {
+        return R.ok(imService.getCurrentEmployeeConversationDetail(conversationId));
+    }
+
+    @GetMapping("/group-conversations/{conversationId}/members")
+    public R<List<ImConversationMemberResponse>> groupMembers(@PathVariable Long conversationId) {
+        return R.ok(imService.listCurrentEmployeeGroupMembers(conversationId));
+    }
+
+    @GetMapping("/group-conversations/{conversationId}/profile")
+    public R<ImGroupProfileResponse> groupProfile(@PathVariable Long conversationId) {
+        return R.ok(imService.getCurrentEmployeeGroupProfile(conversationId));
+    }
+
+    @PostMapping("/group-conversations/{conversationId}/profile")
+    public R<ImGroupProfileResponse> updateGroupProfile(
+        @PathVariable Long conversationId,
+        @Valid @RequestBody UpdateGroupConversationRequest request
+    ) {
+        return R.ok(imService.updateCurrentEmployeeGroupProfile(conversationId, request));
     }
 
     @PostMapping("/group-conversations/{conversationId}/members")
@@ -69,6 +116,17 @@ public class EmployeeImController {
         return R.ok(imService.removeCurrentEmployeeGroupMembers(conversationId, request));
     }
 
+    @PostMapping("/group-conversations/{conversationId}/leave")
+    public R<List<ImConversationMemberResponse>> leaveGroup(@PathVariable Long conversationId) {
+        return R.ok(imService.leaveCurrentEmployeeGroupConversation(conversationId));
+    }
+
+    @PostMapping("/group-conversations/{conversationId}/dismiss")
+    public R<Void> dismissGroup(@PathVariable Long conversationId) {
+        imService.dismissCurrentEmployeeGroupConversation(conversationId);
+        return R.ok();
+    }
+
     @GetMapping("/conversations/{conversationId}/messages")
     public R<List<ImMessageResponse>> messages(@PathVariable Long conversationId,
                                                 @RequestParam(required = false) Long beforeSeq,
@@ -82,9 +140,51 @@ public class EmployeeImController {
         return R.ok(imService.sendCurrentEmployeeMessage(conversationId, request));
     }
 
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/edit")
+    public R<ImMessageResponse> editMessage(@PathVariable Long conversationId,
+                                            @PathVariable Long messageId,
+                                            @Valid @RequestBody EditImMessageRequest request) {
+        return R.ok(imService.editCurrentEmployeeMessage(conversationId, messageId, request));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/recall")
+    public R<ImMessageResponse> recallMessage(@PathVariable Long conversationId,
+                                              @PathVariable Long messageId) {
+        return R.ok(imService.recallCurrentEmployeeMessage(conversationId, messageId));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/attachments/{attachmentRefId}/download-tickets")
+    public R<DownloadTicketResponse> createMessageAttachmentDownloadTicket(
+        @PathVariable Long conversationId,
+        @PathVariable Long messageId,
+        @PathVariable Long attachmentRefId,
+        @Valid @RequestBody CreateDownloadTicketRequest request
+    ) {
+        return R.ok(imService.createCurrentEmployeeMessageAttachmentDownloadTicket(
+            conversationId,
+            messageId,
+            attachmentRefId,
+            request
+        ));
+    }
+
+    @GetMapping("/attachments/download/{ticketNo}")
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable String ticketNo) {
+        DownloadFileResult result = imService.downloadCurrentEmployeeAttachment(ticketNo);
+        return downloadResponseFactory.attachment(result);
+    }
+
     @PostMapping("/conversations/{conversationId}/read-position")
     public R<ImConversationSummaryResponse> updateReadPosition(@PathVariable Long conversationId,
                                                                @Valid @RequestBody UpdateReadPositionRequest request) {
         return R.ok(imService.updateCurrentEmployeeReadPosition(conversationId, request));
+    }
+
+    @PostMapping("/conversations/{conversationId}/preference")
+    public R<ImConversationSummaryResponse> updatePreference(
+        @PathVariable Long conversationId,
+        @Valid @RequestBody UpdateConversationPreferenceRequest request
+    ) {
+        return R.ok(imService.updateCurrentEmployeeConversationPreference(conversationId, request));
     }
 }

@@ -7,6 +7,15 @@ package com.workforcehub.spi;
 public interface ImAgentTriggerService {
 
     /**
+     * 校验当前员工是否可在 IM 中使用指定 Agent，并返回会话展示元信息。
+     *
+     * @param agentId Agent ID
+     * @param userId 员工用户 ID
+     * @return Agent 元信息
+     */
+    ImAgentDescriptor requireUsableAgent(Long agentId, Long userId);
+
+    /**
      * 在会话中触发 Agent 回复
      *
      * @param conversationId 会话ID
