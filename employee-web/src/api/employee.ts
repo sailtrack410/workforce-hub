@@ -3,9 +3,11 @@ import type {
   AttendanceDateRangeQuery,
   ClockCorrectionRequestCreateRequest,
   ConfirmUploadRequest,
+  CreateGroupConversationRequest,
   CreateDownloadTicketRequest,
   CreateUploadTicketRequest,
   CurrentUserResponse,
+  ImMessageListQuery,
   FileTrashRequest,
   ImConversationSummaryResponse,
   ImMessageResponse,
@@ -14,6 +16,8 @@ import type {
   LoginResponse,
   PageResult,
   SendImMessageRequest,
+  StartPrivateConversationRequest,
+  UpdateReadPositionRequest,
   UnknownRecord,
   WorkflowRequestListQuery,
   WorkflowRequestSummaryResponse,
@@ -61,11 +65,20 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
     },
     im: {
       conversations: () => client.get<ImConversationSummaryResponse[]>('/api/employee/im/conversations'),
-      messages: (conversationId: number) => (
-        client.get<ImMessageResponse[]>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages`)
+      messages: (conversationId: number, query: ImMessageListQuery = {}) => (
+        client.get<ImMessageResponse[]>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages`, { query })
+      ),
+      startPrivateConversation: (request: StartPrivateConversationRequest) => (
+        client.post<ImConversationSummaryResponse>('/api/employee/im/private-conversations', request)
+      ),
+      createGroupConversation: (request: CreateGroupConversationRequest) => (
+        client.post<ImConversationSummaryResponse>('/api/employee/im/group-conversations', request)
       ),
       sendMessage: (conversationId: number, request: SendImMessageRequest) => (
         client.post<ImMessageResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages`, request)
+      ),
+      updateReadPosition: (conversationId: number, request: UpdateReadPositionRequest) => (
+        client.post<ImConversationSummaryResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/read-position`, request)
       ),
     },
     files: {

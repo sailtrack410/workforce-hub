@@ -89,6 +89,11 @@ export interface SendImMessageRequest {
   clientMessageId?: string;
 }
 
+export interface ImMessageListQuery extends QueryParams {
+  beforeSeq?: number;
+  size?: number;
+}
+
 export interface ImConversationSummaryResponse {
   conversationId: number;
   conversationType: string;
@@ -105,6 +110,19 @@ export interface ImConversationSummaryResponse {
   pin: boolean;
   mute: boolean;
   memberRole: string;
+}
+
+export interface StartPrivateConversationRequest {
+  targetUserId: number;
+}
+
+export interface CreateGroupConversationRequest {
+  title: string;
+  memberUserIds: number[];
+}
+
+export interface UpdateReadPositionRequest {
+  lastReadSeq: number;
 }
 
 export interface LeaveRequestCreateRequest {

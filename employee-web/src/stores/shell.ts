@@ -38,6 +38,7 @@ export interface ConversationMessage {
   body: string;
   side?: 'left' | 'right' | 'system';
   time?: string;
+  processCard?: ConversationProcessCard;
 }
 
 export interface ConversationCard {
@@ -60,10 +61,43 @@ export interface ConversationAttachment {
   status: string;
 }
 
+export interface ConversationProcessCheck {
+  label: string;
+  result: string;
+  passed: boolean;
+}
+
+export interface ConversationProcessCard {
+  title: string;
+  status: string;
+  statusTone: 'info' | 'success' | 'warning' | 'neutral';
+  body: string;
+  fields?: Array<[string, string]>;
+  checks?: ConversationProcessCheck[];
+  file?: ConversationAttachment;
+  actionLabel: string;
+}
+
+export interface ConversationAuditRecord {
+  label: string;
+  actor: string;
+  time: string;
+  status: string;
+  statusTone: 'done' | 'current' | 'pending' | 'rejected';
+  detail: string;
+}
+
+export interface ConversationEvidence {
+  label: string;
+  value: string;
+}
+
 export interface ConversationPanel {
   members: Array<{ name: string; role: string }>;
   tasks: string[];
   attachments: ConversationAttachment[];
+  auditTrail?: ConversationAuditRecord[];
+  agentEvidence?: ConversationEvidence[];
 }
 
 export interface ConversationRecord {
@@ -272,7 +306,70 @@ const conversations: ConversationRecord[] = [
     ],
     messages: [
       { id: 'system-1', author: '系统', role: '工作流消息', body: '请假申请已写入业务申请头，待办已投递给直属上级。', side: 'system' },
-      { id: 'agent-card', author: 'HR 助手', role: '预审 Agent', body: '余额预审通过。申请链路将先进入直属上级审批，附件与请假时长已完成一致性检查。', side: 'left' },
+      {
+        id: 'agent-submit',
+        type: 'process-card',
+        author: 'HR 助手',
+        role: '流程 Agent',
+        body: '王晨提交的年假申请已进入审批链路，请相关审批人按节点处理。',
+        side: 'left',
+        time: '10:20',
+        processCard: {
+          title: '王晨年假申请待确认',
+          status: '审批中',
+          statusTone: 'warning',
+          body: '王晨提交的年假申请已发起，当前等待直属上级确认交接安排与排班冲突。',
+          fields: [
+            ['申请人', '王晨'],
+            ['请假类型', '年假 2 天'],
+            ['起止时间', '5月11日 09:00 - 5月12日 18:00'],
+            ['当前节点', '直属上级审批'],
+          ],
+          actionLabel: '查看详情',
+        },
+      },
+      {
+        id: 'agent-precheck',
+        type: 'process-card',
+        author: 'HR 助手',
+        role: '预审 Agent',
+        body: '根据假期余额、考勤记录和附件完整性，预审结果已生成。',
+        side: 'left',
+        time: '10:22',
+        processCard: {
+          title: 'Agent 预审已通过',
+          status: '已通过',
+          statusTone: 'success',
+          body: '系统已完成第一轮规则校验，审批人可直接查看依据并继续处理。',
+          checks: [
+            { label: '假期余额校验', result: '余额充足', passed: true },
+            { label: '时间范围校验', result: '无排班冲突', passed: true },
+            { label: '历史请假频率', result: '低风险', passed: true },
+          ],
+          fields: [
+            ['建议处理', '可同意'],
+            ['置信度', '98%'],
+          ],
+          actionLabel: '查看预审依据',
+        },
+      },
+      {
+        id: 'agent-file',
+        type: 'process-card',
+        author: '文件 Agent',
+        role: '材料校验',
+        body: '相关材料已确认，审批链路可引用附件。',
+        side: 'left',
+        time: '10:23',
+        processCard: {
+          title: '文件已确认',
+          status: '已完成',
+          statusTone: 'info',
+          body: '请假理由与交接材料齐全，文件引用已纳入本次审批。',
+          file: { id: 'leave-handover', name: '请假交接清单.docx', type: 'DOCX', size: '84KB', status: '已确认' },
+          actionLabel: '查看文件',
+        },
+      },
       { id: 'manager-1', author: '周悦', role: '审批人', body: '下午我会集中处理，请把交接清单再确认一次。', side: 'left' },
       { id: 'me-1', author: '林澈', role: '申请人', body: '附件已上传，补充说明放到文件中心了。', side: 'right' },
     ],
@@ -286,6 +383,18 @@ const conversations: ConversationRecord[] = [
       attachments: [
         { id: 'leave-handover', name: '请假交接清单.docx', type: 'DOCX', size: '84KB', status: '已上传' },
         { id: 'leave-note', name: '年假说明.pdf', type: 'PDF', size: '640KB', status: '审批附件' },
+      ],
+      auditTrail: [
+        { label: '提交申请', actor: '王晨', time: '10:20', status: '已提交', statusTone: 'done', detail: '年假申请进入审批流程。' },
+        { label: 'Agent 预审', actor: 'HR 助手', time: '10:22', status: '已通过', statusTone: 'done', detail: '余额、时间范围、附件完整性均已通过。' },
+        { label: '直属上级审批', actor: '周悦', time: '当前节点', status: '处理中', statusTone: 'current', detail: '等待确认交接安排与团队排班冲突。' },
+        { label: 'HR 归档', actor: '人事专员', time: '待处理', status: '未开始', statusTone: 'pending', detail: '审批通过后写入假期台账并同步考勤。' },
+        { label: '流程结束', actor: '系统', time: '待处理', status: '未开始', statusTone: 'pending', detail: '结果通知申请人和审批相关人。' },
+      ],
+      agentEvidence: [
+        { label: '假期规则', value: '年假管理办法（2024 版）' },
+        { label: '历史数据', value: '王晨近 6 个月请假与考勤记录' },
+        { label: '相似案例', value: '同部门 2 天年假申请通过率 98%' },
       ],
     },
   },
@@ -573,6 +682,9 @@ const todoItems: TodoRecord[] = [
     ],
   },
 ];
+
+const staticTodoItems = todoItems;
+const staticConversations = conversations;
 
 const fileSpaces: FileSpaceRecord[] = [
   {
@@ -945,10 +1057,19 @@ export const useShellStore = defineStore('employee-shell', {
     setListWidth(width: number) {
       this.listWidth = Math.max(260, Math.min(480, Math.round(width)));
     },
+    mergeBackendTodos(backendTodos: TodoRecord[]) {
+      if (!backendTodos.length) return;
+      const backendIds = new Set(backendTodos.map((item) => item.id));
+      const fallbackTodos = staticTodoItems.filter((item) => !backendIds.has(item.id));
+      this.todos = [...backendTodos, ...fallbackTodos];
+      if (!backendIds.has(this.active.todos)) {
+        this.active.todos = this.todos[0]?.id ?? this.active.todos;
+      }
+    },
     mergeBackendConversations(backendConversations: ConversationRecord[]) {
       if (!backendConversations.length) return;
       const backendIds = new Set(backendConversations.map((item) => item.id));
-      const fallbackConversations = conversations.filter((item) => !backendIds.has(item.id));
+      const fallbackConversations = staticConversations.filter((item) => !backendIds.has(item.id));
       this.conversations = [...backendConversations, ...fallbackConversations];
       if (!backendIds.has(this.active.messages)) {
         this.active.messages = this.conversations[0]?.id ?? this.active.messages;
@@ -961,7 +1082,6 @@ export const useShellStore = defineStore('employee-shell', {
       const latestMessage = backendMessages[backendMessages.length - 1];
       conversation.subtitle = latestMessage.body;
       conversation.meta = latestMessage.time || conversation.meta;
-      conversation.unread = 0;
     },
     appendMessage(text: string) {
       const conversation = this.activeConversation;

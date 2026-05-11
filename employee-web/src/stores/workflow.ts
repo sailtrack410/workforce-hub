@@ -45,26 +45,18 @@ export function mapWorkflowTodoToRecord(todo: WorkflowTodoResponse): TodoRecord 
     currentStepName: '待处理',
     summary: todo.summary,
     fields: [
-      ['requestId', String(todo.requestId)],
-      ['taskId', todo.taskId],
-      ['status', todo.status],
-      ['priority', todo.priority ?? 'NORMAL'],
+      ['申请编号', `REQ-${todo.requestId}`],
+      ['任务状态', todo.status],
+      ['优先级', normalizePriority(todo.priority)],
+      ['当前处理', '待处理'],
     ],
-    timeline: ['后端待办已加载', '等待员工处理', '处理后回写审批动作'],
-    apis: [
-      api('GET', '/api/employee/workflow/todos', 'implemented', '员工端待办列表已由后端开放'),
-      api('POST', '/api/employee/workflow/tasks/{taskId}/approve', 'implemented', '审批通过动作已由后端开放'),
-      api('POST', '/api/employee/workflow/tasks/{taskId}/reject', 'implemented', '审批驳回动作已由后端开放'),
-    ],
+    timeline: ['待办已同步', '等待员工处理', '处理完成后更新审批状态'],
+    apis: [],
     actions: [
       { label: '审批通过', action: 'toast', message: '审批通过会通过 workflow 接口写入动作。' },
       { label: '驳回', action: 'toast', message: '驳回会通过 workflow 接口写入动作。' },
     ],
   };
-}
-
-function api(method: 'GET' | 'POST', path: string, status: 'implemented', note: string) {
-  return { method, path, status, note };
 }
 
 function normalizePriority(priority?: string | null) {

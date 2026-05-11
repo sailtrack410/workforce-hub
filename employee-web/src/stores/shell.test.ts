@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { useShellStore, type ConversationMessage, type ConversationRecord } from './shell';
+import { useShellStore, type ConversationMessage, type ConversationRecord, type TodoRecord } from './shell';
 
 describe('useShellStore', () => {
   beforeEach(() => {
@@ -32,6 +32,28 @@ describe('useShellStore', () => {
     expect(steps.filter((step) => step.status === 'current').map((step) => step.label)).toEqual(['直属上级审批']);
   });
 
+  it('keeps approval workflow feedback as agent process messages', () => {
+    const shell = useShellStore();
+
+    const cards = shell.activeConversation.messages.filter((message) => message.type === 'process-card');
+
+    expect(cards).toHaveLength(3);
+    expect(cards.map((message) => message.processCard?.title)).toEqual([
+      '王晨年假申请待确认',
+      'Agent 预审已通过',
+      '文件已确认',
+    ]);
+  });
+
+  it('keeps user-facing conversation detail free from API route strings', () => {
+    const shell = useShellStore();
+    const panelText = JSON.stringify(shell.activeConversation.panel);
+
+    expect(panelText).not.toContain('/api/');
+    expect(panelText).not.toContain('GET ');
+    expect(panelText).not.toContain('POST ');
+  });
+
   it('keeps group member count for compact conversation titles', () => {
     const shell = useShellStore();
 
@@ -47,6 +69,27 @@ describe('useShellStore', () => {
     shell.setFilter('todos', '未处理');
 
     expect(shell.filteredTodos.map((item) => item.id)).toEqual(['todo-attendance']);
+  });
+
+  it('merges loaded backend todos while preserving static fallback data', () => {
+    const shell = useShellStore();
+    const backendTodo: TodoRecord = {
+      ...shell.todos[0],
+      id: 'workflow-todo-10',
+      title: '后端待办',
+      status: 'PENDING',
+      taskId: 'TASK-10',
+    };
+
+    shell.mergeBackendTodos([backendTodo]);
+
+    expect(shell.todos[0]).toMatchObject({
+      id: 'workflow-todo-10',
+      title: '后端待办',
+      taskId: 'TASK-10',
+    });
+    expect(shell.todos.some((item) => item.id === 'todo-approval')).toBe(true);
+    expect(shell.active.todos).toBe('workflow-todo-10');
   });
 
   it('merges loaded backend conversations while preserving static fallback data', () => {

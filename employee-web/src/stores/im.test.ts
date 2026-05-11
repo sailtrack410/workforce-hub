@@ -39,6 +39,13 @@ function createImApi(): EmployeeImApi {
   return {
     conversations: () => Promise.resolve([conversation]),
     messages: () => Promise.resolve([message]),
+    startPrivateConversation: () => Promise.resolve(conversation),
+    createGroupConversation: () => Promise.resolve({
+      ...conversation,
+      conversationId: 7301,
+      conversationType: 'GROUP',
+      title: '项目推进群',
+    }),
     sendMessage: () => Promise.resolve({
       ...message,
       messageId: 7103,
@@ -47,6 +54,11 @@ function createImApi(): EmployeeImApi {
       contentJson: '{"text":"我下午两点同步。"}',
       contentText: '我下午两点同步。',
       sentAt: '2026-05-09T10:12:00',
+    }),
+    updateReadPosition: (_conversationId, request) => Promise.resolve({
+      ...conversation,
+      lastReadSeq: request.lastReadSeq,
+      unreadCount: Math.max(conversation.lastMessageSeq - request.lastReadSeq, 0),
     }),
   };
 }
@@ -108,12 +120,14 @@ describe('IM store', () => {
     const im = useImStore();
 
     await im.loadConversations(createImApi());
-    await im.loadMessages(7001, 2003, createImApi());
+    await im.loadMessages(7001, 2003, {}, createImApi());
 
     expect(im.loading).toBe(false);
     expect(im.messageLoading).toBe(false);
     expect(im.conversations.map((item) => item.id)).toEqual(['7001']);
     expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7102']);
+    expect(im.lastMessageSeqByConversation['7001']).toBe(2);
+    expect(im.lastReadSeqByConversation['7001']).toBe(1);
   });
 
   it('sends text message and appends mapped backend response', async () => {
@@ -138,7 +152,9 @@ describe('IM store', () => {
     im.messagesByConversation['7001'] = [mapImMessageToConversationMessage(message, 2003)];
     const sent = await im.sendMessage(7001, '我下午两点同步。', 2003, imApi);
 
-    expect(requests).toEqual([{ messageType: 'TEXT', text: '我下午两点同步。' }]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ messageType: 'TEXT', text: '我下午两点同步。' });
+    expect(requests[0].clientMessageId).toMatch(/^web-7001-/);
     expect(sent).toMatchObject({
       id: '7103',
       author: '我',
@@ -147,5 +163,65 @@ describe('IM store', () => {
     });
     expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7102', '7103']);
     expect(im.messageSending).toBe(false);
+  });
+
+  it('updates read position and syncs unread count back to conversation list', async () => {
+    const im = useImStore();
+    await im.loadConversations(createImApi());
+
+    const updated = await im.updateReadPosition(7001, 2, createImApi());
+
+    expect(updated.lastReadSeq).toBe(2);
+    expect(im.lastReadSeqByConversation['7001']).toBe(2);
+    expect(im.conversations[0].unread).toBe(0);
+    expect(im.conversations[0].unreadLabel).toBe('已读');
+  });
+
+  it('prepends older message page without duplicating existing messages', async () => {
+    const im = useImStore();
+    im.messagesByConversation['7001'] = [mapImMessageToConversationMessage(message, 2003)];
+    const olderMessage: ImMessageResponse = {
+      ...message,
+      messageId: 7101,
+      seqNo: 1,
+      senderId: 2003,
+      contentJson: '{"text":"我上午可以处理补卡。"}',
+      contentText: '我上午可以处理补卡。',
+      sentAt: '2026-05-09T10:00:00',
+    };
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      messages: () => Promise.resolve([olderMessage, message]),
+    };
+
+    await im.loadMessages(7001, 2003, { beforeSeq: 2, size: 20 }, imApi);
+
+    expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7101', '7102']);
+  });
+
+  it('creates private conversation and inserts it into conversation list', async () => {
+    const im = useImStore();
+
+    const record = await im.startPrivateConversation(2002, createImApi());
+
+    expect(record).toMatchObject({
+      id: '7001',
+      title: '张三与李四',
+      flow: '私聊',
+    });
+    expect(im.conversations[0].id).toBe('7001');
+  });
+
+  it('creates group conversation and inserts it into conversation list', async () => {
+    const im = useImStore();
+
+    const record = await im.createGroupConversation('项目推进群', [2002, 2004], createImApi());
+
+    expect(record).toMatchObject({
+      id: '7301',
+      title: '项目推进群',
+      flow: '团队协作',
+    });
+    expect(im.conversations[0].id).toBe('7301');
   });
 });

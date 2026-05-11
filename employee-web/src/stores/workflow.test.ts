@@ -37,11 +37,7 @@ describe('workflow store', () => {
       taskId: 'TASK-10',
       currentStepName: '待处理',
     });
-    expect(record.apis.map((api) => api.path)).toEqual([
-      '/api/employee/workflow/todos',
-      '/api/employee/workflow/tasks/{taskId}/approve',
-      '/api/employee/workflow/tasks/{taskId}/reject',
-    ]);
+    expect(record.apis).toEqual([]);
   });
 
   it('loads workflow todos from employee API', async () => {

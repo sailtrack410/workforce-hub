@@ -74,21 +74,27 @@ describe('createEmployeeApi', () => {
     const api = createEmployeeApi(client);
 
     await api.im.conversations();
-    await api.im.messages(7001);
+    await api.im.messages(7001, { beforeSeq: 20, size: 10 });
+    await api.im.startPrivateConversation({ targetUserId: 2002 });
+    await api.im.createGroupConversation({ title: '项目推进群', memberUserIds: [2002, 2004] });
     await api.im.sendMessage(7001, {
       messageType: 'TEXT',
       text: '我下午两点同步。',
       clientMessageId: 'client-msg-001',
     });
+    await api.im.updateReadPosition(7001, { lastReadSeq: 3 });
 
     expect(calls).toEqual([
       ['get', '/api/employee/im/conversations', undefined],
-      ['get', '/api/employee/im/conversations/7001/messages', undefined],
+      ['get', '/api/employee/im/conversations/7001/messages', { query: { beforeSeq: 20, size: 10 } }],
+      ['post', '/api/employee/im/private-conversations', { targetUserId: 2002 }],
+      ['post', '/api/employee/im/group-conversations', { title: '项目推进群', memberUserIds: [2002, 2004] }],
       ['post', '/api/employee/im/conversations/7001/messages', {
         messageType: 'TEXT',
         text: '我下午两点同步。',
         clientMessageId: 'client-msg-001',
       }],
+      ['post', '/api/employee/im/conversations/7001/read-position', { lastReadSeq: 3 }],
     ]);
   });
 });

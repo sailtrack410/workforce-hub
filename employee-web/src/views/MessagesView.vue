@@ -16,19 +16,22 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-vue-next';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { SectionAction, SectionFilter, SectionId } from '../stores/shell';
 import { navItems, sectionFilters, shellUser, useShellStore } from '../stores/shell';
 import { useImStore } from '../stores/im';
 import { useSessionStore } from '../stores/session';
+import { useWorkflowStore } from '../stores/workflow';
 
 const shell = useShellStore();
 const im = useImStore();
 const session = useSessionStore();
+const workflow = useWorkflowStore();
 const draft = ref('');
 const searchOpen = ref(true);
 const resizing = ref(false);
 const toastMessage = ref('');
+const messageStream = ref<HTMLElement | null>(null);
 let toastTimer: ReturnType<typeof window.setTimeout> | undefined;
 
 const sectionIcons: Record<SectionId, typeof MessageCircle> = {
@@ -112,7 +115,7 @@ function selectNav(section: SectionId) {
 
 async function syncConversationMessages(id: string) {
   const conversationId = Number(id);
-  if (!Number.isSafeInteger(conversationId)) return;
+  if (!Number.isFinite(conversationId)) return;
   if (!session.user && !session.loading) {
     await session.loadCurrentUser();
   }
@@ -120,6 +123,21 @@ async function syncConversationMessages(id: string) {
   const messages = im.messagesByConversation[id];
   if (messages?.length) {
     shell.mergeBackendMessages(id, messages);
+    const lastSeq = im.lastMessageSeqByConversation[id];
+    const lastReadSeq = im.lastReadSeqByConversation[id] ?? 0;
+    if (typeof lastSeq === 'number' && lastSeq > lastReadSeq) {
+      try {
+        const updated = await im.updateReadPosition(conversationId, lastSeq);
+        const conversation = shell.conversations.find((item) => item.id === id);
+        if (conversation) {
+          conversation.unread = updated.unreadCount;
+          conversation.unreadLabel = updated.unreadCount > 0 ? '未读消息' : '已读';
+        }
+      } catch {
+        // 已读回写失败不阻断消息展示
+      }
+    }
+    await scrollMessagesToLatest('auto');
   }
 }
 
@@ -138,6 +156,16 @@ function openDetail() {
 
 function closeDetail() {
   shell.setDetailOpen(false);
+}
+
+async function scrollMessagesToLatest(behavior: ScrollBehavior = 'smooth') {
+  await nextTick();
+  const stream = messageStream.value;
+  if (!stream) return;
+  stream.scrollTo({
+    top: stream.scrollHeight,
+    behavior,
+  });
 }
 
 async function sendMessage() {
@@ -160,6 +188,7 @@ async function sendMessage() {
       shell.mergeBackendMessages(conversationKey, messages);
     }
     draft.value = '';
+    await scrollMessagesToLatest();
   } catch (error) {
     showToast(error instanceof Error ? error.message : '消息发送失败，请稍后重试。');
   }
@@ -203,6 +232,11 @@ onMounted(() => {
   const currentUserReady = session.initialized
     ? Promise.resolve()
     : session.loadCurrentUser().catch(() => undefined);
+  void workflow.loadTodos().then(() => {
+    if (workflow.todos.length) {
+      shell.mergeBackendTodos(workflow.todos);
+    }
+  });
   void currentUserReady.then(() => im.loadConversations()).then(() => {
     if (im.conversations.length) {
       shell.mergeBackendConversations(im.conversations);
@@ -440,27 +474,7 @@ onBeforeUnmount(() => {
           </div>
         </header>
 
-        <section class="message-stream">
-          <button class="workflow-progress" type="button" @click="openDetail">
-            <div class="workflow-progress-head">
-              <strong>{{ activeConversation.flow }}</strong>
-              <span>{{ activeConversationCurrentStep?.detail ?? activeConversation.summaryTitle }}</span>
-            </div>
-            <div class="workflow-steps" :style="{ '--step-count': activeConversation.workflowSteps.length }">
-              <div class="workflow-line" aria-hidden="true"></div>
-              <span
-                v-for="step in activeConversation.workflowSteps"
-                :key="step.label"
-                class="workflow-step"
-                :class="step.status"
-              >
-                <i aria-hidden="true"></i>
-                <em>{{ step.label }}</em>
-                <b v-if="step.status === 'current'">{{ step.detail }}</b>
-              </span>
-            </div>
-          </button>
-
+        <section ref="messageStream" class="message-stream">
           <template
             v-for="message in activeConversation.messages"
             :key="message.id"
@@ -471,6 +485,60 @@ onBeforeUnmount(() => {
             >
               <strong>{{ message.author }} · {{ message.role }}</strong>
               <span>{{ message.body }}</span>
+            </article>
+            <article
+              v-else-if="message.type === 'process-card' && message.processCard"
+              class="process-card-message"
+            >
+              <div class="bubble-avatar agent-avatar">{{ message.author.slice(0, 1) }}</div>
+              <div class="agent-process-wrap">
+                <div class="bubble-meta">
+                  <strong>{{ message.author }}</strong>
+                  <span>{{ message.role }}</span>
+                  <time v-if="message.time">{{ message.time }}</time>
+                </div>
+                <button class="agent-process-card" type="button" @click="openDetail">
+                  <span class="process-card-head">
+                    <strong>{{ message.processCard.title }}</strong>
+                    <em :class="`tone-${message.processCard.statusTone}`">{{ message.processCard.status }}</em>
+                  </span>
+                  <span class="process-card-copy">{{ message.processCard.body }}</span>
+
+                  <span v-if="message.processCard.fields?.length" class="process-fields">
+                    <span v-for="field in message.processCard.fields" :key="field[0]">
+                      <small>{{ field[0] }}</small>
+                      <b>{{ field[1] }}</b>
+                    </span>
+                  </span>
+
+                  <span v-if="message.processCard.checks?.length" class="process-checks">
+                    <span
+                      v-for="check in message.processCard.checks"
+                      :key="check.label"
+                      :class="{ passed: check.passed }"
+                    >
+                      <i aria-hidden="true"></i>
+                      <span>
+                        <strong>{{ check.label }}</strong>
+                        <small>{{ check.result }}</small>
+                      </span>
+                    </span>
+                  </span>
+
+                  <span v-if="message.processCard.file" class="process-file">
+                    <span class="attachment-icon">{{ message.processCard.file.type }}</span>
+                    <span>
+                      <strong>{{ message.processCard.file.name }}</strong>
+                      <small>{{ message.processCard.file.size }} · {{ message.processCard.file.status }}</small>
+                    </span>
+                  </span>
+
+                  <span class="process-card-foot">
+                    <span>{{ message.body }}</span>
+                    <b>{{ message.processCard.actionLabel }}</b>
+                  </span>
+                </button>
+              </div>
             </article>
             <article
               v-else
@@ -657,21 +725,38 @@ onBeforeUnmount(() => {
       </header>
 
       <template v-if="isMessages">
-        <section class="context-block context-progress">
-          <h3>流程进度</h3>
-          <div class="context-steps">
+        <section class="context-block audit-block">
+          <h3>审核链路</h3>
+          <div class="audit-chain">
             <span
-              v-for="step in activeConversation.workflowSteps"
-              :key="step.label"
-              :class="step.status"
+              v-for="record in activeConversation.panel.auditTrail"
+              :key="`${record.label}-${record.actor}`"
+              class="audit-step"
+              :class="record.statusTone"
             >
-              <strong>{{ step.label }}</strong>
-              {{ step.detail }}
+              <i aria-hidden="true"></i>
+              <span class="audit-step-main">
+                <strong>{{ record.label }}</strong>
+                <em>{{ record.actor }} · {{ record.time }}</em>
+                <small>{{ record.detail }}</small>
+              </span>
+              <b>{{ record.status }}</b>
             </span>
           </div>
         </section>
 
-        <section class="context-block">
+        <section class="context-block evidence-block">
+          <h3>Agent 审核依据</h3>
+          <div v-if="activeConversation.panel.agentEvidence?.length" class="evidence-list">
+            <span v-for="item in activeConversation.panel.agentEvidence" :key="item.label">
+              <small>{{ item.label }}</small>
+              <strong>{{ item.value }}</strong>
+            </span>
+          </div>
+          <p v-else class="empty-inline">暂无审核依据</p>
+        </section>
+
+        <section class="context-block materials-block">
           <h3>相关材料</h3>
           <div v-if="activeConversation.panel.attachments.length" class="attachment-list">
             <button
@@ -689,33 +774,6 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <p v-else class="empty-inline">无文件</p>
-        </section>
-
-        <section class="context-block">
-          <h3>关键字段</h3>
-          <div class="task-list">
-            <span v-for="card in activeConversation.cards" :key="card.label">
-              <strong>{{ card.value }}</strong>
-              {{ card.hint }}
-            </span>
-          </div>
-        </section>
-
-        <section class="context-block">
-          <h3>相关成员</h3>
-          <div class="member-list">
-            <span v-for="member in activeConversation.panel.members" :key="member.name">
-              <strong>{{ member.name }}</strong>
-              {{ member.role }}
-            </span>
-          </div>
-        </section>
-
-        <section class="context-block">
-          <h3>相关任务</h3>
-          <div class="task-list">
-            <span v-for="task in activeConversation.panel.tasks" :key="task">{{ task }}</span>
-          </div>
         </section>
       </template>
 

@@ -8,27 +8,26 @@
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
-  --bg: #f5f6f8;
-  --surface: #fbfbfc;
-  --surface-muted: #eef1f5;
-  --surface-strong: #e4eaf1;
-  --ink: #202833;
-  --ink-soft: #535f6c;
-  --muted: #7c8794;
-  --line: #d9e0e8;
-  --primary: #416f9a;
-  --primary-soft: #e5edf6;
-  --green: #4e7f6b;
-  --green-soft: #e1eee8;
-  --amber: #9b742d;
-  --amber-soft: #f1e6d2;
-  --red: #ad574d;
-  --red-soft: #f1dedb;
-  --rail: #2b3947;
-  --rail-active: #eaf0f6;
-  --shadow: 0 18px 48px rgba(32, 40, 51, 0.1);
-  --content-max: 1180px;
-  --content-pad: clamp(18px, 2.2vw, 32px);
+  --bg: #f4f7fb;
+  --surface: #fbfcfe;
+  --surface-muted: #eef3f8;
+  --surface-strong: #dfe8f2;
+  --ink: #202a36;
+  --ink-soft: #536171;
+  --muted: #7b8795;
+  --line: #d8e1eb;
+  --primary: #3f668e;
+  --primary-soft: #e3ebf5;
+  --green: #527b70;
+  --green-soft: #e4eee9;
+  --amber: #987542;
+  --amber-soft: #f1e8d9;
+  --red: #aa5c56;
+  --red-soft: #f0dfdd;
+  --rail: #2b3541;
+  --rail-active: #eef4fa;
+  --shadow: 0 18px 48px rgba(32, 42, 54, 0.09);
+  --content-pad: clamp(20px, 2vw, 34px);
 }
 
 * {
@@ -69,6 +68,7 @@ p {
 .employee-shell {
   display: grid;
   grid-template-columns: 76px var(--list-width, 356px) minmax(0, 1fr);
+  height: 100vh;
   min-height: 100vh;
   overflow: hidden;
   background: var(--bg);
@@ -175,6 +175,7 @@ p {
   grid-column: 2;
   grid-row: 1;
   display: grid;
+  min-height: 0;
   min-width: 0;
   grid-template-rows: auto minmax(0, 1fr);
   border-right: 1px solid var(--line);
@@ -451,10 +452,17 @@ p {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  width: 56px;
+  min-width: 56px;
+  position: relative;
 }
 
 .item-unread {
+  position: absolute;
+  top: 21px;
+  right: 0;
   display: inline-grid;
   min-width: 16px;
   height: 16px;
@@ -489,6 +497,17 @@ p {
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.item-time {
+  display: block;
+  width: 56px;
+  margin-top: 0;
+  text-align: right;
+}
+
+.message-list-item .item-note {
+  padding-right: 26px;
 }
 
 .pill {
@@ -559,15 +578,19 @@ p {
 .main-pane {
   grid-column: 3;
   grid-row: 1;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
   background: var(--bg);
 }
 
 .workspace {
   display: grid;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: stretch;
+  overflow: hidden;
 }
 
 .workspace-head {
@@ -579,7 +602,7 @@ p {
   justify-content: space-between;
   gap: 16px;
   min-height: 64px;
-  padding: 11px max(var(--content-pad), calc((100% - var(--content-max)) / 2));
+  padding: 11px var(--content-pad);
   border-bottom: 1px solid rgba(216, 224, 229, 0.78);
   background: rgba(251, 251, 252, 0.96);
   backdrop-filter: blur(10px);
@@ -628,136 +651,21 @@ p {
 }
 
 .message-stream {
-  overflow: auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  min-height: 0;
   width: 100%;
   margin: 0;
-  padding: 18px max(var(--content-pad), calc((100% - var(--content-max)) / 2)) 34px;
+  overflow: auto;
+  padding: 18px var(--content-pad) 34px;
   background: var(--bg);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.workflow-progress {
-  display: grid;
-  gap: 12px;
-  width: 100%;
-  margin-bottom: 16px;
-  border: 1px solid rgba(217, 224, 232, 0.9);
-  border-radius: 8px;
-  padding: 14px 16px;
-  background: rgba(251, 251, 252, 0.8);
-  color: var(--ink);
-  text-align: left;
-}
-
-.workflow-progress:hover,
-.workflow-progress:focus-visible {
-  outline: none;
-  border-color: rgba(65, 111, 154, 0.34);
-  background: var(--surface);
-}
-
-.workflow-progress-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  min-width: 0;
-}
-
-.workflow-progress-head strong {
-  flex: 0 0 auto;
-  font-size: 14px;
-  font-weight: 780;
-}
-
-.workflow-progress-head span {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workflow-steps {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(var(--step-count), minmax(0, 1fr));
-  gap: 8px;
-  padding-top: 2px;
-}
-
-.workflow-line {
-  position: absolute;
-  top: 10px;
-  right: calc((100% / var(--step-count)) / 2);
-  left: calc((100% / var(--step-count)) / 2);
-  height: 1px;
-  background: linear-gradient(90deg, var(--primary) 0 66%, var(--line) 66% 100%);
-}
-
-.workflow-step {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  justify-items: center;
-  align-content: start;
-  gap: 5px;
-  text-align: center;
-}
-
-.workflow-step::after {
+.message-stream::-webkit-scrollbar {
   display: none;
-}
-
-.workflow-step i {
-  position: relative;
-  z-index: 2;
-  display: block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface);
-}
-
-.workflow-step.done i {
-  border-color: var(--primary);
-  background: var(--primary);
-}
-
-.workflow-step.current i {
-  border-color: var(--primary);
-  background:
-    radial-gradient(circle at center, var(--primary) 0 4px, transparent 5px),
-    var(--surface);
-}
-
-.workflow-step em {
-  overflow: hidden;
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workflow-step.current em {
-  color: var(--primary);
-  font-weight: 760;
-}
-
-.workflow-step b {
-  overflow: hidden;
-  max-width: 180px;
-  margin-top: -1px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .summary-panel h3,
@@ -799,13 +707,14 @@ p {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  max-width: min(760px, 76%);
+  max-width: calc(100% - 56px);
   margin-top: 14px;
 }
 
 .message-bubble.right {
   margin-left: auto;
   flex-direction: row-reverse;
+  max-width: 82%;
 }
 
 .bubble-avatar {
@@ -854,6 +763,228 @@ p {
   line-height: 1.55;
 }
 
+.process-card-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.agent-avatar {
+  background: var(--surface-strong);
+  color: var(--primary);
+}
+
+.agent-process-wrap {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 7px;
+}
+
+.bubble-meta time {
+  color: var(--muted);
+}
+
+.agent-process-card {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  border: 1px solid rgba(219, 227, 236, 0.7);
+  border-radius: 9px;
+  padding: 16px 18px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(35, 49, 63, 0.035);
+  color: var(--ink);
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.agent-process-card:hover,
+.agent-process-card:focus-visible {
+  background: var(--surface);
+}
+
+.agent-process-card:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(53, 95, 140, 0.18),
+    0 6px 18px rgba(35, 49, 63, 0.035);
+}
+
+.process-card-head,
+.process-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.process-card-head strong {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-card-head em {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.process-card-head .tone-warning {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.process-card-head .tone-success {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.process-card-head .tone-info {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.process-card-head .tone-neutral {
+  background: var(--surface-muted);
+  color: var(--ink-soft);
+}
+
+.process-card-copy {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.process-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 13px;
+}
+
+.process-fields span,
+.process-checks span,
+.process-file {
+  min-width: 0;
+}
+
+.process-fields small,
+.process-file small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.process-fields b {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-checks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.process-checks > span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface-muted);
+}
+
+.process-checks i {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.process-checks .passed i {
+  border-color: var(--green);
+  background:
+    linear-gradient(135deg, transparent 0 45%, #fff 45% 55%, transparent 55% 100%),
+    var(--green);
+}
+
+.process-checks strong,
+.process-checks small {
+  display: block;
+}
+
+.process-checks strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.process-checks small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.process-file {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.process-file strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-card-foot {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.process-card-foot span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-card-foot b {
+  flex: 0 0 auto;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 780;
+}
+
 .composer {
   display: grid;
   grid-template-rows: auto auto;
@@ -862,7 +993,7 @@ p {
   width: 100%;
   margin: 0;
   border-top: 1px solid var(--line);
-  padding: 8px max(var(--content-pad), calc((100% - var(--content-max)) / 2)) 10px;
+  padding: 8px var(--content-pad) 10px;
   background: rgba(251, 251, 252, 0.96);
   box-shadow: 0 -10px 30px rgba(32, 40, 51, 0.05);
 }
@@ -984,6 +1115,12 @@ p {
   font-size: 15px;
 }
 
+.audit-block,
+.evidence-block,
+.materials-block {
+  gap: 12px;
+}
+
 .member-list,
 .task-list,
 .context-steps {
@@ -1075,6 +1212,127 @@ p {
   text-align: center;
 }
 
+.audit-chain {
+  position: relative;
+  display: grid;
+  gap: 0;
+}
+
+.audit-chain::before {
+  position: absolute;
+  top: 16px;
+  bottom: 18px;
+  left: 9px;
+  width: 1px;
+  background: var(--line);
+  content: '';
+}
+
+.audit-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 0 18px;
+  color: var(--ink-soft);
+}
+
+.audit-step:last-child {
+  padding-bottom: 2px;
+}
+
+.audit-step > i {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 19px;
+  height: 19px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.audit-step.done > i {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.audit-step.current > i {
+  border-color: var(--primary);
+  background:
+    radial-gradient(circle at center, var(--primary) 0 4px, transparent 5px),
+    var(--surface);
+}
+
+.audit-step.pending > i {
+  background: var(--surface-muted);
+}
+
+.audit-step-main {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.audit-step-main strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.audit-step-main em,
+.audit-step-main small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-step b {
+  align-self: start;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--surface-muted);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.audit-step.done b {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.audit-step.current b {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.evidence-list {
+  display: grid;
+  gap: 10px;
+}
+
+.evidence-list span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.evidence-list small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.evidence-list strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .context-steps span {
   position: relative;
   padding-left: 34px;
@@ -1138,9 +1396,10 @@ p {
 .content-grid {
   display: grid;
   gap: 16px;
-  width: min(calc(100% - (var(--content-pad) * 2)), var(--content-max));
-  margin: 0 auto;
-  padding: 18px 0 30px;
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px var(--content-pad) 30px;
 }
 
 .field-grid {
@@ -1364,44 +1623,6 @@ p {
     width: 100%;
     margin: 0;
     padding: 12px 14px 18px;
-  }
-
-  .workflow-progress {
-    padding: 12px;
-  }
-
-  .workflow-progress-head {
-    display: grid;
-    gap: 4px;
-  }
-
-  .workflow-progress-head span {
-    white-space: normal;
-  }
-
-  .workflow-steps {
-    gap: 4px;
-  }
-
-  .workflow-step {
-    gap: 4px;
-  }
-
-  .workflow-line {
-    top: 9px;
-  }
-
-  .workflow-step i {
-    width: 16px;
-    height: 16px;
-  }
-
-  .workflow-step em {
-    font-size: 11px;
-  }
-
-  .workflow-step b {
-    display: none;
   }
 
   .message-bubble {
