@@ -19,11 +19,17 @@ public class ImWebSocketPushService {
     private static final Logger log = LoggerFactory.getLogger(ImWebSocketPushService.class);
 
     private final ImWebSocketSessionRegistry sessionRegistry;
+    private final ImWebSocketOutboxService outboxService;
+    private final ImWebSocketOutboxDispatcher outboxDispatcher;
     private final ObjectMapper objectMapper;
 
     public ImWebSocketPushService(ImWebSocketSessionRegistry sessionRegistry,
+                                  ImWebSocketOutboxService outboxService,
+                                  ImWebSocketOutboxDispatcher outboxDispatcher,
                                   ObjectMapper objectMapper) {
         this.sessionRegistry = sessionRegistry;
+        this.outboxService = outboxService;
+        this.outboxDispatcher = outboxDispatcher;
         this.objectMapper = objectMapper;
     }
 
@@ -32,7 +38,8 @@ public class ImWebSocketPushService {
         if (recipients.isEmpty()) {
             return;
         }
-        Runnable delivery = () -> pushToUsers(recipients, event);
+        outboxService.enqueue(recipients, event);
+        Runnable delivery = () -> outboxDispatcher.dispatchDueEvents(10);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override

@@ -73,6 +73,7 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
         registry.add("workforce.workflow.enabled", () -> "true");
         registry.add("logging.level.com.workforcehub", () -> "info");
         registry.add("workforce.agent.timeout-scan.enabled", () -> "false");
+        registry.add("workforce.im.outbox.dispatcher.enabled", () -> "false");
         registry.add("flowable.database-schema-update", () -> "false");
         registry.add("flowable.async-executor-activate", () -> "false");
     }
@@ -102,6 +103,7 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM sys_file_cleanup_job_run");
             deleteIfExists(jdbcTemplate, "agt_task_timeout_job_run");
             deleteIfExists(jdbcTemplate, "sys_job_lock");
+            deleteIfExists(jdbcTemplate, "im_event_outbox");
             jdbcTemplate.execute("DELETE FROM sys_todo_item");
             jdbcTemplate.execute("DELETE FROM sys_audit_log");
             jdbcTemplate.execute("DELETE FROM sys_storage_usage");

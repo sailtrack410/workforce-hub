@@ -38,16 +38,29 @@ public class ImWebSocketSessionRegistry {
         }
     }
 
+    public void clear() {
+        sessionsByUserId.clear();
+    }
+
     public int sendToUsers(Collection<Long> userIds, String payload) {
+        try {
+            return sendToUsersOrThrow(userIds, payload);
+        } catch (IOException e) {
+            log.warn("IM WebSocket 推送失败", e);
+            return 0;
+        }
+    }
+
+    public int sendToUsersOrThrow(Collection<Long> userIds, String payload) throws IOException {
         Set<Long> uniqueUserIds = new LinkedHashSet<>(userIds);
         int deliveredCount = 0;
         for (Long userId : uniqueUserIds) {
-            deliveredCount += sendToUser(userId, payload);
+            deliveredCount += sendToUserOrThrow(userId, payload);
         }
         return deliveredCount;
     }
 
-    private int sendToUser(Long userId, String payload) {
+    private int sendToUserOrThrow(Long userId, String payload) throws IOException {
         CopyOnWriteArraySet<WebSocketSession> sessions = sessionsByUserId.get(userId);
         if (sessions == null || sessions.isEmpty()) {
             return 0;
@@ -59,23 +72,21 @@ public class ImWebSocketSessionRegistry {
                 unregister(userId, session);
                 continue;
             }
-            if (send(userId, session, payload)) {
-                deliveredCount++;
-            }
+            sendOrThrow(userId, session, payload);
+            deliveredCount++;
         }
         return deliveredCount;
     }
 
-    private boolean send(Long userId, WebSocketSession session, String payload) {
+    private void sendOrThrow(Long userId, WebSocketSession session, String payload) throws IOException {
         try {
             synchronized (session) {
                 session.sendMessage(new TextMessage(payload));
             }
-            return true;
         } catch (IOException e) {
             log.warn("IM WebSocket 推送失败 userId={} sessionId={}", userId, session.getId(), e);
             unregister(userId, session);
-            return false;
+            throw e;
         }
     }
 }

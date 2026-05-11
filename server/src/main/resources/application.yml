@@ -106,6 +106,15 @@ workforce:
   im:
     websocket:
       allowed-origin-patterns: ${IM_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
+    outbox:
+      dispatcher:
+        enabled: ${IM_OUTBOX_DISPATCHER_ENABLED:true}
+        batch-size: ${IM_OUTBOX_DISPATCHER_BATCH_SIZE:100}
+        max-attempts: ${IM_OUTBOX_DISPATCHER_MAX_ATTEMPTS:5}
+        retry-delay-ms: ${IM_OUTBOX_DISPATCHER_RETRY_DELAY_MS:5000}
+        sending-stale-ms: ${IM_OUTBOX_DISPATCHER_SENDING_STALE_MS:60000}
+        fixed-delay-ms: ${IM_OUTBOX_DISPATCHER_FIXED_DELAY_MS:3000}
+        initial-delay-ms: ${IM_OUTBOX_DISPATCHER_INITIAL_DELAY_MS:3000}
   agent:
     model:
       enabled: ${AGENT_MODEL_ENABLED:false}

@@ -2,6 +2,7 @@ package com.workforcehub.im;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.im.websocket.ImWebSocketOutboxDispatcher;
 import com.workforcehub.im.websocket.ImWebSocketSessionRegistry;
 import com.workforcehub.spi.ImAgentReplyResult;
 import com.workforcehub.spi.ImAgentResultCallback;
@@ -11,6 +12,7 @@ import com.sun.net.httpserver.HttpServer;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -75,6 +77,9 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     private ImWebSocketSessionRegistry webSocketSessionRegistry;
 
     @Autowired
+    private ImWebSocketOutboxDispatcher imWebSocketOutboxDispatcher;
+
+    @Autowired
     private ImAgentResultCallback imAgentResultCallback;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
@@ -98,6 +103,11 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     @DynamicPropertySource
     static void registerAgentModelProperties(DynamicPropertyRegistry registry) {
         registry.add("workforce.agent.model.enabled", () -> "true");
+    }
+
+    @BeforeEach
+    void clearWebSocketSessions() {
+        webSocketSessionRegistry.clear();
     }
 
     @Test
@@ -768,9 +778,53 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         assertSocketEvent(employeeSocket, "IM_MESSAGE_CREATED", 7001L);
         assertSocketEvent(managerSocket, "IM_MESSAGE_CREATED", 7001L);
         assertEquals(0, outsiderSocket.messages().size());
+        awaitOutboxStatus("IM_MESSAGE_CREATED", 7001L, "SENT");
         unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
         unregisterSocket(MANAGER_USER_ID, managerSocket);
         unregisterSocket(OTHER_EMPLOYEE_USER_ID, outsiderSocket);
+    }
+
+    @Test
+    @DisplayName("WebSocket推送失败时outbox应保留失败记录并支持重试")
+    void websocketOutboxShouldRetryFailedDelivery() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+        FailingOnceWebSocketSession employeeSocket = new FailingOnceWebSocketSession(EMPLOYEE_USER_ID);
+        webSocketSessionRegistry.register(EMPLOYEE_USER_ID, employeeSocket);
+        CapturingWebSocketSession managerSocket = registerSocket(MANAGER_USER_ID);
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", 7001L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "失败后要能重试。",
+                      "clientMessageId": "client-msg-push-retry-001"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        awaitOutboxStatus("IM_MESSAGE_CREATED", 7001L, "FAILED");
+        assertEquals(0, employeeSocket.messages().size());
+        assertEquals(0, managerSocket.messages().size());
+        webSocketSessionRegistry.register(EMPLOYEE_USER_ID, employeeSocket);
+        jdbcTemplate.update("""
+            UPDATE im_event_outbox
+            SET next_retry_at = NOW()
+            WHERE event_type = 'IM_MESSAGE_CREATED'
+              AND conversation_id = ?
+              AND status = 'FAILED'
+            """, 7001L);
+
+        imWebSocketOutboxDispatcher.dispatchDueEvents();
+
+        assertSocketEvent(employeeSocket, "IM_MESSAGE_CREATED", 7001L);
+        assertSocketEvent(managerSocket, "IM_MESSAGE_CREATED", 7001L);
+        awaitOutboxStatus("IM_MESSAGE_CREATED", 7001L, "SENT");
+        unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
+        unregisterSocket(MANAGER_USER_ID, managerSocket);
     }
 
     @Test
@@ -1980,16 +2034,23 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     private void assertSocketEvent(CapturingWebSocketSession session,
                                    String eventType,
                                    Long conversationId) throws Exception {
-        boolean matched = false;
+        awaitCondition(() -> {
+            imWebSocketOutboxDispatcher.dispatchDueEvents();
+            return hasSocketEvent(session, eventType, conversationId);
+        }, "应收到 IM WebSocket 事件: " + eventType);
+    }
+
+    private boolean hasSocketEvent(CapturingWebSocketSession session,
+                                   String eventType,
+                                   Long conversationId) throws Exception {
         for (String message : session.messages()) {
             JsonNode node = objectMapper.readTree(message);
-            matched = eventType.equals(node.path("eventType").asText())
-                && conversationId.equals(node.path("conversationId").asLong());
-            if (matched) {
-                break;
+            if (eventType.equals(node.path("eventType").asText())
+                && conversationId.equals(node.path("conversationId").asLong())) {
+                return true;
             }
         }
-        assertTrue(matched, "应收到 IM WebSocket 事件: " + eventType);
+        return false;
     }
 
     private void awaitMessageCount(Long conversationId, Long expectedCount) throws Exception {
@@ -2007,6 +2068,18 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             WHERE agent_id = ?
               AND context_id = ?
             """, String.class, agentId, conversationId)), "等待Agent任务状态变为 " + expectedStatus);
+    }
+
+    private void awaitOutboxStatus(String eventType, Long conversationId, String expectedStatus) throws Exception {
+        imWebSocketOutboxDispatcher.dispatchDueEvents();
+        awaitCondition(() -> expectedStatus.equals(jdbcTemplate.queryForObject("""
+            SELECT status
+            FROM im_event_outbox
+            WHERE event_type = ?
+              AND conversation_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """, String.class, eventType, conversationId)), "等待IM outbox状态变为 " + expectedStatus);
     }
 
     private void awaitCondition(CheckedBooleanSupplier condition, String message) throws Exception {
@@ -2058,7 +2131,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             this.attributes = Map.of("imUserId", userId);
         }
 
-        private List<String> messages() {
+        protected List<String> messages() {
             return messages;
         }
 
@@ -2128,7 +2201,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         }
 
         @Override
-        public void sendMessage(org.springframework.web.socket.WebSocketMessage<?> message) {
+        public void sendMessage(org.springframework.web.socket.WebSocketMessage<?> message) throws IOException {
             messages.add(message.getPayload().toString());
         }
 
@@ -2145,6 +2218,24 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         @Override
         public void close(org.springframework.web.socket.CloseStatus status) {
             open = false;
+        }
+    }
+
+    private static class FailingOnceWebSocketSession extends CapturingWebSocketSession {
+
+        private boolean failed;
+
+        private FailingOnceWebSocketSession(Long userId) {
+            super(userId);
+        }
+
+        @Override
+        public void sendMessage(org.springframework.web.socket.WebSocketMessage<?> message) throws IOException {
+            if (!failed) {
+                failed = true;
+                throw new IOException("simulated websocket failure");
+            }
+            super.sendMessage(message);
         }
     }
 

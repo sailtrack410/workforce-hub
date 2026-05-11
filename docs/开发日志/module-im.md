@@ -1,5 +1,47 @@
 # module-im 开发日志
 
+## 2026-05-11 IM WebSocket outbox 可靠投递
+
+### 背景
+
+IM 消息和 Agent 回写已经能完成演示闭环，但此前 WebSocket 推送发生在业务事务提交后直接调用内存连接。数据库提交成功后如果推送失败或进程崩溃，前端可能收不到实时事件，且后端没有可追踪的失败账本。
+
+### 本轮完成内容
+
+- 新增 Flyway 迁移 `V14__add_im_event_outbox.sql`，创建 `im_event_outbox`。
+- 新增 outbox 写入与投递组件：
+  - `ImEventOutboxRepository`
+  - `ImEventOutboxRow`
+  - `ImWebSocketOutboxService`
+  - `ImWebSocketOutboxDispatcher`
+  - `ImWebSocketOutboxProperties`
+- `ImWebSocketPushService.pushToUsersAfterCommit(...)` 改为在业务事务内写 outbox，并在事务提交后唤醒 dispatcher。
+- dispatcher 支持 `PENDING/FAILED` 到期批量抢占、`SENDING` 投递、成功标记 `SENT`、失败标记 `FAILED`，超过最大次数标记 `DEAD`。
+- 支持 `SENDING` 超时重扫，避免投递进程中断后事件永久卡住。
+- dispatcher 抢占、成功和失败状态更新使用独立事务，避免事务提交回调阶段状态推进不确定。
+- `IM_MESSAGE_CREATED`、`IM_AGENT_MESSAGE_CREATED`、`IM_AGENT_REPLY_FAILED` 等现有推送事件保持前端 payload 结构不变，只改变后端投递方式。
+- `ModuleImApiIntegrationTest` 增加 outbox 失败重试覆盖：首次 WebSocket 抛出 IOException 后 outbox 记录 `FAILED`，重试后进入 `SENT`。
+
+### 本轮边界
+
+- 本轮不新增管理员 outbox 查询页面，失败运营入口留到后续 admin-web/后台治理阶段。
+- 第一版 outbox 只覆盖 IM WebSocket 推送，不抽象成全局事件总线。
+- 当前 dispatcher 仍在应用进程内执行，不引入 MQ；表结构已为多实例 `FOR UPDATE SKIP LOCKED` 抢占预留。
+- 无在线用户时投递视为成功，WebSocket 只保证“事件被尝试投递到当前连接”，离线补偿仍依赖消息列表拉取。
+
+### 验证记录
+
+- 编译：`cd server && mvn -DskipTests compile test-compile`
+  - 结果：通过。
+- IM 专项：`cd server && env TEST_DB_NAME=workforce_hub_im_outbox_retry mvn -Dtest=ModuleImApiIntegrationTest test`
+  - 结果：通过，45 个用例全部通过。
+- IM/Agent 组合专项：`cd server && env TEST_DB_NAME=workforce_hub_outbox_im_agent mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过，92 个用例全部通过。
+- 基础回归：`cd server && env TEST_DB_NAME=workforce_hub_outbox_base mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest,ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test`
+  - 结果：通过，112 个用例全部通过。
+- 格式检查：`git diff --check`
+  - 结果：通过。
+
 ## 2026-05-11 IM Agent 真实模型回写与失败幂等
 
 ### 背景

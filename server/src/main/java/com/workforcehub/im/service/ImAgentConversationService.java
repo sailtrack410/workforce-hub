@@ -426,7 +426,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                     "NORMAL",
                     sentAt
                 ));
-                webSocketPushService.pushToUsers(
+                webSocketPushService.pushToUsersAfterCommit(
                     activeUserMemberIds(conversationId),
                     ImWebSocketEvent.of("IM_AGENT_REPLY_FAILED", conversationId, messageId, seqNo, agentId, response)
                 );
