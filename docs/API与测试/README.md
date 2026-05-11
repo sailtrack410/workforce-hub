@@ -16,6 +16,8 @@
   - 假期账户接口 API 文档与测试用例
 - `module-attendance/`
   - 考勤基础配置、打卡、日结果与异常接口 API 文档与测试用例
+- `module-im/`
+  - 员工端 IM 会话、群治理、消息、WebSocket 推送和 IM x Agent 会话接口 API 文档与测试用例
 - `module-agent/`
   - Agent 治理、授权、任务、工具调用与审计接口 API 文档和测试用例
 

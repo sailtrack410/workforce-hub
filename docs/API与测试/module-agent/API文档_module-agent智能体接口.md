@@ -5,12 +5,12 @@
 | 项目 | 说明 |
 | --- | --- |
 | 模块 | `module-agent` |
-| 当前状态 | 第一批后端闭环已实现：后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、任务运行指标、失败聚合、人工确认超时手动扫描、超时扫描批次查询，员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消，以及服务级/定时人工确认超时扫描 |
+| 当前状态 | 后台 Agent 治理、列表、详情、停用、版本、工具、ACL、发布、任务查询、任务工具调用明细、任务审计轨迹、任务运行指标、失败聚合、人工确认超时手动扫描、超时扫描批次查询已实现；员工端 Agent 列表、任务创建、人工确认继续、拒绝、取消已实现；IM 会话 Agent 已接入真实模型异步执行、成功回写、失败提示和幂等保护 |
 | 认证方式 | 复用 Spring Session，后台接口必须使用管理员会话，员工接口必须使用员工会话 |
 | 响应格式 | 统一 `R<T>`，`code=0` 表示接口调用成功，业务失败使用非 0 code |
-| 数据库变更 | 新增 `V12__add_agent_timeout_job_records.sql`，增加 `sys_job_lock` 和 `agt_task_timeout_job_run` |
+| 数据库变更 | Agent 超时扫描使用 `V12__add_agent_timeout_job_records.sql`；IM 会话消息幂等使用 `V13__add_im_message_client_idempotency.sql`；IM WebSocket outbox 使用 `V14__add_im_event_outbox.sql` |
 
-当前第一批不是完整 Agent 平台，暂不包含版本回滚、会话 Agent 结果回写、workflow 真实触发器和后台告警监控。后台任务查询已提供分页列表、详情、工具调用明细、审计轨迹、运行指标和失败聚合入口；人工确认超时扫描已提供服务调用、后台手动触发、定时触发、数据库锁互斥、批次运行记录和后台批次查询。
+当前还不是完整 Agent 平台，暂不包含版本回滚、workflow 真实触发器、RAG、工具调用型会话 Agent 和后台告警监控。后台任务查询已提供分页列表、详情、工具调用明细、审计轨迹、运行指标和失败聚合入口；人工确认超时扫描已提供服务调用、后台手动触发、定时触发、数据库锁互斥、批次运行记录和后台批次查询；IM 会话 Agent 的前端接入契约详见 `../module-im/API文档_module-im会话接口.md`。
 
 ---
 
@@ -661,6 +661,33 @@
 | `toolCalls[].toolCode` | 是 | 工具编码 |
 | `toolCalls[].requestPayloadJson` | 否 | 合法 JSON 字符串 |
 
+### 4.2.1 IM 会话 Agent 触发说明
+
+前端做聊天式 Agent 对话时，不直接调用 `POST /api/employee/agents/{agentId}/tasks`。正确链路是：
+
+1. `GET /api/employee/agents` 查询当前员工可用 Agent。
+2. `POST /api/employee/im/agent-conversations` 创建或复用 Agent 会话。
+3. `POST /api/employee/im/conversations/{conversationId}/messages` 向 Agent 会话发送 `TEXT` 消息。
+4. 后端异步创建 `triggerType=CONVERSATION`、`contextType=IM_CONVERSATION` 的 Agent 任务。
+5. 模型成功时 IM 写入 `senderType=AGENT` 消息并推送 `IM_AGENT_MESSAGE_CREATED`。
+6. 模型失败时 IM 写入 `senderType=SYSTEM` 失败提示并推送 `IM_AGENT_REPLY_FAILED`。
+
+第一版会话 Agent 只把当前用户消息和 Agent 版本系统提示发给 OpenAI 兼容模型，不做多轮上下文、工具调用、RAG 或知识库引用。
+
+模型失败分类包括：
+
+| failureType | 含义 |
+| --- | --- |
+| `CONFIG_MISSING` | 模型未启用、baseUrl、apiKey 或 model 缺失，或版本模型配置 JSON 不合法 |
+| `AUTH_FAILED` | 模型服务返回 `401` 或 `403` |
+| `TIMEOUT` | 模型调用超时或被中断 |
+| `RATE_LIMITED` | 模型服务返回 `429` |
+| `PROVIDER_ERROR` | 模型服务网络错误、5xx 或其他非 2xx |
+| `INVALID_RESPONSE` | 模型响应为空或不可解析 |
+| `UNKNOWN` | 未归类异常 |
+
+这些失败分类会进入 Agent 任务失败记录和审计；员工端只展示 IM 系统提示，不暴露供应商原始错误。
+
 ### 4.3 人工确认 Agent 任务
 
 `POST /api/employee/agent-tasks/{taskId}/confirm`
@@ -839,6 +866,6 @@ AgentTaskTimeoutJobService#runTimeoutScan(String triggerType, int batchSize)
 - 增加后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和告警入口。
 - 增加人工确认超时扫描失败告警和长期等待任务升级处理。
 - 接入 workflow 预审触发器与回调。
-- 接入 IM 会话 Agent 触发与回复回写。
-- 接入任务异步执行、重试、超时扫描、运行指标细化和告警。
+- 扩展 IM 会话 Agent 的多轮上下文、工具调用、RAG 和知识库引用。
+- 接入任务重试、模型调用超时治理、运行指标细化和告警。
 - 接入工具参数 Schema 校验、敏感数据脱敏和更细的风险控制策略。

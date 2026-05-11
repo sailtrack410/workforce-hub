@@ -4,10 +4,10 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 测试类 | `ModuleAgentApiIntegrationTest`、`ModuleAgentTaskTimeoutIntegrationTest` |
-| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/任务工具调用明细/任务审计轨迹/任务运行指标/失败聚合/人工确认超时手动扫描、超时扫描批次查询，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描、批次记录、锁跳过和定时入口 |
+| 测试类 | `ModuleAgentApiIntegrationTest`、`ModuleAgentTaskTimeoutIntegrationTest`、`ModuleImApiIntegrationTest`、`ModuleImGroupIntegrationTest` |
+| 当前覆盖 | 后台创建/列表/详情/停用/版本/工具/绑定/ACL/发布/任务查询/任务工具调用明细/任务审计轨迹/任务运行指标/失败聚合/人工确认超时手动扫描、超时扫描批次查询，员工 Agent 列表，任务创建，工具调用，人工确认等待、继续、拒绝、取消，失败任务保留，人工确认超时扫描、批次记录、锁跳过和定时入口；IM 侧覆盖会话 Agent 创建、真实模型异步回写、失败提示、幂等和 WebSocket 推送 |
 | 运行前提 | 本地 MySQL、Redis 可用；测试使用 `LocalIntegrationTestSupport` 自动建库、迁移和装载组织种子数据 |
-| 数据库变更 | 本轮新增 `V12__add_agent_timeout_job_records.sql`，测试依赖 `sys_job_lock` 和 `agt_task_timeout_job_run` |
+| 数据库变更 | Agent 超时扫描依赖 `V12__add_agent_timeout_job_records.sql`；IM 会话幂等和推送可靠性依赖 `V13__add_im_message_client_idempotency.sql`、`V14__add_im_event_outbox.sql` |
 
 ---
 
@@ -22,8 +22,8 @@ env TEST_DB_NAME=workforce_hub_agent_timeout_runs_agent mvn -Dtest=ModuleAgentAp
 
 预期结果：
 
-- 26 个用例全部通过。
-- 空库可执行 V1 到 V12 的 Flyway 迁移。
+- Agent 单模块用例全部通过。
+- 空库可执行当前全部 Flyway 迁移。
 - `LocalIntegrationTestSupport` 每个用例前清理 `agt_*` 与相关业务表。
 
 ### 2.2 编译验证
@@ -73,6 +73,9 @@ env TEST_DB_NAME=workforce_hub_agent_timeout_runs_regression mvn -Dtest=ModuleAu
 | AGT-023 | P1 | 定时入口在测试环境禁用后无副作用 | `scheduledTimeoutScan()` 在测试基线下不写批次、不取消任务 |
 | AGT-024 | P0 | 后台分页查询超时扫描批次记录 | `GET /api/admin/agent-tasks/timeout-scan-runs` 支持按触发方式和状态筛选，并返回运行摘要 |
 | AGT-025 | P1 | 后台超时扫描批次查询非法状态 | `status=UNKNOWN_STATUS` 返回 `code=400`、`message=Agent超时扫描批次状态不支持` |
+| AGT-026 | P0 | IM 会话 Agent 成功回写 | 向 Agent 会话发送文本后，真实模型成功返回，Agent 任务进入 `SUCCEEDED`，IM 写入 `senderType=AGENT` 消息并推送 `IM_AGENT_MESSAGE_CREATED` |
+| AGT-027 | P0 | IM 会话 Agent 失败提示 | 模型未启用、配置缺失或调用失败时，Agent 任务进入 `FAILED`，IM 写入系统提示并推送 `IM_AGENT_REPLY_FAILED` |
+| AGT-028 | P0 | IM 会话 Agent 回写幂等 | 重复成功或失败回写不重复生成 IM 消息 |
 
 ---
 
@@ -351,6 +354,6 @@ WHERE lock_name = 'AGENT_TASK_TIMEOUT_SCAN';
 - 后台 Agent 版本回滚、重新启用、工具查询、ACL 查询和告警入口。
 - 后台人工确认超时扫描失败告警。
 - workflow 预审真实触发和回调。
-- IM 会话 Agent 触发和回复回写。
 - 知识库绑定空间 ACL。
+- IM 会话 Agent 多轮上下文、工具调用、RAG 和知识库引用。
 - 工具参数 Schema 校验和敏感字段脱敏。
