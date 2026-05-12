@@ -8,10 +8,12 @@ import {
   SlidersHorizontal,
   SunMedium,
   PencilLine,
+  UsersRound,
 } from 'lucide-vue-next';
 import { useEmployeeShellContext } from '../employee-shell-context';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
+import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 import AppInput from '../../components/ui/AppInput.vue';
 
 const {
@@ -34,15 +36,21 @@ const {
   passwordChangeSubmitting,
   passwordChangeNotice,
   passwordChangeError,
+  avatarUploading,
+  avatarUpdateError,
+  avatarPickerInput,
+  colleagues,
+  colleaguesLoading,
+  colleaguesError,
   currentUserName,
   currentUserShortName,
+  currentAvatarUrl,
   selectedProfileId,
   profileStatusLabel,
   profileIdentityRows,
   accountSecurityRows,
   currentEmail,
   organizationRows,
-  settingsMetrics,
   preferenceRows,
   activeProfile,
   relationTree,
@@ -58,12 +66,10 @@ const {
   submitMobileUpdate,
   sendPasswordChangeCode,
   submitPasswordChange,
+  openAvatarPicker,
+  handleAvatarSelected,
   showToast,
 } = useEmployeeShellContext();
-
-function notifyAvatarUnavailable() {
-  showToast('头像编辑尚未开放（后端接口待补）');
-}
 </script>
 
 <template>
@@ -86,12 +92,25 @@ function notifyAvatarUnavailable() {
   <section class="content-stack settings-dashboard">
     <section v-if="selectedProfileId === 'profile'" class="personal-center">
       <article class="personal-hero">
-        <button class="personal-avatar" type="button" aria-label="更换头像" @click="notifyAvatarUnavailable">
-          <AppAvatar :label="currentUserShortName" tone="primary" size="lg" status="online" />
+        <button
+          class="personal-avatar"
+          type="button"
+          :aria-label="avatarUploading ? '头像上传中' : '更换头像'"
+          :disabled="avatarUploading"
+          @click="openAvatarPicker"
+        >
+          <AppAvatar :label="currentUserShortName" :image="currentAvatarUrl" tone="primary" size="lg" status="online" />
           <span class="personal-avatar-overlay">
             <Camera :size="14" />
           </span>
         </button>
+        <input
+          ref="avatarPickerInput"
+          type="file"
+          accept="image/*"
+          hidden
+          @change="handleAvatarSelected"
+        />
         <div class="personal-hero-copy">
           <h3>{{ currentUserName }}</h3>
           <div class="personal-hero-meta">
@@ -122,10 +141,19 @@ function notifyAvatarUnavailable() {
               <dd>{{ displayField(currentEmail) }}</dd>
             </div>
           </dl>
+          <p v-if="avatarUpdateError" class="dialog-error">{{ avatarUpdateError }}</p>
         </div>
       </article>
 
       <nav class="personal-nav" aria-label="个人中心快捷">
+        <button type="button" class="personal-nav-item" @click="selectSettingsItem('organization')">
+          <span class="personal-nav-icon"><UsersRound :size="18" /></span>
+          <div>
+            <strong>组织关系</strong>
+            <span>{{ session.departmentName || '未分配部门' }} · 同事 / 上下级</span>
+          </div>
+          <ChevronRight :size="16" />
+        </button>
         <button type="button" class="personal-nav-item" @click="selectSettingsItem('security')">
           <span class="personal-nav-icon"><ShieldCheck :size="18" /></span>
           <div>
@@ -138,7 +166,7 @@ function notifyAvatarUnavailable() {
           <span class="personal-nav-icon"><SlidersHorizontal :size="18" /></span>
           <div>
             <strong>偏好设置</strong>
-            <span>主题 · 会话密度（本地保存）</span>
+            <span>主题 · 会话密度（云端同步）</span>
           </div>
           <ChevronRight :size="16" />
         </button>
@@ -155,15 +183,33 @@ function notifyAvatarUnavailable() {
           </div>
         </dl>
       </article>
+    </section>
 
-      <article class="settings-card">
+    <section v-else-if="selectedProfileId === 'organization'" class="settings-card-grid">
+      <article class="settings-card settings-wide-card">
         <header class="settings-card-head">
-          <h3>组织关系</h3>
+          <h3>所在部门</h3>
         </header>
         <dl class="settings-list">
           <div v-for="row in organizationRows" :key="row[0]">
             <dt>{{ row[0] }}</dt>
             <dd>{{ row[1] }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article v-if="relationTree.managerName || relationTree.subordinates.length" class="settings-card">
+        <header class="settings-card-head">
+          <h3>上下级</h3>
+        </header>
+        <dl class="settings-list compact">
+          <div>
+            <dt>直属上级</dt>
+            <dd>{{ relationTree.managerName || '暂无' }}</dd>
+          </div>
+          <div>
+            <dt>直属下级</dt>
+            <dd>{{ relationTree.subordinates.length ? `${relationTree.subordinates.length} 人` : '暂无' }}</dd>
           </div>
         </dl>
         <div v-if="relationTree.subordinates.length" class="settings-member-list">
@@ -173,21 +219,20 @@ function notifyAvatarUnavailable() {
         </div>
       </article>
 
-      <article class="settings-card">
+      <article class="settings-card settings-wide-card">
         <header class="settings-card-head">
-          <h3>工作概览</h3>
+          <h3>同部门同事 <small v-if="colleagues.length">（{{ colleagues.length }} 人）</small></h3>
         </header>
-        <div class="settings-metric-grid">
-          <div
-            v-for="metric in settingsMetrics"
-            :key="metric.label"
-            class="settings-metric-card"
-            :style="{ '--metric-level': `${metric.level}%` }"
-          >
-            <small>{{ metric.label }}</small>
-            <strong>{{ metric.value }}</strong>
-            <span>{{ metric.detail }}</span>
-            <i />
+        <p v-if="colleaguesError" class="dialog-error">{{ colleaguesError }}</p>
+        <AppEmptyState v-else-if="!colleaguesLoading && !colleagues.length" title="暂无同事" description="当前部门只有你一个人" />
+        <p v-else-if="colleaguesLoading" class="form-hint">加载中…</p>
+        <div v-else class="colleague-list">
+          <div v-for="user in colleagues" :key="user.userId" class="colleague-row">
+            <AppAvatar :label="(user.realName || '').slice(0, 2)" tone="primary" size="sm" />
+            <div>
+              <strong>{{ user.realName }}</strong>
+              <small>{{ user.positionName || '未设置岗位' }}<span v-if="user.managerName"> · 直属上级 {{ user.managerName }}</span></small>
+            </div>
           </div>
         </div>
       </article>
@@ -303,7 +348,7 @@ function notifyAvatarUnavailable() {
     </section>
 
     <section v-else-if="selectedProfileId === 'preferences'" class="settings-card-grid">
-      <p class="settings-hint">主题、密度等偏好会自动保存在本机浏览器，刷新或切换页面后保留。当前账号尚未支持云端同步。</p>
+      <p class="settings-hint">主题、密度、列表宽度会实时同步到云端，换设备登录会保持一致。本机会同步缓存一份避免离线时丢失。</p>
       <article class="settings-card">
         <header class="settings-card-head">
           <h3>显示设置</h3>

@@ -26,4 +26,7 @@ public interface OrgDirectoryMapper {
     OrgUserDetailResponse selectUserDetailById(@Param("userId") Long userId);
 
     List<OrgUserSummaryResponse> selectDirectSubordinates(@Param("managerUserId") Long managerUserId);
+
+    List<OrgUserSummaryResponse> selectColleaguesByDept(@Param("deptId") Long deptId,
+                                                       @Param("currentUserId") Long currentUserId);
 }

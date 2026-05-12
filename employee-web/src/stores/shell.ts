@@ -519,6 +519,15 @@ const profileItems: ProfileRecord[] = [
     fields: [],
   },
   {
+    id: 'organization',
+    title: '组织关系',
+    subtitle: '同部门 / 上下级',
+    note: '',
+    tone: 'green',
+    stats: [],
+    fields: [],
+  },
+  {
     id: 'security',
     title: '账号与安全',
     subtitle: '手机号 / 邮箱 / 密码',
@@ -540,7 +549,6 @@ const profileItems: ProfileRecord[] = [
 
 const SETTINGS_ALIAS: Record<string, string> = {
   center: 'profile',
-  organization: 'profile',
   storage: 'profile',
 };
 
@@ -696,6 +704,8 @@ export const useShellStore = defineStore('employee-shell', {
     workbench: workbenchItems,
     contacts: contactItems,
     profile: profileItems,
+    colleagues: [] as OrgUserSummaryResponse[],
+    avatarUrl: '' as string,
     };
   },
   getters: {
@@ -838,6 +848,32 @@ export const useShellStore = defineStore('employee-shell', {
     setMessageDensity(density: MessageDensity) {
       this.messageDensity = density;
       writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+    },
+    hydratePreferencesFromServer(prefs: { theme?: string | null; messageDensity?: string | null; listWidth?: number | null }) {
+      if (prefs.theme === 'dark' || prefs.theme === 'light') this.theme = prefs.theme;
+      if (prefs.messageDensity === 'cozy' || prefs.messageDensity === 'compact') this.messageDensity = prefs.messageDensity;
+      if (typeof prefs.listWidth === 'number' && Number.isFinite(prefs.listWidth)) {
+        this.listWidth = Math.max(384, Math.min(520, Math.round(prefs.listWidth)));
+      }
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+    },
+    applyServerPreferences(preferences: { theme?: string | null; messageDensity?: string | null; listWidth?: number | null }) {
+      if (preferences.theme === 'light' || preferences.theme === 'dark') {
+        this.theme = preferences.theme;
+      }
+      if (preferences.messageDensity === 'cozy' || preferences.messageDensity === 'compact') {
+        this.messageDensity = preferences.messageDensity;
+      }
+      if (typeof preferences.listWidth === 'number' && Number.isFinite(preferences.listWidth)) {
+        this.listWidth = Math.max(384, Math.min(520, Math.round(preferences.listWidth)));
+      }
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+    },
+    setColleagues(rows: OrgUserSummaryResponse[]) {
+      this.colleagues = rows ?? [];
+    },
+    setAvatarUrl(url: string | null | undefined) {
+      this.avatarUrl = url ?? '';
     },
     syncSessionProfile(
       user: CurrentUserResponse | null,

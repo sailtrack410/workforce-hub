@@ -1,10 +1,12 @@
 <script setup lang="ts">
 const props = withDefaults(defineProps<{
   label: string;
+  image?: string;
   tone?: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
   size?: 'sm' | 'md' | 'lg';
   status?: 'online' | 'busy' | 'away' | 'offline' | '';
 }>(), {
+  image: '',
   tone: 'primary',
   size: 'md',
   status: '',
@@ -13,8 +15,9 @@ const props = withDefaults(defineProps<{
 
 <template>
   <span class="ui-avatar-wrap">
-    <span class="ui-avatar" :class="[props.tone, props.size]">
-      <slot>{{ props.label.slice(0, 2) }}</slot>
+    <span class="ui-avatar" :class="[props.tone, props.size, { 'has-image': !!props.image }]">
+      <img v-if="props.image" :src="props.image" :alt="props.label" />
+      <slot v-else>{{ props.label.slice(0, 2) }}</slot>
     </span>
     <span v-if="props.status" class="ui-avatar-status" :class="props.status" />
   </span>
@@ -32,6 +35,13 @@ const props = withDefaults(defineProps<{
   border-radius: var(--radius-8);
   font-size: var(--text-caption-md);
   font-weight: 750;
+  overflow: hidden;
+}
+
+.ui-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .ui-avatar.sm {

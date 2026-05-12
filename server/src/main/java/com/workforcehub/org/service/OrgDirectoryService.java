@@ -2,6 +2,8 @@ package com.workforcehub.org.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.workforcehub.auth.domain.OrgUser;
+import com.workforcehub.auth.mapper.OrgUserMapper;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
@@ -12,11 +14,14 @@ import com.workforcehub.org.dto.OrgPositionResponse;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.dto.OrgUserListQuery;
 import com.workforcehub.org.dto.OrgUserSummaryResponse;
+import com.workforcehub.org.dto.UpdateEmployeeProfileRequest;
 import com.workforcehub.org.mapper.OrgDirectoryMapper;
 import com.workforcehub.org.mapper.OrgPositionMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,11 +35,14 @@ public class OrgDirectoryService {
 
     private final OrgDirectoryMapper orgDirectoryMapper;
     private final OrgPositionMapper orgPositionMapper;
+    private final OrgUserMapper orgUserMapper;
 
     public OrgDirectoryService(OrgDirectoryMapper orgDirectoryMapper,
-                               OrgPositionMapper orgPositionMapper) {
+                               OrgPositionMapper orgPositionMapper,
+                               OrgUserMapper orgUserMapper) {
         this.orgDirectoryMapper = orgDirectoryMapper;
         this.orgPositionMapper = orgPositionMapper;
+        this.orgUserMapper = orgUserMapper;
     }
 
     public List<OrgDepartmentTreeNodeResponse> getDepartmentTree() {
@@ -141,6 +149,38 @@ public class OrgDirectoryService {
     public List<OrgUserSummaryResponse> getCurrentEmployeeSubordinates() {
         ensureEmployeeContext();
         return listDirectSubordinates(CurrentUserHolder.requireUserId());
+    }
+
+    public List<OrgUserSummaryResponse> getCurrentEmployeeColleagues() {
+        ensureEmployeeContext();
+        Long userId = CurrentUserHolder.requireUserId();
+        OrgUserDetailResponse self = getUserDetail(userId);
+        Long deptId = self.getPrimaryDeptId();
+        if (deptId == null) {
+            return Collections.emptyList();
+        }
+        return orgDirectoryMapper.selectColleaguesByDept(deptId, userId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public OrgUserDetailResponse updateCurrentEmployeeProfile(UpdateEmployeeProfileRequest request) {
+        ensureEmployeeContext();
+        Long userId = CurrentUserHolder.requireUserId();
+        OrgUser entity = orgUserMapper.selectById(userId);
+        if (entity == null || (entity.getIsDeleted() != null && entity.getIsDeleted() != 0)) {
+            throw new BizException(404, "员工不存在");
+        }
+        if (request == null) {
+            return getUserDetail(userId);
+        }
+        if (request.getMobile() != null) {
+            String mobile = request.getMobile().trim();
+            entity.setMobile(mobile.isEmpty() ? null : mobile);
+        }
+        entity.setAvatarAttachmentRefId(request.getAvatarAttachmentRefId());
+        entity.setUpdatedBy(userId);
+        orgUserMapper.updateById(entity);
+        return getUserDetail(userId);
     }
 
     private void ensureEmployeeContext() {

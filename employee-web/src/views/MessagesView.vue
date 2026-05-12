@@ -135,6 +135,12 @@ const passwordChangeError = ref('');
 const fileSendTarget = ref<{ file: PersonalFileRecord; caption: string; submitting: boolean } | null>(null);
 const fileSendTargetQuery = ref('');
 const fileSendTargetError = ref('');
+const currentAvatarUrl = ref('');
+const avatarUploading = ref(false);
+const avatarUpdateError = ref('');
+const avatarPickerInput = ref<HTMLInputElement | null>(null);
+const preferencesHydrated = ref(false);
+let preferencePushTimer: number | undefined;
 const leaveAccounts = ref<LeaveAccountResponse[]>([]);
 const attendanceExceptions = ref<AttendanceExceptionResponse[]>([]);
 const workbenchLoading = ref(false);
@@ -247,6 +253,7 @@ const workbenchIcons: Record<string, typeof MessageCircle> = {
 
 const profileIcons: Record<string, typeof MessageCircle> = {
   profile: UserRound,
+  organization: UsersRound,
   security: ShieldCheck,
   preferences: SlidersHorizontal,
 };
@@ -452,6 +459,9 @@ const relationTree = computed(() => {
     conversationMembers,
   };
 });
+const colleagues = computed(() => session.colleagues);
+const colleaguesLoading = computed(() => session.profileLoading);
+const colleaguesError = computed(() => session.profileError);
 const hasActiveConversation = computed(() => Boolean(activeConversation.value.id));
 const hasActiveTodo = computed(() => Boolean(activeTodo.value.id));
 const businessEmptyTitle = computed(() => {
@@ -1765,14 +1775,95 @@ async function loadAuthenticatedWorkspace() {
     refreshWorkbenchData(),
     loadWorkflowRequests(),
     loadAgents(),
+    hydrateUserPreferences(),
   ]);
   await im.loadVisibleConversationDetails();
   shell.mergeBackendConversations(im.conversations);
   shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
+  void refreshCurrentUserAvatarUrl();
   if (shell.conversations.length) {
     await syncConversationMessages(shell.active.messages);
   }
   connectImSocket();
+}
+
+async function hydrateUserPreferences() {
+  try {
+    const prefs = await employeeApi.me.preferences();
+    shell.hydratePreferencesFromServer(prefs);
+  } catch {
+    // 服务器没有偏好记录时维持本地缺省值。
+  } finally {
+    preferencesHydrated.value = true;
+  }
+}
+
+function schedulePreferencePush() {
+  if (!preferencesHydrated.value) return;
+  if (preferencePushTimer) window.clearTimeout(preferencePushTimer);
+  preferencePushTimer = window.setTimeout(async () => {
+    preferencePushTimer = undefined;
+    try {
+      await employeeApi.me.updatePreferences({
+        theme: shell.theme,
+        messageDensity: shell.messageDensity,
+        listWidth: shell.listWidth,
+      });
+    } catch {
+      // 远端更新失败不影响本地体验，下次自动重试。
+    }
+  }, 600);
+}
+
+async function refreshCurrentUserAvatarUrl() {
+  const refId = session.profile?.avatarAttachmentRefId;
+  if (!refId) {
+    currentAvatarUrl.value = '';
+    return;
+  }
+  try {
+    const ticket = await employeeApi.files.createDownloadTicket(refId, { downloadType: 'INLINE' });
+    currentAvatarUrl.value = resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo));
+  } catch {
+    currentAvatarUrl.value = '';
+  }
+}
+
+function openAvatarPicker() {
+  if (avatarUploading.value) return;
+  avatarUpdateError.value = '';
+  avatarPickerInput.value?.click();
+}
+
+async function handleAvatarSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    avatarUpdateError.value = '请选择图片文件';
+    showToast(avatarUpdateError.value);
+    return;
+  }
+  avatarUploading.value = true;
+  avatarUpdateError.value = '';
+  try {
+    const attachmentRefId = await uploadPersonalFile(file);
+    if (!attachmentRefId) {
+      avatarUpdateError.value = uploadResult.value?.text || '头像上传失败';
+      return;
+    }
+    await employeeApi.me.updateProfile({ avatarAttachmentRefId: attachmentRefId });
+    await session.loadOrgProfile();
+    shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
+    await refreshCurrentUserAvatarUrl();
+    showToast('头像已更新');
+  } catch (error) {
+    avatarUpdateError.value = error instanceof Error ? error.message : '头像更新失败';
+    showToast(avatarUpdateError.value);
+  } finally {
+    avatarUploading.value = false;
+  }
 }
 
 async function submitLogin() {
@@ -2211,7 +2302,19 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('resize', updateFilterOverflow);
   if (toastTimer) window.clearTimeout(toastTimer);
+  if (preferencePushTimer) window.clearTimeout(preferencePushTimer);
   closeImSocket();
+});
+
+watch(
+  () => [shell.theme, shell.messageDensity, shell.listWidth] as const,
+  () => {
+    schedulePreferencePush();
+  },
+);
+
+watch(() => session.profile?.avatarAttachmentRefId, () => {
+  void refreshCurrentUserAvatarUrl();
 });
 
 watch([filterOptions, activeSection, searchOpen], () => {
@@ -2341,6 +2444,13 @@ const employeeShellContext = {
   fileSendTarget,
   fileSendTargetQuery,
   fileSendTargetError,
+  currentAvatarUrl,
+  avatarUploading,
+  avatarUpdateError,
+  avatarPickerInput,
+  colleagues,
+  colleaguesLoading,
+  colleaguesError,
   authNotice,
   leaveAccounts,
   attendanceExceptions,
@@ -2562,6 +2672,8 @@ const employeeShellContext = {
   openSendFileTarget,
   closeSendFileTarget,
   confirmSendFileTarget,
+  openAvatarPicker,
+  handleAvatarSelected,
   selectNav,
   openTodoAction,
   closeTodoAction,
@@ -2733,7 +2845,7 @@ provideEmployeeShellContext(employeeShellContext);
           <span>{{ themeLabel }}</span>
         </button>
         <button class="profile-button" type="button" @click="selectNav('settings')">
-          <AppAvatar :label="currentUserShortName" tone="primary" size="lg" status="online" />
+          <AppAvatar :label="currentUserShortName" :image="currentAvatarUrl" tone="primary" size="lg" status="online" />
           <span class="profile-copy">
             <strong>{{ currentUserName }}</strong>
             <small>{{ session.positionName || session.departmentName }}</small>

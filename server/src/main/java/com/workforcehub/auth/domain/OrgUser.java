@@ -25,6 +25,7 @@ public class OrgUser {
     private String realName;
     private String gender;
     private String mobile;
+    private Long avatarAttachmentRefId;
     private Long primaryDeptId;
     private Long positionId;
     private Long managerUserId;

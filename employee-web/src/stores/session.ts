@@ -22,6 +22,7 @@ export interface EmployeeOrgApi {
   profile(): Promise<OrgUserDetailResponse>;
   manager(): Promise<OrgUserSummaryResponse | null>;
   subordinates(): Promise<OrgUserSummaryResponse[]>;
+  colleagues(): Promise<OrgUserSummaryResponse[]>;
 }
 
 export const useSessionStore = defineStore('employee-session', {
@@ -30,6 +31,7 @@ export const useSessionStore = defineStore('employee-session', {
     profile: null as OrgUserDetailResponse | null,
     manager: null as OrgUserSummaryResponse | null,
     subordinates: [] as OrgUserSummaryResponse[],
+    colleagues: [] as OrgUserSummaryResponse[],
     loading: false,
     profileLoading: false,
     error: '',
@@ -87,18 +89,21 @@ export const useSessionStore = defineStore('employee-session', {
       this.profileLoading = true;
       this.profileError = '';
       try {
-        const [profile, manager, subordinates] = await Promise.all([
+        const [profile, manager, subordinates, colleagues] = await Promise.all([
           orgApi.profile(),
           orgApi.manager().catch(() => null),
           orgApi.subordinates().catch(() => []),
+          orgApi.colleagues().catch(() => []),
         ]);
         this.profile = profile;
         this.manager = manager;
         this.subordinates = subordinates;
+        this.colleagues = colleagues;
       } catch (error) {
         this.profile = null;
         this.manager = null;
         this.subordinates = [];
+        this.colleagues = [];
         this.profileError = resolveSessionError(error);
       } finally {
         this.profileLoading = false;
@@ -114,6 +119,7 @@ export const useSessionStore = defineStore('employee-session', {
         this.profile = null;
         this.manager = null;
         this.subordinates = [];
+        this.colleagues = [];
         this.loading = false;
         this.initialized = true;
       }

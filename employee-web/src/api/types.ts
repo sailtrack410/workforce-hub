@@ -53,6 +53,7 @@ export interface OrgUserDetailResponse {
   realName: string;
   gender?: string | null;
   mobile?: string | null;
+  avatarAttachmentRefId?: EntityId | null;
   primaryDeptId?: EntityId | null;
   primaryDeptName?: string | null;
   positionId?: EntityId | null;
@@ -70,6 +71,19 @@ export interface OrgUserDetailResponse {
 
 export interface UpdateEmployeeProfileRequest {
   mobile?: string | null;
+  avatarAttachmentRefId?: EntityId | null;
+}
+
+export interface EmployeePreferenceResponse {
+  theme: 'light' | 'dark';
+  messageDensity: 'cozy' | 'compact';
+  listWidth: number;
+}
+
+export interface UpdateEmployeePreferenceRequest {
+  theme?: 'light' | 'dark';
+  messageDensity?: 'cozy' | 'compact';
+  listWidth?: number;
 }
 
 export interface OrgUserSummaryResponse {
