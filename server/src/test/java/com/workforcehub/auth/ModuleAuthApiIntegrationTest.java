@@ -4,6 +4,7 @@ import com.workforcehub.auth.domain.AuthUserAccount;
 import com.workforcehub.auth.domain.OrgUser;
 import com.workforcehub.auth.mapper.AuthUserAccountMapper;
 import com.workforcehub.auth.mapper.OrgUserMapper;
+import com.workforcehub.auth.service.EmailCodeService;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -56,6 +57,9 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
+    private EmailCodeService emailCodeService;
+
+    @Autowired
     private AuthUserAccountMapper accountMapper;
 
     @Autowired
@@ -97,6 +101,7 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.userType").value("USER"))
             .andExpect(jsonPath("$.data.displayName").value("张三"))
             .andExpect(jsonPath("$.data.loginName").value(EMPLOYEE_LOGIN_NAME))
+            .andExpect(jsonPath("$.data.email").value("zhangsan@example.com"))
             .andExpect(jsonPath("$.data.primaryDeptId").value(111))
             .andExpect(jsonPath("$.data.positionId").value(3001))
             .andExpect(jsonPath("$.data.managerUserId").value(2002))
@@ -159,7 +164,7 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.requestId").value("auth-send-code-001"));
 
-        Object code = redisTemplate.opsForValue().get("auth:email:code:BIND:" + email);
+        Object code = redisTemplate.opsForValue().get(emailCodeService.buildCodeKey(email, "BIND"));
         assertNotNull(code, "验证码发送成功后应写入 Redis");
 
         ArgumentCaptor<SimpleMailMessage> messageCaptor = ArgumentCaptor.forClass(SimpleMailMessage.class);
@@ -348,7 +353,7 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private String readCode(String email, String purpose) {
-        Object code = redisTemplate.opsForValue().get("auth:email:code:" + purpose + ":" + email);
+        Object code = redisTemplate.opsForValue().get(emailCodeService.buildCodeKey(email, purpose));
         assertNotNull(code, "Redis 中应存在验证码");
         return code.toString();
     }

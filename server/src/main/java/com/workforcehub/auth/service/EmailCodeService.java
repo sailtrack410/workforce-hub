@@ -16,8 +16,8 @@ import java.util.concurrent.TimeUnit;
  * 邮箱验证码服务
  *
  * Redis Key 设计：
- * - auth:email:code:{purpose}:{email}     存验证码，TTL 5 分钟
- * - auth:email:send:{purpose}:{email}     防重发标记，TTL 60 秒
+ * - {workforce.auth.redis-key-prefix}auth:email:code:{purpose}:{email}     存验证码，TTL 5 分钟
+ * - {workforce.auth.redis-key-prefix}auth:email:send:{purpose}:{email}     防重发标记，TTL 60 秒
  *
  * purpose 取值：BIND（绑定邮箱）/ RESET_PASSWORD（找回密码）
  */
@@ -35,14 +35,17 @@ public class EmailCodeService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final JavaMailSender mailSender;
+    private final String keyPrefix;
 
     @Value("${spring.mail.username:noreply@workforce-hub.local}")
     private String mailFrom;
 
     public EmailCodeService(RedisTemplate<String, Object> redisTemplate,
-                            JavaMailSender mailSender) {
+                            JavaMailSender mailSender,
+                            @Value("${workforce.auth.redis-key-prefix:}") String keyPrefix) {
         this.redisTemplate = redisTemplate;
         this.mailSender = mailSender;
+        this.keyPrefix = keyPrefix == null ? "" : keyPrefix;
     }
 
     /**
@@ -52,7 +55,7 @@ public class EmailCodeService {
         validatePurpose(purpose);
 
         // 防重发
-        String sendLockKey = SEND_LOCK_KEY_PREFIX + purpose + ":" + email;
+        String sendLockKey = buildSendLockKey(email, purpose);
         Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
             sendLockKey, "1", RESEND_INTERVAL.getSeconds(), TimeUnit.SECONDS
         );
@@ -64,7 +67,7 @@ public class EmailCodeService {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
 
         // 存储验证码
-        String codeKey = CODE_KEY_PREFIX + purpose + ":" + email;
+        String codeKey = buildCodeKey(email, purpose);
         redisTemplate.opsForValue().set(codeKey, code, CODE_TTL.getSeconds(), TimeUnit.SECONDS);
 
         // 发送邮件
@@ -87,7 +90,7 @@ public class EmailCodeService {
      */
     public boolean verifyCode(String email, String purpose, String code) {
         validatePurpose(purpose);
-        String codeKey = CODE_KEY_PREFIX + purpose + ":" + email;
+        String codeKey = buildCodeKey(email, purpose);
         Object stored = redisTemplate.opsForValue().get(codeKey);
         if (stored == null) {
             return false;
@@ -103,6 +106,14 @@ public class EmailCodeService {
         if (!"BIND".equals(purpose) && !"RESET_PASSWORD".equals(purpose)) {
             throw new BizException(400, "不支持的验证码用途");
         }
+    }
+
+    public String buildCodeKey(String email, String purpose) {
+        return keyPrefix + CODE_KEY_PREFIX + purpose + ":" + email;
+    }
+
+    public String buildSendLockKey(String email, String purpose) {
+        return keyPrefix + SEND_LOCK_KEY_PREFIX + purpose + ":" + email;
     }
 
     private void sendMail(String email, String purpose, String code) {

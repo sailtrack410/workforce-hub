@@ -68,6 +68,7 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("spring.data.redis.port", () -> env("REDIS_PORT", "6379"));
         registry.add("spring.data.redis.password", () -> env("REDIS_PASSWORD", ""));
         registry.add("spring.session.redis.namespace", LocalIntegrationTestSupport::testSessionRedisNamespace);
+        registry.add("workforce.auth.redis-key-prefix", LocalIntegrationTestSupport::testAuthRedisKeyPrefix);
         registry.add("spring.autoconfigure.exclude", LocalIntegrationTestSupport::resolveAutoConfigurationExcludes);
         registry.add("workforce.workflow.enabled", () -> "false");
         registry.add("spring.mail.host", () -> env("MAIL_HOST", "localhost"));
@@ -90,8 +91,8 @@ public abstract class LocalIntegrationTestSupport {
 
     private void resetRedisState() {
         deleteKeys(testSessionRedisNamespace() + "*");
-        deleteKeys("auth:login:fail:*");
-        deleteKeys("auth:email:*");
+        deleteKeys(testAuthRedisKeyPrefix() + "auth:login:fail:*");
+        deleteKeys(testAuthRedisKeyPrefix() + "auth:email:*");
     }
 
     private void resetBusinessTables() {
@@ -214,6 +215,10 @@ public abstract class LocalIntegrationTestSupport {
 
     private static String testSessionRedisNamespace() {
         return "workforce:test:session:" + env("TEST_DB_NAME", "workforce_hub_test");
+    }
+
+    private static String testAuthRedisKeyPrefix() {
+        return "workforce:test:auth:" + env("TEST_DB_NAME", "workforce_hub_test") + ":";
     }
 
     private void deleteKeys(String pattern) {

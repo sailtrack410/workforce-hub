@@ -10,6 +10,7 @@ public class CurrentUserResponse {
     private UserType userType;
     private String displayName;
     private String loginName;
+    private String email;
 
     /**
      * 业务用户的部门ID（仅 USER 类型）

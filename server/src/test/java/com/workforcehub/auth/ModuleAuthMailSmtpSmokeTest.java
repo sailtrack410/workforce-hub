@@ -43,7 +43,7 @@ class ModuleAuthMailSmtpSmokeTest extends LocalIntegrationTestSupport {
 
         emailCodeService.sendCode(email, "BIND");
 
-        Object code = redisTemplate.opsForValue().get("auth:email:code:BIND:" + email);
+        Object code = redisTemplate.opsForValue().get(emailCodeService.buildCodeKey(email, "BIND"));
         assertNotNull(code, "真实 SMTP 发送成功后仍应把验证码写入 Redis，供后续绑定/重置流程校验");
     }
 

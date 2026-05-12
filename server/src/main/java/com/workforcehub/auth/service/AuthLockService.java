@@ -1,6 +1,7 @@
 package com.workforcehub.auth.service;
 
 import com.workforcehub.common.enums.UserType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -9,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 登录失败频控
- * Key 格式: auth:login:fail:{userType}:{loginName}
+ * Key 格式: {workforce.auth.redis-key-prefix}auth:login:fail:{userType}:{loginName}
  *
  * 策略：
  * - 每次失败计数 +1
@@ -24,9 +25,12 @@ public class AuthLockService {
     private static final Duration LOCK_DURATION = Duration.ofMinutes(30);
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final String keyPrefix;
 
-    public AuthLockService(RedisTemplate<String, Object> redisTemplate) {
+    public AuthLockService(RedisTemplate<String, Object> redisTemplate,
+                           @Value("${workforce.auth.redis-key-prefix:}") String keyPrefix) {
         this.redisTemplate = redisTemplate;
+        this.keyPrefix = keyPrefix == null ? "" : keyPrefix;
     }
 
     /**
@@ -70,6 +74,6 @@ public class AuthLockService {
     }
 
     private String buildKey(UserType userType, String loginName) {
-        return KEY_PREFIX + userType.name() + ":" + loginName;
+        return keyPrefix + KEY_PREFIX + userType.name() + ":" + loginName;
     }
 }

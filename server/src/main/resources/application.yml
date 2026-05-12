@@ -58,10 +58,11 @@ spring:
   # ==================== Mail (SMTP) ====================
   # 第一版用于邮箱验证码、绑定邮箱、找回密码
   # 开发环境可指向本地 MailHog/Mailpit；生产环境需配置真实 SMTP
-  # 本地测试示例：localhost:1025 + auth/starttls/ssl 全部 false
+  # 本地测试示例：127.0.0.1:1025 + auth/starttls/ssl 全部 false
+  # 使用 127.0.0.1 而不是 localhost，避免本机 IPv4/IPv6 解析差异导致调试 SMTP 偶发连不上
   # 网易 163 示例：smtp.163.com:465 + auth=true + ssl.enable=true
   mail:
-    host: ${MAIL_HOST:localhost}
+    host: ${MAIL_HOST:127.0.0.1}
     port: ${MAIL_PORT:1025}
     username: ${MAIL_USERNAME:noreply@workforce-hub.local}
     password: ${MAIL_PASSWORD:}

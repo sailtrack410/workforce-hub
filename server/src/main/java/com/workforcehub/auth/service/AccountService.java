@@ -60,6 +60,14 @@ public class AccountService {
         response.setUserType(user.getUserType());
         response.setDisplayName(user.getDisplayName());
         response.setLoginName(user.getUsername());
+        if (user.getUserType() == UserType.USER) {
+            AuthUserAccount account = accountMapper.selectOne(
+                new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, user.getUserId())
+            );
+            if (account != null) {
+                response.setEmail(account.getEmail());
+            }
+        }
 
         if (user.getUserType() == UserType.USER) {
             OrgUser orgUser = orgUserMapper.selectById(user.getUserId());
