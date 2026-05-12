@@ -395,6 +395,52 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工应能分页查询自己的个人文件列表和回收站列表")
+    void employeeShouldListOwnPersonalFilesAndRecycleBin() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        Long activeAttachmentRefId = createConfirmedPersonalFile(employeeSession, "个人列表-有效.txt", "employee-active-file");
+        Long trashedAttachmentRefId = createConfirmedPersonalFile(employeeSession, "个人列表-回收站.txt", "employee-trashed-file");
+        Long workflowAttachmentRefId = cloneWorkflowAttachmentRef(activeAttachmentRefId);
+        Long otherUserAttachmentRefId = cloneOtherUserPersonalAttachmentRef(activeAttachmentRefId);
+
+        trashEmployeeFile(employeeSession, trashedAttachmentRefId);
+
+        mockMvc.perform(get("/api/employee/files")
+                .cookie(employeeSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(activeAttachmentRefId))
+            .andExpect(jsonPath("$.data.list[0].displayName").value("个人列表-有效.txt"))
+            .andExpect(jsonPath("$.data.list[0].ownerType").value("PERSONAL_FILE"))
+            .andExpect(jsonPath("$.data.list[0].uploaderType").value("USER"))
+            .andExpect(jsonPath("$.data.list[0].uploaderId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data.list[0].mimeType").value("text/plain"))
+            .andExpect(jsonPath("$.data.list[0].fileSize").value("employee-active-file".getBytes(StandardCharsets.UTF_8).length))
+            .andExpect(jsonPath("$.data.list[0].scanStatus").value("PENDING"))
+            .andExpect(jsonPath("$.data.list[0].deletedAt").doesNotExist());
+
+        mockMvc.perform(get("/api/employee/files/recycle-bin")
+                .cookie(employeeSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(trashedAttachmentRefId))
+            .andExpect(jsonPath("$.data.list[0].displayName").value("个人列表-回收站.txt"))
+            .andExpect(jsonPath("$.data.list[0].deletedAt").isString())
+            .andExpect(jsonPath("$.data.list[0].purgeAfter").isString());
+
+        assertEquals(1, personalFileListVisibleCount(activeAttachmentRefId));
+        assertEquals(1, personalFileListHiddenCount(workflowAttachmentRefId));
+        assertEquals(1, personalFileListHiddenCount(otherUserAttachmentRefId));
+    }
+
+    @Test
     @DisplayName("员工个人文件生命周期接口不能操作审批归档附件")
     void employeeLifecycleShouldRejectWorkflowAttachmentRef() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -1130,6 +1176,56 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             EMPLOYEE_USER_ID
         );
         return workflowAttachmentRefId;
+    }
+
+    private Long cloneOtherUserPersonalAttachmentRef(Long sourceAttachmentRefId) {
+        Long fileObjectId = jdbcTemplate.queryForObject(
+            "SELECT file_object_id FROM sys_attachment_ref WHERE id = ?",
+            Long.class,
+            sourceAttachmentRefId
+        );
+        Long otherUserAttachmentRefId = System.nanoTime();
+        jdbcTemplate.update("""
+            INSERT INTO sys_attachment_ref
+                (id, owner_type, owner_id, file_object_id, original_file_name,
+                 display_name, uploader_type, uploader_id, visibility_scope, created_by)
+            VALUES
+                (?, 'PERSONAL_FILE', NULL, ?, '其他员工个人文件.txt',
+                 '其他员工个人文件.txt', 'USER', 2004, 'OWNER', 2004)
+            """,
+            otherUserAttachmentRefId,
+            fileObjectId
+        );
+        return otherUserAttachmentRefId;
+    }
+
+    private int personalFileListVisibleCount(Long attachmentRefId) {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_attachment_ref
+            WHERE id = ?
+              AND owner_type = 'PERSONAL_FILE'
+              AND uploader_type = 'USER'
+              AND uploader_id = ?
+              AND deleted_at IS NULL
+              AND is_deleted = 0
+            """, Integer.class, attachmentRefId, EMPLOYEE_USER_ID);
+        return count == null ? 0 : count;
+    }
+
+    private int personalFileListHiddenCount(Long attachmentRefId) {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_attachment_ref
+            WHERE id = ?
+              AND (
+                owner_type <> 'PERSONAL_FILE'
+                OR uploader_type <> 'USER'
+                OR uploader_id <> ?
+              )
+              AND is_deleted = 0
+            """, Integer.class, attachmentRefId, EMPLOYEE_USER_ID);
+        return count == null ? 0 : count;
     }
 
     private String createEmployeeDownloadTicket(Cookie employeeSession, Long attachmentRefId) throws Exception {

@@ -1,5 +1,6 @@
 package com.workforcehub.file.controller;
 
+import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.response.R;
 import com.workforcehub.file.dto.AttachmentRefResponse;
 import com.workforcehub.file.dto.ConfirmUploadRequest;
@@ -7,6 +8,7 @@ import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.CreateUploadTicketRequest;
 import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
+import com.workforcehub.file.dto.EmployeeFileResponse;
 import com.workforcehub.file.dto.FilePurgeResponse;
 import com.workforcehub.file.dto.FileRestoreResponse;
 import com.workforcehub.file.dto.FileTrashRequest;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -39,6 +42,18 @@ public class EmployeeFileController {
                                   FileDownloadResponseFactory downloadResponseFactory) {
         this.fileCenterService = fileCenterService;
         this.downloadResponseFactory = downloadResponseFactory;
+    }
+
+    @GetMapping
+    public R<PageResult<EmployeeFileResponse>> listFiles(@RequestParam(defaultValue = "1") long pageNo,
+                                                         @RequestParam(defaultValue = "20") long pageSize) {
+        return R.ok(fileCenterService.listEmployeeFiles(pageNo, pageSize, false));
+    }
+
+    @GetMapping("/recycle-bin")
+    public R<PageResult<EmployeeFileResponse>> listRecycleBin(@RequestParam(defaultValue = "1") long pageNo,
+                                                              @RequestParam(defaultValue = "20") long pageSize) {
+        return R.ok(fileCenterService.listEmployeeFiles(pageNo, pageSize, true));
     }
 
     @PostMapping("/upload-tickets")
