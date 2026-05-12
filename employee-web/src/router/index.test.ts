@@ -19,6 +19,7 @@ describe('employee router', () => {
     ['/files', 'employee-files', 'files'],
     ['/contacts', 'employee-contacts', 'contacts'],
     ['/settings', 'employee-settings', 'settings'],
+    ['/settings/security', 'employee-settings-detail', 'settings'],
   ])('resolves %s to a real section route', async (path, name, section) => {
     const employeeRoutes = await loadEmployeeRoutes();
     const route = findRoute(employeeRoutes, path);

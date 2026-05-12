@@ -1,41 +1,18 @@
 <script setup lang="ts">
 import {
-  AtSign,
   ChevronLeft,
-  Clock3,
-  Download,
-  Eye,
-  FolderOpen,
-  Info,
-  Send,
-  Sparkles,
-  Trash2,
-  UsersRound,
   MoonStar,
   SunMedium,
   PencilLine,
-  LayoutGrid,
-  Settings,
 } from 'lucide-vue-next';
 import { useEmployeeShellContext } from '../employee-shell-context';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
-import AppBadge from '../../components/ui/AppBadge.vue';
 import AppButton from '../../components/ui/AppButton.vue';
-import AppEmptyState from '../../components/ui/AppEmptyState.vue';
-import AppErrorState from '../../components/ui/AppErrorState.vue';
 import AppInput from '../../components/ui/AppInput.vue';
-import AppLoadingState from '../../components/ui/AppLoadingState.vue';
-import AppSkeleton from '../../components/ui/AppSkeleton.vue';
-import AppTag from '../../components/ui/AppTag.vue';
-import ConversationProcessCard from '../../components/shell/ConversationProcessCard.vue';
-import MessageBubble from '../../components/shell/MessageBubble.vue';
 
 const {
-shell,
-  im,
+  shell,
   session,
-  workflow,
-  draft,
   bindEmail,
   bindEmailCode,
   bindEmailCodeSending,
@@ -48,64 +25,13 @@ shell,
   mobileUpdateNotice,
   mobileUpdateError,
   mobileInput,
-  leaveAccounts,
-  attendanceExceptions,
-  todoActionComment,
-  todoActionError,
-  fileUploading,
-  agentTaskForm,
-  agentTaskSubmitting,
-  agentTaskResult,
-  agentTaskError,
-  agents,
-  agentsLoading,
-  leaveForm,
-  leaveAttachmentIds,
-  leaveSubmitting,
-  leaveResult,
-  leaveError,
-  workflowRequests,
-  workflowRequestsTotal,
-  workflowRequestsLoading,
-  workflowRequestsError,
-  selectedRequestId,
-  workflowDetail,
-  workflowActions,
-  workflowDetailLoading,
-  workflowDetailError,
-  withdrawComment,
-  withdrawSubmitting,
-  attendanceDailyResults,
-  attendanceLoading,
-  attendanceError,
-  punchLoading,
-  punchResult,
-  clockCorrectionForm,
-  clockCorrectionAttachmentIds,
-  clockCorrectionSubmitting,
-  clockCorrectionResult,
-  clockCorrectionError,
-  activeConversation,
-  activeTodo,
-  activeFile,
-  activeWorkbench,
-  activeContact,
-  activeProfile,
-  pendingTodoCount,
-  fileUsageCircumference,
-  activeFileUsage,
-  activeFileUsageOffset,
-  currentMeta,
+  passwordChangeForm,
+  passwordChangeCodeSending,
+  passwordChangeSubmitting,
+  passwordChangeNotice,
+  passwordChangeError,
   currentUserName,
   currentUserShortName,
-  activeFilter,
-  activeConversationTitle,
-  activeConversationCurrentStep,
-  mustHandleTodos,
-  approvalTodos,
-  deferredTodos,
-  workbenchLaunchers,
-  workbenchHighlights,
   selectedProfileId,
   profileStatusLabel,
   profileIdentityRows,
@@ -113,70 +39,19 @@ shell,
   currentEmail,
   organizationRows,
   settingsMetrics,
-  storageRows,
-  recentFileRows,
   preferenceRows,
-  selectedLeaveAccount,
-  activeWorkbenchTitle,
-  selectedRequest,
-  workflowDetailRows,
-  attendanceSummary,
-  teamAttendanceRows,
+  activeProfile,
   relationTree,
-  hasActiveConversation,
-  hasActiveTodo,
-  businessEmptyTitle,
   backToList,
-  runAction,
-  openDetail,
-  openGroupPanel,
-  openUploadPanel,
-  openCreateConversation,
-  insertAgentMention,
-  sendMessage,
-  openMessageAction,
-  openImAttachment,
-  retryTodos,
-  statusText,
-  toneOfStatus,
-  submitLeaveRequest,
-  isFileTrashed,
-  minutesToDayLabel,
-  loadWorkflowRequests,
-  loadWorkflowRequestDetail,
-  bizTypeLabel,
-  formatDateTime,
-  fileToneOf,
-  fileIconOf,
-  fileTypeLabelFromName,
-  fileSizeLabel,
-  previewWorkflowAttachment,
-  downloadWorkflowAttachment,
   displayField,
-  actionTypeLabel,
-  withdrawWorkflowRequest,
-  refreshAttendancePanel,
-  punchAttendance,
-  punchTypeLabel,
-  submitClockCorrectionRequest,
-  selectWorkbenchItem,
-  loadAgents,
-  submitAgentTask,
-  confirmAgentTask,
-  cancelAgentTask,
-  sendSelectedFileToConversation,
-  openPersonalFilePreview,
-  downloadPersonalFile,
-  trashPersonalFile,
-  restorePersonalFile,
-  purgePersonalFile,
-  toneOfConversation,
-  submitMobileUpdate,
   openMobileReset,
   sendBindEmailCode,
   submitBindEmail,
   startBindEmailEditing,
   cancelBindEmailEditing,
+  submitMobileUpdate,
+  sendPasswordChangeCode,
+  submitPasswordChange,
 } = useEmployeeShellContext();
 </script>
 
@@ -198,7 +73,7 @@ shell,
   </header>
 
   <section class="content-stack settings-dashboard">
-    <section v-if="selectedProfileId === 'center'" class="settings-card-grid">
+    <section v-if="selectedProfileId === 'profile'" class="settings-card-grid">
       <article class="settings-card settings-profile-card">
         <div class="settings-profile-main">
           <AppAvatar :label="currentUserShortName" tone="primary" size="lg" status="online" />
@@ -223,66 +98,9 @@ shell,
         </dl>
       </article>
 
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>账号安全</h3>
-        </header>
-        <dl class="settings-list compact">
-          <div v-for="row in accountSecurityRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
-      </article>
-
       <article class="settings-card settings-wide-card">
         <header class="settings-card-head">
-          <h3>工作概览</h3>
-        </header>
-        <div class="settings-metric-grid">
-          <div
-            v-for="metric in settingsMetrics"
-            :key="metric.label"
-            class="settings-metric-card"
-            :style="{ '--metric-level': `${metric.level}%` }"
-          >
-            <small>{{ metric.label }}</small>
-            <strong>{{ metric.value }}</strong>
-            <span>{{ metric.detail }}</span>
-            <i />
-          </div>
-        </div>
-      </article>
-
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>快捷操作</h3>
-        </header>
-        <div class="settings-action-list">
-          <button type="button" @click="shell.selectItem('settings', 'profile')">个人资料</button>
-          <button type="button" @click="shell.selectItem('settings', 'security')">账号安全</button>
-          <button type="button" @click="shell.selectItem('settings', 'preferences')">偏好设置</button>
-          <button type="button" @click="shell.selectItem('settings', 'storage')">文件空间</button>
-        </div>
-      </article>
-
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>组织关系</h3>
-        </header>
-        <dl class="settings-list">
-          <div v-for="row in organizationRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
-      </article>
-    </section>
-
-    <section v-else-if="selectedProfileId === 'profile'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>个人资料</h3>
+          <h3>身份资料</h3>
         </header>
         <dl class="settings-list two-column">
           <div class="settings-list-row is-editable">
@@ -300,30 +118,10 @@ shell,
           </div>
         </dl>
       </article>
-    </section>
-
-    <section v-else-if="selectedProfileId === 'organization'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>组织架构</h3>
-        </header>
-        <div class="settings-org-chart">
-          <div class="settings-org-node department-node">{{ relationTree.department }}</div>
-          <div class="settings-org-level">
-            <div v-if="relationTree.managerName" class="settings-org-node">直属上级：{{ relationTree.managerName }}</div>
-            <div class="settings-org-node current-user-node">{{ relationTree.ownName }}</div>
-          </div>
-          <div v-if="relationTree.subordinates.length" class="settings-org-level child-level">
-            <div v-for="user in relationTree.subordinates" :key="user.userId" class="settings-org-node">
-              {{ user.realName }}
-            </div>
-          </div>
-        </div>
-      </article>
 
       <article class="settings-card">
         <header class="settings-card-head">
-          <h3>组织信息</h3>
+          <h3>组织关系</h3>
         </header>
         <dl class="settings-list">
           <div v-for="row in organizationRows" :key="row[0]">
@@ -331,16 +129,29 @@ shell,
             <dd>{{ row[1] }}</dd>
           </div>
         </dl>
+        <div v-if="relationTree.subordinates.length" class="settings-member-list">
+          <span v-for="user in relationTree.subordinates" :key="user.userId">
+            {{ user.realName }}
+          </span>
+        </div>
       </article>
 
-      <article v-if="relationTree.conversationMembers.length" class="settings-card">
+      <article class="settings-card">
         <header class="settings-card-head">
-          <h3>会话成员</h3>
+          <h3>工作概览</h3>
         </header>
-        <div class="settings-member-list">
-          <span v-for="contact in relationTree.conversationMembers" :key="contact.id">
-            {{ contact.name }}
-          </span>
+        <div class="settings-metric-grid">
+          <div
+            v-for="metric in settingsMetrics"
+            :key="metric.label"
+            class="settings-metric-card"
+            :style="{ '--metric-level': `${metric.level}%` }"
+          >
+            <small>{{ metric.label }}</small>
+            <strong>{{ metric.value }}</strong>
+            <span>{{ metric.detail }}</span>
+            <i />
+          </div>
         </div>
       </article>
     </section>
@@ -348,7 +159,7 @@ shell,
     <section v-else-if="selectedProfileId === 'security'" class="settings-card-grid">
       <article class="settings-card">
         <header class="settings-card-head">
-          <h3>账号安全</h3>
+          <h3>账号概览</h3>
         </header>
         <dl class="settings-list">
           <div v-for="row in accountSecurityRows" :key="row[0]">
@@ -421,6 +232,37 @@ shell,
           <p v-if="bindEmailError" class="dialog-error">{{ bindEmailError }}</p>
         </div>
       </article>
+
+      <article class="settings-card">
+        <header class="settings-card-head">
+          <h3>修改密码</h3>
+        </header>
+        <div class="security-form">
+          <p v-if="!currentEmail" class="form-hint">请先在上方绑定邮箱以接收验证码。</p>
+          <label class="security-field">
+            <span>邮箱</span>
+            <AppInput :model-value="currentEmail" disabled placeholder="未绑定邮箱" />
+          </label>
+          <label class="security-field">
+            <span>验证码</span>
+            <AppInput v-model="passwordChangeForm.code" placeholder="邮箱验证码" />
+          </label>
+          <label class="security-field">
+            <span>新密码</span>
+            <AppInput v-model="passwordChangeForm.newPassword" type="password" placeholder="8-64 位新密码" />
+          </label>
+          <div class="form-actions">
+            <AppButton variant="secondary" size="sm" :disabled="!currentEmail || passwordChangeCodeSending" @click="sendPasswordChangeCode">
+              {{ passwordChangeCodeSending ? '发送中' : '发送验证码' }}
+            </AppButton>
+            <AppButton variant="primary" size="sm" :disabled="!currentEmail || passwordChangeSubmitting || !passwordChangeForm.code.trim() || passwordChangeForm.newPassword.length < 8" @click="submitPasswordChange">
+              {{ passwordChangeSubmitting ? '提交中' : '修改密码' }}
+            </AppButton>
+          </div>
+          <p v-if="passwordChangeNotice" class="form-result">{{ passwordChangeNotice }}</p>
+          <p v-if="passwordChangeError" class="dialog-error">{{ passwordChangeError }}</p>
+        </div>
+      </article>
     </section>
 
     <section v-else-if="selectedProfileId === 'preferences'" class="settings-card-grid">
@@ -461,56 +303,6 @@ shell,
           >
             紧凑
           </button>
-        </div>
-      </article>
-    </section>
-
-    <section v-else-if="selectedProfileId === 'storage'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>文件空间</h3>
-          <AppButton variant="primary" size="sm" :disabled="fileUploading" @click="runAction({ action: 'upload-personal-file', label: '上传文件' })">
-            {{ fileUploading ? '上传中' : '上传文件' }}
-          </AppButton>
-        </header>
-        <div class="settings-storage-layout">
-          <div class="settings-storage-chart" :style="{ '--storage-level': `${activeFileUsage}%` }">
-            <strong>{{ activeFileUsage }}%</strong>
-            <span>已用</span>
-          </div>
-          <dl class="settings-list">
-            <div v-for="row in storageRows" :key="row[0]">
-              <dt>{{ row[0] }}</dt>
-              <dd>{{ row[1] }}</dd>
-            </div>
-          </dl>
-        </div>
-      </article>
-
-      <article v-if="recentFileRows.length" class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>最近文件</h3>
-        </header>
-        <div class="file-list">
-          <div v-for="file in recentFileRows" :key="file.id" class="file-row">
-            <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
-              <component :is="fileIconOf(file)" :size="18" />
-            </span>
-            <div>
-              <strong>{{ file.name }}</strong>
-              <small>{{ file.type }} · {{ file.size }} · {{ file.createdAt }} · {{ file.status }}</small>
-            </div>
-            <div class="file-actions">
-              <button type="button" :disabled="!file.attachmentRefId || isFileTrashed(file)" @click="openPersonalFilePreview(file)">
-                <Eye :size="15" />
-                预览
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId || isFileTrashed(file)" @click="downloadPersonalFile(file)">
-                <Download :size="15" />
-                下载
-              </button>
-            </div>
-          </div>
         </div>
       </article>
     </section>

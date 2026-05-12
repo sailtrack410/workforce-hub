@@ -73,6 +73,12 @@ export const employeeRoutes = [
         meta: { section: 'settings' },
       },
       {
+        path: 'settings/:panel',
+        name: 'employee-settings-detail',
+        component: SettingsSection,
+        meta: { section: 'settings' },
+      },
+      {
         path: 'processes',
         name: 'employee-processes',
         component: EmptySection,

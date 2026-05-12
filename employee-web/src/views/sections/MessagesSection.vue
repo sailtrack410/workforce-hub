@@ -246,7 +246,7 @@ shell,
     </template>
   </section>
 
-  <section class="content-stack">
+  <section v-else class="content-stack">
     <AppEmptyState title="暂无会话" description="暂无消息" />
   </section>
 

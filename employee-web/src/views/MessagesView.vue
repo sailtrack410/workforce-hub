@@ -66,6 +66,8 @@ import {
   sectionFilters,
   shellUser,
   useShellStore,
+  normalizeSettingsPanel,
+  normalizeWorkbenchApp,
 } from '../stores/shell';
 import { mapImMessageToConversationMessage, useImStore } from '../stores/im';
 import { useSessionStore } from '../stores/session';
@@ -120,6 +122,14 @@ const mobileUpdateNotice = ref('');
 const mobileUpdateError = ref('');
 const mobileInput = ref<HTMLInputElement | null>(null);
 const authNotice = ref('');
+const passwordChangeForm = ref({ code: '', newPassword: '' });
+const passwordChangeCodeSending = ref(false);
+const passwordChangeSubmitting = ref(false);
+const passwordChangeNotice = ref('');
+const passwordChangeError = ref('');
+const fileSendTarget = ref<{ file: PersonalFileRecord; caption: string; submitting: boolean } | null>(null);
+const fileSendTargetQuery = ref('');
+const fileSendTargetError = ref('');
 const leaveAccounts = ref<LeaveAccountResponse[]>([]);
 const attendanceExceptions = ref<AttendanceExceptionResponse[]>([]);
 const workbenchLoading = ref(false);
@@ -232,12 +242,9 @@ const workbenchIcons: Record<string, typeof MessageCircle> = {
 };
 
 const profileIcons: Record<string, typeof MessageCircle> = {
-  center: LayoutGrid,
   profile: ContactRound,
-  organization: UsersRound,
   security: Settings,
   preferences: SunMedium,
-  storage: FolderOpen,
 };
 
 const activeSection = computed(() => shell.section);
@@ -483,6 +490,7 @@ function routeNameForSection(section: SectionId, item?: string) {
   if (section === 'messages' && item) return 'employee-message-detail';
   if (section === 'todos' && item) return 'employee-todo-detail';
   if (section === 'workbench' && item) return 'employee-workbench-detail';
+  if (section === 'settings' && item) return 'employee-settings-detail';
   return sectionRouteNames[section] ?? 'employee-messages';
 }
 
@@ -490,6 +498,7 @@ function routeParamsForSection(section: SectionId, item?: string) {
   if (section === 'messages' && item) return { conversationId: item };
   if (section === 'todos' && item) return { todoId: item };
   if (section === 'workbench' && item) return { app: item };
+  if (section === 'settings' && item) return { panel: item };
   return {};
 }
 
@@ -603,6 +612,12 @@ function selectWorkbenchItem(id: string) {
   if (id === 'balance' || id === 'leave') void refreshWorkbenchData();
   if (id === 'files') void refreshFileCenter();
   if (id === 'agent') void loadAgents();
+}
+
+function selectSettingsItem(id: string) {
+  const canonical = normalizeSettingsPanel(id);
+  navigateSection('settings', canonical);
+  shell.selectItem('settings', canonical);
 }
 
 async function sha256Hex(file: File) {
@@ -1581,8 +1596,7 @@ async function openMobileReset() {
   mobileDraft.value = session.profile?.mobile ?? '';
   mobileUpdateNotice.value = '';
   mobileUpdateError.value = '';
-  navigateSection('settings');
-  shell.selectItem('settings', 'security');
+  selectSettingsItem('security');
   await nextTick();
   mobileInput.value?.focus();
 }
@@ -1609,6 +1623,79 @@ async function submitMobileUpdate() {
   }
 }
 
+async function sendPasswordChangeCode() {
+  const email = currentEmail.value;
+  if (!email || passwordChangeCodeSending.value) return;
+  passwordChangeCodeSending.value = true;
+  passwordChangeNotice.value = '';
+  passwordChangeError.value = '';
+  try {
+    await session.sendPasswordResetCode(email);
+    passwordChangeNotice.value = '验证码已发送至当前邮箱';
+    showToast(passwordChangeNotice.value);
+  } catch (error) {
+    passwordChangeError.value = error instanceof Error ? error.message : '验证码发送失败';
+    showToast(passwordChangeError.value);
+  } finally {
+    passwordChangeCodeSending.value = false;
+  }
+}
+
+async function submitPasswordChange() {
+  const email = currentEmail.value;
+  const code = passwordChangeForm.value.code.trim();
+  const newPassword = passwordChangeForm.value.newPassword;
+  if (!email || !code || newPassword.length < 8 || passwordChangeSubmitting.value) return;
+  passwordChangeSubmitting.value = true;
+  passwordChangeNotice.value = '';
+  passwordChangeError.value = '';
+  try {
+    await session.resetPassword({ email, code, newPassword });
+    passwordChangeForm.value.code = '';
+    passwordChangeForm.value.newPassword = '';
+    passwordChangeNotice.value = '密码已更新，下次登录请使用新密码';
+    showToast(passwordChangeNotice.value);
+  } catch (error) {
+    passwordChangeError.value = error instanceof Error ? error.message : '密码修改失败';
+    showToast(passwordChangeError.value);
+  } finally {
+    passwordChangeSubmitting.value = false;
+  }
+}
+
+function openSendFileTarget(file: PersonalFileRecord) {
+  if (!file?.attachmentRefId || isFileTrashed(file)) return;
+  fileSendTarget.value = { file, caption: '', submitting: false };
+  fileSendTargetQuery.value = '';
+  fileSendTargetError.value = '';
+}
+
+function closeSendFileTarget() {
+  if (fileSendTarget.value?.submitting) return;
+  fileSendTarget.value = null;
+  fileSendTargetQuery.value = '';
+  fileSendTargetError.value = '';
+}
+
+async function confirmSendFileTarget(conversationId: EntityId) {
+  const target = fileSendTarget.value;
+  if (!target || target.submitting) return;
+  if (!target.file.attachmentRefId) return;
+  target.submitting = true;
+  fileSendTargetError.value = '';
+  try {
+    await im.sendFileMessage(conversationId, target.file.attachmentRefId, target.caption.trim(), session.user?.userId);
+    const messages = im.messagesByConversation[String(conversationId)];
+    if (messages?.length) shell.mergeBackendMessages(String(conversationId), messages);
+    shell.mergeBackendConversations(im.conversations);
+    fileSendTarget.value = null;
+    fileSendTargetQuery.value = '';
+    showToast('文件已发送');
+  } catch (error) {
+    target.submitting = false;
+    fileSendTargetError.value = error instanceof Error ? error.message : '文件发送失败';
+  }
+}
 function selectNav(section: SectionId) {
   navigateSection(section);
   shell.setMobileView('list');
@@ -1947,8 +2034,16 @@ async function sendMessage() {
 }
 
 async function sendSelectedFileToConversation(file: PersonalFileRecord) {
+  if (!file?.attachmentRefId) return;
+  if (isFileTrashed(file)) {
+    showToast('已删除的文件不能发送');
+    return;
+  }
   const conversationId = activeConversationId();
-  if (!conversationId || !file.attachmentRefId) return;
+  if (!conversationId || activeSection.value !== 'messages') {
+    openSendFileTarget(file);
+    return;
+  }
   try {
     await im.sendFileMessage(conversationId, file.attachmentRefId, draft.value, session.user?.userId);
     const messages = im.messagesByConversation[String(conversationId)];
@@ -2163,7 +2258,25 @@ watch(
   () => route.params.app,
   (app) => {
     if (typeof app === 'string') {
-      selectWorkbenchItem(app);
+      const canonical = normalizeWorkbenchApp(app);
+      shell.selectItem('workbench', canonical);
+      if (canonical !== app) {
+        void router.replace({ name: 'employee-workbench-detail', params: { app: canonical } });
+      }
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => route.params.panel,
+  (panel) => {
+    if (typeof panel === 'string') {
+      const canonical = normalizeSettingsPanel(panel);
+      shell.selectItem('settings', canonical);
+      if (canonical !== panel) {
+        void router.replace({ name: 'employee-settings-detail', params: { panel: canonical } });
+      }
     }
   },
   { immediate: true },
@@ -2216,6 +2329,14 @@ const employeeShellContext = {
   mobileUpdateNotice,
   mobileUpdateError,
   mobileInput,
+  passwordChangeForm,
+  passwordChangeCodeSending,
+  passwordChangeSubmitting,
+  passwordChangeNotice,
+  passwordChangeError,
+  fileSendTarget,
+  fileSendTargetQuery,
+  fileSendTargetError,
   authNotice,
   leaveAccounts,
   attendanceExceptions,
@@ -2432,6 +2553,11 @@ const employeeShellContext = {
   submitClockCorrectionRequest,
   openMobileReset,
   submitMobileUpdate,
+  sendPasswordChangeCode,
+  submitPasswordChange,
+  openSendFileTarget,
+  closeSendFileTarget,
+  confirmSendFileTarget,
   selectNav,
   openTodoAction,
   closeTodoAction,
@@ -2460,6 +2586,7 @@ const employeeShellContext = {
   selectFilter,
   scrollFilters,
   updateFilterOverflow,
+  selectSettingsItem,
   sendBindEmailCode,
   submitBindEmail,
   startBindEmailEditing,
@@ -2802,7 +2929,7 @@ provideEmployeeShellContext(employeeShellContext);
             v-for="item in filteredProfile"
             :key="item.id"
             :active="item.id === activeProfile.id"
-            @click="shell.selectItem('settings', item.id)"
+            @click="selectSettingsItem(item.id)"
           >
             <div class="generic-row">
               <span class="list-icon tone-gray">
@@ -3207,6 +3334,59 @@ provideEmployeeShellContext(employeeShellContext);
           </AppButton>
         </div>
       </form>
+    </AppDialog>
+
+    <AppDialog v-if="fileSendTarget">
+      <section class="send-file-dialog">
+        <header class="dialog-head dialog-head-row">
+          <div>
+            <h2>发送到会话</h2>
+            <p>选择要发送 “{{ fileSendTarget.file.name }}” 的会话</p>
+          </div>
+          <button class="field-icon-button" type="button" :disabled="fileSendTarget.submitting" aria-label="关闭" @click="closeSendFileTarget">
+            <X :size="15" />
+          </button>
+        </header>
+
+        <label class="security-field">
+          <span>附言（可选）</span>
+          <textarea v-model="fileSendTarget.caption" class="ui-textarea compact-textarea" rows="2" placeholder="对接收人说一句话" />
+        </label>
+
+        <label class="security-field">
+          <span>搜索会话</span>
+          <AppInput v-model="fileSendTargetQuery" placeholder="按会话名 / 备注搜索" />
+        </label>
+
+        <div class="send-file-list">
+          <AppEmptyState v-if="!shell.conversations.length" title="暂无会话" description="先在消息页发起会话后再来发送文件。" />
+          <template v-else>
+            <button
+              v-for="conv in shell.conversations.filter((item) => !fileSendTargetQuery.trim() || [item.title, item.subtitle, item.tag].some((text) => (text || '').toLowerCase().includes(fileSendTargetQuery.trim().toLowerCase())))"
+              :key="conv.id"
+              type="button"
+              class="send-file-row"
+              :disabled="fileSendTarget.submitting"
+              @click="confirmSendFileTarget(conv.id)"
+            >
+              <AppAvatar :label="conv.badge || conv.title.slice(0, 2)" :tone="toneOfConversation(conv.tone)" size="sm" />
+              <div>
+                <strong>{{ conv.title }}</strong>
+                <small>{{ conv.subtitle || conv.tag || conv.flow }}</small>
+              </div>
+              <Send :size="14" />
+            </button>
+          </template>
+        </div>
+
+        <p v-if="fileSendTargetError" class="dialog-error">{{ fileSendTargetError }}</p>
+
+        <div class="dialog-actions">
+          <AppButton variant="ghost" type="button" :disabled="fileSendTarget.submitting" @click="closeSendFileTarget">
+            取消
+          </AppButton>
+        </div>
+      </section>
     </AppDialog>
 
     <AppDialog v-if="filePreview">

@@ -489,18 +489,6 @@ const workbenchItems: WorkbenchRecord[] = [
     steps: [],
   },
   {
-    id: 'files',
-    title: '文件中心',
-    label: '文件',
-    subtitle: '文件中心',
-    note: '',
-    tone: 'blue',
-    status: '',
-    fields: [],
-    stats: [],
-    steps: [],
-  },
-  {
     id: 'agent',
     title: 'Agent任务',
     label: 'Agent',
@@ -518,36 +506,18 @@ const contactItems: ContactRecord[] = [];
 
 const profileItems: ProfileRecord[] = [
   {
-    id: 'center',
-    title: '个人中心',
-    subtitle: '仪表盘',
-    note: '',
-    tone: 'blue',
-    stats: [],
-    fields: [],
-  },
-  {
     id: 'profile',
-    title: '个人资料',
-    subtitle: '身份信息',
+    title: '个人信息',
+    subtitle: '身份与组织',
     note: '',
     tone: 'blue',
-    stats: [],
-    fields: [],
-  },
-  {
-    id: 'organization',
-    title: '组织关系',
-    subtitle: '组织架构',
-    note: '',
-    tone: 'green',
     stats: [],
     fields: [],
   },
   {
     id: 'security',
     title: '账号安全',
-    subtitle: '账号安全',
+    subtitle: '手机号 / 邮箱 / 密码',
     note: '',
     tone: 'amber',
     stats: [],
@@ -556,22 +526,35 @@ const profileItems: ProfileRecord[] = [
   {
     id: 'preferences',
     title: '偏好设置',
-    subtitle: '显示与会话',
-    note: '',
-    tone: 'blue',
-    stats: [],
-    fields: [],
-  },
-  {
-    id: 'storage',
-    title: '文件空间',
-    subtitle: '个人云空间',
+    subtitle: '主题与密度',
     note: '',
     tone: 'gray',
     stats: [],
     fields: [],
   },
 ];
+
+const SETTINGS_ALIAS: Record<string, string> = {
+  center: 'profile',
+  organization: 'profile',
+  storage: 'profile',
+};
+
+export function normalizeSettingsPanel(id?: string | null): string {
+  if (!id) return 'profile';
+  if (SETTINGS_ALIAS[id]) return SETTINGS_ALIAS[id];
+  return profileItems.some((item) => item.id === id) ? id : 'profile';
+}
+
+const WORKBENCH_ALIAS: Record<string, string> = {
+  files: 'leave',
+};
+
+export function normalizeWorkbenchApp(id?: string | null): string {
+  if (!id) return workbenchItems[0]?.id ?? 'leave';
+  if (WORKBENCH_ALIAS[id]) return WORKBENCH_ALIAS[id];
+  return workbenchItems.some((item) => item.id === id) ? id : (workbenchItems[0]?.id ?? 'leave');
+}
 
 function findById<T extends { id: string }>(items: T[], id: string, fallback: T) {
   return items.find((item) => item.id === id) ?? items[0] ?? fallback;
@@ -700,7 +683,7 @@ export const useShellStore = defineStore('employee-shell', {
       processes: 'requests',
       contacts: '',
       reports: 'overview',
-      settings: 'center',
+      settings: 'profile',
     },
     conversations: [] as ConversationRecord[],
     todos: [] as TodoRecord[],
@@ -814,13 +797,16 @@ export const useShellStore = defineStore('employee-shell', {
       this.filters[section] = filter;
     },
     selectItem(section: SectionId, id: string) {
-      this.active[section] = id;
+      let normalized = id;
+      if (section === 'settings') normalized = normalizeSettingsPanel(id);
+      else if (section === 'workbench') normalized = normalizeWorkbenchApp(id);
+      this.active[section] = normalized;
       this.mobileView = 'detail';
       if (section === 'workbench') {
         this.detailOpen = false;
       }
       if (section === 'messages') {
-        const active = this.conversations.find((item) => item.id === id);
+        const active = this.conversations.find((item) => item.id === normalized);
         if (active) active.unread = 0;
       }
     },
@@ -945,7 +931,7 @@ export const useShellStore = defineStore('employee-shell', {
         },
       ];
       if (!this.profile.some((item) => item.id === this.active.settings)) {
-        this.active.settings = this.profile[0]?.id ?? 'center';
+        this.active.settings = this.profile[0]?.id ?? 'profile';
       }
       this.contacts = collectContacts(user, profile, manager, subordinates, this.conversations);
       if (!this.contacts.some((item) => item.id === this.active.contacts)) {

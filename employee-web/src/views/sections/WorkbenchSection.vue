@@ -179,7 +179,7 @@ shell,
   cancelBindEmailEditing,
 } = useEmployeeShellContext();
 
-const activeUploadableFiles = () => activeFile.files.filter((item: { attachmentRefId?: unknown }) => item.attachmentRefId && !isFileTrashed(item));
+const activeUploadableFiles = () => activeFile.value.files.filter((item: { attachmentRefId?: unknown }) => item.attachmentRefId && !isFileTrashed(item));
 </script>
 
 <template>
@@ -202,9 +202,6 @@ const activeUploadableFiles = () => activeFile.files.filter((item: { attachmentR
       </AppButton>
       <AppButton v-if="activeWorkbench.id === 'attendance'" variant="secondary" size="sm" :disabled="attendanceLoading" @click="refreshAttendancePanel">
         {{ attendanceLoading ? '刷新中' : '刷新' }}
-      </AppButton>
-      <AppButton v-if="activeWorkbench.id === 'files'" variant="primary" size="sm" :disabled="fileUploading" @click="openUploadPanel">
-        上传文件
       </AppButton>
     </div>
   </header>
@@ -503,67 +500,6 @@ const activeUploadableFiles = () => activeFile.files.filter((item: { attachmentR
           </dl>
         </article>
         <AppEmptyState v-if="!leaveAccounts.length" title="暂无假期账户" description="暂无假期账户" />
-      </section>
-    </template>
-
-    <template v-else-if="activeWorkbench.id === 'files'">
-      <section class="detail-grid">
-        <article class="detail-card">
-          <h3>空间用量</h3>
-          <dl class="field-grid">
-            <div v-for="item in activeFile.summary" :key="item[0]">
-              <dt>{{ item[1] }}</dt>
-              <dd>{{ item[0] }}</dd>
-            </div>
-          </dl>
-        </article>
-        <article class="detail-card">
-          <h3>文件上传</h3>
-          <div class="punch-actions">
-            <AppButton variant="primary" :disabled="fileUploading" @click="openUploadPanel">
-              上传文件
-            </AppButton>
-          </div>
-        </article>
-      </section>
-      <section class="detail-card">
-        <h3>个人文件</h3>
-        <AppEmptyState v-if="!activeFile.files.length" title="暂无文件" description="暂无文件" />
-        <div v-else class="file-list">
-          <div v-for="file in activeFile.files" :key="file.id" class="file-row">
-            <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
-              <component :is="fileIconOf(file)" :size="18" />
-            </span>
-            <div>
-              <strong>{{ file.name }}</strong>
-              <small>{{ file.type }} · {{ file.size }} · {{ file.createdAt }} · {{ file.status }}</small>
-            </div>
-            <div class="file-actions">
-              <button type="button" :disabled="!file.attachmentRefId || im.messageSending" @click="sendSelectedFileToConversation(file)">
-                <Send :size="15" />
-                发送
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId || isFileTrashed(file)" @click="openPersonalFilePreview(file)">
-                <Eye :size="15" />
-                预览
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId || isFileTrashed(file)" @click="downloadPersonalFile(file)">
-                <Download :size="15" />
-                下载
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId || isFileTrashed(file)" @click="trashPersonalFile(file)">
-                <Trash2 :size="15" />
-                删除
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId || !isFileTrashed(file)" @click="restorePersonalFile(file)">
-                恢复
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId || !isFileTrashed(file)" @click="purgePersonalFile(file)">
-                彻删
-              </button>
-            </div>
-          </div>
-        </div>
       </section>
     </template>
 
