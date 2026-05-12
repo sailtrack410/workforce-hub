@@ -1,24 +1,25 @@
 import { defineStore } from 'pinia';
+import type {
+  CurrentUserResponse,
+  EmployeeFileResponse,
+  EntityId,
+  OrgUserDetailResponse,
+  OrgUserSummaryResponse,
+  QuotaResponse,
+} from '../api';
 
-export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'profile';
+export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'reports' | 'settings';
 export type ConversationTone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
-export type SectionFilter = '全部' | '未处理' | 'Agent' | '组织群' | '私聊';
-export type ApiContractStatus = 'implemented' | 'planned' | 'mockOnly';
-
-export interface ApiContractHint {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  path: string;
-  status: ApiContractStatus;
-  note: string;
-}
+export type SectionFilter = '全部' | '未处理' | 'Agent' | '群聊' | '私聊';
+export type ThemeMode = 'light' | 'dark';
+export type MessageDensity = 'cozy' | 'compact';
 
 export interface SectionAction {
   label: string;
-  action: 'switch-section' | 'switch-item' | 'open-workbench' | 'toast';
+  action: 'switch-section' | 'switch-item' | 'open-workbench' | 'upload-personal-file' | 'approve-todo' | 'reject-todo';
   section?: SectionId;
   item?: string;
   app?: string;
-  message?: string;
 }
 
 export interface SectionMeta {
@@ -30,6 +31,12 @@ export interface SectionMeta {
   secondaryAction?: SectionAction;
 }
 
+export interface NavRailItem {
+  id: SectionId;
+  label: string;
+  glyph: string;
+}
+
 export interface ConversationMessage {
   id: string;
   type?: 'text' | 'process-card';
@@ -38,6 +45,10 @@ export interface ConversationMessage {
   body: string;
   side?: 'left' | 'right' | 'system';
   time?: string;
+  seqNo?: number;
+  senderType?: string;
+  status?: string;
+  attachments?: ConversationAttachment[];
   processCard?: ConversationProcessCard;
 }
 
@@ -59,6 +70,8 @@ export interface ConversationAttachment {
   type: string;
   size: string;
   status: string;
+  attachmentRefId?: EntityId;
+  mimeType?: string;
 }
 
 export interface ConversationProcessCheck {
@@ -93,7 +106,7 @@ export interface ConversationEvidence {
 }
 
 export interface ConversationPanel {
-  members: Array<{ name: string; role: string }>;
+  members: Array<{ name: string; role: string; userId?: string | number; memberType?: string }>;
   tasks: string[];
   attachments: ConversationAttachment[];
   auditTrail?: ConversationAuditRecord[];
@@ -113,6 +126,8 @@ export interface ConversationRecord {
   unread: number;
   flow: string;
   status: string;
+  pinned?: boolean;
+  muted?: boolean;
   unreadLabel: string;
   summaryTitle: string;
   summaryBody: string;
@@ -136,7 +151,6 @@ export interface TodoRecord {
   summary: string;
   fields: Array<[string, string]>;
   timeline: string[];
-  apis: ApiContractHint[];
   actions: SectionAction[];
 }
 
@@ -148,7 +162,19 @@ export interface FileSpaceRecord {
   usage: number;
   label: string;
   summary: Array<[string, string]>;
-  files: Array<[string, string, string, string, string]>;
+  files: PersonalFileRecord[];
+}
+
+export interface PersonalFileRecord {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  createdAt: string;
+  status: string;
+  attachmentRefId?: EntityId;
+  mimeType?: string;
+  downloadUrl?: string;
 }
 
 export interface WorkbenchRecord {
@@ -175,12 +201,22 @@ export interface ProfileRecord {
   fields: Array<[string, string]>;
 }
 
+export interface ContactRecord {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  relation: string;
+  source: string;
+  userId?: string | number;
+}
+
 export const sectionMeta: Record<SectionId, SectionMeta> = {
   messages: {
     kicker: '',
     title: '消息',
     subtitle: '',
-    search: '搜索会话、待办、附件、状态',
+    search: '搜索会话、人员、文件',
     secondaryAction: {
       label: '查看待办',
       action: 'switch-section',
@@ -188,14 +224,14 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     },
   },
   todos: {
-    kicker: '统一处理',
+    kicker: '',
     title: '待办',
-    subtitle: '审批、附件、考勤和文件提醒会汇聚到这里',
+    subtitle: '',
     search: '搜索待办、申请号、处理人',
     primaryAction: {
       label: '刷新列表',
-      action: 'toast',
-      message: '已刷新待办列表。',
+      action: 'switch-section',
+      section: 'todos',
     },
     secondaryAction: {
       label: '打开申请',
@@ -204,25 +240,19 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     },
   },
   files: {
-    kicker: '文件中心',
+    kicker: '',
     title: '文档',
-    subtitle: '个人文件、审批附件、下载票据和回收站',
-    search: '搜索文件、票据、状态',
+    subtitle: '',
+    search: '搜索文件、材料、状态',
     primaryAction: {
-      label: '申请上传',
-      action: 'toast',
-      message: '上传流程是申请票据、直传对象、确认上传。',
-    },
-    secondaryAction: {
-      label: '回收站',
-      action: 'switch-item',
-      item: 'recycle',
+      label: '上传文件',
+      action: 'upload-personal-file',
     },
   },
   workbench: {
-    kicker: '业务办理',
+    kicker: '',
     title: '工作台',
-    subtitle: '请假、考勤、假期、文件和申请入口都从这里展开',
+    subtitle: '',
     search: '搜索请假、考勤、假期、文件',
     primaryAction: {
       label: '请假申请',
@@ -235,21 +265,29 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
       item: 'attendance',
     },
   },
-  profile: {
-    kicker: '个人中心',
-    title: '我的',
-    subtitle: '身份、组织、账号安全和可访问范围',
-    search: '搜索资料、安全、权限',
-    primaryAction: {
-      label: '绑定邮箱',
-      action: 'toast',
-      message: '员工端邮箱绑定和验证码入口已按认证文档预留。',
-    },
-    secondaryAction: {
-      label: '重置密码',
-      action: 'toast',
-      message: '密码重置入口已按认证文档预留。',
-    },
+  processes: {
+    kicker: '',
+    title: '流程',
+    subtitle: '',
+    search: '搜索流程、审批、编号',
+  },
+  contacts: {
+    kicker: '',
+    title: '通讯录',
+    subtitle: '',
+    search: '搜索姓名、部门、岗位',
+  },
+  reports: {
+    kicker: '',
+    title: '报表',
+    subtitle: '',
+    search: '搜索报表、指标、时间',
+  },
+  settings: {
+    kicker: '',
+    title: '设置',
+    subtitle: '',
+    search: '搜索账号、安全、偏好',
   },
 };
 
@@ -258,650 +296,357 @@ export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = 
   { id: 'todos', label: '待办', glyph: '办' },
   { id: 'files', label: '文档', glyph: '档' },
   { id: 'workbench', label: '工作台', glyph: '台' },
-  { id: 'profile', label: '我的', glyph: '我' },
+  { id: 'processes', label: '流程', glyph: '流' },
+  { id: 'contacts', label: '通讯录', glyph: '录' },
+  { id: 'reports', label: '报表', glyph: '表' },
+  { id: 'settings', label: '设置', glyph: '设' },
 ];
 
-export const sectionFilters: SectionFilter[] = ['全部', '未处理', 'Agent', '组织群', '私聊'];
+export const primaryNavItems: NavRailItem[] = navItems;
+
+export const sectionFilters: SectionFilter[] = ['全部', '未处理', 'Agent', '群聊', '私聊'];
 
 const currentUser = {
-  name: '林澈',
-  shortName: '林',
-  loginName: 'lin.che',
-  email: 'lin.che@workforce.local',
-  title: '运营专员',
-  department: '运营中心 / 运营一部',
-  manager: '周悦',
-  status: '在职',
-  workNo: 'WFH-1027',
-  location: '上海',
-  phone: '138-0000-1027',
+  name: '员工',
+  shortName: '员',
+  loginName: '',
+  title: '',
+  department: '',
 };
 
-const conversations: ConversationRecord[] = [
-  {
-    id: 'leave-approval',
-    kind: 'approval',
-    tone: 'blue',
-    badge: '王晨',
-    title: '王晨年假申请',
-    subtitle: '请假 2 天，余额预审通过，等待审批确认',
-    meta: '10:24',
-    tag: '审批 · PENDING',
-    unread: 2,
-    flow: '审批',
-    status: 'PENDING',
-    unreadLabel: '未读消息',
-    summaryTitle: '余额预审通过，审批链将进入直属上级。',
-    summaryBody: '请假时长、附件引用、假期账户余额都已完成第一轮校验。',
-    cards: [
-      { label: '申请号', value: 'WF-LEAVE-20260506-01', hint: '申请号' },
-      { label: '当前状态', value: 'PENDING', hint: '待办状态' },
-      { label: '优先级', value: '高', hint: '优先级' },
-    ],
-    workflowSteps: [
-      { label: '提交申请', status: 'done', detail: '王晨已提交年假申请。' },
-      { label: '余额预审', status: 'done', detail: '年假余额、请假时长和附件引用已校验。' },
-      { label: '直属上级审批', status: 'current', detail: '当前等待周悦确认交接安排与排班冲突。' },
-      { label: 'HR归档', status: 'pending', detail: '审批通过后写入假期台账并同步考勤。' },
-    ],
-    messages: [
-      { id: 'system-1', author: '系统', role: '工作流消息', body: '请假申请已写入业务申请头，待办已投递给直属上级。', side: 'system' },
-      {
-        id: 'agent-submit',
-        type: 'process-card',
-        author: 'HR 助手',
-        role: '流程 Agent',
-        body: '王晨提交的年假申请已进入审批链路，请相关审批人按节点处理。',
-        side: 'left',
-        time: '10:20',
-        processCard: {
-          title: '王晨年假申请待确认',
-          status: '审批中',
-          statusTone: 'warning',
-          body: '王晨提交的年假申请已发起，当前等待直属上级确认交接安排与排班冲突。',
-          fields: [
-            ['申请人', '王晨'],
-            ['请假类型', '年假 2 天'],
-            ['起止时间', '5月11日 09:00 - 5月12日 18:00'],
-            ['当前节点', '直属上级审批'],
-          ],
-          actionLabel: '查看详情',
-        },
-      },
-      {
-        id: 'agent-precheck',
-        type: 'process-card',
-        author: 'HR 助手',
-        role: '预审 Agent',
-        body: '根据假期余额、考勤记录和附件完整性，预审结果已生成。',
-        side: 'left',
-        time: '10:22',
-        processCard: {
-          title: 'Agent 预审已通过',
-          status: '已通过',
-          statusTone: 'success',
-          body: '系统已完成第一轮规则校验，审批人可直接查看依据并继续处理。',
-          checks: [
-            { label: '假期余额校验', result: '余额充足', passed: true },
-            { label: '时间范围校验', result: '无排班冲突', passed: true },
-            { label: '历史请假频率', result: '低风险', passed: true },
-          ],
-          fields: [
-            ['建议处理', '可同意'],
-            ['置信度', '98%'],
-          ],
-          actionLabel: '查看预审依据',
-        },
-      },
-      {
-        id: 'agent-file',
-        type: 'process-card',
-        author: '文件 Agent',
-        role: '材料校验',
-        body: '相关材料已确认，审批链路可引用附件。',
-        side: 'left',
-        time: '10:23',
-        processCard: {
-          title: '文件已确认',
-          status: '已完成',
-          statusTone: 'info',
-          body: '请假理由与交接材料齐全，文件引用已纳入本次审批。',
-          file: { id: 'leave-handover', name: '请假交接清单.docx', type: 'DOCX', size: '84KB', status: '已确认' },
-          actionLabel: '查看文件',
-        },
-      },
-      { id: 'manager-1', author: '周悦', role: '审批人', body: '下午我会集中处理，请把交接清单再确认一次。', side: 'left' },
-      { id: 'me-1', author: '林澈', role: '申请人', body: '附件已上传，补充说明放到文件中心了。', side: 'right' },
-    ],
-    panel: {
-      members: [
-        { name: '王晨', role: '申请人' },
-        { name: '周悦', role: '审批人' },
-        { name: 'HR 助手', role: '预审 Agent' },
-      ],
-      tasks: ['待办已投递给直属上级', '请假余额扣减等待审批通过', '审批附件下载授权已就绪'],
-      attachments: [
-        { id: 'leave-handover', name: '请假交接清单.docx', type: 'DOCX', size: '84KB', status: '已上传' },
-        { id: 'leave-note', name: '年假说明.pdf', type: 'PDF', size: '640KB', status: '审批附件' },
-      ],
-      auditTrail: [
-        { label: '提交申请', actor: '王晨', time: '10:20', status: '已提交', statusTone: 'done', detail: '年假申请进入审批流程。' },
-        { label: 'Agent 预审', actor: 'HR 助手', time: '10:22', status: '已通过', statusTone: 'done', detail: '余额、时间范围、附件完整性均已通过。' },
-        { label: '直属上级审批', actor: '周悦', time: '当前节点', status: '处理中', statusTone: 'current', detail: '等待确认交接安排与团队排班冲突。' },
-        { label: 'HR 归档', actor: '人事专员', time: '待处理', status: '未开始', statusTone: 'pending', detail: '审批通过后写入假期台账并同步考勤。' },
-        { label: '流程结束', actor: '系统', time: '待处理', status: '未开始', statusTone: 'pending', detail: '结果通知申请人和审批相关人。' },
-      ],
-      agentEvidence: [
-        { label: '假期规则', value: '年假管理办法（2024 版）' },
-        { label: '历史数据', value: '王晨近 6 个月请假与考勤记录' },
-        { label: '相似案例', value: '同部门 2 天年假申请通过率 98%' },
-      ],
-    },
-  },
-  {
-    id: 'operation-team',
-    kind: 'team',
-    tone: 'green',
-    badge: '运营',
-    title: '运营一部组织群',
-    subtitle: '五月排班和补卡说明已同步到群文件',
-    memberCount: 12,
-    meta: '09:42',
-    tag: '组织群 · ACTIVE',
-    unread: 3,
-    flow: '组织协作',
-    status: 'ACTIVE',
-    unreadLabel: '未读消息',
-    summaryTitle: '排班同步已发布，群内待确认事项进入跟进。',
-    summaryBody: '本周排班、补卡规则与群文件下载已完成归档，后续将持续更新。',
-    cards: [
-      { label: '群状态', value: 'ACTIVE', hint: '群聊状态' },
-      { label: '待确认', value: '3 项', hint: '待跟进任务' },
-      { label: '文件数', value: '12', hint: '群文件' },
-    ],
-    workflowSteps: [
-      { label: '群文件', status: 'done', detail: '五月排班与补卡说明已同步。' },
-      { label: '成员确认', status: 'current', detail: '当前等待组内成员确认排班。' },
-      { label: '跟进归档', status: 'pending', detail: '确认完成后归档到组织群文件。' },
-    ],
-    messages: [
-      { id: 'system-2', author: '系统', role: '群消息', body: '五月排班与补卡说明已同步到群文件。', side: 'system' },
-      { id: 'ops-1', author: '运营小组', role: '群主', body: '今晚 18:00 前确认排班，若有冲突直接在这里回复。', side: 'left' },
-      { id: 'me-2', author: '林澈', role: '成员', body: '收到，我会在群文件里确认替班。', side: 'right' },
-    ],
-    panel: {
-      members: [
-        { name: '运营小组', role: '群主' },
-        { name: '周悦', role: '协同人' },
-        { name: '林澈', role: '成员' },
-      ],
-      tasks: ['排班确认', '补卡说明归档', '群文件同步'],
-      attachments: [
-        { id: 'ops-schedule', name: '五月排班表.xlsx', type: 'XLSX', size: '148KB', status: '群文件' },
-        { id: 'ops-rule', name: '补卡说明.pdf', type: 'PDF', size: '310KB', status: '已同步' },
-      ],
-    },
-  },
-  {
-    id: 'hr-agent',
-    kind: 'agent',
-    tone: 'green',
-    badge: 'HR',
-    title: 'HR 助手',
-    subtitle: '年假余额还剩 5 天，建议避开团队峰值',
-    meta: '昨天',
-    tag: 'Agent · READY',
-    unread: 1,
-    flow: 'Agent 建议',
-    status: 'READY',
-    unreadLabel: '未读消息',
-    summaryTitle: '可执行建议已整理，支持直接投递待办。',
-    summaryBody: 'Agent 已基于余额、团队峰值和历史审批节奏给出建议，可继续追问或一键生成申请。',
-    cards: [
-      { label: '建议数', value: '3', hint: '建议条目' },
-      { label: '可用余额', value: '5 天', hint: '年假余额' },
-      { label: '响应级别', value: 'READY', hint: 'Agent 状态' },
-    ],
-    workflowSteps: [
-      { label: '问题识别', status: 'done', detail: '识别年假余额与团队峰值。' },
-      { label: '建议生成', status: 'current', detail: '已给出请假时段建议，可继续追问。' },
-      { label: '生成申请', status: 'pending', detail: '确认后进入工作台申请草稿。' },
-    ],
-    messages: [
-      { id: 'system-3', author: '系统', role: 'Agent 结果', body: '可直接在当前会话发起年假申请，已规避团队峰值时段。', side: 'system' },
-      { id: 'agent-1', author: 'HR 助手', role: '预审 Agent', body: '建议优先选择 5 月中旬后的两个工作日，审批通过率更高。', side: 'left' },
-      { id: 'me-3', author: '林澈', role: '申请人', body: '那帮我按建议生成一版申请。', side: 'right' },
-    ],
-    panel: {
-      members: [
-        { name: 'HR 助手', role: 'Agent' },
-        { name: '林澈', role: '申请人' },
-        { name: '周悦', role: '审批人' },
-      ],
-      tasks: ['建议生成申请', '余额校验', '审批链预览'],
-      attachments: [],
-    },
-  },
-  {
-    id: 'attendance-alert',
-    kind: 'attendance',
-    tone: 'amber',
-    badge: '考勤',
-    title: '考勤提醒',
-    subtitle: '5 月 3 日存在签退缺卡，结果会进入异常列表',
-    meta: '周三',
-    tag: '考勤 · ABNORMAL',
-    unread: 1,
-    flow: '考勤异常',
-    status: 'ABNORMAL',
-    unreadLabel: '未读消息',
-    summaryTitle: '缺卡已记录，进入异常待处理流程。',
-    summaryBody: '异常原因、打卡时段和审批路径已经串联，后续可直接发起补卡说明。',
-    cards: [
-      { label: '异常类型', value: '签退缺卡', hint: '考勤异常' },
-      { label: '发生日期', value: '5 月 3 日', hint: '异常日期' },
-      { label: '处理状态', value: '待确认', hint: '待处理' },
-    ],
-    workflowSteps: [
-      { label: '异常生成', status: 'done', detail: '系统已记录 5 月 3 日签退缺卡。' },
-      { label: '本人确认', status: 'current', detail: '当前等待补充缺卡说明。' },
-      { label: '异常归档', status: 'pending', detail: '处理完成后同步日结果。' },
-    ],
-    messages: [
-      { id: 'system-4', author: '系统', role: '考勤消息', body: '5 月 3 日存在签退缺卡，结果将进入异常列表。', side: 'system' },
-      { id: 'hr-2', author: '考勤小组', role: '处理人', body: '请补充说明原因，必要时同步直属主管。', side: 'left' },
-      { id: 'me-4', author: '林澈', role: '申请人', body: '我晚点补交说明，先确认当天排班。', side: 'right' },
-    ],
-    panel: {
-      members: [
-        { name: '考勤小组', role: '处理人' },
-        { name: '林澈', role: '申请人' },
-        { name: '周悦', role: '审批人' },
-      ],
-      tasks: ['缺卡说明补交', '排班核对', '异常处理归档'],
-      attachments: [],
-    },
-  },
-  {
-    id: 'file-center',
-    kind: 'file',
-    tone: 'gray',
-    badge: '文件',
-    title: '文件中心通知',
-    subtitle: '员工手册下载票据还剩 8 分钟',
-    meta: '昨天',
-    tag: '文件 · ACTIVE',
-    unread: 0,
-    flow: '文件流转',
-    status: 'ACTIVE',
-    unreadLabel: '未读消息',
-    summaryTitle: '文件下载票据已下发，接收端可继续查看。',
-    summaryBody: '员工手册、票据和读取授权都已进入文件流转记录。',
-    cards: [
-      { label: '文件状态', value: 'ACTIVE', hint: '文件可访问' },
-      { label: '剩余时间', value: '8 分钟', hint: '下载票据' },
-      { label: '授权', value: '已就绪', hint: '访问授权' },
-    ],
-    workflowSteps: [
-      { label: '票据生成', status: 'done', detail: '员工手册下载票据已生成。' },
-      { label: '等待下载', status: 'current', detail: '票据剩余 8 分钟，请在有效期内使用。' },
-      { label: '审计写入', status: 'pending', detail: '下载完成后记录消费审计。' },
-    ],
-    messages: [
-      { id: 'system-5', author: '系统', role: '文件消息', body: '员工手册下载票据已生成，请在有效期内完成下载。', side: 'system' },
-      { id: 'file-1', author: '文件中心', role: '服务', body: '可继续查看员工手册版本说明和附件清单。', side: 'left' },
-    ],
-    panel: {
-      members: [
-        { name: '文件中心', role: '服务' },
-        { name: '林澈', role: '接收人' },
-        { name: 'HR 助手', role: '校验 Agent' },
-      ],
-      tasks: ['手册下载', '票据校验', '附件访问'],
-      attachments: [
-        { id: 'employee-handbook', name: '员工手册.pdf', type: 'PDF', size: '2.1MB', status: '票据有效' },
-      ],
-    },
-  },
-];
+const preferenceStorageKey = 'workforce-hub.employee.preferences.v1';
+const personalFilesStoragePrefix = 'workforce-hub.employee.personal-files.v1';
 
-const todoItems: TodoRecord[] = [
-  {
-    id: 'todo-approval',
-    title: '王晨年假申请',
-    subtitle: '审批待办 · 周悦待处理',
-    note: '请假 2 天，余额预审通过',
-    time: '10:24',
-    status: 'PENDING',
-    priority: '高',
-    requestNo: 'WF-LEAVE-20260506-01',
-    taskId: 'TASK-20481',
-    currentStepName: '直属上级审批',
-    summary: '员工提交年假申请，待审批人确认交接安排与团队排班冲突。',
-    fields: [
-      ['申请人', '王晨'],
-      ['请假类型', '年假'],
-      ['起止时间', '2026-05-11 09:00 至 2026-05-12 18:00'],
-      ['预审结果', '余额充足'],
-    ],
-    timeline: ['王晨提交申请', 'HR 助手完成余额预审', '等待周悦审批', '通过后写入假期台账'],
-    apis: [
-      api('GET', '/api/employee/workflow/todos', 'implemented', '员工端待办列表已由后端开放'),
-      api('POST', '/api/employee/workflow/tasks/{taskId}/approve', 'implemented', '审批通过动作已由后端开放'),
-      api('POST', '/api/employee/workflow/tasks/{taskId}/reject', 'implemented', '审批驳回动作已由后端开放'),
-    ],
-    actions: [
-      { label: '审批通过', action: 'toast', message: '待办处理会在后端通过 workflow 接口写入审批动作。' },
-      { label: '驳回', action: 'toast', message: '驳回动作会通过 /tasks/{taskId}/reject 完成。' },
-    ],
-  },
-  {
-    id: 'todo-ticket',
-    title: '员工手册下载票据',
-    subtitle: '文件提醒 · 仅本人可用',
-    note: '短期票据剩余 8 分钟',
-    time: '剩余 8 分钟',
-    status: 'ACTIVE',
-    priority: '中',
-    requestNo: 'FILE-TICKET-20260507-02',
-    taskId: 'FILE-TICKET-02',
-    currentStepName: '文件下载票据',
-    summary: '文件下载采用短期票据，过期后可重新申请，不暴露固定对象地址。',
-    fields: [
-      ['文件名', '员工手册.pdf'],
-      ['票据状态', 'ACTIVE'],
-      ['ownerType', 'PERSONAL_FILE'],
-      ['安全策略', '一次性下载、可审计'],
-    ],
-    timeline: ['申请下载票据', '生成短期下载入口', '票据即将过期', '必要时重新申请'],
-    apis: [
-      api('POST', '/api/employee/files/{attachmentRefId}/download-tickets', 'implemented', '员工端文件下载票据已由后端开放'),
-      api('GET', '/api/employee/files/download/{ticketNo}', 'implemented', '短期票据下载入口已由后端开放'),
-    ],
-    actions: [
-      { label: '重新申请', action: 'toast', message: '下载票据到期后可以重新申请，不影响原文件引用。' },
-      { label: '查看文件', action: 'switch-section', section: 'files' },
-    ],
-  },
-  {
-    id: 'todo-attendance',
-    title: '5 月 3 日考勤缺卡',
-    subtitle: '个人待办 · 异常提醒',
-    note: '签退缺失，需要在工作台继续处理',
-    time: '今天 18:00',
-    status: 'OPEN',
-    priority: '中',
-    requestNo: 'ATT-20260503-01',
-    taskId: 'ATT-20260503-01',
-    currentStepName: '考勤异常处理',
-    summary: '考勤异常会进入统一待办和个人考勤入口，员工查看自己的结果和异常。',
-    fields: [
-      ['异常日期', '2026-05-03'],
-      ['异常类型', 'MISS_PUNCH'],
-      ['日结果', 'ABNORMAL'],
-      ['建议动作', '查看个人考勤'],
-    ],
-    timeline: ['系统生成异常', '写入日结果', '投递个人待办', '在工作台继续查看'],
-    apis: [
-      api('POST', '/api/employee/attendance/punch', 'implemented', '员工端打卡接口已由后端开放'),
-      api('GET', '/api/employee/attendance/daily-results', 'implemented', '员工端日结果接口已由后端开放'),
-      api('GET', '/api/employee/attendance/exceptions', 'implemented', '员工端异常列表接口已由后端开放'),
-    ],
-    actions: [
-      { label: '查看考勤', action: 'switch-item', section: 'workbench', item: 'attendance' },
-      { label: '查看详情', action: 'toast', message: '考勤详情已按员工端接口口径保留。' },
-    ],
-  },
-  {
-    id: 'todo-request',
-    title: '我的申请状态更新',
-    subtitle: '流程提醒 · 申请已进入审批中',
-    note: '请假申请状态已从草稿切到审批中',
-    time: '周一',
-    status: 'IN_APPROVAL',
-    priority: '低',
-    requestNo: 'WF-LEAVE-20260506-01',
-    taskId: 'REQ-2051',
-    currentStepName: '申请详情同步',
-    summary: '申请列表用于查看自己的申请、当前节点和审批结果。',
-    fields: [
-      ['申请编号', 'WF-LEAVE-20260506-01'],
-      ['当前状态', 'IN_APPROVAL'],
-      ['当前节点', '直属上级审批'],
-      ['列表来源', 'GET /api/employee/workflow/requests'],
-    ],
-    timeline: ['员工提交申请', '流程进入审批中', '我的申请列表同步', '待审批结果回写'],
-    apis: [
-      api('GET', '/api/employee/workflow/requests', 'implemented', '员工端申请分页列表已由后端开放'),
-      api('GET', '/api/employee/workflow/requests/{requestId}', 'implemented', '员工端申请详情已由后端开放'),
-      api('GET', '/api/employee/workflow/requests/{requestId}/actions', 'implemented', '员工端申请动作流水已由后端开放'),
-    ],
-    actions: [
-      { label: '打开申请', action: 'switch-item', section: 'workbench', item: 'requests' },
-      { label: '查看消息', action: 'switch-section', section: 'messages' },
-    ],
-  },
-];
+function readStoredPreferences(): { theme: ThemeMode; messageDensity: MessageDensity } {
+  const defaults = { theme: 'light' as ThemeMode, messageDensity: 'cozy' as MessageDensity };
+  try {
+    const storage = globalThis.localStorage;
+    const raw = storage?.getItem(preferenceStorageKey);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<{ theme: ThemeMode; messageDensity: MessageDensity }>;
+    return {
+      theme: parsed.theme === 'dark' || parsed.theme === 'light' ? parsed.theme : defaults.theme,
+      messageDensity: parsed.messageDensity === 'compact' || parsed.messageDensity === 'cozy'
+        ? parsed.messageDensity
+        : defaults.messageDensity,
+    };
+  } catch {
+    return defaults;
+  }
+}
 
-const staticTodoItems = todoItems;
-const staticConversations = conversations;
+function writeStoredPreferences(preferences: { theme: ThemeMode; messageDensity: MessageDensity }) {
+  try {
+    globalThis.localStorage?.setItem(preferenceStorageKey, JSON.stringify(preferences));
+  } catch {
+    // 浏览器隐私模式可能禁止写入本地存储，不阻断当前会话设置。
+  }
+}
 
-const fileSpaces: FileSpaceRecord[] = [
-  {
+function isStoredPersonalFile(value: unknown): value is PersonalFileRecord {
+  if (!value || typeof value !== 'object') return false;
+  const file = value as Partial<PersonalFileRecord>;
+  return typeof file.id === 'string'
+    && typeof file.name === 'string'
+    && typeof file.type === 'string'
+    && typeof file.size === 'string'
+    && typeof file.createdAt === 'string'
+    && typeof file.status === 'string';
+}
+
+function personalFilesStorageKey(ownerId?: string | number | null) {
+  return `${personalFilesStoragePrefix}.${ownerId || 'anonymous'}`;
+}
+
+function readStoredPersonalFiles(ownerId?: string | number | null): PersonalFileRecord[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(personalFilesStorageKey(ownerId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isStoredPersonalFile).slice(0, 24);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredPersonalFiles(files: PersonalFileRecord[], ownerId?: string | number | null) {
+  try {
+    globalThis.localStorage?.setItem(personalFilesStorageKey(ownerId), JSON.stringify(files.slice(0, 24)));
+  } catch {
+    // 本地存储不可写时只影响刷新后的文件列表保留，不影响本次上传链路。
+  }
+}
+
+const emptyConversation: ConversationRecord = {
+  id: '',
+  kind: 'team',
+  tone: 'gray',
+  badge: '',
+  title: '暂无会话',
+  subtitle: '',
+  meta: '',
+  tag: '',
+  unread: 0,
+  flow: '会话',
+  status: '',
+  pinned: false,
+  muted: false,
+  unreadLabel: '',
+  summaryTitle: '',
+  summaryBody: '',
+  cards: [],
+  workflowSteps: [],
+  messages: [],
+  panel: {
+    members: [],
+    tasks: [],
+    attachments: [],
+    auditTrail: [],
+    agentEvidence: [],
+  },
+};
+
+const emptyTodo: TodoRecord = {
+  id: '',
+  title: '暂无待办',
+  subtitle: '',
+  note: '',
+  time: '',
+  status: '',
+  priority: '',
+  requestNo: '',
+  taskId: '',
+  currentStepName: '',
+  summary: '',
+  fields: [],
+  timeline: [],
+  actions: [],
+};
+
+function createFileSpaces(files: PersonalFileRecord[] = []): FileSpaceRecord[] {
+  return [{
     id: 'personal',
     title: '我的云空间',
-    subtitle: 'PERSONAL_FILE · 3.2GB / 10GB',
-    note: '上传票据、确认上传、下载票据、回收站都从这里串起来',
-    usage: 32,
+    subtitle: '个人空间',
+    note: '',
+    usage: 0,
     label: '个人',
-    summary: [['3.2GB', '已用空间'], ['10GB', '个人配额'], ['2 次', '近 7 天上传']],
-    files: [
-      ['请假交接清单.docx', 'DOCX', '84KB', '今天 09:14', '已确认'],
-      ['员工手册.pdf', 'PDF', '2.1MB', '昨天 17:08', '短期票据'],
-      ['报销凭证.zip', 'ZIP', '16.4MB', '周一', '已确认'],
-    ],
-  },
-  {
-    id: 'workflow',
-    title: '审批附件',
-    subtitle: 'WF_REQUEST · 2 个申请引用',
-    note: '审批参与人可以申请下载票据，下载后自动消费',
-    usage: 54,
-    label: '业务',
-    summary: [['2 个', '申请引用'], ['1 次', '票据使用'], ['可追溯', '审计留痕']],
-    files: [
-      ['请假交接清单.docx', 'DOCX', '84KB', '今天 10:03', '申请引用'],
-      ['年假说明.pdf', 'PDF', '640KB', '昨天 16:22', '审批附件'],
-      ['审批备注.txt', 'TXT', '8KB', '昨天', '只读'],
-    ],
-  },
-  {
-    id: 'tickets',
-    title: '下载票据',
-    subtitle: 'ACTIVE / USED / EXPIRED',
-    note: '短期有效、一次性消费，不直接暴露对象地址',
-    usage: 18,
-    label: '票据',
-    summary: [['ACTIVE', '当前票据'], ['USED', '已消费'], ['EXPIRED', '过期状态']],
-    files: [
-      ['ticket-20260507-01', 'TICKET', 'ACTIVE', '剩余 8 分钟', '可下载'],
-      ['ticket-20260506-11', 'TICKET', 'USED', '已消费', '审计已写入'],
-      ['ticket-20260505-02', 'TICKET', 'EXPIRED', '已过期', '需重申'],
-    ],
-  },
-  {
-    id: 'recycle',
-    title: '回收站',
-    subtitle: '30 天保留',
-    note: '恢复、彻底删除和容量释放都从这里理解',
-    usage: 7,
-    label: '回收',
-    summary: [['30 天', '保留期'], ['2 项', '可恢复'], ['1 项', '待彻底删除']],
-    files: [
-      ['旧请假说明.docx', 'DOCX', '132KB', '两天前', '可恢复'],
-      ['旧排班表.xlsx', 'XLSX', '148KB', '上周', '可恢复'],
-      ['临时截图.png', 'PNG', '64KB', '上周', '待清理'],
-    ],
-  },
-];
+    summary: [['0B', '已用空间'], ['0B', '个人配额'], ['可上传', '上传状态']],
+    files,
+  }];
+}
+
+const fileSpaces = createFileSpaces();
 
 const workbenchItems: WorkbenchRecord[] = [
   {
     id: 'leave',
     title: '请假申请',
-    label: 'workflow',
-    subtitle: 'POST /api/employee/workflow/leave-requests',
-    note: '请假单会先走余额校验，再进入审批链。',
+    label: 'leave',
+    subtitle: '请假审批',
+    note: '',
     tone: 'blue',
     status: '可用',
-    fields: [
-      ['leaveTypeId', 'ANNUAL_LEAVE'],
-      ['startAt', '2026-05-11 09:00:00'],
-      ['endAt', '2026-05-12 18:00:00'],
-      ['durationMinutes', '960'],
-      ['reason', '家中有事请假两天'],
-      ['attachmentRefIds', '[9601]'],
-    ],
-    stats: [['余额', '先校验'], ['附件', '可选'], ['结果', 'IN_APPROVAL']],
-    steps: ['先查 /api/employee/leave/accounts', '再提交 /api/employee/workflow/leave-requests', '最后在我的申请里看状态'],
+    fields: [],
+    stats: [],
+    steps: [],
   },
   {
     id: 'requests',
     title: '我的申请',
-    label: 'workflow',
-    subtitle: 'GET /api/employee/workflow/requests',
-    note: '查看自己发起的申请、当前节点和审批结果。',
+    label: 'requests',
+    subtitle: '申请记录',
+    note: '',
     tone: 'gray',
-    status: '已开放',
-    fields: [
-      ['requestId', '2051896265423310851'],
-      ['requestNo', 'WF-LEAVE-20260506132606'],
-      ['status', 'IN_APPROVAL / APPROVED / REJECTED'],
-      ['currentStepName', '直属上级审批'],
-    ],
-    stats: [['列表', '分页查询'], ['详情', '申请状态'], ['轨迹', '动作流水']],
-    steps: ['从消息或待办跳转进入', '按 requestId 查看申请详情', '按 actions 查看审批轨迹'],
+    status: '',
+    fields: [],
+    stats: [],
+    steps: [],
   },
   {
     id: 'attendance',
     title: '我的考勤',
     label: 'attendance',
-    subtitle: 'GET /api/employee/attendance/daily-results',
-    note: '查看自己的日结果、异常和团队维度（领导可见）。',
+    subtitle: '考勤结果',
+    note: '',
     tone: 'amber',
-    status: '已开放',
-    fields: [
-      ['workDate', '2026-05-07'],
-      ['resultStatus', 'ABNORMAL'],
-      ['lateMinutes', '0'],
-      ['earlyLeaveMinutes', '0'],
-      ['absenceMinutes', '20'],
-      ['exceptionFlag', 'true'],
-    ],
-    stats: [['日结果', 'NORMAL / ABNORMAL'], ['异常', '迟到 / 早退 / 缺卡'], ['团队', '仅领导可见']],
-    steps: ['打卡结果先写入考勤服务', '请假审批通过后触发重算', '异常页只看自己的结果'],
+    status: '',
+    fields: [],
+    stats: [],
+    steps: [],
   },
   {
     id: 'balance',
     title: '我的假期',
-    label: 'leave',
-    subtitle: 'GET /api/employee/leave/accounts',
-    note: '余额查询只返回当前员工自己的账户。',
+    label: 'balance',
+    subtitle: '假期余额',
+    note: '',
     tone: 'green',
-    status: '已开放',
-    fields: [
-      ['leaveCode', 'ANNUAL_LEAVE'],
-      ['availableMinutes', '960'],
-      ['frozenMinutes', '0'],
-      ['status', 'ACTIVE'],
-      ['lastTxnType', 'ADJUST'],
-    ],
-    stats: [['余额', '分钟级'], ['扣减', '审批通过'], ['流水', '可追溯']],
-    steps: ['余额先查账户', '申请时先校验再提交', '审批通过后扣减并重算考勤'],
+    status: '',
+    fields: [],
+    stats: [],
+    steps: [],
   },
   {
     id: 'files',
     title: '文件中心',
-    label: 'file',
-    subtitle: 'POST /api/employee/files/upload-tickets',
-    note: '上传票据、确认上传、下载票据和回收站都在文件中心。',
+    label: '文件',
+    subtitle: '文件中心',
+    note: '',
     tone: 'blue',
-    status: '已开放',
-    fields: [
-      ['ownerType', 'PERSONAL_FILE'],
-      ['uploadTicket', 'CREATED / UPLOADED / CONFIRMED'],
-      ['downloadTicket', 'ACTIVE / USED / EXPIRED'],
-      ['trash', '可恢复 / 可彻底删除'],
-    ],
-    stats: [['上传', '两段式'], ['下载', '短期票据'], ['安全', '可审计']],
-    steps: ['先申请上传票据', '再直传对象存储', '最后确认上传生成引用'],
+    status: '',
+    fields: [],
+    stats: [],
+    steps: [],
   },
   {
     id: 'agent',
-    title: 'Agent 问答',
-    label: 'future',
-    subtitle: 'module-agent 待后续接入',
-    note: '先保留入口，不把它做成假完成。',
-    tone: 'gray',
-    status: '待后续',
-    fields: [
-      ['触发器', 'SPI 回调'],
-      ['可见范围', '授权上下文'],
-      ['执行结果', '审计可追溯'],
-    ],
-    stats: [['现在', '只保留入口'], ['后续', 'Agent 闭环'], ['规则', '可审计']],
-    steps: ['当前先不做伪接口', '等 module-agent 落地后再接', '入口保留在工作台即可'],
-    disabled: true,
+    title: 'Agent任务',
+    label: 'Agent',
+    subtitle: 'Agent任务',
+    note: '',
+    tone: 'green',
+    status: '',
+    fields: [],
+    stats: [],
+    steps: [],
   },
 ];
 
+const contactItems: ContactRecord[] = [];
+
 const profileItems: ProfileRecord[] = [
   {
-    id: 'overview',
-    title: '账号概览',
-    subtitle: 'SESSION 会话 / 员工身份 / 组织归属',
-    note: '默认进入 employee-web，默认能访问消息、待办、文档、工作台和我的。',
+    id: 'center',
+    title: '个人中心',
+    subtitle: '仪表盘',
+    note: '',
     tone: 'blue',
-    stats: [['林澈', '当前用户'], ['在职', '状态'], ['上海', '地点']],
-    fields: [['loginName', currentUser.loginName], ['email', currentUser.email], ['workNo', currentUser.workNo], ['phone', currentUser.phone]],
+    stats: [],
+    fields: [],
   },
   {
-    id: 'relations',
+    id: 'profile',
+    title: '个人资料',
+    subtitle: '身份信息',
+    note: '',
+    tone: 'blue',
+    stats: [],
+    fields: [],
+  },
+  {
+    id: 'organization',
     title: '组织关系',
-    subtitle: '主部门 / 直属上级 / 直属下级',
-    note: '领导不是后台管理员，是员工能力上的增强身份。',
+    subtitle: '组织架构',
+    note: '',
     tone: 'green',
-    stats: [['运营中心 / 运营一部', '主部门'], ['周悦', '直属上级'], ['2 人', '直属下级']],
-    fields: [['部门', currentUser.department], ['直属上级', currentUser.manager], ['身份', '员工 / 领导（视组织关系而定）']],
+    stats: [],
+    fields: [],
   },
   {
     id: 'security',
     title: '账号安全',
-    subtitle: '登录、邮箱、密码重置与会话策略',
-    note: '认证使用服务端 Session，不是纯 JWT。',
+    subtitle: '账号安全',
+    note: '',
     tone: 'amber',
-    stats: [['登录', '账号密码'], ['邮箱', '可绑定'], ['会话', 'SESSION']],
-    fields: [['登录入口', '/api/employee/auth/login'], ['邮箱验证码', '/api/employee/auth/email/send-code'], ['绑定邮箱', '/api/employee/auth/email/bind'], ['密码重置', '/api/employee/auth/password/reset']],
+    stats: [],
+    fields: [],
+  },
+  {
+    id: 'preferences',
+    title: '偏好设置',
+    subtitle: '显示与会话',
+    note: '',
+    tone: 'blue',
+    stats: [],
+    fields: [],
+  },
+  {
+    id: 'storage',
+    title: '文件空间',
+    subtitle: '个人云空间',
+    note: '',
+    tone: 'gray',
+    stats: [],
+    fields: [],
   },
 ];
 
-function findById<T extends { id: string }>(items: T[], id: string) {
-  return items.find((item) => item.id === id) ?? items[0];
-}
-
-function api(
-  method: ApiContractHint['method'],
-  path: string,
-  status: ApiContractStatus,
-  note: string,
-): ApiContractHint {
-  return { method, path, status, note };
+function findById<T extends { id: string }>(items: T[], id: string, fallback: T) {
+  return items.find((item) => item.id === id) ?? items[0] ?? fallback;
 }
 
 function includesKeyword(values: Array<string | number | undefined>, keyword: string) {
   if (!keyword) return true;
   const normalized = keyword.toLowerCase();
   return values.some((value) => String(value ?? '').toLowerCase().includes(normalized));
+}
+
+function displayValue(value: unknown) {
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string' && value.trim()) return value;
+  return '暂无';
+}
+
+function statusValue(value?: string | null) {
+  if (value === 'ACTIVE' || value === 'IN_SERVICE') return '在职';
+  if (value === 'DISABLED') return '停用';
+  if (value === 'RESIGNED') return '离职';
+  return displayValue(value);
+}
+
+function fileStatusValue(value?: string | null) {
+  if (value === 'PENDING') return '待处理';
+  if (value === 'READY' || value === 'CLEAN') return '已确认';
+  if (value === 'REJECTED' || value === 'INFECTED') return '异常';
+  return statusValue(value);
+}
+
+function bytesToSize(bytes?: number | null) {
+  if (!bytes || bytes <= 0) return '0B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const precision = size >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${size.toFixed(precision)}${units[unitIndex]}`;
+}
+
+function fileTypeLabelFromName(name?: string | null, mimeType = '') {
+  const ext = name?.split('.').pop()?.trim();
+  if (ext && ext !== name) return ext.slice(0, 8).toUpperCase();
+  if (mimeType) return mimeType.split('/').pop()?.slice(0, 8).toUpperCase() || '文件';
+  return '文件';
+}
+
+function formatDisplayDateTime(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function mapEmployeeFile(file: EmployeeFileResponse): PersonalFileRecord {
+  const name = file.displayName || file.originalFileName || '未命名文件';
+  return {
+    id: `personal-file-${file.attachmentRefId}`,
+    name,
+    type: fileTypeLabelFromName(name, file.mimeType ?? ''),
+    size: bytesToSize(file.fileSize),
+    createdAt: formatDisplayDateTime(file.createdAt) || '刚刚',
+    status: file.deletedAt ? '回收站' : fileStatusValue(file.scanStatus),
+    attachmentRefId: file.attachmentRefId,
+    mimeType: file.mimeType ?? undefined,
+  };
 }
 
 function isPendingStatus(status: string) {
@@ -912,62 +657,84 @@ function matchesConversationFilter(item: ConversationRecord, filter: SectionFilt
   if (filter === '全部') return true;
   if (filter === '未处理') return item.unread > 0 || isPendingStatus(item.status);
   if (filter === 'Agent') return item.kind === 'agent' || item.title.includes('Agent') || item.tag.includes('Agent');
-  if (filter === '组织群') return item.kind === 'team';
+  if (filter === '群聊') return item.kind === 'team';
   if (filter === '私聊') return item.kind === 'approval' || item.kind === 'attendance' || item.kind === 'file';
   return true;
 }
 
 export const useShellStore = defineStore('employee-shell', {
-  state: () => ({
+  state: () => {
+    const storedPreferences = readStoredPreferences();
+    return {
     section: 'messages' as SectionId,
     detailOpen: false,
     mobileView: 'list' as 'list' | 'detail',
-    listWidth: 336,
+    listWidth: 400,
+    theme: storedPreferences.theme,
+    messageDensity: storedPreferences.messageDensity,
     search: {
       messages: '',
       todos: '',
       files: '',
       workbench: '',
-      profile: '',
+      processes: '',
+      contacts: '',
+      reports: '',
+      settings: '',
     },
     filters: {
       messages: '全部' as SectionFilter,
       todos: '全部' as SectionFilter,
       files: '全部' as SectionFilter,
       workbench: '全部' as SectionFilter,
-      profile: '全部' as SectionFilter,
+      processes: '全部' as SectionFilter,
+      contacts: '全部' as SectionFilter,
+      reports: '全部' as SectionFilter,
+      settings: '全部' as SectionFilter,
     },
     active: {
-      messages: 'leave-approval',
-      todos: 'todo-approval',
+      messages: '',
+      todos: '',
       files: 'personal',
       workbench: 'leave',
-      profile: 'overview',
+      processes: 'requests',
+      contacts: '',
+      reports: 'overview',
+      settings: 'center',
     },
-    conversations,
-    todos: todoItems,
-    files: fileSpaces,
+    conversations: [] as ConversationRecord[],
+    todos: [] as TodoRecord[],
+    files: createFileSpaces(),
+    personalFileOwnerId: '',
     workbench: workbenchItems,
+    contacts: contactItems,
     profile: profileItems,
-  }),
+    };
+  },
   getters: {
     totalUnread(state): number {
       return state.conversations.reduce((sum, item) => sum + item.unread, 0);
     },
+    pendingTodoCount(state): number {
+      return state.todos.filter((item) => isPendingStatus(item.status)).length;
+    },
     activeConversation(state): ConversationRecord {
-      return findById(state.conversations, state.active.messages);
+      return findById(state.conversations, state.active.messages, emptyConversation);
     },
     activeTodo(state): TodoRecord {
-      return findById(state.todos, state.active.todos);
+      return findById(state.todos, state.active.todos, emptyTodo);
     },
     activeFile(state): FileSpaceRecord {
-      return findById(state.files, state.active.files);
+      return findById(state.files, state.active.files, fileSpaces[0]);
     },
     activeWorkbench(state): WorkbenchRecord {
-      return findById(state.workbench, state.active.workbench);
+      return findById(state.workbench, state.active.workbench, workbenchItems[0]);
+    },
+    activeContact(state): ContactRecord | null {
+      return state.contacts.find((item) => item.id === state.active.contacts) ?? state.contacts[0] ?? null;
     },
     activeProfile(state): ProfileRecord {
-      return findById(state.profile, state.active.profile);
+      return findById(state.profile, state.active.settings, profileItems[0]);
     },
     currentMeta(state): SectionMeta {
       return sectionMeta[state.section];
@@ -980,6 +747,8 @@ export const useShellStore = defineStore('employee-shell', {
           item.tag,
           item.flow,
           item.status,
+          item.panel.members.map((member) => `${member.name} ${member.role}`).join(' '),
+          item.panel.attachments.map((file) => file.name).join(' '),
         ], state.search.messages));
     },
     filteredTodos(state): TodoRecord[] {
@@ -1002,13 +771,11 @@ export const useShellStore = defineStore('employee-shell', {
         item.subtitle,
         item.note,
         item.label,
-        item.files.map((file) => file.join(' ')).join(' '),
+        item.files.map((file) => [file.name, file.type, file.size, file.status].join(' ')).join(' '),
       ], state.search.files));
     },
     filteredWorkbench(state): WorkbenchRecord[] {
       return state.workbench
-        .filter((item) => state.filters.workbench !== '未处理' || item.status !== '已开放')
-        .filter((item) => state.filters.workbench !== 'Agent' || item.id === 'agent')
         .filter((item) => includesKeyword([
           item.title,
           item.subtitle,
@@ -1024,7 +791,16 @@ export const useShellStore = defineStore('employee-shell', {
         item.note,
         item.tone,
         item.fields.map((field) => field.join(' ')).join(' '),
-      ], state.search.profile));
+      ], state.search.settings));
+    },
+    filteredContacts(state): ContactRecord[] {
+      return state.contacts.filter((item) => includesKeyword([
+        item.name,
+        item.role,
+        item.department,
+        item.relation,
+        item.source,
+      ], state.search.contacts));
     },
   },
   actions: {
@@ -1040,6 +816,9 @@ export const useShellStore = defineStore('employee-shell', {
     selectItem(section: SectionId, id: string) {
       this.active[section] = id;
       this.mobileView = 'detail';
+      if (section === 'workbench') {
+        this.detailOpen = false;
+      }
       if (section === 'messages') {
         const active = this.conversations.find((item) => item.id === id);
         if (active) active.unread = 0;
@@ -1055,24 +834,207 @@ export const useShellStore = defineStore('employee-shell', {
       this.mobileView = view;
     },
     setListWidth(width: number) {
-      this.listWidth = Math.max(260, Math.min(480, Math.round(width)));
+      this.listWidth = Math.max(384, Math.min(520, Math.round(width)));
+    },
+    setTheme(theme: ThemeMode) {
+      this.theme = theme;
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity });
+    },
+    toggleTheme() {
+      this.theme = this.theme === 'light' ? 'dark' : 'light';
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity });
+    },
+    setMessageDensity(density: MessageDensity) {
+      this.messageDensity = density;
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity });
+    },
+    syncSessionProfile(
+      user: CurrentUserResponse | null,
+      profile: OrgUserDetailResponse | null,
+      manager: OrgUserSummaryResponse | null,
+      subordinates: OrgUserSummaryResponse[],
+    ) {
+      const name = profile?.realName || user?.displayName || currentUser.name;
+      const employmentStatus = statusValue(profile?.employmentStatus ?? user?.employmentStatus);
+      const ownerId = String(profile?.userId ?? user?.userId ?? '');
+      if (ownerId !== this.personalFileOwnerId) {
+        this.personalFileOwnerId = ownerId;
+        const personal = this.files.find((item) => item.id === 'personal');
+        if (personal) personal.files = readStoredPersonalFiles(ownerId);
+      }
+      this.profile = [
+        {
+          id: 'center',
+          title: '个人中心',
+          subtitle: '仪表盘',
+          note: '',
+          tone: 'blue',
+          stats: [[name, '姓名'], [employmentStatus, '状态'], [displayValue(profile?.workLocation), '地点']],
+          fields: [
+            ['姓名', name],
+            ['登录名', displayValue(user?.loginName)],
+            ['工号', displayValue(profile?.employeeNo)],
+            ['手机号', displayValue(profile?.mobile)],
+          ],
+        },
+        {
+          id: 'profile',
+          title: '个人资料',
+          subtitle: '身份信息',
+          note: '',
+          tone: 'blue',
+          stats: [[name, '姓名'], [employmentStatus, '状态'], [displayValue(profile?.workLocation), '地点']],
+          fields: [
+            ['姓名', name],
+            ['登录名', displayValue(user?.loginName)],
+            ['工号', displayValue(profile?.employeeNo)],
+            ['手机号', displayValue(profile?.mobile)],
+            ['部门', displayValue(profile?.primaryDeptName)],
+            ['岗位', displayValue(profile?.positionName)],
+            ['入职日期', displayValue(profile?.hireDate)],
+            ['工作地点', displayValue(profile?.workLocation)],
+          ],
+        },
+        {
+          id: 'organization',
+          title: '组织关系',
+          subtitle: '组织架构',
+          note: '',
+          tone: 'green',
+          stats: [
+            [displayValue(profile?.primaryDeptName), '主部门'],
+            [displayValue(manager?.realName ?? profile?.managerName), '直属上级'],
+            [`${subordinates.length} 人`, '直属下级'],
+          ],
+          fields: [
+            ['部门', displayValue(profile?.primaryDeptName)],
+            ['岗位', displayValue(profile?.positionName)],
+            ['直属上级', displayValue(manager?.realName ?? profile?.managerName)],
+            ['直属下级', subordinates.length ? subordinates.map((item) => item.realName).join('、') : '暂无'],
+          ],
+        },
+        {
+          id: 'security',
+          title: '账号安全',
+          subtitle: '账号安全',
+          note: '',
+          tone: 'amber',
+          stats: [['邮箱', '验证'], ['会话', '状态']],
+          fields: [
+            ['用户类型', displayValue(user?.userType)],
+            ['会话状态', user ? '已登录' : '未登录'],
+          ],
+        },
+        {
+          id: 'preferences',
+          title: '偏好设置',
+          subtitle: '显示与会话',
+          note: '',
+          tone: 'blue',
+          stats: [],
+          fields: [],
+        },
+        {
+          id: 'storage',
+          title: '文件空间',
+          subtitle: '个人云空间',
+          note: '',
+          tone: 'gray',
+          stats: [],
+          fields: [],
+        },
+      ];
+      if (!this.profile.some((item) => item.id === this.active.settings)) {
+        this.active.settings = this.profile[0]?.id ?? 'center';
+      }
+      this.contacts = collectContacts(user, profile, manager, subordinates, this.conversations);
+      if (!this.contacts.some((item) => item.id === this.active.contacts)) {
+        this.active.contacts = this.contacts[0]?.id ?? '';
+      }
+    },
+    syncFileQuota(quota: QuotaResponse) {
+      const personal = this.files.find((item) => item.id === 'personal');
+      if (!personal) return;
+      const used = bytesToSize(quota.personalUsedBytes);
+      const total = bytesToSize(quota.personalQuotaBytes);
+      personal.subtitle = `个人空间 · ${used} / ${total}`;
+      personal.usage = Math.max(0, Math.min(100, Math.round(Number(quota.personalUsagePercent ?? 0))));
+      personal.summary = [
+        [used, '已用空间'],
+        [total, '个人配额'],
+        [quota.uploadWritable ? '可上传' : statusValue(quota.blockReason), '上传状态'],
+      ];
+      if (!quota.uploadWritable && quota.blockReason) {
+        personal.note = quota.blockReason;
+      } else {
+        personal.note = '';
+      }
+    },
+    mergeBackendPersonalFiles(activeFiles: EmployeeFileResponse[], recycleBinFiles: EmployeeFileResponse[] = []) {
+      const personal = this.files.find((item) => item.id === 'personal');
+      if (!personal) return;
+      const rows = [...activeFiles, ...recycleBinFiles].map(mapEmployeeFile);
+      personal.files = rows.slice(0, 24);
+      writeStoredPersonalFiles(personal.files, this.personalFileOwnerId);
+    },
+    addPersonalFile(file: {
+      name: string;
+      type: string;
+      size: string;
+      status: string;
+      attachmentRefId?: EntityId;
+      mimeType?: string;
+      downloadUrl?: string;
+      createdAt?: string;
+    }) {
+      const personal = this.files.find((item) => item.id === 'personal');
+      if (!personal) return;
+      const id = file.attachmentRefId ? `personal-file-${file.attachmentRefId}` : `personal-file-${Date.now()}-${file.name}`;
+      const row: PersonalFileRecord = {
+        id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        createdAt: file.createdAt ?? '刚刚',
+        status: file.status,
+        attachmentRefId: file.attachmentRefId,
+        mimeType: file.mimeType,
+        downloadUrl: file.downloadUrl,
+      };
+      personal.files = [row, ...personal.files]
+        .filter((item, index, rows) => rows.findIndex((next) => (
+          (row.attachmentRefId && next.attachmentRefId === row.attachmentRefId)
+          || (!row.attachmentRefId && next.name === row.name && next.createdAt === row.createdAt)
+        )) === index)
+        .slice(0, 24);
+      writeStoredPersonalFiles(personal.files, this.personalFileOwnerId);
+    },
+    removePersonalFile(attachmentRefId: EntityId) {
+      const personal = this.files.find((item) => item.id === 'personal');
+      if (!personal) return;
+      personal.files = personal.files.filter((item) => item.attachmentRefId !== attachmentRefId);
+      writeStoredPersonalFiles(personal.files, this.personalFileOwnerId);
+    },
+    updatePersonalFile(attachmentRefId: EntityId, patch: Partial<PersonalFileRecord>) {
+      const personal = this.files.find((item) => item.id === 'personal');
+      if (!personal) return;
+      personal.files = personal.files.map((item) => (
+        item.attachmentRefId === attachmentRefId ? { ...item, ...patch } : item
+      ));
+      writeStoredPersonalFiles(personal.files, this.personalFileOwnerId);
     },
     mergeBackendTodos(backendTodos: TodoRecord[]) {
-      if (!backendTodos.length) return;
       const backendIds = new Set(backendTodos.map((item) => item.id));
-      const fallbackTodos = staticTodoItems.filter((item) => !backendIds.has(item.id));
-      this.todos = [...backendTodos, ...fallbackTodos];
+      this.todos = backendTodos;
       if (!backendIds.has(this.active.todos)) {
-        this.active.todos = this.todos[0]?.id ?? this.active.todos;
+        this.active.todos = this.todos[0]?.id ?? '';
       }
     },
     mergeBackendConversations(backendConversations: ConversationRecord[]) {
-      if (!backendConversations.length) return;
       const backendIds = new Set(backendConversations.map((item) => item.id));
-      const fallbackConversations = staticConversations.filter((item) => !backendIds.has(item.id));
-      this.conversations = [...backendConversations, ...fallbackConversations];
+      this.conversations = backendConversations;
       if (!backendIds.has(this.active.messages)) {
-        this.active.messages = this.conversations[0]?.id ?? this.active.messages;
+        this.active.messages = this.conversations[0]?.id ?? '';
       }
     },
     mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
@@ -1081,7 +1043,7 @@ export const useShellStore = defineStore('employee-shell', {
       conversation.messages = backendMessages;
       const latestMessage = backendMessages[backendMessages.length - 1];
       conversation.subtitle = latestMessage.body;
-      conversation.meta = latestMessage.time || conversation.meta;
+      conversation.meta = formatListDate(latestMessage.time) || conversation.meta;
     },
     appendMessage(text: string) {
       const conversation = this.activeConversation;
@@ -1099,4 +1061,74 @@ export const useShellStore = defineStore('employee-shell', {
   },
 });
 
+function formatListDate(value?: string) {
+  if (!value) return '';
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  const date = new Date(normalized);
+  if (!Number.isNaN(date.getTime())) {
+    return `${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+  const match = value.match(/^\d{4}-(\d{1,2})-(\d{1,2})/);
+  if (match) return `${Number(match[1])}月${Number(match[2])}日`;
+  return value;
+}
+
 export const shellUser = currentUser;
+
+function contactFromOrgUser(user: OrgUserSummaryResponse, relation: string, source: string): ContactRecord {
+  return {
+    id: `user-${user.userId}`,
+    name: user.realName,
+    role: displayValue(user.positionName),
+    department: displayValue(user.primaryDeptName),
+    relation,
+    source,
+    userId: user.userId,
+  };
+}
+
+function collectContacts(
+  user: CurrentUserResponse | null,
+  profile: OrgUserDetailResponse | null,
+  manager: OrgUserSummaryResponse | null,
+  subordinates: OrgUserSummaryResponse[],
+  conversations: ConversationRecord[],
+): ContactRecord[] {
+  const contacts = new Map<string, ContactRecord>();
+  const add = (contact: ContactRecord) => {
+    if (contact.name && contact.name !== '暂无') {
+      contacts.set(contact.id, contact);
+    }
+  };
+  if (profile || user) {
+    const userId = profile?.userId ?? user?.userId;
+    if (userId) {
+      add({
+        id: `user-${userId}`,
+        name: profile?.realName || user?.displayName || currentUser.name,
+        role: displayValue(profile?.positionName),
+        department: displayValue(profile?.primaryDeptName),
+        relation: '本人',
+        source: '个人资料',
+        userId,
+      });
+    }
+  }
+  if (manager) add(contactFromOrgUser(manager, '直属上级', '组织关系'));
+  subordinates.forEach((item) => add(contactFromOrgUser(item, '直属下级', '组织关系')));
+  conversations.forEach((conversation) => {
+    conversation.panel.members.forEach((member) => {
+      if (member.name === (profile?.realName || user?.displayName)) return;
+      add({
+        id: member.userId ? `user-${member.userId}` : `member-${member.name}-${member.role}`,
+        name: member.name,
+        role: member.role,
+        department: '',
+        relation: conversation.flow,
+        source: conversation.title,
+        userId: member.userId,
+      });
+    });
+  });
+  return [...contacts.values()];
+}

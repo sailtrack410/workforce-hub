@@ -15,13 +15,35 @@ npm run build
 
 员工端 API 基础层位于 `src/api/`，默认使用服务端 Session Cookie，所有请求都会带 `credentials: "include"`。
 
-本地前后端分端口联调时，可以在 `employee-web/.env.local` 配置：
+本地前后端分端口联调时，Vite 开发服务默认会把 `/api` 和 `/ws` 代理到 `http://localhost:8080`。如果后端端口不是 8080，可以在 `employee-web/.env.local` 配置：
+
+```bash
+VITE_API_PROXY_TARGET=http://localhost:8082
+```
+
+生产或预览环境如果需要跨域直连后端，可以配置：
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-当前页面仍以静态展示数据为主；真实接口先通过 `src/api/employee.ts` 统一收口，后续页面接入时禁止在 Vue 组件里直接散写 `fetch`。
+如果要联调找回密码，后端默认会连 `127.0.0.1:1025` 的本地 SMTP。可以直接启动：
+
+```bash
+python3 server/scripts/dev/start_debug_smtp.py
+```
+
+如果要联调 IM 内 Agent 回复，但暂时没接真实模型，可以启动本地兼容桩：
+
+```bash
+python3 server/scripts/dev/start_agent_stub_server.py
+```
+
+更完整的后端联调前置、演示账号和非空数据初始化说明见：
+
+- [employee-web后端联调基线.md](/Users/sailtrack/工程文件/java_web/workforce-hub/docs/本地联调/employee-web后端联调基线.md)
+
+消息和待办运行态不再混入静态样例数据；接口加载失败或未登录时会显示空态/错误态。真实接口统一收口在 `src/api/employee.ts`，禁止在 Vue 组件里直接散写 `fetch`。
 
 ## 仓库边界
 

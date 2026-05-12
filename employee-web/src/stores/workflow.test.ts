@@ -17,6 +17,8 @@ const todo: WorkflowTodoResponse = {
 function createWorkflowApi(todos: WorkflowTodoResponse[] = [todo]): EmployeeWorkflowApi {
   return {
     todos: () => Promise.resolve(todos),
+    approveTask: () => Promise.resolve({ requestId: 20, status: 'APPROVED' }),
+    rejectTask: () => Promise.resolve({ requestId: 20, status: 'REJECTED' }),
   };
 }
 
@@ -37,7 +39,7 @@ describe('workflow store', () => {
       taskId: 'TASK-10',
       currentStepName: '待处理',
     });
-    expect(record.apis).toEqual([]);
+    expect(record.actions.map((action) => action.label)).toEqual(['审批通过', '驳回']);
   });
 
   it('loads workflow todos from employee API', async () => {

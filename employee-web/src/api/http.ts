@@ -130,9 +130,123 @@ async function parsePayload(response: Response) {
   if (response.status === 204) return null;
   const contentType = response.headers.get('Content-Type') ?? '';
   if (contentType.includes('application/json')) {
-    return response.json();
+    const text = await response.text();
+    if (!text) return null;
+    return parseJsonPreservingUnsafeIntegers(text);
   }
   return response.text();
+}
+
+export function parseJsonPreservingUnsafeIntegers(json: string) {
+  return JSON.parse(preserveUnsafeIntegers(json));
+}
+
+const unsafeIntegerFieldNames = new Set([
+  'agentTaskId',
+  'agentId',
+  'agentVersionId',
+  'applicantUserId',
+  'attachmentRefId',
+  'bizId',
+  'leaveTypeId',
+  'accountId',
+  'avatarFileId',
+  'boundAgentId',
+  'conversationId',
+  'dailyResultId',
+  'deptId',
+  'primaryDeptId',
+  'positionId',
+  'managerUserId',
+  'userId',
+  'downloadTicketId',
+  'exceptionId',
+  'fileObjectId',
+  'groupId',
+  'memberId',
+  'messageId',
+  'ownerId',
+  'ownerUserId',
+  'policyId',
+  'punchRecordId',
+  'quotedMessageId',
+  'requestId',
+  'scheduleId',
+  'shiftId',
+  'taskId',
+  'uploadTicketId',
+  'senderId',
+  'uploaderId',
+]);
+
+function preserveUnsafeIntegers(json: string) {
+  let output = '';
+  let index = 0;
+
+  while (index < json.length) {
+    if (json[index] !== '"') {
+      output += json[index];
+      index += 1;
+      continue;
+    }
+
+    const stringStart = index;
+    index = readStringEnd(json, index + 1);
+    const literal = json.slice(stringStart, index);
+    output += literal;
+
+    const fieldName = literal.includes('\\') ? '' : literal.slice(1, -1);
+    if (!unsafeIntegerFieldNames.has(fieldName)) continue;
+
+    const afterField = index;
+    let cursor = skipWhitespace(json, afterField);
+    if (json[cursor] !== ':') continue;
+    cursor = skipWhitespace(json, cursor + 1);
+
+    const numberStart = cursor;
+    if (json[cursor] === '-') cursor += 1;
+    const digitsStart = cursor;
+    while (cursor < json.length && isDigit(json[cursor])) cursor += 1;
+    const digitCount = cursor - digitsStart;
+    if (digitCount < 16 || !isNumberBoundary(json, cursor)) continue;
+
+    output += `${json.slice(afterField, numberStart)}"${json.slice(numberStart, cursor)}"`;
+    index = cursor;
+  }
+
+  return output;
+}
+
+function readStringEnd(json: string, start: number) {
+  let escaped = false;
+  for (let index = start; index < json.length; index += 1) {
+    const char = json[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') return index + 1;
+  }
+  return json.length;
+}
+
+function skipWhitespace(text: string, start: number) {
+  let index = start;
+  while (index < text.length && /\s/.test(text[index])) index += 1;
+  return index;
+}
+
+function isDigit(char: string) {
+  return char >= '0' && char <= '9';
+}
+
+function isNumberBoundary(json: string, index: number) {
+  const cursor = skipWhitespace(json, index);
+  return [',', '}', ']'].includes(json[cursor] ?? '');
 }
 
 function isApiEnvelope(payload: unknown): payload is ApiEnvelope<unknown> {

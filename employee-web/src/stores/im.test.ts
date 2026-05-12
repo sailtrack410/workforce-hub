@@ -38,6 +38,40 @@ const conversation: ImConversationSummaryResponse = {
 function createImApi(): EmployeeImApi {
   return {
     conversations: () => Promise.resolve([conversation]),
+    conversationDetail: () => Promise.resolve({
+      conversation,
+      members: [
+        {
+          memberId: 2002,
+          memberType: 'USER',
+          displayName: '张三',
+          memberRole: 'MEMBER',
+          status: 'ACTIVE',
+          joinedAt: '2026-05-09T09:00:00',
+        },
+      ],
+      groupProfile: null,
+    }),
+    groupMembers: () => Promise.resolve([]),
+    groupProfile: () => Promise.resolve({
+      conversationId: 7001,
+      title: '项目推进群',
+      groupType: 'CUSTOM',
+      ownerUserId: 2002,
+      status: 'ACTIVE',
+    }),
+    updateGroupProfile: (_conversationId, request) => Promise.resolve({
+      conversationId: 7001,
+      title: request.title ?? '项目推进群',
+      groupType: 'CUSTOM',
+      ownerUserId: 2002,
+      noticeText: request.noticeText,
+      status: 'ACTIVE',
+    }),
+    addGroupMembers: () => Promise.resolve([]),
+    removeGroupMembers: () => Promise.resolve([]),
+    leaveGroup: () => Promise.resolve([]),
+    dismissGroup: () => Promise.resolve(),
     messages: () => Promise.resolve([message]),
     startPrivateConversation: () => Promise.resolve(conversation),
     createGroupConversation: () => Promise.resolve({
@@ -45,6 +79,12 @@ function createImApi(): EmployeeImApi {
       conversationId: 7301,
       conversationType: 'GROUP',
       title: '项目推进群',
+    }),
+    startAgentConversation: () => Promise.resolve({
+      ...conversation,
+      conversationId: 7401,
+      conversationType: 'AGENT',
+      title: 'HR 助手',
     }),
     sendMessage: () => Promise.resolve({
       ...message,
@@ -55,11 +95,22 @@ function createImApi(): EmployeeImApi {
       contentText: '我下午两点同步。',
       sentAt: '2026-05-09T10:12:00',
     }),
+    editMessage: () => Promise.resolve(message),
+    recallMessage: () => Promise.resolve({ ...message, status: 'RECALLED' }),
+    createMessageAttachmentDownloadTicket: () => Promise.resolve({
+      downloadTicketId: 1,
+      ticketNo: 'DL-1',
+      downloadUrl: '/download/DL-1',
+      fileName: '附件.pdf',
+      fileSize: 1024,
+    }),
     updateReadPosition: (_conversationId, request) => Promise.resolve({
       ...conversation,
       lastReadSeq: request.lastReadSeq,
       unreadCount: Math.max(conversation.lastMessageSeq - request.lastReadSeq, 0),
     }),
+    updatePreference: () => Promise.resolve(conversation),
+    downloadAttachmentUrl: (ticketNo) => `/api/employee/im/attachments/download/${ticketNo}`,
   };
 }
 
@@ -78,12 +129,12 @@ describe('IM store', () => {
       unread: 1,
       flow: '私聊',
       status: 'ACTIVE',
-      tag: 'PRIVATE · ACTIVE',
+      tag: '私聊 · 正常',
     });
     expect(record.cards).toEqual([
-      { label: '会话类型', value: 'PRIVATE', hint: 'IM 类型' },
-      { label: '未读数', value: '1', hint: '基于 lastReadSeq 计算' },
-      { label: '最新序号', value: '2', hint: '消息序号' },
+      { label: '会话类型', value: '私聊', hint: '会话类型' },
+      { label: '未读数', value: '1', hint: '未读消息' },
+      { label: '会话状态', value: '正常', hint: '状态' },
     ]);
   });
 
@@ -93,7 +144,7 @@ describe('IM store', () => {
     expect(record).toMatchObject({
       id: '7102',
       author: '用户 2002',
-      role: 'USER · TEXT',
+      role: '成员',
       body: '下午同步一下排班。',
       side: 'left',
       time: '2026-05-09 10:10',
@@ -104,7 +155,7 @@ describe('IM store', () => {
     const record = mapImMessageToConversationMessage({
       ...message,
       messageId: 7101,
-      senderId: 2003,
+      senderId: '2003',
       contentText: '我上午可以处理补卡。',
     }, 2003);
 
@@ -119,7 +170,7 @@ describe('IM store', () => {
   it('loads conversations and messages from employee IM API', async () => {
     const im = useImStore();
 
-    await im.loadConversations(createImApi());
+    await im.loadConversations({}, createImApi());
     await im.loadMessages(7001, 2003, {}, createImApi());
 
     expect(im.loading).toBe(false);
@@ -128,6 +179,55 @@ describe('IM store', () => {
     expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7102']);
     expect(im.lastMessageSeqByConversation['7001']).toBe(2);
     expect(im.lastReadSeqByConversation['7001']).toBe(1);
+  });
+
+  it('loads conversation members into shell panel', async () => {
+    const im = useImStore();
+
+    await im.loadConversations({}, createImApi());
+    await im.loadConversationDetail(7001, createImApi());
+
+    expect(im.conversations[0].panel.members).toEqual([{
+      name: '张三',
+      role: '成员',
+      userId: 2002,
+      memberType: 'USER',
+    }]);
+    expect(im.conversations[0].memberCount).toBe(1);
+  });
+
+  it('loads visible conversation details so contacts can use real members', async () => {
+    const im = useImStore();
+    let detailCalls = 0;
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      conversationDetail: (conversationId) => {
+        detailCalls += 1;
+        return Promise.resolve({
+          conversation: { ...conversation, conversationId },
+          members: [
+            {
+              memberId: '2053928981082898411',
+              memberType: 'USER',
+              displayName: '张三',
+              memberRole: 'MEMBER',
+              status: 'ACTIVE',
+              joinedAt: '2026-05-09T09:00:00',
+            },
+          ],
+          groupProfile: null,
+        });
+      },
+    };
+
+    await im.loadConversations({}, imApi);
+    await im.loadVisibleConversationDetails(undefined, imApi);
+
+    expect(detailCalls).toBe(1);
+    expect(im.conversations[0].panel.members[0]).toMatchObject({
+      name: '张三',
+      userId: '2053928981082898411',
+    });
   });
 
   it('sends text message and appends mapped backend response', async () => {
@@ -167,7 +267,7 @@ describe('IM store', () => {
 
   it('updates read position and syncs unread count back to conversation list', async () => {
     const im = useImStore();
-    await im.loadConversations(createImApi());
+    await im.loadConversations({}, createImApi());
 
     const updated = await im.updateReadPosition(7001, 2, createImApi());
 
@@ -220,7 +320,7 @@ describe('IM store', () => {
     expect(record).toMatchObject({
       id: '7301',
       title: '项目推进群',
-      flow: '团队协作',
+      flow: '群聊',
     });
     expect(im.conversations[0].id).toBe('7301');
   });

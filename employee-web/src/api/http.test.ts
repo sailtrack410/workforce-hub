@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiClientError, createApiClient } from './http';
+import { ApiClientError, createApiClient, parseJsonPreservingUnsafeIntegers } from './http';
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), {
@@ -54,6 +54,59 @@ describe('createApiClient', () => {
     });
 
     expect(fetcher.mock.calls[0][0]).toBe('/api/employee/workflow/requests?pageNo=2&pageSize=20&status=PENDING');
+  });
+
+  it('preserves unsafe integer ids from JSON responses as strings', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(
+      '{"code":0,"message":"ok","data":{"conversationId":2053928981082898411,"seqNo":2,"uploadTicketId":2053928981082898444,"downloadTicketId":2053928981082898455,"primaryDeptId":2053928808839610369,"positionId":2053928809028354049,"leaveTypeId":2053928811234567890,"agentId":2053928980726382594,"nested":{"messageId":2053928981082898422},"contentJson":"{\\"agentTaskId\\": 2053928981082898433}"}}',
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    const client = createApiClient({ fetcher });
+
+    const data = await client.get<{
+      conversationId: string;
+      seqNo: number;
+      uploadTicketId: string;
+      downloadTicketId: string;
+      primaryDeptId: string;
+      positionId: string;
+      leaveTypeId: string;
+      agentId: string;
+      nested: { messageId: string };
+      contentJson: string;
+    }>('/api/employee/im/conversations');
+
+    expect(data).toEqual({
+      conversationId: '2053928981082898411',
+      seqNo: 2,
+      uploadTicketId: '2053928981082898444',
+      downloadTicketId: '2053928981082898455',
+      primaryDeptId: '2053928808839610369',
+      positionId: '2053928809028354049',
+      leaveTypeId: '2053928811234567890',
+      agentId: '2053928980726382594',
+      nested: { messageId: '2053928981082898422' },
+      contentJson: '{"agentTaskId": 2053928981082898433}',
+    });
+  });
+
+  it('preserves unsafe integer ids when parsing realtime event payloads', () => {
+    const payload = parseJsonPreservingUnsafeIntegers(
+      '{"eventType":"IM_MESSAGE_CREATED","conversationId":2053928981082898411,"payload":{"messageId":2053928981082898422,"conversationId":2053928981082898411,"senderId":2053928981082898403,"seqNo":3}}',
+    ) as {
+      conversationId: string;
+      payload: {
+        messageId: string;
+        conversationId: string;
+        senderId: string;
+        seqNo: number;
+      };
+    };
+
+    expect(payload.conversationId).toBe('2053928981082898411');
+    expect(payload.payload.messageId).toBe('2053928981082898422');
+    expect(payload.payload.conversationId).toBe('2053928981082898411');
+    expect(payload.payload.senderId).toBe('2053928981082898403');
   });
 
   it('throws ApiClientError when backend R code is not ok', async () => {

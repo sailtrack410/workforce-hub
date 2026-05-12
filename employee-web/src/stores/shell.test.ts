@@ -1,30 +1,242 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { useShellStore, type ConversationMessage, type ConversationRecord, type TodoRecord } from './shell';
+import {
+  useShellStore,
+  type ConversationMessage,
+  type ConversationRecord,
+  type TodoRecord,
+} from './shell';
+
+const storage = new Map<string, string>();
+Object.defineProperty(globalThis, 'localStorage', {
+  value: {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
+    clear: () => storage.clear(),
+  },
+  configurable: true,
+});
+
+const shellDemoConversations: ConversationRecord[] = [
+  {
+    id: 'leave-approval',
+    kind: 'approval',
+    tone: 'blue',
+    badge: '王晨',
+    title: '王晨年假申请',
+    subtitle: '请假 2 天，等待审批确认',
+    meta: '10:24',
+    tag: '审批',
+    unread: 2,
+    flow: '私聊',
+    status: 'PENDING',
+    unreadLabel: '未读消息',
+    summaryTitle: '王晨年假申请',
+    summaryBody: '请假 2 天，等待审批确认',
+    cards: [],
+    workflowSteps: [
+      { label: '提交申请', status: 'done', detail: '已提交' },
+      { label: '余额校验', status: 'done', detail: '已通过' },
+      { label: '直属上级审批', status: 'current', detail: '待处理' },
+      { label: '完成', status: 'pending', detail: '待完成' },
+    ],
+    messages: [
+      {
+        id: 'm-1',
+        type: 'process-card',
+        author: 'HR 助手',
+        role: 'Agent',
+        body: '王晨年假申请待确认',
+        processCard: {
+          title: '王晨年假申请待确认',
+          status: '待处理',
+          statusTone: 'warning',
+          body: '待处理',
+          actionLabel: '查看',
+        },
+      },
+      {
+        id: 'm-2',
+        type: 'process-card',
+        author: 'HR 助手',
+        role: 'Agent',
+        body: 'Agent 预审已通过',
+        processCard: {
+          title: 'Agent 预审已通过',
+          status: '已完成',
+          statusTone: 'success',
+          body: '已完成',
+          actionLabel: '查看',
+        },
+      },
+      {
+        id: 'm-3',
+        type: 'process-card',
+        author: 'HR 助手',
+        role: 'Agent',
+        body: '文件已确认',
+        processCard: {
+          title: '文件已确认',
+          status: '已完成',
+          statusTone: 'success',
+          body: '已完成',
+          actionLabel: '查看',
+        },
+      },
+    ],
+    panel: {
+      members: [{ name: 'HR 助手', role: 'Agent' }],
+      tasks: [],
+      attachments: [],
+    },
+  },
+  {
+    id: 'operation-team',
+    kind: 'team',
+    tone: 'green',
+    badge: '运营',
+    title: '运营一部群',
+    subtitle: '五月排班已同步',
+    memberCount: 12,
+    meta: '09:42',
+    tag: '群聊',
+    unread: 0,
+    flow: '群聊',
+    status: 'ACTIVE',
+    unreadLabel: '已读',
+    summaryTitle: '运营一部群',
+    summaryBody: '五月排班已同步',
+    cards: [],
+    workflowSteps: [],
+    messages: [],
+    panel: {
+      members: [{ name: '周悦', role: '成员' }],
+      tasks: [],
+      attachments: [],
+    },
+  },
+  {
+    id: 'hr-agent',
+    kind: 'agent',
+    tone: 'green',
+    badge: 'HR',
+    title: 'HR 助手',
+    subtitle: '假期余额',
+    meta: '09:20',
+    tag: 'Agent',
+    unread: 0,
+    flow: 'Agent 会话',
+    status: 'ACTIVE',
+    unreadLabel: '已读',
+    summaryTitle: 'HR 助手',
+    summaryBody: '假期余额',
+    cards: [],
+    workflowSteps: [],
+    messages: [],
+    panel: {
+      members: [{ name: 'HR 助手', role: 'Agent' }],
+      tasks: [],
+      attachments: [],
+    },
+  },
+  {
+    id: 'file-center',
+    kind: 'file',
+    tone: 'gray',
+    badge: '文档',
+    title: '文件助手',
+    subtitle: '材料已确认',
+    meta: '08:40',
+    tag: '文件',
+    unread: 0,
+    flow: '私聊',
+    status: 'ACTIVE',
+    unreadLabel: '已读',
+    summaryTitle: '文件助手',
+    summaryBody: '材料已确认',
+    cards: [],
+    workflowSteps: [],
+    messages: [],
+    panel: {
+      members: [{ name: 'HR 助手', role: 'Agent' }],
+      tasks: [],
+      attachments: [{ id: 'f-1', name: '材料.pdf', type: 'PDF', size: '1KB', status: '已确认' }],
+    },
+  },
+];
+
+const shellDemoTodos: TodoRecord[] = [
+  {
+    id: 'todo-approval',
+    title: '王晨年假申请',
+    subtitle: '流程待办',
+    note: '待处理',
+    time: '10:24',
+    status: 'PENDING',
+    priority: '高',
+    requestNo: 'REQ-1',
+    taskId: 'TASK-1',
+    currentStepName: '直属上级审批',
+    summary: '待处理',
+    fields: [],
+    timeline: [],
+    actions: [],
+  },
+  {
+    id: 'todo-attendance',
+    title: '考勤异常确认',
+    subtitle: '流程待办',
+    note: '待处理',
+    time: '09:00',
+    status: 'PENDING',
+    priority: '中',
+    requestNo: 'ATT-1',
+    taskId: 'TASK-2',
+    currentStepName: '异常确认',
+    summary: '考勤异常',
+    fields: [],
+    timeline: [],
+    actions: [],
+  },
+];
 
 describe('useShellStore', () => {
   beforeEach(() => {
+    localStorage.clear();
     setActivePinia(createPinia());
   });
 
-  it('filters message conversations by keyword', () => {
+  it('starts without simulated conversations or todos', () => {
     const shell = useShellStore();
+
+    expect(shell.conversations).toEqual([]);
+    expect(shell.todos).toEqual([]);
+    expect(shell.activeConversation.id).toBe('');
+    expect(shell.activeTodo.id).toBe('');
+  });
+
+  it('filters message conversations by title and member keyword', () => {
+    const shell = useShellStore();
+    shell.mergeBackendConversations(shellDemoConversations);
 
     shell.setSearch('messages', 'HR 助手');
 
-    expect(shell.filteredConversations.map((item) => item.id)).toEqual(['hr-agent']);
+    expect(shell.filteredConversations.map((item) => item.id)).toEqual(['leave-approval', 'hr-agent', 'file-center']);
   });
 
   it('filters message conversations by chip', () => {
     const shell = useShellStore();
+    shell.mergeBackendConversations(shellDemoConversations);
 
-    shell.setFilter('messages', '组织群');
+    shell.setFilter('messages', '群聊');
 
     expect(shell.filteredConversations.map((item) => item.id)).toEqual(['operation-team']);
   });
 
   it('keeps approval progress data with one current step', () => {
     const shell = useShellStore();
+    shell.mergeBackendConversations(shellDemoConversations);
 
     const steps = shell.activeConversation.workflowSteps;
 
@@ -34,6 +246,7 @@ describe('useShellStore', () => {
 
   it('keeps approval workflow feedback as agent process messages', () => {
     const shell = useShellStore();
+    shell.mergeBackendConversations(shellDemoConversations);
 
     const cards = shell.activeConversation.messages.filter((message) => message.type === 'process-card');
 
@@ -47,6 +260,7 @@ describe('useShellStore', () => {
 
   it('keeps user-facing conversation detail free from API route strings', () => {
     const shell = useShellStore();
+    shell.mergeBackendConversations(shellDemoConversations);
     const panelText = JSON.stringify(shell.activeConversation.panel);
 
     expect(panelText).not.toContain('/api/');
@@ -56,6 +270,7 @@ describe('useShellStore', () => {
 
   it('keeps group member count for compact conversation titles', () => {
     const shell = useShellStore();
+    shell.mergeBackendConversations(shellDemoConversations);
 
     const group = shell.conversations.find((item) => item.id === 'operation-team');
 
@@ -64,6 +279,7 @@ describe('useShellStore', () => {
 
   it('combines pending filter and keyword search for todos', () => {
     const shell = useShellStore();
+    shell.mergeBackendTodos(shellDemoTodos);
 
     shell.setSearch('todos', '考勤');
     shell.setFilter('todos', '未处理');
@@ -71,10 +287,10 @@ describe('useShellStore', () => {
     expect(shell.filteredTodos.map((item) => item.id)).toEqual(['todo-attendance']);
   });
 
-  it('merges loaded backend todos while preserving static fallback data', () => {
+  it('uses loaded backend todos as the source of truth', () => {
     const shell = useShellStore();
     const backendTodo: TodoRecord = {
-      ...shell.todos[0],
+      ...shellDemoTodos[0],
       id: 'workflow-todo-10',
       title: '后端待办',
       status: 'PENDING',
@@ -88,14 +304,14 @@ describe('useShellStore', () => {
       title: '后端待办',
       taskId: 'TASK-10',
     });
-    expect(shell.todos.some((item) => item.id === 'todo-approval')).toBe(true);
+    expect(shell.todos.some((item) => item.id === 'todo-approval')).toBe(false);
     expect(shell.active.todos).toBe('workflow-todo-10');
   });
 
-  it('merges loaded backend conversations while preserving static fallback data', () => {
+  it('uses loaded backend conversations as the source of truth', () => {
     const shell = useShellStore();
     const backendConversation: ConversationRecord = {
-      ...shell.conversations[0],
+      ...shellDemoConversations[0],
       id: '7001',
       title: '张三与李四',
       subtitle: '下午同步一下排班。',
@@ -110,14 +326,14 @@ describe('useShellStore', () => {
       title: '张三与李四',
       flow: '私聊',
     });
-    expect(shell.conversations.some((item) => item.id === 'leave-approval')).toBe(true);
+    expect(shell.conversations.some((item) => item.id === 'leave-approval')).toBe(false);
     expect(shell.active.messages).toBe('7001');
   });
 
   it('merges loaded backend messages into the active conversation', () => {
     const shell = useShellStore();
     const backendConversation: ConversationRecord = {
-      ...shell.conversations[0],
+      ...shellDemoConversations[0],
       id: '7001',
       title: '张三与李四',
       messages: [],
@@ -126,7 +342,7 @@ describe('useShellStore', () => {
       {
         id: '7101',
         author: '用户 2003',
-        role: 'USER · TEXT',
+        role: '成员',
         body: '我上午可以处理补卡。',
         side: 'left',
       },
@@ -146,5 +362,94 @@ describe('useShellStore', () => {
 
     expect(shell.filteredFiles).toEqual([]);
     expect(shell.activeFile.id).toBe('personal');
+  });
+
+  it('persists display preferences across store instances', () => {
+    const shell = useShellStore();
+    shell.setTheme('dark');
+    shell.setMessageDensity('compact');
+
+    setActivePinia(createPinia());
+    const restored = useShellStore();
+
+    expect(restored.theme).toBe('dark');
+    expect(restored.messageDensity).toBe('compact');
+  });
+
+  it('keeps uploaded personal file metadata for backend file actions', () => {
+    const shell = useShellStore();
+
+    shell.addPersonalFile({
+      name: '考勤证明.pdf',
+      type: 'PDF',
+      size: '10KB',
+      status: '已确认',
+      attachmentRefId: 42,
+      mimeType: 'application/pdf',
+    });
+
+    expect(shell.activeFile.files[0]).toMatchObject({
+      id: 'personal-file-42',
+      name: '考勤证明.pdf',
+      attachmentRefId: 42,
+      mimeType: 'application/pdf',
+    });
+    expect(shell.filteredFiles.map((item) => item.id)).toEqual(['personal']);
+  });
+
+  it('merges backend personal file list into the file center', () => {
+    const shell = useShellStore();
+
+    shell.mergeBackendPersonalFiles([
+      {
+        attachmentRefId: '2053928981082898444',
+        fileObjectId: '2053928981082898555',
+        ownerType: 'PERSONAL_FILE',
+        ownerId: null,
+        originalFileName: '入职材料.pdf',
+        displayName: '入职材料.pdf',
+        uploaderType: 'USER',
+        uploaderId: '2003',
+        mimeType: 'application/pdf',
+        fileSize: 2048,
+        scanStatus: 'PENDING',
+        createdAt: '2026-05-12T09:30:00',
+        updatedAt: '2026-05-12T09:30:00',
+      },
+    ], [
+      {
+        attachmentRefId: '2053928981082898666',
+        fileObjectId: '2053928981082898777',
+        ownerType: 'PERSONAL_FILE',
+        ownerId: null,
+        originalFileName: '旧证明.txt',
+        displayName: '旧证明.txt',
+        uploaderType: 'USER',
+        uploaderId: '2003',
+        mimeType: 'text/plain',
+        fileSize: 12,
+        scanStatus: 'PENDING',
+        deletedAt: '2026-05-12T10:00:00',
+        purgeAfter: '2026-06-11T10:00:00',
+        createdAt: '2026-05-12T09:00:00',
+        updatedAt: '2026-05-12T10:00:00',
+      },
+    ]);
+
+    expect(shell.activeFile.files).toHaveLength(2);
+    expect(shell.activeFile.files[0]).toMatchObject({
+      id: 'personal-file-2053928981082898444',
+      name: '入职材料.pdf',
+      type: 'PDF',
+      size: '2.0KB',
+      status: '待处理',
+      attachmentRefId: '2053928981082898444',
+      mimeType: 'application/pdf',
+    });
+    expect(shell.activeFile.files[1]).toMatchObject({
+      id: 'personal-file-2053928981082898666',
+      name: '旧证明.txt',
+      status: '回收站',
+    });
   });
 });

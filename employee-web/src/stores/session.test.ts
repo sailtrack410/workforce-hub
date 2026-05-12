@@ -20,6 +20,8 @@ function createAuthApi(overrides: Partial<EmployeeAuthApi> = {}): EmployeeAuthAp
     me: () => Promise.resolve(currentUser),
     login: (_request: LoginRequest) => Promise.resolve(currentUser as LoginResponse),
     logout: () => Promise.resolve(),
+    sendEmailCode: () => Promise.resolve(),
+    resetPassword: () => Promise.resolve(),
     ...overrides,
   };
 }
@@ -69,5 +71,32 @@ describe('useSessionStore', () => {
 
     expect(session.user).toBeNull();
     expect(session.isAuthenticated).toBe(false);
+  });
+
+  it('requests password reset code and submits reset password payload', async () => {
+    const session = useSessionStore();
+    const requests: unknown[] = [];
+    const authApi = createAuthApi({
+      sendEmailCode: (request) => {
+        requests.push(request);
+        return Promise.resolve();
+      },
+      resetPassword: (request) => {
+        requests.push(request);
+        return Promise.resolve();
+      },
+    });
+
+    await session.sendPasswordResetCode('zhangsan@example.com', authApi);
+    await session.resetPassword({
+      email: 'zhangsan@example.com',
+      code: '123456',
+      newPassword: 'Employee@654321',
+    }, authApi);
+
+    expect(requests).toEqual([
+      { email: 'zhangsan@example.com', purpose: 'RESET_PASSWORD' },
+      { email: 'zhangsan@example.com', code: '123456', newPassword: 'Employee@654321' },
+    ]);
   });
 });
