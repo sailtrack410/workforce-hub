@@ -19,6 +19,7 @@ import com.workforcehub.im.dto.StartPrivateConversationRequest;
 import com.workforcehub.im.dto.UpdateConversationPreferenceRequest;
 import com.workforcehub.im.dto.UpdateGroupConversationRequest;
 import com.workforcehub.im.dto.UpdateReadPositionRequest;
+import com.workforcehub.im.service.ImGroupService;
 import com.workforcehub.im.service.ImService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
@@ -41,11 +42,14 @@ import java.util.List;
 public class EmployeeImController {
 
     private final ImService imService;
+    private final ImGroupService imGroupService;
     private final FileDownloadResponseFactory downloadResponseFactory;
 
     public EmployeeImController(ImService imService,
+                                ImGroupService imGroupService,
                                 FileDownloadResponseFactory downloadResponseFactory) {
         this.imService = imService;
+        this.imGroupService = imGroupService;
         this.downloadResponseFactory = downloadResponseFactory;
     }
 
@@ -67,7 +71,7 @@ public class EmployeeImController {
     public R<ImConversationSummaryResponse> createGroupConversation(
         @Valid @RequestBody CreateGroupConversationRequest request
     ) {
-        return R.ok(imService.createCurrentEmployeeGroupConversation(request));
+        return R.ok(imGroupService.createCurrentEmployeeGroupConversation(request));
     }
 
     @PostMapping("/agent-conversations")
@@ -84,12 +88,12 @@ public class EmployeeImController {
 
     @GetMapping("/group-conversations/{conversationId}/members")
     public R<List<ImConversationMemberResponse>> groupMembers(@PathVariable Long conversationId) {
-        return R.ok(imService.listCurrentEmployeeGroupMembers(conversationId));
+        return R.ok(imGroupService.listCurrentEmployeeGroupMembers(conversationId));
     }
 
     @GetMapping("/group-conversations/{conversationId}/profile")
     public R<ImGroupProfileResponse> groupProfile(@PathVariable Long conversationId) {
-        return R.ok(imService.getCurrentEmployeeGroupProfile(conversationId));
+        return R.ok(imGroupService.getCurrentEmployeeGroupProfile(conversationId));
     }
 
     @PostMapping("/group-conversations/{conversationId}/profile")
@@ -97,7 +101,7 @@ public class EmployeeImController {
         @PathVariable Long conversationId,
         @Valid @RequestBody UpdateGroupConversationRequest request
     ) {
-        return R.ok(imService.updateCurrentEmployeeGroupProfile(conversationId, request));
+        return R.ok(imGroupService.updateCurrentEmployeeGroupProfile(conversationId, request));
     }
 
     @PostMapping("/group-conversations/{conversationId}/members")
@@ -105,7 +109,7 @@ public class EmployeeImController {
         @PathVariable Long conversationId,
         @Valid @RequestBody GroupMemberUserIdsRequest request
     ) {
-        return R.ok(imService.addCurrentEmployeeGroupMembers(conversationId, request));
+        return R.ok(imGroupService.addCurrentEmployeeGroupMembers(conversationId, request));
     }
 
     @PostMapping("/group-conversations/{conversationId}/members/remove")
@@ -113,17 +117,17 @@ public class EmployeeImController {
         @PathVariable Long conversationId,
         @Valid @RequestBody GroupMemberUserIdsRequest request
     ) {
-        return R.ok(imService.removeCurrentEmployeeGroupMembers(conversationId, request));
+        return R.ok(imGroupService.removeCurrentEmployeeGroupMembers(conversationId, request));
     }
 
     @PostMapping("/group-conversations/{conversationId}/leave")
     public R<List<ImConversationMemberResponse>> leaveGroup(@PathVariable Long conversationId) {
-        return R.ok(imService.leaveCurrentEmployeeGroupConversation(conversationId));
+        return R.ok(imGroupService.leaveCurrentEmployeeGroupConversation(conversationId));
     }
 
     @PostMapping("/group-conversations/{conversationId}/dismiss")
     public R<Void> dismissGroup(@PathVariable Long conversationId) {
-        imService.dismissCurrentEmployeeGroupConversation(conversationId);
+        imGroupService.dismissCurrentEmployeeGroupConversation(conversationId);
         return R.ok();
     }
 

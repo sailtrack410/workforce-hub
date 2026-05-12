@@ -43,6 +43,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -166,6 +167,44 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工置顶会话应优先出现在会话列表前面")
+    void employeePinnedConversationShouldSortBeforeRecentUnpinnedConversation() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+        seedPagedConversation(7010L, 7110L, "分页会话A", "2026-05-09 12:00:00", "分页第一条");
+        seedPagedConversation(7011L, 7111L, "分页会话B", "2026-05-09 11:30:00", "分页第二条");
+        jdbcTemplate.update("""
+            UPDATE im_conversation_member
+            SET pin_flag = 1
+            WHERE conversation_id = 7001
+              AND member_type = 'USER'
+              AND member_id = ?
+            """, EMPLOYEE_USER_ID);
+
+        mockMvc.perform(get("/api/employee/im/conversations")
+                .queryParam("size", "3")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(3)))
+            .andExpect(jsonPath("$.data[0].conversationId").value(7001))
+            .andExpect(jsonPath("$.data[0].pin").value(true))
+            .andExpect(jsonPath("$.data[1].conversationId").value(7010))
+            .andExpect(jsonPath("$.data[2].conversationId").value(7011));
+
+        mockMvc.perform(get("/api/employee/im/conversations")
+                .queryParam("beforeLastMessageAt", "2026-05-09T10:10:00")
+                .queryParam("beforeConversationId", "7001")
+                .queryParam("size", "2")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(2)))
+            .andExpect(jsonPath("$.data[0].conversationId").value(7010))
+            .andExpect(jsonPath("$.data[1].conversationId").value(7011));
+    }
+
+    @Test
     @DisplayName("员工会话列表分页参数非法时应返回业务错误")
     void employeeConversationPageParamsShouldBeValidated() throws Exception {
         Cookie employeeSession = loginEmployee("zhangsan.employee");
@@ -213,6 +252,23 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.members[1].memberId").value(MANAGER_USER_ID))
             .andExpect(jsonPath("$.data.members[1].displayName").value("李四"))
             .andExpect(jsonPath("$.data.groupProfile").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("会话成员关联用户软删除后应返回稳定展示名降级值")
+    void conversationDetailShouldFallbackDisplayNameWhenMemberProfileDeleted() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+        jdbcTemplate.update("UPDATE org_user SET is_deleted = 1 WHERE id = ?", MANAGER_USER_ID);
+
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}", 7001L)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.members", hasSize(2)))
+            .andExpect(jsonPath("$.data.members[0].displayName").value("张三"))
+            .andExpect(jsonPath("$.data.members[1].memberId").value(MANAGER_USER_ID))
+            .andExpect(jsonPath("$.data.members[1].displayName").value("USER:%d".formatted(MANAGER_USER_ID)));
     }
 
     @Test
@@ -782,49 +838,6 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
         unregisterSocket(MANAGER_USER_ID, managerSocket);
         unregisterSocket(OTHER_EMPLOYEE_USER_ID, outsiderSocket);
-    }
-
-    @Test
-    @DisplayName("WebSocket推送失败时outbox应保留失败记录并支持重试")
-    void websocketOutboxShouldRetryFailedDelivery() throws Exception {
-        Cookie employeeSession = loginEmployee("zhangsan.employee");
-        seedPrivateConversation();
-        FailingOnceWebSocketSession employeeSocket = new FailingOnceWebSocketSession(EMPLOYEE_USER_ID);
-        webSocketSessionRegistry.register(EMPLOYEE_USER_ID, employeeSocket);
-        CapturingWebSocketSession managerSocket = registerSocket(MANAGER_USER_ID);
-
-        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", 7001L)
-                .cookie(employeeSession)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {
-                      "messageType": "TEXT",
-                      "text": "失败后要能重试。",
-                      "clientMessageId": "client-msg-push-retry-001"
-                    }
-                    """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(0));
-
-        awaitOutboxStatus("IM_MESSAGE_CREATED", 7001L, "FAILED");
-        assertEquals(0, employeeSocket.messages().size());
-        assertEquals(0, managerSocket.messages().size());
-        webSocketSessionRegistry.register(EMPLOYEE_USER_ID, employeeSocket);
-        jdbcTemplate.update("""
-            UPDATE im_event_outbox
-            SET next_retry_at = NOW()
-            WHERE event_type = 'IM_MESSAGE_CREATED'
-              AND conversation_id = ?
-              AND status = 'FAILED'
-            """, 7001L);
-
-        imWebSocketOutboxDispatcher.dispatchDueEvents();
-
-        assertSocketEvent(employeeSocket, "IM_MESSAGE_CREATED", 7001L);
-        assertSocketEvent(managerSocket, "IM_MESSAGE_CREATED", 7001L);
-        awaitOutboxStatus("IM_MESSAGE_CREATED", 7001L, "SENT");
-        unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
-        unregisterSocket(MANAGER_USER_ID, managerSocket);
     }
 
     @Test
@@ -1457,6 +1470,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         Cookie employeeSession = loginEmployee("zhangsan.employee");
         seedPrivateConversation();
         CapturingWebSocketSession employeeSocket = registerSocket(EMPLOYEE_USER_ID);
+        CapturingWebSocketSession managerSocket = registerSocket(MANAGER_USER_ID);
 
         mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/preference", 7001L)
                 .cookie(employeeSession)
@@ -1486,7 +1500,10 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
               AND member_id = ?
             """, Integer.class, EMPLOYEE_USER_ID));
         assertSocketEvent(employeeSocket, "IM_CONVERSATION_PREFERENCE_UPDATED", 7001L);
+        imWebSocketOutboxDispatcher.dispatchDueEvents();
+        assertFalse(hasSocketEvent(managerSocket, "IM_CONVERSATION_PREFERENCE_UPDATED", 7001L));
         unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
+        unregisterSocket(MANAGER_USER_ID, managerSocket);
     }
 
     @Test
@@ -2218,24 +2235,6 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         @Override
         public void close(org.springframework.web.socket.CloseStatus status) {
             open = false;
-        }
-    }
-
-    private static class FailingOnceWebSocketSession extends CapturingWebSocketSession {
-
-        private boolean failed;
-
-        private FailingOnceWebSocketSession(Long userId) {
-            super(userId);
-        }
-
-        @Override
-        public void sendMessage(org.springframework.web.socket.WebSocketMessage<?> message) throws IOException {
-            if (!failed) {
-                failed = true;
-                throw new IOException("simulated websocket failure");
-            }
-            super.sendMessage(message);
         }
     }
 

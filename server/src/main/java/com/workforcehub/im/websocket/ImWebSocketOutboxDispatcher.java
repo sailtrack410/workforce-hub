@@ -58,14 +58,24 @@ public class ImWebSocketOutboxDispatcher {
     }
 
     public int dispatchDueEvents(int batchSize) {
+        return dispatchDueEventsWithResult(batchSize).dispatchedCount();
+    }
+
+    public ImWebSocketOutboxDispatchResult dispatchDueEventsWithResult(int batchSize) {
         List<ImEventOutboxRow> rows = claimDueEvents(Math.max(batchSize, 1));
-        int dispatched = 0;
+        List<Long> attemptedEventIds = rows.stream()
+            .map(ImEventOutboxRow::id)
+            .toList();
+        List<Long> dispatchedEventIds = new java.util.ArrayList<>();
+        List<Long> failedEventIds = new java.util.ArrayList<>();
         for (ImEventOutboxRow row : rows) {
             if (dispatchOne(row)) {
-                dispatched++;
+                dispatchedEventIds.add(row.id());
+            } else {
+                failedEventIds.add(row.id());
             }
         }
-        return dispatched;
+        return new ImWebSocketOutboxDispatchResult(attemptedEventIds, dispatchedEventIds, failedEventIds);
     }
 
     private List<ImEventOutboxRow> claimDueEvents(int batchSize) {

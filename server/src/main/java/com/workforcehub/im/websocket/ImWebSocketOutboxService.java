@@ -32,6 +32,7 @@ public class ImWebSocketOutboxService {
         if (recipients.isEmpty()) {
             return;
         }
+        LocalDateTime dueNow = LocalDateTime.now().minusSeconds(1);
         outboxRepository.insertEvent(
             IdWorker.getId(),
             event.eventType(),
@@ -41,7 +42,7 @@ public class ImWebSocketOutboxService {
             event.actorUserId(),
             writeJson(recipients),
             writeJson(event),
-            LocalDateTime.now()
+            dueNow
         );
     }
 

@@ -13,29 +13,24 @@ import com.workforcehub.file.repository.AttachmentRefRepository;
 import com.workforcehub.file.service.DownloadTicketExecutionService;
 import com.workforcehub.file.storage.StorageObjectResource;
 import com.workforcehub.file.storage.StorageProviderRegistry;
-import com.workforcehub.im.dto.CreateGroupConversationRequest;
 import com.workforcehub.im.dto.EditImMessageRequest;
-import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
 import com.workforcehub.im.dto.ImConversationDetailResponse;
-import com.workforcehub.im.dto.ImConversationMemberResponse;
 import com.workforcehub.im.dto.ImMessageAttachmentResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
-import com.workforcehub.im.dto.ImGroupProfileResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.dto.StartAgentConversationRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
 import com.workforcehub.im.dto.UpdateConversationPreferenceRequest;
-import com.workforcehub.im.dto.UpdateGroupConversationRequest;
 import com.workforcehub.im.dto.UpdateReadPositionRequest;
 import com.workforcehub.im.repository.ImAttachmentRow;
-import com.workforcehub.im.repository.ImConversationMemberRow;
 import com.workforcehub.im.repository.ImConversationSummaryRow;
-import com.workforcehub.im.repository.ImGroupProfileRow;
+import com.workforcehub.im.repository.ImMessageRepository;
 import com.workforcehub.im.repository.ImMessageRow;
 import com.workforcehub.im.repository.ImRepository;
 import com.workforcehub.im.repository.ImUserRelationRow;
 import com.workforcehub.im.websocket.ImWebSocketEvent;
+import com.workforcehub.im.websocket.ImWebSocketEventTypes;
 import com.workforcehub.im.websocket.ImWebSocketPushService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -62,27 +57,33 @@ public class ImService {
     private static final String USER_SENDER_TYPE = "USER";
 
     private final ImRepository imRepository;
+    private final ImMessageRepository imMessageRepository;
     private final ObjectMapper objectMapper;
     private final AttachmentRefRepository attachmentRefRepository;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
     private final StorageProviderRegistry storageProviderRegistry;
     private final ImWebSocketPushService webSocketPushService;
     private final ImAgentConversationService imAgentConversationService;
+    private final ImGroupService imGroupService;
 
     public ImService(ImRepository imRepository,
+                     ImMessageRepository imMessageRepository,
                      ObjectMapper objectMapper,
                      AttachmentRefRepository attachmentRefRepository,
                      DownloadTicketExecutionService downloadTicketExecutionService,
                      StorageProviderRegistry storageProviderRegistry,
                      ImWebSocketPushService webSocketPushService,
-                     ImAgentConversationService imAgentConversationService) {
+                     ImAgentConversationService imAgentConversationService,
+                     ImGroupService imGroupService) {
         this.imRepository = imRepository;
+        this.imMessageRepository = imMessageRepository;
         this.objectMapper = objectMapper;
         this.attachmentRefRepository = attachmentRefRepository;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
         this.storageProviderRegistry = storageProviderRegistry;
         this.webSocketPushService = webSocketPushService;
         this.imAgentConversationService = imAgentConversationService;
+        this.imGroupService = imGroupService;
     }
 
     public List<ImConversationSummaryResponse> listCurrentEmployeeConversations(String beforeLastMessageAt,
@@ -112,7 +113,7 @@ public class ImService {
             }
             throw new BizException(404, "会话不存在");
         }
-        return imRepository.listMessages(conversationId, beforeSeq, normalizeMessagePageSize(size))
+        return imMessageRepository.listMessages(conversationId, beforeSeq, normalizeMessagePageSize(size))
             .stream()
             .map(this::toMessageResponse)
             .toList();
@@ -131,9 +132,9 @@ public class ImService {
 
         ImConversationDetailResponse response = new ImConversationDetailResponse();
         response.setConversation(conversation);
-        response.setMembers(listActiveConversationMemberResponses(conversationId, true));
+        response.setMembers(imGroupService.listActiveConversationMemberResponses(conversationId, true));
         if ("GROUP".equals(conversation.getConversationType())) {
-            response.setGroupProfile(getGroupProfileForUser(conversationId, userId));
+            response.setGroupProfile(imGroupService.getGroupProfileForUser(conversationId, userId));
         }
         return response;
     }
@@ -165,153 +166,8 @@ public class ImService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ImConversationSummaryResponse createCurrentEmployeeGroupConversation(CreateGroupConversationRequest request) {
-        Long ownerUserId = requireActiveEmployeeUserId();
-        imRepository.findActiveOrgUser(ownerUserId)
-            .orElseThrow(() -> new BizException(403, "当前员工不可创建群聊"));
-
-        String title = request.getTitle().trim();
-        Set<Long> normalizedMemberIds = normalizeGroupMemberIds(ownerUserId, request.getMemberUserIds());
-        if (normalizedMemberIds.isEmpty()) {
-            throw new BizException(400, "群聊至少需要选择1名其他成员");
-        }
-        if (imRepository.countActiveOrgUsers(normalizedMemberIds) != normalizedMemberIds.size()) {
-            throw new BizException(404, "目标成员不存在或不可加入群聊");
-        }
-
-        Long conversationId = IdWorker.getId();
-        imRepository.insertGroupConversation(conversationId, title, ownerUserId);
-        imRepository.insertGroupProfile(IdWorker.getId(), conversationId, "CUSTOM", ownerUserId, ownerUserId);
-        imRepository.insertUserMember(IdWorker.getId(), conversationId, ownerUserId, "OWNER", "CREATE");
-        for (Long memberUserId : normalizedMemberIds) {
-            imRepository.insertUserMember(IdWorker.getId(), conversationId, memberUserId, "MEMBER", "CREATE");
-        }
-        return imRepository.findConversationSummaryForUser(conversationId, ownerUserId)
-            .map(this::toConversationSummaryResponse)
-            .orElseThrow(() -> new BizException(500, "群聊创建失败"));
-    }
-
-    @Transactional(rollbackFor = Exception.class)
     public ImConversationSummaryResponse startCurrentEmployeeAgentConversation(StartAgentConversationRequest request) {
         return imAgentConversationService.startCurrentEmployeeAgentConversation(request);
-    }
-
-    public List<ImConversationMemberResponse> listCurrentEmployeeGroupMembers(Long conversationId) {
-        Long userId = requireActiveEmployeeUserId();
-        ensureCanAccessActiveGroup(conversationId, userId);
-        return listActiveConversationMemberResponses(conversationId);
-    }
-
-    public ImGroupProfileResponse getCurrentEmployeeGroupProfile(Long conversationId) {
-        Long userId = requireActiveEmployeeUserId();
-        ensureCanAccessActiveGroup(conversationId, userId);
-        return imRepository.findActiveGroupProfile(conversationId)
-            .map(row -> toGroupProfileResponse(row, imRepository.findActiveUserMemberRole(conversationId, userId).orElse(null)))
-            .orElseThrow(() -> new BizException(404, "群聊不存在"));
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public ImGroupProfileResponse updateCurrentEmployeeGroupProfile(Long conversationId,
-                                                                    UpdateGroupConversationRequest request) {
-        Long ownerUserId = requireActiveEmployeeUserId();
-        ensureCanManageCustomGroup(conversationId, ownerUserId);
-        String title = normalizeOptionalText(request.getTitle());
-        String noticeText = normalizeOptionalText(request.getNoticeText());
-        if (!StringUtils.hasText(title) && !StringUtils.hasText(noticeText)) {
-            throw new BizException(400, "群资料更新内容不能为空");
-        }
-        imRepository.updateGroupProfile(conversationId, title, noticeText, ownerUserId);
-        ImGroupProfileResponse response = getGroupProfileForUser(conversationId, ownerUserId);
-        pushConversationEventAfterCommit(
-            conversationId,
-            ImWebSocketEvent.of("IM_GROUP_PROFILE_UPDATED", conversationId, null, null, ownerUserId, response)
-        );
-        return response;
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public List<ImConversationMemberResponse> addCurrentEmployeeGroupMembers(Long conversationId,
-                                                                             GroupMemberUserIdsRequest request) {
-        Long ownerUserId = requireActiveEmployeeUserId();
-        ensureCanManageCustomGroup(conversationId, ownerUserId);
-        Set<Long> normalizedMemberIds = normalizeGroupMemberIds(ownerUserId, request.getMemberUserIds());
-        if (normalizedMemberIds.isEmpty()) {
-            throw new BizException(400, "至少选择1名要添加的成员");
-        }
-        if (imRepository.countActiveOrgUsers(normalizedMemberIds) != normalizedMemberIds.size()) {
-            throw new BizException(404, "目标成员不存在或不可加入群聊");
-        }
-        for (Long memberUserId : normalizedMemberIds) {
-            imRepository.upsertUserMember(IdWorker.getId(), conversationId, memberUserId, "MEMBER", "OWNER_INVITE");
-        }
-        List<ImConversationMemberResponse> response = listActiveConversationMemberResponses(conversationId);
-        pushConversationEventAfterCommit(
-            conversationId,
-            ImWebSocketEvent.of("IM_GROUP_MEMBERS_ADDED", conversationId, null, null, ownerUserId, response)
-        );
-        return response;
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public List<ImConversationMemberResponse> removeCurrentEmployeeGroupMembers(Long conversationId,
-                                                                                GroupMemberUserIdsRequest request) {
-        Long ownerUserId = requireActiveEmployeeUserId();
-        ensureCanManageCustomGroup(conversationId, ownerUserId);
-        List<Long> recipientsBeforeChange = activeUserMemberIds(conversationId);
-        Set<Long> normalizedMemberIds = normalizeUserIds(request.getMemberUserIds());
-        if (normalizedMemberIds.contains(ownerUserId)) {
-            throw new BizException(400, "群主不能把自己移出群聊");
-        }
-        if (normalizedMemberIds.isEmpty()) {
-            throw new BizException(400, "至少选择1名要移出的成员");
-        }
-        imRepository.markUserMembersLeft(conversationId, normalizedMemberIds);
-        List<ImConversationMemberResponse> response = listActiveConversationMemberResponses(conversationId);
-        pushConversationEventToUsersAfterCommit(
-            recipientsBeforeChange,
-            ImWebSocketEvent.of("IM_GROUP_MEMBERS_REMOVED", conversationId, null, null, ownerUserId, response)
-        );
-        return response;
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public List<ImConversationMemberResponse> leaveCurrentEmployeeGroupConversation(Long conversationId) {
-        Long userId = requireActiveEmployeeUserId();
-        ensureCanAccessActiveGroup(conversationId, userId);
-        String memberRole = imRepository.findActiveUserMemberRole(conversationId, userId).orElse(null);
-        if ("OWNER".equals(memberRole)) {
-            throw new BizException(400, "群主不能直接退群，请先解散群聊或转让群主");
-        }
-        List<Long> recipientsBeforeChange = activeUserMemberIds(conversationId);
-        int updated = imRepository.markUserMemberLeft(conversationId, userId);
-        if (updated == 0) {
-            throw new BizException(409, "当前群成员状态不允许退群");
-        }
-        List<ImConversationMemberResponse> response = listActiveConversationMemberResponses(conversationId);
-        pushConversationEventToUsersAfterCommit(
-            recipientsBeforeChange,
-            ImWebSocketEvent.of("IM_GROUP_MEMBER_LEFT", conversationId, null, null, userId, response)
-        );
-        return response;
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void dismissCurrentEmployeeGroupConversation(Long conversationId) {
-        Long ownerUserId = requireActiveEmployeeUserId();
-        ensureCanManageCustomGroup(conversationId, ownerUserId);
-        List<Long> recipientsBeforeChange = activeUserMemberIds(conversationId);
-        imRepository.dismissGroupConversation(conversationId, ownerUserId);
-        pushConversationEventToUsersAfterCommit(
-            recipientsBeforeChange,
-            ImWebSocketEvent.of(
-                "IM_GROUP_DISMISSED",
-                conversationId,
-                null,
-                null,
-                ownerUserId,
-                Map.of("conversationId", conversationId)
-            )
-        );
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -323,7 +179,7 @@ public class ImService {
         if (!StringUtils.hasText(text) && attachmentRefIds.isEmpty()) {
             throw new BizException(400, "消息内容不能为空");
         }
-        Long lastSeq = imRepository.lockActiveConversationAndGetLastSeq(conversationId);
+        Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(conversationId);
         if (lastSeq == null) {
             throw new BizException(404, "会话不存在");
         }
@@ -331,14 +187,14 @@ public class ImService {
         String messageType = normalizeMessageType(request.getMessageType(), StringUtils.hasText(text), !attachmentRefIds.isEmpty());
         String clientMessageId = normalizeClientMessageId(request.getClientMessageId());
         if (clientMessageId != null) {
-            ImMessageResponse existing = imRepository.findMessageByClientMessageId(
+            ImMessageResponse existing = imMessageRepository.findMessageByClientMessageId(
                 conversationId,
                 USER_SENDER_TYPE,
                 userId,
                 clientMessageId
             ).map(this::toMessageResponse).orElse(null);
             if (existing != null) {
-                imRepository.updateMemberLastReadSeq(conversationId, userId, existing.getSeqNo());
+                imMessageRepository.updateMemberLastReadSeq(conversationId, userId, existing.getSeqNo());
                 return existing;
             }
         }
@@ -352,7 +208,7 @@ public class ImService {
         LocalDateTime sentAt = LocalDateTime.now();
         String contentJson = buildContentJson(text, sourceAttachments);
         try {
-            imRepository.insertMessage(
+            imMessageRepository.insertMessage(
                 messageId,
                 conversationId,
                 seqNo,
@@ -367,20 +223,20 @@ public class ImService {
             if (clientMessageId == null) {
                 throw e;
             }
-            ImMessageResponse existing = imRepository.findMessageByClientMessageId(
+            ImMessageResponse existing = imMessageRepository.findMessageByClientMessageId(
                 conversationId,
                 USER_SENDER_TYPE,
                 userId,
                 clientMessageId
             ).map(this::toMessageResponse).orElseThrow(() -> new BizException(409, "消息幂等写入冲突"));
-            imRepository.updateMemberLastReadSeq(conversationId, userId, existing.getSeqNo());
+            imMessageRepository.updateMemberLastReadSeq(conversationId, userId, existing.getSeqNo());
             return existing;
         }
         for (int i = 0; i < sourceAttachments.size(); i++) {
             imRepository.createImMessageAttachmentRef(messageId, sourceAttachments.get(i), userId, i);
         }
-        imRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, userId);
-        imRepository.updateMemberLastReadSeq(conversationId, userId, seqNo);
+        imMessageRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, userId);
+        imMessageRepository.updateMemberLastReadSeq(conversationId, userId, seqNo);
 
         ImMessageResponse response = toMessageResponse(new ImMessageRow(
             messageId,
@@ -396,7 +252,7 @@ public class ImService {
         ));
         pushConversationEventAfterCommit(
             conversationId,
-            ImWebSocketEvent.of("IM_MESSAGE_CREATED", conversationId, messageId, seqNo, userId, response)
+            ImWebSocketEvent.of(ImWebSocketEventTypes.MESSAGE_CREATED, conversationId, messageId, seqNo, userId, response)
         );
         imAgentConversationService.triggerAgentReplyAfterCommitIfNeeded(response);
         return response;
@@ -408,7 +264,7 @@ public class ImService {
                                                         EditImMessageRequest request) {
         Long userId = requireActiveEmployeeUserId();
         ensureCanAccessConversation(conversationId, userId);
-        ImMessageRow message = imRepository.findMessageById(messageId)
+        ImMessageRow message = imMessageRepository.findMessageById(messageId)
             .orElseThrow(() -> new BizException(404, "消息不存在"));
         ensureEditableMessage(message, conversationId, userId);
 
@@ -417,16 +273,16 @@ public class ImService {
             throw new BizException(400, "消息内容不能为空");
         }
         String contentJson = buildContentJson(text, imRepository.listMessageAttachments(messageId));
-        int updated = imRepository.updateMessageContent(messageId, contentJson, LocalDateTime.now());
+        int updated = imMessageRepository.updateMessageContent(messageId, contentJson, LocalDateTime.now());
         if (updated == 0) {
             throw new BizException(409, "当前消息状态不允许编辑");
         }
-        ImMessageResponse response = imRepository.findMessageById(messageId)
+        ImMessageResponse response = imMessageRepository.findMessageById(messageId)
             .map(this::toMessageResponse)
             .orElseThrow(() -> new BizException(404, "消息不存在"));
         pushConversationEventAfterCommit(
             conversationId,
-            ImWebSocketEvent.of("IM_MESSAGE_EDITED", conversationId, messageId, response.getSeqNo(), userId, response)
+            ImWebSocketEvent.of(ImWebSocketEventTypes.MESSAGE_EDITED, conversationId, messageId, response.getSeqNo(), userId, response)
         );
         return response;
     }
@@ -435,21 +291,21 @@ public class ImService {
     public ImMessageResponse recallCurrentEmployeeMessage(Long conversationId, Long messageId) {
         Long userId = requireActiveEmployeeUserId();
         ensureCanAccessConversation(conversationId, userId);
-        ImMessageRow message = imRepository.findMessageById(messageId)
+        ImMessageRow message = imMessageRepository.findMessageById(messageId)
             .orElseThrow(() -> new BizException(404, "消息不存在"));
         ensureRecallableMessage(message, conversationId, userId);
 
         String contentJson = buildRecallContentJson();
-        int updated = imRepository.recallMessage(messageId, contentJson, LocalDateTime.now());
+        int updated = imMessageRepository.recallMessage(messageId, contentJson, LocalDateTime.now());
         if (updated == 0) {
             throw new BizException(409, "当前消息状态不允许撤回");
         }
-        ImMessageResponse response = imRepository.findMessageById(messageId)
+        ImMessageResponse response = imMessageRepository.findMessageById(messageId)
             .map(this::toMessageResponse)
             .orElseThrow(() -> new BizException(404, "消息不存在"));
         pushConversationEventAfterCommit(
             conversationId,
-            ImWebSocketEvent.of("IM_MESSAGE_RECALLED", conversationId, messageId, response.getSeqNo(), userId, response)
+            ImWebSocketEvent.of(ImWebSocketEventTypes.MESSAGE_RECALLED, conversationId, messageId, response.getSeqNo(), userId, response)
         );
         return response;
     }
@@ -461,7 +317,7 @@ public class ImService {
                                                                                        CreateDownloadTicketRequest request) {
         Long userId = requireActiveEmployeeUserId();
         ensureCanAccessConversation(conversationId, userId);
-        ImMessageRow message = imRepository.findMessageById(messageId)
+        ImMessageRow message = imMessageRepository.findMessageById(messageId)
             .orElseThrow(() -> new BizException(404, "消息不存在"));
         if (!conversationId.equals(message.conversationId())) {
             throw new BizException(404, "消息不存在");
@@ -533,7 +389,7 @@ public class ImService {
         if (!"IM_MESSAGE".equals(attachment.ownerType()) || attachment.ownerId() == null) {
             throw new BizException(404, "消息附件不存在");
         }
-        ImMessageRow message = imRepository.findMessageById(attachment.ownerId())
+        ImMessageRow message = imMessageRepository.findMessageById(attachment.ownerId())
             .orElseThrow(() -> new BizException(404, "消息不存在"));
         ensureCanAccessConversation(message.conversationId(), userId);
         ensureMessageAllowsAttachmentDownload(message);
@@ -570,17 +426,17 @@ public class ImService {
                                                                            UpdateReadPositionRequest request) {
         Long userId = requireActiveEmployeeUserId();
         ensureCanAccessConversation(conversationId, userId);
-        Long lastMessageSeq = imRepository.findActiveConversationLastMessageSeq(conversationId)
+        Long lastMessageSeq = imMessageRepository.findActiveConversationLastMessageSeq(conversationId)
             .orElseThrow(() -> new BizException(404, "会话不存在"));
         Long safeReadSeq = Math.min(request.getLastReadSeq(), lastMessageSeq);
-        imRepository.updateMemberLastReadSeq(conversationId, userId, safeReadSeq);
+        imMessageRepository.updateMemberLastReadSeq(conversationId, userId, safeReadSeq);
         ImConversationSummaryResponse response = imRepository.findConversationSummaryForUser(conversationId, userId)
             .map(this::toConversationSummaryResponse)
             .orElseThrow(() -> new BizException(500, "已读位点更新失败"));
         pushConversationEventAfterCommit(
             conversationId,
             ImWebSocketEvent.of(
-                "IM_READ_POSITION_UPDATED",
+                ImWebSocketEventTypes.READ_POSITION_UPDATED,
                 conversationId,
                 null,
                 safeReadSeq,
@@ -608,10 +464,10 @@ public class ImService {
         ImConversationSummaryResponse response = imRepository.findConversationSummaryForUser(conversationId, userId)
             .map(this::toConversationSummaryResponse)
             .orElseThrow(() -> new BizException(500, "会话偏好更新失败"));
-        pushConversationEventAfterCommit(
-            conversationId,
+        pushConversationEventToUsersAfterCommit(
+            List.of(userId),
             ImWebSocketEvent.of(
-                "IM_CONVERSATION_PREFERENCE_UPDATED",
+                ImWebSocketEventTypes.CONVERSATION_PREFERENCE_UPDATED,
                 conversationId,
                 null,
                 null,
@@ -643,30 +499,6 @@ public class ImService {
         response.setMute(row.mute());
         response.setMemberRole(row.memberRole());
         response.setLastMessage(row.lastMessage() == null ? null : toMessageResponse(row.lastMessage()));
-        return response;
-    }
-
-    private ImConversationMemberResponse toConversationMemberResponse(ImConversationMemberRow row) {
-        ImConversationMemberResponse response = new ImConversationMemberResponse();
-        response.setMemberId(row.memberId());
-        response.setMemberType(row.memberType());
-        response.setDisplayName(row.displayName());
-        response.setMemberRole(row.memberRole());
-        response.setStatus(row.status());
-        response.setJoinedAt(row.joinedAt());
-        return response;
-    }
-
-    private ImGroupProfileResponse toGroupProfileResponse(ImGroupProfileRow row, String currentMemberRole) {
-        ImGroupProfileResponse response = new ImGroupProfileResponse();
-        response.setConversationId(row.conversationId());
-        response.setTitle(row.title());
-        response.setAvatarFileId(row.avatarFileId());
-        response.setGroupType(row.groupType());
-        response.setOwnerUserId(row.ownerUserId());
-        response.setNoticeText(row.noticeText());
-        response.setStatus(row.status());
-        response.setCurrentMemberRole(currentMemberRole);
         return response;
     }
 
@@ -710,61 +542,6 @@ public class ImService {
         return clientMessageId.trim();
     }
 
-    private Set<Long> normalizeGroupMemberIds(Long ownerUserId, List<Long> memberUserIds) {
-        Set<Long> normalized = new LinkedHashSet<>();
-        for (Long memberUserId : memberUserIds) {
-            if (memberUserId == null || ownerUserId.equals(memberUserId)) {
-                continue;
-            }
-            normalized.add(memberUserId);
-        }
-        return normalized;
-    }
-
-    private Set<Long> normalizeUserIds(List<Long> userIds) {
-        Set<Long> normalized = new LinkedHashSet<>();
-        for (Long userId : userIds) {
-            if (userId == null) {
-                continue;
-            }
-            normalized.add(userId);
-        }
-        return normalized;
-    }
-
-    private void ensureCanManageCustomGroup(Long conversationId, Long userId) {
-        if (!imRepository.existsActiveCustomGroupConversation(conversationId)) {
-            if (imRepository.existsConversation(conversationId)) {
-                throw new BizException(400, "仅自定义群聊支持成员治理");
-            }
-            throw new BizException(404, "群聊不存在");
-        }
-        String memberRole = imRepository.findActiveUserMemberRole(conversationId, userId).orElse(null);
-        if (!"OWNER".equals(memberRole)) {
-            throw new BizException(403, "只有群主可以管理群成员");
-        }
-    }
-
-    private List<ImConversationMemberResponse> listActiveConversationMemberResponses(Long conversationId) {
-        return listActiveConversationMemberResponses(conversationId, false);
-    }
-
-    private List<ImConversationMemberResponse> listActiveConversationMemberResponses(Long conversationId,
-                                                                                    boolean includeAgentMembers) {
-        List<ImConversationMemberRow> rows = includeAgentMembers
-            ? imRepository.listActiveMembers(conversationId)
-            : imRepository.listActiveUserMembers(conversationId);
-        return rows.stream()
-            .map(this::toConversationMemberResponse)
-            .toList();
-    }
-
-    private ImGroupProfileResponse getGroupProfileForUser(Long conversationId, Long userId) {
-        return imRepository.findActiveGroupProfile(conversationId)
-            .map(row -> toGroupProfileResponse(row, imRepository.findActiveUserMemberRole(conversationId, userId).orElse(null)))
-            .orElseThrow(() -> new BizException(404, "群聊不存在"));
-    }
-
     private void pushConversationEventAfterCommit(Long conversationId, ImWebSocketEvent event) {
         pushConversationEventToUsersAfterCommit(activeUserMemberIds(conversationId), event);
     }
@@ -775,18 +552,6 @@ public class ImService {
 
     private List<Long> activeUserMemberIds(Long conversationId) {
         return imRepository.listPushableActiveUserMemberIds(conversationId);
-    }
-
-    private void ensureCanAccessActiveGroup(Long conversationId, Long userId) {
-        if (!imRepository.existsActiveGroupConversation(conversationId)) {
-            if (imRepository.existsConversation(conversationId)) {
-                throw new BizException(400, "仅群聊支持成员列表");
-            }
-            throw new BizException(404, "群聊不存在");
-        }
-        if (!imRepository.existsActiveUserMembership(conversationId, userId)) {
-            throw new BizException(403, "无权访问该群聊");
-        }
     }
 
     private boolean hasDirectManagerRelation(ImUserRelationRow currentUser, ImUserRelationRow targetUser) {

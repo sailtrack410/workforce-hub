@@ -1,0 +1,34 @@
+package com.workforcehub.im.dto;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDateTime;
+
+/**
+ * 后台 IM outbox 事件分页查询参数。
+ */
+@Data
+public class AdminImOutboxEventQuery {
+
+    @Min(value = 1, message = "pageNo 最小为 1")
+    private long pageNo = 1;
+
+    @Min(value = 1, message = "pageSize 最小为 1")
+    @Max(value = 100, message = "pageSize 最大为 100")
+    private long pageSize = 20;
+
+    private String status;
+    private String eventType;
+    private Long conversationId;
+    private Long messageId;
+    private Long actorUserId;
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime createdFrom;
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime createdTo;
+}

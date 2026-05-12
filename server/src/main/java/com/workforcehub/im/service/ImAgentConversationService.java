@@ -11,9 +11,11 @@ import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.StartAgentConversationRequest;
 import com.workforcehub.im.repository.ImAttachmentRow;
 import com.workforcehub.im.repository.ImConversationSummaryRow;
+import com.workforcehub.im.repository.ImMessageRepository;
 import com.workforcehub.im.repository.ImMessageRow;
 import com.workforcehub.im.repository.ImRepository;
 import com.workforcehub.im.websocket.ImWebSocketEvent;
+import com.workforcehub.im.websocket.ImWebSocketEventTypes;
 import com.workforcehub.im.websocket.ImWebSocketPushService;
 import com.workforcehub.spi.ImAgentDescriptor;
 import com.workforcehub.spi.ImAgentReplyResult;
@@ -51,17 +53,20 @@ public class ImAgentConversationService implements ImAgentResultCallback {
     private static final long SYSTEM_SENDER_ID = 0L;
 
     private final ImRepository imRepository;
+    private final ImMessageRepository imMessageRepository;
     private final ObjectMapper objectMapper;
     private final ImWebSocketPushService webSocketPushService;
     private final ObjectProvider<ImAgentTriggerService> imAgentTriggerServiceProvider;
     private final TransactionTemplate transactionTemplate;
 
     public ImAgentConversationService(ImRepository imRepository,
+                                      ImMessageRepository imMessageRepository,
                                       ObjectMapper objectMapper,
                                       ImWebSocketPushService webSocketPushService,
                                       ObjectProvider<ImAgentTriggerService> imAgentTriggerServiceProvider,
                                       PlatformTransactionManager transactionManager) {
         this.imRepository = imRepository;
+        this.imMessageRepository = imMessageRepository;
         this.objectMapper = objectMapper;
         this.webSocketPushService = webSocketPushService;
         this.imAgentTriggerServiceProvider = imAgentTriggerServiceProvider;
@@ -102,14 +107,14 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         if (!"SUCCEEDED".equals(result.status())) {
             throw new BizException(400, "Agent回复状态不支持");
         }
-        Long lastSeq = imRepository.lockActiveConversationAndGetLastSeq(conversationId);
+        Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(conversationId);
         if (lastSeq == null) {
             throw new BizException(404, "会话不存在");
         }
         String normalizedMessageType = normalizeAgentMessageType(result.messageType());
         String normalizedContentJson = normalizeAgentContentJson(result.contentJson(), agentTaskId);
         String clientMessageId = agentMessageClientId(result);
-        if (clientMessageId != null && imRepository.findMessageByClientMessageId(
+        if (clientMessageId != null && imMessageRepository.findMessageByClientMessageId(
             conversationId,
             AGENT_SENDER_TYPE,
             agentId,
@@ -121,7 +126,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         Long messageId = IdWorker.getId();
         LocalDateTime sentAt = LocalDateTime.now();
         try {
-            imRepository.insertMessage(
+            imMessageRepository.insertMessage(
                 messageId,
                 conversationId,
                 seqNo,
@@ -138,7 +143,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
             }
             throw e;
         }
-        imRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, agentId);
+        imMessageRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, agentId);
         ImMessageResponse response = toMessageResponse(new ImMessageRow(
             messageId,
             conversationId,
@@ -153,7 +158,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         ));
         pushConversationEventAfterCommit(
             conversationId,
-            ImWebSocketEvent.of("IM_AGENT_MESSAGE_CREATED", conversationId, messageId, seqNo, agentId, response)
+            ImWebSocketEvent.of(ImWebSocketEventTypes.AGENT_MESSAGE_CREATED, conversationId, messageId, seqNo, agentId, response)
         );
     }
 
@@ -378,12 +383,12 @@ public class ImAgentConversationService implements ImAgentResultCallback {
     private void writeAgentFailureSystemMessage(Long conversationId, Long agentId, String clientMessageId) {
         try {
             transactionTemplate.executeWithoutResult(status -> {
-                Long lastSeq = imRepository.lockActiveConversationAndGetLastSeq(conversationId);
+                Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(conversationId);
                 if (lastSeq == null) {
                     throw new BizException(404, "会话不存在");
                 }
                 if (StringUtils.hasText(clientMessageId)
-                    && imRepository.findMessageByClientMessageId(
+                    && imMessageRepository.findMessageByClientMessageId(
                         conversationId,
                         SYSTEM_SENDER_TYPE,
                         SYSTEM_SENDER_ID,
@@ -396,7 +401,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 LocalDateTime sentAt = LocalDateTime.now();
                 String contentJson = buildSystemContentJson("Agent 暂时无法回复，请稍后再试");
                 try {
-                    imRepository.insertMessage(
+                    imMessageRepository.insertMessage(
                         messageId,
                         conversationId,
                         seqNo,
@@ -413,7 +418,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                     }
                     throw e;
                 }
-                imRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, agentId);
+                imMessageRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, agentId);
                 ImMessageResponse response = toMessageResponse(new ImMessageRow(
                     messageId,
                     conversationId,
@@ -428,7 +433,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 ));
                 webSocketPushService.pushToUsersAfterCommit(
                     activeUserMemberIds(conversationId),
-                    ImWebSocketEvent.of("IM_AGENT_REPLY_FAILED", conversationId, messageId, seqNo, agentId, response)
+                    ImWebSocketEvent.of(ImWebSocketEventTypes.AGENT_REPLY_FAILED, conversationId, messageId, seqNo, agentId, response)
                 );
             });
         } catch (Exception e) {
