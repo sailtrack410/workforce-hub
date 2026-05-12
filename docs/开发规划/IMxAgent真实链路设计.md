@@ -2,16 +2,16 @@
 
 ## 一、设计目标
 
-当前 IM x Agent 已经能支撑演示：员工在 Agent 会话里发文本消息，`module-im` 触发 `module-agent` 创建任务，Agent 同步生成 mock 回复，再回写 IM 消息并推送 WebSocket。
+当前 IM x Agent 已经从早期 mock 演示链路升级为真实模型异步链路：员工在 Agent 会话里发文本消息，`module-im` 触发 `module-agent` 创建任务，Agent 通过 OpenAI 兼容模型客户端执行，随后回写 IM 消息或失败提示，并通过 outbox 派发 WebSocket 事件。
 
-下一阶段目标是把这条演示链路升级为真实链路：
+当前已落地能力：
 
-- Agent 回复由 mock 规则回复切换为真实大模型调用。
-- Agent 任务从同步执行改为异步状态机。
-- IM 与 Agent 的跨模块字段显式化，避免散参数和隐式约定。
-- WebSocket 推送从事务内直接推送改为 outbox 可靠投递。
+- Agent 回复已由 mock 规则回复切换为 OpenAI 兼容模型调用。
+- Agent 任务已从同步执行改为异步状态机。
+- IM 与 Agent 的跨模块字段已通过命令/结果对象显式化。
+- WebSocket 推送已从事务内直接推送改为 outbox 可靠投递。
 
-本设计只覆盖基础对话链路，不覆盖工具调用、RAG、知识库引用和多轮上下文压缩。
+本文保留为已落地设计说明和后续边界记录。当前只覆盖基础对话链路，不覆盖工具调用、RAG、知识库引用和多轮上下文压缩。
 
 ---
 
@@ -171,13 +171,13 @@ SPI 只表达跨模块语义，不暴露内部 Repository、Row、Entity 或 Ser
 
 ---
 
-## 七、落地顺序
+## 七、落地状态
 
-1. SPI 命令对象化：先改 `ImAgentTriggerService` / `ImAgentResultCallback`，保持现有 mock 行为不变。
-2. 服务拆分：拆出 `ImAgentConversationService` 和 `AgentTaskExecutionService`，不新增行为。
-3. 真实模型调用：接 OpenAI 兼容 HTTP 客户端，把 mock 回复替换为模型结果。
-4. outbox：新增 Flyway 表、写入 outbox、dispatcher 推送、失败重试。
-5. 审查与文档：每个节点单独审查，P0/P1 当下修，P2 写入计划。
+1. 已完成：SPI 命令对象化，`ImAgentTriggerService` / `ImAgentResultCallback` 使用命令/结果对象表达跨模块语义。
+2. 已完成：服务拆分，已拆出 `ImAgentConversationService` 和 `AgentTaskExecutionService`。
+3. 已完成：真实模型调用，已接入 OpenAI 兼容 HTTP 客户端，模型不可用时任务进入失败并回写 IM 失败提示。
+4. 已完成：outbox，已新增 Flyway 表、写入 outbox、dispatcher 推送和失败重试。
+5. 持续执行：审查与文档，每个节点单独审查，P0/P1 当下修，P2 写入计划。
 
 ---
 
@@ -191,4 +191,4 @@ cd server && env TEST_DB_NAME=<unique_name> mvn -Dtest=ModuleAuthApiIntegrationT
 cd server && env TEST_DB_NAME=<unique_name> mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test
 ```
 
-真实模型节点额外增加模型客户端单元测试或 WireMock 风格 HTTP stub 测试，不依赖真实外部 API key。
+真实模型节点使用本地 OpenAI 兼容 HTTP stub 或等价测试桩验证，不依赖真实外部 API key。

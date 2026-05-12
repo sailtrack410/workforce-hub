@@ -6,9 +6,9 @@
 | --- | --- |
 | 文档名称 | `module-im` 会话接口 API 测试用例 |
 | 对应 API 文档 | `API文档_module-im会话接口.md` |
-| 对应测试类 | `ModuleImApiIntegrationTest`、`ModuleImGroupIntegrationTest` |
+| 对应测试类 | `ModuleImApiIntegrationTest`、`ModuleImGroupIntegrationTest`、`ModuleImOutboxIntegrationTest` |
 | 发布日期 | `2026-05-12` |
-| 当前状态 | 后端集成测试已覆盖员工端 IM、群治理、IM x Agent、WebSocket outbox 可靠投递 |
+| 当前状态 | 后端集成测试已覆盖员工端 IM、群治理、IM x Agent、WebSocket outbox 可靠投递、后台 outbox 治理、状态总览和失败聚合、会话置顶排序和偏好私有事件 |
 
 ---
 
@@ -17,7 +17,7 @@
 IM/Agent 相关提交至少执行：
 
 ```bash
-cd server && env TEST_DB_NAME=<unique_name> mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test
+cd server && env TEST_DB_NAME=<unique_name> mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleImOutboxIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test
 ```
 
 基础回归按项目总计划执行：
@@ -42,6 +42,8 @@ cd server && env TEST_DB_NAME=<unique_name> mvn -Dtest=ModuleAuthApiIntegrationT
 | IM-CONV-006 | P0 | `GET /api/employee/im/conversations/{conversationId}` | 成员查询会话详情 | `code=0`；返回会话、成员，群聊额外返回群资料 |
 | IM-CONV-007 | P0 | `GET /api/employee/im/conversations/{conversationId}` | 非成员访问已有会话 | `code=403`；`message=无权访问该会话` |
 | IM-CONV-008 | P1 | `GET /api/employee/im/conversations/{conversationId}` | 会话不存在 | `code=404`；`message=会话不存在` |
+| IM-CONV-009 | P0 | `GET /api/employee/im/conversations` | 当前员工置顶较旧会话 | 置顶会话排在较新的未置顶会话前；游标翻页继续返回未置顶会话 |
+| IM-CONV-010 | P1 | `GET /api/employee/im/conversations/{conversationId}` | 历史成员关联用户被软删除 | `displayName` 降级为 `USER:{memberId}`，不返回空展示名 |
 
 ---
 
@@ -145,9 +147,24 @@ cd server && env TEST_DB_NAME=<unique_name> mvn -Dtest=ModuleAuthApiIntegrationT
 | IM-WS-005 | P0 | 员工状态过滤 | 员工状态不可用 | 不继续收到 IM WebSocket 推送 |
 | IM-WS-006 | P0 | 编辑推送 | 文本消息编辑成功 | 在线成员收到 `IM_MESSAGE_EDITED` |
 | IM-WS-007 | P0 | 撤回推送 | 消息撤回成功 | 在线成员收到 `IM_MESSAGE_RECALLED` |
-| IM-WS-008 | P0 | 偏好推送 | 置顶或免打扰变更 | 当前会话成员收到 `IM_CONVERSATION_PREFERENCE_UPDATED` |
-| IM-WS-009 | P0 | outbox 失败重试 | 首次 WebSocket 发送抛出异常 | outbox 记录 `FAILED`；重试后变为 `SENT`，消息最终推送 |
+| IM-WS-008 | P0 | 偏好推送 | 置顶或免打扰变更 | 仅操作者本人收到 `IM_CONVERSATION_PREFERENCE_UPDATED`，其他成员不收到私有偏好事件 |
+| IM-WS-009 | P0 | outbox 失败重试 | 首次 WebSocket 发送抛出异常 | 初次事件立即可投递；outbox 记录 `FAILED`；重试后变为 `SENT`，消息最终推送 |
 | IM-WS-010 | P1 | outbox 迁移 | 空库或已有 V13 库启动 | `V14__add_im_event_outbox.sql` 顺序执行成功 |
+| IM-WS-011 | P0 | `GET /api/admin/im/outbox-events` | 管理员按 `status/eventType/conversationId` 查询失败 outbox 事件 | `code=0`；分页返回 `eventId`、`payloadJson`、`lastError`、`retryCount` |
+| IM-WS-012 | P0 | `GET /api/admin/im/outbox-events/{eventId}` | 管理员查看 outbox 事件详情 | `code=0`；返回单条事件完整字段 |
+| IM-WS-013 | P0 | `POST /api/admin/im/outbox-events/{eventId}/retry` + `POST /api/admin/im/outbox-events/dispatch` | 管理员重试失败事件并主动派发 | 事件从 `FAILED` 重新可投递，派发成功后进入 `SENT`，在线成员收到事件；写入 `IM_OUTBOX_RETRY_REQUESTED` 和 `IM_OUTBOX_DISPATCH_TRIGGERED` 审计，派发审计包含 eventId 明细 |
+| IM-WS-014 | P1 | `POST /api/admin/im/outbox-events/{eventId}/retry` | 对 `SENT` 或 `PENDING` 事件手动重试 | `code=409`；`message=当前outbox事件状态不允许手动重试` |
+| IM-WS-015 | P1 | `GET /api/admin/im/outbox-events` | 员工会话访问后台 outbox 接口 | HTTP `403`；`code=403` |
+| IM-WS-016 | P1 | `GET /api/admin/im/outbox-events?status=UNKNOWN` | 不支持的 outbox 状态 | `code=400`；`message=outbox事件状态不支持` |
+| IM-WS-017 | P1 | `POST /api/admin/im/outbox-events/dispatch` | 请求体为空 | `code=0`；默认 `requestedBatchSize=50` |
+| IM-WS-018 | P0 | `GET /api/admin/im/outbox-events/audits?eventId={eventId}` | 管理员按事件查询 outbox 操作审计 | `code=0`；返回 `IM_OUTBOX_RETRY_REQUESTED` 和 `IM_OUTBOX_DISPATCH_TRIGGERED`；派发审计可通过 eventId 明细被查出 |
+| IM-WS-019 | P1 | `GET /api/admin/im/outbox-events/audits?actionType=UNKNOWN` | 不支持的 outbox 审计动作 | `code=400`；`message=outbox审计动作不支持` |
+| IM-WS-020 | P0 | `POST /api/admin/im/outbox-events/batch-retry` | 管理员批量重试失败 outbox，并混入 `SENT` 和不存在事件 | `code=0`；返回逐条 `items`；可重试事件成功重置，不可重试和不存在事件进入 skipped；写入 `IM_OUTBOX_BATCH_RETRY_REQUESTED` 审计 |
+| IM-WS-021 | P1 | `POST /api/admin/im/outbox-events/batch-retry` | `eventIds` 为空或超过 100 个 | `code=400`；返回参数校验错误 |
+| IM-WS-022 | P0 | `GET /api/admin/im/outbox-events/summary` | 管理员查看 outbox 状态总览 | `code=0`；返回 `totalCount`、`dueDispatchCount`、`staleSendingCount`、最早时间和固定顺序状态计数 |
+| IM-WS-023 | P1 | `GET /api/admin/im/outbox-events/summary` | 员工会话访问 outbox 状态总览 | HTTP `403`；`code=403` |
+| IM-WS-024 | P0 | `GET /api/admin/im/outbox-events/failure-summary` | 管理员查看 outbox 失败原因聚合 | `code=0`；只返回 `FAILED/DEAD`，按状态和失败原因聚合事件数、最大重试次数和发生时间 |
+| IM-WS-025 | P1 | `GET /api/admin/im/outbox-events/failure-summary` | 员工会话访问 outbox 失败原因聚合 | HTTP `403`；`code=403` |
 
 ---
 
@@ -190,13 +207,117 @@ cd server && env TEST_DB_NAME=<unique_name> mvn -Dtest=ModuleAuthApiIntegrationT
 
 ## 十二、最近一次已记录验证
 
-第 5 步 outbox 收口后已记录的验证结果：
+第 90 审 IM outbox 专项测试拆分后已记录的验证结果：
 
-- 编译：`cd server && mvn -DskipTests compile test-compile`
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
   - 结果：通过。
-- IM 专项：`cd server && env TEST_DB_NAME=workforce_hub_im_outbox_retry mvn -Dtest=ModuleImApiIntegrationTest test`
-  - 结果：通过，45 个用例全部通过。
-- IM/Agent 组合专项：`cd server && env TEST_DB_NAME=workforce_hub_outbox_im_agent mvn -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
-  - 结果：通过，92 个用例全部通过。
-- 基础回归：`cd server && env TEST_DB_NAME=workforce_hub_outbox_base mvn -Dtest=ModuleAuthApiIntegrationTest,ModuleOrgApiIntegrationTest,ModuleOrgWriteApiIntegrationTest,ModuleFileApiIntegrationTest,ModuleFileAdminApiIntegrationTest,ModuleFileCleanupIntegrationTest,ModuleWorkflowFlowableIntegrationTest,ModuleWorkflowAdminApiIntegrationTest,ModuleWorkflowAgentPreReviewIntegrationTest,ModuleLeaveApiIntegrationTest,ModuleLeaveWorkflowIntegrationTest,ModuleAttendanceApiIntegrationTest test`
-  - 结果：通过，112 个用例全部通过。
+- outbox 专项测试类：`cd server && env TEST_DB_NAME=wfh_im_outbox_split_tests_$(date +%s) mvn -q -Dtest=ModuleImOutboxIntegrationTest test`
+  - 结果：通过。
+- IM 员工端主测试类：`cd server && env TEST_DB_NAME=wfh_im_api_after_split_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest test`
+  - 结果：通过。
+
+第 89 审 IM outbox 审计动作常量收敛后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 审计动作目标用例：`cd server && env TEST_DB_NAME=wfh_im_audit_actions_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents test`
+  - 结果：通过。
+
+第 88 审 IM outbox 事件类型常量收敛后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox eventType 筛选目标用例：`cd server && env TEST_DB_NAME=wfh_im_event_types_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents test`
+  - 结果：通过。
+
+第 87 审 IM outbox 后台仓储细分收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 后台仓储细分目标用例：`cd server && env TEST_DB_NAME=wfh_im_outbox_repo_split2_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents+adminBatchRetryOutboxEventsShouldValidateEventIds+adminShouldSummarizeImOutboxEvents+adminShouldGetImOutboxFailureSummary test`
+  - 结果：通过。
+
+第 86 审 IM outbox 后台服务拆分收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 后台服务拆分目标用例：`cd server && env TEST_DB_NAME=wfh_im_outbox_split_admin_verify_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents+adminBatchRetryOutboxEventsShouldValidateEventIds+adminShouldSummarizeImOutboxEvents+adminShouldGetImOutboxFailureSummary test`
+  - 结果：通过。
+
+第 85 审 IM outbox 失败原因聚合接口收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 失败原因聚合目标用例：`cd server && env TEST_DB_NAME=wfh_im_outbox_failure_summary_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldGetImOutboxFailureSummary test`
+  - 结果：通过。
+
+第 84 审 IM outbox 状态总览接口收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 状态总览目标用例：`cd server && env TEST_DB_NAME=wfh_im_outbox_summary_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldSummarizeImOutboxEvents test`
+  - 结果：通过。
+
+第 83 审 IM outbox 批量重试接口收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 批量重试目标用例：`cd server && env TEST_DB_NAME=wfh_im_outbox_batch_retry_validation_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents+adminBatchRetryOutboxEventsShouldValidateEventIds test`
+  - 结果：通过。
+- dispatcher 失败重试兼容性：`cd server && env TEST_DB_NAME=wfh_im_outbox_batch_retry_dispatcher_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#websocketOutboxShouldRetryFailedDelivery test`
+  - 结果：通过。
+- IM/Agent 组合回归：`cd server && env TEST_DB_NAME=wfh_im_outbox_batch_retry_combo_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过。
+
+第 82 审 IM outbox 操作审计查询接口收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 操作审计查询目标用例：`cd server && env TEST_DB_NAME=wfh_im_outbox_audit_api_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents test`
+  - 结果：通过。
+
+第 81 审 IM outbox 派发审计明细收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 后台派发审计明细与失败重试组合：`cd server && env TEST_DB_NAME=wfh_im_outbox_dispatch_detail_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents,ModuleImApiIntegrationTest#websocketOutboxShouldRetryFailedDelivery test`
+  - 结果：通过。
+
+第 80 审 IM outbox 后台操作审计收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 后台治理、操作审计与失败重试组合：`cd server && env TEST_DB_NAME=wfh_im_outbox_admin_audit_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents,ModuleImApiIntegrationTest#websocketOutboxShouldRetryFailedDelivery test`
+  - 结果：通过。
+
+第 79 审 IM outbox 后台读模型仓储拆分后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 后台治理与失败重试组合：`cd server && env TEST_DB_NAME=wfh_im_outbox_repo_split_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents,ModuleImApiIntegrationTest#websocketOutboxShouldRetryFailedDelivery test`
+  - 结果：通过。
+
+第 78 审 IM outbox 后台治理接口收口后已记录的验证结果：
+
+- 编译与测试编译：`cd server && mvn -q -DskipTests compile test-compile`
+  - 结果：通过。
+- outbox 后台治理目标用例：`cd server && env TEST_DB_NAME=wfh_im_outbox_admin_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents test`
+  - 结果：通过。
+- outbox 后台治理与失败重试组合：`cd server && env TEST_DB_NAME=wfh_im_outbox_admin2_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#adminShouldManageImOutboxEvents,ModuleImApiIntegrationTest#websocketOutboxShouldRetryFailedDelivery test`
+  - 结果：通过。
+- IM 员工端全类：`cd server && env TEST_DB_NAME=wfh_im_outbox_full_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest test`
+  - 结果：通过，48 个用例全部通过。
+- IM/Agent 组合回归：`cd server && env TEST_DB_NAME=wfh_im_outbox_combo_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过，95 个用例全部通过。
+
+第 77 审 IM 偏好与 outbox 即时投递收口后已记录的验证结果：
+
+- IM outbox 重试目标用例：`cd server && env TEST_DB_NAME=wfh_im_retry_fix_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest#websocketOutboxShouldRetryFailedDelivery test`
+  - 结果：通过。
+- IM 专项：`cd server && env TEST_DB_NAME=wfh_im_full_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest test`
+  - 结果：通过，47 个用例全部通过。
+- IM 群治理专项：`cd server && env TEST_DB_NAME=wfh_im_group_$(date +%s) mvn -q -Dtest=ModuleImGroupIntegrationTest test`
+  - 结果：通过。
+- IM/Agent 组合回归：`cd server && env TEST_DB_NAME=wfh_im_agent_combo_$(date +%s) mvn -q -Dtest=ModuleImApiIntegrationTest,ModuleImGroupIntegrationTest,ModuleAgentApiIntegrationTest,ModuleAgentTaskTimeoutIntegrationTest,ModuleAgentTaskTimeoutRepositoryBoundaryTest test`
+  - 结果：通过。
+- 基础回归仍按本文第二部分命令执行；本次小收口未重跑全部基础模块。

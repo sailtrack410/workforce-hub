@@ -55,6 +55,19 @@
 | 员工账号 B | `lisi.manager` | `Employee@123456` | 直属领导 |
 | 员工账号 C | `wangwu.employee` | `Employee@123456` | 试用期员工 |
 
+### 4.2.1 employee-web 当前联调演示账号
+
+| 类型 | 登录名 | 密码 | 说明 |
+| --- | --- | --- | --- |
+| 领导 | `demo.leader` | `Employee@123456` | `userId=22001` |
+| 员工一 | `demo.employee1` | `Employee@123456` | `userId=22002` |
+| 员工二 | `demo.employee2` | `Employee@123456` | `userId=22003` |
+
+说明：
+
+- `demo.employee1`、`demo.employee2` 的直属上级都是 `demo.leader`
+- 这组账号更适合 employee-web 消息与审批联调
+
 ### 4.3 关键邮箱数据
 
 | 登录名 | 默认邮箱 | 说明 |
@@ -190,6 +203,12 @@ mvn -Dtest=ModuleAuthMailSmtpSmokeTest test
 4. 再跑员工端 `AUTH-EMP-001` 到 `AUTH-EMP-006`
 5. 跑邮箱与密码链路 `AUTH-MAIL-*`、`AUTH-RESET-*`
 6. 最后跑鉴权与契约用例 `AUTH-GUARD-*`、`AUTH-CONTRACT-001`
+
+本地调试 SMTP 推荐直接使用：
+
+```bash
+python3 server/scripts/dev/start_debug_smtp.py
+```
 
 ## 九、回归通过标准
 

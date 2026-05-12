@@ -44,6 +44,23 @@
 http://localhost:8080
 ```
 
+本地找回密码链路默认额外依赖：
+
+```text
+SMTP: 127.0.0.1:1025
+```
+
+如果本地没有启动调试 SMTP，`POST /api/employee/auth/email/send-code` 会返回业务失败：
+
+- `code=500`
+- `message=邮件发送失败，请稍后重试`
+
+推荐本地调试命令：
+
+```bash
+python3 server/scripts/dev/start_debug_smtp.py
+```
+
 ## 3.2 鉴权方式
 
 当前项目采用服务端 Session 鉴权，不使用 Bearer Token。
@@ -57,8 +74,18 @@ http://localhost:8080
 - 后台端认证接口：仅后台管理员会话可访问 `me`、`logout`
 - 员工端认证接口：仅员工会话可访问 `me`、`email/bind`
 - `email/send-code` 与 `password/reset` 当前允许匿名调用
+- 员工端没有前台自注册接口
 - 员工会话访问后台端路径会被拒绝
 - 后台会话访问员工端路径会被拒绝
+
+### 员工账号开通说明
+
+当前产品口径是“员工账号由企业管理员后台创建并开通”，不是 C 端自助注册。
+
+前端如需展示“开通账号”入口，应明确提示：
+
+- 员工账号不支持前台自注册
+- 需联系企业管理员通过后台创建账号
 
 ## 3.3 请求头约定
 
@@ -197,6 +224,11 @@ http://localhost:8080
 | `email` | `string` | 是 | 已绑定邮箱 |
 | `code` | `string` | 是 | 密码重置验证码 |
 | `newPassword` | `string` | 是 | 新密码，长度 `8-64` |
+
+注意：
+
+- 当前请求体不需要 `loginName`
+- employee-web 当前已按 `email + code + newPassword` 接入
 
 ## 4.7 关键枚举说明
 

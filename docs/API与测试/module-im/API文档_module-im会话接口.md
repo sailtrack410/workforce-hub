@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 | --- | --- |
 | 文档名称 | `module-im` 会话接口 API 文档 |
-| 文档版本 | `v1.0` |
-| 适用范围 | 员工端会话列表、私聊、群聊、Agent 会话、消息发送、消息分页、编辑撤回、已读、偏好、附件下载、WebSocket 推送 |
+| 文档版本 | `v1.1` |
+| 适用范围 | 员工端会话列表、私聊、群聊、Agent 会话、消息发送、消息分页、编辑撤回、已读、偏好、附件下载、WebSocket 推送、后台 outbox 治理 |
 | 对应模块 | `server/src/main/java/com/workforcehub/im` |
 | 发布日期 | `2026-05-12` |
-| 当前状态 | 后端会话闭环、IM x Agent 异步真实模型回写、失败提示和 WebSocket outbox 可靠投递已实现，可供 employee-web 接入 |
+| 当前状态 | 后端会话闭环、IM x Agent 异步真实模型回写、失败提示、WebSocket outbox 可靠投递和后台 outbox 查询/重试/状态总览/失败聚合已实现，可供 employee-web 与后续 admin-web 接入 |
 
 ---
 
@@ -24,6 +24,15 @@
 5. 建立 WebSocket：`ws://localhost:8080/ws/employee/im`，复用同一个员工 `SESSION` Cookie。
 6. 收到 `IM_MESSAGE_CREATED`、`IM_AGENT_MESSAGE_CREATED`、`IM_AGENT_REPLY_FAILED` 后刷新对应会话和消息流。
 7. Agent 对话：先 `GET /api/employee/agents` 取可用 Agent，再 `POST /api/employee/im/agent-conversations` 创建会话，随后向该会话发送 `TEXT` 消息。
+
+### employee-web 当前联调前置
+
+如果前端登录后消息页仍然是空的，优先检查两类前置：
+
+1. 当前员工是否已有会话和消息
+2. 后台是否已初始化可用 Agent
+
+后端本身不会自动生成演示聊天数据；本地需要至少创建一条私聊或群聊后，列表才会出现内容。
 
 ---
 
@@ -49,6 +58,18 @@ ws://localhost:8080/ws/employee/im
 - WebSocket 握手复用同一个员工会话 Cookie。
 - 未登录握手返回 HTTP `401`，后台管理员会话或不可登录员工握手返回 HTTP `403`。
 - 员工状态不可登录时，HTTP IM 接口返回 `code=403`，消息为 `当前员工状态不允许使用会话`。
+
+如果要在本地演示 IM 内 Agent 回复，但暂时没接真实模型，可以先启动兼容桩：
+
+```bash
+python3 server/scripts/dev/start_agent_stub_server.py
+```
+
+默认模型桩地址：
+
+```text
+http://127.0.0.1:18080/v1/chat/completions
+```
 
 ### 3.3 请求头
 
@@ -179,7 +200,7 @@ ws://localhost:8080/ws/employee/im
 | --- | --- | --- |
 | `memberId` | `number` | 成员 ID，用户成员为 `org_user.id`，Agent 成员为 Agent ID |
 | `memberType` | `string` | `USER`、`AGENT` |
-| `displayName` | `string` | 展示名 |
+| `displayName` | `string` | 展示名；关联用户或 Agent 已软删除时降级为 `USER:{memberId}` 或 `AGENT:{memberId}` |
 | `memberRole` | `string` | `OWNER`、`MEMBER`、`AGENT` 等 |
 | `status` | `string` | 成员状态 |
 | `joinedAt` | `string/null` | 加入时间 |
@@ -218,6 +239,8 @@ ws://localhost:8080/ws/employee/im
 - `beforeLastMessageAt` 和 `beforeConversationId` 必须同时传或同时不传。
 - `size <= 0` 返回 `code=400`、`message=分页大小必须大于0`。
 - 列表只返回当前员工活跃参与的会话。
+- 排序规则为当前员工私有置顶优先，然后按 `lastMessageAt` 倒序、`conversationId` 倒序。
+- 游标翻页会带入游标会话的置顶状态，前端继续只需要传 `beforeLastMessageAt + beforeConversationId`。
 
 响应：
 
@@ -255,6 +278,7 @@ ws://localhost:8080/ws/employee/im
 - 非成员访问已有会话返回 `code=403`、`message=无权访问该会话`。
 - 会话不存在返回 `code=404`、`message=会话不存在`。
 - 群聊返回 `groupProfile`，私聊和 Agent 会话该字段为 `null`。
+- 成员展示名由后端直接返回；如果历史成员关联用户或 Agent 被软删除，`displayName` 会降级为 `USER:{memberId}` 或 `AGENT:{memberId}`，前端不需要再兜底展示空字符串。
 
 ### 5.3 发起私聊
 
@@ -466,7 +490,8 @@ ws://localhost:8080/ws/employee/im
 规则：
 
 - `pin` 和 `mute` 至少传一个。
-- 成功后返回更新后的 `ImConversationSummaryResponse`，并推送 `IM_CONVERSATION_PREFERENCE_UPDATED`。
+- 成功后返回更新后的 `ImConversationSummaryResponse`，并只向当前操作者推送 `IM_CONVERSATION_PREFERENCE_UPDATED`。
+- `pin=true` 会影响当前员工自己的会话列表排序，不影响其他成员的列表顺序。
 
 ---
 
@@ -688,7 +713,7 @@ workforce:
 | `IM_MESSAGE_EDITED` | `ImMessageResponse` | 替换本地同 `messageId` 消息 |
 | `IM_MESSAGE_RECALLED` | `ImMessageResponse` | 替换为撤回态，隐藏附件 |
 | `IM_READ_POSITION_UPDATED` | `{ userId, lastReadSeq }` | 更新已读位点；当前第一版可只刷新会话摘要 |
-| `IM_CONVERSATION_PREFERENCE_UPDATED` | `{ userId, pin, mute }` | 更新当前员工会话置顶/免打扰状态 |
+| `IM_CONVERSATION_PREFERENCE_UPDATED` | `{ userId, pin, mute }` | 只推送给操作者本人；更新当前员工会话置顶/免打扰状态 |
 | `IM_GROUP_PROFILE_UPDATED` | `ImGroupProfileResponse` | 刷新群资料和会话标题 |
 | `IM_GROUP_MEMBERS_ADDED` | `ImConversationMemberResponse[]` | 刷新成员列表 |
 | `IM_GROUP_MEMBERS_REMOVED` | `ImConversationMemberResponse[]` | 刷新成员列表；若当前用户被移除，应退出该会话视图 |
@@ -700,14 +725,425 @@ workforce:
 后端已将 IM WebSocket 业务事件写入 `im_event_outbox`，事务提交后由 dispatcher 投递：
 
 - 前端 payload 结构不因 outbox 改变。
+- 初次入账事件会被标记为立即可投递，数据库事务提交后会马上尝试推送；失败后按 `next_retry_at` 重试。
 - WebSocket 只保证投递到当前在线连接；离线期间仍应通过会话列表和消息分页补齐。
 - 前端收到事件应按 `messageId`、`conversationId + seqNo` 或事件语义做幂等处理，避免重连或重试导致 UI 重复追加。
 
 ---
 
-## 十、IM x Agent 前端接入说明
+## 十、后台 outbox 治理接口
 
-### 10.1 获取可用 Agent
+后台 outbox 接口用于 admin-web 或演示排障查看实时推送账本。所有接口必须使用后台管理员 `SESSION`，员工会话访问返回 HTTP `403`。
+
+### 10.1 outbox 状态总览
+
+```text
+GET /api/admin/im/outbox-events/summary
+```
+
+用途：
+
+- 给 admin-web 首页、红点和排障面板展示 outbox 积压概况。
+- 只读接口，不触发派发，不修改事件状态，不写审计。
+- `dueDispatchCount` 统计当前可被 dispatcher 抢占的事件：到期的 `PENDING/FAILED`，以及超过 `sending-stale-ms` 的 `SENDING`。
+- `staleSendingCount` 只统计超过 `sending-stale-ms` 的 `SENDING`，用于识别卡住的投递线程。
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "totalCount": 6,
+    "dueDispatchCount": 3,
+    "staleSendingCount": 1,
+    "earliestCreatedAt": "2026-05-12T08:00:00",
+    "earliestNextRetryAt": "2000-01-01T00:00:00",
+    "generatedAt": "2026-05-12T10:30:00",
+    "sendingStaleBefore": "2026-05-12T10:29:00",
+    "statusCounts": [
+      {
+        "status": "PENDING",
+        "count": 2
+      },
+      {
+        "status": "SENDING",
+        "count": 1
+      },
+      {
+        "status": "SENT",
+        "count": 1
+      },
+      {
+        "status": "FAILED",
+        "count": 1
+      },
+      {
+        "status": "DEAD",
+        "count": 1
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+字段说明：
+
+| 字段 | 说明 |
+| --- | --- |
+| `totalCount` | outbox 总事件数 |
+| `dueDispatchCount` | 当前 dispatcher 可立即抢占的事件数 |
+| `staleSendingCount` | 已超过 `sending-stale-ms` 的 `SENDING` 事件数 |
+| `earliestCreatedAt` | 最早创建的 outbox 事件时间；无事件时为 `null` |
+| `earliestNextRetryAt` | `PENDING/FAILED` 中最早的下次投递时间；无待投递事件时为 `null` |
+| `generatedAt` | 后端生成统计的时间 |
+| `sendingStaleBefore` | `claimed_at` 早于该时间的 `SENDING` 会被视为 stale |
+| `statusCounts` | 固定按 `PENDING/SENDING/SENT/FAILED/DEAD` 返回，缺失状态 count 为 `0` |
+
+常见错误：
+
+| 场景 | HTTP 状态 | 业务码 | message |
+| --- | --- | --- | --- |
+| 员工会话访问 | `403` | `403` | `当前账号不是管理员身份，无法访问后台端` |
+
+### 10.2 outbox 失败原因聚合
+
+```text
+GET /api/admin/im/outbox-events/failure-summary
+```
+
+用途：
+
+- 给 admin-web 告警面板展示当前主要失败原因。
+- 只聚合 `FAILED`、`DEAD` 事件，不返回 `PENDING/SENDING/SENT`。
+- 按 `eventCount DESC`、`lastOccurredAt DESC`、`lastError ASC` 排序，最多返回 20 条。
+- `last_error` 为空或空字符串时归一为 `UNKNOWN`。
+- 只读接口，不触发重试或派发，不写审计。
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "status": "FAILED",
+      "lastError": "simulated websocket failure",
+      "eventCount": 2,
+      "maxRetryCount": 3,
+      "firstOccurredAt": "2026-05-12T08:00:00",
+      "lastOccurredAt": "2026-05-12T08:05:00"
+    },
+    {
+      "status": "DEAD",
+      "lastError": "max attempts",
+      "eventCount": 1,
+      "maxRetryCount": 5,
+      "firstOccurredAt": "2026-05-12T08:10:00",
+      "lastOccurredAt": "2026-05-12T08:10:00"
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+字段说明：
+
+| 字段 | 说明 |
+| --- | --- |
+| `status` | `FAILED` 或 `DEAD` |
+| `lastError` | 失败原因；空值统一为 `UNKNOWN` |
+| `eventCount` | 该状态和失败原因下的事件数量 |
+| `maxRetryCount` | 当前聚合组内最大的重试次数 |
+| `firstOccurredAt` | 该失败组最早更新时间 |
+| `lastOccurredAt` | 该失败组最近更新时间 |
+
+常见错误：
+
+| 场景 | HTTP 状态 | 业务码 | message |
+| --- | --- | --- | --- |
+| 员工会话访问 | `403` | `403` | `当前账号不是管理员身份，无法访问后台端` |
+
+### 10.3 分页查询 outbox 事件
+
+```text
+GET /api/admin/im/outbox-events?pageNo=1&pageSize=20&status=FAILED&eventType=IM_MESSAGE_CREATED&conversationId=7001
+```
+
+查询参数：
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `pageNo` | 否 | 默认 `1`，最小 `1` |
+| `pageSize` | 否 | 默认 `20`，最大 `100` |
+| `status` | 否 | `PENDING`、`SENDING`、`SENT`、`FAILED`、`DEAD` |
+| `eventType` | 否 | WebSocket 事件类型，如 `IM_MESSAGE_CREATED` |
+| `conversationId` | 否 | 会话 ID |
+| `messageId` | 否 | 消息 ID |
+| `actorUserId` | 否 | 触发用户 ID；Agent 事件为 Agent ID |
+| `createdFrom` | 否 | ISO 时间，事件创建起始 |
+| `createdTo` | 否 | ISO 时间，事件创建结束 |
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "eventId": 2055523000000000001,
+        "eventType": "IM_MESSAGE_CREATED",
+        "conversationId": 7001,
+        "messageId": 2055522999000000001,
+        "seqNo": 3,
+        "actorUserId": 2003,
+        "recipientUserIdsJson": "[2003,2002]",
+        "payloadJson": "{\"eventType\":\"IM_MESSAGE_CREATED\",\"conversationId\":7001}",
+        "status": "FAILED",
+        "retryCount": 1,
+        "nextRetryAt": "2026-05-12T10:15:03",
+        "lastError": "simulated websocket failure",
+        "claimedAt": "2026-05-12T10:15:00",
+        "sentAt": null,
+        "createdAt": "2026-05-12T10:15:00",
+        "updatedAt": "2026-05-12T10:15:00"
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+### 10.4 查看单个 outbox 事件
+
+```text
+GET /api/admin/im/outbox-events/{eventId}
+```
+
+用途：
+
+- 查看单条事件的 `payloadJson`、目标用户、最近失败原因和重试次数。
+- 不触发投递，不修改事件状态。
+
+事件不存在返回 `code=404`、`message=IM outbox事件不存在`。
+
+### 10.5 手动重试 outbox 事件
+
+```text
+POST /api/admin/im/outbox-events/{eventId}/retry
+```
+
+行为：
+
+- 仅允许 `FAILED`、`DEAD` 事件进入手动重试。
+- 后端会校验 `payloadJson.eventType` 和 `payloadJson.conversationId` 与索引字段一致；不一致或 JSON 损坏时返回 `409`，避免重放错误 payload。
+- 重试接口只把事件重置为可立即投递的 `FAILED` 状态，不同步保证已经推送成功；随后由 dispatcher 或 `dispatch` 接口执行派发。
+- `SENDING` 卡住事件不允许手动重试，由 dispatcher 按 `sending-stale-ms` 自动重新抢占。
+- 手动重试成功会写入 `sys_audit_log`，`action_type=IM_OUTBOX_RETRY_REQUESTED`，`target_type=IM_EVENT_OUTBOX`，`target_id` 为事件 ID。
+
+常见错误：
+
+| 场景 | HTTP 状态 | 业务码 | message |
+| --- | --- | --- | --- |
+| 事件不存在 | `200` | `404` | `IM outbox事件不存在` |
+| 当前状态是 `SENT`、`PENDING` 或 `SENDING` | `200` | `409` | `当前outbox事件状态不允许手动重试` |
+| payload 与索引不一致 | `200` | `409` | `outbox事件payload与索引字段不一致，需人工核查后再重试` |
+| payload 非合法 JSON | `200` | `409` | `outbox事件payload不是合法JSON，需人工核查后再重试` |
+
+### 10.6 手动派发到期 outbox 事件
+
+```text
+POST /api/admin/im/outbox-events/dispatch
+Content-Type: application/json
+
+{
+  "batchSize": 50
+}
+```
+
+字段说明：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `batchSize` | 否 | 默认 `50`，最小 `1`，最大 `500` |
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "requestedBatchSize": 50,
+    "dispatchedCount": 1
+  },
+  "requestId": "..."
+}
+```
+
+说明：
+
+- `dispatchedCount` 表示本次成功发送并标记 `SENT` 的事件数，不等于扫描到的事件数。
+- 如果目标用户离线，当前实现仍视为发送完成并标记 `SENT`；前端靠重新拉取会话和消息补齐离线内容。
+- `dispatch` 可用于演示前或 admin-web 排障时主动补偿，不替代后台定时 dispatcher。
+- 每次主动派发都会写入 `sys_audit_log`，`action_type=IM_OUTBOX_DISPATCH_TRIGGERED`，`target_type=IM_EVENT_OUTBOX_DISPATCH`，详情包含 `requestedBatchSize`、`attemptedCount`、`dispatchedCount`、`attemptedEventIds`、`dispatchedEventIds` 和 `failedEventIds`。
+
+### 10.7 批量重试 outbox 事件
+
+```text
+POST /api/admin/im/outbox-events/batch-retry
+Content-Type: application/json
+
+{
+  "eventIds": [2055523000000000001, 2055523000000000002]
+}
+```
+
+字段说明：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `eventIds` | 是 | outbox 事件 ID 列表，不能为空，单次最多 `100` 个；重复 ID 会按首次出现顺序去重 |
+
+行为：
+
+- 批量重试采用“部分成功”语义，不因为某一条事件不存在、状态不允许或 payload 异常而回滚整批。
+- 单条成功规则与 `POST /api/admin/im/outbox-events/{eventId}/retry` 一致：只允许 `FAILED`、`DEAD`，并校验 payload 与索引字段一致。
+- 成功项会被重置为可立即投递的 `FAILED` 状态；接口不保证同步推送成功，后续仍由 dispatcher 或 `dispatch` 接口派发。
+- 跳过项会返回 `skipReason`，前端应逐条展示。
+- 每次批量重试都会写入 `sys_audit_log`，`action_type=IM_OUTBOX_BATCH_RETRY_REQUESTED`，`target_type=IM_EVENT_OUTBOX_BATCH_RETRY`，`result` 为 `SUCCESS` 或 `PARTIAL_SUCCESS`，详情包含 `requestedEventIds`、`succeededEventIds`、`skippedEventIds`。
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "requestedCount": 3,
+    "succeededCount": 1,
+    "skippedCount": 2,
+    "items": [
+      {
+        "eventId": 2055523000000000001,
+        "succeeded": true,
+        "beforeStatus": "FAILED",
+        "afterStatus": "FAILED",
+        "skipReason": null
+      },
+      {
+        "eventId": 2055523000000000002,
+        "succeeded": false,
+        "beforeStatus": "SENT",
+        "afterStatus": null,
+        "skipReason": "当前outbox事件状态不允许手动重试"
+      },
+      {
+        "eventId": 999999999999,
+        "succeeded": false,
+        "beforeStatus": null,
+        "afterStatus": null,
+        "skipReason": "IM outbox事件不存在"
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+常见错误：
+
+| 场景 | HTTP 状态 | 业务码 | message |
+| --- | --- | --- | --- |
+| `eventIds` 为空 | `400` | `400` | `outbox事件ID不能为空` |
+| 单次超过 100 个事件 | `400` | `400` | `单次批量重试最多支持100个事件` |
+| `eventIds` 包含小于等于 0 的值 | `200` | `400` | `outbox事件ID必须大于0` |
+| 员工会话访问 | `403` | `403` | `当前账号不是管理员身份，无法访问后台端` |
+
+### 10.8 查询 outbox 操作审计
+
+```text
+GET /api/admin/im/outbox-events/audits?pageNo=1&pageSize=20&eventId=2055523000000000001
+```
+
+用途：
+
+- 给 admin-web 展示 outbox 手动重试和主动派发的操作历史。
+- 只查询 IM outbox 相关审计，不作为通用 `sys_audit_log` 浏览接口。
+- 按 `eventId` 查询时，会匹配单条重试审计的 `target_id`，也会匹配主动派发审计 detail 中的 `attemptedEventIds`、`dispatchedEventIds`、`failedEventIds`。
+
+查询参数：
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `pageNo` | 否 | 默认 `1`，最小 `1` |
+| `pageSize` | 否 | 默认 `20`，最大 `100` |
+| `actionType` | 否 | 仅支持 `IM_OUTBOX_RETRY_REQUESTED`、`IM_OUTBOX_BATCH_RETRY_REQUESTED`、`IM_OUTBOX_DISPATCH_TRIGGERED` |
+| `eventId` | 否 | outbox 事件 ID，用于追踪单个事件被哪些管理员操作影响 |
+| `operatorId` | 否 | 管理员用户 ID |
+| `occurredFrom` | 否 | ISO 时间，审计发生起始 |
+| `occurredTo` | 否 | ISO 时间，审计发生结束 |
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 2,
+    "list": [
+      {
+        "auditId": 2055524000000000001,
+        "operatorType": "ADMIN",
+        "operatorId": 8001,
+        "actionType": "IM_OUTBOX_DISPATCH_TRIGGERED",
+        "targetType": "IM_EVENT_OUTBOX_DISPATCH",
+        "targetId": null,
+        "result": "SUCCESS",
+        "detailJson": "{\"requestedBatchSize\":10,\"attemptedCount\":1,\"dispatchedCount\":1,\"attemptedEventIds\":[2055523000000000001],\"dispatchedEventIds\":[2055523000000000001],\"failedEventIds\":[]}",
+        "occurredAt": "2026-05-12T10:18:00"
+      },
+      {
+        "auditId": 2055523999000000001,
+        "operatorType": "ADMIN",
+        "operatorId": 8001,
+        "actionType": "IM_OUTBOX_RETRY_REQUESTED",
+        "targetType": "IM_EVENT_OUTBOX",
+        "targetId": 2055523000000000001,
+        "result": "SUCCESS",
+        "detailJson": "{\"eventId\":2055523000000000001,\"eventType\":\"IM_MESSAGE_CREATED\",\"conversationId\":7001,\"beforeStatus\":\"FAILED\",\"afterStatus\":\"FAILED\"}",
+        "occurredAt": "2026-05-12T10:17:30"
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+常见错误：
+
+| 场景 | HTTP 状态 | 业务码 | message |
+| --- | --- | --- | --- |
+| `actionType` 不支持 | `200` | `400` | `outbox审计动作不支持` |
+| `occurredFrom` 晚于 `occurredTo` | `200` | `400` | `发生时间起始不能晚于结束` |
+| 员工会话访问 | `403` | `403` | `当前账号不是管理员身份，无法访问后台端` |
+
+---
+
+## 十一、IM x Agent 前端接入说明
+
+### 11.1 获取可用 Agent
 
 使用 `module-agent` 员工端接口：
 
@@ -721,7 +1157,7 @@ GET /api/employee/agents
 POST /api/employee/im/agent-conversations
 ```
 
-### 10.2 触发 Agent 回复
+### 11.2 触发 Agent 回复
 
 向 Agent 会话发送文本消息：
 
@@ -741,7 +1177,7 @@ POST /api/employee/im/agent-conversations
 4. 模型成功后写入 `senderType=AGENT` 的消息，并推送 `IM_AGENT_MESSAGE_CREATED`。
 5. 模型失败、配置缺失、超时、限流或响应不可解析时写入 `senderType=SYSTEM` 的失败提示，并推送 `IM_AGENT_REPLY_FAILED`。
 
-### 10.3 Agent 成功消息
+### 11.3 Agent 成功消息
 
 成功回复示例：
 
@@ -769,7 +1205,7 @@ POST /api/employee/im/agent-conversations
 }
 ```
 
-### 10.4 Agent 失败消息
+### 11.4 Agent 失败消息
 
 失败提示示例：
 
@@ -806,7 +1242,7 @@ POST /api/employee/im/agent-conversations
 
 ---
 
-## 十一、常见错误
+## 十二、常见错误
 
 | 场景 | HTTP 状态 | 业务码 | message |
 | --- | --- | --- | --- |
@@ -829,10 +1265,15 @@ POST /api/employee/im/agent-conversations
 | 群主直接退群 | `200` | `400` | `群主不能直接退群，请先解散群聊或转让群主` |
 | Agent 不可用 | `200` | `409` | `Agent未发布或未启用` |
 | 员工无权使用 Agent | `200` | `403` | `无权使用该Agent` |
+| 后台 outbox 查询状态不支持 | `200` | `400` | `outbox事件状态不支持` |
+| 后台 outbox 查询事件类型不支持 | `200` | `400` | `outbox事件类型不支持` |
+| 后台 outbox 审计动作不支持 | `200` | `400` | `outbox审计动作不支持` |
+| 后台 outbox 批量重试事件列表为空 | `400` | `400` | `outbox事件ID不能为空` |
+| 后台 outbox 员工会话访问 | `403` | `403` | `当前账号不是管理员身份，无法访问后台端` |
 
 ---
 
-## 十二、前端落地建议
+## 十三、前端落地建议
 
 - `employee-web/src/api/employee.ts` 应作为唯一后端路径出口，避免组件内硬编码路径。
 - 发送消息必须生成稳定 `clientMessageId`，推荐格式：`web-{conversationId}-{timestamp}-{random}`。
