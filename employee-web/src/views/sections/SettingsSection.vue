@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import {
+  Camera,
   ChevronLeft,
+  ChevronRight,
   MoonStar,
+  ShieldCheck,
+  SlidersHorizontal,
   SunMedium,
   PencilLine,
 } from 'lucide-vue-next';
@@ -42,8 +46,10 @@ const {
   preferenceRows,
   activeProfile,
   relationTree,
+  themeLabel,
   backToList,
   displayField,
+  selectSettingsItem,
   openMobileReset,
   sendBindEmailCode,
   submitBindEmail,
@@ -52,7 +58,12 @@ const {
   submitMobileUpdate,
   sendPasswordChangeCode,
   submitPasswordChange,
+  showToast,
 } = useEmployeeShellContext();
+
+function notifyAvatarUnavailable() {
+  showToast('头像编辑尚未开放（后端接口待补）');
+}
 </script>
 
 <template>
@@ -73,45 +84,71 @@ const {
   </header>
 
   <section class="content-stack settings-dashboard">
-    <section v-if="selectedProfileId === 'profile'" class="settings-card-grid">
-      <article class="settings-card settings-profile-card">
-        <div class="settings-profile-main">
+    <section v-if="selectedProfileId === 'profile'" class="personal-center">
+      <article class="personal-hero">
+        <button class="personal-avatar" type="button" aria-label="更换头像" @click="notifyAvatarUnavailable">
           <AppAvatar :label="currentUserShortName" tone="primary" size="lg" status="online" />
-          <div>
-            <h3>{{ currentUserName }}</h3>
-            <span>{{ session.positionName || session.departmentName || profileStatusLabel }}</span>
+          <span class="personal-avatar-overlay">
+            <Camera :size="14" />
+          </span>
+        </button>
+        <div class="personal-hero-copy">
+          <h3>{{ currentUserName }}</h3>
+          <div class="personal-hero-meta">
+            <span>{{ session.positionName || '未设置岗位' }}</span>
+            <span v-if="session.departmentName">{{ session.departmentName }}</span>
+            <span class="personal-hero-status">{{ profileStatusLabel }}</span>
           </div>
+          <dl class="personal-hero-grid">
+            <div>
+              <dt>工号</dt>
+              <dd>{{ displayField(session.profile?.employeeNo) }}</dd>
+            </div>
+            <div>
+              <dt>登录名</dt>
+              <dd>{{ displayField(session.user?.loginName) }}</dd>
+            </div>
+            <div>
+              <dt>手机号</dt>
+              <dd>
+                {{ displayField(session.profile?.mobile) }}
+                <button class="field-icon-button" type="button" aria-label="修改手机号" @click="openMobileReset">
+                  <PencilLine :size="13" />
+                </button>
+              </dd>
+            </div>
+            <div>
+              <dt>邮箱</dt>
+              <dd>{{ displayField(currentEmail) }}</dd>
+            </div>
+          </dl>
         </div>
-        <dl class="settings-list compact">
-          <div>
-            <dt>工号</dt>
-            <dd>{{ displayField(session.profile?.employeeNo) }}</dd>
-          </div>
-          <div>
-            <dt>登录名</dt>
-            <dd>{{ displayField(session.user?.loginName) }}</dd>
-          </div>
-          <div>
-            <dt>状态</dt>
-            <dd>{{ profileStatusLabel }}</dd>
-          </div>
-        </dl>
       </article>
 
-      <article class="settings-card settings-wide-card">
+      <nav class="personal-nav" aria-label="个人中心快捷">
+        <button type="button" class="personal-nav-item" @click="selectSettingsItem('security')">
+          <span class="personal-nav-icon"><ShieldCheck :size="18" /></span>
+          <div>
+            <strong>账号与安全</strong>
+            <span>手机号 · 邮箱 · 密码</span>
+          </div>
+          <ChevronRight :size="16" />
+        </button>
+        <button type="button" class="personal-nav-item" @click="selectSettingsItem('preferences')">
+          <span class="personal-nav-icon"><SlidersHorizontal :size="18" /></span>
+          <div>
+            <strong>偏好设置</strong>
+            <span>主题 · 会话密度（本地保存）</span>
+          </div>
+          <ChevronRight :size="16" />
+        </button>
+      </nav>
+
+      <article class="settings-card">
         <header class="settings-card-head">
           <h3>身份资料</h3>
         </header>
         <dl class="settings-list two-column">
-          <div class="settings-list-row is-editable">
-            <dt>手机号</dt>
-            <dd>
-              <span>{{ displayField(session.profile?.mobile) }}</span>
-              <button class="field-icon-button" type="button" aria-label="修改手机号" @click="openMobileReset">
-                <PencilLine :size="14" />
-              </button>
-            </dd>
-          </div>
           <div v-for="row in profileIdentityRows" :key="row[0]">
             <dt>{{ row[0] }}</dt>
             <dd>{{ row[1] }}</dd>
@@ -266,6 +303,7 @@ const {
     </section>
 
     <section v-else-if="selectedProfileId === 'preferences'" class="settings-card-grid">
+      <p class="settings-hint">主题、密度等偏好会自动保存在本机浏览器，刷新或切换页面后保留。当前账号尚未支持云端同步。</p>
       <article class="settings-card">
         <header class="settings-card-head">
           <h3>显示设置</h3>

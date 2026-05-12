@@ -7,7 +7,6 @@ import WorkbenchSection from '../views/sections/WorkbenchSection.vue';
 import FilesSection from '../views/sections/FilesSection.vue';
 import ContactsSection from '../views/sections/ContactsSection.vue';
 import SettingsSection from '../views/sections/SettingsSection.vue';
-import EmptySection from '../views/sections/EmptySection.vue';
 
 export const employeeRoutes = [
   {
@@ -80,15 +79,11 @@ export const employeeRoutes = [
       },
       {
         path: 'processes',
-        name: 'employee-processes',
-        component: EmptySection,
-        meta: { section: 'processes' },
+        redirect: '/messages',
       },
       {
         path: 'reports',
-        name: 'employee-reports',
-        component: EmptySection,
-        meta: { section: 'reports' },
+        redirect: '/messages',
       },
     ],
   },

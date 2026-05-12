@@ -4,7 +4,9 @@ import {
   AtSign,
   BarChart3,
   CalendarDays,
+  Camera,
   ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   CircleAlert,
   Clock3,
@@ -35,9 +37,12 @@ import {
   Search,
   Send,
   Settings,
+  ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   SunMedium,
   Trash2,
+  UserRound,
   UsersRound,
   X,
 } from 'lucide-vue-next';
@@ -229,7 +234,7 @@ const sectionIcons: Record<SectionId, typeof MessageCircle> = {
   processes: GitBranch,
   contacts: UsersRound,
   reports: BarChart3,
-  settings: Settings,
+  settings: UserRound,
 };
 
 const workbenchIcons: Record<string, typeof MessageCircle> = {
@@ -237,14 +242,13 @@ const workbenchIcons: Record<string, typeof MessageCircle> = {
   requests: ClipboardList,
   attendance: Clock3,
   balance: Sparkles,
-  files: FolderOpen,
   agent: Sparkles,
 };
 
 const profileIcons: Record<string, typeof MessageCircle> = {
-  profile: ContactRound,
-  security: Settings,
-  preferences: SunMedium,
+  profile: UserRound,
+  security: ShieldCheck,
+  preferences: SlidersHorizontal,
 };
 
 const activeSection = computed(() => shell.section);
@@ -2816,12 +2820,27 @@ provideEmployeeShellContext(employeeShellContext);
             :active="item.id === activeConversation.id"
             @click="selectConversation(item.id)"
           >
-            <div class="message-row">
+            <div class="message-row" :class="`message-row-${item.kind === 'team' ? 'team' : item.kind === 'agent' ? 'agent' : 'private'}`">
               <div class="message-row-main">
-                <AppAvatar :label="item.badge" :tone="toneOfConversation(item.tone)" :status="item.kind === 'agent' ? 'online' : ''" />
+                <div class="message-avatar-wrap">
+                  <AppAvatar
+                    :label="item.badge"
+                    :tone="toneOfConversation(item.tone)"
+                    :status="item.kind === 'agent' ? 'online' : ''"
+                  />
+                  <span v-if="item.kind === 'team'" class="conversation-kind-glyph kind-team" aria-hidden="true">
+                    <UsersRound :size="11" />
+                  </span>
+                  <span v-else-if="item.kind === 'agent'" class="conversation-kind-glyph kind-agent" aria-hidden="true">
+                    <Sparkles :size="11" />
+                  </span>
+                </div>
                 <div class="message-copy">
                   <div class="message-title-line">
                     <strong>{{ item.title }}</strong>
+                    <span v-if="item.kind === 'team'" class="conversation-kind-pill pill-team">群{{ item.memberCount ? ` · ${item.memberCount}` : '' }}</span>
+                    <span v-else-if="item.kind === 'agent'" class="conversation-kind-pill pill-agent">AI</span>
+                    <span v-else class="conversation-kind-pill pill-private">私聊</span>
                   </div>
                   <p>{{ item.subtitle }}</p>
                 </div>

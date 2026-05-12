@@ -285,9 +285,9 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
   },
   settings: {
     kicker: '',
-    title: '设置',
+    title: '个人中心',
     subtitle: '',
-    search: '搜索账号、安全、偏好',
+    search: '搜索资料、账号、偏好',
   },
 };
 
@@ -296,10 +296,8 @@ export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = 
   { id: 'todos', label: '待办', glyph: '办' },
   { id: 'files', label: '文档', glyph: '档' },
   { id: 'workbench', label: '工作台', glyph: '台' },
-  { id: 'processes', label: '流程', glyph: '流' },
   { id: 'contacts', label: '通讯录', glyph: '录' },
-  { id: 'reports', label: '报表', glyph: '表' },
-  { id: 'settings', label: '设置', glyph: '设' },
+  { id: 'settings', label: '个人中心', glyph: '心' },
 ];
 
 export const primaryNavItems: NavRailItem[] = navItems;
@@ -317,25 +315,31 @@ const currentUser = {
 const preferenceStorageKey = 'workforce-hub.employee.preferences.v1';
 const personalFilesStoragePrefix = 'workforce-hub.employee.personal-files.v1';
 
-function readStoredPreferences(): { theme: ThemeMode; messageDensity: MessageDensity } {
-  const defaults = { theme: 'light' as ThemeMode, messageDensity: 'cozy' as MessageDensity };
+type StoredPreferences = { theme: ThemeMode; messageDensity: MessageDensity; listWidth: number };
+
+function readStoredPreferences(): StoredPreferences {
+  const defaults: StoredPreferences = { theme: 'light', messageDensity: 'cozy', listWidth: 400 };
   try {
     const storage = globalThis.localStorage;
     const raw = storage?.getItem(preferenceStorageKey);
     if (!raw) return defaults;
-    const parsed = JSON.parse(raw) as Partial<{ theme: ThemeMode; messageDensity: MessageDensity }>;
+    const parsed = JSON.parse(raw) as Partial<StoredPreferences>;
+    const width = typeof parsed.listWidth === 'number' && Number.isFinite(parsed.listWidth)
+      ? Math.max(384, Math.min(520, Math.round(parsed.listWidth)))
+      : defaults.listWidth;
     return {
       theme: parsed.theme === 'dark' || parsed.theme === 'light' ? parsed.theme : defaults.theme,
       messageDensity: parsed.messageDensity === 'compact' || parsed.messageDensity === 'cozy'
         ? parsed.messageDensity
         : defaults.messageDensity,
+      listWidth: width,
     };
   } catch {
     return defaults;
   }
 }
 
-function writeStoredPreferences(preferences: { theme: ThemeMode; messageDensity: MessageDensity }) {
+function writeStoredPreferences(preferences: StoredPreferences) {
   try {
     globalThis.localStorage?.setItem(preferenceStorageKey, JSON.stringify(preferences));
   } catch {
@@ -507,8 +511,8 @@ const contactItems: ContactRecord[] = [];
 const profileItems: ProfileRecord[] = [
   {
     id: 'profile',
-    title: '个人信息',
-    subtitle: '身份与组织',
+    title: '个人主页',
+    subtitle: '资料与组织',
     note: '',
     tone: 'blue',
     stats: [],
@@ -516,7 +520,7 @@ const profileItems: ProfileRecord[] = [
   },
   {
     id: 'security',
-    title: '账号安全',
+    title: '账号与安全',
     subtitle: '手机号 / 邮箱 / 密码',
     note: '',
     tone: 'amber',
@@ -652,7 +656,7 @@ export const useShellStore = defineStore('employee-shell', {
     section: 'messages' as SectionId,
     detailOpen: false,
     mobileView: 'list' as 'list' | 'detail',
-    listWidth: 400,
+    listWidth: storedPreferences.listWidth,
     theme: storedPreferences.theme,
     messageDensity: storedPreferences.messageDensity,
     search: {
@@ -821,18 +825,19 @@ export const useShellStore = defineStore('employee-shell', {
     },
     setListWidth(width: number) {
       this.listWidth = Math.max(384, Math.min(520, Math.round(width)));
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
     },
     setTheme(theme: ThemeMode) {
       this.theme = theme;
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity });
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
     },
     toggleTheme() {
       this.theme = this.theme === 'light' ? 'dark' : 'light';
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity });
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
     },
     setMessageDensity(density: MessageDensity) {
       this.messageDensity = density;
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity });
+      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
     },
     syncSessionProfile(
       user: CurrentUserResponse | null,
