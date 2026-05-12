@@ -2,67 +2,79 @@ package com.workforcehub.agent.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.ai.chat.ChatResponse;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatClient;
+import org.springframework.ai.retry.NonTransientAiException;
+import org.springframework.ai.retry.TransientAiException;
+import org.springframework.boot.convert.DurationStyle;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * OpenAI 兼容 Chat Completions 模型客户端。
+ * Spring AI OpenAI 兼容 Chat Completions 模型客户端。
  */
 @Service
 @EnableConfigurationProperties(AgentModelProperties.class)
 public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
 
-    private static final String CHAT_COMPLETIONS_PATH = "/chat/completions";
+    private static final String CHAT_COMPLETIONS_SUFFIX = "/chat/completions";
+    private static final String VERSIONED_CHAT_COMPLETIONS_SUFFIX = "/v1/chat/completions";
+    private static final Pattern SPRING_AI_STATUS_MESSAGE = Pattern.compile("^(\\d{3})\\s+-\\s+.*", Pattern.DOTALL);
 
     private final AgentModelProperties properties;
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
+    private final SpringAiOpenAiChatClientFactory chatClientFactory;
 
     public OpenAiCompatibleAgentModelClient(AgentModelProperties properties,
-                                            ObjectMapper objectMapper) {
+                                            ObjectMapper objectMapper,
+                                            SpringAiOpenAiChatClientFactory chatClientFactory) {
         this.properties = properties;
         this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newBuilder()
-            .connectTimeout(properties.getTimeout())
-            .build();
+        this.chatClientFactory = chatClientFactory;
     }
 
     @Override
     public AgentModelResponse generateReply(AgentModelRequest request) {
-        ResolvedModelConfig config = resolveConfig(request.modelConfigJson());
-        HttpRequest httpRequest = buildHttpRequest(config, request);
-        HttpResponse<String> response;
+        SpringAiOpenAiChatClientFactory.ResolvedAgentModelConfig config = resolveConfig(request.modelConfigJson());
         try {
-            response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-        } catch (HttpTimeoutException e) {
-            throw new AgentModelException("TIMEOUT", "模型服务调用超时", e);
-        } catch (IOException e) {
+            OpenAiChatClient chatClient = chatClientFactory.create(config);
+            ChatResponse response = chatClient.call(buildPrompt(request));
+            return parseResponse(response);
+        } catch (AgentModelException e) {
+            throw e;
+        } catch (NonTransientAiException e) {
+            throw mapSpringAiStatusException(e);
+        } catch (TransientAiException e) {
             throw new AgentModelException("PROVIDER_ERROR", "模型服务调用失败", e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new AgentModelException("TIMEOUT", "模型服务调用被中断", e);
+        } catch (RestClientResponseException e) {
+            throw mapResponseException(e);
+        } catch (RestClientException e) {
+            if (e.contains(java.net.http.HttpTimeoutException.class)) {
+                throw new AgentModelException("TIMEOUT", "模型服务调用超时", e);
+            }
+            throw new AgentModelException("PROVIDER_ERROR", "模型服务调用失败", e);
         }
-        return parseResponse(response);
     }
 
-    private ResolvedModelConfig resolveConfig(String modelConfigJson) {
+    private SpringAiOpenAiChatClientFactory.ResolvedAgentModelConfig resolveConfig(String modelConfigJson) {
         if (!properties.isEnabled()) {
             throw new AgentModelException("CONFIG_MISSING", "Agent模型服务未启用");
         }
         JsonNode node = readConfig(modelConfigJson);
-        String baseUrl = stringValue(node, "baseUrl", properties.getBaseUrl());
+        String baseUrl = normalizeBaseUrl(stringValue(node, "baseUrl", properties.getBaseUrl()));
         String apiKey = stringValue(node, "apiKey", properties.getApiKey());
         String model = stringValue(node, "model", properties.getModel());
         Integer maxTokens = intValue(node, "maxTokens", properties.getMaxTokens());
@@ -71,8 +83,8 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
         if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(apiKey) || !StringUtils.hasText(model)) {
             throw new AgentModelException("CONFIG_MISSING", "Agent模型配置缺失");
         }
-        return new ResolvedModelConfig(
-            trimTrailingSlash(baseUrl.trim()),
+        return new SpringAiOpenAiChatClientFactory.ResolvedAgentModelConfig(
+            baseUrl,
             apiKey.trim(),
             model.trim(),
             maxTokens,
@@ -81,64 +93,64 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
         );
     }
 
-    private HttpRequest buildHttpRequest(ResolvedModelConfig config, AgentModelRequest request) {
-        try {
-            List<Map<String, String>> messages = new ArrayList<>();
-            if (StringUtils.hasText(request.systemPrompt())) {
-                messages.add(Map.of(
-                    "role", "system",
-                    "content", request.systemPrompt().trim()
-                ));
-            }
-            messages.add(Map.of(
-                "role", "user",
-                "content", request.userMessage() == null ? "" : request.userMessage()
-            ));
-            Map<String, Object> payload = Map.of(
-                "model", config.model(),
-                "messages", messages,
-                "max_tokens", config.maxTokens(),
-                "temperature", config.temperature()
-            );
-            return HttpRequest.newBuilder()
-                .uri(URI.create(config.baseUrl() + CHAT_COMPLETIONS_PATH))
-                .timeout(config.timeout())
-                .header("Authorization", "Bearer " + config.apiKey())
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
-        } catch (Exception e) {
-            throw new AgentModelException("CONFIG_MISSING", "Agent模型请求构造失败", e);
+    private Prompt buildPrompt(AgentModelRequest request) {
+        List<Message> messages = new ArrayList<>();
+        if (StringUtils.hasText(request.systemPrompt())) {
+            messages.add(new SystemMessage(request.systemPrompt().trim()));
         }
+        messages.add(new UserMessage(request.userMessage() == null ? "" : request.userMessage()));
+        return new Prompt(messages);
     }
 
-    private AgentModelResponse parseResponse(HttpResponse<String> response) {
-        int statusCode = response.statusCode();
+    private AgentModelResponse parseResponse(ChatResponse response) {
+        String text = response == null || response.getResult() == null
+            || response.getResult().getOutput() == null
+            ? ""
+            : response.getResult().getOutput().getContent();
+        if (!StringUtils.hasText(text)) {
+            throw new AgentModelException("INVALID_RESPONSE", "模型服务返回内容为空");
+        }
+        return new AgentModelResponse(text.trim());
+    }
+
+    private AgentModelException mapSpringAiStatusException(NonTransientAiException e) {
+        Integer statusCode = extractSpringAiStatusCode(e);
+        if (statusCode == null) {
+            return new AgentModelException("PROVIDER_ERROR", "模型服务请求失败", e);
+        }
         if (statusCode == 401 || statusCode == 403) {
-            throw new AgentModelException("AUTH_FAILED", "模型服务认证失败");
+            return new AgentModelException("AUTH_FAILED", "模型服务认证失败", e);
         }
         if (statusCode == 429) {
-            throw new AgentModelException("RATE_LIMITED", "模型服务限流");
+            return new AgentModelException("RATE_LIMITED", "模型服务限流", e);
+        }
+        return new AgentModelException("PROVIDER_ERROR", "模型服务请求失败", e);
+    }
+
+    private Integer extractSpringAiStatusCode(NonTransientAiException e) {
+        String message = e.getMessage();
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        Matcher matcher = SPRING_AI_STATUS_MESSAGE.matcher(message);
+        if (!matcher.matches()) {
+            return null;
+        }
+        return Integer.parseInt(matcher.group(1));
+    }
+
+    private AgentModelException mapResponseException(RestClientResponseException e) {
+        int statusCode = e.getRawStatusCode();
+        if (statusCode == 401 || statusCode == 403) {
+            return new AgentModelException("AUTH_FAILED", "模型服务认证失败", e);
+        }
+        if (statusCode == 429) {
+            return new AgentModelException("RATE_LIMITED", "模型服务限流", e);
         }
         if (statusCode >= 500) {
-            throw new AgentModelException("PROVIDER_ERROR", "模型服务返回错误");
+            return new AgentModelException("PROVIDER_ERROR", "模型服务返回错误", e);
         }
-        if (statusCode < 200 || statusCode >= 300) {
-            throw new AgentModelException("PROVIDER_ERROR", "模型服务请求失败");
-        }
-        try {
-            JsonNode root = objectMapper.readTree(response.body());
-            JsonNode contentNode = root.path("choices").path(0).path("message").path("content");
-            String text = contentNode.isMissingNode() || contentNode.isNull() ? "" : contentNode.asText("");
-            if (!StringUtils.hasText(text)) {
-                throw new AgentModelException("INVALID_RESPONSE", "模型服务返回内容为空");
-            }
-            return new AgentModelResponse(text.trim());
-        } catch (AgentModelException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new AgentModelException("INVALID_RESPONSE", "模型服务响应不可解析", e);
-        }
+        return new AgentModelException("PROVIDER_ERROR", "模型服务请求失败", e);
     }
 
     private JsonNode readConfig(String modelConfigJson) {
@@ -182,10 +194,27 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
             return fallback;
         }
         try {
-            return Duration.parse(valueNode.asText());
+            return DurationStyle.detectAndParse(valueNode.asText().trim());
         } catch (Exception e) {
             throw new AgentModelException("CONFIG_MISSING", "Agent模型超时配置不合法", e);
         }
+    }
+
+    private String normalizeBaseUrl(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        String trimmed = trimTrailingSlash(value.trim());
+        if (trimmed.endsWith(VERSIONED_CHAT_COMPLETIONS_SUFFIX)) {
+            return trimmed.substring(0, trimmed.length() - VERSIONED_CHAT_COMPLETIONS_SUFFIX.length());
+        }
+        if (trimmed.endsWith(CHAT_COMPLETIONS_SUFFIX)) {
+            return trimmed.substring(0, trimmed.length() - CHAT_COMPLETIONS_SUFFIX.length());
+        }
+        if (trimmed.endsWith("/v1")) {
+            return trimmed.substring(0, trimmed.length() - "/v1".length());
+        }
+        return trimmed;
     }
 
     private String trimTrailingSlash(String value) {
@@ -194,15 +223,5 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
             trimmed = trimmed.substring(0, trimmed.length() - 1);
         }
         return trimmed;
-    }
-
-    private record ResolvedModelConfig(
-        String baseUrl,
-        String apiKey,
-        String model,
-        Integer maxTokens,
-        Double temperature,
-        Duration timeout
-    ) {
     }
 }

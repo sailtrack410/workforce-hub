@@ -2112,7 +2112,27 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private static void handleModelRequest(HttpExchange exchange) throws IOException {
         byte[] body = """
-            {"choices":[{"message":{"content":"模型回复：帮我总结今天待办"}}]}
+            {
+              "id": "chatcmpl-im-test",
+              "object": "chat.completion",
+              "created": 1710000000,
+              "model": "stub-chat",
+              "usage": {
+                "prompt_tokens": 8,
+                "completion_tokens": 4,
+                "total_tokens": 12
+              },
+              "choices": [
+                {
+                  "index": 0,
+                  "finish_reason": "stop",
+                  "message": {
+                    "role": "assistant",
+                    "content": "模型回复：帮我总结今天待办"
+                  }
+                }
+              ]
+            }
             """.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         exchange.sendResponseHeaders(200, body.length);
