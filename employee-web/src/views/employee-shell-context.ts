@@ -1,4 +1,4 @@
-import { inject, provide } from 'vue';
+import { inject, provide, proxyRefs } from 'vue';
 
 export type EmployeeShellContext = Record<string, any>;
 
@@ -13,5 +13,5 @@ export function useEmployeeShellContext() {
   if (!context) {
     throw new Error('Employee shell context is not available');
   }
-  return context;
+  return proxyRefs(context);
 }

@@ -8,6 +8,7 @@
 !.env.example
 
 # Build outputs
+target/
 server/target/
 employee-web/node_modules/
 employee-web/dist/

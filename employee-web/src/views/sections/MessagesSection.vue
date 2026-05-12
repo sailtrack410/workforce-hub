@@ -7,6 +7,7 @@ import {
   Eye,
   FolderOpen,
   Info,
+  Paperclip,
   Send,
   Sparkles,
   Trash2,
