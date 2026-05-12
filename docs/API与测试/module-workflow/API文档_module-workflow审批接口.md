@@ -15,7 +15,7 @@
 
 ## 二、接口范围
 
-当前已实现 `11` 个员工端接口、`6` 个后台流程模板治理接口，以及 workflow 侧 Agent 预审 SPI 回调入口。
+当前已实现 `11` 个员工端接口、`7` 个后台流程模板治理接口，以及 workflow 侧 Agent 预审 SPI 回调入口。
 
 - `POST /api/employee/workflow/leave-requests`
 - `POST /api/employee/workflow/clock-correction-requests`
@@ -31,6 +31,7 @@
 
 后台流程模板治理接口：
 
+- `GET /api/admin/workflow/process-types`
 - `POST /api/admin/workflow/process-types`
 - `POST /api/admin/workflow/templates`
 - `GET /api/admin/workflow/templates`
@@ -41,6 +42,26 @@
 当前暂未实现但已纳入后续规划：
 
 - 完整 `module-agent` 任务调度、工具调用、后台创建和运行监控
+
+### employee-web 当前联调前置
+
+员工端要真正提交请假/补卡，不只需要登录态，还需要后台先准备好：
+
+1. 已发布的 workflow 模板
+2. 对应 Flowable 定义 key
+3. 如果是扣减类请假，员工已有足够假期余额
+
+当前默认 Flowable 定义 key：
+
+| 业务 | processCode | flowableDefinitionKey |
+| --- | --- | --- |
+| 请假 | `LEAVE` | `leave_manager_approval` |
+| 补卡 | `CLOCK_CORRECTION` | `clock_correction_manager_approval` |
+
+如果模板没初始化，员工端提交时会返回：
+
+- `code=404`
+- `message=未找到已发布的流程模板`
 
 ---
 
@@ -144,6 +165,48 @@ http://localhost:8080
 
 ## 五、接口详情
 
+## 5.0 后台查询流程类型
+
+```http
+GET /api/admin/workflow/process-types?processCode=LEAVE
+Cookie: SESSION=...
+```
+
+### Query 参数
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `processCode` | `string` | 否 | 流程编码；不传时返回所有未删除流程类型 |
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "processTypeId": 2052160000000000001,
+      "processCode": "LEAVE",
+      "processName": "请假流程",
+      "bizType": "LEAVE",
+      "status": "ACTIVE",
+      "createdAt": "2026-05-06T07:00:00",
+      "updatedAt": "2026-05-06T07:00:00"
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+### 业务规则
+
+- 仅返回未删除流程类型。
+- 传 `processCode` 时精确匹配，主要用于本地联调脚本和后台页面复用已有流程类型。
+- 不传 `processCode` 时按 `processCode ASC, processTypeId ASC` 返回。
+
+---
+
 ## 5.1 提交请假申请
 
 ```http
@@ -245,6 +308,11 @@ Cookie: SESSION=...
 | `expectedPunchAt` | `string` | 是 | 申请补写的打卡时间，格式 `yyyy-MM-dd HH:mm:ss`，日期必须等于 `targetDate` |
 | `reason` | `string` | 是 | 补卡原因，最长 512 字符 |
 | `attachmentRefIds` | `array<long>` | 否 | 补卡证明附件引用 ID，最多 10 个；必须是当前申请人拥有且未删除的个人附件 |
+
+注意：
+
+- 当前后端真实字段已经是 `targetDate / missingPunchType / expectedPunchAt`
+- 不再使用旧字段 `workDate / correctionType / correctedAt`
 
 示例：
 

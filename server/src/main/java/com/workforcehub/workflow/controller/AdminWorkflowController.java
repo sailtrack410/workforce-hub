@@ -41,6 +41,11 @@ public class AdminWorkflowController {
         return R.ok(workflowAdminService.createProcessType(request));
     }
 
+    @GetMapping("/process-types")
+    public R<List<WorkflowProcessTypeResponse>> listProcessTypes(@RequestParam(required = false) String processCode) {
+        return R.ok(workflowAdminService.listProcessTypes(processCode));
+    }
+
     @PostMapping("/templates")
     public R<WorkflowTemplateResponse> createTemplate(
             @Valid @RequestBody WorkflowTemplateCreateRequest request) {

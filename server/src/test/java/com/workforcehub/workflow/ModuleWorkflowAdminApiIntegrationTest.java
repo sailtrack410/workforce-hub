@@ -60,6 +60,18 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
             .singleResult(), "测试环境应自动部署请假审批 BPMN 定义");
 
         long processTypeId = createProcessType(adminSession, "LEAVE", "请假流程", "LEAVE");
+
+        mockMvc.perform(get("/api/admin/workflow/process-types")
+                .cookie(adminSession)
+                .param("processCode", "LEAVE"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].processTypeId").value(processTypeId))
+            .andExpect(jsonPath("$.data[0].processCode").value("LEAVE"))
+            .andExpect(jsonPath("$.data[0].processName").value("请假流程"))
+            .andExpect(jsonPath("$.data[0].bizType").value("LEAVE"))
+            .andExpect(jsonPath("$.data[0].status").value("ACTIVE"));
+
         long templateId = createTemplate(adminSession, processTypeId, "LEAVE_MANAGER_APPROVAL", "请假直属上级审批");
         long versionId = createTemplateVersion(adminSession, templateId, 1, "ANNUAL_LEAVE", 480);
 

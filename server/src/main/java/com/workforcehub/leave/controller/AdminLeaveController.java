@@ -7,10 +7,13 @@ import com.workforcehub.leave.dto.LeaveAccountResponse;
 import com.workforcehub.leave.dto.LeaveTypeResponse;
 import com.workforcehub.leave.service.LeaveService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 后台假期治理接口。
@@ -23,6 +26,11 @@ public class AdminLeaveController {
 
     public AdminLeaveController(LeaveService leaveService) {
         this.leaveService = leaveService;
+    }
+
+    @GetMapping("/types")
+    public R<List<LeaveTypeResponse>> listTypes() {
+        return R.ok(leaveService.listLeaveTypes());
     }
 
     @PostMapping("/types")

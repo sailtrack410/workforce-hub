@@ -184,6 +184,21 @@ public class WorkflowAdminRepository {
         return rows.get(0);
     }
 
+    public List<WorkflowProcessTypeAdminRow> listProcessTypes(String processCode) {
+        List<Object> args = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("""
+            SELECT id, process_code, process_name, biz_type, status, created_at, updated_at
+            FROM wf_process_type
+            WHERE is_deleted = 0
+            """);
+        if (StringUtils.hasText(processCode)) {
+            sql.append("  AND process_code = ?\n");
+            args.add(processCode.trim());
+        }
+        sql.append("ORDER BY process_code ASC, id ASC");
+        return jdbcTemplate.query(sql.toString(), this::mapProcessType, args.toArray());
+    }
+
     public WorkflowTemplateAdminRow getTemplateOrThrow(Long templateId) {
         List<WorkflowTemplateAdminRow> rows = jdbcTemplate.query("""
             SELECT wt.id,

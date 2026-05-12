@@ -86,6 +86,25 @@ public class LeaveRepository {
         return row;
     }
 
+    public List<LeaveTypeRow> listLeaveTypes() {
+        return jdbcTemplate.query("""
+            SELECT id, leave_code, leave_name, balance_mode, status, created_at, updated_at
+            FROM lv_type
+            WHERE is_deleted = 0
+            ORDER BY leave_code ASC, id ASC
+            """,
+            (rs, rowNum) -> new LeaveTypeRow(
+                rs.getLong("id"),
+                rs.getString("leave_code"),
+                rs.getString("leave_name"),
+                rs.getString("balance_mode"),
+                rs.getString("status"),
+                rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getTimestamp("updated_at").toLocalDateTime()
+            )
+        );
+    }
+
     public boolean existsActiveUser(Long userId) {
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)

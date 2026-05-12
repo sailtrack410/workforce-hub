@@ -151,6 +151,12 @@ public class WorkflowAdminService {
             .toList();
     }
 
+    public List<WorkflowProcessTypeResponse> listProcessTypes(String processCode) {
+        return workflowAdminRepository.listProcessTypes(processCode).stream()
+            .map(this::toProcessTypeResponse)
+            .toList();
+    }
+
     public List<WorkflowTemplateVersionResponse> listTemplateVersions(Long templateId) {
         workflowAdminRepository.getTemplateOrThrow(templateId);
         return workflowAdminRepository.listTemplateVersions(templateId).stream()

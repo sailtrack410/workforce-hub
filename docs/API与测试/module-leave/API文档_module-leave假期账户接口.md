@@ -15,8 +15,9 @@
 
 ## 二、接口范围
 
-当前已实现 `2` 个后台接口、`1` 个员工端接口，以及 workflow 内部余额联动能力。
+当前已实现 `3` 个后台接口、`1` 个员工端接口，以及 workflow 内部余额联动能力。
 
+- `GET /api/admin/leave/types`
 - `POST /api/admin/leave/types`
 - `POST /api/admin/leave/accounts/adjustments`
 - `GET /api/employee/leave/accounts`
@@ -24,9 +25,9 @@
 内部联动：
 
 - 员工提交请假申请前校验 `DEDUCT` 假种余额。
-- 审批通过后扣减余额并写入 `lv_account_txn`。
+- 员工提交请假申请后冻结余额，审批通过后释放冻结并完成扣减，驳回/撤回后释放冻结。
 - 审批通过后触发考勤侧指定日期范围重算，由考勤按已批准请假区间计算整段 `LEAVE` 或部分分钟抵扣。
-- 审批驳回、Agent 驳回、申请撤回不扣减余额。
+- 审批驳回、Agent 驳回、申请撤回不扣减余额，已冻结分钟数会幂等释放。
 - `LeaveQueryService` 已由 `LeaveService` 实现，后续 Agent 可通过 SPI 查询假期余额；考勤侧也通过该 SPI 查询指定日期内已批准请假区间。
 
 ---
@@ -96,7 +97,43 @@ http://localhost:8080
 
 ## 五、接口详情
 
-## 5.1 创建假种
+## 5.1 查询假种列表
+
+```http
+GET /api/admin/leave/types
+Cookie: SESSION=...
+```
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "leaveTypeId": 2052160000000000001,
+      "leaveCode": "ANNUAL_LEAVE",
+      "leaveName": "年假",
+      "balanceMode": "DEDUCT",
+      "status": "ACTIVE",
+      "createdAt": "2026-05-07T07:00:00",
+      "updatedAt": "2026-05-07T07:00:00"
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+### 业务规则
+
+- 仅返回未删除假种。
+- 按 `leaveCode ASC, leaveTypeId ASC` 排序。
+- 本接口用于后台治理页面和本地联调脚本复用已有假种，避免重复创建。
+
+---
+
+## 5.2 创建假种
 
 ```http
 POST /api/admin/leave/types
@@ -151,7 +188,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.2 管理员调整员工假期余额
+## 5.3 管理员调整员工假期余额
 
 ```http
 POST /api/admin/leave/accounts/adjustments
@@ -215,7 +252,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.3 员工查询自己的假期账户
+## 5.4 员工查询自己的假期账户
 
 ```http
 GET /api/employee/leave/accounts
@@ -273,13 +310,27 @@ Cookie: SESSION=...
 }
 ```
 
-### 6.2 审批通过扣减
+### 6.2 提交冻结
+
+员工提交请假申请并成功启动审批时：
+
+- 若假种为 `NO_DEDUCT`，不冻结余额。
+- 若假种为 `DEDUCT`，锁定 `lv_account` 并把 `durationMinutes` 从 `available_minutes` 转入 `frozen_minutes`。
+- 写入 `lv_account_txn`：
+  - `txn_type=FREEZE`
+  - `change_minutes=-durationMinutes`
+  - `source_type=WORKFLOW_REQUEST`
+  - `source_id=wf_request.id`
+  - `source_txn_key=WORKFLOW_FREEZE:{requestId}`
+- 重复冻结同一申请时按 `source_txn_key` 幂等返回，不重复冻结。
+
+### 6.3 审批通过扣减
 
 直属上级审批通过时：
 
 - 读取 `wf_req_leave` 中的 `leave_type_id` 与 `duration_minutes`。
-- 再次锁定 `lv_account` 校验余额，防止提交后余额被其他操作消耗。
-- 扣减 `lv_account.available_minutes`。
+- 优先从 `frozen_minutes` 扣减并释放冻结，`available_minutes` 不再二次扣减。
+- 兼容历史未冻结申请：如果没有冻结流水且可用余额足够，审批通过时直接扣减 `available_minutes`。
 - 写入 `lv_account_txn`：
   - `txn_type=DEDUCT`
   - `change_minutes=-durationMinutes`
@@ -291,7 +342,7 @@ Cookie: SESSION=...
 - 扣减失败时审批不会进入错误终态。
 - 扣减成功、审批状态更新为 `APPROVED` 后，同一事务内触发考勤日结果重算。
 
-### 6.3 审批通过联动考勤
+### 6.4 审批通过联动考勤
 
 直属上级审批通过请假申请后：
 
@@ -302,11 +353,12 @@ Cookie: SESSION=...
 - 当已批准请假只覆盖部分时段时，考勤侧按分钟抵扣迟到、早退和缺勤窗口，不会把整天误算为 `LEAVE`。
 - 重叠请假区间由考勤侧合并后再计算，避免重复抵扣同一时间段。
 
-### 6.4 不扣减场景
+### 6.5 不扣减场景
 
 - 直属上级驳回不扣减。
 - Agent 预审驳回不扣减。
 - 申请人撤回不扣减。
+- 上述场景如果已冻结余额，会写入 `RELEASE` 流水并把冻结分钟数退回 `available_minutes`。
 
 ---
 
@@ -324,7 +376,9 @@ Cookie: SESSION=...
 | `200` | `409` | `假种编码已存在` | 创建假种编码重复 |
 | `200` | `409` | `假种已停用` | 调整或扣减停用假种 |
 | `200` | `409` | `幂等键已被不同余额调整操作使用` | 余额调整 `sourceTxnKey` 被不同操作指纹复用 |
+| `200` | `409` | `幂等键已被不同假期冻结操作使用` | 提交冻结 `source_txn_key` 被其他流水占用 |
 | `200` | `409` | `幂等键已被不同假期扣减操作使用` | 审批扣减 `source_txn_key` 被其他流水占用 |
+| `200` | `409` | `幂等键已被不同假期释放操作使用` | 驳回/撤回释放 `source_txn_key` 被其他流水占用 |
 
 ---
 
@@ -335,5 +389,4 @@ Cookie: SESSION=...
 - 第一版不做结转、过期清零。
 - 第一版不做节假日、休息日和工作日历对请假扣减分钟数的精细过滤。
 - 第一版不支持跨天班次下的请假分钟级覆盖。
-- 第一版不冻结提交中的余额，只在提交前检查，审批通过时再次检查并扣减。
-- 第一版保留 `frozen_minutes` 字段，后续可扩展为“提交冻结、撤回/驳回解冻、通过转扣减”。
+- 第一版已接入提交冻结、撤回/驳回释放、审批通过转扣减；自动发放、结转和过期清零仍待后续。

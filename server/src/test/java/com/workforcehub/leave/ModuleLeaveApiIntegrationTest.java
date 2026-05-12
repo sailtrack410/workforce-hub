@@ -73,6 +73,16 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
 
         long leaveTypeId = data(typeResult).get("leaveTypeId").asLong();
 
+        mockMvc.perform(get("/api/admin/leave/types")
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)]", leaveTypeId).value(hasSize(1)))
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].leaveCode", leaveTypeId).value("ANNUAL_" + suffix))
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].leaveName", leaveTypeId).value("年假-" + suffix))
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].balanceMode", leaveTypeId).value("DEDUCT"))
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].status", leaveTypeId).value("ACTIVE"));
+
         mockMvc.perform(post("/api/admin/leave/accounts/adjustments")
                 .cookie(adminSession)
                 .contentType(MediaType.APPLICATION_JSON)

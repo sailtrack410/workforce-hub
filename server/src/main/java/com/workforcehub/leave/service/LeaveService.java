@@ -106,6 +106,12 @@ public class LeaveService implements LeaveQueryService {
         return toAccountResponse(updatedAccount, TXN_TYPE_ADJUST, request.getChangeMinutes());
     }
 
+    public List<LeaveTypeResponse> listLeaveTypes() {
+        return leaveRepository.listLeaveTypes().stream()
+            .map(this::toLeaveTypeResponse)
+            .toList();
+    }
+
     public List<LeaveAccountResponse> listCurrentEmployeeAccounts() {
         Long userId = CurrentUserHolder.requireUserId();
         return leaveRepository.listUserAccounts(userId).stream()
