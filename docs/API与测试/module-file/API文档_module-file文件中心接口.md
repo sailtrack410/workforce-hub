@@ -15,14 +15,16 @@
 
 ## 二、接口范围
 
-本文档覆盖以下 `22` 个接口。
+本文档覆盖以下 `24` 个接口。
 
-当前已实现 `22` 个接口：员工端 `8` 个接口（含真实下载执行入口），后台端 `14` 个接口（后台上传确认、后台文件生命周期治理、清理任务、存储摘要、配额策略 CRUD）。
+当前已实现 `24` 个接口：员工端 `10` 个接口（含个人文件列表、回收站列表和真实下载执行入口），后台端 `14` 个接口（后台上传确认、后台文件生命周期治理、清理任务、存储摘要、配额策略 CRUD）。
 
 ### 1. 员工端
 
 - `POST /api/employee/files/upload-tickets`
 - `POST /api/employee/files/confirm-upload`
+- `GET /api/employee/files`
+- `GET /api/employee/files/recycle-bin`
 - `GET /api/employee/files/quota`
 - `POST /api/employee/files/{attachmentRefId}/download-tickets`
 - `GET /api/employee/files/download/{ticketNo}`
@@ -481,7 +483,118 @@ http://localhost:8080
 - 服务端重新计算 hash 与大小
 - 重复确认当前采用宽松幂等：如果 `uploadTicketId` 已经生成附件引用，则以原票据对应附件为准返回，不再次按当前请求体重建引用
 
-### 6.3 查询我的云空间用量
+### 6.3 查询我的文件列表
+
+`GET /api/employee/files?pageNo=1&pageSize=20`
+
+用途：
+
+- 支撑员工端个人文件中心渲染已上传文件列表
+- 只返回当前登录员工上传的有效个人文件
+- 不混入审批附件、消息附件、群文件、知识库文件、后台治理文件或其他员工的个人文件
+
+查询参数：
+
+| 参数 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `pageNo` | 否 | `1` | 页码，小于 `1` 时按 `1` 处理 |
+| `pageSize` | 否 | `20` | 每页数量，小于 `1` 时按 `1` 处理，大于 `100` 时按 `100` 处理 |
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "attachmentRefId": 9001,
+        "fileObjectId": 8001,
+        "ownerType": "PERSONAL_FILE",
+        "ownerId": null,
+        "originalFileName": "个人资料.pdf",
+        "displayName": "个人资料.pdf",
+        "uploaderType": "USER",
+        "uploaderId": 1001,
+        "mimeType": "application/pdf",
+        "fileSize": 1048576,
+        "scanStatus": "PENDING",
+        "deletedAt": null,
+        "purgeAfter": null,
+        "createdAt": "2026-05-12T10:30:00",
+        "updatedAt": "2026-05-12T10:30:00"
+      }
+    ]
+  },
+  "requestId": "file202605120001"
+}
+```
+
+关键校验：
+
+- 当前请求必须是员工会话
+- 只查询 `owner_type=PERSONAL_FILE`
+- 只查询 `uploader_type=USER` 且 `uploader_id` 等于当前登录用户的附件引用
+- 只返回未删除的附件引用和未删除的物理文件对象
+- 按 `createdAt DESC, attachmentRefId DESC` 排序
+
+### 6.4 查询我的回收站文件列表
+
+`GET /api/employee/files/recycle-bin?pageNo=1&pageSize=20`
+
+用途：
+
+- 支撑员工端文件中心回收站渲染
+- 只返回当前登录员工已移入回收站、尚未彻底删除的个人文件
+
+查询参数与 `GET /api/employee/files` 一致。
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "attachmentRefId": 9002,
+        "fileObjectId": 8002,
+        "ownerType": "PERSONAL_FILE",
+        "ownerId": null,
+        "originalFileName": "旧文件.txt",
+        "displayName": "旧文件.txt",
+        "uploaderType": "USER",
+        "uploaderId": 1001,
+        "mimeType": "text/plain",
+        "fileSize": 128,
+        "scanStatus": "PENDING",
+        "deletedAt": "2026-05-12T11:00:00",
+        "purgeAfter": "2026-06-11T11:00:00",
+        "createdAt": "2026-05-12T10:30:00",
+        "updatedAt": "2026-05-12T11:00:00"
+      }
+    ]
+  },
+  "requestId": "file202605120002"
+}
+```
+
+关键校验：
+
+- 当前请求必须是员工会话
+- 只查询当前登录员工自己的个人文件
+- 只返回 `deletedAt` 不为空且尚未彻底删除的附件引用
+- 前端可用 `purgeAfter` 展示回收站保留期限
+
+### 6.5 查询我的云空间用量
 
 `GET /api/employee/files/quota`
 
@@ -511,7 +624,7 @@ http://localhost:8080
 }
 ```
 
-### 6.4 申请下载票据
+### 6.6 申请下载票据
 
 `POST /api/employee/files/{attachmentRefId}/download-tickets`
 
@@ -549,7 +662,7 @@ http://localhost:8080
 - 员工端普通文件入口仅允许 `owner_type=PERSONAL_FILE`，审批附件、群文件、知识库文件等业务附件必须走对应业务模块授权入口
 - 下载行为写入审计日志
 
-### 6.4.1 使用下载票据下载文件
+### 6.6.1 使用下载票据下载文件
 
 `GET /api/employee/files/download/{ticketNo}`
 
@@ -574,7 +687,7 @@ http://localhost:8080
 - 附件引用和物理文件对象未删除
 - 存储 Provider 中的对象必须存在
 
-### 6.5 移入回收站
+### 6.7 移入回收站
 
 `POST /api/employee/files/{attachmentRefId}/trash`
 
@@ -601,7 +714,7 @@ http://localhost:8080
 }
 ```
 
-### 6.6 从回收站恢复
+### 6.8 从回收站恢复
 
 `POST /api/employee/files/{attachmentRefId}/restore`
 
@@ -633,7 +746,7 @@ http://localhost:8080
 - 当前用户有恢复权限
 - 恢复后不会突破当前配额和企业总池限制
 
-### 6.7 彻底删除业务引用
+### 6.9 彻底删除业务引用
 
 `DELETE /api/employee/files/{attachmentRefId}`
 

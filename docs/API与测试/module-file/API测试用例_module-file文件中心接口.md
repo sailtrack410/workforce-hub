@@ -204,7 +204,17 @@
 | `FILE-QTA-002` | P1 | `GET /api/employee/files/quota` | 企业进入写入保护时提示原因 | 后端容量低于安全预留 | 无 | HTTP `200`；`uploadWritable=false`；返回 `blockReason` |
 | `FILE-QTA-003` | P0 | `GET /api/admin/files/storage-summary` | 后台查询存储摘要 | 管理员已登录 | 无 | HTTP `200`；返回长期池、缓存池、真实后端容量 |
 
-## 6.4 下载票据
+## 6.4 个人文件列表
+
+| 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `FILE-LIST-001` | P0 | `GET /api/employee/files` | 员工查询个人有效文件列表 | 员工 A 已登录；存在员工 A 的有效个人文件、回收站文件、审批附件和员工 B 文件 | `pageNo=1&pageSize=20` | HTTP `200`；`code=0`；只返回员工 A 的有效 `PERSONAL_FILE`；不返回回收站文件、审批附件和其他员工文件 |
+| `FILE-LIST-002` | P0 | `GET /api/employee/files/recycle-bin` | 员工查询个人回收站文件列表 | 员工 A 已登录；存在员工 A 的回收站个人文件和有效个人文件 | `pageNo=1&pageSize=20` | HTTP `200`；`code=0`；只返回员工 A 的回收站个人文件；返回 `deletedAt` 和 `purgeAfter` |
+| `FILE-LIST-003` | P1 | `GET /api/employee/files` | 分页参数归一化 | 员工 A 已登录 | `pageNo=0&pageSize=200` | HTTP `200`；服务端按 `pageNo=1`、`pageSize=100` 执行 |
+| `FILE-LIST-004` | P0 | `GET /api/employee/files` | 未登录不能查询个人文件列表 | 无会话 | `pageNo=1&pageSize=20` | HTTP `401` |
+| `FILE-LIST-005` | P0 | `GET /api/employee/files` | 后台管理员不能查询员工个人文件列表 | 后台管理员已登录 | `pageNo=1&pageSize=20` | HTTP `403` |
+
+## 6.5 下载票据
 
 | 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -223,7 +233,7 @@
 | `FILE-ADM-DL-005` | P1 | `GET /api/admin/files` | 后台列表默认隐藏存储内部字段 | 管理员已登录；存在后台治理文件 | 分页查询 | 响应不包含 `contentSha256`、`storageProvider`、`bucketName`、`objectKey` |
 | `FILE-ADM-DL-006` | P1 | `GET /api/admin/files/download/{ticketNo}` | 非法 MIME 降级为二进制下载 | 历史数据或手工数据写入非法 MIME | 访问后台下载入口 | HTTP `200`；`Content-Type=application/octet-stream`；Body 等于原始文件字节 |
 
-## 6.5 回收站
+## 6.6 回收站
 
 | 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -236,7 +246,7 @@
 | `FILE-TRASH-007` | P0 | 并发集成测试 | 员工端同一附件彻底删除只释放一次用量 | 员工文件已进入回收站；个人空间和企业总池还有其他文件作为账本哨兵 | 两个请求并发彻底删除同一附件 | 仅一个请求 `code=0`；另一个 `code=404`；`USER` 与 `GLOBAL` 只扣减目标文件一次 |
 | `FILE-ADM-TRASH-006` | P0 | 并发集成测试 | 后台同一附件彻底删除只释放一次用量 | 后台文件已进入回收站；企业总池还有其他文件作为账本哨兵 | 两个请求并发彻底删除同一附件 | 仅一个请求 `code=0`；另一个 `code=404`；`GLOBAL` 只扣减目标文件一次 |
 
-## 6.6 后台配额治理
+## 6.7 后台配额治理
 
 | 用例 ID | 优先级 | 接口 | 用例名称 | 前置条件 | 请求 | 预期结果 |
 | --- | --- | --- | --- | --- | --- | --- |
