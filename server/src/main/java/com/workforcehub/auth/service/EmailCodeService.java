@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
  * - {workforce.auth.redis-key-prefix}auth:email:code:{purpose}:{email}     存验证码，TTL 5 分钟
  * - {workforce.auth.redis-key-prefix}auth:email:send:{purpose}:{email}     防重发标记，TTL 60 秒
  *
- * purpose 取值：BIND（绑定邮箱）/ RESET_PASSWORD（找回密码）
+ * purpose 取值：BIND（绑定邮箱）/ RESET_PASSWORD（找回密码）/ LOGIN（登录二次验证）
  */
 @Slf4j
 @Service
@@ -103,7 +103,7 @@ public class EmailCodeService {
     }
 
     private void validatePurpose(String purpose) {
-        if (!"BIND".equals(purpose) && !"RESET_PASSWORD".equals(purpose)) {
+        if (!"BIND".equals(purpose) && !"RESET_PASSWORD".equals(purpose) && !"LOGIN".equals(purpose)) {
             throw new BizException(400, "不支持的验证码用途");
         }
     }
@@ -120,12 +120,19 @@ public class EmailCodeService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(mailFrom);
         message.setTo(email);
-        if ("BIND".equals(purpose)) {
-            message.setSubject("【Workforce Hub】邮箱绑定验证码");
-            message.setText("您的邮箱绑定验证码为：" + code + "，5 分钟内有效。如非本人操作请忽略。");
-        } else {
-            message.setSubject("【Workforce Hub】密码重置验证码");
-            message.setText("您的密码重置验证码为：" + code + "，5 分钟内有效。如非本人操作请忽略。");
+        switch (purpose) {
+            case "BIND" -> {
+                message.setSubject("【Workforce Hub】邮箱绑定验证码");
+                message.setText("您的邮箱绑定验证码为：" + code + "，5 分钟内有效。如非本人操作请忽略。");
+            }
+            case "LOGIN" -> {
+                message.setSubject("【Workforce Hub】登录验证码");
+                message.setText("您的登录验证码为：" + code + "，5 分钟内有效。如非本人操作请立即修改账号密码。");
+            }
+            default -> {
+                message.setSubject("【Workforce Hub】密码重置验证码");
+                message.setText("您的密码重置验证码为：" + code + "，5 分钟内有效。如非本人操作请忽略。");
+            }
         }
         mailSender.send(message);
     }

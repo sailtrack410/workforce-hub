@@ -62,8 +62,13 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     private static final long MANAGER_USER_ID = 2002L;
     private static final long EMPLOYEE_USER_ID = 2003L;
     private static final long OTHER_EMPLOYEE_USER_ID = 2004L;
+    private static final ObjectMapper STATIC_OBJECT_MAPPER = new ObjectMapper();
     private static HttpServer modelServer;
     private static String modelBaseUrl;
+
+    static {
+        System.setProperty("test.workforce.agent.model.enabled", "true");
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -99,11 +104,15 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         if (modelServer != null) {
             modelServer.stop(0);
         }
+        System.clearProperty("test.workforce.agent.model.enabled");
     }
 
     @DynamicPropertySource
     static void registerAgentModelProperties(DynamicPropertyRegistry registry) {
         registry.add("workforce.agent.model.enabled", () -> "true");
+        registry.add("workforce.agent.model.base-url", () -> "");
+        registry.add("workforce.agent.model.api-key", () -> "");
+        registry.add("workforce.agent.model.model", () -> "");
     }
 
     @BeforeEach
@@ -502,7 +511,12 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[1].seqNo").value(2))
             .andExpect(jsonPath("$.data[1].senderType").value("AGENT"))
             .andExpect(jsonPath("$.data[1].senderId").value(agentId))
-            .andExpect(jsonPath("$.data[1].contentText").value("模型回复：帮我总结今天待办"));
+            .andExpect(jsonPath("$.data[1].messageType").value("CARD"))
+            .andExpect(jsonPath("$.data[1].contentText").value("年假与考勤影响"))
+            .andExpect(jsonPath("$.data[1].contentJson").value(Matchers.allOf(
+                Matchers.containsString("\"cardType\""),
+                Matchers.containsString("\"knowledge_answer\"")
+            )));
 
         assertEquals(2L, jdbcTemplate.queryForObject(
             "SELECT last_message_seq FROM im_conversation WHERE id = ?",
@@ -2111,6 +2125,24 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private static void handleModelRequest(HttpExchange exchange) throws IOException {
+        String cardJson = """
+            {
+              "cardType": "knowledge_answer",
+              "state": "ANSWERED",
+              "title": "年假与考勤影响",
+              "answer": "审批通过后会扣减年假余额，并同步生成请假考勤结果。",
+              "confidence": "high",
+              "citations": [
+                {
+                  "id": "policy-annual-leave",
+                  "title": "员工年假制度",
+                  "sourceType": "POLICY",
+                  "score": 0.87
+                }
+              ]
+            }
+            """;
+        String escapedCardJson = STATIC_OBJECT_MAPPER.writeValueAsString(cardJson);
         byte[] body = """
             {
               "id": "chatcmpl-im-test",
@@ -2128,12 +2160,12 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                   "finish_reason": "stop",
                   "message": {
                     "role": "assistant",
-                    "content": "模型回复：帮我总结今天待办"
+                    "content": %s
                   }
                 }
               ]
             }
-            """.getBytes(StandardCharsets.UTF_8);
+            """.formatted(escapedCardJson).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         exchange.sendResponseHeaders(200, body.length);
         exchange.getResponseBody().write(body);

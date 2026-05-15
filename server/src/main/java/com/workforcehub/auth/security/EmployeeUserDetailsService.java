@@ -46,6 +46,10 @@ public class EmployeeUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String loginName) throws UsernameNotFoundException {
         AuthUserAccount account = accountMapper.selectByLoginName(loginName);
+        if (account == null && loginName != null && loginName.contains("@")) {
+            // 兼容员工端使用邮箱登录：仅在输入形似邮箱时回退查询，避免每次登录都查两次。
+            account = accountMapper.selectByEmail(loginName);
+        }
         if (account == null) {
             throw new UsernameNotFoundException("账号不存在");
         }

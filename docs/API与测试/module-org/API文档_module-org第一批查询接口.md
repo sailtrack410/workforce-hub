@@ -5,8 +5,8 @@
 | 项目 | 内容 |
 | --- | --- |
 | 文档名称 | `module-org` 第一批查询接口 API 文档 |
-| 文档版本 | `v1.0` |
-| 适用范围 | 后台组织目录查询、员工个人组织信息查询 |
+| 文档版本 | `v1.1` |
+| 适用范围 | 后台组织目录查询、员工个人组织信息查询、员工通讯录联系人摘要 |
 | 对应模块 | `server/module-org` |
 | 发布日期 | `2026-05-02` |
 | 当前状态 | 已随代码落地，可用于联调与测试 |
@@ -15,7 +15,7 @@
 
 ## 二、文档范围
 
-本文档覆盖以下 `9` 个接口：
+本文档覆盖以下 `10` 个接口：
 
 ### 1. 后台端
 
@@ -31,6 +31,7 @@
 - `GET /api/employee/me/profile`
 - `GET /api/employee/me/manager`
 - `GET /api/employee/me/subordinates`
+- `GET /api/employee/me/colleagues`
 
 ---
 
@@ -218,6 +219,7 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 | `userId` | `long` | 是 | 员工用户 ID |
 | `employeeNo` | `string` | 是 | 工号 |
 | `realName` | `string` | 是 | 姓名 |
+| `avatarAttachmentRefId` | `long/null` | 是 | 头像附件引用 ID，前端可通过文件下载票据渲染头像 |
 | `primaryDeptId` | `long` | 是 | 主部门 ID |
 | `primaryDeptName` | `string/null` | 是 | 主部门名称 |
 | `positionId` | `long/null` | 是 | 岗位 ID |
@@ -226,6 +228,8 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 | `managerName` | `string/null` | 是 | 直属上级姓名 |
 | `employmentStatus` | `string` | 是 | 在职状态 |
 | `status` | `string` | 是 | 主档状态 |
+| `signature` | `string` | 是 | 个性签名，未设置时返回空字符串 |
+| `presenceStatus` | `string` | 是 | 在线状态展示值，未设置时返回 `ONLINE` |
 
 ## 4.4 UserDetail
 
@@ -235,6 +239,7 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 | --- | --- | --- | --- |
 | `gender` | `string/null` | 是 | 性别 |
 | `mobile` | `string/null` | 是 | 手机号 |
+| `avatarAttachmentRefId` | `long/null` | 是 | 头像附件引用 ID |
 | `hireDate` | `string/null` | 是 | 入职日期 |
 | `regularizedAt` | `string/null` | 是 | 转正日期 |
 | `serviceStartDate` | `string/null` | 是 | 司龄起算日 |
@@ -268,6 +273,7 @@ Cookie: SESSION=xxxxxxxxxxxxxxxx
 | 7 | `GET` | `/api/employee/me/profile` | 员工 | 查询本人档案 |
 | 8 | `GET` | `/api/employee/me/manager` | 员工 | 查询本人直属上级 |
 | 9 | `GET` | `/api/employee/me/subordinates` | 员工 | 查询本人直属下级 |
+| 10 | `GET` | `/api/employee/me/colleagues` | 员工 | 查询本人同部门同事 |
 
 ---
 
@@ -421,6 +427,7 @@ curl --location 'http://localhost:8080/api/admin/users?pageNo=1&pageSize=20&keyw
         "userId": 2003,
         "employeeNo": "E1003",
         "realName": "张三",
+        "avatarAttachmentRefId": 9011,
         "primaryDeptId": 110,
         "primaryDeptName": "研发中心",
         "positionId": 3001,
@@ -428,7 +435,9 @@ curl --location 'http://localhost:8080/api/admin/users?pageNo=1&pageSize=20&keyw
         "managerUserId": 2002,
         "managerName": "李四",
         "employmentStatus": "ACTIVE",
-        "status": "ACTIVE"
+        "status": "ACTIVE",
+        "signature": "保持节奏",
+        "presenceStatus": "ONLINE"
       }
     ]
   },
@@ -484,6 +493,7 @@ curl --location 'http://localhost:8080/api/admin/users/2003' \
     "realName": "张三",
     "gender": "MALE",
     "mobile": "13800000003",
+    "avatarAttachmentRefId": 9011,
     "primaryDeptId": 110,
     "primaryDeptName": "研发中心",
     "positionId": 3001,
@@ -546,6 +556,7 @@ curl --location 'http://localhost:8080/api/admin/users/2003' \
     "userId": 2002,
     "employeeNo": "E1002",
     "realName": "李四",
+    "avatarAttachmentRefId": null,
     "primaryDeptId": 110,
     "primaryDeptName": "研发中心",
     "positionId": 3002,
@@ -553,7 +564,9 @@ curl --location 'http://localhost:8080/api/admin/users/2003' \
     "managerUserId": null,
     "managerName": null,
     "employmentStatus": "ACTIVE",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "signature": "",
+    "presenceStatus": "ONLINE"
   },
   "requestId": "0a19353484c94b27beeea0a8d8ac2391"
 }
@@ -604,6 +617,7 @@ curl --location 'http://localhost:8080/api/admin/users/2003' \
       "userId": 2003,
       "employeeNo": "E1003",
       "realName": "张三",
+      "avatarAttachmentRefId": 9011,
       "primaryDeptId": 110,
       "primaryDeptName": "研发中心",
       "positionId": 3001,
@@ -611,7 +625,9 @@ curl --location 'http://localhost:8080/api/admin/users/2003' \
       "managerUserId": 2002,
       "managerName": "李四",
       "employmentStatus": "ACTIVE",
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "signature": "保持节奏",
+      "presenceStatus": "ONLINE"
     }
   ],
   "requestId": "e47f98b4d1a74e12a8f2633eb5990e1a"
@@ -654,6 +670,7 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
     "realName": "张三",
     "gender": "MALE",
     "mobile": "13800000003",
+    "avatarAttachmentRefId": 9011,
     "primaryDeptId": 111,
     "primaryDeptName": "后端组",
     "positionId": 3001,
@@ -699,6 +716,7 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
     "userId": 2002,
     "employeeNo": "E1002",
     "realName": "李四",
+    "avatarAttachmentRefId": null,
     "primaryDeptId": 110,
     "primaryDeptName": "研发中心",
     "positionId": 3002,
@@ -706,7 +724,9 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
     "managerUserId": null,
     "managerName": null,
     "employmentStatus": "ACTIVE",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "signature": "",
+    "presenceStatus": "ONLINE"
   },
   "requestId": "b7d4b0a0c26d4c15a096c0ce4fb78d48"
 }
@@ -741,6 +761,7 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
       "userId": 2003,
       "employeeNo": "E1003",
       "realName": "张三",
+      "avatarAttachmentRefId": 9011,
       "primaryDeptId": 111,
       "primaryDeptName": "后端组",
       "positionId": 3001,
@@ -748,12 +769,15 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
       "managerUserId": 2002,
       "managerName": "李四",
       "employmentStatus": "ACTIVE",
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "signature": "保持节奏",
+      "presenceStatus": "ONLINE"
     },
     {
       "userId": 2004,
       "employeeNo": "E1004",
       "realName": "王五",
+      "avatarAttachmentRefId": 9012,
       "primaryDeptId": 111,
       "primaryDeptName": "后端组",
       "positionId": 3001,
@@ -761,10 +785,60 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
       "managerUserId": 2002,
       "managerName": "李四",
       "employmentStatus": "ACTIVE",
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "signature": "专注项目推进",
+      "presenceStatus": "AWAY"
     }
   ],
   "requestId": "55f4b7fa2e5442b0bd7c5482816ef820"
+}
+```
+
+---
+
+## 6.10 查询本人同部门同事
+
+### 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法 | `GET` |
+| 路径 | `/api/employee/me/colleagues` |
+| 鉴权 | 员工会话 |
+| 请求体 | 无 |
+| 幂等性 | 是 |
+
+### 返回说明
+
+- 返回与当前登录员工 `primaryDeptId` 相同的其他员工，不包含本人
+- 返回结构为 `UserSummary[]`
+- 可直接作为通讯录联系人列表的数据源，包含头像、岗位、部门、签名和在线状态
+
+### 成功响应示例
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "userId": 2004,
+      "employeeNo": "E1004",
+      "realName": "王五",
+      "avatarAttachmentRefId": 9012,
+      "primaryDeptId": 111,
+      "primaryDeptName": "后端组",
+      "positionId": 3001,
+      "positionName": "后端开发工程师",
+      "managerUserId": 2002,
+      "managerName": "李四",
+      "employmentStatus": "PROBATION",
+      "status": "ACTIVE",
+      "signature": "专注项目推进",
+      "presenceStatus": "AWAY"
+    }
+  ],
+  "requestId": "8b2d8c1f7d8745c28b8a7bd7b1d2ed0a"
 }
 ```
 
@@ -779,7 +853,7 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
 1. 先登录后台端，验证 `departments/tree`、`positions`、`users`
 2. 再验证后台端 `user detail / manager / subordinates`
 3. 登录员工端，验证 `me/profile`
-4. 再验证 `me/manager` 与 `me/subordinates`
+4. 再验证 `me/manager`、`me/subordinates` 与 `me/colleagues`
 5. 最后验证错误场景：
    - 未登录
    - 路径串用
@@ -793,6 +867,8 @@ curl --location 'http://localhost:8080/api/employee/me/profile' \
 - `requestId` 建议在前端日志和报错弹窗里保留
 - `manager` 接口可能返回 `null`
 - `subordinates` 接口一定按数组处理，不要按对象处理
+- `colleagues` 接口一定按数组处理；接口不返回本人，前端如需“我”卡片应从 `me/profile` 单独渲染
+- `UserSummary.avatarAttachmentRefId/signature/presenceStatus` 用于通讯录展示；旧前端类型需要同步补字段
 
 ## 7.3 当前版本限制
 

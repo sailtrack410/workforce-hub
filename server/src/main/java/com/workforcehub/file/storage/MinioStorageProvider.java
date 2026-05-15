@@ -12,6 +12,7 @@ import io.minio.http.Method;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -30,11 +31,15 @@ public class MinioStorageProvider implements StorageProvider {
     public MinioStorageProvider(@Value("${minio.endpoint}") String endpoint,
                                 @Value("${minio.access-key}") String accessKey,
                                 @Value("${minio.secret-key}") String secretKey,
-                                @Value("${minio.bucket}") String bucketName) {
-        this.minioClient = MinioClient.builder()
+                                @Value("${minio.bucket}") String bucketName,
+                                @Value("${minio.region:us-east-1}") String region) {
+        MinioClient.Builder builder = MinioClient.builder()
             .endpoint(endpoint)
-            .credentials(accessKey, secretKey)
-            .build();
+            .credentials(accessKey, secretKey);
+        if (StringUtils.hasText(region)) {
+            builder.region(region.trim());
+        }
+        this.minioClient = builder.build();
         this.bucketName = bucketName;
     }
 

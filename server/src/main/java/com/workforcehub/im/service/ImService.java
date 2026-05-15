@@ -696,7 +696,11 @@ public class ImService {
         try {
             JsonNode node = objectMapper.readTree(contentJson);
             JsonNode textNode = node.get("text");
-            return textNode == null || textNode.isNull() ? "" : textNode.asText("");
+            if (textNode != null && !textNode.isNull()) {
+                return textNode.asText("");
+            }
+            JsonNode titleNode = node.get("title");
+            return titleNode == null || titleNode.isNull() ? "" : titleNode.asText("");
         } catch (Exception ignored) {
             return "";
         }

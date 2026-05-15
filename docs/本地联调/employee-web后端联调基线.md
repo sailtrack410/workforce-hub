@@ -85,9 +85,9 @@ curl http://localhost:8080/actuator/health
 
 ### 2. SMTP
 
-找回密码依赖 SMTP。
+找回密码、登录邮箱二验和绑定邮箱都依赖 SMTP。
 
-默认配置已经调整为：
+后端从 `server/` 启动时会自动读取仓库根目录 `.env`。如果 `.env` 配置了真实 SMTP，例如 163 邮箱，验证码会走真实邮箱；没有配置时使用本地调试默认值：
 
 ```bash
 MAIL_HOST=127.0.0.1
@@ -100,7 +100,7 @@ MAIL_PORT=1025
 python3 server/scripts/dev/start_debug_smtp.py
 ```
 
-如果 SMTP 没启动：
+如果走本地调试 SMTP 且服务没启动：
 
 - `POST /api/employee/auth/email/send-code` 会返回 `code=500`
 - 提示文案通常是 `邮件发送失败，请稍后重试`

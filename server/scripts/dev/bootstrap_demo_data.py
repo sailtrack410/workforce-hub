@@ -17,9 +17,6 @@ BASE_URL = os.environ.get("WFH_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
 ADMIN_LOGIN = os.environ.get("WFH_ADMIN_LOGIN", "admin.demo")
 ADMIN_PASSWORD = os.environ.get("WFH_ADMIN_PASSWORD", "Admin@123456")
 EMPLOYEE_PASSWORD = os.environ.get("WFH_EMPLOYEE_PASSWORD", "Employee@123456")
-AGENT_MODEL_BASE_URL = os.environ.get("WFH_AGENT_MODEL_BASE_URL", "http://127.0.0.1:18080/v1")
-AGENT_MODEL_API_KEY = os.environ.get("WFH_AGENT_MODEL_API_KEY", "demo-key")
-AGENT_MODEL_NAME = os.environ.get("WFH_AGENT_MODEL_NAME", "stub-chat")
 user_login_by_user_id: dict[int, str] = {}
 
 
@@ -32,12 +29,13 @@ class DemoUserSpec:
     user_id: int | None
     manager_login: str | None
     leave_minutes: int
+    bind_default_email: bool = True
 
 
 DEMO_USERS = (
     DemoUserSpec("demo.leader", "演示领导", "D22001", "13900002201", 22001, None, 1440),
     DemoUserSpec("demo.employee1", "演示员工一", "D22002", "13900002202", 22002, "demo.leader", 960),
-    DemoUserSpec("demo.employee2", "演示员工二", "D22003", "13900002203", 22003, "demo.leader", 480),
+    DemoUserSpec("demo.employee2", "演示员工二", "D22003", "13900002203", 22003, "demo.leader", 480, False),
 )
 
 
@@ -241,7 +239,7 @@ def ensure_demo_user(admin: HttpClient,
     admin.request("PUT", f"/api/admin/users/{user_id}/account", {
         "loginName": spec.login_name,
         "newPassword": EMPLOYEE_PASSWORD,
-        "email": f"{spec.login_name}@example.com",
+        "email": f"{spec.login_name}@example.com" if spec.bind_default_email else "",
         "accountStatus": "ACTIVE",
     })
     return user_id
@@ -427,7 +425,7 @@ def list_admin_agents(admin: HttpClient) -> list[dict[str, Any]]:
     return (admin.request("GET", "/api/admin/agents", params={"pageNo": 1, "pageSize": 100}).get("data") or {}).get("list") or []
 
 
-def ensure_agent(admin: HttpClient, employee_user_id: int) -> int:
+def ensure_agent(admin: HttpClient, employee_user_ids: list[int]) -> int:
     agents = list_admin_agents(admin)
     existing = next((item for item in agents if item.get("agentCode") == "DEMO_IM_AGENT"), None)
     if existing:
@@ -446,12 +444,7 @@ def ensure_agent(admin: HttpClient, employee_user_id: int) -> int:
     if not version_id:
         version_resp = admin.request("POST", f"/api/admin/agents/{agent_id}/versions", {
             "versionNo": 1,
-            "modelConfigJson": json.dumps({
-                "provider": "openai-compatible",
-                "baseUrl": AGENT_MODEL_BASE_URL,
-                "apiKey": AGENT_MODEL_API_KEY,
-                "model": AGENT_MODEL_NAME,
-            }, ensure_ascii=False),
+            "modelConfigJson": json.dumps({}, ensure_ascii=False),
             "systemPrompt": "你是用于本地联调演示的企业助手，回复简洁直接。",
         }, allow_biz_error=True)
         if version_resp.get("code") == 0:
@@ -463,14 +456,15 @@ def ensure_agent(admin: HttpClient, employee_user_id: int) -> int:
         log(f"发布演示 Agent versionId={version_id}")
     if detail.get("status") != "ACTIVE":
         raise ApiError("演示 Agent 当前未启用，请先检查现有数据状态")
-    acl_resp = admin.request("POST", f"/api/admin/agents/{agent_id}/acl", {
-        "subjectType": "USER",
-        "subjectId": employee_user_id,
-        "permCode": "use",
-        "status": "ACTIVE",
-    }, allow_biz_error=True)
-    if acl_resp.get("code") not in (0, 409):
-        raise ApiError(f"授予 Agent ACL 失败 {acl_resp}")
+    for employee_user_id in employee_user_ids:
+        acl_resp = admin.request("POST", f"/api/admin/agents/{agent_id}/acl", {
+            "subjectType": "USER",
+            "subjectId": employee_user_id,
+            "permCode": "use",
+            "status": "ACTIVE",
+        }, allow_biz_error=True)
+        if acl_resp.get("code") not in (0, 409):
+            raise ApiError(f"授予 Agent ACL 失败 userId={employee_user_id} {acl_resp}")
     return agent_id
 
 
@@ -557,7 +551,7 @@ def main() -> int:
         ensure_private_conversation(employee1, leader_user_id)
         ensure_workflow_demo(employee1, leader, leave_type_id)
 
-        agent_id = ensure_agent(client, employee1_user_id)
+        agent_id = ensure_agent(client, [employee1_user_id, employee2_user_id])
         ensure_agent_conversation(employee1, agent_id)
 
         log("演示数据引导完成。")

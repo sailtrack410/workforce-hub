@@ -5,8 +5,8 @@
 | 项目 | 内容 |
 | --- | --- |
 | 文档名称 | `module-org` 第一批查询接口测试用例 |
-| 文档版本 | `v1.0` |
-| 适用范围 | 组织查询读侧接口联调、回归、冒烟 |
+| 文档版本 | `v1.1` |
+| 适用范围 | 组织查询读侧接口联调、回归、冒烟、通讯录联系人摘要 |
 | 发布日期 | `2026-05-02` |
 
 ---
@@ -19,6 +19,7 @@
 - 验证 Session 鉴权与路径隔离生效
 - 验证分页参数和边界参数校验
 - 验证直属上级 / 下级的空值与空数组语义
+- 验证同部门同事列表返回通讯录展示字段
 - 验证 `X-Request-Id` 透传能力
 
 ---
@@ -145,6 +146,7 @@
 | `ORG-EMP-003` | P1 | `GET /api/employee/me/subordinates` | 普通员工无直属下级 | 已登录员工账号 A | 无参数 | HTTP `200`；`code=0`；返回空数组 `[]` |
 | `ORG-EMP-004` | P0 | `GET /api/employee/me/subordinates` | 领导员工获取直属下级 | 已登录员工账号 B；存在下级 | 无参数 | HTTP `200`；`code=0`；返回直属下级数组 |
 | `ORG-EMP-005` | P1 | `GET /api/employee/me/manager` | 顶级领导无直属上级 | 已登录员工账号 B；无上级 | 无参数 | HTTP `200`；`code=0`；`data=null` |
+| `ORG-EMP-006` | P0 | `GET /api/employee/me/colleagues` | 普通员工获取同部门同事通讯录字段 | 已登录员工账号 A；同部门存在员工账号 C，且账号 C 已设置头像、签名、在线状态 | 无参数 | HTTP `200`；`code=0`；返回数组不包含本人；同事项包含 `avatarAttachmentRefId`、`signature`、`presenceStatus` |
 
 ## 6.3 鉴权与安全
 
@@ -175,7 +177,7 @@
 3. 执行 `ORG-ADMIN-001` 到 `ORG-ADMIN-003`
 4. 执行 `ORG-ADMIN-007`、`ORG-ADMIN-009`、`ORG-ADMIN-011`
 5. 登录员工账号 A，保存 `SESSION` Cookie
-6. 执行 `ORG-EMP-001`、`ORG-EMP-002`、`ORG-EMP-003`
+6. 执行 `ORG-EMP-001`、`ORG-EMP-002`、`ORG-EMP-003`、`ORG-EMP-006`
 7. 执行 `ORG-AUTH-001` 到 `ORG-AUTH-004`
 8. 执行 `ORG-VALID-001`、`ORG-VALID-002`
 
@@ -186,6 +188,7 @@
 - 所有 P0 用例通过
 - 无接口出现 `500`
 - `manager=null` 与 `subordinates=[]` 的语义稳定
+- `colleagues` 返回数组且同事项包含通讯录展示字段
 - 前后端都能读懂 `requestId`
 
 ---

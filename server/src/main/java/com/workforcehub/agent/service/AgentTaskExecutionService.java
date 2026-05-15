@@ -193,22 +193,44 @@ public class AgentTaskExecutionService {
         if (callback == null) {
             throw new BizException(501, "IM Agent结果回写服务未接入");
         }
+        AgentConversationReplyContent replyContent = buildConversationReplyContent(replyText, taskId, agent.agentCode());
         callback.onAgentReply(new ImAgentReplyResult(
             command.conversationId(),
             command.sourceMessageId(),
             agent.id(),
             taskId,
-            "TEXT",
-            writeJson(Map.of(
-                "text", safeReplyText(replyText),
-                "agentTaskId", taskId,
-                "agentCode", agent.agentCode()
-            )),
+            replyContent.messageType(),
+            replyContent.contentJson(),
             "SUCCEEDED",
             null,
             null,
             agentMessageIdempotencyKey(taskId)
         ));
+    }
+
+    private AgentConversationReplyContent buildConversationReplyContent(String replyText, Long taskId, String agentCode) {
+        String safeText = safeReplyText(replyText);
+        JsonNode cardNode = parseKnowledgeAnswerCardNode(safeText);
+        if (cardNode instanceof com.fasterxml.jackson.databind.node.ObjectNode objectNode) {
+            objectNode.put("agentTaskId", taskId);
+            objectNode.put("agentCode", agentCode);
+            return new AgentConversationReplyContent("CARD", writeJson(objectNode));
+        }
+        return new AgentConversationReplyContent("TEXT", writeJson(Map.of(
+            "text", safeText,
+            "agentTaskId", taskId,
+            "agentCode", agentCode
+        )));
+    }
+
+    private JsonNode parseKnowledgeAnswerCardNode(String replyText) {
+        try {
+            JsonNode node = objectMapper.readTree(replyText);
+            JsonNode cardType = node.get("cardType");
+            return cardType != null && "knowledge_answer".equals(cardType.asText()) ? node : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void notifyImAgentFailed(ImAgentTriggerCommand command,
@@ -323,6 +345,12 @@ public class AgentTaskExecutionService {
         AgentRow agent,
         AgentVersionRow version,
         String messageContent
+    ) {
+    }
+
+    private record AgentConversationReplyContent(
+        String messageType,
+        String contentJson
     ) {
     }
 }

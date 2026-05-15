@@ -3,12 +3,12 @@ package com.workforcehub.file.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.file.config.FileStorageProperties;
 import com.workforcehub.file.dto.CreateQuotaPolicyRequest;
 import com.workforcehub.file.dto.QuotaPolicyResponse;
 import com.workforcehub.file.dto.QuotaResponse;
 import com.workforcehub.file.dto.StorageSummaryResponse;
 import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
-import com.workforcehub.file.storage.LocalStorageProvider;
 import com.workforcehub.file.storage.StorageProvider;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,20 +28,22 @@ import java.util.List;
 @Service
 public class FileQuotaPolicyService {
 
-    private static final String PROVIDER_LOCAL = LocalStorageProvider.PROVIDER_CODE;
     private static final long DEFAULT_PERSONAL_QUOTA_BYTES = 10L * 1024L * 1024L * 1024L;
     private static final long DEFAULT_GLOBAL_QUOTA_BYTES = 400L * 1024L * 1024L * 1024L;
     private static final long DEFAULT_CACHE_QUOTA_BYTES = 50L * 1024L * 1024L * 1024L;
 
     private final JdbcTemplate jdbcTemplate;
     private final StorageProviderRegistry storageProviderRegistry;
+    private final FileStorageProperties fileStorageProperties;
     private final StorageUsageLedgerService storageUsageLedgerService;
 
     public FileQuotaPolicyService(JdbcTemplate jdbcTemplate,
                                   StorageProviderRegistry storageProviderRegistry,
+                                  FileStorageProperties fileStorageProperties,
                                   StorageUsageLedgerService storageUsageLedgerService) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
+        this.fileStorageProperties = fileStorageProperties;
         this.storageUsageLedgerService = storageUsageLedgerService;
     }
 
@@ -69,7 +71,7 @@ public class FileQuotaPolicyService {
 
     public StorageSummaryResponse getStorageSummary() {
         CurrentUserHolder.requireUserId();
-        StorageProvider provider = storageProviderRegistry.require(PROVIDER_LOCAL);
+        StorageProvider provider = storageProviderRegistry.require(fileStorageProperties.getStorageProvider());
         long globalQuota = resolveQuota("GLOBAL", null, DEFAULT_GLOBAL_QUOTA_BYTES);
         long globalUsed = storageUsageLedgerService.usedBytes("GLOBAL", null);
         long cacheQuota = resolveQuota("TEMP_CACHE", null, DEFAULT_CACHE_QUOTA_BYTES);

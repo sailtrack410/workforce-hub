@@ -4,6 +4,8 @@ import com.workforcehub.auth.dto.BindEmailRequest;
 import com.workforcehub.auth.dto.CurrentUserResponse;
 import com.workforcehub.auth.dto.LoginRequest;
 import com.workforcehub.auth.dto.LoginResponse;
+import com.workforcehub.auth.dto.LoginSendCodeRequest;
+import com.workforcehub.auth.dto.LoginSendCodeResponse;
 import com.workforcehub.auth.dto.ResetPasswordRequest;
 import com.workforcehub.auth.dto.SendCodeRequest;
 import com.workforcehub.auth.service.AccountService;
@@ -37,6 +39,11 @@ public class EmployeeAuthController {
     public R<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                   HttpServletRequest httpRequest) {
         return R.ok(loginService.loginEmployee(request, httpRequest));
+    }
+
+    @PostMapping("/login/send-code")
+    public R<LoginSendCodeResponse> sendLoginCode(@Valid @RequestBody LoginSendCodeRequest request) {
+        return R.ok(loginService.sendLoginCode(request.getIdentifier()));
     }
 
     @PostMapping("/logout")

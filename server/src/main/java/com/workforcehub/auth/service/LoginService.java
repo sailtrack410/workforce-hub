@@ -3,6 +3,7 @@ package com.workforcehub.auth.service;
 import com.workforcehub.auth.domain.AuthUserAccount;
 import com.workforcehub.auth.dto.LoginRequest;
 import com.workforcehub.auth.dto.LoginResponse;
+import com.workforcehub.auth.dto.LoginSendCodeResponse;
 import com.workforcehub.auth.mapper.AuthUserAccountMapper;
 import com.workforcehub.auth.mapper.AdminUserMapper;
 import com.workforcehub.auth.security.EmploymentLoginBlockedException;
@@ -14,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AccountExpiredException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
@@ -37,27 +39,37 @@ import java.time.LocalDateTime;
  * - 失败计数 / 锁定校验
  * - 写入 SecurityContext 与 Session
  * - 更新 last_login_at
+ * - 员工端凭证通过后做邮箱二次验证（已绑定邮箱校验 LOGIN 验证码；未绑定邮箱先完成 BIND 验证）
  */
 @Slf4j
 @Service
 public class LoginService {
+
+    private static final String LOGIN_CODE_PURPOSE = "LOGIN";
+    private static final String BIND_CODE_PURPOSE = "BIND";
 
     private final WfhAuthenticationProvider employeeAuthProvider;
     private final WfhAuthenticationProvider adminAuthProvider;
     private final AuthLockService authLockService;
     private final AuthUserAccountMapper accountMapper;
     private final AdminUserMapper adminUserMapper;
+    private final EmailCodeService emailCodeService;
+    private final boolean emailVerifyEnabled;
 
     public LoginService(@Qualifier("employeeAuthProvider") WfhAuthenticationProvider employeeAuthProvider,
                         @Qualifier("adminAuthProvider") WfhAuthenticationProvider adminAuthProvider,
                         AuthLockService authLockService,
                         AuthUserAccountMapper accountMapper,
-                        AdminUserMapper adminUserMapper) {
+                        AdminUserMapper adminUserMapper,
+                        EmailCodeService emailCodeService,
+                        @Value("${workforce.auth.email-verify.enabled:true}") boolean emailVerifyEnabled) {
         this.employeeAuthProvider = employeeAuthProvider;
         this.adminAuthProvider = adminAuthProvider;
         this.authLockService = authLockService;
         this.accountMapper = accountMapper;
         this.adminUserMapper = adminUserMapper;
+        this.emailCodeService = emailCodeService;
+        this.emailVerifyEnabled = emailVerifyEnabled;
     }
 
     /**
@@ -72,6 +84,27 @@ public class LoginService {
      */
     public LoginResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest) {
         return doLogin(UserType.ADMIN, request, httpRequest, adminAuthProvider);
+    }
+
+    /**
+     * 员工端：根据登录名 / 邮箱发送登录验证码。
+     * 找不到账号或未绑定邮箱时返回 maskedEmail=null，前端据此引导后续流程。
+     */
+    public LoginSendCodeResponse sendLoginCode(String identifier) {
+        LoginSendCodeResponse response = new LoginSendCodeResponse();
+        if (!emailVerifyEnabled) {
+            return response;
+        }
+        if (identifier == null || identifier.isBlank()) {
+            return response;
+        }
+        AuthUserAccount account = lookupAccount(identifier.trim());
+        if (account == null || account.getEmail() == null || account.getEmail().isBlank()) {
+            return response;
+        }
+        emailCodeService.sendCode(account.getEmail(), LOGIN_CODE_PURPOSE);
+        response.setMaskedEmail(maskEmail(account.getEmail()));
+        return response;
     }
 
     private LoginResponse doLogin(UserType userType, LoginRequest request,
@@ -122,7 +155,54 @@ public class LoginService {
             throw new BizException(403, "登录凭证已过期，请重置密码");
         }
 
-        // 3. Session 轮换：先废弃旧 Session，再创建新 Session 写入认证上下文
+        WfhUserDetails user = (WfhUserDetails) authentication.getPrincipal();
+
+        // 3. 员工端：邮箱二次验证分支（受 workforce.auth.email-verify.enabled 开关控制）
+        if (emailVerifyEnabled && userType == UserType.USER) {
+            AuthUserAccount account = accountMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AuthUserAccount>()
+                    .eq(AuthUserAccount::getUserId, user.getUserId())
+            );
+            String boundEmail = account != null ? account.getEmail() : null;
+            boolean hasEmail = boundEmail != null && !boundEmail.isBlank();
+            if (hasEmail) {
+                if (request.getEmailCode() == null || request.getEmailCode().isBlank()) {
+                    // 凭证 OK 但未提供验证码，引导前端进入二验步骤；不签发会话。
+                    LoginResponse pending = new LoginResponse();
+                    pending.setUserId(user.getUserId());
+                    pending.setUserType(userType);
+                    pending.setDisplayName(user.getDisplayName());
+                    pending.setLoginName(user.getUsername());
+                    pending.setRequiresEmailCode(true);
+                    pending.setMaskedEmail(maskEmail(boundEmail));
+                    log.info("登录二验待提交 userType={} userId={} loginName={}",
+                        userType, user.getUserId(), loginName);
+                    return pending;
+                }
+                if (!emailCodeService.verifyCode(boundEmail, LOGIN_CODE_PURPOSE, request.getEmailCode().trim())) {
+                    log.warn("登录二验失败 userType={} userId={} loginName={}",
+                        userType, user.getUserId(), loginName);
+                    throw new BizException(401, "邮箱验证码错误或已过期");
+                }
+            } else {
+                String bindEmail = request.getBindEmail() == null ? null : request.getBindEmail().trim();
+                String bindCode = request.getEmailCode() == null ? null : request.getEmailCode().trim();
+                if (bindEmail == null || bindEmail.isBlank() || bindCode == null || bindCode.isBlank()) {
+                    LoginResponse pending = new LoginResponse();
+                    pending.setUserId(user.getUserId());
+                    pending.setUserType(userType);
+                    pending.setDisplayName(user.getDisplayName());
+                    pending.setLoginName(user.getUsername());
+                    pending.setRequiresEmailBinding(true);
+                    log.info("登录前需绑定邮箱 userType={} userId={} loginName={}",
+                        userType, user.getUserId(), loginName);
+                    return pending;
+                }
+                bindEmailForLogin(account, user.getUserId(), bindEmail, bindCode);
+            }
+        }
+
+        // 4. Session 轮换：先废弃旧 Session，再创建新 Session 写入认证上下文
         //    防止 session fixation 攻击（攻击者预设 JSESSIONID，受害者登录后被劫持）
         HttpSession oldSession = httpRequest.getSession(false);
         if (oldSession != null) {
@@ -136,23 +216,39 @@ public class LoginService {
         SecurityContextHolder.setContext(context);
         newSession.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
 
-        // 4. 清除失败计数
+        // 5. 清除失败计数
         authLockService.clearFailures(userType, loginName);
 
-        // 5. 更新最后登录时间
-        WfhUserDetails user = (WfhUserDetails) authentication.getPrincipal();
+        // 6. 更新最后登录时间
         updateLastLogin(userType, user.getUserId());
 
         log.info("登录成功 userType={} userId={} loginName={} sessionId={}",
             userType, user.getUserId(), loginName, newSession.getId());
 
-        // 6. 构造响应
+        // 7. 构造响应
         LoginResponse response = new LoginResponse();
         response.setUserId(user.getUserId());
         response.setUserType(userType);
         response.setDisplayName(user.getDisplayName());
-        response.setLoginName(loginName);
+        response.setLoginName(user.getUsername());
         return response;
+    }
+
+    private void bindEmailForLogin(AuthUserAccount account, Long userId, String email, String code) {
+        if (!emailCodeService.verifyCode(email, BIND_CODE_PURPOSE, code)) {
+            throw new BizException(400, "验证码错误或已过期");
+        }
+        AuthUserAccount existing = accountMapper.selectByEmail(email);
+        if (existing != null && !existing.getUserId().equals(userId)) {
+            throw new BizException(400, "该邮箱已被其他账号绑定");
+        }
+        if (account == null) {
+            throw new BizException(404, "账号不存在");
+        }
+        account.setEmail(email);
+        account.setEmailVerifiedAt(LocalDateTime.now());
+        accountMapper.updateById(account);
+        log.info("登录前邮箱绑定成功 userId={} email={}", userId, email);
     }
 
     /**
@@ -164,6 +260,36 @@ public class LoginService {
             session.invalidate();
         }
         SecurityContextHolder.clearContext();
+    }
+
+    private AuthUserAccount lookupAccount(String identifier) {
+        AuthUserAccount account = accountMapper.selectByLoginName(identifier);
+        if (account == null && identifier.contains("@")) {
+            account = accountMapper.selectByEmail(identifier);
+        }
+        return account;
+    }
+
+    static String maskEmail(String email) {
+        if (email == null) return null;
+        int at = email.indexOf('@');
+        if (at <= 0) return email;
+        String name = email.substring(0, at);
+        String domain = email.substring(at + 1);
+        String maskedName = name.length() <= 2
+            ? name.charAt(0) + "*"
+            : name.charAt(0) + "*".repeat(Math.min(name.length() - 2, 4)) + name.charAt(name.length() - 1);
+        int dot = domain.lastIndexOf('.');
+        String maskedDomain;
+        if (dot <= 0) {
+            maskedDomain = domain.length() <= 2 ? domain : domain.charAt(0) + "**";
+        } else {
+            String dHead = domain.substring(0, dot);
+            String dTail = domain.substring(dot);
+            String maskedHead = dHead.length() <= 2 ? dHead : dHead.charAt(0) + "**";
+            maskedDomain = maskedHead + dTail;
+        }
+        return maskedName + "@" + maskedDomain;
     }
 
     private void updateLastLogin(UserType userType, Long userId) {

@@ -4,6 +4,11 @@ server:
     context-path: /
 
 spring:
+  config:
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+
   application:
     name: workforce-hub
 
@@ -104,6 +109,8 @@ flowable:
 
 # ==================== Workforce Hub 业务配置 ====================
 workforce:
+  file:
+    storage-provider: ${FILE_STORAGE_PROVIDER:LOCAL}
   im:
     websocket:
       allowed-origin-patterns: ${IM_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
@@ -137,6 +144,7 @@ minio:
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
   secret-key: ${MINIO_SECRET_KEY:minioadmin}
   bucket: ${MINIO_BUCKET:workforce-hub}
+  region: ${MINIO_REGION:us-east-1}
 
 # ==================== Logging ====================
 management:

@@ -6,12 +6,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.file.config.FileStorageProperties;
 import com.workforcehub.file.dto.CreateUploadTicketRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
 import com.workforcehub.file.repository.AttachmentRefRepository;
 import com.workforcehub.file.repository.FileObjectRepository;
 import com.workforcehub.file.repository.FileObjectRow;
-import com.workforcehub.file.storage.LocalStorageProvider;
 import com.workforcehub.file.storage.StorageProvider;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.file.storage.StorageUploadTarget;
@@ -31,10 +31,9 @@ import java.util.Map;
 @Service
 public class FileUploadTicketService {
 
-    private static final String PROVIDER_LOCAL = LocalStorageProvider.PROVIDER_CODE;
-
     private final JdbcTemplate jdbcTemplate;
     private final StorageProviderRegistry storageProviderRegistry;
+    private final FileStorageProperties fileStorageProperties;
     private final ObjectMapper objectMapper;
     private final StorageUsageLedgerService storageUsageLedgerService;
     private final FileObjectRepository fileObjectRepository;
@@ -43,6 +42,7 @@ public class FileUploadTicketService {
 
     public FileUploadTicketService(JdbcTemplate jdbcTemplate,
                                    StorageProviderRegistry storageProviderRegistry,
+                                   FileStorageProperties fileStorageProperties,
                                    ObjectMapper objectMapper,
                                    StorageUsageLedgerService storageUsageLedgerService,
                                    FileObjectRepository fileObjectRepository,
@@ -50,6 +50,7 @@ public class FileUploadTicketService {
                                    FileQuotaPolicyService fileQuotaPolicyService) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
+        this.fileStorageProperties = fileStorageProperties;
         this.objectMapper = objectMapper;
         this.storageUsageLedgerService = storageUsageLedgerService;
         this.fileObjectRepository = fileObjectRepository;
@@ -172,7 +173,8 @@ public class FileUploadTicketService {
         Long ticketId = IdWorker.getId();
         String ticketNo = "UP" + ticketId;
         String objectKey = buildObjectKey(request.getContentSha256(), request.getFileName(), ticketId);
-        StorageProvider provider = storageProviderRegistry.require(PROVIDER_LOCAL);
+        String providerCode = fileStorageProperties.getStorageProvider();
+        StorageProvider provider = storageProviderRegistry.require(providerCode);
         String bucketName = provider.defaultBucketName();
         StorageUploadTarget uploadTarget = provider.buildUploadTarget(bucketName, objectKey, request.getMimeType(), 60);
 
@@ -192,7 +194,7 @@ public class FileUploadTicketService {
                 uploaderId,
                 request.getOwnerType(),
                 request.getOwnerId(),
-                PROVIDER_LOCAL,
+                providerCode,
                 bucketName,
                 request.getFileName(),
                 request.getMimeType(),
@@ -221,7 +223,7 @@ public class FileUploadTicketService {
         response.setTicketNo(ticketNo);
         response.setDeduplicated(false);
         response.setAttachmentRefId(null);
-        response.setStorageProvider(PROVIDER_LOCAL);
+        response.setStorageProvider(providerCode);
         response.setBucketName(bucketName);
         response.setObjectKey(objectKey);
         response.setUploadUrl(uploadTarget.uploadUrl());

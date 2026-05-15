@@ -71,10 +71,18 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("workforce.auth.redis-key-prefix", LocalIntegrationTestSupport::testAuthRedisKeyPrefix);
         registry.add("spring.autoconfigure.exclude", LocalIntegrationTestSupport::resolveAutoConfigurationExcludes);
         registry.add("workforce.workflow.enabled", () -> "false");
+        registry.add("workforce.auth.email-verify.enabled", () -> env(
+            "TEST_WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED",
+            System.getProperty("test.workforce.auth.email-verify.enabled", "false")
+        ));
         registry.add("spring.mail.host", () -> env("MAIL_HOST", "localhost"));
         registry.add("spring.mail.port", () -> env("MAIL_PORT", "1025"));
         registry.add("management.health.mail.enabled", () -> "false");
         registry.add("logging.level.com.workforcehub", () -> "info");
+        registry.add("workforce.agent.model.enabled", () -> env(
+            "TEST_WORKFORCE_AGENT_MODEL_ENABLED",
+            System.getProperty("test.workforce.agent.model.enabled", "false")
+        ));
         registry.add("workforce.agent.timeout-scan.enabled", () -> "false");
         registry.add("workforce.im.outbox.dispatcher.enabled", () -> "false");
     }

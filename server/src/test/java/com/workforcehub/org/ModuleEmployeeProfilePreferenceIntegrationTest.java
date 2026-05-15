@@ -78,6 +78,42 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
     }
 
     @Test
+    @DisplayName("同部门同事列表应返回联系人头像、签名和在线状态")
+    void colleaguesShouldExposePersonalizationFields() throws Exception {
+        Cookie colleagueSession = loginEmployee("wangwu.employee", "Employee@123456", "test-colleague-personalization-wangwu");
+        mockMvc.perform(put("/api/employee/me/profile")
+                .cookie(colleagueSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "avatarAttachmentRefId": 8888
+                    }
+                    """))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/api/employee/me/preferences")
+                .cookie(colleagueSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "signature": "专注项目推进",
+                      "presenceStatus": "AWAY"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        Cookie session = loginEmployee("zhangsan.employee", "Employee@123456", "test-colleague-personalization-zhangsan");
+
+        mockMvc.perform(get("/api/employee/me/colleagues")
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].userId").value(2004))
+            .andExpect(jsonPath("$.data[0].avatarAttachmentRefId").value(8888))
+            .andExpect(jsonPath("$.data[0].signature").value("专注项目推进"))
+            .andExpect(jsonPath("$.data[0].presenceStatus").value("AWAY"));
+    }
+
+    @Test
     @DisplayName("首次读取偏好应返回默认值；写入后再次读取应返回新值")
     void preferencesShouldHydrateAndPersist() throws Exception {
         Cookie session = loginEmployee("wangwu.employee", "Employee@123456", "test-preferences-001");
@@ -87,7 +123,16 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.theme").value("light"))
             .andExpect(jsonPath("$.data.messageDensity").value("cozy"))
-            .andExpect(jsonPath("$.data.listWidth").value(400));
+            .andExpect(jsonPath("$.data.listWidth").value(400))
+            .andExpect(jsonPath("$.data.signature").value(""))
+            .andExpect(jsonPath("$.data.presenceStatus").value("ONLINE"))
+            .andExpect(jsonPath("$.data.notifSound").value(true))
+            .andExpect(jsonPath("$.data.notifDesktop").value(true))
+            .andExpect(jsonPath("$.data.notifMentionOnly").value(false))
+            .andExpect(jsonPath("$.data.notifUnreadBadge").value(true))
+            .andExpect(jsonPath("$.data.accentColor").value("indigo"))
+            .andExpect(jsonPath("$.data.fontScale").value("medium"))
+            .andExpect(jsonPath("$.data.bubbleStyle").value("rounded"));
 
         mockMvc.perform(put("/api/employee/me/preferences")
                 .cookie(session)
@@ -96,20 +141,100 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
                     {
                       "theme": "dark",
                       "messageDensity": "compact",
-                      "listWidth": 520
+                      "listWidth": 520,
+                      "signature": "保持节奏",
+                      "presenceStatus": "BUSY",
+                      "notifSound": false,
+                      "notifDesktop": false,
+                      "notifMentionOnly": true,
+                      "notifUnreadBadge": false,
+                      "accentColor": "violet",
+                      "fontScale": "large",
+                      "bubbleStyle": "sharp"
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.theme").value("dark"))
             .andExpect(jsonPath("$.data.messageDensity").value("compact"))
-            .andExpect(jsonPath("$.data.listWidth").value(520));
+            .andExpect(jsonPath("$.data.listWidth").value(520))
+            .andExpect(jsonPath("$.data.signature").value("保持节奏"))
+            .andExpect(jsonPath("$.data.presenceStatus").value("BUSY"))
+            .andExpect(jsonPath("$.data.notifSound").value(false))
+            .andExpect(jsonPath("$.data.notifDesktop").value(false))
+            .andExpect(jsonPath("$.data.notifMentionOnly").value(true))
+            .andExpect(jsonPath("$.data.notifUnreadBadge").value(false))
+            .andExpect(jsonPath("$.data.accentColor").value("violet"))
+            .andExpect(jsonPath("$.data.fontScale").value("large"))
+            .andExpect(jsonPath("$.data.bubbleStyle").value("sharp"));
 
         mockMvc.perform(get("/api/employee/me/preferences")
                 .cookie(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.theme").value("dark"))
             .andExpect(jsonPath("$.data.messageDensity").value("compact"))
-            .andExpect(jsonPath("$.data.listWidth").value(520));
+            .andExpect(jsonPath("$.data.listWidth").value(520))
+            .andExpect(jsonPath("$.data.signature").value("保持节奏"))
+            .andExpect(jsonPath("$.data.presenceStatus").value("BUSY"))
+            .andExpect(jsonPath("$.data.notifSound").value(false))
+            .andExpect(jsonPath("$.data.accentColor").value("violet"))
+            .andExpect(jsonPath("$.data.bubbleStyle").value("sharp"));
+    }
+
+    @Test
+    @DisplayName("非法的状态 / 强调色 / 字号 / 气泡 / 签名超长 都应被参数校验拦截")
+    void preferencesInvalidEnumsShouldBeRejected() throws Exception {
+        Cookie session = loginEmployee("zhangsan.employee", "Employee@123456", "test-preferences-invalid-002");
+
+        mockMvc.perform(put("/api/employee/me/preferences")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "presenceStatus": "OFFLINE"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/employee/me/preferences")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "accentColor": "hotpink"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/employee/me/preferences")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "fontScale": "huge"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/employee/me/preferences")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "bubbleStyle": "bubbly"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+
+        String oversized = "a".repeat(141);
+        mockMvc.perform(put("/api/employee/me/preferences")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "signature": "%s"
+                    }
+                    """.formatted(oversized)))
+            .andExpect(status().isBadRequest());
     }
 
     @Test

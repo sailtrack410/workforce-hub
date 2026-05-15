@@ -109,6 +109,8 @@ http://localhost:8080
 | `LOCAL` | 本地磁盘 |
 | `MINIO` | MinIO 对象存储 |
 
+后端通过 `workforce.file.storage-provider` 选择上传票据和存储摘要使用的存储后端，默认读取环境变量 `FILE_STORAGE_PROVIDER`，未配置时为 `LOCAL`。当配置为 `MINIO` 时，上传票据返回 MinIO 预签名上传地址，存储桶来自 `MINIO_BUCKET`；`MINIO_REGION` 默认 `us-east-1`，用于避免预签名阶段额外探测桶地域。
+
 #### ownerType
 
 第一版员工端上传仅开放 `PERSONAL_FILE`，后台端仅开放 `ADMIN_FILE`。其他 `ownerType` 作为跨模块附件归属枚举保留，需等消息、文档、审批、知识库或 Agent 模块提供归属存在性与授权校验后，再通过专门入口开放。
@@ -239,8 +241,8 @@ http://localhost:8080
 | `ticketNo` | `string/null` | 是 | 上传票据编号；秒传时对应已确认秒传票据 |
 | `deduplicated` | `boolean` | 是 | 是否命中物理去重 |
 | `attachmentRefId` | `long/null` | 是 | 秒传时直接返回业务引用 ID |
-| `storageProvider` | `string` | 是 | `LOCAL` 或 `MINIO` |
-| `bucketName` | `string` | 是 | 存储桶 |
+| `storageProvider` | `string` | 是 | 当前配置的 `workforce.file.storage-provider`，例如 `LOCAL` 或 `MINIO` |
+| `bucketName` | `string` | 是 | 当前存储后端返回的默认存储桶 |
 | `objectKey` | `string` | 是 | 对象 key |
 | `uploadUrl` | `string/null` | 是 | 客户端上传地址 |
 | `headers` | `object` | 是 | 上传对象时需要携带的头 |
@@ -956,6 +958,8 @@ http://localhost:8080
 ### 7.9 查询存储摘要
 
 `GET /api/admin/files/storage-summary`
+
+后端会按当前 `workforce.file.storage-provider` 查询可用容量和写保护状态。生产环境使用 MinIO 时，应同时配置 `MINIO_ENDPOINT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET` 和 `MINIO_REGION`。
 
 成功响应：
 

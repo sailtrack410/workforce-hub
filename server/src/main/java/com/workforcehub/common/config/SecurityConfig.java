@@ -97,6 +97,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // 匿名入口（按接口粒度拆开，避免通配符把不同安全级别接口混在一起）
                 .requestMatchers("/api/employee/auth/login").permitAll()
+                .requestMatchers("/api/employee/auth/login/send-code").permitAll()
                 .requestMatchers("/api/employee/auth/email/send-code").permitAll()
                 .requestMatchers("/api/employee/auth/password/reset").permitAll()
                 .requestMatchers("/api/admin/auth/login").permitAll()

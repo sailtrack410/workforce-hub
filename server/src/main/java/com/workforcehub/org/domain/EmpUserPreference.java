@@ -21,6 +21,19 @@ public class EmpUserPreference {
     private String theme;
     private String messageDensity;
     private Integer listWidth;
+
+    private String signature;
+    private String presenceStatus;
+
+    private Boolean notifSound;
+    private Boolean notifDesktop;
+    private Boolean notifMentionOnly;
+    private Boolean notifUnreadBadge;
+
+    private String accentColor;
+    private String fontScale;
+    private String bubbleStyle;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
