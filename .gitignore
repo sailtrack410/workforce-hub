@@ -16,6 +16,11 @@ employee-web/file-dist/
 employee-web/*.tsbuildinfo
 employee-web/vite.config.js
 employee-web/vite.config.d.ts
+admin-web/node_modules/
+admin-web/dist/
+admin-web/*.tsbuildinfo
+admin-web/vite.config.js
+admin-web/vite.config.d.ts
 
 # Local verification screenshots
 employee-web-*.png

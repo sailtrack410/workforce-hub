@@ -109,6 +109,9 @@ flowable:
 
 # ==================== Workforce Hub 业务配置 ====================
 workforce:
+  auth:
+    email-verify:
+      enabled: ${AUTH_EMAIL_VERIFY_ENABLED:false}
   file:
     storage-provider: ${FILE_STORAGE_PROVIDER:LOCAL}
   im:
@@ -125,7 +128,7 @@ workforce:
         initial-delay-ms: ${IM_OUTBOX_DISPATCHER_INITIAL_DELAY_MS:3000}
   agent:
     model:
-      enabled: ${AGENT_MODEL_ENABLED:false}
+      enabled: ${AGENT_MODEL_ENABLED:true}
       base-url: ${AGENT_MODEL_BASE_URL:}
       api-key: ${AGENT_MODEL_API_KEY:}
       model: ${AGENT_MODEL_NAME:}
@@ -137,6 +140,12 @@ workforce:
       batch-size: ${AGENT_TIMEOUT_SCAN_BATCH_SIZE:100}
       fixed-delay-ms: ${AGENT_TIMEOUT_SCAN_FIXED_DELAY_MS:60000}
       initial-delay-ms: ${AGENT_TIMEOUT_SCAN_INITIAL_DELAY_MS:60000}
+  ragflow:
+    vector:
+      enabled: ${RAGFLOW_VECTOR_ENABLED:false}
+      url: ${RAGFLOW_VECTOR_URL:}
+      username: ${RAGFLOW_VECTOR_USERNAME:}
+      password: ${RAGFLOW_VECTOR_PASSWORD:}
 
 # ==================== MinIO ====================
 minio:
