@@ -162,6 +162,14 @@ public class OrgDirectoryService {
         return orgDirectoryMapper.selectColleaguesByDept(deptId, userId);
     }
 
+    public Long countDepartmentUsers(Long deptId) {
+        if (deptId == null) {
+            return 0L;
+        }
+        Long count = orgDirectoryMapper.countUsersByDept(deptId);
+        return count == null ? 0L : count;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public OrgUserDetailResponse updateCurrentEmployeeProfile(UpdateEmployeeProfileRequest request) {
         ensureEmployeeContext();

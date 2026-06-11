@@ -229,4 +229,12 @@
         ORDER BY u.real_name ASC, u.id ASC
     </select>
 
+    <select id="countUsersByDept" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM org_user u
+        WHERE u.primary_dept_id = #{deptId}
+          AND u.is_deleted = 0
+          AND u.employment_status &lt;&gt; 'OFFBOARDED'
+    </select>
+
 </mapper>

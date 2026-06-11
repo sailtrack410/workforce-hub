@@ -29,4 +29,6 @@ public interface OrgDirectoryMapper {
 
     List<OrgUserSummaryResponse> selectColleaguesByDept(@Param("deptId") Long deptId,
                                                        @Param("currentUserId") Long currentUserId);
+
+    Long countUsersByDept(@Param("deptId") Long deptId);
 }
