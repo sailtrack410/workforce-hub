@@ -2,17 +2,33 @@ package com.workforcehub.workflow.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.workforcehub.common.exception.BizException;
+import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.workflow.dto.AdminWorkflowRequestQuery;
+import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
+import com.workforcehub.workflow.dto.WorkflowLeaveDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowProcessTypeCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowProcessTypeResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestAttachmentResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestSummaryResponse;
+import com.workforcehub.workflow.dto.WorkflowTaskActionResponse;
 import com.workforcehub.workflow.dto.WorkflowTemplateCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowTemplateResponse;
 import com.workforcehub.workflow.dto.WorkflowTemplateVersionCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowTemplateVersionPublishRequest;
 import com.workforcehub.workflow.dto.WorkflowTemplateVersionResponse;
+import com.workforcehub.workflow.repository.WorkflowAttachmentRow;
+import com.workforcehub.workflow.repository.WorkflowClockCorrectionDetailRow;
+import com.workforcehub.workflow.repository.WorkflowLeaveDetailRow;
 import com.workforcehub.workflow.repository.WorkflowAdminRepository;
 import com.workforcehub.workflow.repository.WorkflowProcessTypeAdminRow;
+import com.workforcehub.workflow.repository.WorkflowRequestDetailRow;
+import com.workforcehub.workflow.repository.WorkflowRequestSummaryRow;
+import com.workforcehub.workflow.repository.WorkflowTaskActionRow;
 import com.workforcehub.workflow.repository.WorkflowTemplateAdminRow;
 import com.workforcehub.workflow.repository.WorkflowTemplateVersionAdminRow;
 import org.flowable.engine.RepositoryService;
@@ -164,6 +180,30 @@ public class WorkflowAdminService {
             .toList();
     }
 
+    public PageResult<WorkflowRequestSummaryResponse> pageRequests(AdminWorkflowRequestQuery query) {
+        long total = workflowAdminRepository.countRequests(query);
+        List<WorkflowRequestSummaryResponse> rows = workflowAdminRepository.pageRequests(query).stream()
+            .map(this::toRequestSummaryResponse)
+            .toList();
+        return PageResult.of(query.getPageNo(), query.getPageSize(), total, rows);
+    }
+
+    public WorkflowRequestDetailResponse getRequestDetail(Long requestId) {
+        WorkflowRequestDetailRow row = workflowAdminRepository.getRequestDetailOrThrow(requestId);
+        WorkflowLeaveDetailRow leave = workflowAdminRepository.getLeaveDetailByRequestId(requestId);
+        WorkflowClockCorrectionDetailRow clockCorrection =
+            workflowAdminRepository.getClockCorrectionDetailByRequestId(requestId);
+        List<WorkflowAttachmentRow> attachments = workflowAdminRepository.listAttachmentsByRequestId(requestId);
+        return toRequestDetailResponse(row, leave, clockCorrection, attachments);
+    }
+
+    public List<WorkflowTaskActionResponse> listRequestActions(Long requestId) {
+        workflowAdminRepository.getRequestDetailOrThrow(requestId);
+        return workflowAdminRepository.listTaskActions(requestId).stream()
+            .map(this::toActionResponse)
+            .toList();
+    }
+
     private WorkflowProcessTypeResponse toProcessTypeResponse(WorkflowProcessTypeAdminRow row) {
         WorkflowProcessTypeResponse response = new WorkflowProcessTypeResponse();
         response.setProcessTypeId(row.id());
@@ -221,6 +261,91 @@ public class WorkflowAdminService {
         return response;
     }
 
+    private WorkflowRequestSummaryResponse toRequestSummaryResponse(WorkflowRequestSummaryRow row) {
+        WorkflowRequestSummaryResponse response = new WorkflowRequestSummaryResponse();
+        response.setRequestId(row.id());
+        response.setRequestNo(row.requestNo());
+        response.setBizType(row.bizType());
+        response.setBizId(row.bizId());
+        response.setTitle(row.title());
+        response.setStatus(row.status());
+        response.setCurrentStepKey(row.currentStepKey());
+        response.setCurrentStepName(row.currentStepName());
+        response.setSubmittedAt(row.submittedAt());
+        response.setFinishedAt(row.finishedAt());
+        return response;
+    }
+
+    private WorkflowRequestDetailResponse toRequestDetailResponse(WorkflowRequestDetailRow row,
+                                                                  WorkflowLeaveDetailRow leave,
+                                                                  WorkflowClockCorrectionDetailRow clockCorrection,
+                                                                  List<WorkflowAttachmentRow> attachments) {
+        WorkflowRequestDetailResponse response = new WorkflowRequestDetailResponse();
+        response.setRequestId(row.id());
+        response.setRequestNo(row.requestNo());
+        response.setBizType(row.bizType());
+        response.setBizId(row.bizId());
+        response.setApplicantUserId(row.applicantUserId());
+        response.setTitle(row.title());
+        response.setStatus(row.status());
+        response.setCurrentStepKey(row.currentStepKey());
+        response.setCurrentStepName(row.currentStepName());
+        response.setFlowableProcessInstanceId(row.flowableProcessInstanceId());
+        response.setSubmittedAt(row.submittedAt());
+        response.setFinishedAt(row.finishedAt());
+        if (leave != null) {
+            WorkflowLeaveDetailResponse leaveResponse = new WorkflowLeaveDetailResponse();
+            leaveResponse.setLeaveTypeId(leave.leaveTypeId());
+            leaveResponse.setStartAt(leave.startAt());
+            leaveResponse.setEndAt(leave.endAt());
+            leaveResponse.setDurationMinutes(leave.durationMinutes());
+            leaveResponse.setReason(leave.reason());
+            response.setLeave(leaveResponse);
+        }
+        if (clockCorrection != null) {
+            WorkflowClockCorrectionDetailResponse clockCorrectionResponse =
+                new WorkflowClockCorrectionDetailResponse();
+            clockCorrectionResponse.setTargetDate(clockCorrection.targetDate());
+            clockCorrectionResponse.setMissingPunchType(clockCorrection.missingPunchType());
+            clockCorrectionResponse.setExpectedPunchAt(clockCorrection.expectedPunchAt());
+            clockCorrectionResponse.setReason(clockCorrection.reason());
+            response.setClockCorrection(clockCorrectionResponse);
+        }
+        response.setAttachments(attachments.stream()
+            .map(this::toAttachmentResponse)
+            .toList());
+        return response;
+    }
+
+    private WorkflowRequestAttachmentResponse toAttachmentResponse(WorkflowAttachmentRow row) {
+        WorkflowRequestAttachmentResponse response = new WorkflowRequestAttachmentResponse();
+        response.setAttachmentRefId(row.attachmentRefId());
+        response.setDisplayName(row.displayName());
+        response.setMimeType(row.mimeType());
+        response.setFileSize(row.fileSize());
+        response.setContentSha256(row.contentSha256());
+        response.setScanStatus(row.scanStatus());
+        return response;
+    }
+
+    private WorkflowTaskActionResponse toActionResponse(WorkflowTaskActionRow row) {
+        WorkflowTaskActionResponse response = new WorkflowTaskActionResponse();
+        response.setActionId(row.actionId());
+        response.setRequestId(row.requestId());
+        response.setTaskId(row.taskId());
+        response.setStepKey(row.stepKey());
+        response.setStepName(row.stepName());
+        response.setActorType(row.actorType());
+        response.setActorId(row.actorId());
+        response.setActionType(row.actionType());
+        response.setComment(row.comment());
+        response.setBeforeStatus(row.beforeStatus());
+        response.setAfterStatus(row.afterStatus());
+        response.setAgentDecisionJson(compactJson(row.agentDecisionJson()));
+        response.setActedAt(row.actedAt());
+        return response;
+    }
+
     private String normalizeStatus(String status) {
         if (!StringUtils.hasText(status)) {
             return "ACTIVE";
@@ -248,9 +373,28 @@ public class WorkflowAdminService {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(objectMapper.readTree(value));
+            JsonNode node = objectMapper.readTree(value);
+            if (node.isObject()) {
+                ObjectNode ordered = objectMapper.createObjectNode();
+                putIfPresent(ordered, node, "decision");
+                putIfPresent(ordered, node, "reason");
+                node.fields().forEachRemaining(entry -> {
+                    if (!ordered.has(entry.getKey())) {
+                        ordered.set(entry.getKey(), entry.getValue());
+                    }
+                });
+                return objectMapper.writeValueAsString(ordered);
+            }
+            return objectMapper.writeValueAsString(node);
         } catch (Exception e) {
             return value;
+        }
+    }
+
+    private void putIfPresent(ObjectNode target, JsonNode source, String fieldName) {
+        JsonNode value = source.get(fieldName);
+        if (value != null) {
+            target.set(fieldName, value);
         }
     }
 

@@ -162,6 +162,70 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
         assertEquals(versionTwoId, currentPublishedTemplateVersionId("LEAVE"));
     }
 
+    @Test
+    @DisplayName("后台应能查询审批申请列表、详情和动作轨迹，员工会话不能访问后台读侧")
+    void adminShouldQueryWorkflowRequestsDetailAndActions() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        seedWorkflowDefinitions();
+        Long annualLeaveTypeId = seedAnnualLeaveType();
+
+        MvcResult submitResult = mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(annualLeaveTypeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").isNumber())
+            .andReturn();
+        long requestId = data(submitResult).get("requestId").asLong();
+        String taskId = managerTaskId(requestId);
+
+        mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/approve", taskId)
+                .cookie(managerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "同意"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("APPROVED"));
+
+        mockMvc.perform(get("/api/admin/workflow/requests")
+                .cookie(adminSession)
+                .param("bizType", "LEAVE")
+                .param("status", "APPROVED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].requestId").value(requestId))
+            .andExpect(jsonPath("$.data.list[0].status").value("APPROVED"));
+
+        mockMvc.perform(get("/api/admin/workflow/requests/{requestId}", requestId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.requestId").value(requestId))
+            .andExpect(jsonPath("$.data.applicantUserId").value(2003))
+            .andExpect(jsonPath("$.data.leave.leaveTypeId").value(annualLeaveTypeId))
+            .andExpect(jsonPath("$.data.leave.durationMinutes").value(480));
+
+        mockMvc.perform(get("/api/admin/workflow/requests/{requestId}/actions", requestId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasSize(1)))
+            .andExpect(jsonPath("$.data[0].actionType").value("APPROVE"))
+            .andExpect(jsonPath("$.data[0].actorId").value(2002));
+
+        mockMvc.perform(get("/api/admin/workflow/requests")
+                .cookie(employeeSession))
+            .andExpect(status().isForbidden());
+    }
+
     private long createProcessType(Cookie adminSession, String processCode, String processName, String bizType)
         throws Exception {
         MvcResult result = mockMvc.perform(post("/api/admin/workflow/process-types")
@@ -261,6 +325,30 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
         return result.getResponse().getCookie("SESSION");
     }
 
+    private Cookie loginEmployee() throws Exception {
+        return loginEmployee("zhangsan.employee");
+    }
+
+    private Cookie loginManager() throws Exception {
+        return loginEmployee("lisi.manager");
+    }
+
+    private Cookie loginEmployee(String loginName) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "%s",
+                      "password": "Employee@123456"
+                    }
+                    """.formatted(loginName)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(cookie().exists("SESSION"))
+            .andReturn();
+        return result.getResponse().getCookie("SESSION");
+    }
+
     private JsonNode data(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
     }
@@ -315,5 +403,64 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
             ORDER BY wtv.version_no DESC, wtv.id DESC
             LIMIT 1
             """, Long.class, processCode);
+    }
+
+    private void seedWorkflowDefinitions() {
+        jdbcTemplate.update("""
+            INSERT INTO wf_process_type
+                (id, process_code, process_name, biz_type, status)
+            VALUES
+                (9101, 'LEAVE', '请假流程', 'LEAVE', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template
+                (id, process_type_id, template_code, template_name, status)
+            VALUES
+                (9201, 9101, 'LEAVE_MANAGER_APPROVAL', '请假直属上级审批', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO wf_template_version
+                (id, template_id, version_no, flowable_definition_key, status, published_by, published_at, effective_from)
+            VALUES
+                (9301, 9201, 1, 'leave_manager_approval', 'PUBLISHED', 8001, NOW(), DATE_SUB(NOW(), INTERVAL 1 DAY))
+            """);
+    }
+
+    private Long seedAnnualLeaveType() {
+        jdbcTemplate.update("""
+            INSERT INTO lv_type
+                (id, leave_code, leave_name, balance_mode, status)
+            VALUES
+                (9401, 'ANNUAL_LEAVE', '年假', 'DEDUCT', 'ACTIVE')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO lv_account
+                (id, user_id, leave_type_id, available_minutes, frozen_minutes, version, status)
+            VALUES
+                (9501, 2003, 9401, 960, 0, 0, 'ACTIVE')
+            """);
+        return 9401L;
+    }
+
+    private String leaveRequestJson(Long annualLeaveTypeId) {
+        return """
+            {
+              "leaveTypeId": %d,
+              "startAt": "2026-05-07 09:00:00",
+              "endAt": "2026-05-07 18:00:00",
+              "durationMinutes": 480,
+              "reason": "家中有事请假一天"
+            }
+            """.formatted(annualLeaveTypeId);
+    }
+
+    private String managerTaskId(long requestId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT art.ID_
+            FROM wf_request wr
+            JOIN ACT_RU_TASK art ON art.PROC_INST_ID_ = wr.flowable_process_instance_id
+            WHERE wr.id = ?
+            LIMIT 1
+            """, String.class, requestId);
     }
 }

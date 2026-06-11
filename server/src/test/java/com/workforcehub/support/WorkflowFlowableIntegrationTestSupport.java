@@ -72,6 +72,10 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
         registry.add("management.health.mail.enabled", () -> "false");
         registry.add("spring.autoconfigure.exclude", () -> FLOWABLE_WORKFLOW_TEST_EXCLUDES);
         registry.add("workforce.workflow.enabled", () -> "true");
+        registry.add("workforce.auth.email-verify.enabled", () -> env(
+            "TEST_WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED",
+            System.getProperty("test.workforce.auth.email-verify.enabled", "false")
+        ));
         registry.add("logging.level.com.workforcehub", () -> "info");
         registry.add("workforce.agent.timeout-scan.enabled", () -> "false");
         registry.add("workforce.im.outbox.dispatcher.enabled", () -> "false");

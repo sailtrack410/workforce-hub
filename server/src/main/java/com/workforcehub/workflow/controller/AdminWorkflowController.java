@@ -1,8 +1,13 @@
 package com.workforcehub.workflow.controller;
 
 import com.workforcehub.common.response.R;
+import com.workforcehub.common.response.PageResult;
+import com.workforcehub.workflow.dto.AdminWorkflowRequestQuery;
 import com.workforcehub.workflow.dto.WorkflowProcessTypeCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowProcessTypeResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestSummaryResponse;
+import com.workforcehub.workflow.dto.WorkflowTaskActionResponse;
 import com.workforcehub.workflow.dto.WorkflowTemplateCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowTemplateResponse;
 import com.workforcehub.workflow.dto.WorkflowTemplateVersionCreateRequest;
@@ -39,6 +44,22 @@ public class AdminWorkflowController {
     public R<WorkflowProcessTypeResponse> createProcessType(
             @Valid @RequestBody WorkflowProcessTypeCreateRequest request) {
         return R.ok(workflowAdminService.createProcessType(request));
+    }
+
+    @GetMapping("/requests")
+    public R<PageResult<WorkflowRequestSummaryResponse>> listRequests(
+            @Valid AdminWorkflowRequestQuery query) {
+        return R.ok(workflowAdminService.pageRequests(query));
+    }
+
+    @GetMapping("/requests/{requestId}")
+    public R<WorkflowRequestDetailResponse> getRequest(@PathVariable Long requestId) {
+        return R.ok(workflowAdminService.getRequestDetail(requestId));
+    }
+
+    @GetMapping("/requests/{requestId}/actions")
+    public R<List<WorkflowTaskActionResponse>> listRequestActions(@PathVariable Long requestId) {
+        return R.ok(workflowAdminService.listRequestActions(requestId));
     }
 
     @GetMapping("/process-types")
