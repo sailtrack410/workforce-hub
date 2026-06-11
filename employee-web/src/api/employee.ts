@@ -30,12 +30,15 @@ import type {
   GroupMemberUserIdsRequest,
   ImConversationListQuery,
   ImConversationDetailResponse,
+  ImGroupFileResponse,
   ImConversationMemberResponse,
   ImConversationSummaryResponse,
   ImGroupProfileResponse,
   ImMessageResponse,
   LeaveRequestCreateRequest,
   LeaveAccountResponse,
+  LoginSendCodeRequest,
+  LoginSendCodeResponse,
   LoginRequest,
   LoginResponse,
   OrgUserDetailResponse,
@@ -72,6 +75,7 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
   return {
     auth: {
       login: (request: LoginRequest) => client.post<LoginResponse>('/api/employee/auth/login', request),
+      sendLoginCode: (request: LoginSendCodeRequest) => client.post<LoginSendCodeResponse>('/api/employee/auth/login/send-code', request),
       logout: () => client.post<void>('/api/employee/auth/logout'),
       me: () => client.get<CurrentUserResponse>('/api/employee/auth/me'),
       sendEmailCode: (request: SendEmailCodeRequest) => client.post<void>('/api/employee/auth/email/send-code', request),
@@ -119,6 +123,25 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
       ),
       groupProfile: (conversationId: string | number) => (
         client.get<ImGroupProfileResponse>(`/api/employee/im/group-conversations/${encodeURIComponent(conversationId)}/profile`)
+      ),
+      groupFiles: (conversationId: string | number) => (
+        client.get<ImGroupFileResponse[]>(`/api/employee/im/group-conversations/${encodeURIComponent(conversationId)}/files`)
+      ),
+      createGroupFileDownloadTicket: (
+        conversationId: string | number,
+        attachmentRefId: EntityId,
+        request: CreateDownloadTicketRequest,
+      ) => (
+        client.post<DownloadTicketResponse>(
+          `/api/employee/im/group-conversations/${encodeURIComponent(String(conversationId))}/files/${pathId(attachmentRefId)}/download-tickets`,
+          request,
+        )
+      ),
+      trashGroupFile: (conversationId: string | number, attachmentRefId: EntityId, request: FileTrashRequest) => (
+        client.post<FileTrashResponse>(
+          `/api/employee/im/group-conversations/${encodeURIComponent(String(conversationId))}/files/${pathId(attachmentRefId)}/trash`,
+          request,
+        )
       ),
       updateGroupProfile: (conversationId: string | number, request: UpdateGroupConversationRequest) => (
         client.post<ImGroupProfileResponse>(`/api/employee/im/group-conversations/${encodeURIComponent(conversationId)}/profile`, request)
@@ -176,7 +199,7 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
       downloadAttachmentUrl: (ticketNo: string) => `/api/employee/im/attachments/download/${encodeURIComponent(ticketNo)}`,
     },
     agents: {
-      list: () => client.get<AgentResponse[]>('/api/employee/agents'),
+      list: (query: { keyword?: string } = {}) => client.get<AgentResponse[]>('/api/employee/agents', { query }),
       createTask: (agentId: EntityId, request: CreateAgentTaskRequest) => (
         client.post<AgentTaskResponse>(`/api/employee/agents/${pathId(agentId)}/tasks`, request)
       ),

@@ -19,6 +19,16 @@ export interface PageResult<T> {
 export interface LoginRequest {
   loginName: string;
   password: string;
+  emailCode?: string;
+  bindEmail?: string;
+}
+
+export interface LoginSendCodeRequest {
+  identifier: string;
+}
+
+export interface LoginSendCodeResponse {
+  maskedEmail?: string | null;
 }
 
 export interface SendEmailCodeRequest {
@@ -37,6 +47,9 @@ export interface LoginResponse {
   userType: string;
   displayName: string;
   loginName: string;
+  requiresEmailCode?: boolean;
+  maskedEmail?: string | null;
+  requiresEmailBinding?: boolean;
 }
 
 export interface CurrentUserResponse extends LoginResponse {
@@ -74,16 +87,39 @@ export interface UpdateEmployeeProfileRequest {
   avatarAttachmentRefId?: EntityId | null;
 }
 
+export type PresenceStatus = 'ONLINE' | 'BUSY' | 'AWAY' | 'DND';
+export type AccentColor = 'indigo' | 'violet' | 'blue' | 'teal' | 'amber' | 'rose';
+export type FontScale = 'small' | 'medium' | 'large';
+export type BubbleStyle = 'rounded' | 'sharp';
+
 export interface EmployeePreferenceResponse {
   theme: 'light' | 'dark';
   messageDensity: 'cozy' | 'compact';
   listWidth: number;
+  signature: string;
+  presenceStatus: PresenceStatus;
+  notifSound: boolean;
+  notifDesktop: boolean;
+  notifMentionOnly: boolean;
+  notifUnreadBadge: boolean;
+  accentColor: AccentColor;
+  fontScale: FontScale;
+  bubbleStyle: BubbleStyle;
 }
 
 export interface UpdateEmployeePreferenceRequest {
   theme?: 'light' | 'dark';
   messageDensity?: 'cozy' | 'compact';
   listWidth?: number;
+  signature?: string;
+  presenceStatus?: PresenceStatus;
+  notifSound?: boolean;
+  notifDesktop?: boolean;
+  notifMentionOnly?: boolean;
+  notifUnreadBadge?: boolean;
+  accentColor?: AccentColor;
+  fontScale?: FontScale;
+  bubbleStyle?: BubbleStyle;
 }
 
 export interface OrgUserSummaryResponse {
@@ -298,6 +334,20 @@ export interface ImGroupProfileResponse {
   noticeText?: string | null;
   status: string;
   currentMemberRole?: string | null;
+}
+
+export interface ImGroupFileResponse {
+  attachmentRefId: EntityId;
+  conversationId: EntityId;
+  displayName: string;
+  mimeType: string;
+  fileSize: number;
+  contentSha256: string;
+  scanStatus: string;
+  uploaderId?: EntityId | null;
+  uploaderName?: string | null;
+  createdAt?: string | null;
+  canDelete: boolean;
 }
 
 export interface StartPrivateConversationRequest {
@@ -539,6 +589,8 @@ export interface AgentResponse {
   agentType: string;
   identityMode: string;
   publishedVersionId?: EntityId | null;
+  publishedVersionNo?: number | null;
+  publishedVersionLabel?: string | null;
   status: string;
   createdAt?: string | null;
   updatedAt?: string | null;

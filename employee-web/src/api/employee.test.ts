@@ -193,12 +193,15 @@ describe('createEmployeeApi', () => {
     await api.im.removeGroupMembers(7001, { memberUserIds: [2002] });
     await api.im.leaveGroup(7001);
     await api.im.dismissGroup(7001);
+    await api.im.groupFiles(7001);
+    await api.im.createGroupFileDownloadTicket(7001, '2053928981082898444', { downloadType: 'SINGLE', reason: '预览' });
+    await api.im.trashGroupFile(7001, '2053928981082898444', { reason: '删除' });
     await api.im.updatePreference(7001, { pin: true });
     await api.im.startAgentConversation({ agentId: 9001 });
     await api.im.editMessage(7001, 7101, { text: '更新后的消息' });
     await api.im.recallMessage(7001, 7101);
     await api.im.createMessageAttachmentDownloadTicket('2053928814116044802', '2053928814116044811', '2053928981082898444', { downloadType: 'SINGLE' });
-    await api.agents.list();
+    await api.agents.list({ keyword: 'HR' });
     await api.agents.createTask(9001, { triggerType: 'MANUAL', inputPayloadJson: '{}' });
     await api.agentTasks.confirm('2053928981082898433', { approved: true, comment: '确认' });
     await api.agentTasks.cancel('2053928981082898433', { reason: '取消' });
@@ -215,12 +218,15 @@ describe('createEmployeeApi', () => {
       ['post', '/api/employee/im/group-conversations/7001/members/remove', { memberUserIds: [2002] }],
       ['post', '/api/employee/im/group-conversations/7001/leave', undefined],
       ['post', '/api/employee/im/group-conversations/7001/dismiss', undefined],
+      ['get', '/api/employee/im/group-conversations/7001/files', undefined],
+      ['post', '/api/employee/im/group-conversations/7001/files/2053928981082898444/download-tickets', { downloadType: 'SINGLE', reason: '预览' }],
+      ['post', '/api/employee/im/group-conversations/7001/files/2053928981082898444/trash', { reason: '删除' }],
       ['post', '/api/employee/im/conversations/7001/preference', { pin: true }],
       ['post', '/api/employee/im/agent-conversations', { agentId: 9001 }],
       ['post', '/api/employee/im/conversations/7001/messages/7101/edit', { text: '更新后的消息' }],
       ['post', '/api/employee/im/conversations/7001/messages/7101/recall', undefined],
       ['post', '/api/employee/im/conversations/2053928814116044802/messages/2053928814116044811/attachments/2053928981082898444/download-tickets', { downloadType: 'SINGLE' }],
-      ['get', '/api/employee/agents', undefined],
+      ['get', '/api/employee/agents', { query: { keyword: 'HR' } }],
       ['post', '/api/employee/agents/9001/tasks', { triggerType: 'MANUAL', inputPayloadJson: '{}' }],
       ['post', '/api/employee/agent-tasks/2053928981082898433/confirm', { approved: true, comment: '确认' }],
       ['post', '/api/employee/agent-tasks/2053928981082898433/cancel', { reason: '取消' }],

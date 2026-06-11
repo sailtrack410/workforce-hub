@@ -1,12 +1,13 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
-import MessagesView from '../views/MessagesView.vue';
-import MessagesSection from '../views/sections/MessagesSection.vue';
-import TodosSection from '../views/sections/TodosSection.vue';
-import WorkbenchSection from '../views/sections/WorkbenchSection.vue';
-import FilesSection from '../views/sections/FilesSection.vue';
-import ContactsSection from '../views/sections/ContactsSection.vue';
-import SettingsSection from '../views/sections/SettingsSection.vue';
+
+const MessagesView = () => import('@/views/MessagesView.vue');
+const MessagesSection = () => import('@/views/sections/MessagesSection.vue');
+const TodosSection = () => import('@/views/sections/TodosSection.vue');
+const WorkbenchSection = () => import('@/views/sections/WorkbenchSection.vue');
+const FilesSection = () => import('@/views/sections/FilesSection.vue');
+const ContactsSection = () => import('@/views/sections/ContactsSection.vue');
+const SettingsSection = () => import('@/views/sections/SettingsSection.vue');
 
 export const employeeRoutes = [
   {

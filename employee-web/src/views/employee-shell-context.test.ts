@@ -1,38 +1,40 @@
-import { computed, createRenderer, defineComponent, h, isRef, nextTick, ref } from 'vue';
+import { createRenderer, defineComponent, h, nextTick, reactive } from 'vue';
 import { describe, expect, it } from 'vitest';
-import { provideEmployeeShellContext, useEmployeeShellContext } from './employee-shell-context';
+import { provideSettingsSectionContext, useSettingsSectionContext } from './employee-shell-context';
+import type { SettingsSectionContext } from './employee-shell-context';
 
 describe('employee shell context', () => {
-  it('keeps injected refs reactive after section components destructure them', async () => {
-    const selectedProfile = ref('center');
-    let injectedSelectedProfile: unknown;
+  it('keeps injected store objects live after section components destructure them', async () => {
+    const shell = reactive({ theme: 'light' });
+    let injectedShell: unknown;
 
     const Child = defineComponent({
       setup() {
-        const { selectedProfileId } = useEmployeeShellContext();
-        injectedSelectedProfile = selectedProfileId;
+        const { shell } = useSettingsSectionContext();
+        injectedShell = shell;
         return () => h('span');
       },
     });
 
     const Root = defineComponent({
       setup() {
-        provideEmployeeShellContext({
-          selectedProfileId: computed(() => selectedProfile.value),
-        });
+        provideSettingsSectionContext({
+          shell,
+          session: {},
+          showToast: () => undefined,
+        } as unknown as SettingsSectionContext);
         return () => h(Child);
       },
     });
 
     createTestRenderer().createApp(Root).mount({});
 
-    expect(isRef(injectedSelectedProfile)).toBe(true);
-    expect((injectedSelectedProfile as { value: string }).value).toBe('center');
+    expect((injectedShell as { theme: string }).theme).toBe('light');
 
-    selectedProfile.value = 'security';
+    shell.theme = 'dark';
     await nextTick();
 
-    expect((injectedSelectedProfile as { value: string }).value).toBe('security');
+    expect((injectedShell as { theme: string }).theme).toBe('dark');
   });
 });
 

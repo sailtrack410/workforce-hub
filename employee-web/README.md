@@ -27,7 +27,7 @@ VITE_API_PROXY_TARGET=http://localhost:8082
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-如果要联调找回密码，后端默认会连 `127.0.0.1:1025` 的本地 SMTP。可以直接启动：
+如果要联调找回密码、登录邮箱二验或绑定邮箱，后端会先读取仓库根目录 `.env` 中的 SMTP 配置；没有真实 SMTP 配置时默认连 `127.0.0.1:1025` 的本地 SMTP。可以直接启动：
 
 ```bash
 python3 server/scripts/dev/start_debug_smtp.py

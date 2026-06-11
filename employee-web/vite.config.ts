@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig, loadEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 function localUploadBridgePlugin(): Plugin {
   return {
@@ -71,13 +72,28 @@ function resolveLocalUploadTargets(uploadPath: string) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const apiProxyTarget = env.VITE_API_PROXY_TARGET || 'http://localhost:8080';
+  const nodeEnv = process.env.NODE_ENV ?? (mode === 'production' ? 'production' : 'development');
 
   return {
     base: './',
     define: {
-      'process.env.NODE_ENV': JSON.stringify('production'),
+      'process.env.NODE_ENV': JSON.stringify(nodeEnv),
     },
-    plugins: [vue(), localUploadBridgePlugin()],
+    plugins: [
+      vue(),
+      localUploadBridgePlugin(),
+      visualizer({
+        filename: 'dist/stats.html',
+        gzipSize: true,
+        brotliSize: true,
+        template: 'treemap',
+      }),
+    ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+      },
+    },
     server: {
       proxy: {
         '/api': {
@@ -88,6 +104,16 @@ export default defineConfig(({ mode }) => {
           target: apiProxyTarget,
           changeOrigin: true,
           ws: true,
+        },
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-vue': ['vue', 'vue-router', 'pinia'],
+            'vendor-icons': ['lucide-vue-next', '@icon-park/vue-next'],
+          },
         },
       },
     },

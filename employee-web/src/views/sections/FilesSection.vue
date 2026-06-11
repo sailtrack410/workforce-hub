@@ -8,7 +8,9 @@ import {
   Send,
   Trash2,
 } from 'lucide-vue-next';
-import { useEmployeeShellContext } from '../employee-shell-context';
+import { useFilesSectionContext } from '../employee-shell-context';
+import { fileIconOf, fileToneOf, isFileTrashed } from '@/utils/file-record';
+import type { PersonalFileRecord } from '@/stores/shell';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 
@@ -22,22 +24,19 @@ const {
   currentMeta,
   backToList,
   runAction,
-  isFileTrashed,
-  fileToneOf,
-  fileIconOf,
   sendSelectedFileToConversation,
   openPersonalFilePreview,
   downloadPersonalFile,
   trashPersonalFile,
   restorePersonalFile,
   purgePersonalFile,
-} = useEmployeeShellContext();
+} = useFilesSectionContext();
 
 type FileTab = 'all' | 'trash';
 const fileTab = ref<FileTab>('all');
 
-const activeFiles = computed(() => activeFile.value.files.filter((file: { status?: string }) => !isFileTrashed(file)));
-const trashedFiles = computed(() => activeFile.value.files.filter((file: { status?: string }) => isFileTrashed(file)));
+const activeFiles = computed(() => activeFile.value.files.filter((file: PersonalFileRecord) => !isFileTrashed(file)));
+const trashedFiles = computed(() => activeFile.value.files.filter((file: PersonalFileRecord) => isFileTrashed(file)));
 const visibleFiles = computed(() => fileTab.value === 'trash' ? trashedFiles.value : activeFiles.value);
 const emptyTitle = computed(() => fileTab.value === 'trash' ? '回收站为空' : '暂无文件');
 const emptyDescription = computed(() => fileTab.value === 'trash' ? '删除的文件会暂存在这里' : '点击右上角“上传文件”后开始管理');

@@ -1,183 +1,32 @@
 <script setup lang="ts">
+import { computed, unref } from 'vue';
 import {
-  AtSign,
   ChevronLeft,
-  Clock3,
-  Download,
-  Eye,
-  FolderOpen,
-  Info,
-  Send,
-  Sparkles,
-  Trash2,
-  UsersRound,
-  MoonStar,
-  SunMedium,
-  PencilLine,
-  LayoutGrid,
-  Settings,
+  BadgeCheck,
+  MessageSquareText,
+  UserRoundCheck,
 } from 'lucide-vue-next';
-import { useEmployeeShellContext } from '../employee-shell-context';
+import { useContactsSectionContext } from '../employee-shell-context';
+import { displayField, employmentStatusLabel } from '@/utils/employee-format';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
-import AppBadge from '../../components/ui/AppBadge.vue';
-import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
-import AppErrorState from '../../components/ui/AppErrorState.vue';
-import AppInput from '../../components/ui/AppInput.vue';
-import AppLoadingState from '../../components/ui/AppLoadingState.vue';
-import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 import AppTag from '../../components/ui/AppTag.vue';
-import ConversationProcessCard from '../../components/shell/ConversationProcessCard.vue';
-import MessageBubble from '../../components/shell/MessageBubble.vue';
 
 const {
-shell,
-  im,
-  session,
-  workflow,
-  draft,
-  bindEmail,
-  bindEmailCode,
-  bindEmailCodeSending,
-  bindEmailSubmitting,
-  bindEmailEditing,
-  bindEmailNotice,
-  bindEmailError,
-  mobileDraft,
-  mobileSubmitting,
-  mobileUpdateNotice,
-  mobileUpdateError,
-  mobileInput,
-  leaveAccounts,
-  attendanceExceptions,
-  todoActionComment,
-  todoActionError,
-  fileUploading,
-  agentTaskForm,
-  agentTaskSubmitting,
-  agentTaskResult,
-  agentTaskError,
-  agents,
-  agentsLoading,
-  leaveForm,
-  leaveAttachmentIds,
-  leaveSubmitting,
-  leaveResult,
-  leaveError,
-  workflowRequests,
-  workflowRequestsTotal,
-  workflowRequestsLoading,
-  workflowRequestsError,
-  selectedRequestId,
-  workflowDetail,
-  workflowActions,
-  workflowDetailLoading,
-  workflowDetailError,
-  withdrawComment,
-  withdrawSubmitting,
-  attendanceDailyResults,
-  attendanceLoading,
-  attendanceError,
-  punchLoading,
-  punchResult,
-  clockCorrectionForm,
-  clockCorrectionAttachmentIds,
-  clockCorrectionSubmitting,
-  clockCorrectionResult,
-  clockCorrectionError,
-  activeConversation,
-  activeTodo,
-  activeFile,
-  activeWorkbench,
+  shell,
   activeContact,
-  activeProfile,
-  pendingTodoCount,
-  fileUsageCircumference,
-  activeFileUsage,
-  activeFileUsageOffset,
-  currentMeta,
-  currentUserName,
-  currentUserShortName,
-  activeFilter,
-  activeConversationTitle,
-  activeConversationCurrentStep,
-  mustHandleTodos,
-  approvalTodos,
-  deferredTodos,
-  workbenchLaunchers,
-  workbenchHighlights,
-  selectedProfileId,
-  profileStatusLabel,
-  profileIdentityRows,
-  accountSecurityRows,
-  currentEmail,
-  organizationRows,
-  settingsMetrics,
-  storageRows,
-  recentFileRows,
-  preferenceRows,
-  selectedLeaveAccount,
-  activeWorkbenchTitle,
-  selectedRequest,
-  workflowDetailRows,
-  attendanceSummary,
-  teamAttendanceRows,
-  relationTree,
-  hasActiveConversation,
-  hasActiveTodo,
-  businessEmptyTitle,
   backToList,
-  runAction,
-  openDetail,
-  openGroupPanel,
-  openUploadPanel,
-  openCreateConversation,
-  insertAgentMention,
-  sendMessage,
-  openMessageAction,
-  openImAttachment,
-  retryTodos,
-  statusText,
-  toneOfStatus,
-  submitLeaveRequest,
-  isFileTrashed,
-  minutesToDayLabel,
-  loadWorkflowRequests,
-  loadWorkflowRequestDetail,
-  bizTypeLabel,
-  formatDateTime,
-  fileToneOf,
-  fileIconOf,
-  fileTypeLabelFromName,
-  fileSizeLabel,
-  previewWorkflowAttachment,
-  downloadWorkflowAttachment,
-  displayField,
-  actionTypeLabel,
-  withdrawWorkflowRequest,
-  refreshAttendancePanel,
-  punchAttendance,
-  punchTypeLabel,
-  submitClockCorrectionRequest,
-  selectWorkbenchItem,
-  loadAgents,
-  submitAgentTask,
-  confirmAgentTask,
-  cancelAgentTask,
-  sendSelectedFileToConversation,
-  openPersonalFilePreview,
-  downloadPersonalFile,
-  trashPersonalFile,
-  restorePersonalFile,
-  purgePersonalFile,
-  toneOfConversation,
-  submitMobileUpdate,
-  openMobileReset,
-  sendBindEmailCode,
-  submitBindEmail,
-  startBindEmailEditing,
-  cancelBindEmailEditing,
-} = useEmployeeShellContext();
+} = useContactsSectionContext();
+
+const selectedContact = computed(() => unref(activeContact) ?? shell.filteredContacts[0] ?? shell.contacts[0] ?? null);
+
+function presenceStatusLabel(status?: string | null) {
+  if (status === 'ONLINE') return '在线';
+  if (status === 'BUSY') return '忙碌';
+  if (status === 'AWAY') return '离开';
+  if (status === 'DND') return '勿扰';
+  return '未设置';
+}
 </script>
 
 <template>
@@ -189,36 +38,68 @@ shell,
       </button>
       <div class="workspace-head-text">
         <h2 class="workspace-title">通讯录</h2>
-        <div v-if="activeContact" class="workspace-meta-line">
-          <span>{{ activeContact.name }}</span>
-          <span>{{ activeContact.relation }}</span>
+        <div v-if="selectedContact" class="workspace-meta-line">
+          <span>{{ selectedContact.name }}</span>
+          <span>{{ selectedContact.relation }}</span>
         </div>
       </div>
     </div>
   </header>
 
   <section class="content-stack">
-    <article v-if="activeContact" class="detail-card">
-      <div class="title-line">
-        <h3>{{ activeContact.name }}</h3>
-        <AppTag tone="primary">{{ activeContact.relation }}</AppTag>
+    <article v-if="selectedContact" class="detail-card">
+      <div class="contact-profile-head">
+        <AppAvatar :label="selectedContact.name.slice(0, 1)" tone="primary" size="lg" />
+        <div class="contact-profile-copy">
+          <div class="title-line">
+            <h3>{{ selectedContact.name }}</h3>
+            <AppTag tone="primary">{{ selectedContact.relation }}</AppTag>
+          </div>
+          <p>{{ selectedContact.role || '未设置岗位' }}<span v-if="selectedContact.department"> · {{ selectedContact.department }}</span></p>
+          <div class="contact-profile-badges">
+            <span>
+              <UserRoundCheck :size="13" />
+              {{ employmentStatusLabel(selectedContact.employmentStatus) }}
+            </span>
+            <span v-if="selectedContact.presenceStatus">
+              <BadgeCheck :size="13" />
+              {{ presenceStatusLabel(selectedContact.presenceStatus) }}
+            </span>
+          </div>
+        </div>
       </div>
+      <p v-if="selectedContact.signature" class="contact-signature">
+        <MessageSquareText :size="15" />
+        <span>{{ selectedContact.signature }}</span>
+      </p>
       <dl class="field-grid">
         <div>
-          <dt>岗位</dt>
-          <dd>{{ activeContact.role || '暂无' }}</dd>
+          <dt>工号</dt>
+          <dd>{{ displayField(selectedContact.employeeNo) }}</dd>
         </div>
         <div>
           <dt>部门</dt>
-          <dd>{{ activeContact.department || '暂无' }}</dd>
+          <dd>{{ displayField(selectedContact.department) }}</dd>
         </div>
         <div>
-          <dt>来源</dt>
-          <dd>{{ activeContact.source }}</dd>
+          <dt>岗位</dt>
+          <dd>{{ displayField(selectedContact.role) }}</dd>
+        </div>
+        <div>
+          <dt>直属上级</dt>
+          <dd>{{ displayField(selectedContact.managerName) }}</dd>
+        </div>
+        <div>
+          <dt>账号状态</dt>
+          <dd>{{ displayField(selectedContact.status) }}</dd>
+        </div>
+        <div>
+          <dt>组织关系</dt>
+          <dd>{{ selectedContact.relation }}</dd>
         </div>
       </dl>
     </article>
-    <AppEmptyState title="暂无联系人" description="暂无联系人" />
+    <AppEmptyState v-if="!selectedContact" title="暂无联系人" description="暂无联系人" />
   </section>
 </div>
 </template>

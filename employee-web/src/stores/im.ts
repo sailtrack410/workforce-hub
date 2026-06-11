@@ -21,7 +21,24 @@ import type {
   UpdateGroupConversationRequest,
   UpdateReadPositionRequest,
 } from '../api';
-import type { ConversationMessage, ConversationRecord, ConversationTone } from './shell';
+import type {
+  ConversationMessage,
+  ConversationRecord,
+  ConversationTone,
+} from './shell';
+import type {
+  AgentResultData,
+  AgentResultFlow,
+  AgentResultRecord,
+  KnowledgeAnswerAction,
+  KnowledgeAnswerCard,
+  KnowledgeAnswerState,
+  KnowledgeApiRef,
+  KnowledgeCitation,
+  KnowledgeRelatedFlow,
+  KnowledgeAnswerRelatedRef,
+} from '@/types/knowledge';
+import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 
 export interface EmployeeImApi {
   conversations(query?: ImConversationListQuery): Promise<ImConversationSummaryResponse[]>;
@@ -65,6 +82,8 @@ export const useImStore = defineStore('employee-im', {
     readPositionUpdating: false,
     error: '',
     loadedAt: null as string | null,
+    _loadMessagesSeq: 0,
+    _loadDetailSeq: 0,
   }),
   actions: {
     async loadConversations(query: ImConversationListQuery = {}, imApi: EmployeeImApi = employeeApi.im) {
@@ -92,6 +111,7 @@ export const useImStore = defineStore('employee-im', {
       query: ImMessageListQuery = {},
       imApi: EmployeeImApi = employeeApi.im,
     ) {
+      const seq = ++this._loadMessagesSeq;
       this.messageLoading = true;
       this.error = '';
       try {
@@ -111,12 +131,16 @@ export const useImStore = defineStore('employee-im', {
           this.lastMessageSeqByConversation[key] = Math.max(this.lastMessageSeqByConversation[key] ?? 0, lastSeq);
         }
       } catch (error) {
+        if (seq !== this._loadMessagesSeq) return;
         this.error = error instanceof Error ? error.message : '消息加载失败';
       } finally {
-        this.messageLoading = false;
+        if (seq === this._loadMessagesSeq) {
+          this.messageLoading = false;
+        }
       }
     },
     async loadConversationDetail(conversationId: string | number, imApi: EmployeeImApi = employeeApi.im) {
+      const seq = ++this._loadDetailSeq;
       this.error = '';
       try {
         const detail = await imApi.conversationDetail(conversationId);
@@ -140,6 +164,7 @@ export const useImStore = defineStore('employee-im', {
         }
         return detail;
       } catch (error) {
+        if (seq !== this._loadDetailSeq) throw error;
         this.error = error instanceof Error ? error.message : '会话详情加载失败';
         throw error;
       }
@@ -159,6 +184,46 @@ export const useImStore = defineStore('employee-im', {
       imApi: EmployeeImApi = employeeApi.im,
     ) {
       return this.loadMessages(conversationId, currentUserId, { beforeSeq, size }, imApi);
+    },
+    async pollAgentReply(
+      conversationId: string | number,
+      afterSeq: number,
+      currentUserId?: EntityId,
+      options: {
+        imApi?: EmployeeImApi;
+        attempts?: number;
+        intervalMs?: number;
+      } = {},
+    ) {
+      const key = String(conversationId);
+      const imApi = options.imApi ?? employeeApi.im;
+      const attempts = Math.max(1, options.attempts ?? 8);
+      const intervalMs = Math.max(0, options.intervalMs ?? 1200);
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        if (attempt > 0 && intervalMs > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+        }
+        const messages = await imApi.messages(conversationId);
+        const mappedMessages = messages.map((message) => mapImMessageToConversationMessage(message, currentUserId));
+        this.messagesByConversation[key] = mappedMessages;
+        const lastSeq = messages[messages.length - 1]?.seqNo;
+        if (typeof lastSeq === 'number') {
+          this.lastMessageSeqByConversation[key] = Math.max(this.lastMessageSeqByConversation[key] ?? 0, lastSeq);
+        }
+        const conversation = this.conversations.find((item) => item.id === key);
+        if (conversation) {
+          conversation.messages = mappedMessages;
+          const lastMessage = mappedMessages[mappedMessages.length - 1];
+          if (lastMessage) {
+            conversation.subtitle = lastMessage.body;
+            conversation.meta = formatConversationDate(lastMessage.time);
+          }
+        }
+        if (messages.some((message) => message.seqNo > afterSeq && message.senderType === 'AGENT')) {
+          return true;
+        }
+      }
+      return false;
     },
     async startPrivateConversation(targetUserId: EntityId, imApi: EmployeeImApi = employeeApi.im) {
       this.loading = true;
@@ -437,7 +502,8 @@ export const useImStore = defineStore('employee-im', {
       return record;
     },
     upsertMessage(conversationId: string, message: ConversationMessage) {
-      const existing = this.messagesByConversation[conversationId] ?? [];
+      const existing = (this.messagesByConversation[conversationId] ?? [])
+        .filter((item) => !(message.senderType === 'AGENT' && item.id.startsWith('agent-loading-')));
       const duplicateIndex = existing.findIndex((item) => item.id === message.id);
       if (duplicateIndex >= 0) {
         const next = [...existing];
@@ -520,6 +586,8 @@ export function mapImConversationToRecord(conversation: ImConversationSummaryRes
 
 export function mapImMessageToConversationMessage(message: ImMessageResponse, currentUserId?: EntityId): ConversationMessage {
   const sentByCurrentUser = currentUserId !== undefined && message.senderType === 'USER' && String(message.senderId) === String(currentUserId);
+  const content = parseMessageContentJson(message.contentJson);
+  const knowledgeCard = message.messageType === 'CARD' ? parseKnowledgeAnswerCard(content) : undefined;
   const attachments = (message.attachments ?? []).map((attachment) => ({
     id: `im-attachment-${attachment.attachmentRefId}`,
     name: attachment.displayName,
@@ -532,18 +600,19 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
   const recalled = message.status === 'RECALLED';
   return {
     id: String(message.messageId),
-    type: message.messageType === 'CARD' ? 'process-card' : 'text',
+    type: knowledgeCard ? 'knowledge-card' : (message.messageType === 'CARD' ? 'process-card' : 'text'),
     author: sentByCurrentUser ? '我' : authorOfMessage(message),
-    role: messageRole(message),
+    role: messageRole(message, knowledgeCard),
     body: recalled
       ? '消息已撤回'
-      : message.contentText || parseTextFromContentJson(message.contentJson) || (attachments.length ? '文件消息' : '[非文本消息]'),
+      : message.contentText || parseTextFromContent(content) || knowledgeCard?.title || (attachments.length ? '文件消息' : '[非文本消息]'),
     side: resolveMessageSide(message, sentByCurrentUser),
     time: formatMessageTime(message.sentAt),
     seqNo: message.seqNo,
     senderType: message.senderType,
     status: message.status,
     attachments,
+    knowledgeCard,
   };
 }
 
@@ -583,8 +652,9 @@ function authorOfMessage(message: ImMessageResponse) {
   return `用户 ${message.senderId}`;
 }
 
-function messageRole(message: ImMessageResponse) {
+function messageRole(message: ImMessageResponse, knowledgeCard?: KnowledgeAnswerCard) {
   if (message.senderType === 'SYSTEM') return '系统消息';
+  if (knowledgeCard) return '知识库 Agent';
   if (message.senderType === 'AGENT') return message.messageType === 'CARD' ? '流程 Agent' : 'AI 助手';
   if (message.messageType === 'CARD') return '流程消息';
   return '成员';
@@ -600,18 +670,6 @@ function statusLabel(status: string) {
   if (status === 'CLEAN') return '已通过';
   if (status === 'QUARANTINED') return '已隔离';
   return status;
-}
-
-function fileSizeLabel(bytes: number) {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)}MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(bytes >= 10 * 1024 ? 0 : 1)}KB`;
-  return `${bytes}B`;
-}
-
-function fileTypeLabelFromName(name: string, mimeType = '') {
-  const ext = name.split('.').pop()?.trim();
-  if (ext) return ext.slice(0, 8).toUpperCase();
-  return (mimeType.split('/').pop() || '文件').slice(0, 8).toUpperCase();
 }
 
 function formatConversationDate(value?: string | null) {
@@ -633,12 +691,291 @@ function formatMessageTime(value?: string | null) {
   return value.replace('T', ' ').slice(0, 16);
 }
 
-function parseTextFromContentJson(contentJson?: string | null) {
-  if (!contentJson) return '';
+function parseMessageContentJson(contentJson?: string | null): Record<string, unknown> | null {
+  if (!contentJson) return null;
   try {
-    const content = JSON.parse(contentJson) as { text?: unknown };
-    return typeof content.text === 'string' ? content.text : '';
+    const content = JSON.parse(contentJson);
+    return content && typeof content === 'object' && !Array.isArray(content) ? content as Record<string, unknown> : null;
   } catch {
-    return '';
+    return null;
   }
+}
+
+function parseTextFromContent(content: Record<string, unknown> | null) {
+  return typeof content?.text === 'string' ? content.text : '';
+}
+
+function parseKnowledgeAnswerCard(content: Record<string, unknown> | null): KnowledgeAnswerCard | undefined {
+  if (!content) return undefined;
+  if (content.cardType === 'agent_result') return parseAgentResultCard(content);
+  if (content.cardType !== 'knowledge_answer') return undefined;
+  return {
+    state: normalizeKnowledgeState(content.state),
+    title: stringValue(content.title, '知识库回复'),
+    answer: stringValue(content.answer || content.text, ''),
+    confidence: normalizeConfidence(content.confidence),
+    citations: arrayValue(content.citations).map(parseKnowledgeCitation).filter(Boolean) as KnowledgeCitation[],
+    relatedFlows: arrayValue(content.relatedFlows).map(parseKnowledgeRelatedFlow).filter(Boolean) as KnowledgeRelatedFlow[],
+    missingReason: optionalString(content.missingReason),
+    suggestedActions: arrayValue(content.suggestedActions).map(parseKnowledgeAction).filter(Boolean) as KnowledgeAnswerAction[],
+    relatedBusiness: arrayValue(content.relatedBusiness).map(parseKnowledgeRelatedRef).filter(Boolean) as KnowledgeAnswerRelatedRef[],
+    generatedAt: optionalString(content.generatedAt),
+  };
+}
+
+function parseAgentResultCard(content: Record<string, unknown>): KnowledgeAnswerCard {
+  const data = parseAgentResultData(content.data);
+  return {
+    state: normalizeAgentResultState(content.status),
+    category: normalizeAgentResultCategory(content.category),
+    status: normalizeAgentResultStatus(content.status),
+    title: stringValue(content.title, 'Agent 回复'),
+    answer: stringValue(content.answer || content.summary, ''),
+    confidence: normalizeConfidence(content.confidence),
+    citations: arrayValue(content.citations).map(parseKnowledgeCitation).filter(Boolean) as KnowledgeCitation[],
+    relatedFlows: data.flow ? [toKnowledgeRelatedFlow(data.flow)] : [],
+    missingReason: optionalString(content.reason),
+    suggestedActions: arrayValue(content.actions).map(parseAgentResultAction).filter(Boolean) as KnowledgeAnswerAction[],
+    relatedBusiness: data.fields ?? [],
+    generatedAt: optionalString(content.generatedAt),
+  };
+}
+
+function parseAgentResultData(value: unknown): AgentResultData {
+  const item = objectValue(value);
+  if (!item) return {};
+  return {
+    fields: arrayValue(item.fields).map(parseKnowledgeRelatedRef).filter(Boolean) as KnowledgeAnswerRelatedRef[],
+    flow: parseAgentResultFlow(item.flow),
+    records: arrayValue(item.records).map(parseAgentResultRecord).filter(Boolean) as AgentResultRecord[],
+  };
+}
+
+function parseAgentResultFlow(value: unknown): AgentResultFlow | null {
+  const item = objectValue(value);
+  if (!item) return null;
+  return {
+    requestId: optionalString(item.requestId),
+    requestNo: optionalString(item.requestNo),
+    title: optionalString(item.title),
+    status: optionalString(item.status),
+    currentNode: optionalString(item.currentNode),
+    detailUrl: optionalString(item.detailUrl),
+  };
+}
+
+function parseAgentResultRecord(value: unknown): AgentResultRecord | undefined {
+  const item = objectValue(value);
+  if (!item) return undefined;
+  const title = optionalString(item.title);
+  if (!title) return undefined;
+  return {
+    title,
+    summary: optionalString(item.summary),
+    fields: arrayValue(item.fields).map(parseFieldTuple).filter(Boolean) as Array<[string, string]>,
+  };
+}
+
+function toKnowledgeRelatedFlow(flow: AgentResultFlow): KnowledgeRelatedFlow {
+  const fields: Array<[string, string]> = [];
+  if (flow.status) fields.push(['状态', flow.status]);
+  if (flow.currentNode) fields.push(['当前节点', flow.currentNode]);
+  if (flow.detailUrl) fields.push(['详情', flow.detailUrl]);
+  return {
+    id: flow.requestId ?? flow.requestNo ?? flow.title ?? 'agent-flow',
+    title: flow.requestNo ? `${flow.title ?? '流程'} ${flow.requestNo}` : flow.title ?? '相关流程',
+    status: flow.status ?? '待处理',
+    statusTone: normalizeBadgeTone(undefined),
+    summary: flow.currentNode ? `当前节点：${flow.currentNode}` : undefined,
+    fields,
+    apiRef: flow.detailUrl ? {
+      status: 'available',
+      method: 'GET',
+      path: flow.detailUrl,
+      description: '流程详情',
+    } : undefined,
+  };
+}
+
+function parseAgentResultAction(value: unknown): KnowledgeAnswerAction | undefined {
+  const item = objectValue(value);
+  if (!item) return undefined;
+  const label = optionalString(item.label);
+  const action = optionalString(item.type) ?? optionalString(item.action);
+  if (!label || !action) return undefined;
+  const target = optionalString(item.target);
+  return {
+    label,
+    action,
+    apiRef: target ? {
+      status: 'available',
+      method: 'GET',
+      path: target,
+    } : parseKnowledgeApiRef(item.apiRef),
+    payload: objectValue(item.payload),
+    disabled: item.disabled === true,
+  };
+}
+
+function normalizeAgentResultState(value: unknown): KnowledgeAnswerState {
+  if (value === 'LOADING') return 'INGESTING';
+  if (value === 'EMPTY') return 'NO_MATCH';
+  if (value === 'NO_PERMISSION') return 'NO_PERMISSION';
+  if (value === 'FAILED') return 'SEARCH_FAILED';
+  return 'ANSWERED';
+}
+
+function normalizeAgentResultStatus(value: unknown): KnowledgeAnswerCard['status'] {
+  if (value === 'LOADING' || value === 'SUCCESS' || value === 'EMPTY' || value === 'NO_PERMISSION' || value === 'FAILED') return value;
+  return 'SUCCESS';
+}
+
+function normalizeAgentResultCategory(value: unknown): KnowledgeAnswerCard['category'] {
+  if (value === 'QA' || value === 'OA' || value === 'KNOWLEDGE') return value;
+  return 'QA';
+}
+
+function normalizeKnowledgeState(value: unknown): KnowledgeAnswerState {
+  if (
+    value === 'ANSWERED'
+    || value === 'NO_MATCH'
+    || value === 'LOW_CONFIDENCE'
+    || value === 'NO_PERMISSION'
+    || value === 'INGESTING'
+    || value === 'SEARCH_FAILED'
+  ) {
+    return value;
+  }
+  return 'ANSWERED';
+}
+
+function normalizeConfidence(value: unknown): KnowledgeAnswerCard['confidence'] {
+  if (value === 'high' || value === 'medium' || value === 'low') return value;
+  return undefined;
+}
+
+function parseKnowledgeCitation(value: unknown): KnowledgeCitation | undefined {
+  const item = objectValue(value);
+  if (!item) return undefined;
+  const title = optionalString(item.title);
+  if (!title) return undefined;
+  return {
+    id: optionalString(item.id),
+    title,
+    snippet: optionalString(item.snippet),
+    sourceType: normalizeCitationSourceType(item.sourceType),
+    score: numberValue(item.score),
+    apiRef: parseKnowledgeApiRef(item.apiRef),
+  };
+}
+
+function parseKnowledgeRelatedFlow(value: unknown): KnowledgeRelatedFlow | undefined {
+  const item = objectValue(value);
+  if (!item) return undefined;
+  const id = optionalString(item.id);
+  const title = optionalString(item.title);
+  if (!id || !title) return undefined;
+  return {
+    id,
+    title,
+    status: stringValue(item.status, '待处理'),
+    statusTone: normalizeBadgeTone(item.statusTone),
+    summary: optionalString(item.summary),
+    fields: arrayValue(item.fields).map(parseFieldTuple).filter(Boolean) as Array<[string, string]>,
+    apiRef: parseKnowledgeApiRef(item.apiRef),
+  };
+}
+
+function parseKnowledgeAction(value: unknown): KnowledgeAnswerAction | undefined {
+  const item = objectValue(value);
+  if (!item) return undefined;
+  const label = optionalString(item.label);
+  const action = optionalString(item.action);
+  if (!label || !action) return undefined;
+  return {
+    label,
+    action,
+    apiRef: parseKnowledgeApiRef(item.apiRef),
+    payload: objectValue(item.payload),
+    disabled: item.disabled === true,
+  };
+}
+
+function parseKnowledgeRelatedRef(value: unknown): KnowledgeAnswerRelatedRef | undefined {
+  const item = objectValue(value);
+  if (!item) return undefined;
+  const label = optionalString(item.label);
+  const relatedValue = optionalString(item.value);
+  if (!label || !relatedValue) return undefined;
+  return {
+    label,
+    value: relatedValue,
+    tone: normalizeRelatedTone(item.tone),
+  };
+}
+
+function parseKnowledgeApiRef(value: unknown): KnowledgeApiRef | undefined {
+  const item = objectValue(value);
+  if (!item) return undefined;
+  const path = optionalString(item.path);
+  if (!path) return undefined;
+  return {
+    status: normalizeApiStatus(item.status),
+    method: normalizeApiMethod(item.method),
+    path,
+    description: optionalString(item.description),
+  };
+}
+
+function parseFieldTuple(value: unknown): [string, string] | undefined {
+  if (!Array.isArray(value) || value.length < 2) return undefined;
+  const label = optionalString(value[0]);
+  const fieldValue = optionalString(value[1]);
+  return label && fieldValue ? [label, fieldValue] : undefined;
+}
+
+function normalizeCitationSourceType(value: unknown): KnowledgeCitation['sourceType'] {
+  if (value === 'DOC' || value === 'FILE' || value === 'WORKFLOW' || value === 'POLICY' || value === 'UNKNOWN') return value;
+  return 'UNKNOWN';
+}
+
+function normalizeBadgeTone(value: unknown): KnowledgeRelatedFlow['statusTone'] {
+  if (value === 'primary' || value === 'success' || value === 'warning' || value === 'danger' || value === 'neutral') return value;
+  return 'neutral';
+}
+
+function normalizeRelatedTone(value: unknown): KnowledgeAnswerRelatedRef['tone'] {
+  if (value === 'blue' || value === 'green' || value === 'amber' || value === 'red' || value === 'gray') return value;
+  return 'gray';
+}
+
+function normalizeApiStatus(value: unknown): KnowledgeApiRef['status'] {
+  if (value === 'available' || value === 'planned' || value === 'unavailable') return value;
+  return 'planned';
+}
+
+function normalizeApiMethod(value: unknown): KnowledgeApiRef['method'] {
+  if (value === 'GET' || value === 'POST' || value === 'PUT' || value === 'DELETE') return value;
+  return 'GET';
+}
+
+function objectValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function optionalString(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return optionalString(value) ?? fallback;
+}
+
+function numberValue(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }

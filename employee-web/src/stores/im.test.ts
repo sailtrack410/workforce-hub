@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import type { ImConversationSummaryResponse, ImMessageResponse, SendImMessageRequest } from '../api';
 import { mapImConversationToRecord, mapImMessageToConversationMessage, useImStore, type EmployeeImApi } from './im';
@@ -151,6 +151,59 @@ describe('IM store', () => {
     });
   });
 
+  it('maps knowledge answer CARD content into a knowledge card message', () => {
+    const record = mapImMessageToConversationMessage({
+      ...message,
+      messageId: 7104,
+      senderType: 'AGENT',
+      senderId: 9001,
+      messageType: 'CARD',
+      contentText: '',
+      contentJson: JSON.stringify({
+        cardType: 'knowledge_answer',
+        state: 'ANSWERED',
+        title: '年假与考勤影响',
+        answer: '审批通过后会扣减年假余额，并同步生成请假考勤结果。',
+        confidence: 'high',
+        generatedAt: '15:24',
+        relatedBusiness: [
+          { label: '当前余额', value: '6.5 天', tone: 'green' },
+        ],
+        relatedFlows: [
+          {
+            id: 'WF-20260514-001',
+            title: '请假申请 WF-20260514-001',
+            status: '审批中',
+            statusTone: 'primary',
+          },
+        ],
+        citations: [
+          {
+            id: 'policy-annual-leave',
+            title: '员工年假制度',
+            sourceType: 'POLICY',
+            score: 0.87,
+          },
+        ],
+        suggestedActions: [
+          { label: '查看引用', action: 'open_citation' },
+        ],
+      }),
+    }, 2003);
+
+    expect(record.type).toBe('knowledge-card');
+    expect(record.knowledgeCard).toMatchObject({
+      state: 'ANSWERED',
+      title: '年假与考勤影响',
+      answer: '审批通过后会扣减年假余额，并同步生成请假考勤结果。',
+      confidence: 'high',
+      citations: [{ title: '员工年假制度', sourceType: 'POLICY' }],
+      relatedFlows: [{ id: 'WF-20260514-001', title: '请假申请 WF-20260514-001' }],
+      suggestedActions: [{ label: '查看引用', action: 'open_citation' }],
+    });
+    expect(record.role).toBe('知识库 Agent');
+  });
+
   it('maps current user messages to the right side', () => {
     const record = mapImMessageToConversationMessage({
       ...message,
@@ -265,6 +318,42 @@ describe('IM store', () => {
     expect(im.messageSending).toBe(false);
   });
 
+  it('polls agent conversation replies and appends backend agent response', async () => {
+    const im = useImStore();
+    const agentReply: ImMessageResponse = {
+      ...message,
+      messageId: 7104,
+      seqNo: 4,
+      senderType: 'AGENT',
+      senderId: 9001,
+      contentJson: '{"text":"Agent真实模型已接通。"}',
+      contentText: 'Agent真实模型已接通。',
+      sentAt: '2026-05-09T10:13:00',
+    };
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      messages: () => Promise.resolve([message, agentReply]),
+    };
+
+    im.messagesByConversation['7001'] = [mapImMessageToConversationMessage(message, 2003)];
+
+    const found = await im.pollAgentReply(7001, 2, 2003, {
+      imApi,
+      attempts: 1,
+      intervalMs: 0,
+    });
+
+    expect(found).toBe(true);
+    expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7102', '7104']);
+    expect(im.messagesByConversation['7001'][1]).toMatchObject({
+      author: 'Agent',
+      role: 'AI 助手',
+      body: 'Agent真实模型已接通。',
+      side: 'left',
+    });
+    expect(im.lastMessageSeqByConversation['7001']).toBe(4);
+  });
+
   it('updates read position and syncs unread count back to conversation list', async () => {
     const im = useImStore();
     await im.loadConversations({}, createImApi());
@@ -323,5 +412,46 @@ describe('IM store', () => {
       flow: '群聊',
     });
     expect(im.conversations[0].id).toBe('7301');
+  });
+
+  it('discards stale loadMessages result when a newer request resolves first', async () => {
+    const im = useImStore();
+    type DeferredMessages = { promise: Promise<ImMessageResponse[]>; resolve: (v: ImMessageResponse[]) => void };
+    let resolveA: DeferredMessages['resolve'];
+    let resolveB: DeferredMessages['resolve'];
+    const deferredA: DeferredMessages = { promise: new Promise((r) => { resolveA = r; }), resolve: null! };
+    const deferredB: DeferredMessages = { promise: new Promise((r) => { resolveB = r; }), resolve: null! };
+    deferredA.resolve = resolveA!;
+    deferredB.resolve = resolveB!;
+
+    const messageB: ImMessageResponse = { ...message, messageId: 8100, contentText: '会话B消息' };
+    const messageA: ImMessageResponse = { ...message, messageId: 8200, contentText: '会话A消息' };
+
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      messages: vi.fn()
+        .mockImplementationOnce(() => deferredA.promise)
+        .mockImplementationOnce(() => deferredB.promise),
+    };
+
+    // Fire two concurrent loadMessages calls
+    const loadA = im.loadMessages('A', 2003, {}, imApi);
+    const loadB = im.loadMessages('B', 2003, {}, imApi);
+
+    // B resolves first
+    deferredB.resolve([messageB]);
+    await loadB;
+    expect(im.messageLoading).toBe(false);
+    expect(im.messagesByConversation['B'].map((m) => m.id)).toEqual(['8100']);
+
+    // A resolves later — its data should still be written (per-key storage),
+    // but loading/error should not be clobbered
+    deferredA.resolve([messageA]);
+    await loadA;
+    expect(im.messageLoading).toBe(false);
+    expect(im.error).toBe('');
+    expect(im.messagesByConversation['A'].map((m) => m.id)).toEqual(['8200']);
+    // B's data should remain untouched
+    expect(im.messagesByConversation['B'].map((m) => m.id)).toEqual(['8100']);
   });
 });

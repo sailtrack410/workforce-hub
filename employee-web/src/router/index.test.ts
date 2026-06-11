@@ -27,6 +27,16 @@ describe('employee router', () => {
     expect(route?.name).toBe(name);
     expect(route?.meta?.section).toBe(section);
   });
+
+  it('lazy-loads the shell and section components', async () => {
+    const employeeRoutes = await loadEmployeeRoutes();
+    const shellRoute = employeeRoutes.find((route) => route.children?.length);
+    const sectionRoutes = shellRoute?.children?.filter((route) => route.component) ?? [];
+
+    expect(typeof shellRoute?.component).toBe('function');
+    expect(sectionRoutes.length).toBeGreaterThan(0);
+    expect(sectionRoutes.every((route) => typeof route.component === 'function')).toBe(true);
+  });
 });
 
 async function loadEmployeeRoutes(): Promise<RouteRecordRaw[]> {

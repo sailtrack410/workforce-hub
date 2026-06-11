@@ -1,18 +1,40 @@
 import { defineStore } from 'pinia';
+import { useImStore } from './im';
 import type {
+  AccentColor,
+  BubbleStyle,
   CurrentUserResponse,
   EmployeeFileResponse,
   EntityId,
+  FontScale,
   OrgUserDetailResponse,
   OrgUserSummaryResponse,
+  PresenceStatus,
   QuotaResponse,
 } from '../api';
+import type { KnowledgeAnswerCard } from '@/types/knowledge';
+import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 
 export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'reports' | 'settings';
 export type ConversationTone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
 export type SectionFilter = '全部' | '未处理' | 'Agent' | '群聊' | '私聊';
 export type ThemeMode = 'light' | 'dark';
 export type MessageDensity = 'cozy' | 'compact';
+
+export interface StoredPreferences {
+  theme: ThemeMode;
+  messageDensity: MessageDensity;
+  listWidth: number;
+  signature: string;
+  presenceStatus: PresenceStatus;
+  notifSound: boolean;
+  notifDesktop: boolean;
+  notifMentionOnly: boolean;
+  notifUnreadBadge: boolean;
+  accentColor: AccentColor;
+  fontScale: FontScale;
+  bubbleStyle: BubbleStyle;
+}
 
 export interface SectionAction {
   label: string;
@@ -39,7 +61,7 @@ export interface NavRailItem {
 
 export interface ConversationMessage {
   id: string;
-  type?: 'text' | 'process-card';
+  type?: 'text' | 'process-card' | 'knowledge-card';
   author: string;
   role: string;
   body: string;
@@ -50,6 +72,7 @@ export interface ConversationMessage {
   status?: string;
   attachments?: ConversationAttachment[];
   processCard?: ConversationProcessCard;
+  knowledgeCard?: KnowledgeAnswerCard;
 }
 
 export interface ConversationCard {
@@ -209,6 +232,12 @@ export interface ContactRecord {
   relation: string;
   source: string;
   userId?: string | number;
+  employeeNo?: string;
+  status?: string | null;
+  employmentStatus?: string | null;
+  signature?: string;
+  presenceStatus?: PresenceStatus;
+  managerName?: string | null;
 }
 
 export const sectionMeta: Record<SectionId, SectionMeta> = {
@@ -315,27 +344,63 @@ const currentUser = {
 const preferenceStorageKey = 'workforce-hub.employee.preferences.v1';
 const personalFilesStoragePrefix = 'workforce-hub.employee.personal-files.v1';
 
-type StoredPreferences = { theme: ThemeMode; messageDensity: MessageDensity; listWidth: number };
+const defaultPreferences: StoredPreferences = {
+  theme: 'light',
+  messageDensity: 'cozy',
+  listWidth: 400,
+  signature: '',
+  presenceStatus: 'ONLINE',
+  notifSound: true,
+  notifDesktop: true,
+  notifMentionOnly: false,
+  notifUnreadBadge: true,
+  accentColor: 'indigo',
+  fontScale: 'medium',
+  bubbleStyle: 'rounded',
+};
+
+function normalizePreferenceInput(preferences: Partial<StoredPreferences> = {}): StoredPreferences {
+  const width = typeof preferences.listWidth === 'number' && Number.isFinite(preferences.listWidth)
+    ? Math.max(384, Math.min(520, Math.round(preferences.listWidth)))
+    : defaultPreferences.listWidth;
+  const signature = typeof preferences.signature === 'string'
+    ? preferences.signature.trim().slice(0, 140)
+    : defaultPreferences.signature;
+  return {
+    theme: preferences.theme === 'dark' || preferences.theme === 'light' ? preferences.theme : defaultPreferences.theme,
+    messageDensity: preferences.messageDensity === 'compact' || preferences.messageDensity === 'cozy'
+      ? preferences.messageDensity
+      : defaultPreferences.messageDensity,
+    listWidth: width,
+    signature,
+    presenceStatus: ['ONLINE', 'BUSY', 'AWAY', 'DND'].includes(String(preferences.presenceStatus))
+      ? preferences.presenceStatus as PresenceStatus
+      : defaultPreferences.presenceStatus,
+    notifSound: typeof preferences.notifSound === 'boolean' ? preferences.notifSound : defaultPreferences.notifSound,
+    notifDesktop: typeof preferences.notifDesktop === 'boolean' ? preferences.notifDesktop : defaultPreferences.notifDesktop,
+    notifMentionOnly: typeof preferences.notifMentionOnly === 'boolean' ? preferences.notifMentionOnly : defaultPreferences.notifMentionOnly,
+    notifUnreadBadge: typeof preferences.notifUnreadBadge === 'boolean' ? preferences.notifUnreadBadge : defaultPreferences.notifUnreadBadge,
+    accentColor: ['indigo', 'violet', 'blue', 'teal', 'amber', 'rose'].includes(String(preferences.accentColor))
+      ? preferences.accentColor as AccentColor
+      : defaultPreferences.accentColor,
+    fontScale: ['small', 'medium', 'large'].includes(String(preferences.fontScale))
+      ? preferences.fontScale as FontScale
+      : defaultPreferences.fontScale,
+    bubbleStyle: preferences.bubbleStyle === 'sharp' || preferences.bubbleStyle === 'rounded'
+      ? preferences.bubbleStyle
+      : defaultPreferences.bubbleStyle,
+  };
+}
 
 function readStoredPreferences(): StoredPreferences {
-  const defaults: StoredPreferences = { theme: 'light', messageDensity: 'cozy', listWidth: 400 };
   try {
     const storage = globalThis.localStorage;
     const raw = storage?.getItem(preferenceStorageKey);
-    if (!raw) return defaults;
+    if (!raw) return defaultPreferences;
     const parsed = JSON.parse(raw) as Partial<StoredPreferences>;
-    const width = typeof parsed.listWidth === 'number' && Number.isFinite(parsed.listWidth)
-      ? Math.max(384, Math.min(520, Math.round(parsed.listWidth)))
-      : defaults.listWidth;
-    return {
-      theme: parsed.theme === 'dark' || parsed.theme === 'light' ? parsed.theme : defaults.theme,
-      messageDensity: parsed.messageDensity === 'compact' || parsed.messageDensity === 'cozy'
-        ? parsed.messageDensity
-        : defaults.messageDensity,
-      listWidth: width,
-    };
+    return normalizePreferenceInput(parsed);
   } catch {
-    return defaults;
+    return defaultPreferences;
   }
 }
 
@@ -539,7 +604,16 @@ const profileItems: ProfileRecord[] = [
   {
     id: 'preferences',
     title: '偏好设置',
-    subtitle: '主题与密度',
+    subtitle: '外观 / 通知 / 状态',
+    note: '',
+    tone: 'gray',
+    stats: [],
+    fields: [],
+  },
+  {
+    id: 'storage',
+    title: '文件空间',
+    subtitle: '配额与最近文件',
     note: '',
     tone: 'gray',
     stats: [],
@@ -549,7 +623,6 @@ const profileItems: ProfileRecord[] = [
 
 const SETTINGS_ALIAS: Record<string, string> = {
   center: 'profile',
-  storage: 'profile',
 };
 
 export function normalizeSettingsPanel(id?: string | null): string {
@@ -598,26 +671,6 @@ function fileStatusValue(value?: string | null) {
   return statusValue(value);
 }
 
-function bytesToSize(bytes?: number | null) {
-  if (!bytes || bytes <= 0) return '0B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let size = bytes;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  const precision = size >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${size.toFixed(precision)}${units[unitIndex]}`;
-}
-
-function fileTypeLabelFromName(name?: string | null, mimeType = '') {
-  const ext = name?.split('.').pop()?.trim();
-  if (ext && ext !== name) return ext.slice(0, 8).toUpperCase();
-  if (mimeType) return mimeType.split('/').pop()?.slice(0, 8).toUpperCase() || '文件';
-  return '文件';
-}
-
 function formatDisplayDateTime(value?: string | null) {
   if (!value) return '';
   const date = new Date(value);
@@ -636,7 +689,7 @@ function mapEmployeeFile(file: EmployeeFileResponse): PersonalFileRecord {
     id: `personal-file-${file.attachmentRefId}`,
     name,
     type: fileTypeLabelFromName(name, file.mimeType ?? ''),
-    size: bytesToSize(file.fileSize),
+    size: fileSizeLabel(file.fileSize),
     createdAt: formatDisplayDateTime(file.createdAt) || '刚刚',
     status: file.deletedAt ? '回收站' : fileStatusValue(file.scanStatus),
     attachmentRefId: file.attachmentRefId,
@@ -667,6 +720,15 @@ export const useShellStore = defineStore('employee-shell', {
     listWidth: storedPreferences.listWidth,
     theme: storedPreferences.theme,
     messageDensity: storedPreferences.messageDensity,
+    signature: storedPreferences.signature,
+    presenceStatus: storedPreferences.presenceStatus,
+    notifSound: storedPreferences.notifSound,
+    notifDesktop: storedPreferences.notifDesktop,
+    notifMentionOnly: storedPreferences.notifMentionOnly,
+    notifUnreadBadge: storedPreferences.notifUnreadBadge,
+    accentColor: storedPreferences.accentColor,
+    fontScale: storedPreferences.fontScale,
+    bubbleStyle: storedPreferences.bubbleStyle,
     search: {
       messages: '',
       todos: '',
@@ -697,7 +759,6 @@ export const useShellStore = defineStore('employee-shell', {
       reports: 'overview',
       settings: 'profile',
     },
-    conversations: [] as ConversationRecord[],
     todos: [] as TodoRecord[],
     files: createFileSpaces(),
     personalFileOwnerId: '',
@@ -709,14 +770,17 @@ export const useShellStore = defineStore('employee-shell', {
     };
   },
   getters: {
-    totalUnread(state): number {
-      return state.conversations.reduce((sum, item) => sum + item.unread, 0);
+    conversations(): ConversationRecord[] {
+      return useImStore().conversations;
+    },
+    totalUnread(): number {
+      return this.conversations.reduce((sum, item) => sum + item.unread, 0);
     },
     pendingTodoCount(state): number {
       return state.todos.filter((item) => isPendingStatus(item.status)).length;
     },
     activeConversation(state): ConversationRecord {
-      return findById(state.conversations, state.active.messages, emptyConversation);
+      return findById(this.conversations, state.active.messages, emptyConversation);
     },
     activeTodo(state): TodoRecord {
       return findById(state.todos, state.active.todos, emptyTodo);
@@ -737,7 +801,7 @@ export const useShellStore = defineStore('employee-shell', {
       return sectionMeta[state.section];
     },
     filteredConversations(state): ConversationRecord[] {
-      return state.conversations.filter((item) => matchesConversationFilter(item, state.filters.messages))
+      return this.conversations.filter((item) => matchesConversationFilter(item, state.filters.messages))
         .filter((item) => includesKeyword([
           item.title,
           item.subtitle,
@@ -835,39 +899,84 @@ export const useShellStore = defineStore('employee-shell', {
     },
     setListWidth(width: number) {
       this.listWidth = Math.max(384, Math.min(520, Math.round(width)));
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+      this.persistPreferences();
     },
     setTheme(theme: ThemeMode) {
       this.theme = theme;
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+      this.persistPreferences();
     },
     toggleTheme() {
       this.theme = this.theme === 'light' ? 'dark' : 'light';
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+      this.persistPreferences();
     },
     setMessageDensity(density: MessageDensity) {
       this.messageDensity = density;
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+      this.persistPreferences();
     },
-    hydratePreferencesFromServer(prefs: { theme?: string | null; messageDensity?: string | null; listWidth?: number | null }) {
-      if (prefs.theme === 'dark' || prefs.theme === 'light') this.theme = prefs.theme;
-      if (prefs.messageDensity === 'cozy' || prefs.messageDensity === 'compact') this.messageDensity = prefs.messageDensity;
-      if (typeof prefs.listWidth === 'number' && Number.isFinite(prefs.listWidth)) {
-        this.listWidth = Math.max(384, Math.min(520, Math.round(prefs.listWidth)));
-      }
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+    setSignature(signature: string) {
+      this.signature = signature.trim().slice(0, 140);
+      this.persistPreferences();
     },
-    applyServerPreferences(preferences: { theme?: string | null; messageDensity?: string | null; listWidth?: number | null }) {
-      if (preferences.theme === 'light' || preferences.theme === 'dark') {
-        this.theme = preferences.theme;
-      }
-      if (preferences.messageDensity === 'cozy' || preferences.messageDensity === 'compact') {
-        this.messageDensity = preferences.messageDensity;
-      }
-      if (typeof preferences.listWidth === 'number' && Number.isFinite(preferences.listWidth)) {
-        this.listWidth = Math.max(384, Math.min(520, Math.round(preferences.listWidth)));
-      }
-      writeStoredPreferences({ theme: this.theme, messageDensity: this.messageDensity, listWidth: this.listWidth });
+    setPresenceStatus(status: PresenceStatus) {
+      this.presenceStatus = status;
+      this.persistPreferences();
+    },
+    setNotificationPreference(field: 'notifSound' | 'notifDesktop' | 'notifMentionOnly' | 'notifUnreadBadge', value: boolean) {
+      if (field === 'notifSound') this.notifSound = value;
+      if (field === 'notifDesktop') this.notifDesktop = value;
+      if (field === 'notifMentionOnly') this.notifMentionOnly = value;
+      if (field === 'notifUnreadBadge') this.notifUnreadBadge = value;
+      this.persistPreferences();
+    },
+    setAccentColor(color: AccentColor) {
+      this.accentColor = color;
+      this.persistPreferences();
+    },
+    setFontScale(scale: FontScale) {
+      this.fontScale = scale;
+      this.persistPreferences();
+    },
+    setBubbleStyle(style: BubbleStyle) {
+      this.bubbleStyle = style;
+      this.persistPreferences();
+    },
+    currentPreferencePayload(): StoredPreferences {
+      return {
+        theme: this.theme,
+        messageDensity: this.messageDensity,
+        listWidth: this.listWidth,
+        signature: this.signature,
+        presenceStatus: this.presenceStatus,
+        notifSound: this.notifSound,
+        notifDesktop: this.notifDesktop,
+        notifMentionOnly: this.notifMentionOnly,
+        notifUnreadBadge: this.notifUnreadBadge,
+        accentColor: this.accentColor,
+        fontScale: this.fontScale,
+        bubbleStyle: this.bubbleStyle,
+      };
+    },
+    persistPreferences() {
+      writeStoredPreferences(this.currentPreferencePayload());
+    },
+    hydratePreferencesFromServer(prefs: Partial<StoredPreferences>) {
+      const normalized = normalizePreferenceInput(prefs);
+      this.theme = normalized.theme;
+      this.messageDensity = normalized.messageDensity;
+      this.listWidth = normalized.listWidth;
+      this.signature = normalized.signature;
+      this.presenceStatus = normalized.presenceStatus;
+      this.notifSound = normalized.notifSound;
+      this.notifDesktop = normalized.notifDesktop;
+      this.notifMentionOnly = normalized.notifMentionOnly;
+      this.notifUnreadBadge = normalized.notifUnreadBadge;
+      this.accentColor = normalized.accentColor;
+      this.fontScale = normalized.fontScale;
+      this.bubbleStyle = normalized.bubbleStyle;
+      this.persistPreferences();
+    },
+    applyServerPreferences(preferences: Partial<StoredPreferences>) {
+      this.hydratePreferencesFromServer(preferences);
     },
     setColleagues(rows: OrgUserSummaryResponse[]) {
       this.colleagues = rows ?? [];
@@ -881,100 +990,25 @@ export const useShellStore = defineStore('employee-shell', {
       manager: OrgUserSummaryResponse | null,
       subordinates: OrgUserSummaryResponse[],
     ) {
-      const name = profile?.realName || user?.displayName || currentUser.name;
-      const employmentStatus = statusValue(profile?.employmentStatus ?? user?.employmentStatus);
       const ownerId = String(profile?.userId ?? user?.userId ?? '');
       if (ownerId !== this.personalFileOwnerId) {
         this.personalFileOwnerId = ownerId;
         const personal = this.files.find((item) => item.id === 'personal');
         if (personal) personal.files = readStoredPersonalFiles(ownerId);
       }
-      this.profile = [
-        {
-          id: 'center',
-          title: '个人中心',
-          subtitle: '仪表盘',
-          note: '',
-          tone: 'blue',
-          stats: [[name, '姓名'], [employmentStatus, '状态'], [displayValue(profile?.workLocation), '地点']],
-          fields: [
-            ['姓名', name],
-            ['登录名', displayValue(user?.loginName)],
-            ['工号', displayValue(profile?.employeeNo)],
-            ['手机号', displayValue(profile?.mobile)],
-          ],
-        },
-        {
-          id: 'profile',
-          title: '个人资料',
-          subtitle: '身份信息',
-          note: '',
-          tone: 'blue',
-          stats: [[name, '姓名'], [employmentStatus, '状态'], [displayValue(profile?.workLocation), '地点']],
-          fields: [
-            ['姓名', name],
-            ['登录名', displayValue(user?.loginName)],
-            ['工号', displayValue(profile?.employeeNo)],
-            ['手机号', displayValue(profile?.mobile)],
-            ['部门', displayValue(profile?.primaryDeptName)],
-            ['岗位', displayValue(profile?.positionName)],
-            ['入职日期', displayValue(profile?.hireDate)],
-            ['工作地点', displayValue(profile?.workLocation)],
-          ],
-        },
-        {
-          id: 'organization',
-          title: '组织关系',
-          subtitle: '组织架构',
-          note: '',
-          tone: 'green',
-          stats: [
-            [displayValue(profile?.primaryDeptName), '主部门'],
-            [displayValue(manager?.realName ?? profile?.managerName), '直属上级'],
-            [`${subordinates.length} 人`, '直属下级'],
-          ],
-          fields: [
-            ['部门', displayValue(profile?.primaryDeptName)],
-            ['岗位', displayValue(profile?.positionName)],
-            ['直属上级', displayValue(manager?.realName ?? profile?.managerName)],
-            ['直属下级', subordinates.length ? subordinates.map((item) => item.realName).join('、') : '暂无'],
-          ],
-        },
-        {
-          id: 'security',
-          title: '账号安全',
-          subtitle: '账号安全',
-          note: '',
-          tone: 'amber',
-          stats: [['邮箱', '验证'], ['会话', '状态']],
-          fields: [
-            ['用户类型', displayValue(user?.userType)],
-            ['会话状态', user ? '已登录' : '未登录'],
-          ],
-        },
-        {
-          id: 'preferences',
-          title: '偏好设置',
-          subtitle: '显示与会话',
-          note: '',
-          tone: 'blue',
-          stats: [],
-          fields: [],
-        },
-        {
-          id: 'storage',
-          title: '文件空间',
-          subtitle: '个人云空间',
-          note: '',
-          tone: 'gray',
-          stats: [],
-          fields: [],
-        },
-      ];
+      this.profile = profileItems;
       if (!this.profile.some((item) => item.id === this.active.settings)) {
         this.active.settings = this.profile[0]?.id ?? 'profile';
       }
-      this.contacts = collectContacts(user, profile, manager, subordinates, this.conversations);
+      this.contacts = collectContacts({
+        user,
+        profile,
+        manager,
+        colleagues: this.colleagues,
+        subordinates,
+        signature: this.signature,
+        presenceStatus: this.presenceStatus,
+      });
       if (!this.contacts.some((item) => item.id === this.active.contacts)) {
         this.active.contacts = this.contacts[0]?.id ?? '';
       }
@@ -982,8 +1016,8 @@ export const useShellStore = defineStore('employee-shell', {
     syncFileQuota(quota: QuotaResponse) {
       const personal = this.files.find((item) => item.id === 'personal');
       if (!personal) return;
-      const used = bytesToSize(quota.personalUsedBytes);
-      const total = bytesToSize(quota.personalQuotaBytes);
+      const used = fileSizeLabel(quota.personalUsedBytes);
+      const total = fileSizeLabel(quota.personalQuotaBytes);
       personal.subtitle = `个人空间 · ${used} / ${total}`;
       personal.usage = Math.max(0, Math.min(100, Math.round(Number(quota.personalUsagePercent ?? 0))));
       personal.summary = [
@@ -1059,7 +1093,7 @@ export const useShellStore = defineStore('employee-shell', {
     },
     mergeBackendConversations(backendConversations: ConversationRecord[]) {
       const backendIds = new Set(backendConversations.map((item) => item.id));
-      this.conversations = backendConversations;
+      useImStore().conversations = backendConversations;
       if (!backendIds.has(this.active.messages)) {
         this.active.messages = this.conversations[0]?.id ?? '';
       }
@@ -1068,6 +1102,7 @@ export const useShellStore = defineStore('employee-shell', {
       const conversation = this.conversations.find((item) => item.id === conversationId);
       if (!conversation || !backendMessages.length) return;
       conversation.messages = backendMessages;
+      conversation.panel.attachments = collectConversationAttachments(backendMessages);
       const latestMessage = backendMessages[backendMessages.length - 1];
       conversation.subtitle = latestMessage.body;
       conversation.meta = formatListDate(latestMessage.time) || conversation.meta;
@@ -1100,6 +1135,17 @@ function formatListDate(value?: string) {
   return value;
 }
 
+function collectConversationAttachments(messages: ConversationMessage[]) {
+  const byId = new Map<string, ConversationAttachment>();
+  for (const message of messages) {
+    for (const attachment of message.attachments ?? []) {
+      const key = attachment.attachmentRefId == null ? attachment.id : String(attachment.attachmentRefId);
+      byId.set(key, attachment);
+    }
+  }
+  return Array.from(byId.values());
+}
+
 export const shellUser = currentUser;
 
 function contactFromOrgUser(user: OrgUserSummaryResponse, relation: string, source: string): ContactRecord {
@@ -1111,16 +1157,25 @@ function contactFromOrgUser(user: OrgUserSummaryResponse, relation: string, sour
     relation,
     source,
     userId: user.userId,
+    employeeNo: user.employeeNo,
+    status: user.status,
+    employmentStatus: user.employmentStatus,
+    managerName: user.managerName,
   };
 }
 
-function collectContacts(
-  user: CurrentUserResponse | null,
-  profile: OrgUserDetailResponse | null,
-  manager: OrgUserSummaryResponse | null,
-  subordinates: OrgUserSummaryResponse[],
-  conversations: ConversationRecord[],
-): ContactRecord[] {
+interface CollectContactsInput {
+  user: CurrentUserResponse | null;
+  profile: OrgUserDetailResponse | null;
+  manager: OrgUserSummaryResponse | null;
+  colleagues: OrgUserSummaryResponse[];
+  subordinates: OrgUserSummaryResponse[];
+  signature: string;
+  presenceStatus: PresenceStatus;
+}
+
+function collectContacts(input: CollectContactsInput): ContactRecord[] {
+  const { user, profile, manager, colleagues, subordinates, signature, presenceStatus } = input;
   const contacts = new Map<string, ContactRecord>();
   const add = (contact: ContactRecord) => {
     if (contact.name && contact.name !== '暂无') {
@@ -1138,24 +1193,17 @@ function collectContacts(
         relation: '本人',
         source: '个人资料',
         userId,
+        employeeNo: profile?.employeeNo,
+        status: profile?.status ?? null,
+        employmentStatus: profile?.employmentStatus ?? user?.employmentStatus ?? null,
+        signature,
+        presenceStatus,
+        managerName: profile?.managerName,
       });
     }
   }
   if (manager) add(contactFromOrgUser(manager, '直属上级', '组织关系'));
+  colleagues.forEach((item) => add(contactFromOrgUser(item, '同部门', '组织通讯录')));
   subordinates.forEach((item) => add(contactFromOrgUser(item, '直属下级', '组织关系')));
-  conversations.forEach((conversation) => {
-    conversation.panel.members.forEach((member) => {
-      if (member.name === (profile?.realName || user?.displayName)) return;
-      add({
-        id: member.userId ? `user-${member.userId}` : `member-${member.name}-${member.role}`,
-        name: member.name,
-        role: member.role,
-        department: '',
-        relation: conversation.flow,
-        source: conversation.title,
-        userId: member.userId,
-      });
-    });
-  });
   return [...contacts.values()];
 }

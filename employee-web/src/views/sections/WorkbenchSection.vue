@@ -1,58 +1,42 @@
 <script setup lang="ts">
 import {
-  AtSign,
   ChevronLeft,
-  Clock3,
   Download,
   Eye,
-  FolderOpen,
-  Info,
-  Send,
-  Sparkles,
-  Trash2,
-  UsersRound,
-  MoonStar,
-  SunMedium,
-  PencilLine,
-  LayoutGrid,
-  Settings,
+  ExternalLink,
+  X,
 } from 'lucide-vue-next';
-import { useEmployeeShellContext } from '../employee-shell-context';
-import AppAvatar from '../../components/ui/AppAvatar.vue';
-import AppBadge from '../../components/ui/AppBadge.vue';
+import { useWorkbenchSectionContext } from '../employee-shell-context';
+import { useWorkbenchState } from '@/composables/useWorkbenchState';
+import {
+  actionTypeLabel,
+  bizTypeLabel,
+  displayField,
+  formatDateTime,
+  minutesToDayLabel,
+  punchTypeLabel,
+  statusText,
+  toneOfStatus,
+} from '@/utils/employee-format';
+import { fileIconOf, fileToneOf, isFileTrashed } from '@/utils/file-record';
+import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import type { PersonalFileRecord } from '@/stores/shell';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 import AppErrorState from '../../components/ui/AppErrorState.vue';
-import AppInput from '../../components/ui/AppInput.vue';
+import AppDialog from '../../components/ui/AppDialog.vue';
 import AppLoadingState from '../../components/ui/AppLoadingState.vue';
-import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 import AppTag from '../../components/ui/AppTag.vue';
-import ConversationProcessCard from '../../components/shell/ConversationProcessCard.vue';
-import MessageBubble from '../../components/shell/MessageBubble.vue';
 
 const {
-shell,
-  im,
+  shell,
   session,
-  workflow,
-  draft,
-  bindEmail,
-  bindEmailCode,
-  bindEmailCodeSending,
-  bindEmailSubmitting,
-  bindEmailEditing,
-  bindEmailNotice,
-  bindEmailError,
-  mobileDraft,
-  mobileSubmitting,
-  mobileUpdateNotice,
-  mobileUpdateError,
-  mobileInput,
+  showToast,
+} = useWorkbenchSectionContext();
+
+const {
   leaveAccounts,
   attendanceExceptions,
-  todoActionComment,
-  todoActionError,
-  fileUploading,
   agentTaskForm,
   agentTaskSubmitting,
   agentTaskResult,
@@ -64,6 +48,8 @@ shell,
   leaveSubmitting,
   leaveResult,
   leaveError,
+  workbenchLoading,
+  workbenchError,
   workflowRequests,
   workflowRequestsTotal,
   workflowRequestsLoading,
@@ -85,101 +71,45 @@ shell,
   clockCorrectionSubmitting,
   clockCorrectionResult,
   clockCorrectionError,
-  activeConversation,
-  activeTodo,
   activeFile,
   activeWorkbench,
-  activeContact,
-  activeProfile,
-  pendingTodoCount,
-  fileUsageCircumference,
-  activeFileUsage,
-  activeFileUsageOffset,
-  currentMeta,
-  currentUserName,
-  currentUserShortName,
-  activeFilter,
-  activeConversationTitle,
-  activeConversationCurrentStep,
-  mustHandleTodos,
-  approvalTodos,
-  deferredTodos,
-  workbenchLaunchers,
   workbenchHighlights,
-  selectedProfileId,
-  profileStatusLabel,
-  profileIdentityRows,
-  accountSecurityRows,
-  currentEmail,
-  organizationRows,
-  settingsMetrics,
-  storageRows,
-  recentFileRows,
-  preferenceRows,
   selectedLeaveAccount,
   activeWorkbenchTitle,
   selectedRequest,
   workflowDetailRows,
   attendanceSummary,
   teamAttendanceRows,
-  relationTree,
-  hasActiveConversation,
-  hasActiveTodo,
-  businessEmptyTitle,
-  backToList,
-  runAction,
-  openDetail,
-  openGroupPanel,
-  openUploadPanel,
-  openCreateConversation,
-  insertAgentMention,
-  sendMessage,
-  openMessageAction,
-  openImAttachment,
-  retryTodos,
-  statusText,
-  toneOfStatus,
   submitLeaveRequest,
-  isFileTrashed,
-  minutesToDayLabel,
+  refreshActiveWorkbench,
   loadWorkflowRequests,
   loadWorkflowRequestDetail,
-  bizTypeLabel,
-  formatDateTime,
-  fileToneOf,
-  fileIconOf,
-  fileTypeLabelFromName,
-  fileSizeLabel,
   previewWorkflowAttachment,
   downloadWorkflowAttachment,
-  displayField,
-  actionTypeLabel,
   withdrawWorkflowRequest,
   refreshAttendancePanel,
   punchAttendance,
-  punchTypeLabel,
   submitClockCorrectionRequest,
-  selectWorkbenchItem,
   loadAgents,
   submitAgentTask,
   confirmAgentTask,
   cancelAgentTask,
-  sendSelectedFileToConversation,
-  openPersonalFilePreview,
-  downloadPersonalFile,
-  trashPersonalFile,
-  restorePersonalFile,
-  purgePersonalFile,
-  toneOfConversation,
-  submitMobileUpdate,
-  openMobileReset,
-  sendBindEmailCode,
-  submitBindEmail,
-  startBindEmailEditing,
-  cancelBindEmailEditing,
-} = useEmployeeShellContext();
+  workflowFilePreview,
+  workflowFilePreviewLoading,
+  workflowFilePreviewTitle,
+  workflowFilePreviewType,
+  activeUploadableFiles,
+  closeWorkflowFilePreview,
+  openWorkflowPreviewExternal,
+} = useWorkbenchState({
+  shell,
+  session,
+  showToast,
+});
 
-const activeUploadableFiles = () => activeFile.value.files.filter((item: { attachmentRefId?: unknown }) => item.attachmentRefId && !isFileTrashed(item));
+function backToList() {
+  shell.setMobileView('list');
+}
 </script>
 
 <template>
@@ -208,86 +138,96 @@ const activeUploadableFiles = () => activeFile.value.files.filter((item: { attac
 
   <section class="content-stack">
     <template v-if="activeWorkbench.id === 'leave'">
-      <section class="highlight-grid attendance-highlight-grid">
-        <article v-for="item in workbenchHighlights" :key="item.label" class="highlight-card">
-          <small>{{ item.label }}</small>
-          <strong>{{ item.value }}</strong>
-          <span>{{ item.note }}</span>
-        </article>
-      </section>
+      <AppErrorState
+        v-if="workbenchError"
+        title="工作台数据加载失败"
+        :description="workbenchError"
+        action-label="重试"
+        @retry="refreshActiveWorkbench"
+      />
+      <AppLoadingState v-else-if="workbenchLoading" />
+      <template v-else>
+        <section class="highlight-grid attendance-highlight-grid">
+          <article v-for="item in workbenchHighlights" :key="item.label" class="highlight-card">
+            <small>{{ item.label }}</small>
+            <strong>{{ item.value }}</strong>
+            <span>{{ item.note }}</span>
+          </article>
+        </section>
 
-      <section class="detail-grid">
-        <article class="detail-card">
-          <h3>请假申请</h3>
-          <form class="workbench-form" @submit.prevent="submitLeaveRequest">
-            <label class="security-field">
-              <span>假期类型</span>
-              <select v-model="leaveForm.leaveTypeId" class="ui-inline-input">
-                <option v-for="account in leaveAccounts" :key="account.leaveTypeId" :value="String(account.leaveTypeId)">
-                  {{ account.leaveName }}
-                </option>
-              </select>
-            </label>
-            <label class="security-field">
-              <span>开始时间</span>
-              <input v-model="leaveForm.startAt" class="ui-inline-input" type="datetime-local" />
-            </label>
-            <label class="security-field">
-              <span>结束时间</span>
-              <input v-model="leaveForm.endAt" class="ui-inline-input" type="datetime-local" />
-            </label>
-            <label class="security-field">
-              <span>请假分钟</span>
-              <input v-model="leaveForm.durationMinutes" class="ui-inline-input" type="number" min="1" step="1" />
-            </label>
-            <label class="security-field form-full">
-              <span>请假原因</span>
-              <textarea v-model="leaveForm.reason" class="ui-textarea compact-textarea" rows="4" />
-            </label>
-            <label v-if="activeFile.files.length" class="security-field form-full">
-              <span>申请附件</span>
-              <select v-model="leaveAttachmentIds" class="ui-inline-input" multiple>
-                <option
-                  v-for="file in activeUploadableFiles()"
-                  :key="file.id"
-                  :value="file.attachmentRefId"
-                >
-                  {{ file.name }}
-                </option>
-              </select>
-            </label>
-            <p v-if="leaveError" class="dialog-error form-full">{{ leaveError }}</p>
-            <p v-if="leaveResult" class="form-result form-full">申请编号：{{ leaveResult.requestNo }} · {{ statusText(leaveResult.status) }}</p>
-            <div class="form-actions form-full">
-              <AppButton variant="primary" type="submit" :disabled="leaveSubmitting || !leaveAccounts.length">
-                {{ leaveSubmitting ? '提交中' : '提交申请' }}
-              </AppButton>
-            </div>
-          </form>
-        </article>
+        <section class="detail-grid">
+          <article class="detail-card">
+            <h3>请假申请</h3>
+            <form class="workbench-form" @submit.prevent="submitLeaveRequest">
+              <label class="security-field">
+                <span>假期类型</span>
+                <select v-model="leaveForm.leaveTypeId" class="ui-inline-input">
+                  <option v-for="account in leaveAccounts" :key="account.leaveTypeId" :value="String(account.leaveTypeId)">
+                    {{ account.leaveName }}
+                  </option>
+                </select>
+              </label>
+              <label class="security-field">
+                <span>开始时间</span>
+                <input v-model="leaveForm.startAt" class="ui-inline-input" type="datetime-local" />
+              </label>
+              <label class="security-field">
+                <span>结束时间</span>
+                <input v-model="leaveForm.endAt" class="ui-inline-input" type="datetime-local" />
+              </label>
+              <label class="security-field">
+                <span>请假分钟</span>
+                <input v-model="leaveForm.durationMinutes" class="ui-inline-input" type="number" min="1" step="1" />
+              </label>
+              <label class="security-field form-full">
+                <span>请假原因</span>
+                <textarea v-model="leaveForm.reason" class="ui-textarea compact-textarea" rows="4" />
+              </label>
+              <label v-if="activeFile.files.length" class="security-field form-full">
+                <span>申请附件</span>
+                <select v-model="leaveAttachmentIds" class="ui-inline-input" multiple>
+                  <option
+                    v-for="file in activeUploadableFiles()"
+                    :key="file.id"
+                    :value="file.attachmentRefId"
+                  >
+                    {{ file.name }}
+                  </option>
+                </select>
+              </label>
+              <p v-if="leaveError" class="dialog-error form-full">{{ leaveError }}</p>
+              <p v-if="leaveResult" class="form-result form-full">申请编号：{{ leaveResult.requestNo }} · {{ statusText(leaveResult.status) }}</p>
+              <div class="form-actions form-full">
+                <AppButton variant="primary" type="submit" :disabled="leaveSubmitting || !leaveAccounts.length">
+                  {{ leaveSubmitting ? '提交中' : '提交申请' }}
+                </AppButton>
+              </div>
+            </form>
+          </article>
 
-        <article class="detail-card">
-          <h3>假期账户</h3>
-          <dl class="field-grid">
-            <div>
-              <dt>假期类型</dt>
-              <dd>{{ selectedLeaveAccount?.leaveName ?? '暂无' }}</dd>
-            </div>
-            <div>
-              <dt>可用余额</dt>
-              <dd>{{ minutesToDayLabel(selectedLeaveAccount?.availableMinutes) }}</dd>
-            </div>
-            <div>
-              <dt>冻结余额</dt>
-              <dd>{{ minutesToDayLabel(selectedLeaveAccount?.frozenMinutes) }}</dd>
-            </div>
-            <div>
-              <dt>状态</dt>
-              <dd>{{ statusText(selectedLeaveAccount?.status ?? '') }}</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
+          <article class="detail-card">
+            <h3>假期账户</h3>
+            <dl class="field-grid">
+              <div>
+                <dt>假期类型</dt>
+                <dd>{{ selectedLeaveAccount?.leaveName ?? '暂无' }}</dd>
+              </div>
+              <div>
+                <dt>可用余额</dt>
+                <dd>{{ minutesToDayLabel(selectedLeaveAccount?.availableMinutes) }}</dd>
+              </div>
+              <div>
+                <dt>冻结余额</dt>
+                <dd>{{ minutesToDayLabel(selectedLeaveAccount?.frozenMinutes) }}</dd>
+              </div>
+              <div>
+                <dt>状态</dt>
+                <dd>{{ statusText(selectedLeaveAccount?.status ?? '') }}</dd>
+              </div>
+            </dl>
+          </article>
+        </section>
+      </template>
     </template>
 
     <template v-else-if="activeWorkbench.id === 'requests'">
@@ -594,4 +534,31 @@ const activeUploadableFiles = () => activeFile.value.files.filter((item: { attac
     </template>
   </section>
 </div>
+
+<AppDialog v-if="workflowFilePreview">
+  <section class="preview-dialog">
+    <header class="dialog-head dialog-head-row">
+      <div>
+        <h2>{{ workflowFilePreviewTitle }}</h2>
+        <p>{{ workflowFilePreviewType || '文件' }}</p>
+      </div>
+      <button class="field-icon-button" type="button" aria-label="关闭" @click="closeWorkflowFilePreview">
+        <X :size="15" />
+      </button>
+    </header>
+    <div class="preview-body">
+      <AppLoadingState v-if="workflowFilePreviewLoading" />
+      <img v-else-if="workflowFilePreview.inline && (workflowFilePreviewType || '').startsWith('image/')" :src="workflowFilePreview.url" :alt="workflowFilePreviewTitle" />
+      <iframe v-else-if="workflowFilePreview.inline" :src="workflowFilePreview.url" title="文件预览" />
+      <div v-else class="preview-fallback">
+        <component :is="fileIconOf(workflowFilePreview.file)" :size="42" />
+        <strong>{{ workflowFilePreviewTitle }}</strong>
+        <AppButton variant="primary" size="sm" @click="openWorkflowPreviewExternal">
+          <ExternalLink :size="15" />
+          打开文件
+        </AppButton>
+      </div>
+    </div>
+  </section>
+</AppDialog>
 </template>

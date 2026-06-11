@@ -2,6 +2,8 @@ import { defineStore } from 'pinia';
 import { ApiClientError, employeeApi } from '../api';
 import type {
   CurrentUserResponse,
+  LoginSendCodeRequest,
+  LoginSendCodeResponse,
   LoginRequest,
   LoginResponse,
   OrgUserDetailResponse,
@@ -13,6 +15,7 @@ import type {
 export interface EmployeeAuthApi {
   me(): Promise<CurrentUserResponse>;
   login(request: LoginRequest): Promise<LoginResponse>;
+  sendLoginCode(request: LoginSendCodeRequest): Promise<LoginSendCodeResponse>;
   logout(): Promise<void>;
   sendEmailCode(request: SendEmailCodeRequest): Promise<void>;
   resetPassword(request: ResetPasswordRequest): Promise<void>;
@@ -74,7 +77,12 @@ export const useSessionStore = defineStore('employee-session', {
       this.error = '';
       try {
         const loginResult = await authApi.login(request);
+        if (loginResult.requiresEmailCode || loginResult.requiresEmailBinding) {
+          this.user = null;
+          return loginResult;
+        }
         this.user = await authApi.me().catch(() => loginResult as CurrentUserResponse);
+        return loginResult;
       } catch (error) {
         this.user = null;
         this.error = resolveSessionError(error);
@@ -82,6 +90,15 @@ export const useSessionStore = defineStore('employee-session', {
       } finally {
         this.loading = false;
         this.initialized = true;
+      }
+    },
+    async sendLoginCode(identifier: string, authApi: EmployeeAuthApi = employeeApi.auth) {
+      this.error = '';
+      try {
+        return await authApi.sendLoginCode({ identifier });
+      } catch (error) {
+        this.error = resolveSessionError(error);
+        throw error;
       }
     },
     async loadOrgProfile(orgApi: EmployeeOrgApi = employeeApi.me) {

@@ -19,6 +19,7 @@ function createAuthApi(overrides: Partial<EmployeeAuthApi> = {}): EmployeeAuthAp
   return {
     me: () => Promise.resolve(currentUser),
     login: (_request: LoginRequest) => Promise.resolve(currentUser as LoginResponse),
+    sendLoginCode: () => Promise.resolve({ maskedEmail: 'l****e@example.com' }),
     logout: () => Promise.resolve(),
     sendEmailCode: () => Promise.resolve(),
     resetPassword: () => Promise.resolve(),
@@ -61,6 +62,43 @@ describe('useSessionStore', () => {
 
     expect(session.isAuthenticated).toBe(true);
     expect(session.user?.loginName).toBe('lin.che');
+  });
+
+  it('does not mark session authenticated when login requires email code', async () => {
+    const session = useSessionStore();
+
+    const result = await session.login({ loginName: 'lin.che', password: 'secret' }, createAuthApi({
+      login: () => Promise.resolve({
+        userId: 1001,
+        userType: 'USER',
+        displayName: '林澈',
+        loginName: 'lin.che',
+        requiresEmailCode: true,
+        maskedEmail: 'l****e@example.com',
+      }),
+    }));
+
+    expect(result.requiresEmailCode).toBe(true);
+    expect(session.isAuthenticated).toBe(false);
+    expect(session.user).toBeNull();
+  });
+
+  it('does not mark session authenticated when login requires email binding', async () => {
+    const session = useSessionStore();
+
+    const result = await session.login({ loginName: 'lin.che', password: 'secret' }, createAuthApi({
+      login: () => Promise.resolve({
+        userId: 1001,
+        userType: 'USER',
+        displayName: '林澈',
+        loginName: 'lin.che',
+        requiresEmailBinding: true,
+      }),
+    }));
+
+    expect(result.requiresEmailBinding).toBe(true);
+    expect(session.isAuthenticated).toBe(false);
+    expect(session.user).toBeNull();
   });
 
   it('clears user after logout', async () => {
