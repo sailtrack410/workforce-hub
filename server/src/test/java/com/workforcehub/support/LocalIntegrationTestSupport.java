@@ -163,6 +163,11 @@ public abstract class LocalIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM agt_agent_version");
             jdbcTemplate.execute("DELETE FROM agt_tool");
             jdbcTemplate.execute("DELETE FROM agt_agent");
+            deleteIfExists(jdbcTemplate, "kb_chunk_manifest");
+            deleteIfExists(jdbcTemplate, "kb_ingest_job");
+            deleteIfExists(jdbcTemplate, "kb_document");
+            deleteIfExists(jdbcTemplate, "kb_space_acl");
+            deleteIfExists(jdbcTemplate, "kb_space");
             jdbcTemplate.execute("DELETE FROM auth_user_account");
             jdbcTemplate.execute("DELETE FROM emp_user_preference");
             jdbcTemplate.execute("DELETE FROM org_department_leader");

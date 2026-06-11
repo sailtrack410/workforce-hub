@@ -29,6 +29,8 @@ public class UserTypePathFilter extends OncePerRequestFilter {
 
     private static final String EMPLOYEE_PATH_PREFIX = "/api/employee/";
     private static final String ADMIN_PATH_PREFIX = "/api/admin/";
+    private static final String EMPLOYEE_LOGIN_PATH = "/api/employee/auth/login";
+    private static final String ADMIN_LOGIN_PATH = "/api/admin/auth/login";
 
     private final ObjectMapper objectMapper;
 
@@ -40,6 +42,10 @@ public class UserTypePathFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String uri = request.getRequestURI();
+        if (EMPLOYEE_LOGIN_PATH.equals(uri) || ADMIN_LOGIN_PATH.equals(uri)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // 仅校验已登录请求
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
