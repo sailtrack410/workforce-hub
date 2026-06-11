@@ -18,21 +18,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EmployeePreferenceService {
 
-    public static final String DEFAULT_THEME = "light";
-    public static final String DEFAULT_DENSITY = "cozy";
-    public static final int DEFAULT_LIST_WIDTH = 400;
-    public static final int MIN_LIST_WIDTH = 384;
-    public static final int MAX_LIST_WIDTH = 520;
-    public static final String DEFAULT_SIGNATURE = "";
-    public static final String DEFAULT_PRESENCE = "ONLINE";
-    public static final boolean DEFAULT_NOTIF_SOUND = true;
-    public static final boolean DEFAULT_NOTIF_DESKTOP = true;
-    public static final boolean DEFAULT_NOTIF_MENTION_ONLY = false;
-    public static final boolean DEFAULT_NOTIF_UNREAD_BADGE = true;
-    public static final String DEFAULT_ACCENT = "indigo";
-    public static final String DEFAULT_FONT_SCALE = "medium";
-    public static final String DEFAULT_BUBBLE = "rounded";
-    public static final int MAX_SIGNATURE_LENGTH = 140;
+    private static final String DEFAULT_THEME = "light";
+    private static final String DEFAULT_DENSITY = "cozy";
+    private static final int DEFAULT_LIST_WIDTH = 400;
+    private static final int MIN_LIST_WIDTH = 384;
+    private static final int MAX_LIST_WIDTH = 520;
+    private static final String DEFAULT_SIGNATURE = "";
+    private static final String DEFAULT_PRESENCE = "ONLINE";
+    private static final boolean DEFAULT_NOTIF_SOUND = true;
+    private static final boolean DEFAULT_NOTIF_DESKTOP = true;
+    private static final boolean DEFAULT_NOTIF_MENTION_ONLY = false;
+    private static final boolean DEFAULT_NOTIF_UNREAD_BADGE = true;
+    private static final String DEFAULT_ACCENT = "indigo";
+    private static final String DEFAULT_FONT_SCALE = "medium";
+    private static final String DEFAULT_BUBBLE = "rounded";
+    private static final int MAX_SIGNATURE_LENGTH = 140;
 
     private final EmpUserPreferenceMapper preferenceMapper;
 
@@ -116,20 +116,27 @@ public class EmployeePreferenceService {
     }
 
     private EmployeePreferenceResponse toResponse(EmpUserPreference row) {
+        if (row == null) {
+            row = new EmpUserPreference();
+        }
         EmployeePreferenceResponse response = new EmployeePreferenceResponse();
-        response.setTheme(row != null && row.getTheme() != null ? row.getTheme() : DEFAULT_THEME);
-        response.setMessageDensity(row != null && row.getMessageDensity() != null ? row.getMessageDensity() : DEFAULT_DENSITY);
-        response.setListWidth(row != null && row.getListWidth() != null ? clampListWidth(row.getListWidth()) : DEFAULT_LIST_WIDTH);
-        response.setSignature(row != null && row.getSignature() != null ? row.getSignature() : DEFAULT_SIGNATURE);
-        response.setPresenceStatus(row != null && row.getPresenceStatus() != null ? row.getPresenceStatus() : DEFAULT_PRESENCE);
-        response.setNotifSound(row != null && row.getNotifSound() != null ? row.getNotifSound() : DEFAULT_NOTIF_SOUND);
-        response.setNotifDesktop(row != null && row.getNotifDesktop() != null ? row.getNotifDesktop() : DEFAULT_NOTIF_DESKTOP);
-        response.setNotifMentionOnly(row != null && row.getNotifMentionOnly() != null ? row.getNotifMentionOnly() : DEFAULT_NOTIF_MENTION_ONLY);
-        response.setNotifUnreadBadge(row != null && row.getNotifUnreadBadge() != null ? row.getNotifUnreadBadge() : DEFAULT_NOTIF_UNREAD_BADGE);
-        response.setAccentColor(row != null && row.getAccentColor() != null ? row.getAccentColor() : DEFAULT_ACCENT);
-        response.setFontScale(row != null && row.getFontScale() != null ? row.getFontScale() : DEFAULT_FONT_SCALE);
-        response.setBubbleStyle(row != null && row.getBubbleStyle() != null ? row.getBubbleStyle() : DEFAULT_BUBBLE);
+        response.setTheme(strOrDefault(row.getTheme(), DEFAULT_THEME));
+        response.setMessageDensity(strOrDefault(row.getMessageDensity(), DEFAULT_DENSITY));
+        response.setListWidth(row.getListWidth() != null ? clampListWidth(row.getListWidth()) : DEFAULT_LIST_WIDTH);
+        response.setSignature(strOrDefault(row.getSignature(), DEFAULT_SIGNATURE));
+        response.setPresenceStatus(strOrDefault(row.getPresenceStatus(), DEFAULT_PRESENCE));
+        response.setNotifSound(row.getNotifSound() != null ? row.getNotifSound() : DEFAULT_NOTIF_SOUND);
+        response.setNotifDesktop(row.getNotifDesktop() != null ? row.getNotifDesktop() : DEFAULT_NOTIF_DESKTOP);
+        response.setNotifMentionOnly(row.getNotifMentionOnly() != null ? row.getNotifMentionOnly() : DEFAULT_NOTIF_MENTION_ONLY);
+        response.setNotifUnreadBadge(row.getNotifUnreadBadge() != null ? row.getNotifUnreadBadge() : DEFAULT_NOTIF_UNREAD_BADGE);
+        response.setAccentColor(strOrDefault(row.getAccentColor(), DEFAULT_ACCENT));
+        response.setFontScale(strOrDefault(row.getFontScale(), DEFAULT_FONT_SCALE));
+        response.setBubbleStyle(strOrDefault(row.getBubbleStyle(), DEFAULT_BUBBLE));
         return response;
+    }
+
+    private String strOrDefault(String value, String defaultValue) {
+        return value != null ? value : defaultValue;
     }
 
     private int clampListWidth(int width) {

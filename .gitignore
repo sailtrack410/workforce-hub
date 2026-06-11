@@ -1,6 +1,10 @@
 .DS_Store
 .idea/
+.codebuddy/
+.workbuddy/
 .playwright-mcp/
+tmp/
+test/
 
 # Local environment files
 .env
