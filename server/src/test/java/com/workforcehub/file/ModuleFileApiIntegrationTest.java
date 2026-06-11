@@ -69,8 +69,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     private String localRoot;
 
     @Test
-    @DisplayName("员工端上传第一版应拒绝非个人文件归属")
-    void employeeUploadTicketShouldRejectBusinessOwnerType() throws Exception {
+    @DisplayName("员工端上传应拒绝未开放的业务归属")
+    void employeeUploadTicketShouldRejectUnsupportedBusinessOwnerType() throws Exception {
         Cookie employeeSession = loginEmployee();
         seedDefaultQuotaPolicy();
         byte[] content = "workflow-attachment-content".getBytes(StandardCharsets.UTF_8);
@@ -92,7 +92,66 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(content.length, sha256(content))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(400))
-            .andExpect(jsonPath("$.message", containsString("员工端第一版仅支持个人文件")));
+            .andExpect(jsonPath("$.message", containsString("不支持该文件归属")));
+    }
+
+    @Test
+    @DisplayName("头像附件应独立于个人文件中心并允许当前用户内联下载")
+    void avatarAttachmentShouldStayOutOfPersonalFileCenterAndAllowInlineDownload() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "avatar-image-content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        MvcResult ticketResult = createUploadTicket(
+                employeeSession,
+                "avatar.png",
+                "image/png",
+                content.length,
+                sha256,
+                "avatar-upload-" + System.nanoTime(),
+                "USER_AVATAR")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        MvcResult confirmResult = confirmUpload(
+                employeeSession,
+                uploadTicketId,
+                objectKey,
+                sha256,
+                content.length,
+                "avatar.png",
+                "USER_AVATAR")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        Long avatarAttachmentRefId = data(confirmResult).get("attachmentRefId").asLong();
+
+        assertEquals(1, personalFileListHiddenCount(avatarAttachmentRefId));
+        mockMvc.perform(get("/api/employee/files")
+                .cookie(employeeSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.list[?(@.attachmentRefId == %s)]".formatted(avatarAttachmentRefId)).isEmpty());
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/download-tickets", avatarAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "INLINE"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.downloadUrl").value(containsString("/api/employee/files/download/")));
     }
 
     @Test
@@ -1116,12 +1175,23 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             long fileSize,
             String sha256,
             String clientRequestId) throws Exception {
+        return createUploadTicket(session, fileName, mimeType, fileSize, sha256, clientRequestId, "PERSONAL_FILE");
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createUploadTicket(
+            Cookie session,
+            String fileName,
+            String mimeType,
+            long fileSize,
+            String sha256,
+            String clientRequestId,
+            String ownerType) throws Exception {
         return mockMvc.perform(post("/api/employee/files/upload-tickets")
             .cookie(session)
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {
-                  "ownerType": "PERSONAL_FILE",
+                  "ownerType": "%s",
                   "ownerId": null,
                   "fileName": "%s",
                   "mimeType": "%s",
@@ -1130,7 +1200,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                   "contentMd5": null,
                   "clientRequestId": "%s"
                 }
-                """.formatted(fileName, mimeType, fileSize, sha256, clientRequestId)));
+                """.formatted(ownerType, fileName, mimeType, fileSize, sha256, clientRequestId)));
     }
 
     private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, String text) throws Exception {
@@ -1308,6 +1378,17 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             String sha256,
             long fileSize,
             String displayName) throws Exception {
+        return confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, fileSize, displayName, "PERSONAL_FILE");
+    }
+
+    private org.springframework.test.web.servlet.ResultActions confirmUpload(
+            Cookie employeeSession,
+            Long uploadTicketId,
+            String objectKey,
+            String sha256,
+            long fileSize,
+            String displayName,
+            String ownerType) throws Exception {
         return mockMvc.perform(post("/api/employee/files/confirm-upload")
             .cookie(employeeSession)
             .contentType(MediaType.APPLICATION_JSON)
@@ -1317,11 +1398,11 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                   "objectKey": "%s",
                   "contentSha256": "%s",
                   "fileSize": %s,
-                  "ownerType": "PERSONAL_FILE",
+                  "ownerType": "%s",
                   "ownerId": null,
                   "displayName": "%s"
                 }
-                """.formatted(uploadTicketId, objectKey, sha256, fileSize, displayName)));
+                """.formatted(uploadTicketId, objectKey, sha256, fileSize, ownerType, displayName)));
     }
 
     private void seedDefaultQuotaPolicy() {
