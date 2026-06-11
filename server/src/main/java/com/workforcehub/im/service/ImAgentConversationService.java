@@ -372,6 +372,9 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 "messageId", userMessage.getMessageId(),
                 "conversationId", userMessage.getConversationId(),
                 "senderId", userMessage.getSenderId(),
+                "userId", userMessage.getSenderId(),
+                "currentUserId", userMessage.getSenderId(),
+                "query", userMessage.getContentText(),
                 "text", userMessage.getContentText(),
                 "contentJson", userMessage.getContentJson()
             ));

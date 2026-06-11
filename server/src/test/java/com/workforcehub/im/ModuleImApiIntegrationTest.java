@@ -542,6 +542,261 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("IM触发DAG时应注入当前员工并支持鉴权查询本人信息")
+    void imDagAgentShouldReadCurrentEmployeeInfo() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedWorkflowAgent(adminSession, "IM_DAG_USER_AGENT", "员工信息助手", """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_user",
+                  "type": "TOOL",
+                  "config": {
+                    "dataSources": ["employeeInfo"],
+                    "targetUserId": "{{input.userId}}"
+                  },
+                  "outputKey": "userData"
+                },
+                { "id": "end", "type": "END", "config": { "reply": "当前员工 {{userData.employeeInfo.realName}}，部门 {{userData.employeeInfo.primaryDeptName}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "end" }
+              ]
+            }
+            """);
+        grantAgentAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        MvcResult conversationResult = mockMvc.perform(post("/api/employee/im/agent-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentId": %d
+                    }
+                    """.formatted(agentId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long conversationId = data(conversationResult).get("conversationId").asLong();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "我是谁",
+                      "clientMessageId": "client-msg-dag-user"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        awaitMessageCount(conversationId, 2L);
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[1].senderType").value("AGENT"))
+            .andExpect(jsonPath("$.data[1].contentText").value(Matchers.containsString("张三")))
+            .andExpect(jsonPath("$.data[1].contentText").value(Matchers.containsString("后端组")));
+
+        awaitTaskStatus(agentId, conversationId, "SUCCEEDED");
+        String traceJson = jdbcTemplate.queryForObject("""
+            SELECT execution_trace_json
+            FROM agt_task
+            WHERE agent_id = ?
+              AND context_id = ?
+            """, String.class, agentId, conversationId);
+        assertTrue(traceJson.contains("employeeInfo"));
+        assertTrue(traceJson.contains("张三"));
+    }
+
+    @Test
+    @DisplayName("IM触发DAG时应按意图端口分流")
+    void imDagAgentShouldRouteByIntentPort() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedWorkflowAgent(adminSession, "IM_DAG_INTENT_AGENT", "意图分流助手", """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "recognize",
+                  "type": "INTENT",
+                  "config": {
+                    "prompt": "请识别用户意图。",
+                    "intents": ["申请请假", "查询假期", "问答"]
+                  },
+                  "outputKey": "intentResult",
+                  "outputFormat": [
+                    { "key": "intent", "type": "string", "description": "意图" }
+                  ]
+                },
+                { "id": "leave_apply", "type": "END", "config": { "replyJson": { "intent": "申请请假", "target": "LEAVE_WORKFLOW" } } },
+                {
+                  "id": "load_leave",
+                  "type": "TOOL",
+                  "config": {
+                    "dataSources": ["leaveBalance"],
+                    "targetUserId": "{{input.userId}}"
+                  },
+                  "outputKey": "leaveData",
+                  "outputFormat": [
+                    {
+                      "key": "leaveBalance",
+                      "type": "array",
+                      "description": "假期账户",
+                      "itemFields": [
+                        { "key": "leaveName", "type": "string", "description": "假期名称" },
+                        { "key": "availableMinutes", "type": "number", "description": "可用分钟" },
+                        { "key": "frozenMinutes", "type": "number", "description": "冻结分钟" }
+                      ]
+                    }
+                  ]
+                },
+                { "id": "leave_query", "type": "END", "config": { "replyJson": { "intent": "查询假期", "target": "LEAVE_BALANCE", "leaveAccounts": "{{leaveData.leaveBalance}}" } } },
+                { "id": "qa", "type": "END", "config": { "replyJson": { "intent": "问答", "target": "QA" } } },
+                { "id": "other", "type": "END", "config": { "replyJson": { "intent": "其他", "target": "QA" } } }
+              ],
+              "edges": [
+                { "from": "start", "to": "recognize" },
+                { "from": "recognize", "fromPort": 0, "to": "leave_apply" },
+                { "from": "recognize", "fromPort": 1, "to": "load_leave" },
+                { "from": "recognize", "fromPort": 2, "to": "qa" },
+                { "from": "recognize", "fromPort": 3, "to": "other" },
+                { "from": "load_leave", "to": "leave_query" }
+              ]
+            }
+            """);
+        grantAgentAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        MvcResult conversationResult = mockMvc.perform(post("/api/employee/im/agent-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentId": %d
+                    }
+                    """.formatted(agentId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long conversationId = data(conversationResult).get("conversationId").asLong();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "帮我查一下假期余额",
+                      "clientMessageId": "client-msg-dag-intent"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        awaitMessageCount(conversationId, 2L);
+        MvcResult messagesResult = mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[1].senderType").value("AGENT"))
+            .andReturn();
+
+        JsonNode response = objectMapper.readTree(messagesResult.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        JsonNode reply = objectMapper.readTree(response.path("data").get(1).path("contentText").asText());
+        assertEquals("查询假期", reply.path("intent").asText());
+        assertEquals("LEAVE_BALANCE", reply.path("target").asText());
+        assertTrue(reply.path("leaveAccounts").isArray());
+    }
+
+    @Test
+    @DisplayName("IM触发DAG时应支持JSON回复")
+    void imDagAgentShouldWriteReplyJson() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedWorkflowAgent(adminSession, "IM_DAG_JSON_AGENT", "员工JSON助手", """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_user",
+                  "type": "TOOL",
+                  "config": {
+                    "dataSources": ["employeeInfo"],
+                    "targetUserId": "{{input.userId}}"
+                  },
+                  "outputKey": "userData"
+                },
+                {
+                  "id": "end",
+                  "type": "END",
+                  "config": {
+                    "replyJson": {
+                      "employee": {
+                        "name": "{{userData.employeeInfo.realName}}",
+                        "department": "{{userData.employeeInfo.primaryDeptName}}",
+                        "position": "{{userData.employeeInfo.positionName}}"
+                      }
+                    }
+                  }
+                }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "end" }
+              ]
+            }
+            """);
+        grantAgentAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        MvcResult conversationResult = mockMvc.perform(post("/api/employee/im/agent-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentId": %d
+                    }
+                    """.formatted(agentId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long conversationId = data(conversationResult).get("conversationId").asLong();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "我是谁",
+                      "clientMessageId": "client-msg-dag-json"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        awaitMessageCount(conversationId, 2L);
+        MvcResult messagesResult = mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[1].senderType").value("AGENT"))
+            .andReturn();
+
+        JsonNode response = objectMapper.readTree(messagesResult.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        JsonNode reply = objectMapper.readTree(response.path("data").get(1).path("contentText").asText());
+        assertEquals("张三", reply.path("employee").path("name").asText());
+        assertEquals("后端组", reply.path("employee").path("department").asText());
+        assertFalse(reply.path("employee").has("userId"));
+    }
+
+    @Test
     @DisplayName("Agent模型配置缺失时应失败任务并向会话写入系统提示")
     void agentModelMissingConfigShouldFailTaskAndWriteSystemMessage() throws Exception {
         Cookie adminSession = loginAdmin();
@@ -956,6 +1211,44 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工应能发送即时消息上传附件并克隆成IM消息附件")
+    void employeeShouldSendPendingImAttachmentAsMessageAttachment() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+        long sourceAttachmentRefId = seedAttachmentRef(
+            EMPLOYEE_USER_ID,
+            "群聊即时附件.txt",
+            "im-pending-attachment-message-content",
+            "PASSED",
+            0,
+            false,
+            "IM_MESSAGE_PENDING",
+            "OWNER"
+        );
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", 7001L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "FILE",
+                      "text": "",
+                      "attachmentRefIds": [%s],
+                      "clientMessageId": "client-msg-file-pending-001"
+                    }
+                    """.formatted(sourceAttachmentRefId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.messageType").value("FILE"))
+            .andExpect(jsonPath("$.data.attachments", hasSize(1)))
+            .andExpect(jsonPath("$.data.attachments[0].displayName").value("群聊即时附件.txt"));
+
+        Long messageAttachmentRefId = messageAttachmentRefId(7001L, 3L);
+        assertEquals("IM_MESSAGE", attachmentOwnerType(messageAttachmentRefId));
+        assertEquals(fileObjectId(sourceAttachmentRefId), fileObjectId(messageAttachmentRefId));
+    }
+
+    @Test
     @DisplayName("员工不能发送不属于自己的个人文件作为IM附件")
     void employeeShouldNotSendOtherUserPersonalFileAsMessageAttachment() throws Exception {
         Cookie employeeSession = loginEmployee("zhangsan.employee");
@@ -1102,7 +1395,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
-            .andExpect(jsonPath("$.message").value("员工端文件接口仅允许下载个人文件"));
+            .andExpect(jsonPath("$.message").value("员工端文件接口仅允许下载个人文件或头像"));
     }
 
     @Test
@@ -1783,6 +2076,17 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                                            String scanStatus,
                                            int isDeleted,
                                            boolean deletedAt) {
+        return seedAttachmentRef(uploaderId, displayName, content, scanStatus, isDeleted, deletedAt, "PERSONAL_FILE", "OWNER");
+    }
+
+    private long seedAttachmentRef(long uploaderId,
+                                   String displayName,
+                                   String content,
+                                   String scanStatus,
+                                   int isDeleted,
+                                   boolean deletedAt,
+                                   String ownerType,
+                                   String visibilityScope) {
         long suffix = Math.abs((long) content.hashCode());
         long fileObjectId = 9700_0000L + suffix;
         long attachmentRefId = 9800_0000L + suffix;
@@ -1815,14 +2119,16 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                  display_name, uploader_type, uploader_id, visibility_scope,
                  deleted_at, sort_order, created_by, is_deleted)
             VALUES
-                (?, 'PERSONAL_FILE', NULL, ?, ?, ?, 'USER', ?, 'OWNER',
+                (?, ?, NULL, ?, ?, ?, 'USER', ?, ?,
                  IF(?, NOW(), NULL), 0, ?, ?)
             """,
             attachmentRefId,
+            ownerType,
             fileObjectId,
             displayName,
             displayName,
             uploaderId,
+            visibilityScope,
             deletedAt,
             uploaderId,
             isDeleted
@@ -1985,6 +2291,18 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                                                  String modelConfigJson) throws Exception {
         long agentId = createAgent(adminSession, agentCode, agentName);
         long versionId = createAgentVersion(adminSession, agentId, modelConfigJson);
+        grantAgentAcl(adminSession, agentId, "ADMIN_USER", 1001L, "manage");
+        publishAgentVersion(adminSession, versionId);
+        return agentId;
+    }
+
+    private long createPublishedWorkflowAgent(Cookie adminSession,
+                                              String agentCode,
+                                              String agentName,
+                                              String workflowConfigJson) throws Exception {
+        long agentId = createAgent(adminSession, agentCode, agentName);
+        long versionId = createWorkflowAgentVersion(adminSession, agentId, workflowConfigJson);
+        grantAgentAcl(adminSession, agentId, "ADMIN_USER", 1001L, "manage");
         publishAgentVersion(adminSession, versionId);
         return agentId;
     }
@@ -2023,6 +2341,44 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return data(result).get("versionId").asLong();
+    }
+
+    private long createWorkflowAgentVersion(Cookie adminSession, long agentId, String workflowConfigJson) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/admin/agents/{agentId}/versions", agentId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionNo": 1,
+                      "modelConfigJson": "%s",
+                      "systemPrompt": "你是IM会话助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(escapeJsonString("""
+                        {"provider":"openai-compatible","baseUrl":"%s","apiKey":"test-key","model":"stub-chat"}
+                        """.formatted(modelBaseUrl).trim()), escapeJsonString(workflowConfigJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long versionId = data(result).get("versionId").asLong();
+        mockMvc.perform(post("/api/admin/agents/workflow-run")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionId": %d,
+                      "inputJson": "{\\"userId\\":2003,\\"query\\":\\"我是谁\\"}",
+                      "modelConfigJson": "%s",
+                      "systemPrompt": "你是IM会话助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(versionId, escapeJsonString("""
+                        {"provider":"openai-compatible","baseUrl":"%s","apiKey":"test-key","model":"stub-chat"}
+                        """.formatted(modelBaseUrl).trim()), escapeJsonString(workflowConfigJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.success").value(true));
+        return versionId;
     }
 
     private void publishAgentVersion(Cookie adminSession, long versionId) throws Exception {
@@ -2124,7 +2480,25 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         assertTrue(condition.getAsBoolean(), message);
     }
 
+    private String escapeJsonString(String value) {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r");
+    }
+
     private static void handleModelRequest(HttpExchange exchange) throws IOException {
+        String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        if (requestBody.contains("可选意图")) {
+            String intent = requestBody.contains("假期") ? "查询假期"
+                : requestBody.contains("请假") ? "申请请假"
+                : "问答";
+            writeModelResponse(exchange, """
+                {"intent":"%s"}
+                """.formatted(intent).trim());
+            return;
+        }
         String cardJson = """
             {
               "cardType": "knowledge_answer",
@@ -2142,7 +2516,11 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
               ]
             }
             """;
-        String escapedCardJson = STATIC_OBJECT_MAPPER.writeValueAsString(cardJson);
+        writeModelResponse(exchange, cardJson);
+    }
+
+    private static void writeModelResponse(HttpExchange exchange, String content) throws IOException {
+        String escapedContent = STATIC_OBJECT_MAPPER.writeValueAsString(content);
         byte[] body = """
             {
               "id": "chatcmpl-im-test",
@@ -2165,7 +2543,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                 }
               ]
             }
-            """.formatted(escapedCardJson).getBytes(StandardCharsets.UTF_8);
+            """.formatted(escapedContent).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         exchange.sendResponseHeaders(200, body.length);
         exchange.getResponseBody().write(body);

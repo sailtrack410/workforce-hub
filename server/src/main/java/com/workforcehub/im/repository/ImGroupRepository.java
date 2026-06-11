@@ -80,6 +80,102 @@ public class ImGroupRepository {
         ).stream().findFirst();
     }
 
+    public List<ImGroupFileRow> listGroupFiles(Long conversationId) {
+        return jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.file_object_id,
+                   ar.owner_id AS conversation_id,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   COALESCE(u.real_name, CONCAT('USER:', ar.uploader_id)) AS uploader_name,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.is_deleted AS file_deleted,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.content_sha256,
+                   fo.scan_status,
+                   ar.created_at
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            LEFT JOIN org_user u ON ar.uploader_type = 'USER'
+                                AND u.id = ar.uploader_id
+                                AND u.is_deleted = 0
+            WHERE ar.owner_type = 'IM_GROUP_FILE'
+              AND ar.owner_id = ?
+              AND ar.is_deleted = 0
+              AND ar.deleted_at IS NULL
+              AND fo.is_deleted = 0
+            ORDER BY ar.created_at DESC, ar.id DESC
+            """,
+            this::mapGroupFile,
+            conversationId
+        );
+    }
+
+    public Optional<ImGroupFileRow> findGroupFile(Long conversationId, Long attachmentRefId) {
+        return jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.file_object_id,
+                   ar.owner_id AS conversation_id,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   COALESCE(u.real_name, CONCAT('USER:', ar.uploader_id)) AS uploader_name,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.is_deleted AS file_deleted,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.content_sha256,
+                   fo.scan_status,
+                   ar.created_at
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            LEFT JOIN org_user u ON ar.uploader_type = 'USER'
+                                AND u.id = ar.uploader_id
+                                AND u.is_deleted = 0
+            WHERE ar.owner_type = 'IM_GROUP_FILE'
+              AND ar.owner_id = ?
+              AND ar.id = ?
+            """,
+            this::mapGroupFile,
+            conversationId,
+            attachmentRefId
+        ).stream().findFirst();
+    }
+
+    public Optional<ImGroupFileRow> findGroupFileByAttachmentRefId(Long attachmentRefId) {
+        return jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.file_object_id,
+                   ar.owner_id AS conversation_id,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   COALESCE(u.real_name, CONCAT('USER:', ar.uploader_id)) AS uploader_name,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.is_deleted AS file_deleted,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.content_sha256,
+                   fo.scan_status,
+                   ar.created_at
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            LEFT JOIN org_user u ON ar.uploader_type = 'USER'
+                                AND u.id = ar.uploader_id
+                                AND u.is_deleted = 0
+            WHERE ar.owner_type = 'IM_GROUP_FILE'
+              AND ar.id = ?
+            """,
+            this::mapGroupFile,
+            attachmentRefId
+        ).stream().findFirst();
+    }
+
     public List<ImConversationMemberRow> listActiveUserMembers(Long conversationId) {
         return jdbcTemplate.query("""
             SELECT m.member_id,
@@ -357,6 +453,26 @@ public class ImGroupRepository {
             """.formatted(placeholders), args);
     }
 
+    public int trashGroupFile(Long conversationId, Long attachmentRefId, Long operatorId) {
+        return jdbcTemplate.update("""
+            UPDATE sys_attachment_ref
+            SET deleted_at = NOW(),
+                deleted_by = ?,
+                purge_after = DATE_ADD(NOW(), INTERVAL 30 DAY),
+                updated_by = ?
+            WHERE id = ?
+              AND owner_type = 'IM_GROUP_FILE'
+              AND owner_id = ?
+              AND is_deleted = 0
+              AND deleted_at IS NULL
+            """,
+            operatorId,
+            operatorId,
+            attachmentRefId,
+            conversationId
+        );
+    }
+
     private ImConversationMemberRow mapConversationMember(ResultSet rs, int rowNum) throws SQLException {
         return new ImConversationMemberRow(
             rs.getLong("member_id"),
@@ -365,6 +481,26 @@ public class ImGroupRepository {
             rs.getString("member_role"),
             rs.getString("status"),
             rs.getTimestamp("joined_at") == null ? null : rs.getTimestamp("joined_at").toLocalDateTime()
+        );
+    }
+
+    private ImGroupFileRow mapGroupFile(ResultSet rs, int rowNum) throws SQLException {
+        return new ImGroupFileRow(
+            rs.getLong("attachment_ref_id"),
+            rs.getLong("file_object_id"),
+            nullableLong(rs, "conversation_id"),
+            rs.getString("display_name"),
+            rs.getString("uploader_type"),
+            nullableLong(rs, "uploader_id"),
+            rs.getString("uploader_name"),
+            rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime(),
+            rs.getInt("attachment_deleted"),
+            rs.getInt("file_deleted"),
+            rs.getString("mime_type"),
+            rs.getLong("file_size"),
+            rs.getString("content_sha256"),
+            rs.getString("scan_status"),
+            rs.getTimestamp("created_at").toLocalDateTime()
         );
     }
 

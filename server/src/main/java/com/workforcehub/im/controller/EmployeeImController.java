@@ -5,12 +5,15 @@ import com.workforcehub.file.controller.FileDownloadResponseFactory;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
+import com.workforcehub.file.dto.FileTrashRequest;
+import com.workforcehub.file.dto.FileTrashResponse;
 import com.workforcehub.im.dto.CreateGroupConversationRequest;
 import com.workforcehub.im.dto.EditImMessageRequest;
 import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
 import com.workforcehub.im.dto.ImConversationDetailResponse;
 import com.workforcehub.im.dto.ImConversationMemberResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
+import com.workforcehub.im.dto.ImGroupFileResponse;
 import com.workforcehub.im.dto.ImGroupProfileResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.SendImMessageRequest;
@@ -94,6 +97,33 @@ public class EmployeeImController {
     @GetMapping("/group-conversations/{conversationId}/profile")
     public R<ImGroupProfileResponse> groupProfile(@PathVariable Long conversationId) {
         return R.ok(imGroupService.getCurrentEmployeeGroupProfile(conversationId));
+    }
+
+    @GetMapping("/group-conversations/{conversationId}/files")
+    public R<List<ImGroupFileResponse>> groupFiles(@PathVariable Long conversationId) {
+        return R.ok(imGroupService.listCurrentEmployeeGroupFiles(conversationId));
+    }
+
+    @PostMapping("/group-conversations/{conversationId}/files/{attachmentRefId}/download-tickets")
+    public R<DownloadTicketResponse> createGroupFileDownloadTicket(
+        @PathVariable Long conversationId,
+        @PathVariable Long attachmentRefId,
+        @Valid @RequestBody CreateDownloadTicketRequest request
+    ) {
+        return R.ok(imGroupService.createCurrentEmployeeGroupFileDownloadTicket(
+            conversationId,
+            attachmentRefId,
+            request
+        ));
+    }
+
+    @PostMapping("/group-conversations/{conversationId}/files/{attachmentRefId}/trash")
+    public R<FileTrashResponse> trashGroupFile(
+        @PathVariable Long conversationId,
+        @PathVariable Long attachmentRefId,
+        @Valid @RequestBody FileTrashRequest request
+    ) {
+        return R.ok(imGroupService.trashCurrentEmployeeGroupFile(conversationId, attachmentRefId, request));
     }
 
     @PostMapping("/group-conversations/{conversationId}/profile")

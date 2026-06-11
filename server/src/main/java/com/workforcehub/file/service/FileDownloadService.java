@@ -48,12 +48,13 @@ public class FileDownloadService {
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
         }
-        ensureEmployeePersonalFileAttachment(attachment);
+        ensureEmployeeDownloadableAttachment(attachment);
         if (attachment.deletedAt() != null || attachment.isDeleted() != 0) {
             throw new BizException(409, "文件已删除");
         }
-        if (!"SINGLE".equalsIgnoreCase(request.getDownloadType())) {
-            throw new BizException(400, "第一版仅支持单文件下载");
+        String downloadType = normalizeEmployeeDownloadType(request.getDownloadType());
+        if (downloadType == null) {
+            throw new BizException(400, "员工端仅支持单文件下载或内联预览");
         }
 
         Long ticketId = IdWorker.getId();
@@ -65,12 +66,13 @@ public class FileDownloadService {
                 (id, ticket_no, attachment_ref_id, requester_type, requester_id,
                  download_type, download_url, reason, expire_at, status)
             VALUES
-                (?, ?, ?, 'USER', ?, 'SINGLE', ?, ?, ?, 'ACTIVE')
+                (?, ?, ?, 'USER', ?, ?, ?, ?, ?, 'ACTIVE')
             """,
             ticketId,
             ticketNo,
             attachmentRefId,
             userId,
+            downloadType,
             downloadUrl,
             blankToNull(request.getReason()),
             expireAt
@@ -107,7 +109,7 @@ public class FileDownloadService {
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权访问该文件");
         }
-        ensureEmployeePersonalFileAttachment(attachment);
+        ensureEmployeeDownloadableAttachment(attachment);
         if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {
             throw new BizException(409, "文件已删除");
         }
@@ -194,25 +196,35 @@ public class FileDownloadService {
     }
 
     private void ensureAdminFileAttachment(AttachmentRow attachment) {
-        if (!"ADMIN_FILE".equals(attachment.ownerType()) || !"ADMIN".equals(attachment.uploaderType())) {
+        if ((!"ADMIN_FILE".equals(attachment.ownerType()) && !"RAGFLOW_DOCUMENT".equals(attachment.ownerType()))
+            || !"ADMIN".equals(attachment.uploaderType())) {
             throw new BizException(403, "后台接口仅允许治理后台文件");
         }
     }
 
-    private void ensureEmployeePersonalFileAttachment(AttachmentRow attachment) {
-        if (!"PERSONAL_FILE".equals(attachment.ownerType())) {
-            throw new BizException(403, "员工端文件接口仅允许下载个人文件");
+    private void ensureEmployeeDownloadableAttachment(AttachmentRow attachment) {
+        if (!"PERSONAL_FILE".equals(attachment.ownerType()) && !"USER_AVATAR".equals(attachment.ownerType())) {
+            throw new BizException(403, "员工端文件接口仅允许下载个人文件或头像");
         }
     }
 
-    private void ensureEmployeePersonalFileAttachment(DownloadAttachmentRow attachment) {
-        if (!"PERSONAL_FILE".equals(attachment.ownerType())) {
-            throw new BizException(403, "员工端文件接口仅允许下载个人文件");
+    private void ensureEmployeeDownloadableAttachment(DownloadAttachmentRow attachment) {
+        if (!"PERSONAL_FILE".equals(attachment.ownerType()) && !"USER_AVATAR".equals(attachment.ownerType())) {
+            throw new BizException(403, "员工端文件接口仅允许下载个人文件或头像");
         }
+    }
+
+    private String normalizeEmployeeDownloadType(String downloadType) {
+        if (!StringUtils.hasText(downloadType)) {
+            return "SINGLE";
+        }
+        String normalized = downloadType.trim().toUpperCase();
+        return "SINGLE".equals(normalized) || "INLINE".equals(normalized) ? normalized : null;
     }
 
     private void ensureAdminDownloadAttachment(DownloadAttachmentRow attachment) {
-        if (!"ADMIN_FILE".equals(attachment.ownerType()) || !"ADMIN".equals(attachment.uploaderType())) {
+        if ((!"ADMIN_FILE".equals(attachment.ownerType()) && !"RAGFLOW_DOCUMENT".equals(attachment.ownerType()))
+            || !"ADMIN".equals(attachment.uploaderType())) {
             throw new BizException(403, "后台接口仅允许治理后台文件");
         }
     }

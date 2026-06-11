@@ -15,6 +15,7 @@ import com.workforcehub.file.repository.FileObjectRow;
 import com.workforcehub.file.storage.StorageProvider;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.file.storage.StorageUploadTarget;
+import com.workforcehub.im.repository.ImRepository;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class FileUploadTicketService {
     private final FileObjectRepository fileObjectRepository;
     private final AttachmentRefRepository attachmentRefRepository;
     private final FileQuotaPolicyService fileQuotaPolicyService;
+    private final ImRepository imRepository;
 
     public FileUploadTicketService(JdbcTemplate jdbcTemplate,
                                    StorageProviderRegistry storageProviderRegistry,
@@ -47,7 +49,8 @@ public class FileUploadTicketService {
                                    StorageUsageLedgerService storageUsageLedgerService,
                                    FileObjectRepository fileObjectRepository,
                                    AttachmentRefRepository attachmentRefRepository,
-                                   FileQuotaPolicyService fileQuotaPolicyService) {
+                                   FileQuotaPolicyService fileQuotaPolicyService,
+                                   ImRepository imRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.fileStorageProperties = fileStorageProperties;
@@ -56,6 +59,7 @@ public class FileUploadTicketService {
         this.fileObjectRepository = fileObjectRepository;
         this.attachmentRefRepository = attachmentRefRepository;
         this.fileQuotaPolicyService = fileQuotaPolicyService;
+        this.imRepository = imRepository;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -67,7 +71,7 @@ public class FileUploadTicketService {
             return existingTicket;
         }
         ensureUploadPolicy(request);
-        fileQuotaPolicyService.ensurePersonalQuota(userId, request.getFileSize());
+        ensureEmployeeQuota(request.getOwnerType(), userId, request.getFileSize());
         fileQuotaPolicyService.ensureGlobalQuota(request.getFileSize());
 
         FileObjectRow existing = fileObjectRepository.findReusableForUploader(
@@ -103,7 +107,7 @@ public class FileUploadTicketService {
                 throw e;
             }
             fileObjectRepository.increaseRefCount(existing.id());
-            storageUsageLedgerService.increaseUsage("USER", userId, request.getFileSize(), 1);
+            increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
             storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
             audit("USER", userId, "FILE_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
@@ -235,17 +239,48 @@ public class FileUploadTicketService {
     }
 
     private void validateEmployeeOwner(String ownerType, Long ownerId) {
-        if (!"PERSONAL_FILE".equals(ownerType)) {
-            throw new BizException(400, "员工端第一版仅支持个人文件");
+        if (!"PERSONAL_FILE".equals(ownerType)
+            && !"USER_AVATAR".equals(ownerType)
+            && !"IM_MESSAGE_PENDING".equals(ownerType)
+            && !"IM_GROUP_FILE".equals(ownerType)) {
+            throw new BizException(400, "员工端不支持该文件归属");
+        }
+        if ("IM_GROUP_FILE".equals(ownerType)) {
+            Long userId = CurrentUserHolder.requireUserId();
+            if (ownerId == null) {
+                throw new BizException(400, "群文件必须指定群聊");
+            }
+            if (!imRepository.existsActiveUserMembership(ownerId, userId)) {
+                throw new BizException(403, "无权访问该群聊");
+            }
+            return;
         }
         if (ownerId != null) {
-            throw new BizException(400, "个人文件不应指定业务归属ID");
+            throw new BizException(400, "员工端文件不应指定业务归属ID");
+        }
+    }
+
+    private void ensureEmployeeQuota(String ownerType, Long userId, Long incomingBytes) {
+        if (!"IM_GROUP_FILE".equals(ownerType)) {
+            fileQuotaPolicyService.ensurePersonalQuota(userId, incomingBytes);
+        }
+    }
+
+    private void increaseEmployeeUsage(String ownerType, Long userId, Long incomingBytes) {
+        if (!"IM_GROUP_FILE".equals(ownerType)) {
+            storageUsageLedgerService.increaseUsage("USER", userId, incomingBytes, 1);
         }
     }
 
     private void validateAdminOwner(String ownerType, Long ownerId) {
-        if (!"ADMIN_FILE".equals(ownerType)) {
+        if (!"ADMIN_FILE".equals(ownerType) && !"RAGFLOW_DOCUMENT".equals(ownerType)) {
             throw new BizException(400, "后台第一版仅支持后台治理文件");
+        }
+        if ("RAGFLOW_DOCUMENT".equals(ownerType)) {
+            if (ownerId == null) {
+                throw new BizException(400, "知识库文件必须指定知识库");
+            }
+            return;
         }
         if (ownerId != null) {
             throw new BizException(400, "后台治理文件不应指定业务归属ID");

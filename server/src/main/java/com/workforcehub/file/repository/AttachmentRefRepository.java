@@ -39,7 +39,7 @@ public class AttachmentRefRepository {
                 (id, owner_type, owner_id, file_object_id, source_upload_ticket_id, original_file_name,
                  display_name, uploader_type, uploader_id, visibility_scope, created_by)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OWNER', ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             attachmentRefId,
             ownerType,
@@ -50,8 +50,16 @@ public class AttachmentRefRepository {
             displayName,
             uploaderType,
             uploaderId,
+            visibilityScope(ownerType),
             uploaderId
         );
+    }
+
+    private String visibilityScope(String ownerType) {
+        if ("IM_GROUP_FILE".equals(ownerType)) {
+            return "CONVERSATION_MEMBER";
+        }
+        return "OWNER";
     }
 
     public int countActiveByFileObjectId(Long fileObjectId) {

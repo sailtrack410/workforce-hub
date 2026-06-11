@@ -201,7 +201,7 @@ public class ImService {
         List<ImAttachmentRow> sourceAttachments = attachmentRefIds.stream()
             .map(attachmentRefId -> imRepository.findAttachmentById(attachmentRefId)
                 .orElseThrow(() -> new BizException(404, "附件引用不存在")))
-            .peek(attachment -> ensureUsablePersonalAttachment(attachment, userId))
+            .peek(attachment -> ensureUsableSourceAttachment(attachment, userId))
             .toList();
         Long seqNo = lastSeq + 1;
         Long messageId = IdWorker.getId();
@@ -386,6 +386,9 @@ public class ImService {
 
         ImAttachmentRow attachment = imRepository.findAttachmentById(ticket.attachmentRefId())
             .orElseThrow(() -> new BizException(404, "消息附件不存在"));
+        if ("IM_GROUP_FILE".equals(attachment.ownerType())) {
+            return imGroupService.downloadCurrentEmployeeGroupOrMessageAttachment(ticketNo);
+        }
         if (!"IM_MESSAGE".equals(attachment.ownerType()) || attachment.ownerId() == null) {
             throw new BizException(404, "消息附件不存在");
         }
@@ -724,11 +727,11 @@ public class ImService {
             .toList();
     }
 
-    private void ensureUsablePersonalAttachment(ImAttachmentRow attachment, Long userId) {
+    private void ensureUsableSourceAttachment(ImAttachmentRow attachment, Long userId) {
         if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
             throw new BizException(403, "无权使用该附件引用");
         }
-        if (!"PERSONAL_FILE".equals(attachment.ownerType())) {
+        if (!"PERSONAL_FILE".equals(attachment.ownerType()) && !"IM_MESSAGE_PENDING".equals(attachment.ownerType())) {
             throw new BizException(403, "无权使用该附件引用");
         }
         if (attachment.deletedAt() != null || attachment.attachmentDeleted() != 0 || attachment.fileDeleted() != 0) {

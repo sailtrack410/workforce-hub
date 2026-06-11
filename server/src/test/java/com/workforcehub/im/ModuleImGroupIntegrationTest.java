@@ -1,9 +1,13 @@
 package com.workforcehub.im;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,6 +16,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.hasSize;
@@ -38,6 +48,12 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Value("${workforce.file.local-root:target/test-file-storage}")
+    private String localRoot;
 
     @Test
     @DisplayName("群成员应能读取自己所在群聊的成员列表")
@@ -491,6 +507,262 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
         ));
     }
 
+    @Test
+    @DisplayName("群成员应能查看本群独立文件并下载且不串到其他群")
+    void groupMemberShouldListAndDownloadOnlyJoinedGroupFiles() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+        seedOtherCustomGroup();
+        long groupFileRefId = seedGroupFileAttachmentRef(
+            7301L,
+            EMPLOYEE_USER_ID,
+            "群资料.txt",
+            "group-file-content"
+        );
+        long otherGroupFileRefId = seedGroupFileAttachmentRef(
+            7309L,
+            OTHER_EMPLOYEE_USER_ID,
+            "其他群资料.txt",
+            "other-group-file-content"
+        );
+
+        MvcResult listResult = mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/files", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].attachmentRefId").value(groupFileRefId))
+            .andExpect(jsonPath("$.data[0].conversationId").value(7301))
+            .andExpect(jsonPath("$.data[0].displayName").value("群资料.txt"))
+            .andExpect(jsonPath("$.data[0].uploaderId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data[0].canDelete").value(false))
+            .andReturn();
+
+        assertEquals(groupFileRefId, data(listResult).get(0).get("attachmentRefId").asLong());
+
+        MvcResult ticketResult = mockMvc.perform(post(
+                    "/api/employee/im/group-conversations/{conversationId}/files/{attachmentRefId}/download-tickets",
+                    7301L,
+                    groupFileRefId
+                )
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE",
+                      "reason": "查看群文件"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.ticketNo").isString())
+            .andExpect(jsonPath("$.data.downloadUrl").value(Matchers.containsString("/api/employee/im/attachments/download/")))
+            .andExpect(jsonPath("$.data.fileName").value("群资料.txt"))
+            .andReturn();
+
+        String ticketNo = data(ticketResult).get("ticketNo").asText();
+        mockMvc.perform(get("/api/employee/im/attachments/download/{ticketNo}", ticketNo)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .bytes("group-file-content".getBytes(StandardCharsets.UTF_8)));
+
+        mockMvc.perform(post(
+                    "/api/employee/im/group-conversations/{conversationId}/files/{attachmentRefId}/download-tickets",
+                    7301L,
+                    otherGroupFileRefId
+                )
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "SINGLE"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message").value("群文件不存在"));
+    }
+
+    @Test
+    @DisplayName("群文件仅群主或群管理员可删除")
+    void onlyGroupOwnerOrAdminShouldDeleteGroupFile() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        seedCustomGroup();
+        long groupFileRefId = seedGroupFileAttachmentRef(
+            7301L,
+            MANAGER_USER_ID,
+            "待删除群资料.txt",
+            "group-file-delete-content"
+        );
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/files/{attachmentRefId}/trash", 7301L, groupFileRefId)
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "普通成员尝试删除"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("只有群主或群管理员可以删除群文件"));
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/files/{attachmentRefId}/trash", 7301L, groupFileRefId)
+                .cookie(ownerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "清理群文件"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").value(groupFileRefId))
+            .andExpect(jsonPath("$.data.deletedAt").isString());
+
+        mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/files", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("群成员上传群文件应归属群空间且不进入个人文件中心")
+    void groupMemberShouldUploadGroupFileOutsidePersonalFileCenter() throws Exception {
+        Cookie memberSession = loginEmployee("lisi.manager");
+        Cookie nonMemberSession = loginEmployee("wangwu.employee");
+        seedCustomGroup();
+
+        byte[] content = "uploaded group file content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        mockMvc.perform(post("/api/employee/files/upload-tickets")
+                .cookie(nonMemberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "ownerType": "IM_GROUP_FILE",
+                      "ownerId": 7301,
+                      "fileName": "非成员群文件.txt",
+                      "mimeType": "text/plain",
+                      "fileSize": %s,
+                      "contentSha256": "%s",
+                      "contentMd5": null,
+                      "clientRequestId": "group-file-non-member"
+                    }
+                    """.formatted(content.length, sha256)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权访问该群聊"));
+
+        MvcResult ticketResult = mockMvc.perform(post("/api/employee/files/upload-tickets")
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "ownerType": "IM_GROUP_FILE",
+                      "ownerId": 7301,
+                      "fileName": "群共享资料.txt",
+                      "mimeType": "text/plain",
+                      "fileSize": %s,
+                      "contentSha256": "%s",
+                      "contentMd5": null,
+                      "clientRequestId": "group-file-upload-1"
+                    }
+                    """.formatted(content.length, sha256)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(false))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        MvcResult confirmResult = mockMvc.perform(post("/api/employee/files/confirm-upload")
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "uploadTicketId": %s,
+                      "objectKey": "%s",
+                      "contentSha256": "%s",
+                      "fileSize": %s,
+                      "ownerType": "IM_GROUP_FILE",
+                      "ownerId": 7301,
+                      "displayName": "群共享资料.txt"
+                    }
+                    """.formatted(uploadTicketId, objectKey, sha256, content.length)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andReturn();
+        long attachmentRefId = data(confirmResult).get("attachmentRefId").asLong();
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_attachment_ref WHERE id = ? AND owner_type = 'IM_GROUP_FILE' AND owner_id = 7301",
+            Long.class,
+            attachmentRefId
+        ));
+        assertEquals("CONVERSATION_MEMBER", jdbcTemplate.queryForObject(
+            "SELECT visibility_scope FROM sys_attachment_ref WHERE id = ?",
+            String.class,
+            attachmentRefId
+        ));
+        assertEquals(0L, usedBytes("USER", MANAGER_USER_ID));
+        assertEquals(content.length, usedBytes("GLOBAL", null));
+
+        MvcResult deduplicatedResult = mockMvc.perform(post("/api/employee/files/upload-tickets")
+                .cookie(memberSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "ownerType": "IM_GROUP_FILE",
+                      "ownerId": 7301,
+                      "fileName": "群共享资料副本.txt",
+                      "mimeType": "text/plain",
+                      "fileSize": %s,
+                      "contentSha256": "%s",
+                      "contentMd5": null,
+                      "clientRequestId": "group-file-upload-2"
+                    }
+                    """.formatted(content.length, sha256)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.deduplicated").value(true))
+            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andReturn();
+        long deduplicatedAttachmentRefId = data(deduplicatedResult).get("attachmentRefId").asLong();
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_attachment_ref WHERE id = ? AND owner_type = 'IM_GROUP_FILE' AND owner_id = 7301",
+            Long.class,
+            deduplicatedAttachmentRefId
+        ));
+        assertEquals(0L, usedBytes("USER", MANAGER_USER_ID));
+        assertEquals(content.length * 2L, usedBytes("GLOBAL", null));
+
+        mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/files", 7301L)
+                .cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(2)))
+            .andExpect(jsonPath("$.data[?(@.attachmentRefId == %s)]".formatted(attachmentRefId)).exists())
+            .andExpect(jsonPath("$.data[?(@.attachmentRefId == %s)]".formatted(deduplicatedAttachmentRefId)).exists());
+
+        mockMvc.perform(get("/api/employee/files")
+                .cookie(memberSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.list[?(@.attachmentRefId == %s)]".formatted(attachmentRefId)).isEmpty())
+            .andExpect(jsonPath("$.data.list[?(@.attachmentRefId == %s)]".formatted(deduplicatedAttachmentRefId)).isEmpty());
+    }
+
     private void seedCustomGroup() {
         jdbcTemplate.update("""
             INSERT INTO im_conversation
@@ -511,6 +783,108 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                 (7303, 7301, 'USER', ?, 'OWNER', 'CREATE', 0, 'ACTIVE'),
                 (7304, 7301, 'USER', ?, 'MEMBER', 'CREATE', 0, 'ACTIVE')
             """, EMPLOYEE_USER_ID, MANAGER_USER_ID);
+    }
+
+    private void seedOtherCustomGroup() {
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation
+                (id, conversation_type, title, last_message_seq, status, created_by, updated_by, is_deleted)
+            VALUES
+                (7309, 'GROUP', '其他项目群', 0, 'ACTIVE', 2004, 2004, 0)
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO im_group_profile
+                (id, conversation_id, group_type, owner_user_id, notice_text, status, created_by, updated_by)
+            VALUES
+                (7310, 7309, 'CUSTOM', 2004, '其他群公告', 'ACTIVE', 2004, 2004)
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO im_conversation_member
+                (id, conversation_id, member_type, member_id, member_role, join_source, last_read_seq, status)
+            VALUES
+                (7311, 7309, 'USER', ?, 'OWNER', 'CREATE', 0, 'ACTIVE')
+            """, OTHER_EMPLOYEE_USER_ID);
+    }
+
+    private long seedGroupFileAttachmentRef(long conversationId,
+                                            long uploaderId,
+                                            String displayName,
+                                            String content) {
+        long suffix = Math.abs((long) (conversationId + ":" + content).hashCode());
+        long fileObjectId = 9750_0000L + suffix;
+        long attachmentRefId = 9850_0000L + suffix;
+        String contentSha256 = "%064x".formatted(attachmentRefId);
+        String objectKey = "im-group-test/" + attachmentRefId + ".txt";
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+        writeLocalObject(objectKey, bytes);
+        jdbcTemplate.update("""
+            INSERT INTO sys_file_object
+                (id, storage_provider, bucket_name, object_key, file_name, file_ext,
+                 mime_type, file_size, file_hash, content_sha256, ref_count,
+                 upload_status, scan_status, created_by, is_deleted)
+            VALUES
+                (?, 'LOCAL', 'local', ?, ?, 'txt',
+                 'text/plain', ?, ?, ?, 1,
+                 'UPLOADED', 'PASSED', ?, 0)
+            """,
+            fileObjectId,
+            objectKey,
+            displayName,
+            (long) bytes.length,
+            contentSha256,
+            contentSha256,
+            uploaderId
+        );
+        jdbcTemplate.update("""
+            INSERT INTO sys_attachment_ref
+                (id, owner_type, owner_id, file_object_id, original_file_name,
+                 display_name, uploader_type, uploader_id, visibility_scope,
+                 sort_order, created_by, is_deleted)
+            VALUES
+                (?, 'IM_GROUP_FILE', ?, ?, ?, ?, 'USER', ?, 'CONVERSATION_MEMBER',
+                 0, ?, 0)
+            """,
+            attachmentRefId,
+            conversationId,
+            fileObjectId,
+            displayName,
+            displayName,
+            uploaderId,
+            uploaderId
+        );
+        return attachmentRefId;
+    }
+
+    private void writeLocalObject(String objectKey, byte[] content) {
+        try {
+            Path target = Path.of(localRoot).resolve(objectKey);
+            Files.createDirectories(target.getParent());
+            Files.write(target, content);
+        } catch (Exception e) {
+            throw new IllegalStateException("写入本地测试文件失败", e);
+        }
+    }
+
+    private JsonNode data(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
+    }
+
+    private String sha256(byte[] content) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        return HexFormat.of().formatHex(digest.digest(content));
+    }
+
+    private long usedBytes(String scopeType, Long scopeId) {
+        Long value = jdbcTemplate.query("""
+            SELECT used_bytes FROM sys_storage_usage
+            WHERE scope_type = ? AND ((scope_id IS NULL AND ? IS NULL) OR scope_id = ?)
+            """,
+            rs -> rs.next() ? rs.getLong("used_bytes") : 0L,
+            scopeType,
+            scopeId,
+            scopeId
+        );
+        return value == null ? 0L : value;
     }
 
     private void seedCustomGroupWithCoworkerOnly() {
