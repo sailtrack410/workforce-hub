@@ -6,19 +6,20 @@
 | --- | --- |
 | 文档名称 | `module-leave` 假期账户接口 API 文档 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 假种创建、假期账户余额调整、员工余额查询、请假审批余额联动、请假审批通过联动考勤重算 |
+| 适用范围 | 假种创建、后台假期账户查询、假期账户余额调整、员工余额查询、请假审批余额联动、请假审批通过联动考勤重算 |
 | 对应模块 | `server/module-leave` |
 | 发布日期 | `2026-05-07` |
-| 当前状态 | 第一版假种、账户、余额流水、workflow 审批通过扣减、审批通过联动考勤日结果重算、已批准请假区间查询已实现；复杂年假规则、自动发放、结转、过期清零待后续迭代 |
+| 当前状态 | 第一版假种、后台账户查询、账户余额流水、workflow 审批通过扣减、审批通过联动考勤日结果重算、已批准请假区间查询已实现；复杂年假规则、自动发放、结转、过期清零待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `3` 个后台接口、`1` 个员工端接口，以及 workflow 内部余额联动能力。
+当前已实现 `4` 个后台接口、`1` 个员工端接口，以及 workflow 内部余额联动能力。
 
 - `GET /api/admin/leave/types`
 - `POST /api/admin/leave/types`
+- `GET /api/admin/leave/accounts`
 - `POST /api/admin/leave/accounts/adjustments`
 - `GET /api/employee/leave/accounts`
 
@@ -188,7 +189,54 @@ Cookie: SESSION=...
 
 ---
 
-## 5.3 管理员调整员工假期余额
+## 5.3 管理员查询员工假期账户
+
+```http
+GET /api/admin/leave/accounts?userId=2003&leaveTypeId=2052160000000000001
+Cookie: SESSION=...
+```
+
+### 查询参数
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `userId` | `long` | 否 | 员工 ID |
+| `leaveTypeId` | `long` | 否 | 假种 ID |
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "accountId": 2052160000000000002,
+      "userId": 2003,
+      "leaveTypeId": 2052160000000000001,
+      "leaveCode": "ANNUAL_LEAVE",
+      "leaveName": "年假",
+      "balanceMode": "DEDUCT",
+      "availableMinutes": 960,
+      "frozenMinutes": 0,
+      "status": "ACTIVE",
+      "lastTxnType": null,
+      "lastChangeMinutes": null
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+### 查询规则
+
+- 仅管理员会话可访问。
+- 仅返回 `ACTIVE` 账户。
+- 最多返回 `500` 条，按 `user_id ASC, leave_code ASC, id ASC` 排序。
+
+---
+
+## 5.4 管理员调整员工假期余额
 
 ```http
 POST /api/admin/leave/accounts/adjustments
@@ -252,7 +300,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.4 员工查询自己的假期账户
+## 5.5 员工查询自己的假期账户
 
 ```http
 GET /api/employee/leave/accounts

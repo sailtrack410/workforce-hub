@@ -6,16 +6,16 @@
 | --- | --- |
 | 文档名称 | `module-workflow` 审批接口 API 文档 |
 | 文档版本 | `v0.1` |
-| 适用范围 | 请假申请提交、补卡申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权、轨迹与后台流程模板治理 |
+| 适用范围 | 请假申请提交、补卡申请提交、我的申请列表、审批待办、审批通过、审批驳回、申请撤回、详情、附件、下载授权、轨迹、后台流程模板治理与后台申请治理 |
 | 对应模块 | `server/module-workflow` |
 | 发布日期 | `2026-05-06` |
-| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理、Agent 预审入口、假期余额联动和补卡审批联动考勤重算已实现；完整 Agent 平台待后续迭代 |
+| 当前状态 | 第一版 Flowable 审批闭环、我的申请列表、审批附件业务引用、审批附件下载授权、后台流程模板治理、后台申请列表/详情/轨迹、Agent 预审入口、假期余额联动和补卡审批联动考勤重算已实现；完整 Agent 平台待后续迭代 |
 
 ---
 
 ## 二、接口范围
 
-当前已实现 `11` 个员工端接口、`7` 个后台流程模板治理接口，以及 workflow 侧 Agent 预审 SPI 回调入口。
+当前已实现 `11` 个员工端接口、`10` 个后台流程治理接口，以及 workflow 侧 Agent 预审 SPI 回调入口。
 
 - `POST /api/employee/workflow/leave-requests`
 - `POST /api/employee/workflow/clock-correction-requests`
@@ -31,6 +31,9 @@
 
 后台流程模板治理接口：
 
+- `GET /api/admin/workflow/requests`
+- `GET /api/admin/workflow/requests/{requestId}`
+- `GET /api/admin/workflow/requests/{requestId}/actions`
 - `GET /api/admin/workflow/process-types`
 - `POST /api/admin/workflow/process-types`
 - `POST /api/admin/workflow/templates`
@@ -790,6 +793,154 @@ Content-Disposition: attachment; filename*=UTF-8''%E8%AF%B7%E5%81%87%E8%AF%81%E6
 
 ## 5.12 创建流程类型
 
+## 5.12 后台查询审批申请列表
+
+```http
+GET /api/admin/workflow/requests?pageNo=1&pageSize=20&status=APPROVED&bizType=LEAVE&applicantUserId=2003&keyword=WF-LEAVE
+Cookie: SESSION=...
+```
+
+### 查询参数
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `pageNo` | `long` | 否 | 默认 `1`，最小 `1` |
+| `pageSize` | `long` | 否 | 默认 `20`，最大 `100` |
+| `status` | `string` | 否 | 申请状态，例如 `IN_APPROVAL`、`APPROVED`、`REJECTED` |
+| `bizType` | `string` | 否 | 业务类型，例如 `LEAVE`、`CLOCK_CORRECTION` |
+| `applicantUserId` | `long` | 否 | 申请人用户 ID |
+| `keyword` | `string` | 否 | 按申请编号或标题模糊查询 |
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "pageNo": 1,
+    "pageSize": 20,
+    "total": 1,
+    "list": [
+      {
+        "requestId": 2055611592012414978,
+        "requestNo": "WF-LEAVE-20260516192929-2055611592012414977",
+        "bizType": "LEAVE",
+        "bizId": 2055611592012414979,
+        "title": "张三的请假申请",
+        "status": "APPROVED",
+        "currentStepKey": null,
+        "currentStepName": null,
+        "submittedAt": "2026-05-16 19:29:29",
+        "finishedAt": "2026-05-16 19:29:29"
+      }
+    ]
+  },
+  "requestId": "..."
+}
+```
+
+### 查询规则
+
+- 仅管理员会话可访问。
+- 按 `submitted_at DESC, id DESC` 排序。
+- `status`、`bizType` 会按大写匹配。
+- `keyword` 匹配 `request_no` 或 `title`。
+
+---
+
+## 5.13 后台查询审批申请详情
+
+```http
+GET /api/admin/workflow/requests/{requestId}
+Cookie: SESSION=...
+```
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "requestId": 2055611592012414978,
+    "requestNo": "WF-LEAVE-20260516192929-2055611592012414977",
+    "bizType": "LEAVE",
+    "bizId": 2055611592012414979,
+    "applicantUserId": 2003,
+    "title": "张三的请假申请",
+    "status": "APPROVED",
+    "currentStepKey": null,
+    "currentStepName": null,
+    "flowableProcessInstanceId": "80c48c5b-511a-11f1-85ae-ca585d7e5a06",
+    "submittedAt": "2026-05-16 19:29:29",
+    "finishedAt": "2026-05-16 19:29:29",
+    "leave": {
+      "leaveTypeId": 9401,
+      "startAt": "2026-05-07 09:00:00",
+      "endAt": "2026-05-07 18:00:00",
+      "durationMinutes": 480,
+      "reason": "家中有事请假一天"
+    },
+    "clockCorrection": null,
+    "attachments": []
+  },
+  "requestId": "..."
+}
+```
+
+### 查询规则
+
+- 请假申请返回 `leave` 明细。
+- 补卡申请返回 `clockCorrection` 明细。
+- 附件返回审批申请业务引用，来源为 `wf_request_attachment`。
+
+---
+
+## 5.14 后台查询审批动作轨迹
+
+```http
+GET /api/admin/workflow/requests/{requestId}/actions
+Cookie: SESSION=...
+```
+
+### 成功响应
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "actionId": 2055611592012414980,
+      "requestId": 2055611592012414978,
+      "taskId": "80c5ebf3-511a-11f1-85ae-ca585d7e5a06",
+      "stepKey": "manager_approval",
+      "stepName": "直属上级审批",
+      "actorType": "USER",
+      "actorId": 2002,
+      "actionType": "APPROVE",
+      "comment": "同意",
+      "agentDecisionJson": null,
+      "beforeStatus": "IN_APPROVAL",
+      "afterStatus": "APPROVED",
+      "actedAt": "2026-05-16 19:29:29"
+    }
+  ],
+  "requestId": "..."
+}
+```
+
+### 查询规则
+
+- 申请不存在时返回 `code=404`、`message=审批申请不存在`。
+- 按 `acted_at ASC, id ASC` 排序。
+- `agentDecisionJson` 返回紧凑 JSON 字符串，优先保留 `decision`、`reason` 字段顺序。
+
+---
+
+## 5.15 创建流程类型
+
 ```http
 POST /api/admin/workflow/process-types
 Content-Type: application/json
@@ -824,7 +975,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.13 创建流程模板
+## 5.16 创建流程模板
 
 ```http
 POST /api/admin/workflow/templates
@@ -849,7 +1000,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.14 创建流程模板版本草稿
+## 5.17 创建流程模板版本草稿
 
 ```http
 POST /api/admin/workflow/templates/{templateId}/versions
@@ -884,7 +1035,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.15 发布流程模板版本
+## 5.18 发布流程模板版本
 
 ```http
 POST /api/admin/workflow/template-versions/{versionId}/publish
@@ -916,7 +1067,7 @@ Cookie: SESSION=...
 
 ---
 
-## 5.16 查询流程模板与版本
+## 5.19 查询流程模板与版本
 
 ```http
 GET /api/admin/workflow/templates?processCode=LEAVE
