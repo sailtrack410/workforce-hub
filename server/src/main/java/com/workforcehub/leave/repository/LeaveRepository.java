@@ -260,6 +260,29 @@ public class LeaveRepository {
         );
     }
 
+    public List<LeaveAccountRow> listAccounts(Long userId, Long leaveTypeId) {
+        java.util.ArrayList<Object> args = new java.util.ArrayList<>();
+        StringBuilder whereSql = new StringBuilder("""
+            WHERE la.status = 'ACTIVE'
+              AND lt.is_deleted = 0
+            """);
+        if (userId != null) {
+            whereSql.append("  AND la.user_id = ?\n");
+            args.add(userId);
+        }
+        if (leaveTypeId != null) {
+            whereSql.append("  AND la.leave_type_id = ?\n");
+            args.add(leaveTypeId);
+        }
+        return jdbcTemplate.query(accountSelectSql() + whereSql + """
+            ORDER BY la.user_id ASC, lt.leave_code ASC, la.id ASC
+            LIMIT 500
+            """,
+            this::mapAccount,
+            args.toArray()
+        );
+    }
+
     public int getAvailableMinutes(Long userId, Long leaveTypeId) {
         Integer minutes = jdbcTemplate.queryForObject("""
             SELECT COALESCE((

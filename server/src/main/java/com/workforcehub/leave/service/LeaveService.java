@@ -119,6 +119,12 @@ public class LeaveService implements LeaveQueryService {
             .toList();
     }
 
+    public List<LeaveAccountResponse> listAdminAccounts(Long userId, Long leaveTypeId) {
+        return leaveRepository.listAccounts(userId, leaveTypeId).stream()
+            .map(row -> toAccountResponse(row, null, null))
+            .toList();
+    }
+
     public void ensureLeaveRequestBalance(Long userId, Long leaveTypeId, int durationMinutes) {
         LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
         if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {

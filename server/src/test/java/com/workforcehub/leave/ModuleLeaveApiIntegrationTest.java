@@ -112,6 +112,22 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].availableMinutes", leaveTypeId).value(960))
             .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].frozenMinutes", leaveTypeId).value(0));
 
+        mockMvc.perform(get("/api/admin/leave/accounts")
+                .cookie(adminSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("leaveTypeId", String.valueOf(leaveTypeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].userId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data[0].leaveTypeId").value(leaveTypeId))
+            .andExpect(jsonPath("$.data[0].availableMinutes").value(960));
+
+        mockMvc.perform(get("/api/admin/leave/accounts")
+                .cookie(employeeSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID)))
+            .andExpect(status().isForbidden());
+
         assertEquals(1L, accountCount(EMPLOYEE_USER_ID, leaveTypeId));
         assertEquals(1L, txnCount(EMPLOYEE_USER_ID, leaveTypeId, "ADJUST", 960));
     }
