@@ -588,6 +588,7 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
   const sentByCurrentUser = currentUserId !== undefined && message.senderType === 'USER' && String(message.senderId) === String(currentUserId);
   const content = parseMessageContentJson(message.contentJson);
   const knowledgeCard = message.messageType === 'CARD' ? parseKnowledgeAnswerCard(content) : undefined;
+  const contentText = message.contentText || businessTextFromContent(content);
   const attachments = (message.attachments ?? []).map((attachment) => ({
     id: `im-attachment-${attachment.attachmentRefId}`,
     name: attachment.displayName,
@@ -605,7 +606,7 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     role: messageRole(message, knowledgeCard),
     body: recalled
       ? '消息已撤回'
-      : message.contentText || parseTextFromContent(content) || knowledgeCard?.title || (attachments.length ? '文件消息' : '[非文本消息]'),
+      : contentText || knowledgeCard?.title || (attachments.length ? '文件消息' : '[非文本消息]'),
     side: resolveMessageSide(message, sentByCurrentUser),
     time: formatMessageTime(message.sentAt),
     seqNo: message.seqNo,
@@ -703,6 +704,19 @@ function parseMessageContentJson(contentJson?: string | null): Record<string, un
 
 function parseTextFromContent(content: Record<string, unknown> | null) {
   return typeof content?.text === 'string' ? content.text : '';
+}
+
+function businessTextFromContent(content: Record<string, unknown> | null) {
+  const text = parseTextFromContent(content);
+  if (text) return text;
+  const intent = optionalString(content?.intent);
+  const action = optionalString(content?.action);
+  const target = optionalString(content?.target);
+  if (target === 'LEAVE_BALANCE') return '假期余额查询';
+  if (action === 'OPEN_LEAVE_APPLY' || target === 'LEAVE_WORKFLOW') return '请假申请入口';
+  if (target === 'QA') return intent ? `${intent}答复` : '问答答复';
+  if (intent) return intent;
+  return '';
 }
 
 function parseKnowledgeAnswerCard(content: Record<string, unknown> | null): KnowledgeAnswerCard | undefined {
