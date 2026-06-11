@@ -29,6 +29,10 @@ admin-web/vite.config.d.ts
 # Local verification screenshots
 employee-web-*.png
 workforce-hub-*.png
+dag-toolbar-bottom.png
+
+# Audit output
+output/ui-audit-*
 
 # Local declaration materials
 docs/申报材料/
