@@ -1,0 +1,286 @@
+/* =========================================================
+   Design Tokens
+   ========================================================= */
+:root {
+  /* ---- 品牌色系 ---- */
+  --green:        #0089FF;
+  --green-dark:   #0070D9;
+  --green-deep:   #005BB5;
+  --green-light:  #33A0FF;
+  --red:          #b33131;
+  --red-dark:     #8d2020;
+  --amber:        #a7651a;
+
+  /* ---- 文本色系 ---- */
+  --ink:          #1a1a2e;
+  --muted:        #6b7280;
+  --muted-light:  #9ca3af;
+  --sidebar-text: #b0c4de;
+  --sidebar-text-active: #ffffff;
+  --sidebar-brand-text: #e0ecff;
+
+  /* ---- 填充/背景色系 ---- */
+  --surface:      #f0f5ff;
+  --panel:        #f8faff;
+  --panel-strong: #ffffff;
+  --line:         #d0ddef;
+
+  /* ---- 语义背景 ---- */
+  --hover-bg:     #e8f3ff;
+  --pill-bg:      #dbeafe;
+  --error-bg:     #fbe7e7;
+  --success-bg:   #e6f5ea;
+  --avatar-bg:    #d0e4ff;
+  --ring-bg:      #b3d9ff;
+  --brand-mark-bg:#b3e0ff;
+
+  /* ---- 侧边栏 ---- */
+  --sidebar-bg:   #0a1628;
+  --sidebar-hover:#132240;
+
+  /* ---- 阴影 ---- */
+  --shadow:       0 18px 45px rgba(0, 80, 180, 0.12);
+  --shadow-sm:    0 8px 22px rgba(0, 80, 180, 0.06);
+
+  /* ---- 圆角 ---- */
+  --radius-sm:    6px;
+  --radius-md:    7px;
+  --radius-lg:    8px;
+  --radius-pill:  999px;
+  --radius-circle: 50%;
+
+  /* ---- 字号 ---- */
+  --text-xs:      12px;
+  --text-sm:      13px;
+  --text-base:    14px;
+  --text-md:      17px;
+  --text-lg:      22px;
+  --text-xl:      24px;
+  --text-2xl:     30px;
+
+  /* ---- 间距 ---- */
+  --space-xs:     6px;
+  --space-sm:     8px;
+  --space-md:     10px;
+  --space-base:   12px;
+  --space-lg:     14px;
+  --space-xl:     18px;
+  --space-2xl:    22px;
+  --space-3xl:    28px;
+
+  /* ---- 控件 ---- */
+  --control-h:    38px;
+  --control-px:   13px;
+
+  /* ---- 全局基础 ---- */
+  color: var(--ink);
+  background: var(--surface);
+  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* =========================================================
+   Reset
+   ========================================================= */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(240, 245, 255, 0.96), rgba(224, 235, 255, 0.94)),
+    repeating-linear-gradient(90deg, rgba(0, 80, 180, 0.04) 0 1px, transparent 1px 48px);
+}
+
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.62; }
+
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+  color: var(--ink);
+  min-height: var(--control-h);
+  padding: var(--space-sm) var(--space-md);
+  outline: none;
+}
+
+textarea { min-height: 88px; resize: vertical; }
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 137, 255, 0.12);
+}
+
+/* =========================================================
+   Shared Forms
+   ========================================================= */
+.stack-form {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.stack-form label {
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+/* =========================================================
+   Page Grid & Panels
+   ========================================================= */
+.page-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.span-12 { grid-column: span 12; }
+.span-7  { grid-column: span 7; }
+.span-6  { grid-column: span 6; }
+.span-5  { grid-column: span 5; }
+
+.panel {
+  min-width: 0;
+  padding: var(--space-xl);
+  border: 1px solid rgba(0, 80, 180, 0.1);
+  border-radius: var(--radius-lg);
+  background: rgba(248, 250, 255, 0.94);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel-title,
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-base);
+  margin-bottom: var(--space-lg);
+}
+
+.panel-title h2,
+.toolbar h2 { font-size: var(--text-md); }
+
+.panel-title span {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.panel h3 {
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-md);
+  font-size: var(--text-base);
+}
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+.primary-button,
+.secondary-button,
+.danger-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: var(--control-h);
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--control-px);
+  font-weight: 800;
+}
+
+.primary-button { background: var(--green); color: var(--panel-strong); }
+.secondary-button { border: 1px solid var(--line); background: var(--panel-strong); color: var(--ink); }
+.danger-button { background: var(--red); color: var(--panel-strong); }
+.icon-button {
+  width: var(--control-h);
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  color: var(--ink);
+}
+
+/* =========================================================
+   Feedback
+   ========================================================= */
+.form-error,
+.inline-error,
+.inline-success {
+  margin: 0;
+  border-radius: var(--radius-sm);
+  padding: 9px var(--space-md);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.form-error,
+.inline-error { background: var(--error-bg); color: var(--red-dark); }
+
+.inline-success { background: var(--success-bg); color: #16a34a; }
+
+/* =========================================================
+   Status Pill
+   ========================================================= */
+.status-pill {
+  display: inline-flex;
+  width: max-content;
+  border-radius: var(--radius-pill);
+  padding: 4px var(--space-sm);
+  background: var(--pill-bg);
+  color: var(--green);
+  font-weight: 800;
+}
+
+/* =========================================================
+   Checkbox Row
+   ========================================================= */
+.stack-form .check-row {
+  display: flex;
+  grid-template-columns: unset;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--ink);
+}
+
+.stack-form .check-row input { width: 18px; min-height: 18px; }
+
+/* =========================================================
+   Empty State
+   ========================================================= */
+.empty-state {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+@media (max-width: 1200px) {
+  .span-5 { grid-column: span 12; }
+}
+
+@media (max-width: 980px) {
+  .span-7, .span-6 { grid-column: span 12; }
+}
+
+@media (max-width: 640px) {
+  .toolbar { align-items: stretch; flex-direction: column; }
+}
