@@ -16,6 +16,8 @@ public record AdminAgentTaskRow(
     String status,
     Integer toolCallCount,
     LocalDateTime waitingDeadlineAt,
+    String workflowSnapshotJson,
+    String executionTraceJson,
     LocalDateTime startedAt,
     LocalDateTime finishedAt,
     String errorMessage,

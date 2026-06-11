@@ -12,6 +12,9 @@ import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.agent.repository.AgentTaskRow;
 import com.workforcehub.agent.repository.AgentVersionRow;
+import com.workforcehub.agent.workflow.WorkflowExecutionResult;
+import com.workforcehub.agent.workflow.WorkflowExecutor;
+import com.workforcehub.agent.workflow.WorkflowParser;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.spi.ImAgentReplyResult;
 import com.workforcehub.spi.ImAgentResultCallback;
@@ -46,19 +49,25 @@ public class AgentTaskExecutionService {
     private final ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider;
     private final Executor agentExecutor;
     private final TransactionTemplate transactionTemplate;
+    private final WorkflowParser workflowParser;
+    private final WorkflowExecutor workflowExecutor;
 
     public AgentTaskExecutionService(AgentRepository agentRepository,
                                      ObjectMapper objectMapper,
                                      AgentModelClient agentModelClient,
                                      ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider,
                                      @Qualifier("agentExecutor") Executor agentExecutor,
-                                     PlatformTransactionManager transactionManager) {
+                                     PlatformTransactionManager transactionManager,
+                                     WorkflowParser workflowParser,
+                                     WorkflowExecutor workflowExecutor) {
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
         this.agentModelClient = agentModelClient;
         this.imAgentResultCallbackProvider = imAgentResultCallbackProvider;
         this.agentExecutor = agentExecutor;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.workflowParser = workflowParser;
+        this.workflowExecutor = workflowExecutor;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
@@ -113,6 +122,18 @@ public class AgentTaskExecutionService {
             return;
         }
         try {
+            if (workflowParser.isWorkflowConfig(context.version().workflowConfigJson())) {
+                WorkflowExecutionResult result = workflowExecutor.execute(
+                    taskId,
+                    context.agent().id(),
+                    context.agent().agentName(),
+                    context.version(),
+                    context.messageContent(),
+                    command.triggerUserId()
+                );
+                finishConversationSucceeded(command, context, result.replyText(), result.traceJson());
+                return;
+            }
             AgentModelResponse modelResponse = agentModelClient.generateReply(new AgentModelRequest(
                 context.agent().id(),
                 taskId,
@@ -121,7 +142,7 @@ public class AgentTaskExecutionService {
                 extractTextFromMessageContent(context.messageContent()),
                 context.version().modelConfigJson()
             ));
-            finishConversationSucceeded(command, context, modelResponse);
+            finishConversationSucceeded(command, context, modelResponse.text(), null);
         } catch (AgentModelException e) {
             finishConversationFailed(command, context, e.failureType(), e.getMessage());
         } catch (Exception e) {
@@ -138,6 +159,9 @@ public class AgentTaskExecutionService {
             AgentRow agent = agentRepository.getAgentOrThrow(task.agentId());
             AgentVersionRow version = agentRepository.getVersionOrThrow(task.agentVersionId());
             agentRepository.markTaskRunning(taskId, command.triggerUserId());
+            if (workflowParser.isWorkflowConfig(version.workflowConfigJson())) {
+                agentRepository.updateTaskWorkflowSnapshot(taskId, version.workflowConfigJson(), command.triggerUserId());
+            }
             audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "Agent会话任务开始执行", false);
             return new ConversationExecutionContext(
                 taskId,
@@ -150,13 +174,17 @@ public class AgentTaskExecutionService {
 
     private void finishConversationSucceeded(ImAgentTriggerCommand command,
                                              ConversationExecutionContext context,
-                                             AgentModelResponse modelResponse) {
+                                             String replyText,
+                                             String traceJson) {
         try {
             transactionTemplate.executeWithoutResult(status -> {
+                if (StringUtils.hasText(traceJson)) {
+                    agentRepository.updateTaskExecutionTrace(context.taskId(), traceJson, command.triggerUserId());
+                }
                 agentRepository.finishTask(context.taskId(), "SUCCEEDED", null, command.triggerUserId());
                 audit(context.taskId(), "TASK_SUCCEEDED", "AGENT_TASK",
                     context.taskId(), "Agent会话任务执行成功", false);
-                notifyImAgentSucceeded(command, context.agent(), context.taskId(), modelResponse.text());
+                notifyImAgentSucceeded(command, context.agent(), context.taskId(), replyText);
             });
         } catch (Exception e) {
             finishConversationFailed(command, context, "UNKNOWN", e.getMessage());
@@ -210,7 +238,7 @@ public class AgentTaskExecutionService {
 
     private AgentConversationReplyContent buildConversationReplyContent(String replyText, Long taskId, String agentCode) {
         String safeText = safeReplyText(replyText);
-        JsonNode cardNode = parseKnowledgeAnswerCardNode(safeText);
+        JsonNode cardNode = parseAgentCardNode(safeText);
         if (cardNode instanceof com.fasterxml.jackson.databind.node.ObjectNode objectNode) {
             objectNode.put("agentTaskId", taskId);
             objectNode.put("agentCode", agentCode);
@@ -223,11 +251,15 @@ public class AgentTaskExecutionService {
         )));
     }
 
-    private JsonNode parseKnowledgeAnswerCardNode(String replyText) {
+    private JsonNode parseAgentCardNode(String replyText) {
         try {
             JsonNode node = objectMapper.readTree(replyText);
             JsonNode cardType = node.get("cardType");
-            return cardType != null && "knowledge_answer".equals(cardType.asText()) ? node : null;
+            if (cardType == null) {
+                return null;
+            }
+            String value = cardType.asText();
+            return "knowledge_answer".equals(value) || "agent_result".equals(value) ? node : null;
         } catch (Exception e) {
             return null;
         }

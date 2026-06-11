@@ -16,6 +16,8 @@ public class AgentResponse {
     private String agentType;
     private String identityMode;
     private Long publishedVersionId;
+    private Integer publishedVersionNo;
+    private String publishedVersionLabel;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

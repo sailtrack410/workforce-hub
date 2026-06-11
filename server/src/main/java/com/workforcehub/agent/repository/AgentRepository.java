@@ -34,6 +34,10 @@ public class AgentRepository {
         return exists("SELECT COUNT(*) FROM agt_agent_version WHERE agent_id = ? AND version_no = ?", agentId, versionNo);
     }
 
+    public boolean existsAgentVersionLabel(Long agentId, String versionLabel) {
+        return exists("SELECT COUNT(*) FROM agt_agent_version WHERE agent_id = ? AND version_label = ?", agentId, versionLabel);
+    }
+
     public void insertAgent(Long agentId,
                             String agentCode,
                             String agentName,
@@ -51,17 +55,57 @@ public class AgentRepository {
     public void insertAgentVersion(Long versionId,
                                    Long agentId,
                                    Integer versionNo,
+                                   String versionLabel,
                                    String modelConfigJson,
                                    String systemPrompt,
                                    String workflowConfigJson,
                                    Long operatorId) {
         jdbcTemplate.update("""
             INSERT INTO agt_agent_version
-                (id, agent_id, version_no, model_config_json, system_prompt, workflow_config_json,
+                (id, agent_id, version_no, version_label, model_config_json, system_prompt, workflow_config_json,
                  publish_status, created_by, updated_by)
             VALUES
-                (?, ?, ?, CAST(? AS JSON), ?, CAST(? AS JSON), 'DRAFT', ?, ?)
-            """, versionId, agentId, versionNo, modelConfigJson, systemPrompt, workflowConfigJson, operatorId, operatorId);
+                (?, ?, ?, ?, CAST(? AS JSON), ?, CAST(? AS JSON), 'DRAFT', ?, ?)
+            """, versionId, agentId, versionNo, versionLabel, modelConfigJson, systemPrompt, workflowConfigJson, operatorId, operatorId);
+    }
+
+    public void updateAgentVersion(Long versionId,
+                                   String modelConfigJson,
+                                   String systemPrompt,
+                                   String workflowConfigJson,
+                                   Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_agent_version
+            SET model_config_json = CAST(? AS JSON),
+                system_prompt = ?,
+                workflow_config_json = CAST(? AS JSON),
+                workflow_test_signature = NULL,
+                workflow_tested_at = NULL,
+                updated_by = ?
+            WHERE id = ?
+            """, modelConfigJson, systemPrompt, workflowConfigJson, operatorId, versionId);
+    }
+
+    public void updateAgentVersionWorkflowTest(Long versionId,
+                                               String modelConfigJson,
+                                               String systemPrompt,
+                                               String workflowConfigJson,
+                                               String workflowTestSignature,
+                                               Long operatorId) {
+        int updated = jdbcTemplate.update("""
+            UPDATE agt_agent_version
+            SET model_config_json = CAST(? AS JSON),
+                system_prompt = ?,
+                workflow_config_json = CAST(? AS JSON),
+                workflow_test_signature = ?,
+                workflow_tested_at = NOW(),
+                updated_by = ?
+            WHERE id = ?
+              AND publish_status = 'DRAFT'
+            """, modelConfigJson, systemPrompt, workflowConfigJson, workflowTestSignature, operatorId, versionId);
+        if (updated == 0) {
+            throw new BizException(409, "只有草稿版本可以测试");
+        }
     }
 
     public void insertTool(Long toolId,
@@ -146,26 +190,48 @@ public class AgentRepository {
     }
 
     public long countAgents() {
+        return countAgents(null);
+    }
+
+    public long countAgents(String keyword) {
+        List<Object> params = new ArrayList<>();
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
-            FROM agt_agent
-            WHERE is_deleted = 0
-            """, Long.class);
+            FROM agt_agent aa
+            """ + agentWhereSql(keyword, params), Long.class, params.toArray());
         return count == null ? 0L : count;
     }
 
     public List<AgentRow> pageAgents(long offset, long limit) {
+        return pageAgents(null, offset, limit);
+    }
+
+    public List<AgentRow> pageAgents(String keyword, long offset, long limit) {
+        List<Object> params = new ArrayList<>();
+        String whereSql = agentWhereSql(keyword, params);
+        params.add(limit);
+        params.add(offset);
         return jdbcTemplate.query(agentSelectSql() + """
-            WHERE aa.is_deleted = 0
+            """ + whereSql + """
             ORDER BY aa.created_at DESC, aa.id DESC
             LIMIT ? OFFSET ?
-            """, this::mapAgent, limit, offset);
+            """, this::mapAgent, params.toArray());
     }
 
     public void disableAgent(Long agentId, Long operatorId) {
         jdbcTemplate.update("""
             UPDATE agt_agent
             SET status = 'INACTIVE',
+                updated_by = ?
+            WHERE id = ?
+              AND is_deleted = 0
+            """, operatorId, agentId);
+    }
+
+    public void enableAgent(Long agentId, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_agent
+            SET status = 'ACTIVE',
                 updated_by = ?
             WHERE id = ?
               AND is_deleted = 0
@@ -215,6 +281,24 @@ public class AgentRepository {
             """, status, status, errorMessage, operatorId, taskId);
     }
 
+    public void updateTaskWorkflowSnapshot(Long taskId, String workflowSnapshotJson, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET workflow_snapshot_json = CAST(? AS JSON),
+                updated_by = ?
+            WHERE id = ?
+            """, workflowSnapshotJson, operatorId, taskId);
+    }
+
+    public void updateTaskExecutionTrace(Long taskId, String executionTraceJson, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_task
+            SET execution_trace_json = CAST(? AS JSON),
+                updated_by = ?
+            WHERE id = ?
+            """, executionTraceJson, operatorId, taskId);
+    }
+
     public void insertToolCallLog(Long logId,
                                   Long taskId,
                                   Long toolId,
@@ -248,7 +332,7 @@ public class AgentRepository {
 
     public AgentRow getAgentOrThrow(Long agentId) {
         List<AgentRow> rows = jdbcTemplate.query(agentSelectSql() + """
-            WHERE id = ? AND is_deleted = 0
+            WHERE aa.id = ? AND aa.is_deleted = 0
             LIMIT 1
             """, this::mapAgent, agentId);
         if (rows.isEmpty()) {
@@ -266,6 +350,22 @@ public class AgentRepository {
             throw new BizException(404, "Agent版本不存在");
         }
         return rows.get(0);
+    }
+
+    public List<AgentVersionRow> listVersionsByAgent(Long agentId) {
+        return jdbcTemplate.query(versionSelectSql() + """
+            WHERE agent_id = ?
+            ORDER BY version_no DESC, id DESC
+            """, this::mapVersion, agentId);
+    }
+
+    public int nextAgentVersionNo(Long agentId) {
+        Integer max = jdbcTemplate.queryForObject("""
+            SELECT COALESCE(MAX(version_no), 0)
+            FROM agt_agent_version
+            WHERE agent_id = ?
+            """, Integer.class, agentId);
+        return (max == null ? 0 : max) + 1;
     }
 
     public AgentToolRow getToolOrThrow(Long toolId) {
@@ -288,6 +388,33 @@ public class AgentRepository {
             throw new BizException(404, "Agent工具不存在或未启用");
         }
         return rows.get(0);
+    }
+
+    public List<AgentToolRow> listTools() {
+        return jdbcTemplate.query(toolSelectSql() + """
+            WHERE is_deleted = 0
+            ORDER BY tool_code ASC, id DESC
+            """, this::mapTool);
+    }
+
+    public List<AgentAclRow> listAclByAgent(Long agentId) {
+        return jdbcTemplate.query("""
+            SELECT id, agent_id, subject_type, subject_id, perm_code, status, created_at, updated_at
+            FROM agt_agent_acl
+            WHERE agent_id = ?
+            ORDER BY updated_at DESC, id DESC
+            """, this::mapAcl, agentId);
+    }
+
+    public boolean hasActiveUsableAcl(Long agentId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM agt_agent_acl
+            WHERE agent_id = ?
+              AND status = 'ACTIVE'
+              AND LOWER(perm_code) IN ('use', 'manage')
+            """, Long.class, agentId);
+        return count != null && count > 0;
     }
 
     public AgentToolBindingRow getBindingByVersionAndToolCode(Long versionId, String toolCode) {
@@ -353,7 +480,28 @@ public class AgentRepository {
         return rows.get(0);
     }
 
-    public List<AgentRow> listUsableAgentsForUser(Long userId) {
+    public List<AgentRow> listUsableAgentsForUser(Long userId, String keyword) {
+        List<Object> params = new ArrayList<>();
+        params.add(userId);
+        params.add(userId);
+        params.add(userId);
+        params.add(userId);
+        params.add(userId);
+        params.add(userId);
+        String keywordSql = "";
+        if (keyword != null && !keyword.isBlank()) {
+            keywordSql = """
+                AND (
+                    aa.agent_name LIKE ?
+                    OR aa.agent_code LIKE ?
+                    OR aa.agent_type LIKE ?
+                )
+                """;
+            String like = "%" + keyword.trim() + "%";
+            params.add(like);
+            params.add(like);
+            params.add(like);
+        }
         return jdbcTemplate.query(agentSelectSql() + """
             WHERE aa.status = 'ACTIVE'
               AND aa.published_version_id IS NOT NULL
@@ -391,10 +539,39 @@ public class AgentRepository {
                                   AND gp.status = 'ACTIVE'
                             )
                         )
+                        OR (
+                            acl.subject_type = 'ROLE'
+                            AND (
+                                (acl.subject_id = 1 AND EXISTS (
+                                    SELECT 1
+                                    FROM org_user
+                                    WHERE id = ?
+                                      AND status = 'ACTIVE'
+                                      AND employment_status IN ('ACTIVE', 'PROBATION', 'PENDING_OFFBOARD')
+                                      AND is_deleted = 0
+                                ))
+                                OR (acl.subject_id = 2 AND (
+                                    EXISTS (
+                                        SELECT 1
+                                        FROM org_user
+                                        WHERE manager_user_id = ?
+                                          AND status = 'ACTIVE'
+                                          AND is_deleted = 0
+                                    )
+                                    OR EXISTS (
+                                        SELECT 1
+                                        FROM org_department_leader dl
+                                        WHERE dl.user_id = ?
+                                          AND dl.status = 'ACTIVE'
+                                    )
+                                ))
+                            )
+                        )
                     )
               )
+            """ + keywordSql + """
             ORDER BY aa.agent_name ASC, aa.id DESC
-            """, this::mapAgent, userId, userId, userId);
+            """, this::mapAgent, params.toArray());
     }
 
     public boolean canUseAgent(Long agentId, Long userId) {
@@ -438,9 +615,37 @@ public class AgentRepository {
                                   AND gp.status = 'ACTIVE'
                             )
                         )
+                        OR (
+                            acl.subject_type = 'ROLE'
+                            AND (
+                                (acl.subject_id = 1 AND EXISTS (
+                                    SELECT 1
+                                    FROM org_user
+                                    WHERE id = ?
+                                      AND status = 'ACTIVE'
+                                      AND employment_status IN ('ACTIVE', 'PROBATION', 'PENDING_OFFBOARD')
+                                      AND is_deleted = 0
+                                ))
+                                OR (acl.subject_id = 2 AND (
+                                    EXISTS (
+                                        SELECT 1
+                                        FROM org_user
+                                        WHERE manager_user_id = ?
+                                          AND status = 'ACTIVE'
+                                          AND is_deleted = 0
+                                    )
+                                    OR EXISTS (
+                                        SELECT 1
+                                        FROM org_department_leader dl
+                                        WHERE dl.user_id = ?
+                                          AND dl.status = 'ACTIVE'
+                                    )
+                                ))
+                            )
+                        )
                     )
               )
-            """, Long.class, agentId, userId, userId, userId);
+            """, Long.class, agentId, userId, userId, userId, userId, userId, userId);
         return count != null && count > 0;
     }
 
@@ -560,6 +765,8 @@ public class AgentRepository {
                      task.triggered_by_type,
                      task.triggered_by_id,
                      task.waiting_deadline_at,
+                     task.workflow_snapshot_json,
+                     task.execution_trace_json,
                      task.status,
                      task.started_at,
                      task.finished_at,
@@ -589,6 +796,8 @@ public class AgentRepository {
                      task.triggered_by_type,
                      task.triggered_by_id,
                      task.waiting_deadline_at,
+                     task.workflow_snapshot_json,
+                     task.execution_trace_json,
                      task.status,
                      task.started_at,
                      task.finished_at,
@@ -707,16 +916,38 @@ public class AgentRepository {
 
     private String agentSelectSql() {
         return """
-            SELECT id, agent_code, agent_name, agent_type, identity_mode,
-                   published_version_id, status, created_at, updated_at
+            SELECT aa.id, aa.agent_code, aa.agent_name, aa.agent_type, aa.identity_mode,
+                   aa.published_version_id, pv.version_no AS published_version_no, pv.version_label AS published_version_label,
+                   aa.status, aa.created_at, aa.updated_at
             FROM agt_agent aa
+            LEFT JOIN agt_agent_version pv ON pv.id = aa.published_version_id
             """;
+    }
+
+    private String agentWhereSql(String keyword, List<Object> params) {
+        StringBuilder where = new StringBuilder("""
+            WHERE aa.is_deleted = 0
+            """);
+        if (keyword != null && !keyword.isBlank()) {
+            String like = "%" + keyword.trim() + "%";
+            where.append("""
+              AND (
+                  aa.agent_name LIKE ?
+                  OR aa.agent_code LIKE ?
+                  OR aa.agent_type LIKE ?
+              )
+            """);
+            params.add(like);
+            params.add(like);
+            params.add(like);
+        }
+        return where.toString();
     }
 
     private String versionSelectSql() {
         return """
-            SELECT id, agent_id, version_no, model_config_json, system_prompt, workflow_config_json,
-                   publish_status, published_at, created_at, updated_at
+            SELECT id, agent_id, version_no, version_label, model_config_json, system_prompt, workflow_config_json,
+                   publish_status, workflow_test_signature, workflow_tested_at, published_at, created_at, updated_at
             FROM agt_agent_version
             """;
     }
@@ -751,7 +982,8 @@ public class AgentRepository {
     private String taskSelectSql() {
         return """
             SELECT id, agent_id, agent_version_id, trigger_type, context_type, context_id,
-                   triggered_by_type, triggered_by_id, waiting_deadline_at, status,
+                   triggered_by_type, triggered_by_id, waiting_deadline_at,
+                   workflow_snapshot_json, execution_trace_json, status,
                    started_at, finished_at, error_message, created_at, updated_at
             FROM agt_task
             """;
@@ -770,6 +1002,8 @@ public class AgentRepository {
                    task.triggered_by_type,
                    task.triggered_by_id,
                    task.waiting_deadline_at,
+                   task.workflow_snapshot_json,
+                   task.execution_trace_json,
                    task.status,
                    task.started_at,
                    task.finished_at,
@@ -826,6 +1060,8 @@ public class AgentRepository {
             rs.getString("agent_type"),
             rs.getString("identity_mode"),
             rs.getObject("published_version_id", Long.class),
+            rs.getObject("published_version_no", Integer.class),
+            rs.getString("published_version_label"),
             rs.getString("status"),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
@@ -837,10 +1073,13 @@ public class AgentRepository {
             rs.getLong("id"),
             rs.getLong("agent_id"),
             rs.getInt("version_no"),
+            rs.getString("version_label"),
             rs.getString("model_config_json"),
             rs.getString("system_prompt"),
             rs.getString("workflow_config_json"),
             rs.getString("publish_status"),
+            rs.getString("workflow_test_signature"),
+            rs.getTimestamp("workflow_tested_at") == null ? null : rs.getTimestamp("workflow_tested_at").toLocalDateTime(),
             rs.getTimestamp("published_at") == null ? null : rs.getTimestamp("published_at").toLocalDateTime(),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
@@ -903,6 +1142,8 @@ public class AgentRepository {
             rs.getString("triggered_by_type"),
             rs.getObject("triggered_by_id", Long.class),
             rs.getTimestamp("waiting_deadline_at") == null ? null : rs.getTimestamp("waiting_deadline_at").toLocalDateTime(),
+            rs.getString("workflow_snapshot_json"),
+            rs.getString("execution_trace_json"),
             rs.getString("status"),
             rs.getTimestamp("started_at") == null ? null : rs.getTimestamp("started_at").toLocalDateTime(),
             rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime(),
@@ -927,6 +1168,8 @@ public class AgentRepository {
             rs.getString("status"),
             rs.getInt("tool_call_count"),
             rs.getTimestamp("waiting_deadline_at") == null ? null : rs.getTimestamp("waiting_deadline_at").toLocalDateTime(),
+            rs.getString("workflow_snapshot_json"),
+            rs.getString("execution_trace_json"),
             rs.getTimestamp("started_at") == null ? null : rs.getTimestamp("started_at").toLocalDateTime(),
             rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime(),
             rs.getString("error_message"),
@@ -1005,6 +1248,57 @@ public class AgentRepository {
             rs.getString("risk_level"),
             rs.getInt("read_only_flag") == 1,
             rs.getString("approval_mode")
+        );
+    }
+
+    // ==================== LLM Model ====================
+
+    public List<LlmModelRow> listLlmModels() {
+        return jdbcTemplate.query(llmModelSelectSql() + " WHERE is_deleted = 0 ORDER BY created_at DESC", this::mapLlmModel);
+    }
+
+    public LlmModelRow getLlmModel(Long modelId) {
+        List<LlmModelRow> list = jdbcTemplate.query(llmModelSelectSql() + " WHERE id = ? AND is_deleted = 0", this::mapLlmModel, modelId);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    public void insertLlmModel(Long modelId, String provider, String modelName, String displayName, String endpoint, String apiKey, String status, Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO agt_llm_model (id, provider, model_name, display_name, endpoint, api_key, status, created_by, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, modelId, provider, modelName, displayName, endpoint, apiKey, status, operatorId, operatorId);
+    }
+
+    public void updateLlmModel(Long modelId, String provider, String modelName, String displayName, String endpoint, String apiKey, String status, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_llm_model
+            SET provider = ?, model_name = ?, display_name = ?, endpoint = ?, api_key = ?, status = ?, updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """, provider, modelName, displayName, endpoint, apiKey, status, operatorId, modelId);
+    }
+
+    public void deleteLlmModel(Long modelId, Long operatorId) {
+        jdbcTemplate.update("UPDATE agt_llm_model SET is_deleted = 1, updated_by = ? WHERE id = ?", operatorId, modelId);
+    }
+
+    private String llmModelSelectSql() {
+        return """
+            SELECT id, provider, model_name, display_name, endpoint, api_key, status, created_at, updated_at
+            FROM agt_llm_model
+            """;
+    }
+
+    private LlmModelRow mapLlmModel(ResultSet rs, int rowNum) throws SQLException {
+        return new LlmModelRow(
+            rs.getLong("id"),
+            rs.getString("provider"),
+            rs.getString("model_name"),
+            rs.getString("display_name"),
+            rs.getString("endpoint"),
+            rs.getString("api_key"),
+            rs.getString("status"),
+            rs.getTimestamp("created_at").toLocalDateTime(),
+            rs.getTimestamp("updated_at").toLocalDateTime()
         );
     }
 }

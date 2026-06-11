@@ -2,6 +2,9 @@ package com.workforcehub.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.AgentModelRequest;
+import com.workforcehub.agent.model.AgentModelResponse;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -9,6 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -16,12 +23,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("api")
+@Import(ModuleAgentApiIntegrationTest.TestAgentModelConfiguration.class)
 class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
@@ -111,24 +122,720 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("后台应能查询Agent列表、详情并停用已发布Agent")
-    void adminShouldListGetAndDisablePublishedAgent() throws Exception {
+    @DisplayName("后台应能校验DAG并拒绝发布非法工作流版本")
+    void adminShouldValidateWorkflowAndRejectInvalidWorkflowPublish() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String invalidWorkflow = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                { "id": "load_user", "type": "TOOL", "config": { "toolCode": "ORG_GET_USER_SUMMARY" } },
+                { "id": "end", "type": "END" }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "start" },
+                { "from": "load_user", "to": "missing" }
+              ]
+            }
+            """;
+
+        mockMvc.perform(post("/api/admin/agents/workflows/validate")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(escapeJsonString(invalidWorkflow))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.valid").value(false))
+            .andExpect(jsonPath("$.data.messages[0]").isString());
+
+        long agentId = createAgent(adminSession, "INVALID_DAG_AGENT", "非法DAG助手", "QA");
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, invalidWorkflow);
+
+        mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value(containsString("工作流配置无效")));
+    }
+
+    @Test
+    @DisplayName("后台发布Agent前必须配置可用范围")
+    void adminShouldRejectPublishWithoutAcl() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "NO_ACL_AGENT", "未授权范围助手", "QA");
+        long versionId = createVersion(adminSession, agentId, 1);
+
+        mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("请先配置Agent可用范围"));
+    }
+
+    @Test
+    @DisplayName("后台发布DAG Agent前必须完成一次当前版本流程测试")
+    void adminShouldRejectDagPublishWithoutWorkflowTest() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "NO_TEST_AGENT", "未测试流程助手", "QA");
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, simpleWorkflow("{{query}}"));
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("请先完成一次流程测试"));
+
+        runWorkflowTest(adminSession, versionId, simpleWorkflow("{{query}}"));
+
+        mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("草稿DAG修改后应重新流程测试才可发布")
+    void adminShouldRejectDagPublishAfterWorkflowChangedSinceTest() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "STALE_TEST_AGENT", "测试失效助手", "QA");
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, simpleWorkflow("{{query}}"));
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        runWorkflowTest(adminSession, versionId, simpleWorkflow("{{query}}"));
+
+        mockMvc.perform(put("/api/admin/agents/versions/{versionId}", versionId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "你是企业协同助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(escapeJsonString(simpleWorkflow("已更新 {{query}}")))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("请先完成一次流程测试"));
+    }
+
+    @Test
+    @DisplayName("员工触发DAG任务时应按版本绑定执行工具并在后台任务详情返回执行轨迹")
+    void employeeDagTaskShouldExecuteBoundToolAndExposeTrace() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long toolId = createTool(adminSession, "ORG_GET_USER_SUMMARY", "组织用户摘要", "SPI", "READONLY", true);
+        long agentId = createAgent(adminSession, "DAG_ORG_AGENT", "DAG组织助手", "QA");
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_user",
+                  "type": "TOOL",
+                  "config": {
+                    "toolCode": "ORG_GET_USER_SUMMARY",
+                    "args": { "userId": "{{input.userId}}" }
+                  },
+                  "outputKey": "user"
+                },
+                { "id": "end", "type": "END", "config": { "reply": "已查询 {{user.result.name}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "end" }
+              ]
+            }
+            """);
+        bindTool(adminSession, versionId, toolId, "AUTO");
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        runWorkflowTest(adminSession, versionId, """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_user",
+                  "type": "TOOL",
+                  "config": {
+                    "toolCode": "ORG_GET_USER_SUMMARY",
+                    "args": { "userId": "{{input.userId}}" }
+                  },
+                  "outputKey": "user"
+                },
+                { "id": "end", "type": "END", "config": { "reply": "已查询 {{user.result.name}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "end" }
+              ]
+            }
+            """);
+        publishVersion(adminSession, versionId);
+
+        MvcResult taskResult = mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "contextId": 2003,
+                      "inputPayloadJson": "{\\"userId\\":2003}"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("SUCCEEDED"))
+            .andExpect(jsonPath("$.data.toolCallCount").value(1))
+            .andReturn();
+
+        long taskId = data(taskResult).get("taskId").asLong();
+        assertEquals("SUCCEEDED", taskStatus(taskId));
+        assertEquals(1L, toolCallCount(taskId, "SUCCESS"));
+        assertTrue(toolResponsePayload(taskId).contains("张三"));
+
+        mockMvc.perform(get("/api/admin/agent-tasks/{taskId}", taskId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.executionTraceJson").value(containsString("load_user")))
+            .andExpect(jsonPath("$.data.executionTraceJson").value(containsString("SUCCEEDED")));
+    }
+
+    @Test
+    @DisplayName("员工DAG数据查询应拒绝越权用户信息")
+    void employeeDagDataSourceShouldRejectUnauthorizedTargetUser() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String workflowConfigJson = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_user",
+                  "type": "TOOL",
+                  "config": {
+                    "dataSources": ["employeeInfo"],
+                    "targetUserId": "{{input.userId}}"
+                  },
+                  "outputKey": "userData"
+                },
+                { "id": "end", "type": "END", "config": { "reply": "已查询 {{userData.employeeInfo.realName}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "end" }
+              ]
+            }
+            """;
+        long agentId = createAgent(adminSession, "DAG_USER_DATA_AUTH_AGENT", "员工数据鉴权助手", "QA");
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, workflowConfigJson);
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        runWorkflowTest(adminSession, versionId, workflowConfigJson, "{\"userId\":2003,\"query\":\"测试\"}");
+        publishVersion(adminSession, versionId);
+
+        mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "contextId": 2004,
+                      "inputPayloadJson": "{\\"userId\\":2004,\\"query\\":\\"查王五\\"}"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("FAILED"))
+            .andExpect(jsonPath("$.data.errorMessage").value("无权查询该员工信息"));
+    }
+
+    @Test
+    @DisplayName("DAG提示词节点应能内嵌工具调用")
+    void promptWorkflowNodeShouldExecuteEmbeddedToolCalls() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long toolId = createTool(adminSession, "ORG_GET_USER_SUMMARY", "组织用户摘要", "SPI", "READONLY", true);
+        long agentId = createAgent(adminSession, "DAG_INTENT_TOOL_AGENT", "DAG节点工具助手", "QA");
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "recognize",
+                  "type": "INTENT",
+                  "config": {
+                    "prompt": "请识别用户意图，用户姓名：{{user.result.name}}",
+                    "toolCalls": [
+                      {
+                        "toolCode": "ORG_GET_USER_SUMMARY",
+                        "args": { "userId": "{{input.userId}}" },
+                        "outputKey": "user"
+                      }
+                    ]
+                  },
+                  "outputKey": "intent"
+                },
+                { "id": "end", "type": "END", "config": { "reply": "{{intent}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "recognize" },
+                { "from": "recognize", "to": "end" }
+              ]
+            }
+            """);
+        bindTool(adminSession, versionId, toolId, "AUTO");
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        publishVersion(adminSession, versionId);
+
+        MvcResult taskResult = mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "contextId": 2003,
+                      "inputPayloadJson": "{\\"userId\\":2003}"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("SUCCEEDED"))
+            .andExpect(jsonPath("$.data.toolCallCount").value(1))
+            .andReturn();
+
+        long taskId = data(taskResult).get("taskId").asLong();
+        assertEquals(1L, toolCallCount(taskId, "SUCCESS"));
+        assertTrue(toolResponsePayload(taskId).contains("张三"));
+    }
+
+    @Test
+    @DisplayName("DAG输出格式为数组时应只保留数组项配置字段")
+    void workflowRunShouldKeepOnlyConfiguredArrayItemFields() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "DAG_ARRAY_FORMAT_AGENT", "数组格式助手", "QA");
+        String workflowConfigJson = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "answer",
+                  "type": "LLM",
+                  "config": { "prompt": "FORMAT_ARRAY_TEST" },
+                  "outputKey": "answer",
+                  "outputFormat": [
+                    {
+                      "key": "leaveAccounts",
+                      "type": "array",
+                      "description": "假期账户",
+                      "itemFields": [
+                        { "key": "leaveName", "type": "string", "description": "假期名称" },
+                        { "key": "availableHours", "type": "number", "description": "可用小时" },
+                        { "key": "frozenHours", "type": "number", "description": "冻结小时" }
+                      ]
+                    }
+                  ]
+                },
+                { "id": "end", "type": "END", "config": { "reply": "{{answer.leaveAccounts}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "answer" },
+                { "from": "answer", "to": "end" }
+              ]
+            }
+            """;
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, workflowConfigJson);
+
+        MvcResult result = mockMvc.perform(post("/api/admin/agents/workflow-run")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionId": %d,
+                      "inputJson": "{\\"query\\":\\"测试\\"}",
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "你是企业协同助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(versionId, escapeJsonString(workflowConfigJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.success").value(true))
+            .andReturn();
+
+        JsonNode output = objectMapper.readTree(data(result).path("steps").get(0).path("output").asText());
+        JsonNode item = output.path("leaveAccounts").get(0);
+        assertTrue(item.path("leaveName").asText().length() > 0);
+        assertEquals(12, item.path("availableHours").asInt());
+        assertEquals(4, item.path("frozenHours").asInt());
+        assertFalse(item.has("accountId"));
+        assertFalse(item.has("userId"));
+        assertFalse(output.has("extra"));
+    }
+
+    @Test
+    @DisplayName("DAG数据查询节点输出格式为数组时应只保留数组项配置字段")
+    void dataSourceWorkflowNodeShouldKeepOnlyConfiguredArrayItemFields() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "DAG_DATA_ARRAY_FORMAT_AGENT", "数据数组格式助手", "QA");
+        long leaveTypeId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long accountId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+            INSERT INTO lv_type
+                (id, leave_code, leave_name, balance_mode, status)
+            VALUES
+                (?, ?, '测试年假', 'DEDUCT', 'ACTIVE')
+            """, leaveTypeId, "AGENT_ARRAY_" + leaveTypeId);
+        jdbcTemplate.update("""
+            INSERT INTO lv_account
+                (id, user_id, leave_type_id, available_minutes, frozen_minutes, version, status)
+            VALUES
+                (?, ?, ?, 720, 240, 0, 'ACTIVE')
+            """, accountId, EMPLOYEE_USER_ID, leaveTypeId);
+        String workflowConfigJson = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_user",
+                  "type": "TOOL",
+                  "config": {
+                    "dataSources": ["leaveBalance"],
+                    "targetUserId": "{{input.userId}}"
+                  },
+                  "outputKey": "userData",
+                  "outputFormat": [
+                    {
+                      "key": "leaveBalance",
+                      "type": "array",
+                      "description": "假期账户",
+                      "itemFields": [
+                        { "key": "leaveName", "type": "string", "description": "假期名称" },
+                        { "key": "availableMinutes", "type": "number", "description": "可用分钟" },
+                        { "key": "frozenMinutes", "type": "number", "description": "冻结分钟" }
+                      ]
+                    }
+                  ]
+                },
+                { "id": "end", "type": "END", "config": { "reply": "{{userData.leaveBalance}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "end" }
+              ]
+            }
+            """;
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, workflowConfigJson);
+
+        MvcResult result = mockMvc.perform(post("/api/admin/agents/workflow-run")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionId": %d,
+                      "inputJson": "{\\"currentUserId\\":2003,\\"userId\\":2003}",
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "你是企业协同助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(versionId, escapeJsonString(workflowConfigJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.success").value(true))
+            .andReturn();
+
+        JsonNode output = objectMapper.readTree(data(result).path("steps").get(0).path("output").asText());
+        JsonNode item = output.path("leaveBalance").get(0);
+        assertTrue(item.path("leaveName").asText().length() > 0);
+        assertTrue(item.has("availableMinutes"));
+        assertTrue(item.has("frozenMinutes"));
+        assertFalse(item.has("accountId"));
+        assertFalse(item.has("userId"));
+        assertFalse(item.has("leaveTypeId"));
+    }
+
+    @Test
+    @DisplayName("DAG应能返回当前部门真实人数卡片字段")
+    void dataSourceWorkflowNodeShouldReturnDepartmentHeadcountFields() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "DAG_DEPT_HEADCOUNT_AGENT", "部门人数助手", "QA");
+        String workflowConfigJson = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_dept",
+                  "type": "TOOL",
+                  "config": {
+                    "dataSources": ["departmentHeadcountFields"],
+                    "targetUserId": "{{input.userId}}"
+                  },
+                  "outputKey": "oaData",
+                  "outputFormat": [
+                    {
+                      "key": "departmentHeadcountFields",
+                      "type": "array",
+                      "description": "部门人数字段",
+                      "itemFields": [
+                        { "key": "label", "type": "string", "description": "标签" },
+                        { "key": "value", "type": "string", "description": "值" },
+                        { "key": "tone", "type": "string", "description": "颜色" }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "end",
+                  "type": "END",
+                  "config": {
+                    "replyJson": {
+                      "cardType": "agent_result",
+                      "category": "OA",
+                      "status": "SUCCESS",
+                      "title": "{{input.queryTitle}}",
+                      "answer": "查询完成",
+                      "data": {
+                        "fields": "{{oaData}}",
+                        "records": null,
+                        "flow": null
+                      }
+                    }
+                  }
+                }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_dept" },
+                { "from": "load_dept", "to": "end" }
+              ]
+            }
+            """;
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, workflowConfigJson);
+
+        MvcResult result = mockMvc.perform(post("/api/admin/agents/workflow-run")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionId": %d,
+                      "inputJson": "{\\"currentUserId\\":2003,\\"userId\\":2003,\\"query\\":\\"我们部门人数是多少？\\"}",
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "你是企业协同助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(versionId, escapeJsonString(workflowConfigJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.success").value(true))
+            .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        JsonNode reply = objectMapper.readTree(response.path("data").path("finalReply").asText());
+        JsonNode fields = reply.path("data").path("fields");
+        assertEquals("部门", fields.get(0).path("label").asText());
+        assertTrue(fields.get(0).path("value").asText().length() > 0);
+        assertEquals("部门人数", fields.get(1).path("label").asText());
+        assertTrue(fields.get(1).path("value").asText().endsWith(" 人"));
+        assertFalse(response.path("data").path("finalReply").asText().contains("假期名称"));
+    }
+
+    @Test
+    @DisplayName("DAG结束节点应能返回JSON结构")
+    void workflowRunShouldReturnConfiguredReplyJson() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "DAG_REPLY_JSON_AGENT", "JSON回复助手", "QA");
+        long leaveTypeId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long accountId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+            INSERT INTO lv_type
+                (id, leave_code, leave_name, balance_mode, status)
+            VALUES
+                (?, ?, '测试年假', 'DEDUCT', 'ACTIVE')
+            """, leaveTypeId, "AGENT_JSON_" + leaveTypeId);
+        jdbcTemplate.update("""
+            INSERT INTO lv_account
+                (id, user_id, leave_type_id, available_minutes, frozen_minutes, version, status)
+            VALUES
+                (?, ?, ?, 720, 240, 0, 'ACTIVE')
+            """, accountId, EMPLOYEE_USER_ID, leaveTypeId);
+        String workflowConfigJson = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "load_user",
+                  "type": "TOOL",
+                  "config": {
+                    "dataSources": ["employeeInfo", "leaveBalance", "orgChart"],
+                    "targetUserId": "{{input.userId}}"
+                  },
+                  "outputKey": "userData",
+                  "outputFormat": [
+                    { "key": "employeeInfo", "type": "object", "description": "员工信息" },
+                    {
+                      "key": "leaveBalance",
+                      "type": "array",
+                      "description": "假期账户",
+                      "itemFields": [
+                        { "key": "leaveName", "type": "string", "description": "假期名称" },
+                        { "key": "availableMinutes", "type": "number", "description": "可用分钟" },
+                        { "key": "frozenMinutes", "type": "number", "description": "冻结分钟" }
+                      ]
+                    },
+                    { "key": "orgChart", "type": "object", "description": "组织关系" }
+                  ]
+                },
+                {
+                  "id": "end",
+                  "type": "END",
+                  "config": {
+                    "replyJson": {
+                      "employee": {
+                        "name": "{{userData.employeeInfo.realName}}",
+                        "department": "{{userData.employeeInfo.primaryDeptName}}",
+                        "position": "{{userData.employeeInfo.positionName}}",
+                        "manager": "{{userData.employeeInfo.managerName}}"
+                      },
+                      "leaveAccounts": "{{userData.leaveBalance}}",
+                      "organization": {
+                        "managerName": "{{userData.orgChart.manager.realName}}"
+                      }
+                    }
+                  }
+                }
+              ],
+              "edges": [
+                { "from": "start", "to": "load_user" },
+                { "from": "load_user", "to": "end" }
+              ]
+            }
+            """;
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, workflowConfigJson);
+
+        MvcResult result = mockMvc.perform(post("/api/admin/agents/workflow-run")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionId": %d,
+                      "inputJson": "{\\"currentUserId\\":2003,\\"userId\\":2003}",
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "你是企业协同助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(versionId, escapeJsonString(workflowConfigJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.success").value(true))
+            .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        JsonNode reply = objectMapper.readTree(response.path("data").path("finalReply").asText());
+        assertEquals("张三", reply.path("employee").path("name").asText());
+        assertTrue(reply.path("employee").path("department").asText().length() > 0);
+        JsonNode item = reply.path("leaveAccounts").get(0);
+        assertTrue(item.path("leaveName").asText().length() > 0);
+        assertTrue(item.has("availableMinutes"));
+        assertTrue(item.has("frozenMinutes"));
+        assertFalse(item.has("accountId"));
+        assertFalse(item.has("userId"));
+        assertFalse(item.has("leaveTypeId"));
+        assertEquals("李四", reply.path("organization").path("managerName").asText());
+    }
+
+    @Test
+    @DisplayName("后台应能更新草稿版本的DAG配置且不能更新已发布版本")
+    void adminShouldUpdateDraftVersionWorkflowAndRejectPublishedVersionUpdate() throws Exception {
+        Cookie adminSession = loginAdmin();
+        long agentId = createAgent(adminSession, "DAG_EDIT_AGENT", "DAG编辑助手", "QA");
+        long versionId = createVersion(adminSession, agentId, 1);
+        String workflow = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                { "id": "answer", "type": "LLM", "config": { "prompt": "{{input.query}}" }, "outputKey": "answer" },
+                { "id": "end", "type": "END", "config": { "reply": "{{answer}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "answer" },
+                { "from": "answer", "to": "end" }
+              ]
+            }
+            """;
+
+        mockMvc.perform(put("/api/admin/agents/versions/{versionId}", versionId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "更新后的系统提示",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(escapeJsonString(workflow))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.versionId").value(versionId))
+            .andExpect(jsonPath("$.data.systemPrompt").value("更新后的系统提示"))
+            .andExpect(jsonPath("$.data.workflowConfigJson").value(containsString("answer")));
+
+        grantAcl(adminSession, agentId, "ADMIN_USER", 1001L, "manage");
+        publishVersion(adminSession, versionId);
+
+        mockMvc.perform(put("/api/admin/agents/versions/{versionId}", versionId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "systemPrompt": "发布后不能修改"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("只有草稿版本可以修改"));
+    }
+
+    @Test
+    @DisplayName("后台应能按关键字查询Agent列表、详情并停用/启用已发布Agent")
+    void adminShouldListGetDisableAndEnablePublishedAgent() throws Exception {
         Cookie adminSession = loginAdmin();
         Cookie employeeSession = loginEmployee("zhangsan.employee");
         long agentId = createPublishedAgentWithoutTool(adminSession, "ADMIN_MANAGED_AGENT", "后台治理助手");
         grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        createVersion(adminSession, agentId, 2, "6.0.1");
 
         mockMvc.perform(get("/api/admin/agents")
                 .cookie(adminSession)
                 .param("pageNo", "1")
-                .param("pageSize", "20"))
+                .param("pageSize", "20")
+                .param("keyword", "治理"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.list", hasSize(1)))
             .andExpect(jsonPath("$.data.list[0].agentId").value(agentId))
             .andExpect(jsonPath("$.data.list[0].agentCode").value("ADMIN_MANAGED_AGENT"))
+            .andExpect(jsonPath("$.data.list[0].publishedVersionNo").value(1))
             .andExpect(jsonPath("$.data.list[0].status").value("ACTIVE"));
+
+        mockMvc.perform(get("/api/admin/agents/{agentId}/versions", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].versionNo").value(2))
+            .andExpect(jsonPath("$.data[0].versionLabel").value("6.0.1"))
+            .andExpect(jsonPath("$.data[0].publishStatus").value("DRAFT"));
 
         mockMvc.perform(get("/api/admin/agents/{agentId}", agentId)
                 .cookie(adminSession))
@@ -170,6 +877,81 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(409))
             .andExpect(jsonPath("$.message").value("Agent未发布或未启用"));
+
+        mockMvc.perform(post("/api/admin/agents/{agentId}/enable", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.agentId").value(agentId))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(get("/api/employee/agents")
+                .cookie(employeeSession)
+                .param("keyword", "治理"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].agentId").value(agentId));
+    }
+
+    @Test
+    @DisplayName("员工应能按关键字搜索可添加到IM的已授权Agent")
+    void employeeShouldSearchUsableAgentsForImAdd() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long hrAgentId = createPublishedAgentWithoutTool(adminSession, "HR_FLOW_AGENT", "HR流程助手");
+        long fileAgentId = createPublishedAgentWithoutTool(adminSession, "FILE_AGENT", "文件助手");
+        grantAcl(adminSession, hrAgentId, "USER", EMPLOYEE_USER_ID, "use");
+        grantAcl(adminSession, fileAgentId, "USER", EMPLOYEE_USER_ID, "use");
+
+        mockMvc.perform(get("/api/employee/agents")
+                .cookie(employeeSession)
+                .param("keyword", "HR"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].agentId").value(hrAgentId))
+            .andExpect(jsonPath("$.data[0].agentCode").value("HR_FLOW_AGENT"));
+    }
+
+    @Test
+    @DisplayName("角色 ACL 应区分普通员工和领导")
+    void roleAclShouldAuthorizeEmployeeAndLeader() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        Cookie managerSession = loginEmployee("lisi.manager");
+        long employeeAgentId = createPublishedAgentWithoutTool(adminSession, "ROLE_EMPLOYEE_AGENT", "员工角色助手");
+        long leaderAgentId = createPublishedAgentWithoutTool(adminSession, "ROLE_LEADER_AGENT", "领导角色助手");
+        grantAcl(adminSession, employeeAgentId, "ROLE", 1L, "use");
+        grantAcl(adminSession, leaderAgentId, "ROLE", 2L, "use");
+
+        mockMvc.perform(get("/api/employee/agents")
+                .cookie(employeeSession)
+                .param("keyword", "ROLE"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[*].agentCode", containsInAnyOrder("ROLE_EMPLOYEE_AGENT")));
+
+        mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", leaderAgentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "inputPayloadJson": "{\\"query\\":\\"普通员工不可调用领导Agent\\"}"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("无权使用该Agent"));
+
+        mockMvc.perform(get("/api/employee/agents")
+                .cookie(managerSession)
+                .param("keyword", "ROLE"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[*].agentCode", containsInAnyOrder("ROLE_EMPLOYEE_AGENT", "ROLE_LEADER_AGENT")));
     }
 
     @Test
@@ -836,6 +1618,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     private long createPublishedAgentWithoutTool(Cookie adminSession, String agentCode, String agentName) throws Exception {
         long agentId = createAgent(adminSession, agentCode, agentName, "QA");
         long versionId = createVersion(adminSession, agentId, 1);
+        grantAcl(adminSession, agentId, "ADMIN_USER", 1001L, "manage");
         publishVersion(adminSession, versionId);
         return agentId;
     }
@@ -884,6 +1667,33 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private long createVersion(Cookie adminSession, long agentId, int versionNo) throws Exception {
+        return createVersion(adminSession, agentId, versionNo, null);
+    }
+
+    private long createVersion(Cookie adminSession, long agentId, int versionNo, String versionLabel) throws Exception {
+        String labelLine = versionLabel == null ? "" : """
+                      "versionLabel": "%s",
+            """.formatted(escapeJsonString(versionLabel));
+        MvcResult result = mockMvc.perform(post("/api/admin/agents/{agentId}/versions", agentId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionNo": %d,
+            %s
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "你是企业协同助手。",
+                      "workflowConfigJson": "{\\"mode\\":\\"tool-first\\"}"
+                    }
+                    """.formatted(versionNo, labelLine)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        return data(result).get("versionId").asLong();
+    }
+
+    private long createVersionWithWorkflow(Cookie adminSession, long agentId, int versionNo, String workflowConfigJson)
+        throws Exception {
         MvcResult result = mockMvc.perform(post("/api/admin/agents/{agentId}/versions", agentId)
                 .cookie(adminSession)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -892,13 +1702,51 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "versionNo": %d,
                       "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
                       "systemPrompt": "你是企业协同助手。",
-                      "workflowConfigJson": "{\\"mode\\":\\"tool-first\\"}"
+                      "workflowConfigJson": "%s"
                     }
-                    """.formatted(versionNo)))
+                    """.formatted(versionNo, escapeJsonString(workflowConfigJson))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return data(result).get("versionId").asLong();
+    }
+
+    private void runWorkflowTest(Cookie adminSession, long versionId, String workflowConfigJson) throws Exception {
+        runWorkflowTest(adminSession, versionId, workflowConfigJson, "{\"query\":\"测试\"}");
+    }
+
+    private void runWorkflowTest(Cookie adminSession, long versionId, String workflowConfigJson, String inputJson) throws Exception {
+        mockMvc.perform(post("/api/admin/agents/workflow-run")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "versionId": %d,
+                      "inputJson": %s,
+                      "modelConfigJson": "{\\"provider\\":\\"mock\\",\\"model\\":\\"agent-test\\"}",
+                      "systemPrompt": "你是企业协同助手。",
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(versionId, objectMapper.writeValueAsString(inputJson), escapeJsonString(workflowConfigJson))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.success").value(true));
+    }
+
+    private String simpleWorkflow(String prompt) {
+        return """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                { "id": "answer", "type": "LLM", "config": { "prompt": "%s" }, "outputKey": "answer" },
+                { "id": "end", "type": "END", "config": { "reply": "{{answer}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "answer" },
+                { "from": "answer", "to": "end" }
+              ]
+            }
+            """.formatted(prompt);
     }
 
     private void bindTool(Cookie adminSession, long versionId, long toolId, String approvalMode) throws Exception {
@@ -1054,6 +1902,30 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private String escapeJsonString(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r");
+    }
+
+    @TestConfiguration
+    static class TestAgentModelConfiguration {
+
+        @Bean
+        @Primary
+        AgentModelClient testAgentModelClient() {
+            return new AgentModelClient() {
+                @Override
+                public AgentModelResponse generateReply(AgentModelRequest request) {
+                    if (request.userMessage().contains("FORMAT_ARRAY_TEST")) {
+                        return new AgentModelResponse("""
+                            {"leaveAccounts":[{"leaveName":"演示年假","availableHours":"12","frozenHours":4,"accountId":999,"userId":22002}],"extra":"x"}
+                            """);
+                    }
+                    return new AgentModelResponse(request.userMessage());
+                }
+            };
+        }
     }
 }

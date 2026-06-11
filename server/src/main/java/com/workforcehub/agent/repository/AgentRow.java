@@ -9,6 +9,8 @@ public record AgentRow(
     String agentType,
     String identityMode,
     Long publishedVersionId,
+    Integer publishedVersionNo,
+    String publishedVersionLabel,
     String status,
     LocalDateTime createdAt,
     LocalDateTime updatedAt

@@ -12,6 +12,8 @@ public record AgentTaskRow(
     String triggeredByType,
     Long triggeredById,
     LocalDateTime waitingDeadlineAt,
+    String workflowSnapshotJson,
+    String executionTraceJson,
     String status,
     LocalDateTime startedAt,
     LocalDateTime finishedAt,
