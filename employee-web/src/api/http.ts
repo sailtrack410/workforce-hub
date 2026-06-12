@@ -148,6 +148,7 @@ const unsafeIntegerFieldNames = new Set([
   'publishedVersionId',
   'applicantUserId',
   'attachmentRefId',
+  'avatarAttachmentRefId',
   'bizId',
   'leaveTypeId',
   'accountId',

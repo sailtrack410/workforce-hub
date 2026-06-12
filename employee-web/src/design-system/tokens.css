@@ -12,16 +12,16 @@
   --font-family-display-cn: 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   --font-family-display: var(--font-family-display-en), var(--font-family-display-cn);
 
-  --primary-50: #edf5fb;
-  --primary-100: #d7e7f4;
-  --primary-200: #b4d1e8;
-  --primary-300: #8ab6d8;
-  --primary-400: #5b93c2;
-  --primary-500: #3f719f;
-  --primary-600: #305982;
-  --primary-700: #28496a;
-  --primary-800: #233c57;
-  --primary-900: #1f3349;
+  --primary-50: #edf6ff;
+  --primary-100: #d9ebff;
+  --primary-200: #b7d8ff;
+  --primary-300: #8ac1ff;
+  --primary-400: #4fa2ff;
+  --primary-500: #1677ff;
+  --primary-600: #0f5fd1;
+  --primary-700: #134ca4;
+  --primary-800: #153f83;
+  --primary-900: #17366c;
 
   --neutral-0: #ffffff;
   --neutral-50: #f6f8fb;
@@ -82,15 +82,15 @@
   --accent-signal: #ff5a4e;
   --accent-signal-soft: #ffe4e0;
 
-  --surface-canvas: var(--neutral-50);
+  --surface-canvas: #f3f5f8;
   --surface-panel: var(--neutral-0);
   --surface-panel-muted: var(--neutral-100);
   --surface-panel-strong: var(--neutral-200);
   --surface-accent: var(--primary-50);
   --surface-info: var(--info-50);
   --surface-danger: var(--danger-50);
-  --surface-rail: #18202a;
-  --surface-rail-accent: #223044;
+  --surface-rail: #1f2329;
+  --surface-rail-accent: #252a31;
 
   --border-subtle: var(--neutral-100);
   --border-default: var(--neutral-200);

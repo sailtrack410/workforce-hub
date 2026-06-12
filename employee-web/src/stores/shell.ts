@@ -232,6 +232,8 @@ export interface ContactRecord {
   relation: string;
   source: string;
   userId?: string | number;
+  avatarAttachmentRefId?: EntityId | null;
+  avatarUrl?: string;
   employeeNo?: string;
   status?: string | null;
   employmentStatus?: string | null;
@@ -983,6 +985,9 @@ export const useShellStore = defineStore('employee-shell', {
     },
     setAvatarUrl(url: string | null | undefined) {
       this.avatarUrl = url ?? '';
+      const ownerId = this.personalFileOwnerId;
+      const ownContact = this.contacts.find((item) => item.userId != null && String(item.userId) === ownerId);
+      if (ownContact) ownContact.avatarUrl = this.avatarUrl;
     },
     syncSessionProfile(
       user: CurrentUserResponse | null,
@@ -1157,6 +1162,7 @@ function contactFromOrgUser(user: OrgUserSummaryResponse, relation: string, sour
     relation,
     source,
     userId: user.userId,
+    avatarAttachmentRefId: user.avatarAttachmentRefId,
     employeeNo: user.employeeNo,
     status: user.status,
     employmentStatus: user.employmentStatus,
@@ -1193,6 +1199,8 @@ function collectContacts(input: CollectContactsInput): ContactRecord[] {
         relation: '本人',
         source: '个人资料',
         userId,
+        avatarAttachmentRefId: profile?.avatarAttachmentRefId,
+        avatarUrl: '',
         employeeNo: profile?.employeeNo,
         status: profile?.status ?? null,
         employmentStatus: profile?.employmentStatus ?? user?.employmentStatus ?? null,

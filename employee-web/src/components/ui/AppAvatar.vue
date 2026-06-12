@@ -3,7 +3,7 @@ const props = withDefaults(defineProps<{
   label: string;
   image?: string;
   tone?: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   status?: 'online' | 'busy' | 'away' | 'offline' | '';
 }>(), {
   image: '',
@@ -32,7 +32,7 @@ const props = withDefaults(defineProps<{
 .ui-avatar {
   display: grid;
   place-items: center;
-  border-radius: var(--radius-8);
+  border-radius: 999px;
   font-size: var(--text-caption-md);
   font-weight: 750;
   overflow: hidden;
@@ -47,7 +47,7 @@ const props = withDefaults(defineProps<{
 .ui-avatar.sm {
   width: 1.75rem;
   height: 1.75rem;
-  border-radius: var(--radius-6);
+  border-radius: 999px;
 }
 
 .ui-avatar.md {
@@ -58,17 +58,23 @@ const props = withDefaults(defineProps<{
 .ui-avatar.lg {
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: var(--radius-12);
+  border-radius: 999px;
+}
+
+.ui-avatar.xl {
+  width: 4.75rem;
+  height: 4.75rem;
+  border-radius: 999px;
 }
 
 .ui-avatar.primary {
-  background: var(--primary-100);
-  color: var(--primary-700);
+  background: linear-gradient(135deg, #4fa2ff, #1677ff);
+  color: #fff;
 }
 
 .ui-avatar.success {
-  background: var(--success-100);
-  color: var(--success-700);
+  background: linear-gradient(135deg, #53d18a, #16a36a);
+  color: #fff;
 }
 
 .ui-avatar.warning {
@@ -82,7 +88,7 @@ const props = withDefaults(defineProps<{
 }
 
 .ui-avatar.neutral {
-  background: var(--surface-panel-strong);
+  background: #e6eaf0;
   color: var(--text-secondary);
 }
 

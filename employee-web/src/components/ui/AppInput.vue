@@ -25,11 +25,11 @@ const props = withDefaults(defineProps<{
 <style scoped>
 .ui-input {
   width: 100%;
-  min-height: 2.75rem;
-  padding: 0 var(--space-16);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-8);
-  background: var(--surface-panel-muted);
+  min-height: 2.5rem;
+  padding: 0 var(--space-14, 0.875rem);
+  border: 1px solid #dfe5ee;
+  border-radius: 999px;
+  background: #fff;
   color: var(--text-primary);
   font-family: var(--font-family-body);
   font-size: var(--text-body-md);

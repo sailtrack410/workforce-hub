@@ -19,23 +19,24 @@ const emit = defineEmits<{
 .ui-list-item {
   display: grid;
   width: 100%;
-  gap: var(--space-16);
-  padding: var(--space-16);
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
   border: 0;
-  border-radius: var(--radius-12);
+  border-radius: 0;
   background: transparent;
   color: inherit;
   text-align: left;
+  border-bottom: 1px solid #eef1f5;
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .ui-list-item:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--surface-panel-muted) 62%, transparent);
+  background: #eef4ff;
   color: var(--text-primary);
 }
 
 .ui-list-item.active {
-  background: color-mix(in srgb, var(--surface-panel-strong) 72%, var(--surface-panel));
+  background: #e8f2ff;
   color: var(--text-primary);
 }
 

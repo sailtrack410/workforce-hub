@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import {
   Camera,
+  BriefcaseBusiness,
   ChevronLeft,
-  ChevronRight,
+  IdCard,
+  Mail,
+  MapPin,
   MoonStar,
-  ShieldCheck,
-  SlidersHorizontal,
+  Phone,
   SunMedium,
-  UploadCloud,
   PencilLine,
-  UsersRound,
 } from 'lucide-vue-next';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -73,6 +73,7 @@ const passwordChangeError = ref('');
 const avatarUploading = ref(false);
 const avatarUpdateError = ref('');
 const avatarPickerInput = ref<HTMLInputElement | null>(null);
+const colleagueAvatarUrls = ref<Record<string, string>>({});
 const signatureDraft = ref('');
 const signatureSaving = ref(false);
 const signatureSaveError = ref('');
@@ -82,6 +83,7 @@ let preferencePushTimer: number | undefined;
 
 const {
   uploadAvatarAttachment,
+  resolveDownloadUrl,
 } = usePersonalFileTransfer();
 const { refreshCurrentUserAvatarUrl } = useCurrentUserAvatarUrl(shell, session);
 
@@ -126,13 +128,16 @@ const bindEmailCodeButtonText = computed(() => (
 const passwordChangeCodeButtonText = computed(() => (
   passwordChangeCodeSending.value ? '发送中' : passwordChangeCodeCooldown.label.value
 ));
-const profileIdentityRows = computed<FieldRows>(() => [
-  ['姓名', displayField(session.profile?.realName || session.user?.displayName)],
+const profileContactRows = computed<FieldRows>(() => [
+  ['手机号', displayField(session.profile?.mobile)],
+  ['邮箱', displayField(currentEmail.value)],
+  ['工作地点', displayField(session.profile?.workLocation)],
   ['登录名', displayField(session.user?.loginName)],
-  ['工号', displayField(session.profile?.employeeNo)],
+]);
+const profileWorkRows = computed<FieldRows>(() => [
   ['部门', displayField(session.profile?.primaryDeptName)],
   ['岗位', displayField(session.profile?.positionName)],
-  ['工作地点', displayField(session.profile?.workLocation)],
+  ['直属上级', displayField(relationTree.value.managerName || session.profile?.managerName)],
   ['入职日期', displayField(session.profile?.hireDate)],
 ]);
 const accountSecurityRows = computed<FieldRows>(() => [
@@ -178,6 +183,9 @@ const notificationRows = computed<FieldRows>(() => [
 const colleagues = computed(() => session.colleagues);
 const colleaguesLoading = computed(() => session.profileLoading);
 const colleaguesError = computed(() => session.profileError);
+function colleagueAvatarUrl(user: OrgUserSummaryResponse) {
+  return colleagueAvatarUrls.value[String(user.avatarAttachmentRefId ?? '')] || '';
+}
 
 void hydrateUserPreferences();
 void refreshCurrentUserAvatarUrl();
@@ -489,6 +497,25 @@ watch(() => session.profile?.avatarAttachmentRefId, () => {
   void refreshCurrentUserAvatarUrl();
 });
 
+watch(colleagues, async (rows) => {
+  const ids = rows
+    .map((item) => item.avatarAttachmentRefId)
+    .filter((id): id is NonNullable<typeof id> => id !== null && id !== undefined)
+    .map((id) => String(id));
+  const missing = ids.filter((id) => !colleagueAvatarUrls.value[id]);
+  if (!missing.length) return;
+  const next = { ...colleagueAvatarUrls.value };
+  await Promise.all(missing.map(async (id) => {
+    try {
+      const ticket = await employeeApi.files.createDownloadTicket(id, { downloadType: 'INLINE' });
+      next[id] = resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo));
+    } catch {
+      next[id] = '';
+    }
+  }));
+  colleagueAvatarUrls.value = next;
+}, { immediate: true });
+
 watch(() => session.profile?.mobile, (mobile) => {
   if (!mobileSubmitting.value) {
     mobileDraft.value = mobile ?? '';
@@ -522,18 +549,35 @@ onBeforeUnmount(() => {
   <section class="content-stack settings-dashboard">
     <section v-if="selectedProfileId === 'profile'" class="personal-center">
       <article class="personal-hero">
-        <button
-          class="personal-avatar"
-          type="button"
-          :aria-label="avatarUploading ? '头像上传中' : '更换头像'"
-          :disabled="avatarUploading"
-          @click="openAvatarPicker"
-        >
-          <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="lg" status="online" />
-          <span class="personal-avatar-overlay">
-            <Camera :size="14" />
-          </span>
-        </button>
+        <div class="personal-hero-cover">
+          <span>{{ session.departmentName || '组织成员' }}</span>
+        </div>
+        <div class="personal-hero-body">
+          <button
+            class="personal-avatar"
+            type="button"
+            :aria-label="avatarUploading ? '头像上传中' : '更换头像'"
+            :disabled="avatarUploading"
+            @click="openAvatarPicker"
+          >
+            <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="xl" status="online" />
+            <span class="personal-avatar-overlay">
+              <Camera :size="14" />
+            </span>
+          </button>
+          <div class="personal-hero-copy">
+            <div class="personal-name-row">
+              <h3>{{ currentUserName }}</h3>
+              <span class="personal-status-pill">{{ profileStatusLabel }}</span>
+            </div>
+            <p class="personal-role-line">
+              <BriefcaseBusiness :size="15" />
+              <span>{{ session.positionName || '未设置岗位' }}</span>
+              <span v-if="session.departmentName">{{ session.departmentName }}</span>
+            </p>
+            <p class="personal-signature">{{ shell.signature || '未设置个性签名' }}</p>
+          </div>
+        </div>
         <input
           ref="avatarPickerInput"
           type="file"
@@ -541,87 +585,65 @@ onBeforeUnmount(() => {
           hidden
           @change="handleAvatarSelected"
         />
-        <div class="personal-hero-copy">
-          <h3>{{ currentUserName }}</h3>
-          <p v-if="shell.signature" class="personal-signature">{{ shell.signature }}</p>
-          <div class="personal-hero-meta">
-            <span>{{ session.positionName || '未设置岗位' }}</span>
-            <span v-if="session.departmentName">{{ session.departmentName }}</span>
-            <span class="personal-hero-status">{{ profileStatusLabel }}</span>
+        <div class="personal-hero-actions">
+          <button type="button" class="personal-action-button" :disabled="avatarUploading" @click="openAvatarPicker">
+            <Camera :size="15" />
+            {{ avatarUploading ? '上传中' : '更换头像' }}
+          </button>
+          <button type="button" class="personal-action-button primary" @click="openMobileReset">
+            <PencilLine :size="15" />
+            编辑资料
+          </button>
+        </div>
+        <div class="personal-contact-strip">
+          <div>
+            <span class="personal-contact-icon"><IdCard :size="16" /></span>
+            <small>工号</small>
+            <strong>{{ displayField(session.profile?.employeeNo) }}</strong>
           </div>
-          <dl class="personal-hero-grid">
-            <div>
-              <dt>工号</dt>
-              <dd>{{ displayField(session.profile?.employeeNo) }}</dd>
-            </div>
-            <div>
-              <dt>登录名</dt>
-              <dd>{{ displayField(session.user?.loginName) }}</dd>
-            </div>
-            <div>
-              <dt>手机号</dt>
-              <dd>
-                {{ displayField(session.profile?.mobile) }}
-                <button class="field-icon-button" type="button" aria-label="修改手机号" @click="openMobileReset">
-                  <PencilLine :size="13" />
-                </button>
-              </dd>
-            </div>
-            <div>
-              <dt>邮箱</dt>
-              <dd>{{ displayField(currentEmail) }}</dd>
+          <div>
+            <span class="personal-contact-icon"><Phone :size="16" /></span>
+            <small>手机号</small>
+            <strong>{{ displayField(session.profile?.mobile) }}</strong>
+          </div>
+          <div>
+            <span class="personal-contact-icon"><Mail :size="16" /></span>
+            <small>邮箱</small>
+            <strong>{{ displayField(currentEmail) }}</strong>
+          </div>
+          <div>
+            <span class="personal-contact-icon"><MapPin :size="16" /></span>
+            <small>办公地</small>
+            <strong>{{ displayField(session.profile?.workLocation) }}</strong>
+          </div>
+        </div>
+        <p v-if="avatarUpdateError" class="dialog-error personal-hero-error">{{ avatarUpdateError }}</p>
+      </article>
+
+      <section class="personal-profile-grid">
+        <article class="settings-card personal-info-card">
+          <header class="settings-card-head">
+            <h3>联系信息</h3>
+          </header>
+          <dl class="settings-list">
+            <div v-for="row in profileContactRows" :key="row[0]">
+              <dt>{{ row[0] }}</dt>
+              <dd>{{ row[1] }}</dd>
             </div>
           </dl>
-          <p v-if="avatarUpdateError" class="dialog-error">{{ avatarUpdateError }}</p>
-        </div>
-      </article>
-
-      <nav class="personal-nav" aria-label="个人中心快捷">
-        <button type="button" class="personal-nav-item" @click="selectSettingsItem('organization')">
-          <span class="personal-nav-icon"><UsersRound :size="18" /></span>
-          <div>
-            <strong>组织关系</strong>
-            <span>{{ session.departmentName || '未分配部门' }} · 同事 / 上下级</span>
-          </div>
-          <ChevronRight :size="16" />
-        </button>
-        <button type="button" class="personal-nav-item" @click="selectSettingsItem('security')">
-          <span class="personal-nav-icon"><ShieldCheck :size="18" /></span>
-          <div>
-            <strong>账号与安全</strong>
-            <span>手机号 · 邮箱 · 密码</span>
-          </div>
-          <ChevronRight :size="16" />
-        </button>
-        <button type="button" class="personal-nav-item" @click="selectSettingsItem('preferences')">
-          <span class="personal-nav-icon"><SlidersHorizontal :size="18" /></span>
-          <div>
-            <strong>偏好设置</strong>
-            <span>状态 · 通知 · 外观</span>
-          </div>
-          <ChevronRight :size="16" />
-        </button>
-        <button type="button" class="personal-nav-item" @click="selectSettingsItem('storage')">
-          <span class="personal-nav-icon"><UploadCloud :size="18" /></span>
-          <div>
-            <strong>文件空间</strong>
-            <span>{{ activeProfile.id === 'storage' ? '当前' : shell.activeFile.subtitle || '个人文件' }}</span>
-          </div>
-          <ChevronRight :size="16" />
-        </button>
-      </nav>
-
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>身份资料</h3>
-        </header>
-        <dl class="settings-list two-column">
-          <div v-for="row in profileIdentityRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
-      </article>
+        </article>
+        <article class="settings-card personal-info-card">
+          <header class="settings-card-head">
+            <h3>组织信息</h3>
+          </header>
+          <dl class="settings-list">
+            <div v-for="row in profileWorkRows" :key="row[0]">
+              <dt>{{ row[0] }}</dt>
+              <dd>{{ row[1] }}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
     </section>
 
     <section v-else-if="selectedProfileId === 'organization'" class="settings-card-grid">
@@ -667,7 +689,7 @@ onBeforeUnmount(() => {
         <p v-else-if="colleaguesLoading" class="form-hint">加载中…</p>
         <div v-else class="colleague-list">
           <div v-for="user in colleagues" :key="user.userId" class="colleague-row">
-            <AppAvatar :label="(user.realName || '').slice(0, 2)" tone="primary" size="sm" />
+            <AppAvatar :label="(user.realName || '').slice(0, 2)" :image="colleagueAvatarUrl(user)" tone="primary" size="sm" />
             <div>
               <strong>{{ user.realName }}</strong>
               <small>{{ user.positionName || '未设置岗位' }}<span v-if="user.managerName"> · 直属上级 {{ user.managerName }}</span></small>

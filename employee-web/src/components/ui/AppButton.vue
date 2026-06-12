@@ -37,10 +37,10 @@ const props = withDefaults(defineProps<{
   align-items: center;
   justify-content: center;
   gap: var(--space-8);
-  min-height: 2.5rem;
-  padding: 0 var(--space-16);
+  min-height: 2.375rem;
+  padding: 0 var(--space-14, 0.875rem);
   border: 1px solid transparent;
-  border-radius: var(--radius-8);
+  border-radius: 999px;
   font-family: var(--font-family-body);
   font-size: var(--text-body-sm);
   font-weight: 600;
@@ -89,18 +89,19 @@ const props = withDefaults(defineProps<{
 }
 
 .ui-button.variant-primary {
-  background: var(--primary-500);
+  background: #1677ff;
   color: var(--text-inverse);
+  box-shadow: 0 6px 14px rgba(22, 119, 255, 0.18);
 }
 
 .ui-button.variant-primary:hover:not(:disabled),
 .ui-button.variant-primary:focus-visible {
-  background: var(--primary-600);
+  background: #0f67df;
 }
 
 .ui-button.variant-secondary {
-  background: var(--surface-panel);
-  border-color: var(--border-default);
+  background: #fff;
+  border-color: #dfe5ee;
   color: var(--text-primary);
 }
 

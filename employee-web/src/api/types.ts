@@ -126,6 +126,7 @@ export interface OrgUserSummaryResponse {
   userId: EntityId;
   employeeNo: string;
   realName: string;
+  avatarAttachmentRefId?: EntityId | null;
   primaryDeptId?: EntityId | null;
   primaryDeptName?: string | null;
   positionId?: EntityId | null;

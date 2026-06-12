@@ -728,59 +728,43 @@ watch(() => shell.active.workbench, (id) => {
 }, { immediate: true });
 
 watch(
-  () => route.meta.section,
-  (section) => {
-    if (typeof section === 'string' && section !== shell.section) {
-      shell.setSection(section as SectionId);
-    }
-  },
-  { immediate: true },
-);
-
-watch(
-  () => route.params.conversationId,
-  (conversationId) => {
-    if (typeof conversationId === 'string') {
-      shell.selectItem('messages', conversationId);
-      void syncConversationMessages(conversationId);
-    }
-  },
-  { immediate: true },
-);
-
-watch(
-  () => route.params.todoId,
-  (todoId) => {
-    if (typeof todoId === 'string') {
-      shell.selectItem('todos', todoId);
-    }
-  },
-  { immediate: true },
-);
-
-watch(
-  () => route.params.app,
-  (app) => {
-    if (typeof app === 'string') {
-      const canonical = normalizeWorkbenchApp(app);
-      shell.selectItem('workbench', canonical);
-      if (canonical !== app) {
-        void router.replace({ name: 'employee-workbench-detail', params: { app: canonical } });
+  () => [route.meta.section, route.params.conversationId, route.params.todoId, route.params.app, route.params.panel] as const,
+  ([section, conversationId, todoId, app, panel]) => {
+    if (typeof section !== 'string') return;
+    const typedSection = section as SectionId;
+    if (typedSection !== shell.section) shell.setSection(typedSection);
+    if (typedSection === 'messages') {
+      if (typeof conversationId === 'string') {
+        shell.selectItem('messages', conversationId);
+        void syncConversationMessages(conversationId);
+      } else {
+        shell.setMobileView('list');
       }
-    }
-  },
-  { immediate: true },
-);
-
-watch(
-  () => route.params.panel,
-  (panel) => {
-    if (typeof panel === 'string') {
-      const canonical = normalizeSettingsPanel(panel);
-      shell.selectItem('settings', canonical);
-      if (canonical !== panel) {
-        void router.replace({ name: 'employee-settings-detail', params: { panel: canonical } });
+    } else if (typedSection === 'todos') {
+      if (typeof todoId === 'string') shell.selectItem('todos', todoId);
+      else shell.setMobileView('list');
+    } else if (typedSection === 'workbench') {
+      if (typeof app === 'string') {
+        const canonical = normalizeWorkbenchApp(app);
+        shell.selectItem('workbench', canonical);
+        if (canonical !== app) {
+          void router.replace({ name: 'employee-workbench-detail', params: { app: canonical } });
+        }
+      } else {
+        shell.setMobileView('list');
       }
+    } else if (typedSection === 'settings') {
+      if (typeof panel === 'string') {
+        const canonical = normalizeSettingsPanel(panel);
+        shell.selectItem('settings', canonical);
+        if (canonical !== panel) {
+          void router.replace({ name: 'employee-settings-detail', params: { panel: canonical } });
+        }
+      } else {
+        shell.setMobileView('list');
+      }
+    } else {
+      shell.setMobileView('list');
     }
   },
   { immediate: true },
@@ -1086,6 +1070,7 @@ provideEmployeeShellContexts(employeeShellContexts);
             v-if="!filteredConversations.length && !filteredSearchAgentResults.length && !searchAgentsLoading && !searchAgentsError"
             title="会话暂时为空"
             :description="listEmptyText"
+            icon="messages"
           />
           <template v-else>
             <AppListItem
@@ -1162,7 +1147,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
 
         <div v-else-if="activeSection === 'todos'" class="list-items">
-          <AppEmptyState v-if="!filteredTodos.length" title="待办已清空" :description="listEmptyText" />
+          <AppEmptyState v-if="!filteredTodos.length" title="待办已清空" :description="listEmptyText" icon="todos" />
           <AppListItem
             v-for="item in filteredTodos"
             v-else
@@ -1185,7 +1170,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
 
         <div v-else-if="activeSection === 'files'" class="list-items">
-          <AppEmptyState v-if="!filteredFiles.length" title="文件空间为空" :description="listEmptyText" />
+          <AppEmptyState v-if="!filteredFiles.length" title="文件空间为空" :description="listEmptyText" icon="files" />
           <AppListItem
             v-for="item in filteredFiles"
             v-else
@@ -1230,7 +1215,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
 
         <div v-else-if="activeSection === 'contacts'" class="list-items">
-          <AppEmptyState v-if="!filteredContacts.length" title="暂无联系人" description="暂无联系人" />
+          <AppEmptyState v-if="!filteredContacts.length" title="暂无联系人" description="暂无联系人" icon="contacts" />
           <AppListItem
             v-for="item in filteredContacts"
             v-else
@@ -1239,7 +1224,7 @@ provideEmployeeShellContexts(employeeShellContexts);
             @click="shell.selectItem('contacts', item.id)"
           >
             <div class="generic-row">
-              <AppAvatar :label="item.name.slice(0, 1)" tone="primary" />
+              <AppAvatar :label="item.name.slice(0, 1)" :image="item.avatarUrl" tone="primary" />
               <div class="generic-copy">
                 <div class="title-line">
                   <strong>{{ item.name }}</strong>

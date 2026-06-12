@@ -68,8 +68,8 @@ const emit = defineEmits<{
 .message-bubble {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-12);
-  max-width: min(42rem, calc(100% - 4rem));
+  gap: var(--space-10, 0.625rem);
+  max-width: min(44rem, calc(100% - 4rem));
 }
 
 .message-bubble.right {
@@ -78,20 +78,22 @@ const emit = defineEmits<{
 }
 
 .bubble-content {
-  padding: var(--space-16);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-12);
-  background: var(--surface-panel);
-  box-shadow: var(--shadow-sm);
+  padding: var(--space-10, 0.625rem) var(--space-14, 0.875rem);
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem 1rem 1rem 0.375rem;
+  background: #fff;
+  box-shadow: 0 1px 1px rgba(16, 24, 40, 0.04);
 }
 
 .message-bubble.right .bubble-content {
-  border-color: color-mix(in srgb, var(--primary-200) 75%, var(--border-default));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--primary-50) 80%, transparent), var(--surface-panel));
+  border-color: #c8e6c9;
+  border-radius: 1rem 1rem 0.375rem 1rem;
+  background: #d9fdd3;
 }
 
 .message-bubble.agent .bubble-content {
-  border-color: color-mix(in srgb, var(--success-200) 70%, var(--border-default));
+  border-color: #cfe3ff;
+  background: #f7fbff;
 }
 
 .bubble-meta {
@@ -120,10 +122,10 @@ const emit = defineEmits<{
 }
 
 .bubble-content p {
-  margin: var(--space-8) 0 0;
-  color: var(--text-secondary);
+  margin: var(--space-6, 0.375rem) 0 0;
+  color: #1f2937;
   font-size: var(--text-body-sm);
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
 .bubble-attachments {

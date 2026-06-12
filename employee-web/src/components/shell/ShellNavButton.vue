@@ -30,10 +30,10 @@ defineProps<{
   align-items: center;
   gap: var(--space-4);
   width: 100%;
-  min-height: 3.75rem;
+  min-height: 3.625rem;
   padding: var(--space-8) var(--space-4);
   border: 0;
-  border-radius: var(--radius-12);
+  border-radius: var(--radius-10, 0.625rem);
   background: transparent;
   color: rgba(255, 255, 255, 0.76);
   text-align: center;
@@ -44,26 +44,26 @@ defineProps<{
 
 .shell-nav-button:hover,
 .shell-nav-button:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
   outline: none;
 }
 
 .shell-nav-button.active {
-  background: rgba(255, 255, 255, 0.10);
+  background: #1677ff;
   color: #fff;
 }
 
 .shell-nav-button.active::before {
   position: absolute;
   top: 50%;
-  left: 50%;
-  width: 1.75rem;
-  height: 0.1875rem;
+  left: -0.5rem;
+  width: 0.25rem;
+  height: 1.5rem;
   border-radius: 999px;
-  background: var(--accent-signal);
+  background: #fff;
   content: '';
-  transform: translate(-50%, 1.15rem);
+  transform: translateY(-50%);
 }
 
 .shell-nav-button.compact {

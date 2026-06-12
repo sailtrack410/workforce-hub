@@ -588,7 +588,10 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
   const sentByCurrentUser = currentUserId !== undefined && message.senderType === 'USER' && String(message.senderId) === String(currentUserId);
   const content = parseMessageContentJson(message.contentJson);
   const knowledgeCard = message.messageType === 'CARD' ? parseKnowledgeAnswerCard(content) : undefined;
-  const contentText = message.contentText || businessTextFromContent(content);
+  const parsedContentText = parseMessageContentJson(message.contentText);
+  const contentText = parsedContentText
+    ? businessTextFromContent(parsedContentText)
+    : message.contentText || businessTextFromContent(content);
   const attachments = (message.attachments ?? []).map((attachment) => ({
     id: `im-attachment-${attachment.attachmentRefId}`,
     name: attachment.displayName,

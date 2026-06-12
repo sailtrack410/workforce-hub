@@ -58,7 +58,7 @@ describe('createApiClient', () => {
 
   it('preserves unsafe integer ids from JSON responses as strings', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(
-      '{"code":0,"message":"ok","data":{"conversationId":2053928981082898411,"seqNo":2,"uploadTicketId":2053928981082898444,"downloadTicketId":2053928981082898455,"primaryDeptId":2053928808839610369,"positionId":2053928809028354049,"leaveTypeId":2053928811234567890,"agentId":2053928980726382594,"publishedVersionId":2053928980726382595,"nested":{"messageId":2053928981082898422},"contentJson":"{\\"agentTaskId\\": 2053928981082898433}"}}',
+      '{"code":0,"message":"ok","data":{"conversationId":2053928981082898411,"seqNo":2,"uploadTicketId":2053928981082898444,"downloadTicketId":2053928981082898455,"primaryDeptId":2053928808839610369,"positionId":2053928809028354049,"leaveTypeId":2053928811234567890,"avatarAttachmentRefId":2053928981082898466,"agentId":2053928980726382594,"publishedVersionId":2053928980726382595,"nested":{"messageId":2053928981082898422},"contentJson":"{\\"agentTaskId\\": 2053928981082898433}"}}',
       { status: 200, headers: { 'Content-Type': 'application/json' } },
     ));
     const client = createApiClient({ fetcher });
@@ -71,6 +71,7 @@ describe('createApiClient', () => {
       primaryDeptId: string;
       positionId: string;
       leaveTypeId: string;
+      avatarAttachmentRefId: string;
       agentId: string;
       publishedVersionId: string;
       nested: { messageId: string };
@@ -85,6 +86,7 @@ describe('createApiClient', () => {
       primaryDeptId: '2053928808839610369',
       positionId: '2053928809028354049',
       leaveTypeId: '2053928811234567890',
+      avatarAttachmentRefId: '2053928981082898466',
       agentId: '2053928980726382594',
       publishedVersionId: '2053928980726382595',
       nested: { messageId: '2053928981082898422' },
