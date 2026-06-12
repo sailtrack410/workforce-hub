@@ -1116,10 +1116,13 @@ provideEmployeeShellContexts(employeeShellContexts);
                 <div class="message-row-main">
                   <div class="message-avatar-wrap">
                     <AppAvatar
-                      :label="item.badge"
+                      :label="item.title"
+                      :image="item.avatarUrl"
                       :tone="toneOfConversation(item.tone)"
                       :status="item.kind === 'agent' ? 'online' : ''"
-                    />
+                    >
+                      <UserRound :size="20" />
+                    </AppAvatar>
                     <span v-if="item.kind === 'team'" class="conversation-kind-glyph kind-team" aria-hidden="true">
                       <UsersRound :size="11" />
                     </span>

@@ -138,9 +138,10 @@ export interface ConversationPanel {
 
 export interface ConversationRecord {
   id: string;
-  kind: 'approval' | 'team' | 'agent' | 'attendance' | 'file';
+  kind: 'approval' | 'team' | 'agent' | 'attendance' | 'file' | 'private';
   tone: ConversationTone;
   badge: string;
+  avatarUrl?: string;
   title: string;
   subtitle: string;
   memberCount?: number;
@@ -708,7 +709,7 @@ function matchesConversationFilter(item: ConversationRecord, filter: SectionFilt
   if (filter === '未处理') return item.unread > 0 || isPendingStatus(item.status);
   if (filter === 'Agent') return item.kind === 'agent' || item.title.includes('Agent') || item.tag.includes('Agent');
   if (filter === '群聊') return item.kind === 'team';
-  if (filter === '私聊') return item.kind === 'approval' || item.kind === 'attendance' || item.kind === 'file';
+  if (filter === '私聊') return item.kind === 'approval' || item.kind === 'attendance' || item.kind === 'file' || item.kind === 'private';
   return true;
 }
 

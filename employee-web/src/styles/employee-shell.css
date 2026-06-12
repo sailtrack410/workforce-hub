@@ -627,13 +627,14 @@
 
 .conversation-kind-pill {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  height: 1.1rem;
-  margin-left: var(--space-6);
-  padding: 0 var(--space-6);
-  font-size: 0.7rem;
+  min-height: 1.35rem;
+  padding: 0 var(--space-9, 0.5625rem);
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  line-height: 1;
   border-radius: 999px;
   border: 1px solid transparent;
   vertical-align: middle;
@@ -698,8 +699,16 @@
 .message-title-line {
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-12);
+}
+
+.title-line {
+  justify-content: space-between;
+}
+
+.message-title-line {
+  justify-content: flex-start;
+  gap: var(--space-8);
 }
 
 .title-line strong,

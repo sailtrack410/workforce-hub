@@ -150,7 +150,11 @@ export const useImStore = defineStore('employee-im', {
         if (record) {
           const mapped = mapImConversationToRecord(detail.conversation);
           record.panel.members = detail.members.map(mapConversationMember);
-          record.memberCount = detail.members.length || record.memberCount;
+          if (record.kind === 'team') {
+            record.memberCount = detail.members.length || record.memberCount;
+          } else {
+            record.memberCount = undefined;
+          }
           record.title = detail.groupProfile?.title || mapped.title;
           record.summaryTitle = record.title;
           record.cards = [
@@ -524,7 +528,7 @@ export const useImStore = defineStore('employee-im', {
       const record = this.conversations.find((item) => item.id === key);
       if (record) {
         record.panel.members = members.map(mapConversationMember);
-        record.memberCount = members.length;
+        record.memberCount = record.kind === 'team' ? members.length : undefined;
       }
       const detail = this.detailsByConversation[key];
       if (detail) detail.members = members;
@@ -557,6 +561,7 @@ export function mapImConversationToRecord(conversation: ImConversationSummaryRes
     kind,
     tone: toneOfKind(kind),
     badge: title.slice(0, 2),
+    avatarUrl: '',
     title,
     subtitle: summaryBody,
     meta: formatConversationDate(conversation.lastMessageAt),
@@ -628,6 +633,7 @@ function resolveMessageSide(message: ImMessageResponse, sentByCurrentUser: boole
 function normalizeConversationKind(conversationType: string): ConversationRecord['kind'] {
   if (conversationType === 'GROUP') return 'team';
   if (conversationType === 'AGENT') return 'agent';
+  if (conversationType === 'PRIVATE') return 'private';
   return 'file';
 }
 

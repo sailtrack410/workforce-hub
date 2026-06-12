@@ -124,6 +124,7 @@ describe('IM store', () => {
 
     expect(record).toMatchObject({
       id: '7001',
+      kind: 'private',
       title: '张三与李四',
       subtitle: '下午同步一下排班。',
       unread: 1,
@@ -246,7 +247,45 @@ describe('IM store', () => {
       userId: 2002,
       memberType: 'USER',
     }]);
-    expect(im.conversations[0].memberCount).toBe(1);
+    expect(im.conversations[0].memberCount).toBeUndefined();
+  });
+
+  it('only writes member count back to group conversations', async () => {
+    const im = useImStore();
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      conversations: () => Promise.resolve([{ ...conversation, conversationType: 'GROUP', title: '项目推进群' }]),
+      conversationDetail: () => Promise.resolve({
+        conversation: { ...conversation, conversationType: 'GROUP', title: '项目推进群' },
+        members: [
+          {
+            memberId: 2002,
+            memberType: 'USER',
+            displayName: '张三',
+            memberRole: 'OWNER',
+            status: 'ACTIVE',
+            joinedAt: '2026-05-09T09:00:00',
+          },
+          {
+            memberId: 2003,
+            memberType: 'USER',
+            displayName: '李四',
+            memberRole: 'MEMBER',
+            status: 'ACTIVE',
+            joinedAt: '2026-05-09T09:00:00',
+          },
+        ],
+        groupProfile: null,
+      }),
+    };
+
+    await im.loadConversations({}, imApi);
+    await im.loadConversationDetail(7001, imApi);
+
+    expect(im.conversations[0]).toMatchObject({
+      kind: 'team',
+      memberCount: 2,
+    });
   });
 
   it('loads visible conversation details so contacts can use real members', async () => {
