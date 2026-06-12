@@ -68,6 +68,11 @@ export interface EmployeeImApi {
   downloadAttachmentUrl(ticketNo: string): string;
 }
 
+export interface EmployeeFilesApi {
+  createDownloadTicket(attachmentRefId: EntityId, request: CreateDownloadTicketRequest): Promise<DownloadTicketResponse>;
+  downloadUrl(ticketNo: string): string;
+}
+
 export const useImStore = defineStore('employee-im', {
   state: () => ({
     conversations: [] as ConversationRecord[],
@@ -86,12 +91,26 @@ export const useImStore = defineStore('employee-im', {
     _loadDetailSeq: 0,
   }),
   actions: {
-    async loadConversations(query: ImConversationListQuery = {}, imApi: EmployeeImApi = employeeApi.im) {
+    async loadConversations(
+      query: ImConversationListQuery = {},
+      imApi: EmployeeImApi = employeeApi.im,
+      filesApi: EmployeeFilesApi = employeeApi.files,
+    ) {
       this.loading = true;
       this.error = '';
       try {
         const conversations = await imApi.conversations(query);
         this.conversations = conversations.map(mapImConversationToRecord);
+        await Promise.all(conversations.map(async (conversation, index) => {
+          if (!conversation.avatarFileId) return;
+          try {
+            const ticket = await filesApi.createDownloadTicket(conversation.avatarFileId, { downloadType: 'INLINE' });
+            const url = ticket.downloadUrl || filesApi.downloadUrl(ticket.ticketNo);
+            this.conversations[index].avatarUrl = /^https?:\/\//i.test(url) || url.startsWith('/') ? url : `/${url}`;
+          } catch {
+            this.conversations[index].avatarUrl = '';
+          }
+        }));
         this.lastMessageSeqByConversation = Object.fromEntries(
           conversations.map((conversation) => [String(conversation.conversationId), conversation.lastMessageSeq]),
         );
@@ -495,6 +514,7 @@ export const useImStore = defineStore('employee-im', {
         next[existingIndex] = {
           ...next[existingIndex],
           ...record,
+          avatarUrl: record.avatarUrl || next[existingIndex].avatarUrl,
           messages: this.messagesByConversation[key] ?? next[existingIndex].messages,
         };
         this.conversations = next;

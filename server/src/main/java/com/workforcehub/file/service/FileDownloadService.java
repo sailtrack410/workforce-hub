@@ -45,9 +45,6 @@ public class FileDownloadService {
     public DownloadTicketResponse createEmployeeDownloadTicket(Long attachmentRefId, CreateDownloadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
-        if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
-            throw new BizException(403, "无权访问该文件");
-        }
         ensureEmployeeDownloadableAttachment(attachment);
         if (attachment.deletedAt() != null || attachment.isDeleted() != 0) {
             throw new BizException(409, "文件已删除");
@@ -55,6 +52,13 @@ public class FileDownloadService {
         String downloadType = normalizeEmployeeDownloadType(request.getDownloadType());
         if (downloadType == null) {
             throw new BizException(400, "员工端仅支持单文件下载或内联预览");
+        }
+        boolean ownUpload = "USER".equals(attachment.uploaderType()) && userId.equals(attachment.uploaderId());
+        boolean inlineAvatar = "USER_AVATAR".equals(attachment.ownerType())
+            && "USER".equals(attachment.uploaderType())
+            && "INLINE".equals(downloadType);
+        if (!ownUpload && !inlineAvatar) {
+            throw new BizException(403, "无权访问该文件");
         }
 
         Long ticketId = IdWorker.getId();
@@ -106,7 +110,11 @@ public class FileDownloadService {
         }
 
         DownloadAttachmentRow attachment = attachmentRefRepository.getDownloadAttachmentOrThrow(ticket.attachmentRefId());
-        if (!"USER".equals(attachment.uploaderType()) || !userId.equals(attachment.uploaderId())) {
+        boolean ownUpload = "USER".equals(attachment.uploaderType()) && userId.equals(attachment.uploaderId());
+        boolean inlineAvatar = "USER_AVATAR".equals(attachment.ownerType())
+            && "USER".equals(attachment.uploaderType())
+            && "INLINE".equals(ticket.downloadType());
+        if (!ownUpload && !inlineAvatar) {
             throw new BizException(403, "无权访问该文件");
         }
         ensureEmployeeDownloadableAttachment(attachment);

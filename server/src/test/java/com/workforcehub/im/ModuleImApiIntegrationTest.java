@@ -124,6 +124,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     @DisplayName("员工应只能看到自己参与的活跃会话并返回最后消息和未读数")
     void employeeShouldListOnlyJoinedActiveConversations() throws Exception {
         Cookie employeeSession = loginEmployee("zhangsan.employee");
+        jdbcTemplate.update("UPDATE org_user SET avatar_attachment_ref_id = ? WHERE id = ?", 9901L, MANAGER_USER_ID);
         seedPrivateConversation();
         seedOtherConversation();
         seedInactiveConversation();
@@ -138,6 +139,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[0].conversationId").value(7001))
             .andExpect(jsonPath("$.data[0].conversationType").value("PRIVATE"))
             .andExpect(jsonPath("$.data[0].title").value("张三与李四"))
+            .andExpect(jsonPath("$.data[0].avatarFileId").value(9901))
             .andExpect(jsonPath("$.data[0].lastMessageSeq").value(2))
             .andExpect(jsonPath("$.data[0].lastMessage.senderType").value("USER"))
             .andExpect(jsonPath("$.data[0].lastMessage.senderId").value(MANAGER_USER_ID))

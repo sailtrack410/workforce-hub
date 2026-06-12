@@ -69,7 +69,12 @@ const emit = defineEmits<{
   display: flex;
   align-items: flex-end;
   gap: var(--space-10, 0.625rem);
+  min-width: 0;
   max-width: min(44rem, calc(100% - 4rem));
+}
+
+.message-bubble .ui-avatar-wrap {
+  flex: 0 0 auto;
 }
 
 .message-bubble.right {
@@ -78,11 +83,14 @@ const emit = defineEmits<{
 }
 
 .bubble-content {
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-10, 0.625rem) var(--space-14, 0.875rem);
   border: 1px solid #e2e8f0;
   border-radius: 1rem 1rem 1rem 0.375rem;
   background: #fff;
   box-shadow: 0 1px 1px rgba(16, 24, 40, 0.04);
+  overflow-wrap: anywhere;
 }
 
 .message-bubble.right .bubble-content {
@@ -126,6 +134,9 @@ const emit = defineEmits<{
   color: #1f2937;
   font-size: var(--text-body-sm);
   line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .bubble-attachments {

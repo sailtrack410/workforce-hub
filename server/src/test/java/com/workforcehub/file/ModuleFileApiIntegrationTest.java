@@ -155,6 +155,64 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("头像附件应允许其他员工内联获取下载票据")
+    void avatarAttachmentShouldAllowOtherEmployeeInlineDownloadTicket() throws Exception {
+        Cookie ownerSession = loginEmployee();
+        Cookie otherEmployeeSession = loginEmployee("lisi.manager");
+        seedDefaultQuotaPolicy();
+        byte[] content = "shared-avatar-image-content".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        MvcResult ticketResult = createUploadTicket(
+                ownerSession,
+                "shared-avatar.png",
+                "image/png",
+                content.length,
+                sha256,
+                "shared-avatar-upload-" + System.nanoTime(),
+                "USER_AVATAR")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        MvcResult confirmResult = confirmUpload(
+                ownerSession,
+                uploadTicketId,
+                objectKey,
+                sha256,
+                content.length,
+                "shared-avatar.png",
+                "USER_AVATAR")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        Long avatarAttachmentRefId = data(confirmResult).get("attachmentRefId").asLong();
+
+        MvcResult downloadTicketResult = mockMvc.perform(post("/api/employee/files/{attachmentRefId}/download-tickets", avatarAttachmentRefId)
+                .cookie(otherEmployeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "downloadType": "INLINE"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.downloadUrl").value(containsString("/api/employee/files/download/")))
+            .andReturn();
+
+        String ticketNo = data(downloadTicketResult).get("ticketNo").asText();
+        mockMvc.perform(get("/api/employee/files/download/{ticketNo}", ticketNo)
+                .cookie(otherEmployeeSession))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(content));
+    }
+
+    @Test
     @DisplayName("员工应能完成 LOCAL 上传票据、确认上传、秒传与下载票据闭环")
     void employeeShouldUploadConfirmDeduplicateAndCreateDownloadTicket() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -1474,14 +1532,18 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private Cookie loginEmployee() throws Exception {
+        return loginEmployee("zhangsan.employee");
+    }
+
+    private Cookie loginEmployee(String loginName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "loginName": "zhangsan.employee",
+                      "loginName": "%s",
                       "password": "Employee@123456"
                     }
-                    """))
+                    """.formatted(loginName)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(cookie().exists("SESSION"))

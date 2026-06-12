@@ -235,6 +235,28 @@ describe('IM store', () => {
     expect(im.lastReadSeqByConversation['7001']).toBe(1);
   });
 
+  it('loads conversation avatar download url from avatar file id', async () => {
+    const im = useImStore();
+    const filesApi = {
+      createDownloadTicket: vi.fn().mockResolvedValue({
+        downloadTicketId: 2,
+        ticketNo: 'AVATAR-1',
+        downloadUrl: '/files/avatar-1.png',
+        fileName: 'avatar.png',
+        fileSize: 128,
+      }),
+      downloadUrl: vi.fn((ticketNo: string) => `/api/employee/files/download/${ticketNo}`),
+    };
+
+    await im.loadConversations({}, {
+      ...createImApi(),
+      conversations: () => Promise.resolve([{ ...conversation, avatarFileId: 9901 }]),
+    }, filesApi);
+
+    expect(filesApi.createDownloadTicket).toHaveBeenCalledWith(9901, { downloadType: 'INLINE' });
+    expect(im.conversations[0].avatarUrl).toBe('/files/avatar-1.png');
+  });
+
   it('loads conversation members into shell panel', async () => {
     const im = useImStore();
 

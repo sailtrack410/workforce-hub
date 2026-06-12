@@ -101,7 +101,10 @@ public class ImRepository {
                    c.conversation_type,
                    c.conversation_key,
                    c.title,
-                   c.avatar_file_id,
+                   COALESCE(
+                       CASE WHEN c.conversation_type = 'PRIVATE' THEN private_user.avatar_attachment_ref_id END,
+                       c.avatar_file_id
+                   ) AS avatar_file_id,
                    c.bound_agent_id,
                    c.last_message_seq,
                    m.last_read_seq,
@@ -122,6 +125,15 @@ public class ImRepository {
                    lm.sent_at AS last_message_sent_at
             FROM im_conversation_member m
             JOIN im_conversation c ON c.id = m.conversation_id
+            LEFT JOIN im_conversation_member private_peer
+                   ON c.conversation_type = 'PRIVATE'
+                  AND private_peer.conversation_id = c.id
+                  AND private_peer.member_type = 'USER'
+                  AND private_peer.member_id <> m.member_id
+                  AND private_peer.status = 'ACTIVE'
+            LEFT JOIN org_user private_user
+                   ON private_user.id = private_peer.member_id
+                  AND private_user.is_deleted = 0
             LEFT JOIN im_message lm ON lm.id = c.last_message_id
             """;
     }
