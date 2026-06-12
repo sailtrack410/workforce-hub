@@ -19,7 +19,7 @@ public class ImWebSocketConfig implements WebSocketConfigurer {
 
     public ImWebSocketConfig(ImWebSocketHandler imWebSocketHandler,
                              ImWebSocketHandshakeInterceptor handshakeInterceptor,
-                             @Value("${workforce.im.websocket.allowed-origin-patterns:http://localhost:5173,http://127.0.0.1:5173}") String[] allowedOriginPatterns) {
+                             @Value("${workforce.im.websocket.allowed-origin-patterns:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5175,http://127.0.0.1:5175}") String[] allowedOriginPatterns) {
         this.imWebSocketHandler = imWebSocketHandler;
         this.handshakeInterceptor = handshakeInterceptor;
         this.allowedOriginPatterns = allowedOriginPatterns;

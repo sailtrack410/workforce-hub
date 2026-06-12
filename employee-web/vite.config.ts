@@ -72,6 +72,7 @@ function resolveLocalUploadTargets(uploadPath: string) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const apiProxyTarget = env.VITE_API_PROXY_TARGET || 'http://localhost:8080';
+  const wsProxyOrigin = env.VITE_WS_PROXY_ORIGIN || 'http://127.0.0.1:5173';
   const nodeEnv = process.env.NODE_ENV ?? (mode === 'production' ? 'production' : 'development');
 
   return {
@@ -104,6 +105,11 @@ export default defineConfig(({ mode }) => {
           target: apiProxyTarget,
           changeOrigin: true,
           ws: true,
+          configure(proxy) {
+            proxy.on('proxyReqWs', (proxyReq) => {
+              proxyReq.setHeader('Origin', wsProxyOrigin);
+            });
+          },
         },
       },
     },

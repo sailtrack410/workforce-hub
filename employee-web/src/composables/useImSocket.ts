@@ -19,6 +19,8 @@ export function useImSocket({ im, session, shell, syncConversationMessages }: Us
   let reconnectTimer: number | undefined;
   let heartbeatTimer: number | undefined;
   let reconnectAttempts = 0;
+  const slowReconnectAfterAttempts = 3;
+  const slowReconnectDelay = 60000;
 
   function websocketUrl() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -42,12 +44,15 @@ export function useImSocket({ im, session, shell, syncConversationMessages }: Us
       socket.close();
       socket = null;
     }
+    reconnectAttempts = 0;
     wsConnected.value = false;
   }
 
   function scheduleImSocketReconnect() {
     if (!session.isAuthenticated || reconnectTimer) return;
-    const delay = Math.min(10000, 800 + reconnectAttempts * 1200);
+    const delay = reconnectAttempts >= slowReconnectAfterAttempts
+      ? slowReconnectDelay
+      : Math.min(10000, 800 + reconnectAttempts * 1200);
     reconnectAttempts += 1;
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = undefined;

@@ -102,8 +102,8 @@ const {
       </div>
     </details>
   </section>
-  <section class="content-stack">
-    <AppEmptyState title="暂无待办" description="暂无待办" />
+  <section v-else class="content-stack todo-empty-stack">
+    <AppEmptyState icon="todos" title="暂无待办" description="新的审批和任务会显示在这里" />
   </section>
 </div>
 </template>

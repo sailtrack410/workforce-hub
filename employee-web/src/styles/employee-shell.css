@@ -2248,14 +2248,20 @@
   background: var(--surface-canvas);
   border-left: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
   transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 0.2s ease, transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.2s ease;
+  visibility: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .group-drawer.open {
+  opacity: 1;
+  pointer-events: auto;
   transform: translateX(0);
+  visibility: visible;
 }
 
 .group-drawer .ui-drawer {
@@ -3096,14 +3102,18 @@
   overflow: hidden;
   border-left: 1px solid transparent;
   background: #fff;
-  transform: translateX(100%);
-  transition: transform var(--transition-base);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base), visibility var(--transition-base);
+  visibility: hidden;
   z-index: 8;
 }
 
 .context-panel.open {
   border-left-color: color-mix(in srgb, var(--border-subtle) 70%, transparent);
-  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .context-block + .context-block {

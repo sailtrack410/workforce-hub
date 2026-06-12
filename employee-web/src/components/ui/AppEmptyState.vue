@@ -22,6 +22,8 @@ const props = defineProps<{
 <style scoped>
 .ui-empty-state {
   display: grid;
+  align-content: center;
+  align-items: center;
   justify-items: center;
   gap: var(--space-12);
   padding: var(--space-32) var(--space-20);
