@@ -9,6 +9,7 @@ import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
+import AdminFilterBar from '@/components/AdminFilterBar.vue';
 
 const store = usePositionStore();
 const toast = useToast();

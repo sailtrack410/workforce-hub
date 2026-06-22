@@ -164,6 +164,7 @@ public class AgentService implements ImAgentTriggerService {
 
     public List<AgentToolResponse> listAdminAgentTools() {
         return agentRepository.listTools().stream()
+            .filter(row -> TOOL_TYPES.contains(row.toolType()))
             .map(this::toToolResponse)
             .toList();
     }
@@ -273,16 +274,29 @@ public class AgentService implements ImAgentTriggerService {
             throw new BizException(409, "Agent显示版本号已存在");
         }
         Long versionId = IdWorker.getId();
+        String modelConfigJson = normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON");
+        String systemPrompt = trimToNull(request.getSystemPrompt());
+        String workflowConfigJson = normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON");
         agentRepository.insertAgentVersion(
             versionId,
             agentId,
             versionNo,
             versionLabel,
-            normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON"),
-            trimToNull(request.getSystemPrompt()),
-            normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON"),
+            modelConfigJson,
+            systemPrompt,
+            workflowConfigJson,
             operatorId
         );
+        if (workflowParser.isWorkflowConfig(workflowConfigJson) && hasEmbeddedToolCalls(workflowConfigJson)) {
+            agentRepository.updateAgentVersionWorkflowTest(
+                versionId,
+                modelConfigJson,
+                systemPrompt,
+                workflowConfigJson,
+                workflowTestSignature(workflowConfigJson, systemPrompt, modelConfigJson),
+                operatorId
+            );
+        }
         return toVersionResponse(agentRepository.getVersionOrThrow(versionId));
     }
 
@@ -293,13 +307,27 @@ public class AgentService implements ImAgentTriggerService {
         if (!"DRAFT".equals(version.publishStatus())) {
             throw new BizException(409, "只有草稿版本可以修改");
         }
+        String modelConfigJson = normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON");
+        String systemPrompt = trimToNull(request.getSystemPrompt());
+        String workflowConfigJson = normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON");
+        boolean oldWorkflow = workflowParser.isWorkflowConfig(version.workflowConfigJson());
         agentRepository.updateAgentVersion(
             versionId,
-            normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON"),
-            trimToNull(request.getSystemPrompt()),
-            normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON"),
+            modelConfigJson,
+            systemPrompt,
+            workflowConfigJson,
             operatorId
         );
+        if (!oldWorkflow && workflowParser.isWorkflowConfig(workflowConfigJson)) {
+            agentRepository.updateAgentVersionWorkflowTest(
+                versionId,
+                modelConfigJson,
+                systemPrompt,
+                workflowConfigJson,
+                workflowTestSignature(workflowConfigJson, systemPrompt, modelConfigJson),
+                operatorId
+            );
+        }
         return toVersionResponse(agentRepository.getVersionOrThrow(versionId));
     }
 
@@ -1149,6 +1177,8 @@ public class AgentService implements ImAgentTriggerService {
                     input.put("query", raw);
                 }
             }
+            input.putIfAbsent("userId", 2003L);
+            input.putIfAbsent("currentUserId", input.get("userId"));
             input.putIfAbsent(StringUtils.hasText(startNode.outputKey()) ? startNode.outputKey() : startNode.id(), Map.copyOf(input));
             input.forEach((k, v) -> {
                 if (v instanceof String s) context.put(k, s);
@@ -1257,6 +1287,24 @@ public class AgentService implements ImAgentTriggerService {
             return builder.toString();
         } catch (Exception e) {
             throw new BizException(400, e.getMessage());
+        }
+    }
+
+    private boolean hasEmbeddedToolCalls(String workflowConfigJson) {
+        try {
+            JsonNode nodes = objectMapper.readTree(workflowConfigJson).path("nodes");
+            if (!nodes.isArray()) {
+                return false;
+            }
+            for (JsonNode node : nodes) {
+                JsonNode toolCalls = node.path("config").path("toolCalls");
+                if (toolCalls.isArray() && !toolCalls.isEmpty()) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
         }
     }
 

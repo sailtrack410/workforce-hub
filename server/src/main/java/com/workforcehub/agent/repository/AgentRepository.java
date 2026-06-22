@@ -341,6 +341,18 @@ public class AgentRepository {
         return rows.get(0);
     }
 
+    public AgentRow findActivePreReviewAgent() {
+        List<AgentRow> rows = jdbcTemplate.query(agentSelectSql() + """
+            WHERE aa.agent_type = 'PRE_REVIEW'
+              AND aa.status = 'ACTIVE'
+              AND aa.published_version_id IS NOT NULL
+              AND aa.is_deleted = 0
+            ORDER BY aa.updated_at DESC, aa.id DESC
+            LIMIT 1
+            """, this::mapAgent);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
     public AgentVersionRow getVersionOrThrow(Long versionId) {
         List<AgentVersionRow> rows = jdbcTemplate.query(versionSelectSql() + """
             WHERE id = ?

@@ -43,6 +43,12 @@ public class TemplateResolver {
             Matcher exactMatcher = EXACT_TEMPLATE_PATTERN.matcher(text);
             if (exactMatcher.matches()) {
                 JsonNode value = context.get(exactMatcher.group(1));
+                if (value != null && value.isObject() && value.size() == 1) {
+                    JsonNode onlyValue = value.elements().next();
+                    if (onlyValue.isArray()) {
+                        return onlyValue.deepCopy();
+                    }
+                }
                 return value == null ? objectMapper.nullNode() : value.deepCopy();
             }
             return TextNode.valueOf(resolveString(text, context));

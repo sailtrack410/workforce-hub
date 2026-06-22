@@ -212,14 +212,20 @@ public class FileDownloadService {
 
     private void ensureEmployeeDownloadableAttachment(AttachmentRow attachment) {
         if (!"PERSONAL_FILE".equals(attachment.ownerType()) && !"USER_AVATAR".equals(attachment.ownerType())) {
-            throw new BizException(403, "员工端文件接口仅允许下载个人文件或头像");
+            throw new BizException(403, employeeDownloadErrorMessage(attachment.ownerType()));
         }
     }
 
     private void ensureEmployeeDownloadableAttachment(DownloadAttachmentRow attachment) {
         if (!"PERSONAL_FILE".equals(attachment.ownerType()) && !"USER_AVATAR".equals(attachment.ownerType())) {
-            throw new BizException(403, "员工端文件接口仅允许下载个人文件或头像");
+            throw new BizException(403, employeeDownloadErrorMessage(attachment.ownerType()));
         }
+    }
+
+    private String employeeDownloadErrorMessage(String ownerType) {
+        return "WF_REQUEST".equals(ownerType)
+            ? "员工端文件接口仅允许下载个人文件"
+            : "员工端文件接口仅允许下载个人文件或头像";
     }
 
     private String normalizeEmployeeDownloadType(String downloadType) {

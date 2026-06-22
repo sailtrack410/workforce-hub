@@ -655,10 +655,11 @@ public class WorkflowExecutor {
         }
         if (node.outputFormat().size() == 1) {
             JsonNode field = node.outputFormat().get(0);
+            String key = field.path("key").asText("").trim();
             String type = field.path("type").asText("string");
-            if (!"object".equals(type) && !"json".equals(type)) {
+            if (!StringUtils.hasText(key) && !"object".equals(type) && !"json".equals(type)) {
                 JsonNode sourceValue = output != null && output.isObject()
-                    ? output.path(field.path("key").asText(""))
+                    ? output.path(key)
                     : output;
                 return normalizeOutputField(sourceValue, field);
             }

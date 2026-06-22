@@ -442,6 +442,15 @@ def ensure_agent(admin: HttpClient, employee_user_ids: list[int]) -> int:
     detail = admin.request("GET", f"/api/admin/agents/{agent_id}").get("data") or {}
     version_id = detail.get("publishedVersionId")
     if not version_id:
+        for employee_user_id in employee_user_ids:
+            acl_resp = admin.request("POST", f"/api/admin/agents/{agent_id}/acl", {
+                "subjectType": "USER",
+                "subjectId": employee_user_id,
+                "permCode": "use",
+                "status": "ACTIVE",
+            }, allow_biz_error=True)
+            if acl_resp.get("code") not in (0, 409):
+                raise ApiError(f"授予 Agent ACL 失败 userId={employee_user_id} {acl_resp}")
         version_resp = admin.request("POST", f"/api/admin/agents/{agent_id}/versions", {
             "versionNo": 1,
             "modelConfigJson": json.dumps({}, ensure_ascii=False),
@@ -465,6 +474,42 @@ def ensure_agent(admin: HttpClient, employee_user_ids: list[int]) -> int:
         }, allow_biz_error=True)
         if acl_resp.get("code") not in (0, 409):
             raise ApiError(f"授予 Agent ACL 失败 userId={employee_user_id} {acl_resp}")
+    return agent_id
+
+
+def ensure_pre_review_agent(admin: HttpClient, employee_user_ids: list[int]) -> int:
+    agents = list_admin_agents(admin)
+    existing = next((item for item in agents if item.get("agentCode") == "DEMO_PRE_REVIEW_AGENT"), None)
+    if existing:
+        agent_id = int(existing["agentId"])
+    else:
+        create_resp = admin.request("POST", "/api/admin/agents", {
+            "agentCode": "DEMO_PRE_REVIEW_AGENT",
+            "agentName": "演示预审 Agent",
+            "agentType": "PRE_REVIEW",
+            "identityMode": "SYSTEM_IDENTITY",
+        })
+        agent_id = int(create_resp["data"]["agentId"])
+        log(f"创建演示预审 Agent -> agentId={agent_id}")
+    for employee_user_id in employee_user_ids:
+        acl_resp = admin.request("POST", f"/api/admin/agents/{agent_id}/acl", {
+            "subjectType": "USER",
+            "subjectId": employee_user_id,
+            "permCode": "use",
+            "status": "ACTIVE",
+        }, allow_biz_error=True)
+        if acl_resp.get("code") not in (0, 409):
+            raise ApiError(f"授予预审 Agent ACL 失败 userId={employee_user_id} {acl_resp}")
+    detail = admin.request("GET", f"/api/admin/agents/{agent_id}").get("data") or {}
+    if not detail.get("publishedVersionId"):
+        version_resp = admin.request("POST", f"/api/admin/agents/{agent_id}/versions", {
+            "versionNo": 1,
+            "modelConfigJson": json.dumps({}, ensure_ascii=False),
+            "systemPrompt": "你是审批预审 Agent，检查请假申请基础信息并输出预审结论。",
+        })
+        version_id = int(version_resp["data"]["versionId"])
+        admin.request("POST", f"/api/admin/agents/versions/{version_id}/publish")
+        log(f"发布演示预审 Agent versionId={version_id}")
     return agent_id
 
 
@@ -549,6 +594,7 @@ def main() -> int:
         employee1 = login_employee(client, "demo.employee1")
         leader = login_employee(client, "demo.leader")
         ensure_private_conversation(employee1, leader_user_id)
+        ensure_pre_review_agent(client, [employee1_user_id, employee2_user_id])
         ensure_workflow_demo(employee1, leader, leave_type_id)
 
         agent_id = ensure_agent(client, [employee1_user_id, employee2_user_id])
