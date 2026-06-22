@@ -120,11 +120,11 @@ class ModuleOrgWriteApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.userId").value(userId))
+            .andExpect(jsonLong("$.data.userId", userId))
             .andExpect(jsonPath("$.data.employeeNo").value("E9" + suffix))
-            .andExpect(jsonPath("$.data.primaryDeptId").value(deptId))
-            .andExpect(jsonPath("$.data.positionId").value(positionId))
-            .andExpect(jsonPath("$.data.managerUserId").value(managerUserId))
+            .andExpect(jsonLong("$.data.primaryDeptId", deptId))
+            .andExpect(jsonLong("$.data.positionId", positionId))
+            .andExpect(jsonLong("$.data.managerUserId", managerUserId))
             .andExpect(jsonPath("$.data.serviceStartDate").value("2026-05-02"))
             .andExpect(jsonPath("$.data.annualLeaveStartDate").value("2026-05-02"));
 

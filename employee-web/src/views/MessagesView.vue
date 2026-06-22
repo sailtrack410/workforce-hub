@@ -51,6 +51,7 @@ import { useCurrentUserAvatarUrl } from '../composables/useCurrentUserAvatarUrl'
 import { useEmployeeAuthFlow } from '../composables/useEmployeeAuthFlow';
 import { useFileUpload } from '../composables/useFileUpload';
 import { useImSocket } from '../composables/useImSocket';
+import { usePersonalFileTransfer } from '../composables/usePersonalFileTransfer';
 import { syncShellSessionProfile } from '../composables/useShellSessionProfileSync';
 import { fileSizeLabel, fileTypeLabel } from '@/utils/file-format';
 import {
@@ -189,6 +190,7 @@ const approvalTodos = computed(() => filteredTodos.value.filter((item) => item.p
 const deferredTodos = computed(() => filteredTodos.value.filter((item) => item.priority === '低'));
 const workbenchLaunchers = computed(() => filteredWorkbench.value);
 const hasActiveConversation = computed(() => Boolean(activeConversation.value.id));
+const { resolveDownloadUrl } = usePersonalFileTransfer();
 const {
   personalFileInput,
   fileUploading,
@@ -288,6 +290,19 @@ function showToast(message: string) {
     toastMessage.value = '';
     toastTimer = undefined;
   }, 2600);
+}
+
+async function refreshContactAvatarUrls() {
+  const contacts = shell.contacts.filter((item) => item.avatarAttachmentRefId && !item.avatarUrl);
+  await Promise.all(contacts.map(async (contact) => {
+    if (!contact.avatarAttachmentRefId) return;
+    try {
+      const ticket = await employeeApi.files.createDownloadTicket(contact.avatarAttachmentRefId, { downloadType: 'INLINE' });
+      contact.avatarUrl = resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo));
+    } catch {
+      contact.avatarUrl = '';
+    }
+  }));
 }
 
 const {
@@ -459,7 +474,8 @@ async function loadAuthenticatedWorkspace() {
   await im.loadVisibleConversationDetails();
   shell.mergeBackendConversations(im.conversations);
   syncShellSessionProfile(shell, session);
-  void refreshCurrentUserAvatarUrl();
+  await refreshCurrentUserAvatarUrl();
+  await refreshContactAvatarUrls();
   if (shell.conversations.length) {
     await syncConversationMessages(shell.active.messages);
   }
@@ -485,6 +501,7 @@ async function syncConversationMessages(id: string) {
   ]);
   shell.mergeBackendConversations(im.conversations);
   syncShellSessionProfile(shell, session);
+  void refreshContactAvatarUrls();
   const messages = im.messagesByConversation[id];
   if (messages?.length) {
     shell.mergeBackendMessages(id, messages);
@@ -685,7 +702,7 @@ onBeforeUnmount(() => {
 });
 
 watch(() => session.profile?.avatarAttachmentRefId, () => {
-  void refreshCurrentUserAvatarUrl();
+  void refreshCurrentUserAvatarUrl().then(refreshContactAvatarUrls);
 });
 
 watch([filterOptions, activeSection, searchOpen], () => {

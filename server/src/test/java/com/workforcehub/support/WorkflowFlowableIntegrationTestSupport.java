@@ -10,6 +10,7 @@ import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.ResultMatcher;
 
 import javax.sql.DataSource;
 import java.nio.file.Files;
@@ -17,11 +18,16 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
 /**
  * module-workflow 专用集成测试支撑。
  * 与普通本地集成测试基线不同，本基线显式保留 Flowable 自动配置，用真实流程引擎跑审批闭环。
  */
 public abstract class WorkflowFlowableIntegrationTestSupport {
+
+    private static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
+    private static final long MIN_SAFE_INTEGER = -9_007_199_254_740_991L;
 
     private static final String MYSQL_URL_TEMPLATE =
         "jdbc:mysql://%s:%s/%s?useUnicode=true&characterEncoding=UTF-8"
@@ -91,6 +97,17 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
         populator.setSqlScriptEncoding("UTF-8");
         populator.addScript(resolveSeedScript());
         DatabasePopulatorUtils.execute(populator, dataSource);
+    }
+
+    protected ResultMatcher jsonLong(String expression, long expected) {
+        return jsonPath(expression).value(jsonLongValue(expected));
+    }
+
+    protected Object jsonLongValue(long value) {
+        if (value >= MIN_SAFE_INTEGER && value <= MAX_SAFE_INTEGER) {
+            return value;
+        }
+        return String.valueOf(value);
     }
 
     private void resetRedisState() {

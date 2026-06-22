@@ -20,6 +20,16 @@ describe('adminApi', () => {
     expect(fetcher.mock.calls[0][0]).toBe('/api/admin/workflow/requests?status=APPROVED&pageNo=2');
   });
 
+  it('maps workflow template publish endpoint', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ versionId: '9001', status: 'PUBLISHED' }));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.workflow.publishTemplateVersion('9001', { flowableDefinitionKey: 'leave_manager_approval' });
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/workflow/template-versions/9001/publish');
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ flowableDefinitionKey: 'leave_manager_approval' });
+  });
+
   it('maps high-risk operation endpoints', async () => {
     const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ jobRunId: 'x', jobType: 'ALL_EXPIRED', dryRun: true, jobStatus: 'SUCCESS' }));
     const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
@@ -49,6 +59,38 @@ describe('adminApi', () => {
     expect(fetcher.mock.calls[0][0]).toBe('/api/admin/agents/versions/9001');
     expect(fetcher.mock.calls[0][1]?.method).toBe('PUT');
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ systemPrompt: 'updated' });
+  });
+
+  it('maps leave type update and delete endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ leaveTypeId: '7001' }));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.leave.updateType('7001', { leaveCode: 'ANNUAL', leaveName: '年假', balanceMode: 'DEDUCT', status: 'ACTIVE' });
+    await api.leave.deleteType('7001');
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/leave/types/7001');
+    expect(fetcher.mock.calls[0][1]?.method).toBe('PUT');
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({
+      leaveCode: 'ANNUAL',
+      leaveName: '年假',
+      balanceMode: 'DEDUCT',
+      status: 'ACTIVE',
+    });
+    expect(fetcher.mock.calls[1][0]).toBe('/api/admin/leave/types/7001');
+    expect(fetcher.mock.calls[1][1]?.method).toBe('DELETE');
+  });
+
+  it('maps system governance endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.system.roles();
+    await api.system.permissions();
+    await api.system.auditLogs({ pageNo: 2, pageSize: 10, actionType: 'UPLOAD' });
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/system/roles');
+    expect(fetcher.mock.calls[1][0]).toBe('/api/admin/system/permissions');
+    expect(fetcher.mock.calls[2][0]).toBe('/api/admin/system/audit-logs?pageNo=2&pageSize=10&actionType=UPLOAD');
   });
 
   it('maps ragflow global settings endpoint', async () => {

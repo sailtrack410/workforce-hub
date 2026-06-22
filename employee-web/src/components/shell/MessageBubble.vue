@@ -7,6 +7,7 @@ import type { EntityId } from '../../api';
 defineProps<{
   message: ConversationMessage;
   agent?: boolean;
+  avatarUrl?: string;
 }>();
 
 const emit = defineEmits<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   <article class="message-bubble" :class="[message.side, { agent }]">
     <AppAvatar
       :label="message.author.slice(0, 1)"
+      :image="avatarUrl"
       :tone="agent ? 'success' : message.side === 'right' ? 'primary' : 'neutral'"
       :status="agent ? 'online' : ''"
     />
@@ -70,7 +72,8 @@ const emit = defineEmits<{
   align-items: flex-end;
   gap: var(--space-10, 0.625rem);
   min-width: 0;
-  max-width: min(44rem, calc(100% - 4rem));
+  width: fit-content;
+  max-width: min(44rem, 100%);
 }
 
 .message-bubble .ui-avatar-wrap {
@@ -83,6 +86,7 @@ const emit = defineEmits<{
 }
 
 .bubble-content {
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   padding: var(--space-10, 0.625rem) var(--space-14, 0.875rem);
@@ -109,12 +113,21 @@ const emit = defineEmits<{
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-8);
+  min-width: 0;
   color: var(--text-tertiary);
   font-size: var(--text-caption-md);
 }
 
 .bubble-meta strong {
   color: var(--text-primary);
+}
+
+.bubble-meta strong,
+.bubble-meta span,
+.bubble-meta time {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .message-action {
@@ -171,6 +184,7 @@ const emit = defineEmits<{
 
 .attachment-actions {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: var(--space-8);
 }
 

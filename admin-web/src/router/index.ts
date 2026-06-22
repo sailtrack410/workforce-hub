@@ -17,6 +17,7 @@ const UserView = () => import('@/views/UserView.vue');
 const FileCleanupView = () => import('@/views/FileCleanupView.vue');
 const RagflowView = () => import('@/views/RagflowView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
+const SystemGovernanceView = () => import('@/views/SystemGovernanceView.vue');
 
 export const adminRoutes = [
   {
@@ -46,6 +47,7 @@ export const adminRoutes = [
       { path: 'users', name: 'admin-users', component: UserView },
       { path: 'files', name: 'admin-files', component: FileCleanupView },
       { path: 'ragflow', name: 'admin-ragflow', component: RagflowView },
+      { path: 'system', name: 'admin-system', component: SystemGovernanceView },
       { path: 'settings', name: 'admin-settings', component: SettingsView },
     ],
   },

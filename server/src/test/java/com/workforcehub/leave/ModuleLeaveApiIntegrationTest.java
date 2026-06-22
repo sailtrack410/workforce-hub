@@ -64,7 +64,7 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(suffix, suffix)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.leaveTypeId").isNumber())
+            .andExpect(jsonPath("$.data.leaveTypeId").isString())
             .andExpect(jsonPath("$.data.leaveCode").value("ANNUAL_" + suffix))
             .andExpect(jsonPath("$.data.leaveName").value("年假-" + suffix))
             .andExpect(jsonPath("$.data.balanceMode").value("DEDUCT"))
@@ -97,8 +97,8 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(EMPLOYEE_USER_ID, leaveTypeId, suffix)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.userId").value(EMPLOYEE_USER_ID))
-            .andExpect(jsonPath("$.data.leaveTypeId").value(leaveTypeId))
+            .andExpect(jsonLong("$.data.userId", EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.leaveTypeId", leaveTypeId))
             .andExpect(jsonPath("$.data.availableMinutes").value(960))
             .andExpect(jsonPath("$.data.lastTxnType").value("ADJUST"))
             .andExpect(jsonPath("$.data.lastChangeMinutes").value(960));
@@ -119,8 +119,8 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].userId").value(EMPLOYEE_USER_ID))
-            .andExpect(jsonPath("$.data[0].leaveTypeId").value(leaveTypeId))
+            .andExpect(jsonLong("$.data[0].userId", EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data[0].leaveTypeId", leaveTypeId))
             .andExpect(jsonPath("$.data[0].availableMinutes").value(960));
 
         mockMvc.perform(get("/api/admin/leave/accounts")

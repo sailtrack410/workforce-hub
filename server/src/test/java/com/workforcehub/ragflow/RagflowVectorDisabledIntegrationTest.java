@@ -58,7 +58,7 @@ class RagflowVectorDisabledIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.spaceId").isNumber())
+            .andExpect(jsonPath("$.data.spaceId").isString())
             .andReturn();
         return com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
             .readTree(result.getResponse().getContentAsString())

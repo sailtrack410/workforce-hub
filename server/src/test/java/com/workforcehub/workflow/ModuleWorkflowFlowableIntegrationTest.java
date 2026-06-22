@@ -89,7 +89,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                 .cookie(managerSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[0].requestId").value(scenario.requestId()))
+            .andExpect(jsonLong("$.data[0].requestId", scenario.requestId()))
             .andExpect(jsonPath("$.data[0].taskId").value(scenario.managerTask().getId()))
             .andExpect(jsonPath("$.data[0].title").value("张三的请假申请"))
             .andExpect(jsonPath("$.data[0].status").value("PENDING"));
@@ -104,7 +104,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonLong("$.data.requestId", scenario.requestId()))
             .andExpect(jsonPath("$.data.status").value("APPROVED"));
 
         assertNull(runtimeService.createProcessInstanceQuery()
@@ -139,7 +139,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").isNumber())
+            .andExpect(jsonPath("$.data.requestId").isString())
             .andExpect(jsonPath("$.data.requestNo").isString())
             .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
             .andExpect(jsonPath("$.data.flowableProcessInstanceId").isString())
@@ -174,7 +174,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").value(requestId))
+            .andExpect(jsonLong("$.data.requestId", requestId))
             .andExpect(jsonPath("$.data.status").value("APPROVED"));
 
         assertNull(runtimeService.createProcessInstanceQuery()
@@ -246,7 +246,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonLong("$.data.requestId", scenario.requestId()))
             .andExpect(jsonPath("$.data.status").value("REJECTED"));
 
         assertNull(runtimeService.createProcessInstanceQuery()
@@ -273,7 +273,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonLong("$.data.requestId", scenario.requestId()))
             .andExpect(jsonPath("$.data.status").value("WITHDRAWN"));
 
         assertNull(runtimeService.createProcessInstanceQuery()
@@ -295,7 +295,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                 .cookie(managerSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").value(scenario.requestId()))
+            .andExpect(jsonLong("$.data.requestId", scenario.requestId()))
             .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
             .andExpect(jsonPath("$.data.currentStepKey").value("manager_approval"))
             .andExpect(jsonPath("$.data.leave.reason").value("家中有事请假一天"))
@@ -329,8 +329,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                 .cookie(employeeSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[0].requestId").value(scenario.requestId()))
-            .andExpect(jsonPath("$.data[0].actorId").value(MANAGER_USER_ID))
+            .andExpect(jsonLong("$.data[0].requestId", scenario.requestId()))
+            .andExpect(jsonLong("$.data[0].actorId", MANAGER_USER_ID))
             .andExpect(jsonPath("$.data[0].actionType").value("APPROVE"))
             .andExpect(jsonPath("$.data[0].comment").value("同意"))
             .andExpect(jsonPath("$.data[0].afterStatus").value("APPROVED"));
@@ -352,7 +352,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
             .andExpect(jsonPath("$.data.pageNo").value(1))
             .andExpect(jsonPath("$.data.pageSize").value(20))
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.list[0].requestId").value(scenario.requestId()))
+            .andExpect(jsonLong("$.data.list[0].requestId", scenario.requestId()))
             .andExpect(jsonPath("$.data.list[0].status").value("IN_APPROVAL"))
             .andExpect(jsonPath("$.data.list[0].title").value("张三的请假申请"));
 
@@ -438,7 +438,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                 .cookie(employeeSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachments[0].attachmentRefId").value(workflowAttachmentRefId))
+            .andExpect(jsonLong("$.data.attachments[0].attachmentRefId", workflowAttachmentRefId))
             .andExpect(jsonPath("$.data.attachments[0].displayName").value("请假证明.pdf"))
             .andExpect(jsonPath("$.data.attachments[0].mimeType").value("application/pdf"));
 
@@ -661,7 +661,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                 .content(leaveRequestJson(annualLeaveTypeId, attachmentRefIds)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").isNumber())
+            .andExpect(jsonPath("$.data.requestId").isString())
             .andExpect(jsonPath("$.data.requestNo").isString())
             .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"))
             .andExpect(jsonPath("$.data.flowableProcessInstanceId").isString())

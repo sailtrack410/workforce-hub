@@ -29,6 +29,7 @@ const selectedDetail = ref<WorkflowRequestDetailResponse | null>(null);
 const templates = ref<WorkflowTemplateResponse[]>([]);
 const templateVersions = ref<WorkflowTemplateVersionResponse[]>([]);
 const actions = ref<WorkflowTaskActionResponse[]>([]);
+const publishingVersionId = ref<string | number | null>(null);
 
 const requestColumns: TableColumn[] = [
   { key: 'title', label: '申请' },
@@ -126,6 +127,30 @@ async function selectTemplate(templateId: string | number) {
     templateVersions.value = await adminApi.workflow.templateVersions(templateId);
   } catch (e) {
     toast.error(errorMessage(e));
+  }
+}
+
+async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) {
+  const template = templates.value.find((item) => String(item.templateId) === String(version.templateId));
+  const flowableDefinitionKey = template?.processCode === 'CLOCK_CORRECTION'
+    ? 'clock_correction_manager_approval'
+    : template?.processCode === 'LEAVE'
+      ? 'leave_manager_approval'
+      : '';
+  if (!flowableDefinitionKey) {
+    toast.error('未配置流程定义 Key');
+    return;
+  }
+
+  publishingVersionId.value = version.versionId;
+  try {
+    await adminApi.workflow.publishTemplateVersion(version.versionId, { flowableDefinitionKey });
+    toast.success('模板版本已发布');
+    await loadPage();
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    publishingVersionId.value = null;
   }
 }
 </script>
@@ -226,6 +251,14 @@ async function selectTemplate(templateId: string | number) {
           <article v-for="ver in templateVersions" :key="formatId(ver.versionId)">
             <strong>v{{ ver.versionNo }} · {{ statusLabel(ver.status) }}</strong>
             <span>#{{ shortId(ver.versionId) }} · {{ ver.flowableDefinitionKey || '-' }}</span>
+            <button
+              v-if="ver.status === 'DRAFT'"
+              class="primary-button action-btn"
+              :disabled="publishingVersionId === ver.versionId"
+              @click.stop="publishTemplateVersion(ver)"
+            >
+              发布
+            </button>
           </article>
         </AdminCompactList>
       </div>

@@ -142,7 +142,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[0].avatarFileId").value(9901))
             .andExpect(jsonPath("$.data[0].lastMessageSeq").value(2))
             .andExpect(jsonPath("$.data[0].lastMessage.senderType").value("USER"))
-            .andExpect(jsonPath("$.data[0].lastMessage.senderId").value(MANAGER_USER_ID))
+            .andExpect(jsonLong("$.data[0].lastMessage.senderId", MANAGER_USER_ID))
             .andExpect(jsonPath("$.data[0].lastMessage.contentText").value("下午同步一下排班。"))
             .andExpect(jsonPath("$.data[0].unreadCount").value(1))
             .andExpect(jsonPath("$.data[0].pin").value(false))
@@ -258,9 +258,9 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.conversation.conversationType").value("PRIVATE"))
             .andExpect(jsonPath("$.data.conversation.lastMessage.contentText").value("下午同步一下排班。"))
             .andExpect(jsonPath("$.data.members", hasSize(2)))
-            .andExpect(jsonPath("$.data.members[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.members[0].memberId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.members[0].displayName").value("张三"))
-            .andExpect(jsonPath("$.data.members[1].memberId").value(MANAGER_USER_ID))
+            .andExpect(jsonLong("$.data.members[1].memberId", MANAGER_USER_ID))
             .andExpect(jsonPath("$.data.members[1].displayName").value("李四"))
             .andExpect(jsonPath("$.data.groupProfile").doesNotExist());
     }
@@ -278,7 +278,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.members", hasSize(2)))
             .andExpect(jsonPath("$.data.members[0].displayName").value("张三"))
-            .andExpect(jsonPath("$.data.members[1].memberId").value(MANAGER_USER_ID))
+            .andExpect(jsonLong("$.data.members[1].memberId", MANAGER_USER_ID))
             .andExpect(jsonPath("$.data.members[1].displayName").value("USER:%d".formatted(MANAGER_USER_ID)));
     }
 
@@ -308,11 +308,11 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data", hasSize(2)))
             .andExpect(jsonPath("$.data[0].messageId").value(7101))
             .andExpect(jsonPath("$.data[0].seqNo").value(1))
-            .andExpect(jsonPath("$.data[0].senderId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data[0].senderId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data[0].contentText").value("我上午可以处理补卡。"))
             .andExpect(jsonPath("$.data[1].messageId").value(7102))
             .andExpect(jsonPath("$.data[1].seqNo").value(2))
-            .andExpect(jsonPath("$.data[1].senderId").value(MANAGER_USER_ID))
+            .andExpect(jsonLong("$.data[1].senderId", MANAGER_USER_ID))
             .andExpect(jsonPath("$.data[1].contentText").value("下午同步一下排班。"));
     }
 
@@ -416,7 +416,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.conversationId").value(7001))
             .andExpect(jsonPath("$.data.seqNo").value(3))
             .andExpect(jsonPath("$.data.senderType").value("USER"))
-            .andExpect(jsonPath("$.data.senderId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.senderId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.messageType").value("TEXT"))
             .andExpect(jsonPath("$.data.contentText").value("我下午两点同步。"))
             .andExpect(jsonPath("$.data.status").value("NORMAL"));
@@ -453,7 +453,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.conversationType").value("AGENT"))
             .andExpect(jsonPath("$.data.conversationKey").value("AGENT:%d:%d".formatted(EMPLOYEE_USER_ID, agentId)))
-            .andExpect(jsonPath("$.data.boundAgentId").value(agentId))
+            .andExpect(jsonLong("$.data.boundAgentId", agentId))
             .andExpect(jsonPath("$.data.title").value("IM问答助手"))
             .andExpect(jsonPath("$.data.lastMessageSeq").value(0))
             .andReturn();
@@ -464,13 +464,13 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.conversation.conversationType").value("AGENT"))
-            .andExpect(jsonPath("$.data.conversation.boundAgentId").value(agentId))
+            .andExpect(jsonLong("$.data.conversation.boundAgentId", agentId))
             .andExpect(jsonPath("$.data.members", hasSize(2)))
             .andExpect(jsonPath("$.data.members[0].memberType").value("USER"))
-            .andExpect(jsonPath("$.data.members[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.members[0].memberId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.members[0].displayName").value("张三"))
             .andExpect(jsonPath("$.data.members[1].memberType").value("AGENT"))
-            .andExpect(jsonPath("$.data.members[1].memberId").value(agentId))
+            .andExpect(jsonLong("$.data.members[1].memberId", agentId))
             .andExpect(jsonPath("$.data.members[1].displayName").value("IM问答助手"))
             .andExpect(jsonPath("$.data.groupProfile").doesNotExist());
 
@@ -484,7 +484,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(agentId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.conversationId").value(conversationId));
+            .andExpect(jsonLong("$.data.conversationId", conversationId));
 
         mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", conversationId)
                 .cookie(employeeSession)
@@ -512,7 +512,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[0].contentText").value("帮我总结今天待办"))
             .andExpect(jsonPath("$.data[1].seqNo").value(2))
             .andExpect(jsonPath("$.data[1].senderType").value("AGENT"))
-            .andExpect(jsonPath("$.data[1].senderId").value(agentId))
+            .andExpect(jsonLong("$.data[1].senderId", agentId))
             .andExpect(jsonPath("$.data[1].messageType").value("CARD"))
             .andExpect(jsonPath("$.data[1].contentText").value("年假与考勤影响"))
             .andExpect(jsonPath("$.data[1].contentJson").value(Matchers.allOf(
@@ -1194,7 +1194,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.seqNo").value(3))
             .andExpect(jsonPath("$.data.messageType").value("FILE"))
             .andExpect(jsonPath("$.data.attachments", hasSize(1)))
-            .andExpect(jsonPath("$.data.attachments[0].attachmentRefId").isNumber())
+            .andExpect(jsonPath("$.data.attachments[0].attachmentRefId").isString())
             .andExpect(jsonPath("$.data.attachments[0].displayName").value("排班附件.txt"))
             .andExpect(jsonPath("$.data.attachments[0].mimeType").value("text/plain"));
 
@@ -1208,7 +1208,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(employeeSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[2].attachments[0].attachmentRefId").value(messageAttachmentRefId))
+            .andExpect(jsonLong("$.data[2].attachments[0].attachmentRefId", messageAttachmentRefId))
             .andExpect(jsonPath("$.data[2].attachments[0].displayName").value("排班附件.txt"));
     }
 

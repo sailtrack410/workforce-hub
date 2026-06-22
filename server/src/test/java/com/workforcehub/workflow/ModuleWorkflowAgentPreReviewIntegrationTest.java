@@ -100,7 +100,7 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"))
-            .andExpect(jsonPath("$.data.agentTaskId").value(AGENT_TASK_ID))
+            .andExpect(jsonLong("$.data.agentTaskId", AGENT_TASK_ID))
             .andExpect(jsonPath("$.data.flowableProcessInstanceId").doesNotExist())
             .andReturn();
 
@@ -144,7 +144,7 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
                 .cookie(managerSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[0].requestId").value(requestId))
+            .andExpect(jsonLong("$.data[0].requestId", requestId))
             .andExpect(jsonPath("$.data[0].taskId").value(managerTask.getId()));
     }
 
@@ -173,7 +173,7 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data[0].actorType").value("AGENT"))
-            .andExpect(jsonPath("$.data[0].actorId").value(AGENT_TASK_ID))
+            .andExpect(jsonLong("$.data[0].actorId", AGENT_TASK_ID))
             .andExpect(jsonPath("$.data[0].actionType").value("AGENT_PRE_REVIEW"))
             .andExpect(jsonPath("$.data[0].afterStatus").value("REJECTED"))
             .andExpect(jsonPath("$.data[0].agentDecisionJson").value("{\"decision\":\"REJECTED\",\"reason\":\"缺少证明材料\"}"));
@@ -204,7 +204,7 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data[0].actorType").value("AGENT"))
-            .andExpect(jsonPath("$.data[0].actorId").value(AGENT_TASK_ID))
+            .andExpect(jsonLong("$.data[0].actorId", AGENT_TASK_ID))
             .andExpect(jsonPath("$.data[0].actionType").value("AGENT_PRE_REVIEW"))
             .andExpect(jsonPath("$.data[0].afterStatus").value("REJECTED"))
             .andExpect(jsonPath("$.data[0].agentDecisionJson")
@@ -354,7 +354,7 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
                 .content(leaveRequestJson(leaveTypeId, durationMinutes, reason)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").isNumber())
+            .andExpect(jsonPath("$.data.requestId").isString())
             .andReturn();
         return data(result).get("requestId").asLong();
     }

@@ -32,6 +32,15 @@ public class LeaveRepository {
         return count != null && count > 0;
     }
 
+    public boolean existsLeaveCodeExceptId(String leaveCode, Long leaveTypeId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM lv_type
+            WHERE leave_code = ? AND id <> ? AND is_deleted = 0
+            """, Long.class, leaveCode, leaveTypeId);
+        return count != null && count > 0;
+    }
+
     public void insertLeaveType(Long leaveTypeId,
                                 String leaveCode,
                                 String leaveName,
@@ -51,6 +60,42 @@ public class LeaveRepository {
             status,
             operatorId,
             operatorId
+        );
+    }
+
+    public int updateLeaveType(Long leaveTypeId,
+                               String leaveCode,
+                               String leaveName,
+                               String balanceMode,
+                               String status,
+                               Long operatorId) {
+        return jdbcTemplate.update("""
+            UPDATE lv_type
+            SET leave_code = ?,
+                leave_name = ?,
+                balance_mode = ?,
+                status = ?,
+                updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """,
+            leaveCode,
+            leaveName,
+            balanceMode,
+            status,
+            operatorId,
+            leaveTypeId
+        );
+    }
+
+    public int deleteLeaveType(Long leaveTypeId, Long operatorId) {
+        return jdbcTemplate.update("""
+            UPDATE lv_type
+            SET is_deleted = 1,
+                updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """,
+            operatorId,
+            leaveTypeId
         );
     }
 

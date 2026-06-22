@@ -146,7 +146,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.list[0].eventId").value(eventId))
+            .andExpect(jsonLong("$.data.list[0].eventId", eventId))
             .andExpect(jsonPath("$.data.list[0].eventType").value("IM_MESSAGE_CREATED"))
             .andExpect(jsonPath("$.data.list[0].status").value("FAILED"))
             .andExpect(jsonPath("$.data.list[0].lastError").value("simulated websocket failure"));
@@ -155,7 +155,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.eventId").value(eventId))
+            .andExpect(jsonLong("$.data.eventId", eventId))
             .andExpect(jsonPath("$.data.payloadJson").value(Matchers.containsString("IM_MESSAGE_CREATED")));
 
         mockMvc.perform(get("/api/admin/im/outbox-events")
@@ -263,9 +263,9 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.requestedCount").value(3))
             .andExpect(jsonPath("$.data.succeededCount").value(1))
             .andExpect(jsonPath("$.data.skippedCount").value(2))
-            .andExpect(jsonPath("$.data.items[0].eventId").value(batchRetryEventId))
+            .andExpect(jsonLong("$.data.items[0].eventId", batchRetryEventId))
             .andExpect(jsonPath("$.data.items[0].succeeded").value(true))
-            .andExpect(jsonPath("$.data.items[1].eventId").value(eventId))
+            .andExpect(jsonLong("$.data.items[1].eventId", eventId))
             .andExpect(jsonPath("$.data.items[1].succeeded").value(false))
             .andExpect(jsonPath("$.data.items[1].skipReason").value("当前outbox事件状态不允许手动重试"))
             .andExpect(jsonPath("$.data.items[2].eventId").value(999999999999L))

@@ -66,7 +66,7 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                 .param("processCode", "LEAVE"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[0].processTypeId").value(processTypeId))
+            .andExpect(jsonLong("$.data[0].processTypeId", processTypeId))
             .andExpect(jsonPath("$.data[0].processCode").value("LEAVE"))
             .andExpect(jsonPath("$.data[0].processName").value("请假流程"))
             .andExpect(jsonPath("$.data[0].bizType").value("LEAVE"))
@@ -85,8 +85,8 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.versionId").value(versionId))
-            .andExpect(jsonPath("$.data.templateId").value(templateId))
+            .andExpect(jsonLong("$.data.versionId", versionId))
+            .andExpect(jsonLong("$.data.templateId", templateId))
             .andExpect(jsonPath("$.data.versionNo").value(1))
             .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
             .andExpect(jsonPath("$.data.flowableDefinitionKey").value("leave_manager_approval"))
@@ -98,17 +98,17 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                 .param("processCode", "LEAVE"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[0].templateId").value(templateId))
+            .andExpect(jsonLong("$.data[0].templateId", templateId))
             .andExpect(jsonPath("$.data[0].processCode").value("LEAVE"))
             .andExpect(jsonPath("$.data[0].templateCode").value("LEAVE_MANAGER_APPROVAL"))
-            .andExpect(jsonPath("$.data[0].currentVersion.versionId").value(versionId))
+            .andExpect(jsonLong("$.data[0].currentVersion.versionId", versionId))
             .andExpect(jsonPath("$.data[0].currentVersion.status").value("PUBLISHED"));
 
         mockMvc.perform(get("/api/admin/workflow/templates/{templateId}/versions", templateId)
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[0].versionId").value(versionId))
+            .andExpect(jsonLong("$.data[0].versionId", versionId))
             .andExpect(jsonPath("$.data[0].status").value("PUBLISHED"))
             .andExpect(jsonPath("$.data[0].ruleSnapshotJson").value("{\"leaveCode\":\"ANNUAL_LEAVE\",\"maxDurationMinutes\":480}"));
 
@@ -177,7 +177,7 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                 .content(leaveRequestJson(annualLeaveTypeId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").isNumber())
+            .andExpect(jsonPath("$.data.requestId").isString())
             .andReturn();
         long requestId = data(submitResult).get("requestId").asLong();
         String taskId = managerTaskId(requestId);
@@ -201,16 +201,16 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.list[0].requestId").value(requestId))
+            .andExpect(jsonLong("$.data.list[0].requestId", requestId))
             .andExpect(jsonPath("$.data.list[0].status").value("APPROVED"));
 
         mockMvc.perform(get("/api/admin/workflow/requests/{requestId}", requestId)
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.requestId").value(requestId))
+            .andExpect(jsonLong("$.data.requestId", requestId))
             .andExpect(jsonPath("$.data.applicantUserId").value(2003))
-            .andExpect(jsonPath("$.data.leave.leaveTypeId").value(annualLeaveTypeId))
+            .andExpect(jsonLong("$.data.leave.leaveTypeId", annualLeaveTypeId))
             .andExpect(jsonPath("$.data.leave.durationMinutes").value(480));
 
         mockMvc.perform(get("/api/admin/workflow/requests/{requestId}/actions", requestId)
@@ -241,7 +241,7 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                     """.formatted(processCode, processName, bizType)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.processTypeId").isNumber())
+            .andExpect(jsonPath("$.data.processTypeId").isString())
             .andExpect(jsonPath("$.data.processCode").value(processCode))
             .andReturn();
         return data(result).get("processTypeId").asLong();
@@ -262,7 +262,7 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                     """.formatted(processTypeId, templateCode, templateName)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.templateId").isNumber())
+            .andExpect(jsonPath("$.data.templateId").isString())
             .andExpect(jsonPath("$.data.templateCode").value(templateCode))
             .andReturn();
         return data(result).get("templateId").asLong();
@@ -286,8 +286,8 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                     """.formatted(versionNo, leaveCode, maxDurationMinutes)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.versionId").isNumber())
-            .andExpect(jsonPath("$.data.templateId").value(templateId))
+            .andExpect(jsonPath("$.data.versionId").isString())
+            .andExpect(jsonLong("$.data.templateId", templateId))
             .andExpect(jsonPath("$.data.versionNo").value(versionNo))
             .andExpect(jsonPath("$.data.status").value("DRAFT"))
             .andReturn();

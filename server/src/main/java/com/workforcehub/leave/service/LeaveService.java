@@ -62,6 +62,33 @@ public class LeaveService implements LeaveQueryService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public LeaveTypeResponse updateLeaveType(Long leaveTypeId, CreateLeaveTypeRequest request) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        leaveRepository.getLeaveTypeOrThrow(leaveTypeId);
+        String leaveCode = request.getLeaveCode().trim().toUpperCase(Locale.ROOT);
+        String leaveName = request.getLeaveName().trim();
+        String balanceMode = normalizeBalanceMode(request.getBalanceMode());
+        String status = normalizeStatus(request.getStatus());
+        if (leaveRepository.existsLeaveCodeExceptId(leaveCode, leaveTypeId)) {
+            throw new BizException(409, "假种编码已存在");
+        }
+        int updated = leaveRepository.updateLeaveType(leaveTypeId, leaveCode, leaveName, balanceMode, status, operatorId);
+        if (updated == 0) {
+            throw new BizException(404, "假种不存在");
+        }
+        return toLeaveTypeResponse(leaveRepository.getLeaveTypeOrThrow(leaveTypeId));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteLeaveType(Long leaveTypeId) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        int updated = leaveRepository.deleteLeaveType(leaveTypeId, operatorId);
+        if (updated == 0) {
+            throw new BizException(404, "假种不存在");
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public LeaveAccountResponse adjustAccount(AdjustLeaveAccountRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
         if (request.getChangeMinutes() == 0) {

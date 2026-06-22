@@ -10,11 +10,14 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.ResultMatcher;
 
 import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
+
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 /**
  * 本地集成测试支撑基类
@@ -22,6 +25,9 @@ import java.util.Set;
  * - 在测试开始前装载 module-org 冒烟种子数据
  */
 public abstract class LocalIntegrationTestSupport {
+
+    private static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
+    private static final long MIN_SAFE_INTEGER = -9_007_199_254_740_991L;
 
     private static final String MYSQL_URL_TEMPLATE =
         "jdbc:mysql://%s:%s/%s?useUnicode=true&characterEncoding=UTF-8"
@@ -95,6 +101,17 @@ public abstract class LocalIntegrationTestSupport {
         populator.setSqlScriptEncoding("UTF-8");
         populator.addScript(resolveSeedScript());
         DatabasePopulatorUtils.execute(populator, dataSource);
+    }
+
+    protected ResultMatcher jsonLong(String expression, long expected) {
+        return jsonPath(expression).value(jsonLongValue(expected));
+    }
+
+    protected Object jsonLongValue(long value) {
+        if (value >= MIN_SAFE_INTEGER && value <= MAX_SAFE_INTEGER) {
+            return value;
+        }
+        return String.valueOf(value);
     }
 
     private void resetRedisState() {

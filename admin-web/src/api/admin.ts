@@ -1,12 +1,16 @@
 import { defaultApiClient, type ApiClient } from './http';
 import type {
   AdjustLeaveAccountRequest,
+  AdminAuditLogQuery,
+  AdminAuditLogResponse,
   AdminAgentTaskAuditResponse,
   AdminAgentTaskFailureSummaryResponse,
   AdminAgentTaskMetricsResponse,
   AdminAgentTaskResponse,
   AdminAgentTaskTimeoutRunResponse,
   AdminAgentTaskToolCallResponse,
+  AdminPermissionResponse,
+  AdminRoleResponse,
   AgentAclResponse,
   AgentResponse,
   AgentTaskListQuery,
@@ -89,12 +93,20 @@ export function createAdminApi(client: ApiClient = defaultApiClient) {
       requestActions: (requestId: EntityId) => client.get<WorkflowTaskActionResponse[]>(`/api/admin/workflow/requests/${pathId(requestId)}/actions`),
       templates: (processCode?: string) => client.get<WorkflowTemplateResponse[]>('/api/admin/workflow/templates', { query: { processCode } }),
       templateVersions: (templateId: EntityId) => client.get<WorkflowTemplateVersionResponse[]>(`/api/admin/workflow/templates/${pathId(templateId)}/versions`),
+      publishTemplateVersion: (versionId: EntityId, request: { flowableDefinitionKey: string }) => client.post<WorkflowTemplateVersionResponse>(`/api/admin/workflow/template-versions/${pathId(versionId)}/publish`, request),
     },
     leave: {
       types: () => client.get<LeaveTypeResponse[]>('/api/admin/leave/types'),
       createType: (request: CreateLeaveTypeRequest) => client.post<LeaveTypeResponse>('/api/admin/leave/types', request),
+      updateType: (leaveTypeId: EntityId, request: CreateLeaveTypeRequest) => client.put<LeaveTypeResponse>(`/api/admin/leave/types/${pathId(leaveTypeId)}`, request),
+      deleteType: (leaveTypeId: EntityId) => client.delete<void>(`/api/admin/leave/types/${pathId(leaveTypeId)}`),
       accounts: (query: { userId?: EntityId; leaveTypeId?: EntityId } = {}) => client.get<LeaveAccountResponse[]>('/api/admin/leave/accounts', { query }),
       adjustAccount: (request: AdjustLeaveAccountRequest) => client.post<LeaveAccountResponse>('/api/admin/leave/accounts/adjustments', request),
+    },
+    system: {
+      roles: () => client.get<AdminRoleResponse[]>('/api/admin/system/roles'),
+      permissions: () => client.get<AdminPermissionResponse[]>('/api/admin/system/permissions'),
+      auditLogs: (query: AdminAuditLogQuery = {}) => client.get<PageResult<AdminAuditLogResponse>>('/api/admin/system/audit-logs', { query }),
     },
     org: {
       departmentTree: () => client.get<OrgDepartmentTreeNodeResponse[]>('/api/admin/departments/tree'),

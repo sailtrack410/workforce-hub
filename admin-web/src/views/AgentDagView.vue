@@ -382,73 +382,82 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
     <div class="empty-state">加载中…</div>
   </div>
   <div v-else-if="agent" class="dag-fullscreen">
-    <header class="dag-float-bar">
-      <button class="icon-button" title="返回列表" @click="goBack">
-        <ArrowLeft :size="16" />
-      </button>
-      <span class="bar-title">{{ agent.agentName || agent.agentCode }}</span>
-      <span :class="['version-state', selectedVersion?.publishStatus?.toLowerCase()]">{{ versionStateText }}</span>
-      <select class="bar-select" :value="selectedVersionId" @change="selectVersion(versions.find((v) => String(v.versionId) === ($event.target as HTMLSelectElement).value)!)">
-        <option v-for="v in versions" :key="v.versionId" :value="String(v.versionId)">
-          V{{ versionDisplay(v) }} · {{ statusLabel(v.publishStatus) }}
-        </option>
-      </select>
-      <div class="version-create">
-        <input v-model="newVersionLabel" title="新草稿显示版本号" />
-        <button class="bar-btn" :disabled="saving" @click="handleCreateDraft">
-          <Plus :size="14" /> 新草稿
+    <header class="dag-commandbar">
+      <div class="dag-commandbar-main">
+        <button class="icon-button dag-back" title="返回列表" @click="goBack">
+          <ArrowLeft :size="16" />
+        </button>
+        <div class="dag-title-group">
+          <span class="bar-title">{{ agent.agentName || agent.agentCode }}</span>
+          <span class="dag-agent-code">{{ agent.agentCode }}</span>
+        </div>
+        <span :class="['version-state', selectedVersion?.publishStatus?.toLowerCase()]">{{ versionStateText }}</span>
+        <select class="bar-select" :value="selectedVersionId" @change="selectVersion(versions.find((v) => String(v.versionId) === ($event.target as HTMLSelectElement).value)!)">
+          <option v-for="v in versions" :key="v.versionId" :value="String(v.versionId)">
+            V{{ versionDisplay(v) }} · {{ statusLabel(v.publishStatus) }}
+          </option>
+        </select>
+        <div class="version-create">
+          <input v-model="newVersionLabel" title="新草稿显示版本号" />
+          <button class="bar-btn" :disabled="saving" @click="handleCreateDraft">
+            <Plus :size="14" /> 草稿
+          </button>
+        </div>
+      </div>
+      <div class="dag-commandbar-actions">
+        <span v-if="isReadonly" class="bar-readonly">只读</span>
+        <span v-if="validationResult && !validationResult.valid" class="bar-error">{{ validationResult.messages.join('；') }}</span>
+        <span :class="['acl-state', hasActiveAcl ? 'ok' : 'warn']">{{ hasActiveAcl ? '范围已配置' : '范围未配置' }}</span>
+        <span :class="['acl-state', lastWorkflowTestPassed ? 'ok' : 'warn']">{{ lastWorkflowTestPassed ? '流程已测' : '流程待测' }}</span>
+        <button class="bar-btn" :disabled="validating || isReadonly" @click="handleValidate">
+          <CheckCircle2 :size="14" /> 校验
+        </button>
+        <button class="bar-btn" :disabled="saving || isReadonly" @click="handleSave">
+          <Save :size="14" /> 保存
+        </button>
+        <button class="bar-btn primary" :disabled="publishing || selectedVersion?.publishStatus !== 'DRAFT'" @click="handlePublish">
+          <Send :size="14" /> 发布
         </button>
       </div>
-      <span v-if="isReadonly" class="bar-readonly">只读版本，请新建草稿后编辑</span>
-      <span v-if="validationResult && !validationResult.valid" class="bar-error">{{ validationResult.messages.join('；') }}</span>
-      <button class="bar-btn" :disabled="validating || isReadonly" @click="handleValidate">
-        <CheckCircle2 :size="14" /> 校验
-      </button>
-      <button class="bar-btn" :disabled="saving || isReadonly" @click="handleSave">
-        <Save :size="14" /> 保存
-      </button>
-      <button class="bar-btn primary" :disabled="publishing || selectedVersion?.publishStatus !== 'DRAFT'" @click="handlePublish">
-        <Send :size="14" /> 发布
-      </button>
     </header>
 
-    <aside class="dag-acl-panel">
-      <div class="acl-title">
-        <ShieldCheck :size="15" />
-        <span>可用范围</span>
-        <span :class="['acl-state', hasActiveAcl ? 'ok' : 'warn']">{{ hasActiveAcl ? '已配置' : '未配置' }}</span>
-        <span :class="['acl-state', lastWorkflowTestPassed ? 'ok' : 'warn']">{{ lastWorkflowTestPassed ? '已测试' : '待测试' }}</span>
-      </div>
-      <div class="acl-form">
-        <select v-model="aclForm.subjectId" :disabled="aclSaving">
-          <option v-for="role in roleOptions" :key="role.id" :value="role.id">{{ role.label }}</option>
-        </select>
-        <select v-model="aclForm.permCode" :disabled="aclSaving">
-          <option value="use">可用</option>
-          <option value="visible">可见</option>
-          <option value="manage">管理</option>
-        </select>
-        <button type="button" :disabled="aclSaving || isReadonly" @click="handleGrantAcl">添加</button>
-      </div>
-      <div class="acl-list">
-        <span v-for="acl in aclList" :key="acl.aclId">
-          {{ aclSubjectLabel(acl.subjectType) }} {{ aclSubjectName(acl) }} · {{ aclPermissionLabel(acl.permCode) }} · {{ statusLabel(acl.status) }}
-        </span>
-      </div>
-    </aside>
+    <div class="dag-workspace">
+      <aside class="dag-acl-panel">
+        <div class="acl-title">
+          <ShieldCheck :size="15" />
+          <span>可用范围</span>
+        </div>
+        <div class="acl-form">
+          <select v-model="aclForm.subjectId" :disabled="aclSaving">
+            <option v-for="role in roleOptions" :key="role.id" :value="role.id">{{ role.label }}</option>
+          </select>
+          <select v-model="aclForm.permCode" :disabled="aclSaving">
+            <option value="use">可用</option>
+            <option value="visible">可见</option>
+            <option value="manage">管理</option>
+          </select>
+          <button type="button" :disabled="aclSaving || isReadonly" @click="handleGrantAcl">添加</button>
+        </div>
+        <div class="acl-list">
+          <span v-for="acl in aclList" :key="acl.aclId">
+            {{ aclSubjectLabel(acl.subjectType) }} {{ aclSubjectName(acl) }} · {{ aclPermissionLabel(acl.permCode) }} · {{ statusLabel(acl.status) }}
+          </span>
+        </div>
+      </aside>
 
-    <AgentDagEditor
-      v-model="workflowConfigJson"
-      :tools="tools"
-      :models="models.map(m => ({ modelId: String(m.modelId), displayName: m.displayName, provider: m.provider }))"
-      :readonly="isReadonly"
-      :version-id="selectedVersion?.versionId"
-      :system-prompt="systemPrompt"
-      :model-config-json="modelConfigJson"
-      @update:system-prompt="(v) => systemPrompt = v"
-      @update:model-config-json="(v) => modelConfigJson = v"
-      @workflow-test-result="handleWorkflowTestResult"
-    />
+      <AgentDagEditor
+        v-model="workflowConfigJson"
+        :tools="tools"
+        :models="models.map(m => ({ modelId: String(m.modelId), displayName: m.displayName, provider: m.provider }))"
+        :readonly="isReadonly"
+        :version-id="selectedVersion?.versionId"
+        :system-prompt="systemPrompt"
+        :model-config-json="modelConfigJson"
+        @update:system-prompt="(v) => systemPrompt = v"
+        @update:model-config-json="(v) => modelConfigJson = v"
+        @workflow-test-result="handleWorkflowTestResult"
+      />
+    </div>
   </div>
   <div v-else class="dag-fullscreen">
     <div class="empty-state">Agent 不存在</div>
@@ -462,33 +471,65 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  min-width: 0;
+  background: #edf3f9;
 }
 
-.dag-float-bar {
-  position: absolute;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
+.dag-commandbar {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 58px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(135deg, #111827, #132033 58%, #0c3b55);
+  color: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.dag-commandbar-main,
+.dag-commandbar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  background: rgba(248, 250, 255, 0.95);
-  border: 1px solid var(--line);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(8px);
-  max-width: calc(100vw - 32px);
+  min-width: 0;
+}
+
+.dag-commandbar-actions {
+  justify-content: flex-end;
   flex-wrap: wrap;
-  justify-content: center;
+}
+
+.dag-back {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.dag-title-group {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .bar-title {
-  font-size: 13px;
-  font-weight: 700;
-  max-width: 160px;
+  font-size: 15px;
+  font-weight: 900;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dag-agent-code {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  font-weight: 800;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -496,64 +537,74 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 
 .version-state {
   border-radius: var(--radius-pill);
-  padding: 4px 8px;
-  background: var(--pill-bg);
-  color: var(--green-dark);
+  padding: 5px 9px;
+  background: rgba(0, 137, 255, 0.18);
+  color: #cbe8ff;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .version-state.archived {
-  background: var(--line);
-  color: var(--muted);
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
 }
 
 .version-state.published {
-  background: #dcfce7;
-  color: #166534;
+  background: rgba(34, 197, 94, 0.18);
+  color: #bbf7d0;
 }
 
 .bar-select {
   width: auto;
-  min-width: 140px;
-  min-height: 30px;
-  padding: 2px 8px;
+  min-width: 154px;
+  min-height: 34px;
+  padding: 4px 9px;
   font-size: 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-strong);
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.bar-select option {
+  color: #111827;
 }
 
 .bar-error {
-  color: var(--red-dark);
+  color: #fecaca;
   font-size: 11px;
-  font-weight: 700;
-  max-width: 160px;
+  font-weight: 900;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bar-readonly {
-  color: var(--amber);
+  color: #fed7aa;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 900;
   white-space: nowrap;
 }
 
 .bar-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-strong);
-  color: var(--ink);
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 900;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, transform 0.12s;
 }
 
 .bar-btn:disabled {
@@ -562,8 +613,9 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 }
 
 .bar-btn:hover:not(:disabled) {
-  border-color: var(--green);
-  color: var(--green);
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
 }
 
 .bar-btn.primary {
@@ -576,25 +628,22 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   background: var(--green-dark);
 }
 
-.dag-acl-panel {
-  position: absolute;
-  top: 52px;
-  right: 318px;
-  z-index: 10;
-  width: 320px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(248, 250, 255, 0.95);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(8px);
+.dag-workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
-@media (max-width: 960px) {
-  .dag-acl-panel {
-    right: 12px;
-    max-width: calc(100vw - 24px);
-  }
+.dag-acl-panel {
+  width: 286px;
+  flex-shrink: 0;
+  padding: 16px;
+  border-right: 1px solid rgba(15, 23, 42, 0.1);
+  background:
+    linear-gradient(180deg, #ffffff, #f5f8fc);
+  box-shadow: 12px 0 30px rgba(15, 23, 42, 0.04);
+  overflow-y: auto;
 }
 
 .version-create {
@@ -605,30 +654,32 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 
 .version-create input {
   width: 58px;
-  min-height: 30px;
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-strong);
-  color: var(--ink);
+  min-height: 34px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 900;
 }
 
 .acl-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  color: #111827;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .acl-state {
-  padding: 1px 6px;
+  padding: 4px 8px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .acl-state.ok {
@@ -643,19 +694,20 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 
 .acl-form {
   display: grid;
-  grid-template-columns: 1fr 76px 54px;
-  gap: 6px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .acl-form select,
 .acl-form input {
   min-width: 0;
-  height: 30px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-strong);
-  color: var(--ink);
+  height: 34px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #111827;
   font-size: 12px;
+  font-weight: 800;
 }
 
 .acl-form input {
@@ -663,13 +715,13 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 }
 
 .acl-form button {
-  height: 30px;
-  border: 1px solid var(--green);
-  border-radius: 6px;
-  background: var(--green);
+  height: 34px;
+  border: 1px solid #0f172a;
+  border-radius: 7px;
+  background: #0f172a;
   color: #fff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 900;
 }
 
 .acl-form button:disabled {
@@ -678,22 +730,57 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 }
 
 .acl-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: 78px;
-  margin-top: 8px;
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
   overflow: auto;
 }
 
 .acl-list span {
   max-width: 100%;
-  padding: 3px 6px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-strong);
-  color: var(--muted);
+  padding: 7px 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #475569;
   font-size: 11px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1180px) {
+  .dag-commandbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dag-commandbar-main,
+  .dag-commandbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 980px) {
+  .dag-workspace {
+    flex-direction: column;
+  }
+
+  .dag-acl-panel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  }
+
+  .acl-form {
+    grid-template-columns: minmax(0, 1fr) 110px 70px;
+  }
+
+  .acl-list {
+    display: flex;
+    flex-wrap: wrap;
+  }
 }
 </style>

@@ -11,6 +11,7 @@ import {
   LogOut,
   MapPin,
   PlaneTakeoff,
+  ShieldCheck,
   Settings,
   Tag,
   TreePine,
@@ -35,6 +36,7 @@ const navItems = [
   { path: '/users', label: '人员管理', icon: Users },
   { path: '/files', label: '文件清理', icon: FileArchive },
   { path: '/ragflow', label: 'RAGFlow', icon: LibraryBig },
+  { path: '/system', label: '系统治理', icon: ShieldCheck },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 

@@ -74,8 +74,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.agentId").value(agentId))
-            .andExpect(jsonPath("$.data.publishedVersionId").value(versionId))
+            .andExpect(jsonLong("$.data.agentId", agentId))
+            .andExpect(jsonLong("$.data.publishedVersionId", versionId))
             .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
         mockMvc.perform(get("/api/employee/agents")
@@ -83,9 +83,9 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].agentId").value(agentId))
+            .andExpect(jsonLong("$.data[0].agentId", agentId))
             .andExpect(jsonPath("$.data[0].agentCode").value("ORG_HELPER"))
-            .andExpect(jsonPath("$.data[0].publishedVersionId").value(versionId));
+            .andExpect(jsonLong("$.data[0].publishedVersionId", versionId));
 
         MvcResult taskResult = mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
                 .cookie(employeeSession)
@@ -106,8 +106,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.agentId").value(agentId))
-            .andExpect(jsonPath("$.data.agentVersionId").value(versionId))
+            .andExpect(jsonLong("$.data.agentId", agentId))
+            .andExpect(jsonLong("$.data.agentVersionId", versionId))
             .andExpect(jsonPath("$.data.status").value("SUCCEEDED"))
             .andExpect(jsonPath("$.data.toolCallCount").value(1))
             .andReturn();
@@ -786,7 +786,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(escapeJsonString(workflow))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.versionId").value(versionId))
+            .andExpect(jsonLong("$.data.versionId", versionId))
             .andExpect(jsonPath("$.data.systemPrompt").value("更新后的系统提示"))
             .andExpect(jsonPath("$.data.workflowConfigJson").value(containsString("answer")));
 
@@ -824,7 +824,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.list", hasSize(1)))
-            .andExpect(jsonPath("$.data.list[0].agentId").value(agentId))
+            .andExpect(jsonLong("$.data.list[0].agentId", agentId))
             .andExpect(jsonPath("$.data.list[0].agentCode").value("ADMIN_MANAGED_AGENT"))
             .andExpect(jsonPath("$.data.list[0].publishedVersionNo").value(1))
             .andExpect(jsonPath("$.data.list[0].status").value("ACTIVE"));
@@ -841,7 +841,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.agentId").value(agentId))
+            .andExpect(jsonLong("$.data.agentId", agentId))
             .andExpect(jsonPath("$.data.agentName").value("后台治理助手"))
             .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
@@ -849,7 +849,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.agentId").value(agentId))
+            .andExpect(jsonLong("$.data.agentId", agentId))
             .andExpect(jsonPath("$.data.status").value("INACTIVE"));
 
         mockMvc.perform(get("/api/admin/agents/{agentId}", agentId)
@@ -882,7 +882,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.agentId").value(agentId))
+            .andExpect(jsonLong("$.data.agentId", agentId))
             .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
         mockMvc.perform(get("/api/employee/agents")
@@ -891,7 +891,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].agentId").value(agentId));
+            .andExpect(jsonLong("$.data[0].agentId", agentId));
     }
 
     @Test
@@ -910,7 +910,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].agentId").value(hrAgentId))
+            .andExpect(jsonLong("$.data[0].agentId", hrAgentId))
             .andExpect(jsonPath("$.data[0].agentCode").value("HR_FLOW_AGENT"));
     }
 
@@ -993,16 +993,16 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.pageSize").value(20))
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.list", hasSize(1)))
-            .andExpect(jsonPath("$.data.list[0].taskId").value(taskId))
-            .andExpect(jsonPath("$.data.list[0].agentId").value(agentId))
+            .andExpect(jsonLong("$.data.list[0].taskId", taskId))
+            .andExpect(jsonLong("$.data.list[0].agentId", agentId))
             .andExpect(jsonPath("$.data.list[0].agentCode").value("TASK_QUERY_AGENT"))
             .andExpect(jsonPath("$.data.list[0].agentName").value("任务查询助手"))
-            .andExpect(jsonPath("$.data.list[0].agentVersionId").isNumber())
+            .andExpect(jsonPath("$.data.list[0].agentVersionId").isString())
             .andExpect(jsonPath("$.data.list[0].triggerType").value("MANUAL"))
             .andExpect(jsonPath("$.data.list[0].contextType").value("USER_QUERY"))
             .andExpect(jsonPath("$.data.list[0].contextId").value(2003))
             .andExpect(jsonPath("$.data.list[0].triggeredByType").value("USER"))
-            .andExpect(jsonPath("$.data.list[0].triggeredById").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.list[0].triggeredById", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.list[0].status").value("SUCCEEDED"))
             .andExpect(jsonPath("$.data.list[0].toolCallCount").value(0));
 
@@ -1010,9 +1010,9 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.taskId").value(taskId))
+            .andExpect(jsonLong("$.data.taskId", taskId))
             .andExpect(jsonPath("$.data.agentCode").value("TASK_QUERY_AGENT"))
-            .andExpect(jsonPath("$.data.triggeredById").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.triggeredById", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
 
         mockMvc.perform(get("/api/admin/agent-tasks")
@@ -1070,7 +1070,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].taskId").value(taskId))
+            .andExpect(jsonLong("$.data[0].taskId", taskId))
             .andExpect(jsonPath("$.data[0].toolCode").value("ORG_GET_USER_SUMMARY"))
             .andExpect(jsonPath("$.data[0].toolName").value("组织用户摘要"))
             .andExpect(jsonPath("$.data[0].toolType").value("SPI"))
@@ -1088,7 +1088,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.length()").value(5))
-            .andExpect(jsonPath("$.data[0].taskId").value(taskId))
+            .andExpect(jsonLong("$.data[0].taskId", taskId))
             .andExpect(jsonPath("$.data[0].actionType").value("TASK_CREATED"))
             .andExpect(jsonPath("$.data[0].riskFlag").value(false))
             .andExpect(jsonPath("$.data[1].actionType").value("TASK_WAITING_HUMAN_CONFIRM"))
@@ -1535,7 +1535,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].agentId").value(agentId));
+            .andExpect(jsonLong("$.data[0].agentId", agentId));
 
         MvcResult taskResult = mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
                 .cookie(employeeSession)

@@ -226,7 +226,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(false))
             .andExpect(jsonPath("$.data.storageProvider").value("LOCAL"))
-            .andExpect(jsonPath("$.data.uploadTicketId").isNumber())
+            .andExpect(jsonPath("$.data.uploadTicketId").isString())
             .andReturn();
 
         JsonNode ticketData = data(ticketResult);
@@ -251,8 +251,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(false))
-            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
-            .andExpect(jsonPath("$.data.fileObjectId").isNumber())
+            .andExpect(jsonPath("$.data.attachmentRefId").isString())
+            .andExpect(jsonPath("$.data.fileObjectId").isString())
             .andReturn();
 
         Long firstAttachmentRefId = data(confirmResult).get("attachmentRefId").asLong();
@@ -274,13 +274,13 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(uploadTicketId, objectKey, sha256, content.length)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(firstAttachmentRefId));
+            .andExpect(jsonLong("$.data.attachmentRefId", firstAttachmentRefId));
 
         createUploadTicket(employeeSession, "病假材料.pdf", content.length, sha256)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(true))
-            .andExpect(jsonPath("$.data.attachmentRefId").isNumber());
+            .andExpect(jsonPath("$.data.attachmentRefId").isString());
 
         Integer fileObjectCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM sys_file_object WHERE content_sha256 = ? AND file_size = ?",
@@ -308,7 +308,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.downloadTicketId").isNumber())
+            .andExpect(jsonPath("$.data.downloadTicketId").isString())
             .andExpect(jsonPath("$.data.downloadUrl").value(containsString("/api/employee/files/download/")))
             .andExpect(jsonPath("$.data.fileName").value("请假证明.pdf"));
 
@@ -448,7 +448,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonLong("$.data.attachmentRefId", attachmentRefId))
             .andExpect(jsonPath("$.data.deletedAt").isString())
             .andExpect(jsonPath("$.data.purgeAfter").isString());
 
@@ -469,7 +469,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonLong("$.data.attachmentRefId", attachmentRefId))
             .andExpect(jsonPath("$.data.restoredAt").isString());
 
         Integer restoredDeletedCount = jdbcTemplate.queryForObject(
@@ -530,11 +530,11 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(activeAttachmentRefId))
+            .andExpect(jsonLong("$.data.list[0].attachmentRefId", activeAttachmentRefId))
             .andExpect(jsonPath("$.data.list[0].displayName").value("个人列表-有效.txt"))
             .andExpect(jsonPath("$.data.list[0].ownerType").value("PERSONAL_FILE"))
             .andExpect(jsonPath("$.data.list[0].uploaderType").value("USER"))
-            .andExpect(jsonPath("$.data.list[0].uploaderId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.list[0].uploaderId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.list[0].mimeType").value("text/plain"))
             .andExpect(jsonPath("$.data.list[0].fileSize").value("employee-active-file".getBytes(StandardCharsets.UTF_8).length))
             .andExpect(jsonPath("$.data.list[0].scanStatus").value("PENDING"))
@@ -547,7 +547,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(trashedAttachmentRefId))
+            .andExpect(jsonLong("$.data.list[0].attachmentRefId", trashedAttachmentRefId))
             .andExpect(jsonPath("$.data.list[0].displayName").value("个人列表-回收站.txt"))
             .andExpect(jsonPath("$.data.list[0].deletedAt").isString())
             .andExpect(jsonPath("$.data.list[0].purgeAfter").isString());
@@ -770,7 +770,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, "并发确认.txt")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(firstAttachmentRefId));
+            .andExpect(jsonLong("$.data.attachmentRefId", firstAttachmentRefId));
 
         Integer attachmentCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM sys_attachment_ref WHERE source_upload_ticket_id = ? AND is_deleted = 0",
@@ -986,7 +986,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.policyId").isNumber())
+            .andExpect(jsonPath("$.data.policyId").isString())
             .andExpect(jsonPath("$.data.policyCode").value("USER_DEFAULT_20G"))
             .andExpect(jsonPath("$.data.quotaBytes").value(21474836480L))
             .andReturn();

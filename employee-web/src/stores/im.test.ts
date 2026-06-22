@@ -144,6 +144,7 @@ describe('IM store', () => {
 
     expect(record).toMatchObject({
       id: '7102',
+      senderId: 2002,
       author: '用户 2002',
       role: '成员',
       body: '下午同步一下排班。',
@@ -255,6 +256,12 @@ describe('IM store', () => {
 
     expect(filesApi.createDownloadTicket).toHaveBeenCalledWith(9901, { downloadType: 'INLINE' });
     expect(im.conversations[0].avatarUrl).toBe('/files/avatar-1.png');
+  });
+
+  it('uses the shared default avatar when conversation has no avatar file', () => {
+    const record = mapImConversationToRecord({ ...conversation, avatarFileId: null });
+
+    expect(record.avatarUrl).toBe('/default-avatar.svg');
   });
 
   it('loads conversation members into shell panel', async () => {

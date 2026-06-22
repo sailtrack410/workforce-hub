@@ -290,6 +290,46 @@ export interface AdjustLeaveAccountRequest {
   sourceTxnKey?: string | null;
 }
 
+export interface AdminRoleResponse {
+  roleId: EntityId;
+  roleCode: string;
+  roleName: string;
+  status: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AdminPermissionResponse {
+  permissionId: EntityId;
+  permCode: string;
+  permName: string;
+  moduleCode?: string | null;
+  actionCode?: string | null;
+  status: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AdminAuditLogQuery extends QueryParams {
+  pageNo?: number;
+  pageSize?: number;
+  operatorType?: string;
+  actionType?: string;
+  targetType?: string;
+}
+
+export interface AdminAuditLogResponse {
+  auditLogId: EntityId;
+  operatorType: string;
+  operatorId?: EntityId | null;
+  actionType: string;
+  targetType?: string | null;
+  targetId?: EntityId | null;
+  result?: string | null;
+  detailJson?: string | null;
+  occurredAt?: string | null;
+}
+
 export interface StorageSummaryResponse {
   orgPoolQuotaBytes?: number | null;
   orgPoolUsedBytes?: number | null;

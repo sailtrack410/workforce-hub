@@ -69,6 +69,7 @@ export interface ConversationMessage {
   time?: string;
   seqNo?: number;
   senderType?: string;
+  senderId?: EntityId | null;
   status?: string;
   attachments?: ConversationAttachment[];
   processCard?: ConversationProcessCard;

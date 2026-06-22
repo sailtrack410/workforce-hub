@@ -40,6 +40,8 @@ import type {
 } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 
+export const DEFAULT_CONVERSATION_AVATAR_URL = '/default-avatar.svg';
+
 export interface EmployeeImApi {
   conversations(query?: ImConversationListQuery): Promise<ImConversationSummaryResponse[]>;
   conversationDetail(conversationId: string | number): Promise<ImConversationDetailResponse>;
@@ -108,7 +110,7 @@ export const useImStore = defineStore('employee-im', {
             const url = ticket.downloadUrl || filesApi.downloadUrl(ticket.ticketNo);
             this.conversations[index].avatarUrl = /^https?:\/\//i.test(url) || url.startsWith('/') ? url : `/${url}`;
           } catch {
-            this.conversations[index].avatarUrl = '';
+            this.conversations[index].avatarUrl = DEFAULT_CONVERSATION_AVATAR_URL;
           }
         }));
         this.lastMessageSeqByConversation = Object.fromEntries(
@@ -581,7 +583,7 @@ export function mapImConversationToRecord(conversation: ImConversationSummaryRes
     kind,
     tone: toneOfKind(kind),
     badge: title.slice(0, 2),
-    avatarUrl: '',
+    avatarUrl: DEFAULT_CONVERSATION_AVATAR_URL,
     title,
     subtitle: summaryBody,
     meta: formatConversationDate(conversation.lastMessageAt),
@@ -639,6 +641,7 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     time: formatMessageTime(message.sentAt),
     seqNo: message.seqNo,
     senderType: message.senderType,
+    senderId: message.senderId,
     status: message.status,
     attachments,
     knowledgeCard,

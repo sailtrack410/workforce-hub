@@ -80,13 +80,13 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
         addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.userId").value(EMPLOYEE_USER_ID))
-            .andExpect(jsonPath("$.data.groupId").value(groupId));
+            .andExpect(jsonLong("$.data.userId", EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.groupId", groupId));
 
         punch(employeeSession, "2026-05-07T09:00:00", "ON_DUTY")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.userId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.userId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.punchType").value("ON_DUTY"));
         punch(employeeSession, "2026-05-07T18:00:00", "OFF_DUTY")
             .andExpect(status().isOk())
@@ -102,7 +102,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].userId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data[0].userId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data[0].workDate").value("2026-05-07"))
             .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"))
             .andExpect(jsonPath("$.data[0].exceptionFlag").value(false));
@@ -115,7 +115,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].userId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data[0].userId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"));
 
         assertEquals(2L, punchCount(EMPLOYEE_USER_ID, "2026-05-07"));
@@ -305,8 +305,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(EMPLOYEE_USER_ID, scheduledShiftId, calendarId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.scheduleId").isNumber())
-            .andExpect(jsonPath("$.data.shiftId").value(scheduledShiftId))
+            .andExpect(jsonPath("$.data.scheduleId").isString())
+            .andExpect(jsonLong("$.data.shiftId", scheduledShiftId))
             .andReturn();
         long scheduleId = data(scheduleResult).get("scheduleId").asLong();
 
@@ -316,8 +316,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
         punch(employeeSession, "2026-05-10T19:00:00", "OFF_DUTY")
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.dailyResult.scheduleId").value(scheduleId))
-            .andExpect(jsonPath("$.data.dailyResult.shiftId").value(scheduledShiftId))
+            .andExpect(jsonLong("$.data.dailyResult.scheduleId", scheduleId))
+            .andExpect(jsonLong("$.data.dailyResult.shiftId", scheduledShiftId))
             .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("NORMAL"))
             .andExpect(jsonPath("$.data.dailyResult.exceptionFlag").value(false))
             .andExpect(jsonPath("$.data.dailyResult.workMinutes").value(540));
@@ -409,7 +409,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("NORMAL"))
-            .andExpect(jsonPath("$.data.dailyResult.shiftId").value(firstShiftId));
+            .andExpect(jsonLong("$.data.dailyResult.shiftId", firstShiftId));
 
         mockMvc.perform(put("/api/admin/attendance/schedules/{scheduleId}", scheduleId)
                 .cookie(adminSession)
@@ -424,7 +424,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(secondShiftId, calendarId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.shiftId").value(secondShiftId));
+            .andExpect(jsonLong("$.data.shiftId", secondShiftId));
 
         mockMvc.perform(get("/api/employee/attendance/daily-results")
                 .cookie(employeeSession)
@@ -432,8 +432,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                 .param("endDate", "2026-05-13"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[0].scheduleId").value(scheduleId))
-            .andExpect(jsonPath("$.data[0].shiftId").value(secondShiftId))
+            .andExpect(jsonLong("$.data[0].scheduleId", scheduleId))
+            .andExpect(jsonLong("$.data[0].shiftId", secondShiftId))
             .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
             .andExpect(jsonPath("$.data[0].lateMinutes").value(60))
             .andExpect(jsonPath("$.data[0].exceptionFlag").value(true));
@@ -622,7 +622,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(calendarCode, calendarName)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.calendarId").isNumber())
+            .andExpect(jsonPath("$.data.calendarId").isString())
             .andReturn();
         return data(result).get("calendarId").asLong();
     }
@@ -654,7 +654,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(shiftCode, shiftName, startTime, endTime)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.shiftId").isNumber())
+            .andExpect(jsonPath("$.data.shiftId").isString())
             .andReturn();
         return data(result).get("shiftId").asLong();
     }
@@ -680,7 +680,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(groupCode, groupName, calendarId, shiftId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.groupId").isNumber())
+            .andExpect(jsonPath("$.data.groupId").isString())
             .andReturn();
         return data(result).get("groupId").asLong();
     }

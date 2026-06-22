@@ -35,6 +35,8 @@ import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 import ConversationProcessCard from '../../components/shell/ConversationProcessCard.vue';
 import KnowledgeAnswerCard from '../../components/shell/cards/KnowledgeAnswerCard.vue';
 import MessageBubble from '../../components/shell/MessageBubble.vue';
+import { DEFAULT_CONVERSATION_AVATAR_URL } from '@/stores/im';
+import type { ConversationMessage } from '@/stores/shell';
 
 const {
   shell,
@@ -137,6 +139,19 @@ async function openGroupManagement() {
   await openGroupPanel();
   if (groupPanelOpen.value) void loadGroupFiles();
 }
+
+function messageAvatarUrl(message: ConversationMessage) {
+  if (message.side === 'system') return '';
+  if (message.side === 'right') return shell.avatarUrl || DEFAULT_CONVERSATION_AVATAR_URL;
+  if (message.senderType === 'AGENT') return activeConversation.value.avatarUrl || DEFAULT_CONVERSATION_AVATAR_URL;
+  if (message.senderId !== undefined && message.senderId !== null) {
+    const contact = shell.contacts.find((item) => (
+      item.userId !== undefined && item.userId !== null && String(item.userId) === String(message.senderId)
+    ));
+    if (contact?.avatarUrl) return contact.avatarUrl;
+  }
+  return DEFAULT_CONVERSATION_AVATAR_URL;
+}
 </script>
 
 <template>
@@ -204,6 +219,7 @@ async function openGroupManagement() {
           v-else
           :message="message"
           :agent="message.role.includes('Agent') || message.author.includes('助手')"
+          :avatar-url="messageAvatarUrl(message)"
           @action="openMessageAction"
           @attachment="openImAttachment"
         />
@@ -414,33 +430,21 @@ async function openGroupManagement() {
               <AppAvatar :label="member.name" tone="primary" size="md" />
               <span class="group-member-name">{{ member.name }}</span>
               <span v-if="member.role === '群主'" class="group-role-badge owner">群主</span>
-            </div>
-            <button class="group-member-card group-add-card" type="button" @click="toggleGroupMemberAdding">
-              <span class="group-add-icon"><Plus :size="18" /></span>
-              <span class="group-member-name">添加</span>
-            </button>
-          </div>
-
-          <!-- 成员列表行（详情） -->
-          <div class="group-member-list">
-            <div v-for="member in activeConversation.panel.members" :key="`row-${member.name}-${member.role}`" class="group-member-row">
-              <AppAvatar :label="member.name" tone="primary" size="sm" />
-              <div class="group-member-row-info">
-                <span class="group-member-row-name">{{ member.name }}</span>
-                <span v-if="member.role === '群主'" class="group-role-badge owner">群主</span>
-                <span v-else class="group-role-badge member">成员</span>
-              </div>
               <button
-                v-if="activeGroupProfile?.currentMemberRole === 'OWNER' && member.role !== '群主'"
+                v-else-if="activeGroupProfile?.currentMemberRole === 'OWNER'"
                 class="group-member-remove"
                 type="button"
                 aria-label="移除成员"
                 :disabled="im.actionLoading"
                 @click="groupProfileForm.removeMemberUserIds = String(member.userId || ''); removeGroupMembers()"
               >
-                <UserMinus :size="14" />
+                <UserMinus :size="13" />
               </button>
             </div>
+            <button class="group-member-card group-add-card" type="button" @click="toggleGroupMemberAdding">
+              <span class="group-add-icon"><Plus :size="18" /></span>
+              <span class="group-member-name">添加</span>
+            </button>
           </div>
         </section>
 
@@ -488,7 +492,12 @@ async function openGroupManagement() {
 
         <!-- 群资料编辑（可折叠） -->
         <section class="group-drawer-section">
-          <h3>群资料</h3>
+          <div class="group-section-header">
+            <h3>群资料</h3>
+            <AppButton variant="primary" size="sm" :disabled="im.actionLoading" @click="saveGroupProfile">
+              保存
+            </AppButton>
+          </div>
           <label class="security-field">
             <span>群名称</span>
             <input v-model="groupProfileForm.title" class="ui-inline-input" />
@@ -497,9 +506,6 @@ async function openGroupManagement() {
             <span>群公告</span>
             <textarea v-model="groupProfileForm.noticeText" class="ui-textarea compact-textarea" rows="2" />
           </label>
-          <AppButton variant="primary" size="sm" :disabled="im.actionLoading" @click="saveGroupProfile">
-            保存群资料
-          </AppButton>
         </section>
 
         <!-- 会话设置 -->

@@ -7,8 +7,11 @@ import com.workforcehub.leave.dto.LeaveAccountResponse;
 import com.workforcehub.leave.dto.LeaveTypeResponse;
 import com.workforcehub.leave.service.LeaveService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,6 +46,18 @@ public class AdminLeaveController {
     @PostMapping("/types")
     public R<LeaveTypeResponse> createLeaveType(@Valid @RequestBody CreateLeaveTypeRequest request) {
         return R.ok(leaveService.createLeaveType(request));
+    }
+
+    @PutMapping("/types/{leaveTypeId}")
+    public R<LeaveTypeResponse> updateLeaveType(@PathVariable Long leaveTypeId,
+                                                @Valid @RequestBody CreateLeaveTypeRequest request) {
+        return R.ok(leaveService.updateLeaveType(leaveTypeId, request));
+    }
+
+    @DeleteMapping("/types/{leaveTypeId}")
+    public R<Void> deleteLeaveType(@PathVariable Long leaveTypeId) {
+        leaveService.deleteLeaveType(leaveTypeId);
+        return R.ok(null);
     }
 
     @PostMapping("/accounts/adjustments")

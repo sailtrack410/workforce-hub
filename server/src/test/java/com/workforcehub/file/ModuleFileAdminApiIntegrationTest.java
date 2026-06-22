@@ -79,7 +79,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(false))
-            .andExpect(jsonPath("$.data.uploadTicketId").isNumber())
+            .andExpect(jsonPath("$.data.uploadTicketId").isString())
             .andReturn();
 
         JsonNode ticketData = data(ticketResult);
@@ -91,7 +91,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(false))
-            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andExpect(jsonPath("$.data.attachmentRefId").isString())
             .andReturn();
 
         long firstAttachmentRefId = data(confirmResult).get("attachmentRefId").asLong();
@@ -106,7 +106,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(true))
-            .andExpect(jsonPath("$.data.attachmentRefId").isNumber());
+            .andExpect(jsonPath("$.data.attachmentRefId").isString());
 
         assertEquals(1L, fileObjectCount(sha256, content.length));
         assertEquals(content.length * 2L, usedBytes("GLOBAL", null));
@@ -137,8 +137,8 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(true))
-            .andExpect(jsonPath("$.data.uploadTicketId").isNumber())
-            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andExpect(jsonPath("$.data.uploadTicketId").isString())
+            .andExpect(jsonPath("$.data.attachmentRefId").isString())
             .andReturn();
         long firstUploadTicketId = data(firstDedupResult).get("uploadTicketId").asLong();
         long firstAttachmentRefId = data(firstDedupResult).get("attachmentRefId").asLong();
@@ -185,7 +185,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(false))
-            .andExpect(jsonPath("$.data.uploadTicketId").isNumber())
+            .andExpect(jsonPath("$.data.uploadTicketId").isString())
             .andExpect(jsonPath("$.data.attachmentRefId").doesNotExist())
             .andReturn();
 
@@ -256,7 +256,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonLong("$.data.list[0].attachmentRefId", attachmentRefId))
             .andExpect(jsonPath("$.data.list[0].ownerType").value("ADMIN_FILE"))
             .andExpect(jsonPath("$.data.list[0].uploaderType").value("ADMIN"));
 
@@ -290,7 +290,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonLong("$.data.attachmentRefId", attachmentRefId))
             .andExpect(jsonPath("$.data.deletedAt").isString());
 
         mockMvc.perform(get("/api/admin/files/recycle-bin")
@@ -300,7 +300,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonLong("$.data.list[0].attachmentRefId", attachmentRefId))
             .andExpect(jsonPath("$.data.list[0].deletedAt").isString());
 
         mockMvc.perform(post("/api/admin/files/{attachmentRefId}/restore", attachmentRefId)
@@ -313,7 +313,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId));
+            .andExpect(jsonLong("$.data.attachmentRefId", attachmentRefId));
 
         mockMvc.perform(post("/api/admin/files/{attachmentRefId}/trash", attachmentRefId)
                 .cookie(adminSession)
@@ -330,7 +330,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonLong("$.data.attachmentRefId", attachmentRefId))
             .andExpect(jsonPath("$.data.physicalCleanupScheduled").value(true));
 
         assertEquals(0L, usedBytes("GLOBAL", null));
@@ -464,7 +464,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
                 .param("pageSize", "20"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.list[0].attachmentRefId").value(attachmentRefId))
+            .andExpect(jsonLong("$.data.list[0].attachmentRefId", attachmentRefId))
             .andExpect(jsonPath("$.data.list[0].contentSha256").doesNotExist())
             .andExpect(jsonPath("$.data.list[0].storageProvider").doesNotExist())
             .andExpect(jsonPath("$.data.list[0].bucketName").doesNotExist())

@@ -1,0 +1,25 @@
+{
+  "checks": {
+    "adminBinaryUploadViaRagflow": true,
+    "adminRagflowReingest": true,
+    "adminRagflowDelete": true,
+    "adminWorkflowTemplatePublishClick": true,
+    "employeeBinaryUpload": true,
+    "employeeFilePreview": true,
+    "employeeFileDownload": true,
+    "employeeFileDelete": true
+  },
+  "screenshots": [
+    "01-admin-ragflow-before-upload.png",
+    "02-admin-ragflow-after-upload.png",
+    "03-admin-ragflow-after-reingest-click.png",
+    "04-admin-ragflow-after-delete-click.png",
+    "05-admin-workflow-template-publish-before-click.png",
+    "06-admin-workflow-template-publish-after-click.png",
+    "07-employee-files-before-upload.png",
+    "08-employee-files-after-upload.png",
+    "09-employee-file-preview-clicked.png",
+    "10-employee-file-download-clicked.png",
+    "11-employee-file-delete-clicked.png"
+  ]
+}

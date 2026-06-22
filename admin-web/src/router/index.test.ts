@@ -16,6 +16,7 @@ describe('admin router', () => {
     expect(findRoute(routes, '/users')?.name).toBe('admin-users');
     expect(findRoute(routes, '/files')?.name).toBe('admin-files');
     expect(findRoute(routes, '/ragflow')?.name).toBe('admin-ragflow');
+    expect(findRoute(routes, '/system')?.name).toBe('admin-system');
     expect(findRoute(routes, '/agent-config')?.name).toBe('admin-agent-config');
   });
 
@@ -32,7 +33,7 @@ describe('admin router', () => {
     const pageRoutes = shellRoute?.children?.filter((route) => route.component && route.path !== '') ?? [];
 
     expect(typeof shellRoute?.component).toBe('function');
-    expect(pageRoutes.length).toBe(12);
+    expect(pageRoutes.length).toBe(13);
     expect(pageRoutes.every((route) => typeof route.component === 'function')).toBe(true);
   });
 });

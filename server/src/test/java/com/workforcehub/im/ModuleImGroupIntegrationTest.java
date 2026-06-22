@@ -66,10 +66,10 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(2)))
-            .andExpect(jsonPath("$.data[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data[0].memberId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data[0].displayName").value("张三"))
             .andExpect(jsonPath("$.data[0].memberRole").value("OWNER"))
-            .andExpect(jsonPath("$.data[1].memberId").value(MANAGER_USER_ID))
+            .andExpect(jsonLong("$.data[1].memberId", MANAGER_USER_ID))
             .andExpect(jsonPath("$.data[1].displayName").value("李四"))
             .andExpect(jsonPath("$.data[1].memberRole").value("MEMBER"));
     }
@@ -100,7 +100,7 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.conversationId").value(7301))
             .andExpect(jsonPath("$.data.title").value("项目推进群"))
             .andExpect(jsonPath("$.data.groupType").value("CUSTOM"))
-            .andExpect(jsonPath("$.data.ownerUserId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.ownerUserId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.noticeText").value("第一版公告"))
             .andExpect(jsonPath("$.data.currentMemberRole").value("MEMBER"));
     }
@@ -119,10 +119,10 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.conversation.conversationType").value("GROUP"))
             .andExpect(jsonPath("$.data.conversation.title").value("项目推进群"))
             .andExpect(jsonPath("$.data.members", hasSize(2)))
-            .andExpect(jsonPath("$.data.members[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.members[0].memberId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data.members[0].displayName").value("张三"))
             .andExpect(jsonPath("$.data.members[0].memberRole").value("OWNER"))
-            .andExpect(jsonPath("$.data.members[1].memberId").value(MANAGER_USER_ID))
+            .andExpect(jsonLong("$.data.members[1].memberId", MANAGER_USER_ID))
             .andExpect(jsonPath("$.data.members[1].displayName").value("李四"))
             .andExpect(jsonPath("$.data.groupProfile.conversationId").value(7301))
             .andExpect(jsonPath("$.data.groupProfile.noticeText").value("第一版公告"))
@@ -340,7 +340,7 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].memberId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data[0].memberId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data[0].memberRole").value("OWNER"));
 
         assertEquals("LEFT", jdbcTemplate.queryForObject(
@@ -399,7 +399,7 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].memberId").value(EMPLOYEE_USER_ID));
+            .andExpect(jsonLong("$.data[0].memberId", EMPLOYEE_USER_ID));
 
         assertEquals("LEFT", jdbcTemplate.queryForObject(
             "SELECT status FROM im_conversation_member WHERE conversation_id = 7301 AND member_id = ?",
@@ -531,10 +531,10 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].attachmentRefId").value(groupFileRefId))
+            .andExpect(jsonLong("$.data[0].attachmentRefId", groupFileRefId))
             .andExpect(jsonPath("$.data[0].conversationId").value(7301))
             .andExpect(jsonPath("$.data[0].displayName").value("群资料.txt"))
-            .andExpect(jsonPath("$.data[0].uploaderId").value(EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data[0].uploaderId", EMPLOYEE_USER_ID))
             .andExpect(jsonPath("$.data[0].canDelete").value(false))
             .andReturn();
 
@@ -619,7 +619,7 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").value(groupFileRefId))
+            .andExpect(jsonLong("$.data.attachmentRefId", groupFileRefId))
             .andExpect(jsonPath("$.data.deletedAt").isString());
 
         mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/files", 7301L)
@@ -698,7 +698,7 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(uploadTicketId, objectKey, sha256, content.length)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andExpect(jsonPath("$.data.attachmentRefId").isString())
             .andReturn();
         long attachmentRefId = data(confirmResult).get("attachmentRefId").asLong();
 
@@ -733,7 +733,7 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(true))
-            .andExpect(jsonPath("$.data.attachmentRefId").isNumber())
+            .andExpect(jsonPath("$.data.attachmentRefId").isString())
             .andReturn();
         long deduplicatedAttachmentRefId = data(deduplicatedResult).get("attachmentRefId").asLong();
 
