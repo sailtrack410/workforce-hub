@@ -1,6 +1,12 @@
+<script setup lang="ts">
+const props = defineProps<{
+  flush?: boolean;
+}>();
+</script>
+
 <template>
   <div class="ui-overlay">
-    <div class="ui-dialog">
+    <div class="ui-dialog" :class="{ flush: props.flush }">
       <slot />
     </div>
   </div>
@@ -23,5 +29,13 @@
   border-radius: var(--radius-12);
   background: var(--surface-panel);
   box-shadow: var(--shadow-lg);
+}
+
+.ui-dialog.flush {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
 }
 </style>

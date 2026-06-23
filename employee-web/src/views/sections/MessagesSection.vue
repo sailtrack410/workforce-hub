@@ -596,7 +596,7 @@ function messageAvatarUrl(message: ConversationMessage) {
     <p v-if="messageActionError" class="message-context-error">{{ messageActionError }}</p>
   </div>
 
-  <AppDialog v-if="messageForwardOpen">
+  <AppDialog v-if="messageForwardOpen" flush>
     <section class="forward-dialog" @click.stop>
       <aside class="forward-picker">
         <label class="forward-search">

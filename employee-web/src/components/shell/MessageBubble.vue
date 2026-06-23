@@ -46,34 +46,36 @@ function openMessageAction(event: MouseEvent) {
       :tone="agent ? 'success' : message.side === 'right' ? 'primary' : 'neutral'"
       :status="agent ? 'online' : ''"
     />
-    <div class="bubble-content">
-      <div class="bubble-meta">
+    <div class="bubble-stack">
+      <div v-if="message.side !== 'right'" class="bubble-meta">
         <strong>{{ message.author }}</strong>
       </div>
-      <div v-if="renderedMarkdown" class="bubble-markdown" v-html="renderedMarkdown" />
-      <p v-else>{{ message.body }}</p>
-      <p v-if="message.translatedText" class="bubble-translation">{{ message.translatedText }}</p>
-      <div v-if="message.attachments?.length" class="bubble-attachments">
-        <span v-for="file in message.attachments" :key="file.id" class="bubble-attachment">
-          <strong>{{ file.name }}</strong>
-          <small>{{ file.type }} · {{ file.size }} · {{ file.status }}</small>
-          <span class="attachment-actions">
-            <button
-              v-if="file.attachmentRefId"
-              type="button"
-              @click="emit('attachment', message, file.attachmentRefId, 'preview')"
-            >
-              预览
-            </button>
-            <button
-              v-if="file.attachmentRefId"
-              type="button"
-              @click="emit('attachment', message, file.attachmentRefId, 'download')"
-            >
-              下载
-            </button>
+      <div class="bubble-content">
+        <div v-if="renderedMarkdown" class="bubble-markdown" v-html="renderedMarkdown" />
+        <p v-else>{{ message.body }}</p>
+        <p v-if="message.translatedText" class="bubble-translation">{{ message.translatedText }}</p>
+        <div v-if="message.attachments?.length" class="bubble-attachments">
+          <span v-for="file in message.attachments" :key="file.id" class="bubble-attachment">
+            <strong>{{ file.name }}</strong>
+            <small>{{ file.type }} · {{ file.size }} · {{ file.status }}</small>
+            <span class="attachment-actions">
+              <button
+                v-if="file.attachmentRefId"
+                type="button"
+                @click="emit('attachment', message, file.attachmentRefId, 'preview')"
+              >
+                预览
+              </button>
+              <button
+                v-if="file.attachmentRefId"
+                type="button"
+                @click="emit('attachment', message, file.attachmentRefId, 'download')"
+              >
+                下载
+              </button>
+            </span>
           </span>
-        </span>
+        </div>
       </div>
     </div>
   </article>
@@ -98,9 +100,19 @@ function openMessageAction(event: MouseEvent) {
   flex-direction: row-reverse;
 }
 
-.bubble-content {
+.bubble-stack {
+  display: grid;
+  gap: var(--space-4, 0.25rem);
   flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
+}
+
+.message-bubble.right .bubble-stack {
+  justify-items: end;
+}
+
+.bubble-content {
   max-width: 100%;
   padding: var(--space-10, 0.625rem) var(--space-14, 0.875rem);
   border: 1px solid #e2e8f0;
@@ -153,6 +165,10 @@ function openMessageAction(event: MouseEvent) {
   word-break: break-word;
 }
 
+.bubble-content > p:first-child {
+  margin-top: 0;
+}
+
 .bubble-translation {
   padding-top: var(--space-6, 0.375rem);
   border-top: 1px solid rgba(15, 23, 42, 0.08);
@@ -168,6 +184,10 @@ function openMessageAction(event: MouseEvent) {
   line-height: 1.65;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.bubble-markdown:first-child {
+  margin-top: 0;
 }
 
 .bubble-markdown :deep(p),
