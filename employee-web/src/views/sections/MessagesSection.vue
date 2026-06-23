@@ -77,6 +77,7 @@ const {
   messageActionTarget,
   messageActionMenu,
   messageActionError,
+  messageForwardOpen,
   messageActionCanRecall,
   activeConversation,
   activeConversationTitle,
@@ -101,6 +102,7 @@ const {
   openMessageAction,
   closeMessageAction,
   runMessageMenuAction,
+  submitMessageForward,
   openImAttachment,
   insertAgentMention,
   sendMessage,
@@ -584,6 +586,18 @@ function messageAvatarUrl(message: ConversationMessage) {
       <component :is="messageActionCanRecall ? RotateCcw : Trash2" :size="15" />
       <span>{{ messageActionCanRecall ? '撤回' : '删除' }}</span>
     </button>
+    <div v-if="messageForwardOpen" class="message-forward-panel">
+      <button
+        v-for="conversation in shell.conversations.filter((item) => item.id !== activeConversationId())"
+        :key="conversation.id"
+        type="button"
+        :disabled="im.actionLoading"
+        @click="submitMessageForward(conversation.id)"
+      >
+        <Forward :size="14" />
+        <span>{{ conversation.title }}</span>
+      </button>
+    </div>
     <p v-if="messageActionError" class="message-context-error">{{ messageActionError }}</p>
   </div>
 </div>
@@ -636,5 +650,14 @@ function messageAvatarUrl(message: ConversationMessage) {
   margin: var(--space-6, 0.375rem) var(--space-10, 0.625rem) 0;
   color: var(--danger-600, #dc2626);
   font-size: 0.75rem;
+}
+
+.message-forward-panel {
+  display: grid;
+  max-height: 10rem;
+  margin-top: var(--space-6, 0.375rem);
+  padding-top: var(--space-6, 0.375rem);
+  border-top: 1px solid var(--border-subtle, #e2e8f0);
+  overflow: auto;
 }
 </style>

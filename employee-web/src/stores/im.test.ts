@@ -97,6 +97,11 @@ function createImApi(): EmployeeImApi {
     }),
     editMessage: () => Promise.resolve(message),
     recallMessage: () => Promise.resolve({ ...message, status: 'RECALLED' }),
+    translateMessage: () => Promise.resolve({ messageId: 7101, sourceText: '原文', translatedText: '译文' }),
+    forwardMessage: () => Promise.resolve(message),
+    favoriteMessage: () => Promise.resolve({ messageId: 7101, actionType: 'FAVORITE', status: 'ACTIVE' }),
+    remindMessage: () => Promise.resolve({ messageId: 7101, actionType: 'REMINDER', status: 'ACTIVE' }),
+    deleteMessage: () => Promise.resolve({ messageId: 7101, actionType: 'DELETE', status: 'ACTIVE' }),
     createMessageAttachmentDownloadTicket: () => Promise.resolve({
       downloadTicketId: 1,
       ticketNo: 'DL-1',

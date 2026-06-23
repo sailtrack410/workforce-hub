@@ -31,6 +31,7 @@ import type {
   ImMessageListQuery,
   FileTrashRequest,
   FileTrashResponse,
+  ForwardImMessageRequest,
   GroupMemberUserIdsRequest,
   ImConversationListQuery,
   ImConversationDetailResponse,
@@ -38,6 +39,7 @@ import type {
   ImConversationMemberResponse,
   ImConversationSummaryResponse,
   ImGroupProfileResponse,
+  ImMessageActionResponse,
   ImMessageResponse,
   LeaveRequestCreateRequest,
   LeaveAccountResponse,
@@ -52,10 +54,12 @@ import type {
   PunchRecordResponse,
   QuotaResponse,
   ResetPasswordRequest,
+  RemindImMessageRequest,
   SendImMessageRequest,
   SendEmailCodeRequest,
   StartAgentConversationRequest,
   StartPrivateConversationRequest,
+  TranslateImMessageResponse,
   UpdateConversationPreferenceRequest,
   UpdateEmployeePreferenceRequest,
   UpdateEmployeeProfileRequest,
@@ -183,6 +187,21 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
       ),
       recallMessage: (conversationId: string | number, messageId: string | number) => (
         client.post<ImMessageResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/recall`)
+      ),
+      translateMessage: (conversationId: string | number, messageId: string | number) => (
+        client.post<TranslateImMessageResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/translate`)
+      ),
+      forwardMessage: (conversationId: string | number, messageId: string | number, request: ForwardImMessageRequest) => (
+        client.post<ImMessageResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/forward`, request)
+      ),
+      favoriteMessage: (conversationId: string | number, messageId: string | number) => (
+        client.post<ImMessageActionResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/favorite`)
+      ),
+      remindMessage: (conversationId: string | number, messageId: string | number, request: RemindImMessageRequest = {}) => (
+        client.post<ImMessageActionResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reminder`, request)
+      ),
+      deleteMessage: (conversationId: string | number, messageId: string | number) => (
+        client.post<ImMessageActionResponse>(`/api/employee/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/delete`)
       ),
       createMessageAttachmentDownloadTicket: (
         conversationId: string | number,

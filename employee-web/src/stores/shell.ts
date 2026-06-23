@@ -71,6 +71,8 @@ export interface ConversationMessage {
   senderType?: string;
   senderId?: EntityId | null;
   status?: string;
+  quotedMessageId?: EntityId | null;
+  translatedText?: string;
   attachments?: ConversationAttachment[];
   processCard?: ConversationProcessCard;
   knowledgeCard?: KnowledgeAnswerCard;

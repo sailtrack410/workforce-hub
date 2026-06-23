@@ -23,7 +23,7 @@ public class ImMessageRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<ImMessageRow> listMessages(Long conversationId, Long beforeSeq, int size) {
+    public List<ImMessageRow> listMessages(Long conversationId, Long userId, Long beforeSeq, int size) {
         if (beforeSeq == null) {
             return jdbcTemplate.query("""
                 SELECT *
@@ -41,6 +41,14 @@ public class ImMessageRepository {
                     FROM im_message
                     WHERE conversation_id = ?
                       AND status <> 'DELETED'
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM im_message_user_action ua
+                          WHERE ua.message_id = im_message.id
+                            AND ua.user_id = ?
+                            AND ua.action_type = 'DELETE'
+                            AND ua.status = 'ACTIVE'
+                      )
                     ORDER BY seq_no DESC
                     LIMIT ?
                 ) latest_page
@@ -48,6 +56,7 @@ public class ImMessageRepository {
                 """,
                 MESSAGE_ROW_MAPPER,
                 conversationId,
+                userId,
                 size
             );
         }
@@ -64,18 +73,27 @@ public class ImMessageRepository {
                        quoted_message_id,
                        status,
                        sent_at
-                FROM im_message
-                WHERE conversation_id = ?
-                  AND seq_no < ?
-                  AND status <> 'DELETED'
-                ORDER BY seq_no DESC
-                LIMIT ?
-            ) previous_page
-            ORDER BY seq_no ASC
+            FROM im_message
+            WHERE conversation_id = ?
+              AND seq_no < ?
+              AND status <> 'DELETED'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM im_message_user_action ua
+                  WHERE ua.message_id = im_message.id
+                    AND ua.user_id = ?
+                    AND ua.action_type = 'DELETE'
+                    AND ua.status = 'ACTIVE'
+              )
+            ORDER BY seq_no DESC
+            LIMIT ?
+        ) previous_page
+        ORDER BY seq_no ASC
             """,
             MESSAGE_ROW_MAPPER,
             conversationId,
             beforeSeq,
+            userId,
             size
         );
     }
@@ -199,13 +217,14 @@ public class ImMessageRepository {
                               Long senderId,
                               String messageType,
                               String clientMessageId,
+                              Long quotedMessageId,
                               String contentJson,
                               LocalDateTime sentAt) {
         jdbcTemplate.update("""
             INSERT INTO im_message
-                (id, conversation_id, seq_no, sender_type, sender_id, message_type, client_message_id, content_json, status, sent_at)
+                (id, conversation_id, seq_no, sender_type, sender_id, message_type, client_message_id, quoted_message_id, content_json, status, sent_at)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), 'NORMAL', ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), 'NORMAL', ?)
             """,
             messageId,
             conversationId,
@@ -214,8 +233,36 @@ public class ImMessageRepository {
             senderId,
             messageType,
             clientMessageId,
+            quotedMessageId,
             contentJson,
             Timestamp.valueOf(sentAt)
+        );
+    }
+
+    public void upsertUserAction(Long actionId,
+                                 Long conversationId,
+                                 Long messageId,
+                                 Long userId,
+                                 String actionType,
+                                 String payloadJson,
+                                 LocalDateTime remindAt) {
+        jdbcTemplate.update("""
+            INSERT INTO im_message_user_action
+                (id, conversation_id, message_id, user_id, action_type, payload_json, remind_at, status)
+            VALUES
+                (?, ?, ?, ?, ?, CAST(? AS JSON), ?, 'ACTIVE')
+            ON DUPLICATE KEY UPDATE
+                payload_json = VALUES(payload_json),
+                remind_at = VALUES(remind_at),
+                status = 'ACTIVE'
+            """,
+            actionId,
+            conversationId,
+            messageId,
+            userId,
+            actionType,
+            payloadJson,
+            remindAt == null ? null : Timestamp.valueOf(remindAt)
         );
     }
 

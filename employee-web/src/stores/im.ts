@@ -6,17 +6,21 @@ import type {
   DownloadTicketResponse,
   EditImMessageRequest,
   EntityId,
+  ForwardImMessageRequest,
   GroupMemberUserIdsRequest,
   ImConversationListQuery,
   ImConversationDetailResponse,
   ImConversationMemberResponse,
   ImConversationSummaryResponse,
   ImGroupProfileResponse,
+  ImMessageActionResponse,
   ImMessageListQuery,
   ImMessageResponse,
+  RemindImMessageRequest,
   SendImMessageRequest,
   StartAgentConversationRequest,
   StartPrivateConversationRequest,
+  TranslateImMessageResponse,
   UpdateConversationPreferenceRequest,
   UpdateGroupConversationRequest,
   UpdateReadPositionRequest,
@@ -59,6 +63,11 @@ export interface EmployeeImApi {
   sendMessage(conversationId: string | number, request: SendImMessageRequest): Promise<ImMessageResponse>;
   editMessage(conversationId: string | number, messageId: string | number, request: EditImMessageRequest): Promise<ImMessageResponse>;
   recallMessage(conversationId: string | number, messageId: string | number): Promise<ImMessageResponse>;
+  translateMessage(conversationId: string | number, messageId: string | number): Promise<TranslateImMessageResponse>;
+  forwardMessage(conversationId: string | number, messageId: string | number, request: ForwardImMessageRequest): Promise<ImMessageResponse>;
+  favoriteMessage(conversationId: string | number, messageId: string | number): Promise<ImMessageActionResponse>;
+  remindMessage(conversationId: string | number, messageId: string | number, request: RemindImMessageRequest): Promise<ImMessageActionResponse>;
+  deleteMessage(conversationId: string | number, messageId: string | number): Promise<ImMessageActionResponse>;
   createMessageAttachmentDownloadTicket(
     conversationId: string | number,
     messageId: string | number,
@@ -290,18 +299,26 @@ export const useImStore = defineStore('employee-im', {
         this.loading = false;
       }
     },
-    async sendMessage(conversationId: string | number, text: string, currentUserId?: EntityId, imApi: EmployeeImApi = employeeApi.im) {
+    async sendMessage(
+      conversationId: string | number,
+      text: string,
+      currentUserId?: EntityId,
+      imApi: EmployeeImApi = employeeApi.im,
+      quotedMessageId?: EntityId,
+    ) {
       const normalizedText = text.trim();
       if (!normalizedText) return null;
       this.messageSending = true;
       this.error = '';
       try {
         const key = String(conversationId);
-        const message = await imApi.sendMessage(conversationId, {
+        const request: SendImMessageRequest = {
           messageType: 'TEXT',
           text: normalizedText,
           clientMessageId: `web-${conversationId}-${Date.now()}`,
-        });
+        };
+        if (quotedMessageId !== undefined) request.quotedMessageId = quotedMessageId;
+        const message = await imApi.sendMessage(conversationId, request);
         const record = mapImMessageToConversationMessage(message, currentUserId);
         this.upsertMessage(key, record);
         this.lastMessageSeqByConversation[key] = Math.max(this.lastMessageSeqByConversation[key] ?? 0, message.seqNo);
@@ -384,6 +401,24 @@ export const useImStore = defineStore('employee-im', {
         return record;
       } catch (error) {
         this.error = error instanceof Error ? error.message : '消息撤回失败';
+        throw error;
+      } finally {
+        this.actionLoading = false;
+      }
+    },
+    async deleteMessage(
+      conversationId: string | number,
+      messageId: string | number,
+      imApi: EmployeeImApi = employeeApi.im,
+    ) {
+      this.actionLoading = true;
+      this.error = '';
+      try {
+        await imApi.deleteMessage(conversationId, messageId);
+        const key = String(conversationId);
+        this.messagesByConversation[key] = (this.messagesByConversation[key] ?? []).filter((item) => item.id !== String(messageId));
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : '消息删除失败';
         throw error;
       } finally {
         this.actionLoading = false;
@@ -653,6 +688,7 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     senderType: message.senderType,
     senderId: message.senderId,
     status: message.status,
+    quotedMessageId: message.quotedMessageId,
     attachments,
     knowledgeCard,
   };

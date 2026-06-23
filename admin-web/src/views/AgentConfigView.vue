@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { Pencil, PlayCircle, Plus, PowerOff, RefreshCcw, Search, Send } from 'lucide-vue-next';
+import { FlaskConical, Pencil, PlayCircle, Plus, PowerOff, RefreshCcw, Save, Search, Send, Trash2 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { adminApi } from '@/api/admin';
-import type { AgentResponse } from '@/api/types';
+import type { AgentResponse, EntityId, LlmModelResponse } from '@/api/types';
 import { errorMessage, formatDateTime, humanizeText, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
@@ -31,6 +31,19 @@ const disabling = ref(false);
 const enableTarget = ref<AgentResponse | null>(null);
 const enableVisible = ref(false);
 const enabling = ref(false);
+const modelLoading = ref(false);
+const modelSaving = ref(false);
+const modelTesting = ref<EntityId | null>(null);
+const llmModels = ref<LlmModelResponse[]>([]);
+const modelEditId = ref<EntityId | null>(null);
+const modelForm = reactive({
+  provider: 'openai',
+  modelName: '',
+  displayName: '',
+  endpoint: '',
+  apiKey: '',
+  status: 'ACTIVE',
+});
 
 const columns: TableColumn[] = [
   { key: 'agentName', label: '助手' },
@@ -51,6 +64,17 @@ async function loadList() {
     toast.error(errorMessage(e));
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadModels() {
+  modelLoading.value = true;
+  try {
+    llmModels.value = await adminApi.llmModels.list();
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    modelLoading.value = false;
   }
 }
 
@@ -161,7 +185,76 @@ async function handleEnable() {
   }
 }
 
-onMounted(loadList);
+function resetModelForm() {
+  modelEditId.value = null;
+  modelForm.provider = 'openai';
+  modelForm.modelName = '';
+  modelForm.displayName = '';
+  modelForm.endpoint = '';
+  modelForm.apiKey = '';
+  modelForm.status = 'ACTIVE';
+}
+
+function editModel(model: LlmModelResponse) {
+  modelEditId.value = model.modelId;
+  modelForm.provider = model.provider;
+  modelForm.modelName = model.modelName;
+  modelForm.displayName = model.displayName;
+  modelForm.endpoint = model.endpoint || '';
+  modelForm.apiKey = '';
+  modelForm.status = model.status || 'ACTIVE';
+}
+
+async function saveModel() {
+  if (!modelForm.modelName.trim() || !modelForm.displayName.trim()) return;
+  modelSaving.value = true;
+  try {
+    const request = {
+      provider: modelForm.provider.trim() || 'openai',
+      modelName: modelForm.modelName.trim(),
+      displayName: modelForm.displayName.trim(),
+      endpoint: modelForm.endpoint.trim() || null,
+      apiKey: modelForm.apiKey.trim() || null,
+      status: modelForm.status,
+    };
+    if (modelEditId.value) {
+      await adminApi.llmModels.update(modelEditId.value, request);
+    } else {
+      await adminApi.llmModels.create(request);
+    }
+    toast.success('模型配置已保存');
+    resetModelForm();
+    await loadModels();
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    modelSaving.value = false;
+  }
+}
+
+async function testModel(model: LlmModelResponse) {
+  modelTesting.value = model.modelId;
+  try {
+    const res = await adminApi.llmModels.test(model.modelId);
+    res.success ? toast.success(res.message) : toast.error(res.message);
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    modelTesting.value = null;
+  }
+}
+
+async function removeModel(model: LlmModelResponse) {
+  await adminApi.llmModels.remove(model.modelId);
+  if (String(modelEditId.value) === String(model.modelId)) resetModelForm();
+  await loadModels();
+  toast.success('模型配置已删除');
+}
+
+onMounted(() => {
+  void loadList();
+  void loadModels();
+});
 </script>
 
 <template>
@@ -237,6 +330,74 @@ onMounted(loadList);
         </div>
       </template>
     </AdminTable>
+  </AdminPanel>
+
+  <AdminPanel :span="12" title="模型配置">
+    <template #actions>
+      <button class="secondary-button" title="刷新" @click="loadModels">
+        <RefreshCcw :size="16" />
+      </button>
+    </template>
+
+    <form class="model-form" @submit.prevent="saveModel">
+      <label>
+        <span>供应商</span>
+        <input v-model="modelForm.provider" placeholder="openai" />
+      </label>
+      <label>
+        <span>模型名称</span>
+        <input v-model="modelForm.modelName" placeholder="gpt-4o-mini" />
+      </label>
+      <label>
+        <span>显示名称</span>
+        <input v-model="modelForm.displayName" placeholder="默认翻译模型" />
+      </label>
+      <label>
+        <span>API 地址</span>
+        <input v-model="modelForm.endpoint" placeholder="https://api.openai.com/v1" />
+      </label>
+      <label>
+        <span>API Key</span>
+        <input v-model="modelForm.apiKey" type="password" placeholder="保存时填写" autocomplete="new-password" />
+      </label>
+      <label>
+        <span>状态</span>
+        <select v-model="modelForm.status">
+          <option value="ACTIVE">启用</option>
+          <option value="INACTIVE">停用</option>
+        </select>
+      </label>
+      <div class="model-form-actions">
+        <button class="primary-button" type="submit" :disabled="modelSaving">
+          <Save :size="16" />
+          <span>{{ modelEditId ? '保存模型' : '新增模型' }}</span>
+        </button>
+        <button class="secondary-button" type="button" @click="resetModelForm">清空</button>
+      </div>
+    </form>
+
+    <div class="model-list" :aria-busy="modelLoading">
+      <div v-for="model in llmModels" :key="model.modelId" class="model-row">
+        <div>
+          <strong>{{ model.displayName }}</strong>
+          <span>{{ model.provider }} · {{ model.modelName }} · {{ statusLabel(model.status) }}</span>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-button action-btn" title="编辑" @click="editModel(model)">
+            <Pencil :size="14" />
+            <span>编辑</span>
+          </button>
+          <button class="secondary-button action-btn" title="测试" :disabled="modelTesting === model.modelId" @click="testModel(model)">
+            <FlaskConical :size="14" />
+            <span>测试</span>
+          </button>
+          <button class="danger-button action-btn" title="删除" @click="removeModel(model)">
+            <Trash2 :size="14" />
+            <span>删除</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </AdminPanel>
 
   <AdminConfirmDialog
@@ -379,5 +540,72 @@ onMounted(loadList);
   color: var(--muted);
   font-size: var(--text-sm);
   font-weight: 700;
+}
+
+.model-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.model-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.model-form input,
+.model-form select {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+}
+
+.model-form-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.model-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.model-row > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.model-row strong,
+.model-row span {
+  overflow-wrap: anywhere;
+}
+
+.model-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .model-form {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

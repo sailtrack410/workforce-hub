@@ -280,6 +280,28 @@ export interface SendImMessageRequest {
   text?: string;
   attachmentRefIds?: EntityId[];
   clientMessageId?: string;
+  quotedMessageId?: EntityId;
+}
+
+export interface TranslateImMessageResponse {
+  messageId: EntityId;
+  sourceText: string;
+  translatedText: string;
+}
+
+export interface ForwardImMessageRequest {
+  targetConversationId: EntityId;
+}
+
+export interface ImMessageActionResponse {
+  messageId: EntityId;
+  actionType: string;
+  status: string;
+}
+
+export interface RemindImMessageRequest {
+  remindAt?: string | null;
+  note?: string | null;
 }
 
 export interface ImConversationListQuery extends QueryParams {

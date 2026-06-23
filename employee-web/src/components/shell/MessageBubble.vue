@@ -52,6 +52,7 @@ function openMessageAction(event: MouseEvent) {
       </div>
       <div v-if="renderedMarkdown" class="bubble-markdown" v-html="renderedMarkdown" />
       <p v-else>{{ message.body }}</p>
+      <p v-if="message.translatedText" class="bubble-translation">{{ message.translatedText }}</p>
       <div v-if="message.attachments?.length" class="bubble-attachments">
         <span v-for="file in message.attachments" :key="file.id" class="bubble-attachment">
           <strong>{{ file.name }}</strong>
@@ -150,6 +151,12 @@ function openMessageAction(event: MouseEvent) {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.bubble-translation {
+  padding-top: var(--space-6, 0.375rem);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  color: var(--text-secondary) !important;
 }
 
 .bubble-markdown {

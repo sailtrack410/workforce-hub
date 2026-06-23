@@ -70,6 +70,8 @@ export function useMessagesState({
   const messageActionMenu = ref<{ x: number; y: number } | null>(null);
   const messageEditText = ref('');
   const messageActionError = ref('');
+  const messageForwardOpen = ref(false);
+  const quotedMessageId = ref<EntityId | null>(null);
 
   const {
     agents,
@@ -305,6 +307,7 @@ export function useMessagesState({
     messageActionMenu.value = null;
     messageEditText.value = '';
     messageActionError.value = '';
+    messageForwardOpen.value = false;
   }
 
   async function runMessageMenuAction(action: MessageMenuAction) {
@@ -316,34 +319,120 @@ export function useMessagesState({
       showToast('已复制');
       return;
     }
+    if (action === 'translate') {
+      await submitMessageTranslate(message);
+      return;
+    }
+    if (action === 'forward') {
+      messageForwardOpen.value = true;
+      return;
+    }
+    if (action === 'favorite') {
+      await submitMessageFavorite(message);
+      return;
+    }
+    if (action === 'remind') {
+      await submitMessageReminder(message);
+      return;
+    }
+    if (action === 'quote') {
+      quotedMessageId.value = message.id;
+      draft.value = `> ${message.body}\n\n${draft.value}`;
+      closeMessageAction();
+      showToast('已引用到输入框');
+      return;
+    }
     if (action === 'delete-or-recall') {
       if (messageActionCanRecall.value) {
         await submitMessageRecall();
         return;
       }
-      deleteMessageLocally(message);
-      closeMessageAction();
-      showToast('已删除');
+      await submitMessageDelete(message);
       return;
     }
-    closeMessageAction();
-    showToast({
-      translate: '已加入翻译任务',
-      forward: '已打开转发选择',
-      favorite: '已收藏',
-      remind: '已添加提醒',
-      quote: '已引用到输入框',
-    }[action]);
-    if (action === 'quote') draft.value = `> ${message.body}\n\n${draft.value}`;
   }
 
-  function deleteMessageLocally(message: ConversationMessage) {
+  function removeMessageLocally(message: ConversationMessage) {
     const conversationId = activeConversationId();
     if (!conversationId) return;
     const currentMessages = im.messagesByConversation[String(conversationId)] ?? activeConversation.value.messages;
     const nextMessages = currentMessages.filter((item) => item.id !== message.id);
     im.messagesByConversation[String(conversationId)] = nextMessages;
     shell.mergeBackendMessages(String(conversationId), nextMessages);
+  }
+
+  async function submitMessageTranslate(message: ConversationMessage) {
+    const conversationId = activeConversationId();
+    if (!conversationId) return;
+    messageActionError.value = '';
+    try {
+      const translated = await employeeApi.im.translateMessage(conversationId, message.id);
+      const key = String(conversationId);
+      const currentMessages = im.messagesByConversation[key] ?? activeConversation.value.messages;
+      const nextMessages = currentMessages.map((item) => (
+        item.id === message.id ? { ...item, translatedText: translated.translatedText } : item
+      ));
+      im.messagesByConversation[key] = nextMessages;
+      shell.mergeBackendMessages(key, nextMessages);
+      closeMessageAction();
+      showToast('已翻译');
+    } catch (error) {
+      messageActionError.value = error instanceof Error ? error.message : '翻译失败';
+    }
+  }
+
+  async function submitMessageForward(targetConversationId: EntityId) {
+    const message = messageActionTarget.value;
+    const conversationId = activeConversationId();
+    if (!message || !conversationId) return;
+    messageActionError.value = '';
+    try {
+      await employeeApi.im.forwardMessage(conversationId, message.id, { targetConversationId });
+      closeMessageAction();
+      showToast('已转发');
+    } catch (error) {
+      messageActionError.value = error instanceof Error ? error.message : '转发失败';
+    }
+  }
+
+  async function submitMessageFavorite(message: ConversationMessage) {
+    const conversationId = activeConversationId();
+    if (!conversationId) return;
+    messageActionError.value = '';
+    try {
+      await employeeApi.im.favoriteMessage(conversationId, message.id);
+      closeMessageAction();
+      showToast('已收藏');
+    } catch (error) {
+      messageActionError.value = error instanceof Error ? error.message : '收藏失败';
+    }
+  }
+
+  async function submitMessageReminder(message: ConversationMessage) {
+    const conversationId = activeConversationId();
+    if (!conversationId) return;
+    messageActionError.value = '';
+    try {
+      await employeeApi.im.remindMessage(conversationId, message.id, { note: message.body.slice(0, 200) });
+      closeMessageAction();
+      showToast('已添加提醒');
+    } catch (error) {
+      messageActionError.value = error instanceof Error ? error.message : '提醒失败';
+    }
+  }
+
+  async function submitMessageDelete(message: ConversationMessage) {
+    const conversationId = activeConversationId();
+    if (!conversationId) return;
+    messageActionError.value = '';
+    try {
+      await im.deleteMessage(conversationId, message.id);
+      removeMessageLocally(message);
+      closeMessageAction();
+      showToast('已删除');
+    } catch (error) {
+      messageActionError.value = error instanceof Error ? error.message : '删除失败';
+    }
   }
 
   async function submitMessageEdit() {
@@ -451,7 +540,7 @@ export function useMessagesState({
       void scrollMessagesToLatest();
     }
     try {
-      const sent = await im.sendMessage(conversationId, text, session.user?.userId);
+      const sent = await im.sendMessage(conversationId, text, session.user?.userId, employeeApi.im, quotedMessageId.value ?? undefined);
       const messages = im.messagesByConversation[conversationKey];
       if (messages?.length) {
         shell.mergeBackendMessages(conversationKey, messages);
@@ -467,6 +556,7 @@ export function useMessagesState({
         }
       }
       draft.value = '';
+      quotedMessageId.value = null;
       await scrollMessagesToLatest();
       if (isAgentConversation && sent?.seqNo !== undefined && !wsConnected.value) {
         void im.pollAgentReply(conversationId, sent.seqNo, session.user?.userId).then(() => {
@@ -524,6 +614,7 @@ export function useMessagesState({
     messageActionMenu,
     messageEditText,
     messageActionError,
+    messageForwardOpen,
     messageActionCanRecall,
     activeConversation,
     activeConversationTitle,
@@ -548,6 +639,7 @@ export function useMessagesState({
     openMessageAction,
     closeMessageAction,
     runMessageMenuAction,
+    submitMessageForward,
     submitMessageEdit,
     submitMessageRecall,
     openImAttachment,

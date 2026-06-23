@@ -134,6 +134,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 agentId,
                 normalizedMessageType,
                 clientMessageId,
+                null,
                 normalizedContentJson,
                 sentAt
             );
@@ -412,6 +413,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                         SYSTEM_SENDER_ID,
                         "SYSTEM",
                         clientMessageId,
+                        null,
                         contentJson,
                         sentAt
                     );

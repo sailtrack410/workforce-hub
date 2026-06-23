@@ -232,6 +232,11 @@ describe('createEmployeeApi', () => {
     await api.im.startAgentConversation({ agentId: 9001 });
     await api.im.editMessage(7001, 7101, { text: '更新后的消息' });
     await api.im.recallMessage(7001, 7101);
+    await api.im.translateMessage(7001, 7101);
+    await api.im.forwardMessage(7001, 7101, { targetConversationId: 7002 });
+    await api.im.favoriteMessage(7001, 7101);
+    await api.im.remindMessage(7001, 7101, { note: '提醒' });
+    await api.im.deleteMessage(7001, 7101);
     await api.im.createMessageAttachmentDownloadTicket('2053928814116044802', '2053928814116044811', '2053928981082898444', { downloadType: 'SINGLE' });
     await api.agents.list({ keyword: 'HR' });
     await api.agents.createTask(9001, { triggerType: 'MANUAL', inputPayloadJson: '{}' });
@@ -257,6 +262,11 @@ describe('createEmployeeApi', () => {
       ['post', '/api/employee/im/agent-conversations', { agentId: 9001 }],
       ['post', '/api/employee/im/conversations/7001/messages/7101/edit', { text: '更新后的消息' }],
       ['post', '/api/employee/im/conversations/7001/messages/7101/recall', undefined],
+      ['post', '/api/employee/im/conversations/7001/messages/7101/translate', undefined],
+      ['post', '/api/employee/im/conversations/7001/messages/7101/forward', { targetConversationId: 7002 }],
+      ['post', '/api/employee/im/conversations/7001/messages/7101/favorite', undefined],
+      ['post', '/api/employee/im/conversations/7001/messages/7101/reminder', { note: '提醒' }],
+      ['post', '/api/employee/im/conversations/7001/messages/7101/delete', undefined],
       ['post', '/api/employee/im/conversations/2053928814116044802/messages/2053928814116044811/attachments/2053928981082898444/download-tickets', { downloadType: 'SINGLE' }],
       ['get', '/api/employee/agents', { query: { keyword: 'HR' } }],
       ['post', '/api/employee/agents/9001/tasks', { triggerType: 'MANUAL', inputPayloadJson: '{}' }],

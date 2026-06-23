@@ -21,4 +21,6 @@ public class SendImMessageRequest {
 
     @Size(max = 128, message = "客户端消息ID不能超过128个字符")
     private String clientMessageId;
+
+    private Long quotedMessageId;
 }

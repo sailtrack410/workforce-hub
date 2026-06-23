@@ -9,16 +9,20 @@ import com.workforcehub.file.dto.FileTrashRequest;
 import com.workforcehub.file.dto.FileTrashResponse;
 import com.workforcehub.im.dto.CreateGroupConversationRequest;
 import com.workforcehub.im.dto.EditImMessageRequest;
+import com.workforcehub.im.dto.ForwardImMessageRequest;
 import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
 import com.workforcehub.im.dto.ImConversationDetailResponse;
 import com.workforcehub.im.dto.ImConversationMemberResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImGroupFileResponse;
 import com.workforcehub.im.dto.ImGroupProfileResponse;
+import com.workforcehub.im.dto.ImMessageActionResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
+import com.workforcehub.im.dto.RemindImMessageRequest;
 import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.dto.StartAgentConversationRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
+import com.workforcehub.im.dto.TranslateImMessageResponse;
 import com.workforcehub.im.dto.UpdateConversationPreferenceRequest;
 import com.workforcehub.im.dto.UpdateGroupConversationRequest;
 import com.workforcehub.im.dto.UpdateReadPositionRequest;
@@ -185,6 +189,42 @@ public class EmployeeImController {
     public R<ImMessageResponse> recallMessage(@PathVariable Long conversationId,
                                               @PathVariable Long messageId) {
         return R.ok(imService.recallCurrentEmployeeMessage(conversationId, messageId));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/translate")
+    public R<TranslateImMessageResponse> translateMessage(@PathVariable Long conversationId,
+                                                          @PathVariable Long messageId) {
+        return R.ok(imService.translateCurrentEmployeeMessage(conversationId, messageId));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/forward")
+    public R<ImMessageResponse> forwardMessage(@PathVariable Long conversationId,
+                                               @PathVariable Long messageId,
+                                               @Valid @RequestBody ForwardImMessageRequest request) {
+        return R.ok(imService.forwardCurrentEmployeeMessage(conversationId, messageId, request));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/favorite")
+    public R<ImMessageActionResponse> favoriteMessage(@PathVariable Long conversationId,
+                                                      @PathVariable Long messageId) {
+        return R.ok(imService.favoriteCurrentEmployeeMessage(conversationId, messageId));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/reminder")
+    public R<ImMessageActionResponse> remindMessage(@PathVariable Long conversationId,
+                                                    @PathVariable Long messageId,
+                                                    @RequestBody(required = false) RemindImMessageRequest request) {
+        return R.ok(imService.remindCurrentEmployeeMessage(
+            conversationId,
+            messageId,
+            request == null ? new RemindImMessageRequest() : request
+        ));
+    }
+
+    @PostMapping("/conversations/{conversationId}/messages/{messageId}/delete")
+    public R<ImMessageActionResponse> deleteMessage(@PathVariable Long conversationId,
+                                                    @PathVariable Long messageId) {
+        return R.ok(imService.deleteCurrentEmployeeMessage(conversationId, messageId));
     }
 
     @PostMapping("/conversations/{conversationId}/messages/{messageId}/attachments/{attachmentRefId}/download-tickets")

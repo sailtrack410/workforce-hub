@@ -317,6 +317,80 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工应能翻译会话消息")
+    void employeeShouldTranslateConversationMessage() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+        seedActiveLlmModel();
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages/{messageId}/translate", 7001L, 7102L)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.messageId").value(7102))
+            .andExpect(jsonPath("$.data.sourceText").value("下午同步一下排班。"))
+            .andExpect(jsonPath("$.data.translatedText").value("Translated: 下午同步一下排班。"));
+    }
+
+    @Test
+    @DisplayName("员工应能收藏提醒删除和转发会话消息")
+    void employeeShouldRunMessageActions() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        seedPrivateConversation();
+        seedPagedConversation(7010L, 7110L, "分页会话A", "2026-05-09 12:00:00", "分页第一条");
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages/{messageId}/favorite", 7001L, 7102L)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.actionType").value("FAVORITE"));
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages/{messageId}/reminder", 7001L, 7102L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "note": "稍后处理"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.actionType").value("REMINDER"));
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages/{messageId}/forward", 7001L, 7102L)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetConversationId": 7010
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.conversationId").value(7010))
+            .andExpect(jsonPath("$.data.contentText").value("下午同步一下排班。"));
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages/{messageId}/delete", 7001L, 7102L)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.actionType").value("DELETE"));
+
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", 7001L)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].messageId").value(7101));
+
+        assertEquals(3L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM im_message_user_action WHERE conversation_id = 7001 AND user_id = ?",
+            Long.class,
+            EMPLOYEE_USER_ID
+        ));
+    }
+
+    @Test
     @DisplayName("员工应能按 beforeSeq 和 size 分页读取更早消息")
     void employeeShouldListMessagesByBeforeSeqAndSize() throws Exception {
         Cookie employeeSession = loginEmployee("zhangsan.employee");
@@ -1927,6 +2001,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private void seedPrivateConversation() {
+        jdbcTemplate.update("DELETE FROM im_message_user_action WHERE conversation_id = 7001");
         jdbcTemplate.update("""
             INSERT INTO im_conversation
                 (id, conversation_type, conversation_key, title, last_message_seq,
@@ -1951,7 +2026,18 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             """, EMPLOYEE_USER_ID, MANAGER_USER_ID);
     }
 
+    private void seedActiveLlmModel() {
+        jdbcTemplate.update("DELETE FROM agt_llm_model WHERE id = 9301");
+        jdbcTemplate.update("""
+            INSERT INTO agt_llm_model
+                (id, provider, model_name, display_name, endpoint, api_key, status)
+            VALUES
+                (9301, 'openai', 'test-model', '测试模型', ?, 'test-key', 'ACTIVE')
+            """, modelBaseUrl);
+    }
+
     private void seedPrivateConversationWithFourMessages() {
+        jdbcTemplate.update("DELETE FROM im_message_user_action WHERE conversation_id = 7001");
         jdbcTemplate.update("""
             INSERT INTO im_conversation
                 (id, conversation_type, conversation_key, title, last_message_seq,
@@ -2492,6 +2578,10 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private static void handleModelRequest(HttpExchange exchange) throws IOException {
         String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        if (requestBody.contains("请翻译以下消息")) {
+            writeModelResponse(exchange, "Translated: 下午同步一下排班。");
+            return;
+        }
         if (requestBody.contains("可选意图")) {
             String intent = requestBody.contains("假期") ? "查询假期"
                 : requestBody.contains("请假") ? "申请请假"

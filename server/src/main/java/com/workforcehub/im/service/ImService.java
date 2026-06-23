@@ -3,6 +3,10 @@ package com.workforcehub.im.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.AgentModelRequest;
+import com.workforcehub.agent.repository.AgentRepository;
+import com.workforcehub.agent.repository.LlmModelRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
@@ -14,13 +18,17 @@ import com.workforcehub.file.service.DownloadTicketExecutionService;
 import com.workforcehub.file.storage.StorageObjectResource;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.im.dto.EditImMessageRequest;
+import com.workforcehub.im.dto.ForwardImMessageRequest;
 import com.workforcehub.im.dto.ImConversationDetailResponse;
+import com.workforcehub.im.dto.ImMessageActionResponse;
 import com.workforcehub.im.dto.ImMessageAttachmentResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
+import com.workforcehub.im.dto.RemindImMessageRequest;
 import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.dto.StartAgentConversationRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
+import com.workforcehub.im.dto.TranslateImMessageResponse;
 import com.workforcehub.im.dto.UpdateConversationPreferenceRequest;
 import com.workforcehub.im.dto.UpdateReadPositionRequest;
 import com.workforcehub.im.repository.ImAttachmentRow;
@@ -65,6 +73,8 @@ public class ImService {
     private final ImWebSocketPushService webSocketPushService;
     private final ImAgentConversationService imAgentConversationService;
     private final ImGroupService imGroupService;
+    private final AgentRepository agentRepository;
+    private final AgentModelClient agentModelClient;
 
     public ImService(ImRepository imRepository,
                      ImMessageRepository imMessageRepository,
@@ -74,7 +84,9 @@ public class ImService {
                      StorageProviderRegistry storageProviderRegistry,
                      ImWebSocketPushService webSocketPushService,
                      ImAgentConversationService imAgentConversationService,
-                     ImGroupService imGroupService) {
+                     ImGroupService imGroupService,
+                     AgentRepository agentRepository,
+                     AgentModelClient agentModelClient) {
         this.imRepository = imRepository;
         this.imMessageRepository = imMessageRepository;
         this.objectMapper = objectMapper;
@@ -84,6 +96,8 @@ public class ImService {
         this.webSocketPushService = webSocketPushService;
         this.imAgentConversationService = imAgentConversationService;
         this.imGroupService = imGroupService;
+        this.agentRepository = agentRepository;
+        this.agentModelClient = agentModelClient;
     }
 
     public List<ImConversationSummaryResponse> listCurrentEmployeeConversations(String beforeLastMessageAt,
@@ -113,7 +127,7 @@ public class ImService {
             }
             throw new BizException(404, "会话不存在");
         }
-        return imMessageRepository.listMessages(conversationId, beforeSeq, normalizeMessagePageSize(size))
+        return imMessageRepository.listMessages(conversationId, userId, beforeSeq, normalizeMessagePageSize(size))
             .stream()
             .map(this::toMessageResponse)
             .toList();
@@ -186,6 +200,7 @@ public class ImService {
 
         String messageType = normalizeMessageType(request.getMessageType(), StringUtils.hasText(text), !attachmentRefIds.isEmpty());
         String clientMessageId = normalizeClientMessageId(request.getClientMessageId());
+        Long quotedMessageId = normalizeQuotedMessageId(conversationId, request.getQuotedMessageId());
         if (clientMessageId != null) {
             ImMessageResponse existing = imMessageRepository.findMessageByClientMessageId(
                 conversationId,
@@ -216,6 +231,7 @@ public class ImService {
                 userId,
                 messageType,
                 clientMessageId,
+                quotedMessageId,
                 contentJson,
                 sentAt
             );
@@ -246,7 +262,7 @@ public class ImService {
             userId,
             messageType,
             contentJson,
-            null,
+            quotedMessageId,
             "NORMAL",
             sentAt
         ));
@@ -308,6 +324,88 @@ public class ImService {
             ImWebSocketEvent.of(ImWebSocketEventTypes.MESSAGE_RECALLED, conversationId, messageId, response.getSeqNo(), userId, response)
         );
         return response;
+    }
+
+    public TranslateImMessageResponse translateCurrentEmployeeMessage(Long conversationId, Long messageId) {
+        Long userId = requireActiveEmployeeUserId();
+        ImMessageRow message = requireReadableMessage(conversationId, messageId, userId);
+        String sourceText = extractText(message.contentJson());
+        if (!StringUtils.hasText(sourceText)) {
+            throw new BizException(400, "当前消息无可翻译文本");
+        }
+        LlmModelRow model = firstActiveLlmModel();
+        if (model == null) {
+            throw new BizException(409, "未配置可用AI模型");
+        }
+        try {
+            String modelConfigJson = objectMapper.writeValueAsString(Map.of(
+                "baseUrl", model.endpoint() == null ? "" : model.endpoint(),
+                "apiKey", model.apiKey(),
+                "model", model.modelName()
+            ));
+            String translatedText = agentModelClient.generateReply(new AgentModelRequest(
+                0L,
+                0L,
+                "message-translate",
+                "你是企业即时消息翻译助手。只输出中文译文，不要解释。",
+                "请翻译以下消息：\n" + sourceText,
+                modelConfigJson
+            )).text();
+            return new TranslateImMessageResponse(messageId, sourceText, translatedText);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException(502, "AI翻译失败");
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImMessageResponse forwardCurrentEmployeeMessage(Long conversationId,
+                                                           Long messageId,
+                                                           ForwardImMessageRequest request) {
+        Long userId = requireActiveEmployeeUserId();
+        ImMessageRow message = requireReadableMessage(conversationId, messageId, userId);
+        if (request.getTargetConversationId() == null) {
+            throw new BizException(400, "目标会话不能为空");
+        }
+        ensureCanAccessConversation(request.getTargetConversationId(), userId);
+        String text = extractText(message.contentJson());
+        if (!StringUtils.hasText(text)) {
+            throw new BizException(400, "当前仅支持转发文本消息");
+        }
+        SendImMessageRequest sendRequest = new SendImMessageRequest();
+        sendRequest.setMessageType("TEXT");
+        sendRequest.setText(text);
+        sendRequest.setClientMessageId("forward-%s-%s-%s".formatted(request.getTargetConversationId(), messageId, System.currentTimeMillis()));
+        return sendCurrentEmployeeMessage(request.getTargetConversationId(), sendRequest);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImMessageActionResponse favoriteCurrentEmployeeMessage(Long conversationId, Long messageId) {
+        Long userId = requireActiveEmployeeUserId();
+        requireReadableMessage(conversationId, messageId, userId);
+        imMessageRepository.upsertUserAction(IdWorker.getId(), conversationId, messageId, userId, "FAVORITE", "{}", null);
+        return new ImMessageActionResponse(messageId, "FAVORITE", "ACTIVE");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImMessageActionResponse remindCurrentEmployeeMessage(Long conversationId,
+                                                                Long messageId,
+                                                                RemindImMessageRequest request) {
+        Long userId = requireActiveEmployeeUserId();
+        requireReadableMessage(conversationId, messageId, userId);
+        String note = blankToNull(request.getNote());
+        String payloadJson = writeJson(Map.of("note", note == null ? "" : note));
+        imMessageRepository.upsertUserAction(IdWorker.getId(), conversationId, messageId, userId, "REMINDER", payloadJson, request.getRemindAt());
+        return new ImMessageActionResponse(messageId, "REMINDER", "ACTIVE");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImMessageActionResponse deleteCurrentEmployeeMessage(Long conversationId, Long messageId) {
+        Long userId = requireActiveEmployeeUserId();
+        requireReadableMessage(conversationId, messageId, userId);
+        imMessageRepository.upsertUserAction(IdWorker.getId(), conversationId, messageId, userId, "DELETE", "{}", null);
+        return new ImMessageActionResponse(messageId, "DELETE", "ACTIVE");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -543,6 +641,46 @@ public class ImService {
             return null;
         }
         return clientMessageId.trim();
+    }
+
+    private Long normalizeQuotedMessageId(Long conversationId, Long quotedMessageId) {
+        if (quotedMessageId == null) {
+            return null;
+        }
+        ImMessageRow quotedMessage = imMessageRepository.findMessageById(quotedMessageId)
+            .orElseThrow(() -> new BizException(404, "引用消息不存在"));
+        if (!conversationId.equals(quotedMessage.conversationId())) {
+            throw new BizException(400, "只能引用当前会话消息");
+        }
+        return quotedMessageId;
+    }
+
+    private ImMessageRow requireReadableMessage(Long conversationId, Long messageId, Long userId) {
+        ensureCanAccessConversation(conversationId, userId);
+        ImMessageRow message = imMessageRepository.findMessageById(messageId)
+            .orElseThrow(() -> new BizException(404, "消息不存在"));
+        if (!conversationId.equals(message.conversationId())) {
+            throw new BizException(404, "消息不存在");
+        }
+        if (!Set.of("NORMAL", "EDITED").contains(message.status())) {
+            throw new BizException(409, "当前消息状态不允许操作");
+        }
+        return message;
+    }
+
+    private LlmModelRow firstActiveLlmModel() {
+        return agentRepository.listLlmModels().stream()
+            .filter(model -> "ACTIVE".equals(model.status()) && StringUtils.hasText(model.apiKey()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception e) {
+            throw new BizException(500, "JSON序列化失败");
+        }
     }
 
     private void pushConversationEventAfterCommit(Long conversationId, ImWebSocketEvent event) {
