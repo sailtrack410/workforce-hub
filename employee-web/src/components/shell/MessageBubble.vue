@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AppAvatar from '../ui/AppAvatar.vue';
-import AppTag from '../ui/AppTag.vue';
 import type { ConversationMessage } from '../../stores/shell';
 import type { EntityId } from '../../api';
 import { renderMarkdownText } from '../../utils/markdown';
@@ -22,10 +21,29 @@ const renderedMarkdown = computed(() => (
     ? renderMarkdownText(props.message.body)
     : ''
 ));
+
+const bubbleTitle = computed(() => (
+  props.message.time ? `${props.message.author} · ${props.message.time}` : props.message.author
+));
+
+const canOpenMessageAction = computed(() => (
+  props.message.side === 'right' && props.message.status !== 'RECALLED'
+));
+
+function openMessageAction(event: MouseEvent) {
+  if (!canOpenMessageAction.value) return;
+  event.preventDefault();
+  emit('action', props.message);
+}
 </script>
 
 <template>
-  <article class="message-bubble" :class="[message.side, { agent }]">
+  <article
+    class="message-bubble"
+    :class="[message.side, { agent }]"
+    :title="bubbleTitle"
+    @contextmenu="openMessageAction"
+  >
     <AppAvatar
       :label="message.author"
       :image="avatarUrl"
@@ -35,17 +53,6 @@ const renderedMarkdown = computed(() => (
     <div class="bubble-content">
       <div class="bubble-meta">
         <strong>{{ message.author }}</strong>
-        <AppTag v-if="agent" tone="success">AI 助手</AppTag>
-        <span v-else>{{ message.role }}</span>
-        <time v-if="message.time">{{ message.time }}</time>
-        <button
-          v-if="message.side === 'right' && message.status !== 'RECALLED'"
-          class="message-action"
-          type="button"
-          @click="emit('action', message)"
-        >
-          操作
-        </button>
       </div>
       <div v-if="renderedMarkdown" class="bubble-markdown" v-html="renderedMarkdown" />
       <p v-else>{{ message.body }}</p>
@@ -137,18 +144,6 @@ const renderedMarkdown = computed(() => (
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
-}
-
-.message-action {
-  border: 0;
-  background: transparent;
-  color: var(--text-tertiary);
-  font-size: var(--text-caption-md);
-}
-
-.message-action:hover,
-.message-action:focus-visible {
-  color: var(--text-accent);
 }
 
 .bubble-content p {
