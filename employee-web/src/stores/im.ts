@@ -685,7 +685,7 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     originalAuthor: sentByCurrentUser ? '我' : authorOfMessage(message),
     role: messageRole(message, knowledgeCard),
     body: recalled
-      ? '消息已撤回'
+      ? (sentByCurrentUser ? '你撤回了一条消息' : '对方撤回了一条消息')
       : contentText || knowledgeCard?.title || (attachments.length ? '文件消息' : '[非文本消息]'),
     side: resolveMessageSide(message, sentByCurrentUser),
     time: formatMessageTime(message.sentAt),

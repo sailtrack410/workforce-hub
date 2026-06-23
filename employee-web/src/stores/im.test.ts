@@ -227,6 +227,32 @@ describe('IM store', () => {
     });
   });
 
+  it('maps recalled messages to visible system-like notices without original text', () => {
+    const ownRecall = mapImMessageToConversationMessage({
+      ...message,
+      senderId: '2003',
+      status: 'RECALLED',
+      contentText: '消息已撤回',
+    }, 2003);
+    const otherRecall = mapImMessageToConversationMessage({
+      ...message,
+      status: 'RECALLED',
+      contentText: '消息已撤回',
+    }, 2003);
+
+    expect(ownRecall).toMatchObject({
+      body: '你撤回了一条消息',
+      side: 'right',
+      status: 'RECALLED',
+    });
+    expect(otherRecall).toMatchObject({
+      body: '对方撤回了一条消息',
+      side: 'left',
+      status: 'RECALLED',
+    });
+    expect(otherRecall.body).not.toContain('下午同步一下排班');
+  });
+
   it('loads conversations and messages from employee IM API', async () => {
     const im = useImStore();
 
