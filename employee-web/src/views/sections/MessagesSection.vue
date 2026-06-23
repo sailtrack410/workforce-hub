@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import {
   AtSign,
+  Bell,
   ChevronLeft,
   Clock3,
+  Copy,
   Download,
   Eye,
   FolderOpen,
+  Forward,
   Info,
+  Languages,
   Paperclip,
   Pin,
   Plus,
+  Quote,
+  RotateCcw,
   Send,
   Sparkles,
+  Star,
   Trash2,
   UserMinus,
   UsersRound,
@@ -68,8 +75,9 @@ const {
   groupActionError,
   groupMemberAdding,
   messageActionTarget,
-  messageEditText,
+  messageActionMenu,
   messageActionError,
+  messageActionCanRecall,
   activeConversation,
   activeConversationTitle,
   activeConversationCurrentStep,
@@ -92,8 +100,7 @@ const {
   toggleActiveConversationPreference,
   openMessageAction,
   closeMessageAction,
-  submitMessageEdit,
-  submitMessageRecall,
+  runMessageMenuAction,
   openImAttachment,
   insertAgentMention,
   sendMessage,
@@ -155,7 +162,7 @@ function messageAvatarUrl(message: ConversationMessage) {
 </script>
 
 <template>
-<div class="workspace">
+<div class="workspace" @click="closeMessageAction">
   <header v-if="hasActiveConversation" class="workspace-head">
     <div class="workspace-title-group">
       <button class="mobile-back" type="button" aria-label="返回列表" @click="backToList">
@@ -543,33 +550,91 @@ function messageAvatarUrl(message: ConversationMessage) {
     </aside>
   </Teleport>
 
-  <AppDialog v-if="messageActionTarget">
-    <form class="message-action-dialog" @submit.prevent="submitMessageEdit">
-      <header class="dialog-head dialog-head-row">
-        <div>
-          <h2>消息操作</h2>
-        </div>
-        <button class="field-icon-button" type="button" :disabled="im.actionLoading" aria-label="关闭" @click="closeMessageAction">
-          <X :size="15" />
-        </button>
-      </header>
-      <label class="dialog-field">
-        <span>消息内容</span>
-        <textarea v-model="messageEditText" class="ui-textarea" rows="5" />
-      </label>
-      <p v-if="messageActionError" class="dialog-error">{{ messageActionError }}</p>
-      <div class="dialog-actions">
-        <AppButton variant="ghost" type="button" :disabled="im.actionLoading" @click="closeMessageAction">
-          取消
-        </AppButton>
-        <AppButton variant="destructive" type="button" :disabled="im.actionLoading" @click="submitMessageRecall">
-          撤回
-        </AppButton>
-        <AppButton variant="primary" type="submit" :disabled="im.actionLoading || !messageEditText.trim()">
-          {{ im.actionLoading ? '提交中' : '保存' }}
-        </AppButton>
-      </div>
-    </form>
-  </AppDialog>
+  <div
+    v-if="messageActionTarget && messageActionMenu"
+    class="message-context-menu"
+    :style="{ left: `${messageActionMenu.x}px`, top: `${messageActionMenu.y}px` }"
+    @click.stop
+  >
+    <button type="button" @click="runMessageMenuAction('copy')">
+      <Copy :size="15" />
+      <span>复制</span>
+    </button>
+    <button type="button" @click="runMessageMenuAction('translate')">
+      <Languages :size="15" />
+      <span>翻译</span>
+    </button>
+    <button type="button" @click="runMessageMenuAction('forward')">
+      <Forward :size="15" />
+      <span>转发</span>
+    </button>
+    <button type="button" @click="runMessageMenuAction('favorite')">
+      <Star :size="15" />
+      <span>收藏</span>
+    </button>
+    <button type="button" @click="runMessageMenuAction('remind')">
+      <Bell :size="15" />
+      <span>提醒</span>
+    </button>
+    <button type="button" @click="runMessageMenuAction('quote')">
+      <Quote :size="15" />
+      <span>引用</span>
+    </button>
+    <button type="button" class="danger" :disabled="im.actionLoading" @click="runMessageMenuAction('delete-or-recall')">
+      <component :is="messageActionCanRecall ? RotateCcw : Trash2" :size="15" />
+      <span>{{ messageActionCanRecall ? '撤回' : '删除' }}</span>
+    </button>
+    <p v-if="messageActionError" class="message-context-error">{{ messageActionError }}</p>
+  </div>
 </div>
 </template>
+
+<style scoped>
+.message-context-menu {
+  position: fixed;
+  z-index: 1200;
+  width: 11.25rem;
+  padding: var(--space-6, 0.375rem);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-8, 0.5rem);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-lg, 0 18px 40px rgba(15, 23, 42, 0.16));
+}
+
+.message-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8, 0.5rem);
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0 var(--space-10, 0.625rem);
+  border: 0;
+  border-radius: var(--radius-6, 0.375rem);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.message-context-menu button:hover:not(:disabled) {
+  background: var(--surface-accent);
+}
+
+.message-context-menu button.danger {
+  color: var(--danger-600, #dc2626);
+}
+
+.message-context-menu button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.message-context-error {
+  margin: var(--space-6, 0.375rem) var(--space-10, 0.625rem) 0;
+  color: var(--danger-600, #dc2626);
+  font-size: 0.75rem;
+}
+</style>

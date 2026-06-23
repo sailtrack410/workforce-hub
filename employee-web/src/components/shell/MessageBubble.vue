@@ -12,7 +12,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  action: [message: ConversationMessage];
+  action: [message: ConversationMessage, event: MouseEvent];
   attachment: [message: ConversationMessage, attachmentId: EntityId, action: 'preview' | 'download'];
 }>();
 
@@ -26,14 +26,10 @@ const bubbleTitle = computed(() => (
   props.message.time ? `${props.message.author} · ${props.message.time}` : props.message.author
 ));
 
-const canOpenMessageAction = computed(() => (
-  props.message.side === 'right' && props.message.status !== 'RECALLED'
-));
-
 function openMessageAction(event: MouseEvent) {
-  if (!canOpenMessageAction.value) return;
+  if (props.message.status === 'RECALLED') return;
   event.preventDefault();
-  emit('action', props.message);
+  emit('action', props.message, event);
 }
 </script>
 

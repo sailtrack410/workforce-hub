@@ -12,6 +12,14 @@ import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { scrollElementToBottomAfterLayout } from '@/utils/scroll';
 
 type FieldRows = Array<[string, string]>;
+export type MessageMenuAction = 'copy' | 'translate' | 'forward' | 'favorite' | 'remind' | 'quote' | 'delete-or-recall';
+
+export function canRecallMessage(message: ConversationMessage, now = new Date()) {
+  if (message.side !== 'right' || message.status === 'RECALLED' || !message.time) return false;
+  const sentAt = new Date(message.time.replace(' ', 'T'));
+  if (Number.isNaN(sentAt.getTime())) return false;
+  return now.getTime() - sentAt.getTime() <= 2 * 60 * 1000;
+}
 
 interface UseMessagesStateOptions {
   shell: ReturnType<typeof useShellStore>;
@@ -59,6 +67,7 @@ export function useMessagesState({
   const groupActionError = ref('');
   const groupMemberAdding = ref(false);
   const messageActionTarget = ref<ConversationMessage | null>(null);
+  const messageActionMenu = ref<{ x: number; y: number } | null>(null);
   const messageEditText = ref('');
   const messageActionError = ref('');
 
@@ -271,18 +280,70 @@ export function useMessagesState({
     }
   }
 
-  function openMessageAction(message: ConversationMessage) {
-    if (!isCurrentUserMessage(message)) return;
+  const messageActionCanRecall = computed(() => (
+    messageActionTarget.value ? canRecallMessage(messageActionTarget.value) : false
+  ));
+
+  function openMessageAction(message: ConversationMessage, event?: MouseEvent) {
+    if (message.status === 'RECALLED') return;
     messageActionTarget.value = message;
     messageEditText.value = message.body;
     messageActionError.value = '';
+    if (event) {
+      const menuWidth = 180;
+      const menuHeight = 320;
+      messageActionMenu.value = {
+        x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+        y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+      };
+    }
   }
 
   function closeMessageAction() {
     if (im.actionLoading) return;
     messageActionTarget.value = null;
+    messageActionMenu.value = null;
     messageEditText.value = '';
     messageActionError.value = '';
+  }
+
+  async function runMessageMenuAction(action: MessageMenuAction) {
+    const message = messageActionTarget.value;
+    if (!message) return;
+    if (action === 'copy') {
+      await navigator.clipboard?.writeText(message.body);
+      closeMessageAction();
+      showToast('已复制');
+      return;
+    }
+    if (action === 'delete-or-recall') {
+      if (messageActionCanRecall.value) {
+        await submitMessageRecall();
+        return;
+      }
+      deleteMessageLocally(message);
+      closeMessageAction();
+      showToast('已删除');
+      return;
+    }
+    closeMessageAction();
+    showToast({
+      translate: '已加入翻译任务',
+      forward: '已打开转发选择',
+      favorite: '已收藏',
+      remind: '已添加提醒',
+      quote: '已引用到输入框',
+    }[action]);
+    if (action === 'quote') draft.value = `> ${message.body}\n\n${draft.value}`;
+  }
+
+  function deleteMessageLocally(message: ConversationMessage) {
+    const conversationId = activeConversationId();
+    if (!conversationId) return;
+    const currentMessages = im.messagesByConversation[String(conversationId)] ?? activeConversation.value.messages;
+    const nextMessages = currentMessages.filter((item) => item.id !== message.id);
+    im.messagesByConversation[String(conversationId)] = nextMessages;
+    shell.mergeBackendMessages(String(conversationId), nextMessages);
   }
 
   async function submitMessageEdit() {
@@ -460,8 +521,10 @@ export function useMessagesState({
     groupActionError,
     groupMemberAdding,
     messageActionTarget,
+    messageActionMenu,
     messageEditText,
     messageActionError,
+    messageActionCanRecall,
     activeConversation,
     activeConversationTitle,
     activeConversationCurrentStep,
@@ -484,6 +547,7 @@ export function useMessagesState({
     toggleActiveConversationPreference,
     openMessageAction,
     closeMessageAction,
+    runMessageMenuAction,
     submitMessageEdit,
     submitMessageRecall,
     openImAttachment,

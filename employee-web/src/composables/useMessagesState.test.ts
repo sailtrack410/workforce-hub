@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { ref } from 'vue';
-import { useMessagesState } from './useMessagesState';
+import { canRecallMessage, useMessagesState } from './useMessagesState';
 import { useImStore } from '@/stores/im';
-import { useShellStore, type ConversationRecord } from '@/stores/shell';
+import { useShellStore, type ConversationMessage, type ConversationRecord } from '@/stores/shell';
 import { useSessionStore } from '@/stores/session';
 
 const agentConversation: ConversationRecord = {
@@ -86,5 +86,20 @@ describe('useMessagesState', () => {
       seqNo: 3,
     });
     await sending;
+  });
+
+  it('allows recall only within two minutes for current user messages', () => {
+    const message: ConversationMessage = {
+      id: 'm-1',
+      author: '我',
+      role: '成员',
+      body: '测试消息',
+      side: 'right',
+      time: '2026-06-23 13:40',
+    };
+
+    expect(canRecallMessage(message, new Date('2026-06-23T13:41:59'))).toBe(true);
+    expect(canRecallMessage(message, new Date('2026-06-23T13:42:01'))).toBe(false);
+    expect(canRecallMessage({ ...message, side: 'left' }, new Date('2026-06-23T13:41:00'))).toBe(false);
   });
 });
