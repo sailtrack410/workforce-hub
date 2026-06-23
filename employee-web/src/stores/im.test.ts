@@ -263,10 +263,14 @@ describe('IM store', () => {
     expect(im.conversations[0].avatarUrl).toBe('/files/avatar-1.png');
   });
 
-  it('uses the shared default avatar when conversation has no avatar file', () => {
-    const record = mapImConversationToRecord({ ...conversation, avatarFileId: null });
+  it('uses separate default avatars when conversation has no avatar file', () => {
+    const privateRecord = mapImConversationToRecord({ ...conversation, avatarFileId: null });
+    const groupRecord = mapImConversationToRecord({ ...conversation, conversationType: 'GROUP', avatarFileId: null });
+    const agentRecord = mapImConversationToRecord({ ...conversation, conversationType: 'AGENT', avatarFileId: null });
 
-    expect(record.avatarUrl).toBe('/default-avatar.svg');
+    expect(privateRecord.avatarUrl).toBe('/default-user-avatar.svg');
+    expect(groupRecord.avatarUrl).toBe('/default-group-avatar.svg');
+    expect(agentRecord.avatarUrl).toBe('/default-agent-avatar.svg');
   });
 
   it('loads conversation members into shell panel', async () => {
@@ -277,6 +281,7 @@ describe('IM store', () => {
 
     expect(im.conversations[0].panel.members).toEqual([{
       name: '张三',
+      originalName: '张三',
       role: '成员',
       userId: 2002,
       memberType: 'USER',

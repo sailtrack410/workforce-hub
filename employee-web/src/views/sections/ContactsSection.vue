@@ -3,12 +3,15 @@ import { computed, unref } from 'vue';
 import {
   ChevronLeft,
   BadgeCheck,
+  Pencil,
+  MessageCircle,
   MessageSquareText,
   UserRoundCheck,
 } from 'lucide-vue-next';
 import { useContactsSectionContext } from '../employee-shell-context';
 import { displayField, employmentStatusLabel } from '@/utils/employee-format';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
+import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 import AppTag from '../../components/ui/AppTag.vue';
 
@@ -16,6 +19,8 @@ const {
   shell,
   activeContact,
   backToList,
+  startPrivateConversationFromContact,
+  openContactRemarkEditor,
 } = useContactsSectionContext();
 
 const selectedContact = computed(() => unref(activeContact) ?? shell.filteredContacts[0] ?? shell.contacts[0] ?? null);
@@ -67,6 +72,16 @@ function presenceStatusLabel(status?: string | null) {
             </span>
           </div>
         </div>
+      </div>
+      <div class="contact-action-row">
+        <AppButton v-if="selectedContact.userId && selectedContact.relation !== '本人'" variant="primary" size="sm" @click="startPrivateConversationFromContact(selectedContact)">
+          <MessageCircle :size="15" />
+          发消息
+        </AppButton>
+        <AppButton v-if="selectedContact.userId" variant="secondary" size="sm" @click="openContactRemarkEditor(selectedContact)">
+          <Pencil :size="15" />
+          备注
+        </AppButton>
       </div>
       <p v-if="selectedContact.signature" class="contact-signature">
         <MessageSquareText :size="15" />

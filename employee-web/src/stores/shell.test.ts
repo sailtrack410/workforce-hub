@@ -413,6 +413,75 @@ describe('useShellStore', () => {
     expect(shell.contacts.some((item) => ['群主', '成员'].includes(item.role))).toBe(false);
   });
 
+  it('persists contact remarks and uses them in contacts, conversations and messages', () => {
+    const shell = useShellStore();
+    shell.setColleagues([
+      {
+        userId: 3001,
+        employeeNo: 'E3001',
+        realName: '同部门王',
+        primaryDeptId: 10,
+        primaryDeptName: '研发部',
+        positionId: 20,
+        positionName: '前端工程师',
+        managerUserId: 1001,
+        managerName: '主管赵',
+        employmentStatus: 'ACTIVE',
+        status: 'ACTIVE',
+      },
+    ]);
+    shell.syncSessionProfile(null, null, null, []);
+    shell.setContactRemark(3001, '前端联系人');
+    shell.mergeBackendConversations([{
+      ...shellDemoConversations[0],
+      id: 'private-3001',
+      kind: 'private',
+      title: '同部门王',
+      panel: {
+        members: [{ name: '同部门王', role: '成员', userId: 3001 }],
+        tasks: [],
+        attachments: [],
+      },
+      messages: [{
+        id: 'm-3001',
+        author: '用户 3001',
+        role: '成员',
+        body: '收到',
+        side: 'left',
+        senderType: 'USER',
+        senderId: 3001,
+      }],
+    }, {
+      ...shellDemoConversations[1],
+      id: 'group-3001',
+      kind: 'team',
+      title: '项目群',
+      panel: {
+        members: [{ name: '同部门王', originalName: '同部门王', role: '成员', userId: 3001 }],
+        tasks: [],
+        attachments: [],
+      },
+      messages: [{
+        id: 'g-3001',
+        author: '用户 3001',
+        role: '成员',
+        body: '群内收到',
+        side: 'left',
+        senderType: 'USER',
+        senderId: 3001,
+      }],
+    }]);
+
+    expect(shell.contacts.find((item) => item.userId === 3001)?.name).toBe('前端联系人');
+    expect(shell.conversations[0].title).toBe('前端联系人');
+    expect(shell.conversations[1].messages[0].author).toBe('前端联系人 @ 同部门王');
+    expect(shell.displayNameForUser(3001, '同部门王')).toBe('前端联系人');
+
+    setActivePinia(createPinia());
+    const restored = useShellStore();
+    expect(restored.contactRemarkFor(3001)).toBe('前端联系人');
+  });
+
   it('merges loaded backend messages into the active conversation', () => {
     const shell = useShellStore();
     const backendConversation: ConversationRecord = {

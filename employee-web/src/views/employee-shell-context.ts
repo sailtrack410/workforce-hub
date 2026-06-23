@@ -91,6 +91,8 @@ export interface ContactsSectionContext {
   shell: StoreShell;
   activeContact: ReadonlyRef<ContactRecord | null>;
   backToList: () => void;
+  startPrivateConversationFromContact: (contact: ContactRecord) => Promise<void>;
+  openContactRemarkEditor: (contact: ContactRecord) => void;
 }
 
 export interface EmptySectionContext {

@@ -63,6 +63,7 @@ export interface ConversationMessage {
   id: string;
   type?: 'text' | 'process-card' | 'knowledge-card';
   author: string;
+  originalAuthor?: string;
   role: string;
   body: string;
   side?: 'left' | 'right' | 'system';
@@ -132,7 +133,7 @@ export interface ConversationEvidence {
 }
 
 export interface ConversationPanel {
-  members: Array<{ name: string; role: string; userId?: string | number; memberType?: string }>;
+  members: Array<{ name: string; originalName?: string; role: string; userId?: string | number; memberType?: string }>;
   tasks: string[];
   attachments: ConversationAttachment[];
   auditTrail?: ConversationAuditRecord[];
@@ -232,6 +233,8 @@ export interface ProfileRecord {
 export interface ContactRecord {
   id: string;
   name: string;
+  originalName?: string;
+  remarkName?: string;
   role: string;
   department: string;
   relation: string;
@@ -350,6 +353,7 @@ const currentUser = {
 
 const preferenceStorageKey = 'workforce-hub.employee.preferences.v1';
 const personalFilesStoragePrefix = 'workforce-hub.employee.personal-files.v1';
+const contactRemarksStoragePrefix = 'workforce-hub.employee.contact-remarks.v1';
 
 const defaultPreferences: StoredPreferences = {
   theme: 'light',
@@ -451,6 +455,32 @@ function writeStoredPersonalFiles(files: PersonalFileRecord[], ownerId?: string 
     globalThis.localStorage?.setItem(personalFilesStorageKey(ownerId), JSON.stringify(files.slice(0, 24)));
   } catch {
     // 本地存储不可写时只影响刷新后的文件列表保留，不影响本次上传链路。
+  }
+}
+
+function contactRemarksStorageKey(ownerId?: string | number | null) {
+  return `${contactRemarksStoragePrefix}.${ownerId || 'anonymous'}`;
+}
+
+function readStoredContactRemarks(ownerId?: string | number | null): Record<string, string> {
+  try {
+    const raw = globalThis.localStorage?.getItem(contactRemarksStorageKey(ownerId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed as Record<string, unknown>)
+      .map(([key, value]) => [key, typeof value === 'string' ? value.trim().slice(0, 30) : ''])
+      .filter(([, value]) => value));
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredContactRemarks(ownerId: string | number | null | undefined, remarks: Record<string, string>) {
+  try {
+    globalThis.localStorage?.setItem(contactRemarksStorageKey(ownerId), JSON.stringify(remarks));
+  } catch {
+    // 本地存储不可写时只影响刷新后的备注保留。
   }
 }
 
@@ -772,6 +802,7 @@ export const useShellStore = defineStore('employee-shell', {
     personalFileOwnerId: '',
     workbench: workbenchItems,
     contacts: contactItems,
+    contactRemarks: readStoredContactRemarks('') as Record<string, string>,
     profile: profileItems,
     colleagues: [] as OrgUserSummaryResponse[],
     avatarUrl: '' as string,
@@ -866,6 +897,8 @@ export const useShellStore = defineStore('employee-shell', {
     filteredContacts(state): ContactRecord[] {
       return state.contacts.filter((item) => includesKeyword([
         item.name,
+        item.originalName,
+        item.remarkName,
         item.role,
         item.department,
         item.relation,
@@ -949,6 +982,29 @@ export const useShellStore = defineStore('employee-shell', {
       this.bubbleStyle = style;
       this.persistPreferences();
     },
+    contactRemarkFor(userId: string | number | null | undefined) {
+      if (userId === undefined || userId === null) return '';
+      return this.contactRemarks[String(userId)] ?? '';
+    },
+    displayNameForUser(userId: string | number | null | undefined, fallback = '') {
+      if (userId === undefined || userId === null) return fallback;
+      return this.contactRemarkFor(userId) || fallback;
+    },
+    setContactRemark(userId: string | number, remark: string) {
+      const key = String(userId);
+      const value = remark.trim().slice(0, 30);
+      const next = { ...this.contactRemarks };
+      if (value) next[key] = value;
+      else delete next[key];
+      this.contactRemarks = next;
+      writeStoredContactRemarks(this.personalFileOwnerId, next);
+      this.applyContactRemarks();
+    },
+    applyContactRemarks() {
+      this.contacts = this.contacts.map((contact) => applyContactRemark(contact, this.contactRemarks));
+      const im = useImStore();
+      im.conversations = im.conversations.map((conversation) => applyConversationRemarks(conversation, this.contactRemarks, this.personalFileOwnerId));
+    },
     currentPreferencePayload(): StoredPreferences {
       return {
         theme: this.theme,
@@ -1005,6 +1061,7 @@ export const useShellStore = defineStore('employee-shell', {
       const ownerId = String(profile?.userId ?? user?.userId ?? '');
       if (ownerId !== this.personalFileOwnerId) {
         this.personalFileOwnerId = ownerId;
+        this.contactRemarks = readStoredContactRemarks(ownerId);
         const personal = this.files.find((item) => item.id === 'personal');
         if (personal) personal.files = readStoredPersonalFiles(ownerId);
       }
@@ -1020,7 +1077,8 @@ export const useShellStore = defineStore('employee-shell', {
         subordinates,
         signature: this.signature,
         presenceStatus: this.presenceStatus,
-      });
+      }).map((contact) => applyContactRemark(contact, this.contactRemarks));
+      this.applyContactRemarks();
       if (!this.contacts.some((item) => item.id === this.active.contacts)) {
         this.active.contacts = this.contacts[0]?.id ?? '';
       }
@@ -1107,7 +1165,9 @@ export const useShellStore = defineStore('employee-shell', {
     },
     mergeBackendConversations(backendConversations: ConversationRecord[]) {
       const backendIds = new Set(backendConversations.map((item) => item.id));
-      useImStore().conversations = backendConversations;
+      useImStore().conversations = backendConversations.map((conversation) => (
+        applyConversationRemarks(conversation, this.contactRemarks, this.personalFileOwnerId)
+      ));
       if (!backendIds.has(this.active.messages)) {
         this.active.messages = this.conversations[0]?.id ?? '';
       }
@@ -1115,9 +1175,9 @@ export const useShellStore = defineStore('employee-shell', {
     mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
       const conversation = this.conversations.find((item) => item.id === conversationId);
       if (!conversation || !backendMessages.length) return;
-      conversation.messages = backendMessages;
+      conversation.messages = applyMessageRemarks(backendMessages, conversation, this.contactRemarks);
       conversation.panel.attachments = collectConversationAttachments(backendMessages);
-      const latestMessage = backendMessages[backendMessages.length - 1];
+      const latestMessage = conversation.messages[conversation.messages.length - 1];
       conversation.subtitle = latestMessage.body;
       conversation.meta = formatListDate(latestMessage.time) || conversation.meta;
     },
@@ -1166,6 +1226,7 @@ function contactFromOrgUser(user: OrgUserSummaryResponse, relation: string, sour
   return {
     id: `user-${user.userId}`,
     name: user.realName,
+    originalName: user.realName,
     role: displayValue(user.positionName),
     department: displayValue(user.primaryDeptName),
     relation,
@@ -1203,6 +1264,7 @@ function collectContacts(input: CollectContactsInput): ContactRecord[] {
       add({
         id: `user-${userId}`,
         name: profile?.realName || user?.displayName || currentUser.name,
+        originalName: profile?.realName || user?.displayName || currentUser.name,
         role: displayValue(profile?.positionName),
         department: displayValue(profile?.primaryDeptName),
         relation: '本人',
@@ -1223,4 +1285,63 @@ function collectContacts(input: CollectContactsInput): ContactRecord[] {
   colleagues.forEach((item) => add(contactFromOrgUser(item, '同部门', '组织通讯录')));
   subordinates.forEach((item) => add(contactFromOrgUser(item, '直属下级', '组织关系')));
   return [...contacts.values()];
+}
+
+function applyContactRemark(contact: ContactRecord, remarks: Record<string, string>): ContactRecord {
+  if (contact.userId === undefined || contact.userId === null) return contact;
+  const originalName = contact.originalName || contact.name;
+  const remarkName = remarks[String(contact.userId)] || '';
+  return {
+    ...contact,
+    originalName,
+    remarkName,
+    name: remarkName || originalName,
+  };
+}
+
+function applyConversationRemarks(conversation: ConversationRecord, remarks: Record<string, string>, currentUserId?: string | number | null): ConversationRecord {
+  const panel = {
+    ...conversation.panel,
+    members: conversation.panel.members.map((member) => {
+      if (member.userId === undefined || member.userId === null) return member;
+      const originalName = member.originalName || member.name;
+      return {
+        ...member,
+        originalName,
+        name: remarks[String(member.userId)] || originalName,
+      };
+    }),
+  };
+  const next: ConversationRecord = { ...conversation, panel };
+  if (next.kind === 'private') {
+    const target = panel.members.find((member) => (
+      member.userId !== undefined && member.userId !== null && String(member.userId) !== String(currentUserId ?? '')
+    )) ?? panel.members.find((member) => member.userId !== undefined && member.userId !== null);
+    if (target?.userId !== undefined && target.userId !== null) {
+      const title = remarks[String(target.userId)] || target.originalName || target.name;
+      next.title = title;
+      next.summaryTitle = title;
+      next.badge = title.slice(0, 2);
+    }
+  }
+  next.messages = applyMessageRemarks(next.messages, next, remarks);
+  return next;
+}
+
+function applyMessageRemarks(messages: ConversationMessage[], conversation: ConversationRecord, remarks: Record<string, string>) {
+  return messages.map((message) => {
+    if (message.senderType !== 'USER' || message.senderId === undefined || message.senderId === null || message.side === 'right') {
+      return message;
+    }
+    const member = conversation.panel.members.find((item) => (
+      item.userId !== undefined && item.userId !== null && String(item.userId) === String(message.senderId)
+    ));
+    const originalAuthor = message.originalAuthor || member?.originalName || member?.name || message.author;
+    const remark = remarks[String(message.senderId)] || '';
+    return {
+      ...message,
+      originalAuthor,
+      author: remark ? (conversation.kind === 'team' ? `${remark} @ ${originalAuthor}` : remark) : originalAuthor,
+    };
+  });
 }

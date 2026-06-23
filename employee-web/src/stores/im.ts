@@ -44,7 +44,10 @@ import type {
 } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 
-export const DEFAULT_CONVERSATION_AVATAR_URL = '/default-avatar.svg';
+export const DEFAULT_USER_AVATAR_URL = '/default-user-avatar.svg';
+export const DEFAULT_GROUP_AVATAR_URL = '/default-group-avatar.svg';
+export const DEFAULT_AGENT_AVATAR_URL = '/default-agent-avatar.svg';
+export const DEFAULT_CONVERSATION_AVATAR_URL = DEFAULT_USER_AVATAR_URL;
 
 export interface EmployeeImApi {
   conversations(query?: ImConversationListQuery): Promise<ImConversationSummaryResponse[]>;
@@ -119,7 +122,7 @@ export const useImStore = defineStore('employee-im', {
             const url = ticket.downloadUrl || filesApi.downloadUrl(ticket.ticketNo);
             this.conversations[index].avatarUrl = /^https?:\/\//i.test(url) || url.startsWith('/') ? url : `/${url}`;
           } catch {
-            this.conversations[index].avatarUrl = DEFAULT_CONVERSATION_AVATAR_URL;
+            this.conversations[index].avatarUrl = defaultAvatarUrlOfKind(this.conversations[index].kind);
           }
         }));
         this.lastMessageSeqByConversation = Object.fromEntries(
@@ -597,6 +600,7 @@ export const useImStore = defineStore('employee-im', {
 function mapConversationMember(member: ImConversationMemberResponse) {
   return {
     name: member.displayName,
+    originalName: member.displayName,
     role: memberRoleLabel(member),
     userId: member.memberType === 'USER' ? member.memberId : undefined,
     memberType: member.memberType,
@@ -628,7 +632,7 @@ export function mapImConversationToRecord(conversation: ImConversationSummaryRes
     kind,
     tone: toneOfKind(kind),
     badge: title.slice(0, 2),
-    avatarUrl: DEFAULT_CONVERSATION_AVATAR_URL,
+    avatarUrl: defaultAvatarUrlOfKind(kind),
     title,
     subtitle: summaryBody,
     meta: formatConversationDate(conversation.lastMessageAt),
@@ -678,6 +682,7 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     id: String(message.messageId),
     type: knowledgeCard ? 'knowledge-card' : (message.messageType === 'CARD' ? 'process-card' : 'text'),
     author: sentByCurrentUser ? '我' : authorOfMessage(message),
+    originalAuthor: sentByCurrentUser ? '我' : authorOfMessage(message),
     role: messageRole(message, knowledgeCard),
     body: recalled
       ? '消息已撤回'
@@ -710,6 +715,12 @@ function toneOfKind(kind: ConversationRecord['kind']): ConversationTone {
   if (kind === 'agent') return 'green';
   if (kind === 'team') return 'blue';
   return 'gray';
+}
+
+function defaultAvatarUrlOfKind(kind: ConversationRecord['kind']) {
+  if (kind === 'agent') return DEFAULT_AGENT_AVATAR_URL;
+  if (kind === 'team') return DEFAULT_GROUP_AVATAR_URL;
+  return DEFAULT_USER_AVATAR_URL;
 }
 
 function flowOfConversationType(conversationType: string) {

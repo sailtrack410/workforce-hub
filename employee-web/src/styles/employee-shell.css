@@ -3262,6 +3262,12 @@
   margin: 0;
 }
 
+.contact-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
 .contact-profile-badges,
 .contact-member-list {
   display: flex;

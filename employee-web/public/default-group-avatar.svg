@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="群聊头像">
+  <rect width="96" height="96" rx="28" fill="#e8f8f0"/>
+  <circle cx="36" cy="36" r="12" fill="#1fad66"/>
+  <circle cx="60" cy="36" r="12" fill="#23c777"/>
+  <path d="M20 75c3-14 11-21 24-21 6 0 12 2 16 6 4-4 10-6 16-6 0 0 1 0 1 0 0 8-1 15-4 21H20z" fill="#1fad66"/>
+</svg>

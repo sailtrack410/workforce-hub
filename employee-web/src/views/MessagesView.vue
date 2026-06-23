@@ -17,6 +17,7 @@ import {
   MoonStar,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Pin,
   PinOff,
   Search,
@@ -37,7 +38,7 @@ import type {
   AgentResponse,
   EntityId,
 } from '../api';
-import type { PersonalFileRecord, SectionAction, SectionFilter, SectionId } from '../stores/shell';
+import type { ContactRecord, ConversationRecord, PersonalFileRecord, SectionAction, SectionFilter, SectionId } from '../stores/shell';
 import {
   primaryNavItems,
   sectionFilters,
@@ -159,10 +160,18 @@ const filterOptions = computed(() => {
 const activeFilter = computed(() => shell.filters[activeSection.value]);
 const filteredConversations = computed(() => shell.filteredConversations);
 const conversationContextMenu = ref<{ conversationId: string; x: number; y: number } | null>(null);
+const contactRemarkTarget = ref<ContactRecord | null>(null);
+const contactRemarkDraft = ref('');
+const contactRemarkError = ref('');
 const contextConversation = computed(() => {
   const menu = conversationContextMenu.value;
   if (!menu) return null;
   return shell.conversations.find((item) => item.id === menu.conversationId) ?? null;
+});
+const contextPrivateTargetContact = computed(() => {
+  const conversation = contextConversation.value;
+  if (!conversation || conversation.kind !== 'private') return null;
+  return contactFromPrivateConversation(conversation);
 });
 const searchAgentResults = ref<AgentResponse[]>([]);
 const searchAgentAvatarUrls = ref<Record<string, string>>({});
@@ -578,7 +587,7 @@ function selectConversation(id: string) {
 
 function openConversationContextMenu(event: MouseEvent, conversationId: string) {
   const menuWidth = 176;
-  const menuHeight = 48;
+  const menuHeight = 96;
   conversationContextMenu.value = {
     conversationId,
     x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
@@ -588,6 +597,64 @@ function openConversationContextMenu(event: MouseEvent, conversationId: string) 
 
 function closeConversationContextMenu() {
   conversationContextMenu.value = null;
+}
+
+function contactFromPrivateConversation(conversation: ConversationRecord): ContactRecord | null {
+  const target = conversation.panel.members.find((member) => (
+    member.userId !== undefined && member.userId !== null && String(member.userId) !== String(session.user?.userId ?? '')
+  )) ?? conversation.panel.members.find((member) => member.userId !== undefined && member.userId !== null);
+  if (!target?.userId) return null;
+  return shell.contacts.find((item) => String(item.userId) === String(target.userId)) ?? {
+    id: `user-${target.userId}`,
+    name: shell.displayNameForUser(target.userId, target.name),
+    originalName: target.originalName || target.name,
+    remarkName: shell.contactRemarkFor(target.userId),
+    role: target.role,
+    department: '',
+    relation: '私聊',
+    source: '会话成员',
+    userId: target.userId,
+  };
+}
+
+function openContactRemarkEditor(contact: ContactRecord) {
+  if (!contact.userId) return;
+  contactRemarkTarget.value = contact;
+  contactRemarkDraft.value = shell.contactRemarkFor(contact.userId);
+  contactRemarkError.value = '';
+}
+
+function closeContactRemarkEditor() {
+  contactRemarkTarget.value = null;
+  contactRemarkDraft.value = '';
+  contactRemarkError.value = '';
+}
+
+function submitContactRemark() {
+  const contact = contactRemarkTarget.value;
+  if (!contact?.userId) return;
+  shell.setContactRemark(contact.userId, contactRemarkDraft.value);
+  closeContactRemarkEditor();
+  showToast(contactRemarkDraft.value.trim() ? '备注已保存' : '备注已清除');
+}
+
+function openConversationRemarkFromMenu() {
+  const contact = contextPrivateTargetContact.value;
+  closeConversationContextMenu();
+  if (contact) openContactRemarkEditor(contact);
+}
+
+async function startPrivateConversationFromContact(contact: ContactRecord) {
+  if (!contact.userId) return;
+  try {
+    const conversation = await im.startPrivateConversation(contact.userId);
+    shell.mergeBackendConversations(im.conversations);
+    navigateMessagesConversation(conversation.id);
+    await syncConversationMessages(conversation.id);
+    showToast('已打开会话');
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '私聊创建失败');
+  }
 }
 
 async function toggleConversationPinnedFromMenu() {
@@ -927,6 +994,8 @@ const employeeShellContexts = {
     shell,
     activeContact,
     backToList,
+    startPrivateConversationFromContact,
+    openContactRemarkEditor,
   },
   empty: {
     currentMeta,
@@ -1514,7 +1583,34 @@ provideEmployeeShellContexts(employeeShellContexts);
         <component :is="contextConversation?.pinned ? PinOff : Pin" :size="15" />
         <span>{{ contextConversation?.pinned ? '取消置顶' : '置顶会话' }}</span>
       </button>
+      <button v-if="contextPrivateTargetContact" type="button" @click="openConversationRemarkFromMenu">
+        <Pencil :size="15" />
+        <span>设置备注</span>
+      </button>
     </div>
+
+    <AppDialog v-if="contactRemarkTarget">
+      <form class="contact-remark-dialog" @submit.prevent="submitContactRemark">
+        <header class="dialog-head dialog-head-row">
+          <div>
+            <h2>设置备注</h2>
+            <p>{{ contactRemarkTarget.originalName || contactRemarkTarget.name }}</p>
+          </div>
+          <button class="field-icon-button" type="button" aria-label="关闭" @click="closeContactRemarkEditor">
+            <X :size="15" />
+          </button>
+        </header>
+        <label class="security-field">
+          <span>备注名</span>
+          <AppInput v-model="contactRemarkDraft" placeholder="留空则使用原名称" />
+        </label>
+        <p v-if="contactRemarkError" class="dialog-error">{{ contactRemarkError }}</p>
+        <div class="dialog-actions">
+          <AppButton variant="ghost" type="button" @click="closeContactRemarkEditor">取消</AppButton>
+          <AppButton variant="primary" type="submit" @click="submitContactRemark">保存</AppButton>
+        </div>
+      </form>
+    </AppDialog>
 
     <AppDialog v-if="todoActionMode">
       <form class="todo-action-dialog" @submit.prevent="submitTodoAction">
