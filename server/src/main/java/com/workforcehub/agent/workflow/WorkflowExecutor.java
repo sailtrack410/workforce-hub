@@ -157,7 +157,7 @@ public class WorkflowExecutor {
         AgentToolBindingRow binding = agentRepository.getBindingByVersionAndToolCode(version.id(), toolCode);
         if (binding == null) {
             agentRepository.getActiveToolByCodeOrThrow(toolCode);
-            throw new BizException(403, "Agent未授权调用该工具");
+            throw new BizException(403, "AI助手未授权调用该工具");
         }
         JsonNode args = templateResolver.resolveJson(node.config().path("args"), context);
         String requestPayloadJson = writeJson(args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
@@ -307,7 +307,7 @@ public class WorkflowExecutor {
         AgentToolBindingRow binding = agentRepository.getBindingByVersionAndToolCode(version.id(), toolCode);
         if (binding == null) {
             agentRepository.getActiveToolByCodeOrThrow(toolCode);
-            throw new BizException(403, "Agent未授权调用该工具");
+            throw new BizException(403, "AI助手未授权调用该工具");
         }
         JsonNode args = templateResolver.resolveJson(toolCall.path("args"), context);
         String requestPayloadJson = writeJson(args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
@@ -871,7 +871,7 @@ public class WorkflowExecutor {
                             AgentToolBindingRow binding = agentRepository.getBindingByVersionAndToolCode(version.id(), toolCode);
                             if (binding == null) {
                                 agentRepository.getActiveToolByCodeOrThrow(toolCode);
-                                throw new BizException(403, "Agent未授权调用该工具");
+                                throw new BizException(403, "AI助手未授权调用该工具");
                             }
                             JsonNode output = applyOutputFormat(node, readJson(toolExecutionService.execute(binding, requestPayloadJson)));
                             context.putJson(outputKey(node), output);

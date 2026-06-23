@@ -365,13 +365,13 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
     private void ensurePendingAgentPreReview(WorkflowRequestRow workflowRequest, Long agentTaskId) {
         if (!STATUS_PENDING_REVIEW.equals(workflowRequest.status())) {
-            throw new BizException(400, "当前申请状态不允许处理Agent预审结果");
+            throw new BizException(400, "当前申请状态不允许处理AI预审结果");
         }
         if (workflowRequest.flowableProcessInstanceId() != null) {
-            throw new BizException(409, "Agent预审完成前不应存在Flowable流程实例");
+            throw new BizException(409, "AI预审完成前不应存在Flowable流程实例");
         }
         if (agentTaskId == null || !agentTaskId.equals(workflowRequest.agentPreReviewTaskId())) {
-            throw new BizException(409, "Agent预审任务不匹配");
+            throw new BizException(409, "AI预审任务不匹配");
         }
     }
 

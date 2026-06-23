@@ -49,7 +49,7 @@ function presenceStatusLabel(status?: string | null) {
   <section class="content-stack">
     <article v-if="selectedContact" class="detail-card">
       <div class="contact-profile-head">
-        <AppAvatar :label="selectedContact.name.slice(0, 1)" :image="selectedContact.avatarUrl" tone="primary" size="lg" />
+        <AppAvatar :label="selectedContact.name" :image="selectedContact.avatarUrl" tone="primary" size="lg" />
         <div class="contact-profile-copy">
           <div class="title-line">
             <h3>{{ selectedContact.name }}</h3>

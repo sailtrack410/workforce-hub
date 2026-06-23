@@ -44,7 +44,7 @@ const resultRows = computed<DetailRow[]>(() => {
   return [
     { label: '任务', value: r.jobRunId },
     { label: '类型', value: r.jobType },
-    { label: '模式', value: r.dryRun ? 'Dry-run' : '执行' },
+    { label: '模式', value: r.dryRun ? '模拟清理' : '正式清理' },
     { label: '状态', value: statusLabel(r.jobStatus) },
     { label: '过期上传票据', value: String(r.expiredUploadTickets ?? 0) },
     { label: '过期下载票据', value: String(r.expiredDownloadTickets ?? 0) },
@@ -142,11 +142,11 @@ async function runCleanupJob() {
         </label>
         <label class="check-row">
           <input v-model="cleanupForm.dryRun" type="checkbox" />
-          <span>Dry-run</span>
+          <span>先模拟，不真正删除</span>
         </label>
         <button :class="cleanupForm.dryRun ? 'primary-button' : 'danger-button'" :disabled="running" type="submit">
           <Play :size="16" />
-          <span>{{ cleanupForm.dryRun ? '执行 Dry-run' : '执行清理' }}</span>
+          <span>{{ cleanupForm.dryRun ? '开始模拟' : '正式清理' }}</span>
         </button>
       </form>
     </AdminPanel>
@@ -158,9 +158,9 @@ async function runCleanupJob() {
 
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
-      :title="cleanupForm.dryRun ? '确认执行 Dry-run' : '确认执行文件清理'"
-      :message="cleanupForm.dryRun ? '确认执行 Dry-run 清理测试？' : '确认执行文件清理？此操作不可撤销。'"
-      :confirm-label="cleanupForm.dryRun ? '执行 Dry-run' : '执行清理'"
+      :title="cleanupForm.dryRun ? '确认开始模拟' : '确认正式清理'"
+      :message="cleanupForm.dryRun ? '系统只会计算可清理内容，不会删除文件。' : '将删除符合条件的文件，此操作不可撤销。'"
+      :confirm-label="cleanupForm.dryRun ? '开始模拟' : '正式清理'"
       :danger="!cleanupForm.dryRun"
       @confirm="runCleanupJob"
     />

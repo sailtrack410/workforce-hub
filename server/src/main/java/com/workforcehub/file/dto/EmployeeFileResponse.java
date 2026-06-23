@@ -11,6 +11,7 @@ public class EmployeeFileResponse {
     private Long fileObjectId;
     private String ownerType;
     private Long ownerId;
+    private Long folderId;
     private String originalFileName;
     private String displayName;
     private String uploaderType;

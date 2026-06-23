@@ -29,6 +29,8 @@ public class ConfirmUploadRequest {
 
     private Long ownerId;
 
+    private Long folderId;
+
     @NotBlank(message = "展示文件名不能为空")
     @Size(max = 256, message = "展示文件名不能超过256个字符")
     private String displayName;

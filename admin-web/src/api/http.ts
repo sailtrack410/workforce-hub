@@ -52,7 +52,7 @@ export function createApiClient(options: { baseUrl?: string; fetcher?: typeof fe
     }
     if (isApiEnvelope(payload)) {
       if (payload.code !== 0) {
-        throw new ApiClientError(payload.message || '请求失败', {
+        throw new ApiClientError(humanizeText(payload.message || '请求失败'), {
           code: payload.code,
           requestId: payload.requestId,
           detail: payload,
@@ -248,9 +248,21 @@ function isApiEnvelope(payload: unknown): payload is ApiEnvelope<unknown> {
 function resolveErrorMessage(payload: unknown, fallback: string) {
   if (payload && typeof payload === 'object' && 'message' in payload) {
     const message = (payload as { message?: unknown }).message;
-    if (typeof message === 'string' && message) return message;
+    if (typeof message === 'string' && message) return humanizeText(message);
   }
-  return fallback || '请求失败';
+  return humanizeText(fallback || '请求失败');
+}
+
+function humanizeText(value: string) {
+  return value
+    .replace(/Agent预审/g, 'AI 预审')
+    .replace(/Agent任务/g, 'AI 任务')
+    .replace(/Agent会话/g, 'AI 会话')
+    .replace(/Agent 不存在/g, 'AI 助手不存在')
+    .replace(/Agent不存在/g, 'AI 助手不存在')
+    .replace(/IM会话/g, '消息会话')
+    .replace(/IM 会话/g, '消息会话')
+    .replace(/Agent/g, 'AI 助手');
 }
 
 export const defaultApiClient = createApiClient({

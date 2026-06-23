@@ -62,7 +62,7 @@ const storageCards = computed(() => {
 <template>
   <AdminSkeleton v-if="loading" :lines="4" />
   <template v-else>
-    <AdminPanel :span="12" title="Agent 任务概览">
+    <AdminPanel :span="12" title="AI 任务概览">
       <AdminMetricStrip :cards="taskCards" />
     </AdminPanel>
 

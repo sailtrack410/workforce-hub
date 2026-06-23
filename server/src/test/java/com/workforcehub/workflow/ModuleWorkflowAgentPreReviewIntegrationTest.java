@@ -227,7 +227,7 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
             )
         );
 
-        assertEquals("Agent预审任务不匹配", exception.getMessage());
+        assertEquals("AI预审任务不匹配", exception.getMessage());
         assertEquals("PENDING_REVIEW", requestStatus(requestId));
         assertNull(processInstanceId(requestId), "错误任务回调不能启动或终止 Flowable 流程");
         assertEquals(0L, actionCount(requestId, "AGENT_PRE_REVIEW", "REJECTED"));
@@ -249,7 +249,7 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
             )
         );
 
-        assertEquals("Agent预审任务不匹配", exception.getMessage());
+        assertEquals("AI预审任务不匹配", exception.getMessage());
         assertEquals("PENDING_REVIEW", requestStatus(requestId));
         assertNull(processInstanceId(requestId), "空任务回调不能启动或终止 Flowable 流程");
         assertEquals(0L, actionCount(requestId, "AGENT_PRE_REVIEW", "REJECTED"));

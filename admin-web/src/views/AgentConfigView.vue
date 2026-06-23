@@ -4,11 +4,12 @@ import { Pencil, PlayCircle, Plus, PowerOff, RefreshCcw, Search, Send } from 'lu
 import { useRouter } from 'vue-router';
 import { adminApi } from '@/api/admin';
 import type { AgentResponse } from '@/api/types';
-import { errorMessage, formatDateTime, statusLabel } from '@/utils/format';
+import { errorMessage, formatDateTime, humanizeText, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
+import AdminIconAvatar from '@/components/AdminIconAvatar.vue';
 
 const router = useRouter();
 const toast = useToast();
@@ -18,8 +19,12 @@ const items = ref<AgentResponse[]>([]);
 const keyword = ref('');
 
 const createVisible = ref(false);
-const createForm = reactive({ agentCode: '', agentName: '' });
+const createForm = reactive({ agentCode: '', agentName: '', avatarAttachmentRefId: '' });
 const creating = ref(false);
+const editTarget = ref<AgentResponse | null>(null);
+const editVisible = ref(false);
+const editForm = reactive({ agentName: '', avatarAttachmentRefId: '' });
+const editing = ref(false);
 const disableTarget = ref<AgentResponse | null>(null);
 const disableVisible = ref(false);
 const disabling = ref(false);
@@ -28,8 +33,8 @@ const enableVisible = ref(false);
 const enabling = ref(false);
 
 const columns: TableColumn[] = [
-  { key: 'agentCode', label: '编码' },
-  { key: 'agentName', label: '名称' },
+  { key: 'agentName', label: '助手' },
+  { key: 'agentCode', label: '编号' },
   { key: 'agentType', label: '类型' },
   { key: 'status', label: '状态' },
   { key: 'publishedVersionId', label: '发布版本' },
@@ -56,7 +61,13 @@ function handleSearch() {
 function openCreate() {
   createForm.agentCode = '';
   createForm.agentName = '';
+  createForm.avatarAttachmentRefId = '';
   createVisible.value = true;
+}
+
+function avatarRef(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 async function handleCreate() {
@@ -66,16 +77,42 @@ async function handleCreate() {
     await adminApi.agentConfig.create({
       agentCode: createForm.agentCode.trim(),
       agentName: createForm.agentName.trim(),
+      avatarAttachmentRefId: avatarRef(createForm.avatarAttachmentRefId),
       agentType: 'QA',
       identityMode: 'SYSTEM_IDENTITY',
     });
     createVisible.value = false;
-    toast.success('Agent 创建成功');
+    toast.success('AI 助手已创建');
     await loadList();
   } catch (e) {
     toast.error(errorMessage(e));
   } finally {
     creating.value = false;
+  }
+}
+
+function openEdit(agent: AgentResponse) {
+  editTarget.value = agent;
+  editForm.agentName = agent.agentName || '';
+  editForm.avatarAttachmentRefId = agent.avatarAttachmentRefId == null ? '' : String(agent.avatarAttachmentRefId);
+  editVisible.value = true;
+}
+
+async function handleEdit() {
+  if (!editTarget.value || !editForm.agentName.trim()) return;
+  editing.value = true;
+  try {
+    await adminApi.agentConfig.update(editTarget.value.agentId, {
+      agentName: editForm.agentName.trim(),
+      avatarAttachmentRefId: avatarRef(editForm.avatarAttachmentRefId),
+    });
+    editVisible.value = false;
+    toast.success('AI 助手已更新');
+    await loadList();
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    editing.value = false;
   }
 }
 
@@ -128,7 +165,7 @@ onMounted(loadList);
 </script>
 
 <template>
-  <AdminPanel :span="12" title="Agent 管理">
+    <AdminPanel :span="12" title="AI 助手">
     <template #actions>
       <form class="agent-search" @submit.prevent="handleSearch">
         <input v-model="keyword" placeholder="搜索名称 / 编码" />
@@ -141,7 +178,7 @@ onMounted(loadList);
       </button>
       <button class="primary-button" @click="openCreate">
         <Plus :size="16" />
-        <span>新建 Agent</span>
+        <span>新建助手</span>
       </button>
     </template>
 
@@ -151,6 +188,14 @@ onMounted(loadList);
       :loading="loading"
       row-key="agentId"
     >
+      <template #cell-agentName="{ row }">
+        <div class="agent-name-cell">
+          <AdminIconAvatar :label="humanizeText(row.agentName) || row.agentCode || 'AI助手'" kind="agent" size="sm" />
+          <div>
+            <strong>{{ humanizeText(row.agentName) || row.agentCode }}</strong>
+          </div>
+        </div>
+      </template>
       <template #cell-status="{ row }">
         <span class="status-pill">{{ statusLabel(row.status) }}</span>
       </template>
@@ -162,13 +207,13 @@ onMounted(loadList);
       </template>
       <template #cell-_actions="{ row }">
         <div class="row-actions">
-          <button class="secondary-button action-btn" title="编辑 DAG" @click.stop="openDagEditor(row)">
+          <button class="secondary-button action-btn" title="编辑资料" @click.stop="openEdit(row)">
             <Pencil :size="14" />
             <span>编辑</span>
           </button>
-          <button class="primary-button action-btn" title="发布" @click.stop="openDagEditor(row)">
+          <button class="primary-button action-btn" title="流程编排" @click.stop="openDagEditor(row)">
             <Send :size="14" />
-            <span>发布</span>
+            <span>编排</span>
           </button>
           <button
             v-if="row.status === 'INACTIVE'"
@@ -196,7 +241,7 @@ onMounted(loadList);
 
   <AdminConfirmDialog
     v-model:visible="createVisible"
-    title="新建 Agent"
+    title="新建 AI 助手"
     message=""
     confirm-label="创建"
     :danger="false"
@@ -205,21 +250,48 @@ onMounted(loadList);
     <template #default>
       <div class="create-dialog-form">
         <label>
-          <span>Agent 编码</span>
-          <input v-model="createForm.agentCode" placeholder="如 ANNUAL_LEAVE_QA" autofocus />
+          <span>助手编号</span>
+          <input v-model="createForm.agentCode" placeholder="如 LEAVE_HELPER" autofocus />
         </label>
         <label>
-          <span>Agent 名称</span>
-          <input v-model="createForm.agentName" placeholder="如 年假问答助手" />
+          <span>助手名称</span>
+          <input v-model="createForm.agentName" placeholder="如 假期助手" />
+        </label>
+        <label>
+          <span>头像附件 ID</span>
+          <input v-model="createForm.avatarAttachmentRefId" placeholder="不填则使用默认图标" />
         </label>
       </div>
     </template>
   </AdminConfirmDialog>
 
   <AdminConfirmDialog
+    v-model:visible="editVisible"
+    title="编辑 AI 助手"
+    message=""
+    confirm-label="保存"
+    :danger="false"
+    @confirm="handleEdit"
+  >
+    <template #default>
+      <div class="create-dialog-form">
+        <label>
+          <span>助手名称</span>
+          <input v-model="editForm.agentName" placeholder="如 假期助手" autofocus />
+        </label>
+        <label>
+          <span>头像附件 ID</span>
+          <input v-model="editForm.avatarAttachmentRefId" placeholder="不填则使用默认图标" />
+        </label>
+        <p class="form-tip">上传头像后填入附件 ID，员工端会优先显示头像，没有头像时显示默认 AI 图标。</p>
+      </div>
+    </template>
+  </AdminConfirmDialog>
+
+  <AdminConfirmDialog
     v-model:visible="disableVisible"
-    title="停用 Agent"
-    :message="disableTarget ? `停用后员工端将不可检索和调用 ${disableTarget.agentName || disableTarget.agentCode}` : ''"
+    title="停用 AI 助手"
+    :message="disableTarget ? `停用后员工端将不可检索和调用 ${humanizeText(disableTarget.agentName) || disableTarget.agentCode}` : ''"
     confirm-label="停用"
     :danger="true"
     @confirm="handleDisable"
@@ -227,8 +299,8 @@ onMounted(loadList);
 
   <AdminConfirmDialog
     v-model:visible="enableVisible"
-    title="启用 Agent"
-    :message="enableTarget ? `启用后员工端可按权限检索和调用 ${enableTarget.agentName || enableTarget.agentCode}` : ''"
+    title="启用 AI 助手"
+    :message="enableTarget ? `启用后员工端可按权限检索和调用 ${humanizeText(enableTarget.agentName) || enableTarget.agentCode}` : ''"
     confirm-label="启用"
     :danger="false"
     @confirm="handleEnable"
@@ -258,6 +330,34 @@ onMounted(loadList);
   gap: 6px;
   flex-wrap: nowrap;
   align-items: center;
+}
+
+.agent-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-name-cell div {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-name-cell strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.agent-name-cell span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.form-tip {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .action-btn {

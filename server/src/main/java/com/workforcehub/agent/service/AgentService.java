@@ -36,6 +36,7 @@ import com.workforcehub.agent.dto.ModelTestResponse;
 import com.workforcehub.agent.dto.TrialRunRequest;
 import com.workforcehub.agent.dto.TrialRunResponse;
 import com.workforcehub.agent.dto.UpdateAgentVersionRequest;
+import com.workforcehub.agent.dto.UpdateAgentRequest;
 import com.workforcehub.agent.dto.UpdateLlmModelRequest;
 import com.workforcehub.agent.dto.WorkflowRunRequest;
 import com.workforcehub.agent.dto.WorkflowRunResponse;
@@ -245,17 +246,31 @@ public class AgentService implements ImAgentTriggerService {
     @Transactional(rollbackFor = Exception.class)
     public AgentResponse createAgent(CreateAgentRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        String agentCode = trimToRequired(request.getAgentCode(), "Agent编码不能为空").toUpperCase(Locale.ROOT);
+        String agentCode = trimToRequired(request.getAgentCode(), "AI助手编码不能为空").toUpperCase(Locale.ROOT);
         if (agentRepository.existsAgentCode(agentCode)) {
-            throw new BizException(409, "Agent编码已存在");
+            throw new BizException(409, "AI助手编码已存在");
         }
         Long agentId = IdWorker.getId();
         agentRepository.insertAgent(
             agentId,
             agentCode,
-            trimToRequired(request.getAgentName(), "Agent名称不能为空"),
-            normalizeIn(request.getAgentType(), AGENT_TYPES, "Agent类型不支持"),
-            normalizeDefault(request.getIdentityMode(), "SYSTEM_IDENTITY", IDENTITY_MODES, "Agent身份模式不支持"),
+            trimToRequired(request.getAgentName(), "AI助手名称不能为空"),
+            request.getAvatarAttachmentRefId(),
+            normalizeIn(request.getAgentType(), AGENT_TYPES, "AI助手类型不支持"),
+            normalizeDefault(request.getIdentityMode(), "SYSTEM_IDENTITY", IDENTITY_MODES, "AI助手身份模式不支持"),
+            operatorId
+        );
+        return toAgentResponse(agentRepository.getAgentOrThrow(agentId));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public AgentResponse updateAgent(Long agentId, UpdateAgentRequest request) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        agentRepository.getAgentOrThrow(agentId);
+        agentRepository.updateAgentProfile(
+            agentId,
+            trimToRequired(request.getAgentName(), "AI助手名称不能为空"),
+            request.getAvatarAttachmentRefId(),
             operatorId
         );
         return toAgentResponse(agentRepository.getAgentOrThrow(agentId));
@@ -268,10 +283,10 @@ public class AgentService implements ImAgentTriggerService {
         Integer versionNo = request.getVersionNo() == null ? agentRepository.nextAgentVersionNo(agentId) : request.getVersionNo();
         String versionLabel = trimToNull(request.getVersionLabel());
         if (agentRepository.existsAgentVersion(agentId, versionNo)) {
-            throw new BizException(409, "Agent版本号已存在");
+            throw new BizException(409, "AI助手版本号已存在");
         }
         if (versionLabel != null && agentRepository.existsAgentVersionLabel(agentId, versionLabel)) {
-            throw new BizException(409, "Agent显示版本号已存在");
+            throw new BizException(409, "AI助手显示版本号已存在");
         }
         Long versionId = IdWorker.getId();
         String modelConfigJson = normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON");
@@ -407,7 +422,7 @@ public class AgentService implements ImAgentTriggerService {
         assertValidWorkflow(version.workflowConfigJson());
         agentRepository.getAgentOrThrow(version.agentId());
         if (!agentRepository.hasActiveUsableAcl(version.agentId())) {
-            throw new BizException(400, "请先配置Agent可用范围");
+            throw new BizException(400, "请先配置AI助手可用范围");
         }
         if (workflowParser.isWorkflowConfig(version.workflowConfigJson())) {
             String expectedSignature = workflowTestSignature(
@@ -436,7 +451,7 @@ public class AgentService implements ImAgentTriggerService {
         Long operatorId = CurrentUserHolder.requireUserId();
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
         if (agent.publishedVersionId() == null) {
-            throw new BizException(400, "未发布Agent不能启用");
+            throw new BizException(400, "未发布AI助手不能启用");
         }
         agentRepository.enableAgent(agentId, operatorId);
         return toAgentResponse(agentRepository.getAgentOrThrow(agentId));
@@ -453,10 +468,10 @@ public class AgentService implements ImAgentTriggerService {
     public ImAgentDescriptor requireUsableAgent(Long agentId, Long userId) {
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
-            throw new BizException(409, "Agent未发布或未启用");
+            throw new BizException(409, "AI助手未发布或未启用");
         }
         if (!agentRepository.canUseAgent(agentId, userId)) {
-            throw new BizException(403, "无权使用该Agent");
+            throw new BizException(403, "无权使用该AI助手");
         }
         return new ImAgentDescriptor(agent.id(), agent.agentCode(), agent.agentName());
     }
@@ -464,10 +479,10 @@ public class AgentService implements ImAgentTriggerService {
     @Override
     public ImAgentTriggerResult triggerConversationReply(ImAgentTriggerCommand command) {
         if (command == null) {
-            throw new BizException(400, "Agent会话触发命令不能为空");
+            throw new BizException(400, "AI会话触发命令不能为空");
         }
         if (!"USER".equals(command.triggerSenderType())) {
-            throw new BizException(400, "仅支持员工消息触发会话Agent");
+            throw new BizException(400, "仅支持员工消息触发AI会话");
         }
         AgentTaskResponse response = agentTaskExecutionService.createConversationReplyTask(command);
         return new ImAgentTriggerResult(response.getTaskId(), response.getStatus(), command.idempotencyKey());
@@ -478,10 +493,10 @@ public class AgentService implements ImAgentTriggerService {
         Long userId = CurrentUserHolder.requireUserId();
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
-            throw new BizException(409, "Agent未发布或未启用");
+            throw new BizException(409, "AI助手未发布或未启用");
         }
         if (!agentRepository.canUseAgent(agentId, userId)) {
-            throw new BizException(403, "无权使用该Agent");
+            throw new BizException(403, "无权使用该AI助手");
         }
         String inputPayloadJson = normalizeJson(request.getInputPayloadJson(), "输入载荷不是合法JSON");
         String triggerType = normalizeIn(request.getTriggerType(), TRIGGER_TYPES, "触发类型不支持");
@@ -510,7 +525,7 @@ public class AgentService implements ImAgentTriggerService {
             waitingDeadlineAt,
             userId
         );
-        audit(taskId, "TASK_CREATED", "AGENT", agent.id(), "员工创建Agent任务", false);
+        audit(taskId, "TASK_CREATED", "AGENT", agent.id(), "员工创建AI任务", false);
         if (workflowTask) {
             agentRepository.updateTaskWorkflowSnapshot(taskId, version.workflowConfigJson(), userId);
         }
@@ -532,7 +547,7 @@ public class AgentService implements ImAgentTriggerService {
         }
 
         agentRepository.markTaskRunning(taskId, userId);
-        audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "Agent任务开始执行", false);
+        audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "AI任务开始执行", false);
         try {
             if (workflowTask) {
                 WorkflowExecutionResult result = workflowExecutor.execute(
@@ -550,7 +565,7 @@ public class AgentService implements ImAgentTriggerService {
                 }
             }
             agentRepository.finishTask(taskId, "SUCCEEDED", null, userId);
-            audit(taskId, "TASK_SUCCEEDED", "AGENT_TASK", taskId, "Agent任务执行成功", false);
+            audit(taskId, "TASK_SUCCEEDED", "AGENT_TASK", taskId, "AI任务执行成功", false);
         } catch (BizException e) {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.finishTask(taskId, "FAILED", errorMessage, userId);
@@ -575,7 +590,7 @@ public class AgentService implements ImAgentTriggerService {
         }
         List<AgentPendingToolCallRow> pendingToolCalls = agentRepository.listPendingToolCalls(task.id());
         if (pendingToolCalls.isEmpty()) {
-            throw new BizException(409, "Agent任务没有可继续执行的待确认工具");
+            throw new BizException(409, "AI任务没有可继续执行的待确认工具");
         }
         agentRepository.markTaskRunning(task.id(), userId);
         audit(task.id(), "TASK_HUMAN_CONFIRMED", "AGENT_TASK", task.id(), safeSummary(request.getComment()), true);
@@ -585,7 +600,7 @@ public class AgentService implements ImAgentTriggerService {
                 executePendingToolCall(pendingToolCall);
             }
             agentRepository.finishTask(task.id(), "SUCCEEDED", null, userId);
-            audit(task.id(), "TASK_SUCCEEDED", "AGENT_TASK", task.id(), "Agent任务执行成功", false);
+            audit(task.id(), "TASK_SUCCEEDED", "AGENT_TASK", task.id(), "AI任务执行成功", false);
         } catch (BizException e) {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.finishTask(task.id(), "FAILED", errorMessage, userId);
@@ -611,13 +626,13 @@ public class AgentService implements ImAgentTriggerService {
     private AgentTaskRow getWaitingTaskForCurrentUser(Long taskId, Long userId) {
         AgentTaskRow task = agentRepository.getTaskForUpdateOrThrow(taskId);
         if (!"USER".equals(task.triggeredByType()) || !userId.equals(task.triggeredById())) {
-            throw new BizException(403, "无权操作该Agent任务");
+            throw new BizException(403, "无权操作该AI任务");
         }
         if (!"WAITING_HUMAN_CONFIRM".equals(task.status())) {
-            throw new BizException(409, "只有等待人工确认的Agent任务可以操作");
+            throw new BizException(409, "只有等待人工确认的AI任务可以操作");
         }
         if (task.waitingDeadlineAt() != null && task.waitingDeadlineAt().isBefore(LocalDateTime.now())) {
-            throw new BizException(409, "Agent任务人工确认已超时");
+            throw new BizException(409, "AI任务人工确认已超时");
         }
         return task;
     }
@@ -631,7 +646,7 @@ public class AgentService implements ImAgentTriggerService {
         AgentToolBindingRow binding = agentRepository.getBindingByVersionAndToolCode(versionId, toolCode);
         if (binding == null) {
             agentRepository.getActiveToolByCodeOrThrow(toolCode);
-            throw new BizException(403, "Agent未授权调用该工具");
+            throw new BizException(403, "AI助手未授权调用该工具");
         }
         return new PreparedToolCall(binding, normalizeJson(toolCall.getRequestPayloadJson(), "工具请求载荷不是合法JSON"));
     }
@@ -769,7 +784,7 @@ public class AgentService implements ImAgentTriggerService {
 
     private AgentTaskQueryCriteria toTaskQueryCriteria(AgentTaskListQuery query) {
         return new AgentTaskQueryCriteria(
-            normalizeOptionalIn(query.getStatus(), TASK_STATUSES, "Agent任务状态不支持"),
+            normalizeOptionalIn(query.getStatus(), TASK_STATUSES, "AI任务状态不支持"),
             query.getAgentId(),
             normalizeOptionalIn(query.getTriggeredByType(), TRIGGERED_BY_TYPES, "触发主体类型不支持"),
             query.getTriggeredById(),
@@ -781,8 +796,8 @@ public class AgentService implements ImAgentTriggerService {
 
     private AgentTaskTimeoutRunQueryCriteria toTimeoutRunQueryCriteria(AgentTaskTimeoutRunQuery query) {
         return new AgentTaskTimeoutRunQueryCriteria(
-            normalizeOptionalIn(query.getTriggerType(), TIMEOUT_RUN_TRIGGER_TYPES, "Agent超时扫描触发类型不支持"),
-            normalizeOptionalIn(query.getStatus(), TIMEOUT_RUN_STATUSES, "Agent超时扫描批次状态不支持"),
+            normalizeOptionalIn(query.getTriggerType(), TIMEOUT_RUN_TRIGGER_TYPES, "AI任务超时扫描触发类型不支持"),
+            normalizeOptionalIn(query.getStatus(), TIMEOUT_RUN_STATUSES, "AI任务超时扫描批次状态不支持"),
             query.getStartedFrom(),
             query.getStartedTo()
         );
@@ -812,6 +827,7 @@ public class AgentService implements ImAgentTriggerService {
         response.setAgentId(row.id());
         response.setAgentCode(row.agentCode());
         response.setAgentName(row.agentName());
+        response.setAvatarAttachmentRefId(row.avatarAttachmentRefId());
         response.setAgentType(row.agentType());
         response.setIdentityMode(row.identityMode());
         response.setPublishedVersionId(row.publishedVersionId());

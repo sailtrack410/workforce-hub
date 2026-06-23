@@ -50,7 +50,7 @@ export function useAgentTasks({ session, showToast }: UseAgentTasksOptions) {
       if (agentTaskResult.value.taskId) {
         agentTaskForm.value.taskId = String(agentTaskResult.value.taskId);
       }
-      showToast('Agent任务已创建');
+      showToast('AI 任务已创建');
     } catch (error) {
       agentTaskError.value = error instanceof Error ? error.message : '任务创建失败';
     } finally {
@@ -68,7 +68,7 @@ export function useAgentTasks({ session, showToast }: UseAgentTasksOptions) {
         approved,
         comment: agentTaskForm.value.comment.trim() || undefined,
       });
-      showToast(approved ? 'Agent任务已确认' : 'Agent任务已拒绝');
+      showToast(approved ? 'AI 任务已确认' : 'AI 任务已拒绝');
     } catch (error) {
       agentTaskError.value = error instanceof Error ? error.message : '操作失败';
     } finally {
@@ -84,7 +84,7 @@ export function useAgentTasks({ session, showToast }: UseAgentTasksOptions) {
     agentTaskError.value = '';
     try {
       agentTaskResult.value = await employeeApi.agentTasks.cancel(taskId, { reason });
-      showToast('Agent任务已取消');
+      showToast('AI 任务已取消');
     } catch (error) {
       agentTaskError.value = error instanceof Error ? error.message : '取消失败';
     } finally {

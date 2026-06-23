@@ -70,7 +70,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
             "TASK_CREATED",
             "AGENT",
             agent.id(),
-            "审批流程触发Agent预审",
+            "审批流程触发AI预审",
             false
         );
         Runnable afterCommit = () -> completePreReview(taskId, requestId, processTypeCode, bizType, bizId, applicantUserId);
@@ -102,7 +102,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
                 "TASK_RUNNING",
                 "AGENT_TASK",
                 taskId,
-                "Agent预审开始执行",
+                "AI预审开始执行",
                 false
             );
             agentRepository.finishTask(taskId, "SUCCEEDED", null, applicantUserId);
@@ -112,7 +112,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
                 "TASK_SUCCEEDED",
                 "AGENT_TASK",
                 taskId,
-                "Agent预审通过",
+                "AI预审通过",
                 false
             );
         });
@@ -130,7 +130,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
         try {
             return objectMapper.writeValueAsString(Map.of(
                 "decision", "APPROVED",
-                "reason", "Agent预审通过",
+                "reason", "AI预审通过",
                 "requestId", requestId,
                 "processTypeCode", processTypeCode,
                 "bizType", bizType,
@@ -138,7 +138,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
                 "applicantUserId", applicantUserId
             ));
         } catch (Exception e) {
-            throw new BizException(500, "Agent预审结果序列化失败");
+            throw new BizException(500, "AI预审结果序列化失败");
         }
     }
 }

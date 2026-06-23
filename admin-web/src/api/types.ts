@@ -685,6 +685,7 @@ export interface AgentResponse {
   agentId: EntityId;
   agentCode?: string | null;
   agentName?: string | null;
+  avatarAttachmentRefId?: EntityId | null;
   agentType?: string | null;
   identityMode?: string | null;
   publishedVersionId?: EntityId | null;
@@ -698,8 +699,14 @@ export interface AgentResponse {
 export interface CreateAgentRequest {
   agentCode: string;
   agentName: string;
+  avatarAttachmentRefId?: EntityId | null;
   agentType?: string | null;
   identityMode?: string | null;
+}
+
+export interface UpdateAgentRequest {
+  agentName: string;
+  avatarAttachmentRefId?: EntityId | null;
 }
 
 export interface AgentVersionResponse {

@@ -209,7 +209,7 @@ async function saveGlobalSettings() {
       scoreThreshold: globalForm.scoreThreshold.trim() || null,
     });
     globalSettingsVisible.value = false;
-    toast.success('RAGFlow设置已保存');
+    toast.success('知识库模型设置已保存');
   } catch (e) {
     toast.error(errorMessage(e));
   } finally {
@@ -444,7 +444,7 @@ async function uploadDocument() {
 async function downloadDocument(row: RagflowDocumentResponse) {
   if (!row.attachmentRefId) return;
   try {
-    const ticket = await adminApi.files.createDownloadTicket(row.attachmentRefId, { downloadType: 'SINGLE', reason: 'RAGFlow查看文件' });
+    const ticket = await adminApi.files.createDownloadTicket(row.attachmentRefId, { downloadType: 'SINGLE', reason: '知识库查看文件' });
     window.open(ticket.downloadUrl || adminApi.files.downloadUrl(ticket.ticketNo), '_blank', 'noopener');
   } catch (e) {
     toast.error(errorMessage(e));
@@ -538,7 +538,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 <template>
   <main class="page-grid ragflow-page">
     <template v-if="!inDetail">
-      <AdminPanel :span="12" title="RAGFlow 模型设置">
+      <AdminPanel :span="12" title="知识库模型设置">
         <template #actions>
           <button class="secondary-button" @click="openGlobalSettings">
             <Settings :size="16" />
@@ -741,7 +741,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
       </template>
     </AdminConfirmDialog>
 
-    <AdminConfirmDialog v-model:visible="globalSettingsVisible" title="RAGFlow 模型设置" message="" confirm-label="保存" @confirm="saveGlobalSettings">
+    <AdminConfirmDialog v-model:visible="globalSettingsVisible" title="知识库模型设置" message="" confirm-label="保存" @confirm="saveGlobalSettings">
       <template #default>
         <div class="dialog-form">
           <h3 class="full-field form-subtitle">OCR</h3>

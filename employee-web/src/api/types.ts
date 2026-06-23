@@ -470,6 +470,7 @@ export interface LeaveAccountResponse {
 export interface CreateUploadTicketRequest {
   ownerType: string;
   ownerId?: EntityId | null;
+  folderId?: EntityId | null;
   fileName: string;
   mimeType: string;
   fileSize: number;
@@ -485,6 +486,7 @@ export interface ConfirmUploadRequest {
   fileSize: number;
   ownerType: string;
   ownerId?: EntityId | null;
+  folderId?: EntityId | null;
   displayName: string;
 }
 
@@ -496,6 +498,38 @@ export interface CreateDownloadTicketRequest {
 export interface FileListQuery extends QueryParams {
   pageNo?: number;
   pageSize?: number;
+  folderId?: EntityId | null;
+  keyword?: string;
+  fileType?: string;
+}
+
+export interface EmployeeFileFolderResponse {
+  folderId: EntityId;
+  parentFolderId?: EntityId | null;
+  folderName: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface EmployeeFileBrowserResponse {
+  currentFolderId?: EntityId | null;
+  breadcrumbs: EmployeeFileFolderResponse[];
+  folders: EmployeeFileFolderResponse[];
+  files: EmployeeFileResponse[];
+}
+
+export interface CreateEmployeeFileFolderRequest {
+  parentFolderId?: EntityId | null;
+  folderName: string;
+}
+
+export interface MoveEmployeeFileRequest {
+  targetFolderId?: EntityId | null;
+}
+
+export interface CopyEmployeeFileRequest {
+  targetFolderId?: EntityId | null;
+  displayName?: string;
 }
 
 export interface FileTrashRequest {
@@ -549,6 +583,7 @@ export interface EmployeeFileResponse {
   fileObjectId: EntityId;
   ownerType: string;
   ownerId?: EntityId | null;
+  folderId?: EntityId | null;
   originalFileName?: string | null;
   displayName: string;
   uploaderType: string;
@@ -587,6 +622,7 @@ export interface AgentResponse {
   agentId: EntityId;
   agentCode: string;
   agentName: string;
+  avatarAttachmentRefId?: EntityId | null;
   agentType: string;
   identityMode: string;
   publishedVersionId?: EntityId | null;

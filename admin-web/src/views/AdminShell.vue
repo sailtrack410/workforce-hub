@@ -19,28 +19,29 @@ import {
 } from 'lucide-vue-next';
 import { useSessionStore } from '@/stores/session';
 import AdminToast from '@/components/AdminToast.vue';
+import AdminIconAvatar from '@/components/AdminIconAvatar.vue';
 
 const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
 
 const navItems = [
-  { path: '/dashboard', label: '概览', icon: BarChart3 },
-  { path: '/agent-tasks', label: 'Agent 任务', icon: Bot },
-  { path: '/agent-config', label: 'Agent 配置', icon: LayoutGrid },
-  { path: '/workflow', label: '审批治理', icon: GitPullRequestArrow },
-  { path: '/leave', label: '假期余额', icon: PlaneTakeoff },
+  { path: '/dashboard', label: '首页', icon: BarChart3 },
+  { path: '/agent-tasks', label: 'AI 任务', icon: Bot },
+  { path: '/agent-config', label: 'AI 助手', icon: LayoutGrid },
+  { path: '/workflow', label: '审批设置', icon: GitPullRequestArrow },
+  { path: '/leave', label: '假期账户', icon: PlaneTakeoff },
   { path: '/leave-types', label: '假种管理', icon: Tag },
   { path: '/departments', label: '部门管理', icon: TreePine },
   { path: '/positions', label: '岗位管理', icon: MapPin },
   { path: '/users', label: '人员管理', icon: Users },
-  { path: '/files', label: '文件清理', icon: FileArchive },
-  { path: '/ragflow', label: 'RAGFlow', icon: LibraryBig },
-  { path: '/system', label: '系统治理', icon: ShieldCheck },
+  { path: '/files', label: '文件空间', icon: FileArchive },
+  { path: '/ragflow', label: '知识库', icon: LibraryBig },
+  { path: '/system', label: '系统记录', icon: ShieldCheck },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
-const activeTitle = computed(() => navItems.find((item) => route.path.startsWith(item.path))?.label ?? '后台运营');
+const activeTitle = computed(() => navItems.find((item) => route.path.startsWith(item.path))?.label ?? '管理后台');
 
 async function logout() {
   await session.logout();
@@ -52,7 +53,7 @@ async function logout() {
   <div class="admin-shell">
     <aside class="admin-sidebar">
       <div class="brand-block">
-        <span class="brand-mark">W</span>
+        <AdminIconAvatar label="企业" kind="org" size="md" />
         <div>
           <strong>Workforce Hub</strong>
           <span>Admin</span>
@@ -76,7 +77,7 @@ async function logout() {
       <header class="admin-topbar">
         <h1>{{ activeTitle }}</h1>
         <div class="admin-user">
-          <span class="admin-avatar">{{ session.shortName }}</span>
+          <AdminIconAvatar :label="session.displayName || '管理员'" kind="user" size="md" />
           <span>{{ session.displayName }}</span>
           <button class="icon-button" title="退出登录" @click="logout">
             <LogOut :size="18" />
@@ -94,15 +95,15 @@ async function logout() {
 .admin-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 196px minmax(0, 1fr);
+  grid-template-columns: 212px minmax(0, 1fr);
 }
 
 .admin-sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
-  padding: 20px var(--space-base);
-  border-right: 1px solid rgba(0, 80, 180, 0.12);
+  padding: 16px 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--sidebar-bg);
   color: var(--sidebar-brand-text);
 }
@@ -111,23 +112,12 @@ async function logout() {
   display: flex;
   align-items: center;
   gap: var(--space-base);
-  padding: var(--space-xs) var(--space-sm) 24px;
-}
-
-.brand-mark {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-lg);
-  background: var(--brand-mark-bg);
-  color: var(--green);
-  font-weight: 900;
+  padding: 4px 8px 20px;
 }
 
 .brand-block div { display: grid; gap: 3px; }
 
-.brand-block span:not(.brand-mark) {
+.brand-block span {
   color: var(--muted-light);
   font-size: var(--text-xs);
 }
@@ -138,8 +128,8 @@ async function logout() {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  min-height: 40px;
-  padding: 0 var(--space-sm);
+  min-height: 38px;
+  padding: 0 10px;
   border-radius: var(--radius-sm);
   color: var(--sidebar-text);
   text-decoration: none;
@@ -152,35 +142,24 @@ async function logout() {
   color: var(--sidebar-text-active);
 }
 
-.admin-main { min-width: 0; padding: var(--space-2xl); }
+.admin-main { min-width: 0; padding: 24px; }
 
 .admin-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 58px;
-  margin-bottom: var(--space-xl);
+  min-height: 52px;
+  margin-bottom: 16px;
 }
 
-.admin-topbar h1 { font-size: var(--text-xl); margin: 0; letter-spacing: 0; }
+.admin-topbar h1 { font-size: 22px; margin: 0; letter-spacing: 0; }
 
 .admin-user {
   display: inline-flex;
   align-items: center;
   gap: var(--space-md);
   color: var(--muted);
-}
-
-.admin-avatar {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-circle);
-  background: var(--avatar-bg);
-  color: var(--green);
-  font-weight: 800;
 }
 
 @media (max-width: 980px) {

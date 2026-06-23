@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
         <p v-else-if="colleaguesLoading" class="form-hint">加载中…</p>
         <div v-else class="colleague-list">
           <div v-for="user in colleagues" :key="user.userId" class="colleague-row">
-            <AppAvatar :label="(user.realName || '').slice(0, 2)" :image="colleagueAvatarUrl(user)" tone="primary" size="sm" />
+            <AppAvatar :label="user.realName || '同事'" :image="colleagueAvatarUrl(user)" tone="primary" size="sm" />
             <div>
               <strong>{{ user.realName }}</strong>
               <small>{{ user.positionName || '未设置岗位' }}<span v-if="user.managerName"> · 直属上级 {{ user.managerName }}</span></small>

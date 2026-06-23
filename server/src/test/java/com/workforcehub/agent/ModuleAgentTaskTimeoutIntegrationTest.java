@@ -323,7 +323,7 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
                 .param("status", "UNKNOWN_STATUS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(400))
-            .andExpect(jsonPath("$.message").value("Agent超时扫描批次状态不支持"));
+            .andExpect(jsonPath("$.message").value("AI任务超时扫描批次状态不支持"));
     }
 
     private long createWaitingTask(Cookie adminSession, Cookie employeeSession) throws Exception {

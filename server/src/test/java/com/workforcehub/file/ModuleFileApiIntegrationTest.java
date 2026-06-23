@@ -558,6 +558,109 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工云空间应支持文件夹浏览、移动、复制和类型筛选")
+    void employeeFileBrowserShouldPersistFoldersMoveCopyAndFilter() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        Long pdfAttachmentRefId = createConfirmedPersonalFile(employeeSession, "项目说明.pdf", "browser-pdf-content");
+        Long imageAttachmentRefId = createConfirmedPersonalFile(employeeSession, "截图.png", "browser-image-content");
+
+        MvcResult folderResult = mockMvc.perform(post("/api/employee/files/folders")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "parentFolderId": null,
+                      "folderName": "报销材料"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.folderName").value("报销材料"))
+            .andReturn();
+        Long folderId = data(folderResult).get("folderId").asLong();
+        Long uploadedInFolderRefId = createConfirmedPersonalFile(
+            employeeSession,
+            "目录上传.txt",
+            "folder-upload-content".getBytes(StandardCharsets.UTF_8),
+            folderId
+        );
+        Long deduplicatedInFolderRefId = createConfirmedPersonalFile(
+            employeeSession,
+            "截图秒传.png",
+            "browser-image-content".getBytes(StandardCharsets.UTF_8),
+            folderId
+        );
+
+        mockMvc.perform(post("/api/employee/files/{attachmentRefId}/move", pdfAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetFolderId": %s
+                    }
+                    """.formatted(folderId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data.attachmentRefId", pdfAttachmentRefId))
+            .andExpect(jsonLong("$.data.folderId", folderId));
+
+        MvcResult rootBrowserResult = mockMvc.perform(get("/api/employee/files/browser")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.folders[0].folderName").value("报销材料"))
+            .andReturn();
+        JsonNode rootFiles = data(rootBrowserResult).get("files");
+        assertEquals(1, rootFiles.size());
+        assertEquals(imageAttachmentRefId.longValue(), rootFiles.get(0).get("attachmentRefId").asLong());
+
+        mockMvc.perform(get("/api/employee/files/browser")
+                .cookie(employeeSession)
+                .param("folderId", String.valueOf(folderId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.breadcrumbs[0].folderName").value("报销材料"))
+            .andExpect(jsonPath("$.data.files[?(@.attachmentRefId == %s)]".formatted(pdfAttachmentRefId)).exists())
+            .andExpect(jsonPath("$.data.files[?(@.attachmentRefId == %s)]".formatted(uploadedInFolderRefId)).exists())
+            .andExpect(jsonPath("$.data.files[?(@.attachmentRefId == %s)]".formatted(deduplicatedInFolderRefId)).exists());
+
+        MvcResult copyResult = mockMvc.perform(post("/api/employee/files/{attachmentRefId}/copy", imageAttachmentRefId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "targetFolderId": %s,
+                      "displayName": "截图副本.png"
+                    }
+                    """.formatted(folderId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.displayName").value("截图副本.png"))
+            .andExpect(jsonLong("$.data.folderId", folderId))
+            .andReturn();
+        Long copiedAttachmentRefId = data(copyResult).get("attachmentRefId").asLong();
+
+        MvcResult imageBrowserResult = mockMvc.perform(get("/api/employee/files/browser")
+                .cookie(employeeSession)
+                .param("folderId", String.valueOf(folderId))
+                .param("fileType", "image"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode imageFiles = data(imageBrowserResult).get("files");
+        assertEquals(2, imageFiles.size());
+        assertTrue(List.of(
+            imageFiles.get(0).get("attachmentRefId").asLong(),
+            imageFiles.get(1).get("attachmentRefId").asLong()
+        ).contains(copiedAttachmentRefId.longValue()));
+        assertTrue(List.of(
+            imageFiles.get(0).get("attachmentRefId").asLong(),
+            imageFiles.get(1).get("attachmentRefId").asLong()
+        ).contains(deduplicatedInFolderRefId.longValue()));
+    }
+
+    @Test
     @DisplayName("员工个人文件生命周期接口不能操作审批归档附件")
     void employeeLifecycleShouldRejectWorkflowAttachmentRef() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -1244,6 +1347,18 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             String sha256,
             String clientRequestId,
             String ownerType) throws Exception {
+        return createUploadTicket(session, fileName, mimeType, fileSize, sha256, clientRequestId, ownerType, null);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createUploadTicket(
+            Cookie session,
+            String fileName,
+            String mimeType,
+            long fileSize,
+            String sha256,
+            String clientRequestId,
+            String ownerType,
+            Long folderId) throws Exception {
         return mockMvc.perform(post("/api/employee/files/upload-tickets")
             .cookie(session)
             .contentType(MediaType.APPLICATION_JSON)
@@ -1251,6 +1366,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                 {
                   "ownerType": "%s",
                   "ownerId": null,
+                  "folderId": %s,
                   "fileName": "%s",
                   "mimeType": "%s",
                   "fileSize": %s,
@@ -1258,7 +1374,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                   "contentMd5": null,
                   "clientRequestId": "%s"
                 }
-                """.formatted(ownerType, fileName, mimeType, fileSize, sha256, clientRequestId)));
+                """.formatted(ownerType, folderId == null ? "null" : folderId, fileName, mimeType, fileSize, sha256, clientRequestId)));
     }
 
     private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, String text) throws Exception {
@@ -1266,8 +1382,20 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, byte[] content) throws Exception {
+        return createConfirmedPersonalFile(employeeSession, fileName, content, null);
+    }
+
+    private Long createConfirmedPersonalFile(Cookie employeeSession, String fileName, byte[] content, Long folderId) throws Exception {
         String sha256 = sha256(content);
-        MvcResult ticketResult = createUploadTicket(employeeSession, fileName, content.length, sha256)
+        MvcResult ticketResult = createUploadTicket(
+                employeeSession,
+                fileName,
+                "text/plain",
+                content.length,
+                sha256,
+                "file-test-" + System.nanoTime(),
+                "PERSONAL_FILE",
+                folderId)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
@@ -1276,7 +1404,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         String objectKey = ticketData.get("objectKey").asText();
         writeLocalObject(objectKey, content);
 
-        MvcResult confirmResult = confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, fileName)
+        MvcResult confirmResult = confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, fileName, "PERSONAL_FILE", folderId)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
@@ -1447,6 +1575,18 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             long fileSize,
             String displayName,
             String ownerType) throws Exception {
+        return confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, fileSize, displayName, ownerType, null);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions confirmUpload(
+            Cookie employeeSession,
+            Long uploadTicketId,
+            String objectKey,
+            String sha256,
+            long fileSize,
+            String displayName,
+            String ownerType,
+            Long folderId) throws Exception {
         return mockMvc.perform(post("/api/employee/files/confirm-upload")
             .cookie(employeeSession)
             .contentType(MediaType.APPLICATION_JSON)
@@ -1458,9 +1598,10 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                   "fileSize": %s,
                   "ownerType": "%s",
                   "ownerId": null,
+                  "folderId": %s,
                   "displayName": "%s"
                 }
-                """.formatted(uploadTicketId, objectKey, sha256, fileSize, ownerType, displayName)));
+                """.formatted(uploadTicketId, objectKey, sha256, fileSize, ownerType, folderId == null ? "null" : folderId, displayName)));
     }
 
     private void seedDefaultQuotaPolicy() {

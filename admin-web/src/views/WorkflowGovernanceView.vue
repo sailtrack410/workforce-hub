@@ -138,7 +138,7 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
       ? 'leave_manager_approval'
       : '';
   if (!flowableDefinitionKey) {
-    toast.error('未配置流程定义 Key');
+    toast.error('未配置审批流程编号');
     return;
   }
 

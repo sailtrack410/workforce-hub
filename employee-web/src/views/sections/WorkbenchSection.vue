@@ -1,26 +1,35 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
 import {
+  Check,
   ChevronLeft,
   Download,
   Eye,
   ExternalLink,
+  Folder,
+  Home,
+  Search,
   X,
 } from 'lucide-vue-next';
+import { employeeApi, type AgentResponse, type EmployeeFileFolderResponse, type EmployeeFileResponse, type EntityId, type LeaveAccountResponse } from '@/api';
 import { useWorkbenchSectionContext } from '../employee-shell-context';
 import { useWorkbenchState } from '@/composables/useWorkbenchState';
+import { usePersonalFileTransfer } from '@/composables/usePersonalFileTransfer';
 import {
   actionTypeLabel,
   bizTypeLabel,
   displayField,
   formatDateTime,
+  humanizeText,
   minutesToDayLabel,
   punchTypeLabel,
   statusText,
   toneOfStatus,
 } from '@/utils/employee-format';
-import { fileIconOf, fileToneOf, isFileTrashed } from '@/utils/file-record';
+import { fileIconOf, fileToneOf } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import type { PersonalFileRecord } from '@/stores/shell';
+import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 import AppErrorState from '../../components/ui/AppErrorState.vue';
@@ -98,7 +107,6 @@ const {
   workflowFilePreviewLoading,
   workflowFilePreviewTitle,
   workflowFilePreviewType,
-  activeUploadableFiles,
   closeWorkflowFilePreview,
   openWorkflowPreviewExternal,
 } = useWorkbenchState({
@@ -110,6 +118,168 @@ const {
 function backToList() {
   shell.setMobileView('list');
 }
+
+type AttachmentPickerTarget = 'leave' | 'clock';
+
+const attachmentPickerOpen = ref(false);
+const attachmentPickerTarget = ref<AttachmentPickerTarget>('leave');
+const attachmentPickerFolderId = ref<EntityId | null>(null);
+const attachmentPickerKeyword = ref('');
+const attachmentPickerType = ref('all');
+const attachmentPickerLoading = ref(false);
+const attachmentPickerError = ref('');
+const attachmentPickerFolders = ref<EmployeeFileFolderResponse[]>([]);
+const attachmentPickerFiles = ref<PersonalFileRecord[]>([]);
+const attachmentPickerBreadcrumbs = ref<EmployeeFileFolderResponse[]>([]);
+let attachmentSearchTimer: number | undefined;
+const agentAvatarUrls = ref<Record<string, string>>({});
+const { resolveDownloadUrl } = usePersonalFileTransfer();
+
+const currentAttachmentIds = computed(() => (
+  attachmentPickerTarget.value === 'leave' ? leaveAttachmentIds.value : clockCorrectionAttachmentIds.value
+));
+const currentAttachmentIdSet = computed(() => new Set(currentAttachmentIds.value.map((item) => String(item))));
+const leaveAvailableMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.availableMinutes ?? 0), 0));
+const leaveFrozenMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.frozenMinutes ?? 0), 0));
+const activeLeaveAccountCount = computed(() => leaveAccounts.value.filter((account) => account.status === 'ACTIVE').length);
+
+function leaveAccountTone(account: LeaveAccountResponse) {
+  if (account.status !== 'ACTIVE') return 'neutral';
+  if ((account.frozenMinutes ?? 0) > 0) return 'warning';
+  return 'success';
+}
+
+function leaveAccountMeta(account: LeaveAccountResponse) {
+  if (account.lastChangeMinutes === undefined || account.lastChangeMinutes === null) return '暂无近期变动';
+  const prefix = account.lastChangeMinutes > 0 ? '+' : '';
+  return `${account.lastTxnType ?? '最近变动'} ${prefix}${minutesToDayLabel(Math.abs(account.lastChangeMinutes))}`;
+}
+
+function leaveAccountToneClass(index: number) {
+  return ['blue', 'green', 'amber', 'gray'][index % 4];
+}
+
+function mapPickerFile(file: EmployeeFileResponse): PersonalFileRecord {
+  const name = file.displayName || file.originalFileName || '未命名文件';
+  return {
+    id: `personal-file-${file.attachmentRefId}`,
+    name,
+    type: fileTypeLabelFromName(name, file.mimeType ?? ''),
+    size: fileSizeLabel(file.fileSize),
+    createdAt: formatDateTime(file.createdAt),
+    status: statusText(file.scanStatus),
+    attachmentRefId: file.attachmentRefId,
+    folderId: file.folderId ?? null,
+    mimeType: file.mimeType ?? undefined,
+  };
+}
+
+async function refreshAgentAvatarUrls(items: AgentResponse[]) {
+  const entries = await Promise.all(items.map(async (agent) => {
+    if (!agent.avatarAttachmentRefId) return [String(agent.agentId), ''] as const;
+    try {
+      const ticket = await employeeApi.files.createDownloadTicket(agent.avatarAttachmentRefId, { downloadType: 'INLINE' });
+      return [String(agent.agentId), resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo))] as const;
+    } catch {
+      return [String(agent.agentId), ''] as const;
+    }
+  }));
+  agentAvatarUrls.value = Object.fromEntries(entries);
+}
+
+function attachmentIdsFor(target: AttachmentPickerTarget) {
+  return target === 'leave' ? leaveAttachmentIds.value : clockCorrectionAttachmentIds.value;
+}
+
+function setAttachmentIdsFor(target: AttachmentPickerTarget, ids: Array<string | number>) {
+  if (target === 'leave') {
+    leaveAttachmentIds.value = ids;
+  } else {
+    clockCorrectionAttachmentIds.value = ids;
+  }
+}
+
+function selectedAttachmentFiles(target: AttachmentPickerTarget) {
+  const ids = attachmentIdsFor(target);
+  return ids.map((id) => (
+    activeFile.value.files.find((file) => String(file.attachmentRefId) === String(id))
+    ?? {
+      id: `selected-${id}`,
+      name: String(id),
+      type: '文件',
+      size: '',
+      createdAt: '',
+      status: '',
+      attachmentRefId: id,
+    }
+  ));
+}
+
+async function loadAttachmentPickerFiles() {
+  attachmentPickerLoading.value = true;
+  attachmentPickerError.value = '';
+  try {
+    const browser = await employeeApi.files.browser({
+      folderId: attachmentPickerFolderId.value ?? undefined,
+      keyword: attachmentPickerKeyword.value.trim() || undefined,
+      fileType: attachmentPickerType.value,
+    });
+    attachmentPickerFolders.value = browser.folders;
+    attachmentPickerFiles.value = browser.files.map(mapPickerFile);
+    attachmentPickerBreadcrumbs.value = browser.breadcrumbs;
+  } catch (error) {
+    attachmentPickerError.value = error instanceof Error ? error.message : '附件加载失败';
+  } finally {
+    attachmentPickerLoading.value = false;
+  }
+}
+
+function openAttachmentPicker(target: AttachmentPickerTarget) {
+  attachmentPickerTarget.value = target;
+  attachmentPickerOpen.value = true;
+  void loadAttachmentPickerFiles();
+}
+
+function closeAttachmentPicker() {
+  attachmentPickerOpen.value = false;
+}
+
+function openAttachmentFolder(folderId: EntityId | null) {
+  attachmentPickerFolderId.value = folderId;
+}
+
+function toggleAttachment(file: PersonalFileRecord) {
+  if (!file.attachmentRefId) return;
+  const target = attachmentPickerTarget.value;
+  const ids = attachmentIdsFor(target);
+  const key = String(file.attachmentRefId);
+  if (ids.some((item) => String(item) === key)) {
+    setAttachmentIdsFor(target, ids.filter((item) => String(item) !== key));
+  } else {
+    setAttachmentIdsFor(target, [...ids, file.attachmentRefId]);
+  }
+}
+
+function removeAttachment(target: AttachmentPickerTarget, attachmentRefId?: EntityId) {
+  if (!attachmentRefId) return;
+  setAttachmentIdsFor(target, attachmentIdsFor(target).filter((item) => String(item) !== String(attachmentRefId)));
+}
+
+watch([attachmentPickerFolderId, attachmentPickerType], () => {
+  if (attachmentPickerOpen.value) void loadAttachmentPickerFiles();
+});
+
+watch(attachmentPickerKeyword, () => {
+  if (!attachmentPickerOpen.value) return;
+  if (attachmentSearchTimer) window.clearTimeout(attachmentSearchTimer);
+  attachmentSearchTimer = window.setTimeout(() => {
+    void loadAttachmentPickerFiles();
+  }, 240);
+});
+
+watch(agents, (items) => {
+  void refreshAgentAvatarUrls(items);
+}, { immediate: true });
 </script>
 
 <template>
@@ -183,18 +353,23 @@ function backToList() {
                 <span>请假原因</span>
                 <textarea v-model="leaveForm.reason" class="ui-textarea compact-textarea" rows="4" />
               </label>
-              <label v-if="activeFile.files.length" class="security-field form-full">
+              <div class="security-field form-full">
                 <span>申请附件</span>
-                <select v-model="leaveAttachmentIds" class="ui-inline-input" multiple>
-                  <option
-                    v-for="file in activeUploadableFiles()"
-                    :key="file.id"
-                    :value="file.attachmentRefId"
-                  >
-                    {{ file.name }}
-                  </option>
-                </select>
-              </label>
+                <div class="attachment-picker-summary">
+                  <button type="button" @click="openAttachmentPicker('leave')">
+                    选择附件
+                    <small>{{ leaveAttachmentIds.length }} 个</small>
+                  </button>
+                  <div v-if="selectedAttachmentFiles('leave').length" class="attachment-chip-list">
+                    <span v-for="file in selectedAttachmentFiles('leave')" :key="file.id">
+                      {{ file.name }}
+                      <button type="button" aria-label="移除附件" @click="removeAttachment('leave', file.attachmentRefId)">
+                        <X :size="13" />
+                      </button>
+                    </span>
+                  </div>
+                </div>
+              </div>
               <p v-if="leaveError" class="dialog-error form-full">{{ leaveError }}</p>
               <p v-if="leaveResult" class="form-result form-full">申请编号：{{ leaveResult.requestNo }} · {{ statusText(leaveResult.status) }}</p>
               <div class="form-actions form-full">
@@ -361,18 +536,23 @@ function backToList() {
               <span>补卡原因</span>
               <textarea v-model="clockCorrectionForm.reason" class="ui-textarea compact-textarea" rows="3" />
             </label>
-            <label v-if="activeFile.files.length" class="security-field">
+            <div class="security-field">
               <span>补卡附件</span>
-              <select v-model="clockCorrectionAttachmentIds" class="ui-inline-input" multiple>
-                <option
-                  v-for="file in activeUploadableFiles()"
-                  :key="file.id"
-                  :value="file.attachmentRefId"
-                >
-                  {{ file.name }}
-                </option>
-              </select>
-            </label>
+              <div class="attachment-picker-summary">
+                <button type="button" @click="openAttachmentPicker('clock')">
+                  选择附件
+                  <small>{{ clockCorrectionAttachmentIds.length }} 个</small>
+                </button>
+                <div v-if="selectedAttachmentFiles('clock').length" class="attachment-chip-list">
+                  <span v-for="file in selectedAttachmentFiles('clock')" :key="file.id">
+                    {{ file.name }}
+                    <button type="button" aria-label="移除附件" @click="removeAttachment('clock', file.attachmentRefId)">
+                      <X :size="13" />
+                    </button>
+                  </span>
+                </div>
+              </div>
+            </div>
             <p v-if="clockCorrectionError" class="dialog-error">{{ clockCorrectionError }}</p>
             <p v-if="clockCorrectionResult" class="form-result">申请编号：{{ clockCorrectionResult.requestNo }} · {{ statusText(clockCorrectionResult.status) }}</p>
             <div class="form-actions">
@@ -423,23 +603,60 @@ function backToList() {
     </template>
 
     <template v-else-if="activeWorkbench.id === 'balance'">
-      <section class="leave-account-grid">
-        <article v-for="account in leaveAccounts" :key="account.accountId" class="detail-card leave-account-card">
-          <small>{{ account.leaveCode }}</small>
-          <h3>{{ account.leaveName }}</h3>
-          <strong>{{ minutesToDayLabel(account.availableMinutes) }}</strong>
-          <dl class="field-grid">
-            <div>
-              <dt>冻结</dt>
-              <dd>{{ minutesToDayLabel(account.frozenMinutes) }}</dd>
-            </div>
-            <div>
-              <dt>状态</dt>
-              <dd>{{ statusText(account.status) }}</dd>
-            </div>
-          </dl>
+      <section class="leave-balance-board">
+        <article class="leave-balance-hero">
+          <div>
+            <small>我的假期</small>
+            <h3>{{ minutesToDayLabel(leaveAvailableMinutes) }}</h3>
+            <p>当前可用余额，提交请假时会自动冻结对应时长。</p>
+          </div>
+          <div class="leave-hero-metrics">
+            <span>
+              <strong>{{ leaveAccounts.length }}</strong>
+              <small>假种</small>
+            </span>
+            <span>
+              <strong>{{ activeLeaveAccountCount }}</strong>
+              <small>可用</small>
+            </span>
+            <span>
+              <strong>{{ minutesToDayLabel(leaveFrozenMinutes) }}</strong>
+              <small>冻结</small>
+            </span>
+          </div>
         </article>
-        <AppEmptyState v-if="!leaveAccounts.length" title="暂无假期账户" description="暂无假期账户" />
+
+        <section class="leave-account-grid refined">
+          <article
+            v-for="(account, index) in leaveAccounts"
+            :key="account.accountId"
+            class="leave-balance-card"
+            :class="`leave-tone-${leaveAccountToneClass(index)}`"
+          >
+            <div class="leave-card-head">
+              <span class="leave-card-icon">
+                <Check :size="18" />
+              </span>
+              <AppTag :tone="leaveAccountTone(account)">{{ statusText(account.status) }}</AppTag>
+            </div>
+            <div>
+              <small>{{ account.leaveCode }}</small>
+              <h3>{{ account.leaveName }}</h3>
+            </div>
+            <strong>{{ minutesToDayLabel(account.availableMinutes) }}</strong>
+            <dl>
+              <div>
+                <dt>冻结</dt>
+                <dd>{{ minutesToDayLabel(account.frozenMinutes) }}</dd>
+              </div>
+              <div>
+                <dt>近期</dt>
+                <dd>{{ leaveAccountMeta(account) }}</dd>
+              </div>
+            </dl>
+          </article>
+          <AppEmptyState v-if="!leaveAccounts.length" title="暂无假期账户" description="暂无假期账户" />
+        </section>
       </section>
     </template>
 
@@ -447,30 +664,33 @@ function backToList() {
       <section class="detail-grid">
         <article class="detail-card">
           <div class="title-line">
-            <h3>可用Agent</h3>
+            <h3>可用 AI 助手</h3>
             <AppButton variant="secondary" size="sm" :disabled="agentsLoading" @click="loadAgents">
               {{ agentsLoading ? '加载中' : '刷新' }}
             </AppButton>
           </div>
           <AppLoadingState v-if="agentsLoading" />
-          <AppEmptyState v-else-if="!agents.length" title="暂无Agent" description="暂无Agent" />
+          <AppEmptyState v-else-if="!agents.length" title="暂无 AI 助手" description="暂无 AI 助手" />
           <div v-else class="compact-table">
-            <div v-for="agent in agents" :key="agent.agentId">
-              <strong>{{ agent.agentName }}</strong>
-              <span>{{ agent.agentType }}</span>
-              <small>{{ agent.agentCode }} · {{ statusText(agent.status) }}</small>
+            <div v-for="agent in agents" :key="agent.agentId" class="agent-compact-row">
+              <AppAvatar :label="humanizeText(agent.agentName)" :image="agentAvatarUrls[String(agent.agentId)]" kind="agent" tone="success" size="sm" />
+              <div>
+                <strong>{{ humanizeText(agent.agentName) }}</strong>
+                <span>{{ agent.agentType }}</span>
+                <small>{{ agent.agentCode }} · {{ statusText(agent.status) }}</small>
+              </div>
             </div>
           </div>
         </article>
 
         <article class="detail-card">
-          <h3>Agent任务</h3>
+          <h3>AI 任务</h3>
           <form class="workbench-form single-column" @submit.prevent="submitAgentTask">
             <label class="security-field">
-              <span>Agent</span>
+              <span>AI 助手</span>
               <select v-model="agentTaskForm.agentId" class="ui-inline-input">
                 <option v-for="agent in agents" :key="agent.agentId" :value="String(agent.agentId)">
-                  {{ agent.agentName }}
+                  {{ humanizeText(agent.agentName) }}
                 </option>
               </select>
             </label>
@@ -534,6 +754,94 @@ function backToList() {
     </template>
   </section>
 </div>
+
+<AppDialog v-if="attachmentPickerOpen">
+  <section class="attachment-picker-dialog">
+    <header class="dialog-head dialog-head-row">
+      <div>
+        <h2>选择附件</h2>
+        <p>{{ currentAttachmentIds.length }} 个已选</p>
+      </div>
+      <button class="field-icon-button" type="button" aria-label="关闭" @click="closeAttachmentPicker">
+        <X :size="15" />
+      </button>
+    </header>
+
+    <div class="file-browser-toolbar">
+      <label class="file-search-field">
+        <Search :size="16" />
+        <input v-model="attachmentPickerKeyword" type="search" placeholder="搜索附件" />
+      </label>
+      <select v-model="attachmentPickerType" class="ui-inline-input file-type-select">
+        <option value="all">全部类型</option>
+        <option value="document">文档</option>
+        <option value="image">图片</option>
+        <option value="sheet">表格</option>
+        <option value="archive">压缩包</option>
+        <option value="media">音视频</option>
+        <option value="code">代码</option>
+      </select>
+    </div>
+
+    <div class="file-breadcrumb">
+      <button type="button" :class="{ active: attachmentPickerFolderId === null }" @click="openAttachmentFolder(null)">
+        <Home :size="15" />
+        根目录
+      </button>
+      <button
+        v-for="folder in attachmentPickerBreadcrumbs"
+        :key="folder.folderId"
+        type="button"
+        :class="{ active: String(attachmentPickerFolderId) === String(folder.folderId) }"
+        @click="openAttachmentFolder(folder.folderId)"
+      >
+        {{ folder.folderName }}
+      </button>
+    </div>
+
+    <AppLoadingState v-if="attachmentPickerLoading" />
+    <p v-else-if="attachmentPickerError" class="dialog-error">{{ attachmentPickerError }}</p>
+    <AppEmptyState
+      v-else-if="!attachmentPickerFolders.length && !attachmentPickerFiles.length"
+      title="暂无附件"
+      description="暂无附件"
+    />
+    <div v-else class="attachment-picker-list">
+      <button
+        v-for="folder in attachmentPickerFolders"
+        :key="folder.folderId"
+        type="button"
+        class="attachment-picker-row"
+        @click="openAttachmentFolder(folder.folderId)"
+      >
+        <span class="file-icon folder-icon">
+          <Folder :size="18" />
+        </span>
+        <strong>{{ folder.folderName }}</strong>
+        <small>文件夹</small>
+      </button>
+      <button
+        v-for="file in attachmentPickerFiles"
+        :key="file.id"
+        type="button"
+        class="attachment-picker-row"
+        :class="{ selected: currentAttachmentIdSet.has(String(file.attachmentRefId)) }"
+        @click="toggleAttachment(file)"
+      >
+        <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
+          <component :is="fileIconOf(file)" :size="18" />
+        </span>
+        <strong>{{ file.name }}</strong>
+        <small>{{ file.type }} · {{ file.size }}</small>
+        <Check v-if="currentAttachmentIdSet.has(String(file.attachmentRefId))" :size="17" />
+      </button>
+    </div>
+
+    <div class="form-actions">
+      <AppButton variant="primary" @click="closeAttachmentPicker">确定</AppButton>
+    </div>
+  </section>
+</AppDialog>
 
 <AppDialog v-if="workflowFilePreview">
   <section class="preview-dialog">

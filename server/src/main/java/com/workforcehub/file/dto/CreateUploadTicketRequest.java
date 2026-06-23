@@ -15,6 +15,8 @@ public class CreateUploadTicketRequest {
 
     private Long ownerId;
 
+    private Long folderId;
+
     @NotBlank(message = "文件名不能为空")
     @Size(max = 256, message = "文件名不能超过256个字符")
     private String fileName;

@@ -160,7 +160,7 @@ export const useImStore = defineStore('employee-im', {
         }
       }
     },
-    async loadConversationDetail(conversationId: string | number, imApi: EmployeeImApi = employeeApi.im) {
+    async loadConversationDetail(conversationId: string | number, imApi: EmployeeImApi = employeeApi.im, currentUserId?: EntityId) {
       const seq = ++this._loadDetailSeq;
       this.error = '';
       try {
@@ -176,8 +176,9 @@ export const useImStore = defineStore('employee-im', {
           } else {
             record.memberCount = undefined;
           }
-          record.title = detail.groupProfile?.title || mapped.title;
+          record.title = privateConversationTitle(detail, currentUserId) || detail.groupProfile?.title || mapped.title;
           record.summaryTitle = record.title;
+          record.badge = record.title.slice(0, 2);
           record.cards = [
             { label: '会话类型', value: mapped.flow, hint: '会话类型' },
             { label: '成员数', value: String(detail.members.length), hint: '成员' },
@@ -194,12 +195,12 @@ export const useImStore = defineStore('employee-im', {
         throw error;
       }
     },
-    async loadVisibleConversationDetails(conversationIds?: Array<string | number>, imApi: EmployeeImApi = employeeApi.im) {
+    async loadVisibleConversationDetails(conversationIds?: Array<string | number>, imApi: EmployeeImApi = employeeApi.im, currentUserId?: EntityId) {
       const ids = (conversationIds?.length ? conversationIds : this.conversations.map((item) => item.id))
         .map((item) => String(item))
         .filter(Boolean)
         .slice(0, 20);
-      await Promise.all(ids.map((conversationId) => this.loadConversationDetail(conversationId, imApi).catch(() => undefined)));
+      await Promise.all(ids.map((conversationId) => this.loadConversationDetail(conversationId, imApi, currentUserId).catch(() => undefined)));
     },
     async loadOlderMessages(
       conversationId: string | number,
@@ -283,7 +284,7 @@ export const useImStore = defineStore('employee-im', {
         const conversation = await imApi.startAgentConversation({ agentId });
         return this.upsertConversation(conversation);
       } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Agent 会话创建失败';
+        this.error = error instanceof Error ? error.message : 'AI 会话创建失败';
         throw error;
       } finally {
         this.loading = false;
@@ -568,9 +569,18 @@ function mapConversationMember(member: ImConversationMemberResponse) {
 }
 
 function memberRoleLabel(member: ImConversationMemberResponse) {
-  if (member.memberType === 'AGENT') return 'Agent';
+  if (member.memberType === 'AGENT') return 'AI 助手';
   if (member.memberRole === 'OWNER') return '群主';
   return '成员';
+}
+
+function privateConversationTitle(detail: ImConversationDetailResponse, currentUserId?: EntityId) {
+  if (detail.conversation.conversationType !== 'PRIVATE') return '';
+  const users = detail.members.filter((member) => member.memberType === 'USER');
+  const target = currentUserId !== undefined && currentUserId !== null
+    ? users.find((member) => String(member.memberId) !== String(currentUserId))
+    : users.length === 1 ? users[0] : undefined;
+  return target?.displayName?.trim() || '';
 }
 
 export function mapImConversationToRecord(conversation: ImConversationSummaryResponse): ConversationRecord {
@@ -667,7 +677,7 @@ function toneOfKind(kind: ConversationRecord['kind']): ConversationTone {
 }
 
 function flowOfConversationType(conversationType: string) {
-  if (conversationType === 'AGENT') return 'Agent 会话';
+  if (conversationType === 'AGENT') return 'AI 会话';
   if (conversationType === 'GROUP') return '群聊';
   if (conversationType === 'PRIVATE') return '私聊';
   return '会话';
@@ -675,20 +685,20 @@ function flowOfConversationType(conversationType: string) {
 
 function fallbackConversationTitle(conversationType: string) {
   if (conversationType === 'GROUP') return '群组会话';
-  if (conversationType === 'AGENT') return 'Agent 会话';
+  if (conversationType === 'AGENT') return 'AI 会话';
   return '私聊会话';
 }
 
 function authorOfMessage(message: ImMessageResponse) {
   if (message.senderType === 'SYSTEM') return '系统';
-  if (message.senderType === 'AGENT') return 'Agent';
+  if (message.senderType === 'AGENT') return 'AI 助手';
   return `用户 ${message.senderId}`;
 }
 
 function messageRole(message: ImMessageResponse, knowledgeCard?: KnowledgeAnswerCard) {
   if (message.senderType === 'SYSTEM') return '系统消息';
-  if (knowledgeCard) return '知识库 Agent';
-  if (message.senderType === 'AGENT') return message.messageType === 'CARD' ? '流程 Agent' : 'AI 助手';
+  if (knowledgeCard) return '知识库 AI';
+  if (message.senderType === 'AGENT') return message.messageType === 'CARD' ? '流程 AI' : 'AI 助手';
   if (message.messageType === 'CARD') return '流程消息';
   return '成员';
 }
@@ -775,7 +785,7 @@ function parseAgentResultCard(content: Record<string, unknown>): KnowledgeAnswer
     state: normalizeAgentResultState(content.status),
     category: normalizeAgentResultCategory(content.category),
     status: normalizeAgentResultStatus(content.status),
-    title: stringValue(content.title, 'Agent 回复'),
+    title: stringValue(content.title, 'AI 回复'),
     answer: stringValue(content.answer || content.summary, ''),
     confidence: normalizeConfidence(content.confidence),
     citations: arrayValue(content.citations).map(parseKnowledgeCitation).filter(Boolean) as KnowledgeCitation[],

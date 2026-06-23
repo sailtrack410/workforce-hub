@@ -16,6 +16,7 @@ interface UseFileUploadOptions {
   shell: ReturnType<typeof useShellStore>;
   activeFile: { value: FileSpaceRecord };
   activeSection: { value: SectionId };
+  uploadFolderId: { value: EntityId | null };
   hasActiveConversation: { value: boolean };
   showToast: (message: string) => void;
   sendSelectedFileToConversation: (file: PersonalFileRecord) => Promise<void>;
@@ -25,6 +26,7 @@ export function useFileUpload({
   shell,
   activeFile,
   activeSection,
+  uploadFolderId,
   hasActiveConversation,
   showToast,
   sendSelectedFileToConversation,
@@ -58,8 +60,8 @@ export function useFileUpload({
   async function refreshPersonalFiles() {
     try {
       const [activeFiles, recycleBinFiles] = await Promise.all([
-        employeeApi.files.list({ pageNo: 1, pageSize: 20 }),
-        employeeApi.files.recycleBin({ pageNo: 1, pageSize: 20 }),
+        employeeApi.files.list({ pageNo: 1, pageSize: 100 }),
+        employeeApi.files.recycleBin({ pageNo: 1, pageSize: 100 }),
       ]);
       shell.mergeBackendPersonalFiles(activeFiles.list, recycleBinFiles.list);
     } catch {
@@ -141,7 +143,7 @@ export function useFileUpload({
         return attachment.attachmentRefId;
       }
 
-      const attachment = await uploadPersonalAttachment(file);
+      const attachment = await uploadPersonalAttachment(file, 'personal', uploadFolderId.value);
       if (attachment.deduplicated) {
         const attachmentRefId = attachment.attachmentRefId;
         shell.addPersonalFile({
@@ -150,6 +152,7 @@ export function useFileUpload({
           size: fileSizeLabel(file.size),
           status: '已确认',
           attachmentRefId,
+          folderId: uploadFolderId.value,
           mimeType: file.type,
         });
         uploadResult.value = { status: 'success', text: '上传成功' };
@@ -165,6 +168,7 @@ export function useFileUpload({
         size: fileSizeLabel(attachment.fileSize || file.size),
         status: attachment.scanStatus ? statusText(attachment.scanStatus) : '已确认',
         attachmentRefId: attachment.attachmentRefId,
+        folderId: uploadFolderId.value,
         mimeType: attachment.mimeType || file.type,
         createdAt: formatDateTime(attachment.createdAt),
       });

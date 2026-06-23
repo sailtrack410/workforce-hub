@@ -174,7 +174,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(400))
-            .andExpect(jsonPath("$.message").value("请先配置Agent可用范围"));
+            .andExpect(jsonPath("$.message").value("请先配置AI助手可用范围"));
     }
 
     @Test
@@ -876,7 +876,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(409))
-            .andExpect(jsonPath("$.message").value("Agent未发布或未启用"));
+            .andExpect(jsonPath("$.message").value("AI助手未发布或未启用"));
 
         mockMvc.perform(post("/api/admin/agents/{agentId}/enable", agentId)
                 .cookie(adminSession))
@@ -944,7 +944,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
-            .andExpect(jsonPath("$.message").value("无权使用该Agent"));
+            .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
 
         mockMvc.perform(get("/api/employee/agents")
                 .cookie(managerSession)
@@ -1034,7 +1034,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .param("status", "UNKNOWN_STATUS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(400))
-            .andExpect(jsonPath("$.message").value("Agent任务状态不支持"));
+            .andExpect(jsonPath("$.message").value("AI任务状态不支持"));
     }
 
     @Test
@@ -1211,7 +1211,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
-            .andExpect(jsonPath("$.message").value("无权使用该Agent"));
+            .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
     }
 
     @Test
@@ -1266,7 +1266,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
-            .andExpect(jsonPath("$.message").value("Agent未授权调用该工具"));
+            .andExpect(jsonPath("$.message").value("AI助手未授权调用该工具"));
 
         assertEquals(0L, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM agt_task", Long.class));
     }
@@ -1465,7 +1465,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(409))
-            .andExpect(jsonPath("$.message").value("Agent任务没有可继续执行的待确认工具"));
+            .andExpect(jsonPath("$.message").value("AI任务没有可继续执行的待确认工具"));
 
         assertEquals("WAITING_HUMAN_CONFIRM", taskStatus(taskId));
         assertEquals("PENDING", toolCallApprovalStatus(taskId));
@@ -1499,7 +1499,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
-            .andExpect(jsonPath("$.message").value("无权操作该Agent任务"));
+            .andExpect(jsonPath("$.message").value("无权操作该AI任务"));
 
         mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/cancel", taskId)
                 .cookie(employeeSession)
@@ -1575,7 +1575,7 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
-            .andExpect(jsonPath("$.message").value("无权使用该Agent"));
+            .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
     }
 
     private long createWaitingTask(Cookie adminSession,

@@ -5,7 +5,7 @@ import type {
   AdminAgentTaskAuditResponse,
   AdminAgentTaskToolCallResponse,
 } from '@/api/types';
-import { formatDateTime, formatFullDateTime, formatId, shortId, statusLabel } from '@/utils/format';
+import { formatDateTime, formatFullDateTime, formatId, humanizeText, shortId, statusLabel } from '@/utils/format';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
 import AdminCompactList from '@/components/AdminCompactList.vue';
@@ -34,16 +34,16 @@ const executionTrace = computed(() => {
   const value = props.selected?.executionTraceJson;
   if (!value) return '';
   try {
-    return JSON.stringify(JSON.parse(value), null, 2);
+    return humanizeText(JSON.stringify(JSON.parse(value), null, 2));
   } catch {
-    return value;
+    return humanizeText(value);
   }
 });
 </script>
 
 <template>
   <AdminPanel :span="5" title="任务详情">
-    <AdminDetailList :rows="detailRows" :error="selected?.errorMessage ?? ''" />
+    <AdminDetailList :rows="detailRows" :error="humanizeText(selected?.errorMessage)" />
 
     <h3>工具调用</h3>
     <AdminCompactList :loading="detailLoading" :empty="toolCalls.length === 0">
@@ -61,7 +61,7 @@ const executionTrace = computed(() => {
     <AdminCompactList :loading="detailLoading" :empty="audits.length === 0">
       <article v-for="audit in audits" :key="formatId(audit.auditId)">
         <strong>{{ audit.actionType }}</strong>
-        <span>{{ formatDateTime(audit.occurredAt) }} · {{ audit.decisionSummary || '-' }}</span>
+        <span>{{ formatDateTime(audit.occurredAt) }} · {{ humanizeText(audit.decisionSummary) || '-' }}</span>
       </article>
     </AdminCompactList>
   </AdminPanel>

@@ -134,6 +134,7 @@ public abstract class LocalIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM sys_storage_usage");
             jdbcTemplate.execute("DELETE FROM sys_storage_quota_policy");
             jdbcTemplate.execute("DELETE FROM sys_upload_ticket");
+            deleteIfExists(jdbcTemplate, "sys_file_folder");
             jdbcTemplate.execute("DELETE FROM sys_attachment_ref");
             jdbcTemplate.execute("DELETE FROM sys_file_object");
             jdbcTemplate.execute("DELETE FROM sys_todo_item");

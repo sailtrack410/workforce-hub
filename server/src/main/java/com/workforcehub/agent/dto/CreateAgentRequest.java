@@ -10,15 +10,17 @@ import lombok.Data;
 @Data
 public class CreateAgentRequest {
 
-    @NotBlank(message = "Agent编码不能为空")
-    @Size(max = 64, message = "Agent编码不能超过64个字符")
+    @NotBlank(message = "AI助手编码不能为空")
+    @Size(max = 64, message = "AI助手编码不能超过64个字符")
     private String agentCode;
 
-    @NotBlank(message = "Agent名称不能为空")
-    @Size(max = 128, message = "Agent名称不能超过128个字符")
+    @NotBlank(message = "AI助手名称不能为空")
+    @Size(max = 128, message = "AI助手名称不能超过128个字符")
     private String agentName;
 
-    @NotBlank(message = "Agent类型不能为空")
+    private Long avatarAttachmentRefId;
+
+    @NotBlank(message = "AI助手类型不能为空")
     private String agentType;
 
     @Size(max = 32, message = "身份模式不能超过32个字符")

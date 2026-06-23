@@ -13,6 +13,7 @@ public class AgentResponse {
     private Long agentId;
     private String agentCode;
     private String agentName;
+    private Long avatarAttachmentRefId;
     private String agentType;
     private String identityMode;
     private Long publishedVersionId;

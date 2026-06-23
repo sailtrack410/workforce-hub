@@ -29,7 +29,7 @@ export function useAgentDirectory({
         createConversationForm.value.agentId = String(agents.value[0].agentId);
       }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Agent加载失败');
+      showToast(error instanceof Error ? error.message : 'AI 助手加载失败');
     } finally {
       agentsLoading.value = false;
     }

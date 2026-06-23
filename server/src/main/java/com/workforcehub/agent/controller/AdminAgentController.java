@@ -16,6 +16,7 @@ import com.workforcehub.agent.dto.ModelTestResponse;
 import com.workforcehub.agent.dto.TrialRunRequest;
 import com.workforcehub.agent.dto.TrialRunResponse;
 import com.workforcehub.agent.dto.UpdateAgentVersionRequest;
+import com.workforcehub.agent.dto.UpdateAgentRequest;
 import com.workforcehub.agent.dto.WorkflowRunRequest;
 import com.workforcehub.agent.dto.WorkflowRunResponse;
 import com.workforcehub.agent.dto.UpdateLlmModelRequest;
@@ -65,6 +66,12 @@ public class AdminAgentController {
     @GetMapping("/{agentId}")
     public R<AgentResponse> getAgent(@PathVariable Long agentId) {
         return R.ok(agentService.getAdminAgent(agentId));
+    }
+
+    @PutMapping("/{agentId}")
+    public R<AgentResponse> updateAgent(@PathVariable Long agentId,
+                                        @Valid @RequestBody UpdateAgentRequest request) {
+        return R.ok(agentService.updateAgent(agentId, request));
     }
 
     @GetMapping("/{agentId}/versions")

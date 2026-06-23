@@ -9,6 +9,6 @@ import lombok.Data;
 @Data
 public class StartAgentConversationRequest {
 
-    @NotNull(message = "Agent ID不能为空")
+    @NotNull(message = "AI助手ID不能为空")
     private Long agentId;
 }

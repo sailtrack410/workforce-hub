@@ -7,8 +7,8 @@
 
 :root {
   color-scheme: light;
-  --font-family-body: 'Inter', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
-  --font-family-display-en: 'Inter', 'Avenir Next', sans-serif;
+  --font-family-body: 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
+  --font-family-display-en: 'HarmonyOS Sans SC', 'Avenir Next', sans-serif;
   --font-family-display-cn: 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   --font-family-display: var(--font-family-display-en), var(--font-family-display-cn);
 
@@ -40,8 +40,8 @@
   --success-200: #b1d8c0;
   --success-300: #86c09b;
   --success-400: #5fa377;
-  --success-500: #4d8562;
-  --success-600: #3f6c50;
+  --success-500: #1fad66;
+  --success-600: #168a50;
   --success-700: #355843;
   --success-800: #2b4736;
   --success-900: #22372a;
@@ -51,8 +51,8 @@
   --warning-200: #e8d08d;
   --warning-300: #d9b85f;
   --warning-400: #c39a3f;
-  --warning-500: #a87e34;
-  --warning-600: #88652a;
+  --warning-500: #ff9f18;
+  --warning-600: #d98200;
   --warning-700: #6b5023;
   --warning-800: #523f1d;
   --warning-900: #3d3017;
@@ -62,8 +62,8 @@
   --danger-200: #ebbdb3;
   --danger-300: #db9283;
   --danger-400: #c86b59;
-  --danger-500: #b15345;
-  --danger-600: #934338;
+  --danger-500: #d93026;
+  --danger-600: #b9231b;
   --danger-700: #77372f;
   --danger-800: #5f2e28;
   --danger-900: #4a2622;
@@ -82,7 +82,7 @@
   --accent-signal: #ff5a4e;
   --accent-signal-soft: #ffe4e0;
 
-  --surface-canvas: #f3f5f8;
+  --surface-canvas: #f7f8fa;
   --surface-panel: var(--neutral-0);
   --surface-panel-muted: var(--neutral-100);
   --surface-panel-strong: var(--neutral-200);
@@ -90,7 +90,7 @@
   --surface-info: var(--info-50);
   --surface-danger: var(--danger-50);
   --surface-rail: #1f2329;
-  --surface-rail-accent: #252a31;
+  --surface-rail-accent: #2b2f36;
 
   --border-subtle: var(--neutral-100);
   --border-default: var(--neutral-200);
@@ -117,11 +117,11 @@
 
   --font-size-12: 0.75rem;
   --font-size-14: 0.875rem;
-  --font-size-17: 1.0625rem;
-  --font-size-21: 1.3125rem;
-  --font-size-26: 1.625rem;
-  --font-size-32: 2rem;
-  --font-size-40: 2.5rem;
+  --font-size-17: 1rem;
+  --font-size-21: 1.125rem;
+  --font-size-26: 1.375rem;
+  --font-size-32: 1.75rem;
+  --font-size-40: 2rem;
 
   --text-caption: var(--font-size-12);
   --text-body: var(--font-size-14);
@@ -154,8 +154,9 @@
   --radius-4: 0.25rem;
   --radius-6: 0.375rem;
   --radius-8: 0.5rem;
-  --radius-12: 0.75rem;
-  --radius-16: 1rem;
+  --radius-10: 0.5rem;
+  --radius-12: 0.5rem;
+  --radius-16: 0.5rem;
 
   --layout-content-pad: clamp(1.25rem, 2vw, 2rem);
   --layout-pane-width: 22rem;

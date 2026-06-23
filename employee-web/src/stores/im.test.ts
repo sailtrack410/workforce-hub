@@ -203,7 +203,7 @@ describe('IM store', () => {
       relatedFlows: [{ id: 'WF-20260514-001', title: '请假申请 WF-20260514-001' }],
       suggestedActions: [{ label: '查看引用', action: 'open_citation' }],
     });
-    expect(record.role).toBe('知识库 Agent');
+    expect(record.role).toBe('知识库 AI');
   });
 
   it('maps current user messages to the right side', () => {
@@ -276,7 +276,44 @@ describe('IM store', () => {
       userId: 2002,
       memberType: 'USER',
     }]);
+    expect(im.conversations[0].title).toBe('张三');
     expect(im.conversations[0].memberCount).toBeUndefined();
+  });
+
+  it('uses the other private chat member as conversation title when both members are returned', async () => {
+    const im = useImStore();
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      conversationDetail: () => Promise.resolve({
+        conversation,
+        members: [
+          {
+            memberId: 2003,
+            memberType: 'USER',
+            displayName: '我',
+            memberRole: 'MEMBER',
+            status: 'ACTIVE',
+            joinedAt: '2026-05-09T09:00:00',
+          },
+          {
+            memberId: 2002,
+            memberType: 'USER',
+            displayName: '张三',
+            memberRole: 'MEMBER',
+            status: 'ACTIVE',
+            joinedAt: '2026-05-09T09:00:00',
+          },
+        ],
+        groupProfile: null,
+      }),
+    };
+
+    await im.loadConversations({}, imApi);
+    await im.loadConversationDetail(7001, imApi, 2003);
+
+    expect(im.conversations[0].title).toBe('张三');
+    expect(im.conversations[0].summaryTitle).toBe('张三');
+    expect(im.conversations[0].badge).toBe('张三');
   });
 
   it('only writes member count back to group conversations', async () => {
@@ -414,7 +451,7 @@ describe('IM store', () => {
     expect(found).toBe(true);
     expect(im.messagesByConversation['7001'].map((item) => item.id)).toEqual(['7102', '7104']);
     expect(im.messagesByConversation['7001'][1]).toMatchObject({
-      author: 'Agent',
+      author: 'AI 助手',
       role: 'AI 助手',
       body: 'Agent真实模型已接通。',
       side: 'left',
@@ -432,6 +469,24 @@ describe('IM store', () => {
     expect(im.lastReadSeqByConversation['7001']).toBe(2);
     expect(im.conversations[0].unread).toBe(0);
     expect(im.conversations[0].unreadLabel).toBe('已读');
+  });
+
+  it('updates conversation pin preference in the conversation list', async () => {
+    const im = useImStore();
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      updatePreference: (_conversationId, request) => Promise.resolve({
+        ...conversation,
+        pin: Boolean(request.pin),
+        mute: Boolean(request.mute),
+      }),
+    };
+
+    await im.loadConversations({}, imApi);
+    const updated = await im.updatePreference(7001, { pin: true, mute: false }, imApi);
+
+    expect(updated.pinned).toBe(true);
+    expect(im.conversations[0].pinned).toBe(true);
   });
 
   it('prepends older message page without duplicating existing messages', async () => {

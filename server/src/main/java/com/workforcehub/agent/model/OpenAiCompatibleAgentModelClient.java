@@ -71,7 +71,7 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
 
     private SpringAiOpenAiChatClientFactory.ResolvedAgentModelConfig resolveConfig(String modelConfigJson) {
         if (!properties.isEnabled()) {
-            throw new AgentModelException("CONFIG_MISSING", "Agent模型服务未启用");
+            throw new AgentModelException("CONFIG_MISSING", "AI模型服务未启用");
         }
         JsonNode node = readConfig(modelConfigJson);
         String baseUrl = normalizeBaseUrl(stringValue(node, "baseUrl", properties.getBaseUrl()));
@@ -81,7 +81,7 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
         Double temperature = doubleValue(node, "temperature", properties.getTemperature());
         Duration timeout = durationValue(node, "timeout", properties.getTimeout());
         if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(apiKey) || !StringUtils.hasText(model)) {
-            throw new AgentModelException("CONFIG_MISSING", "Agent模型配置缺失");
+            throw new AgentModelException("CONFIG_MISSING", "AI模型配置缺失");
         }
         return new SpringAiOpenAiChatClientFactory.ResolvedAgentModelConfig(
             baseUrl,
@@ -160,7 +160,7 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
         try {
             return objectMapper.readTree(modelConfigJson);
         } catch (Exception e) {
-            throw new AgentModelException("CONFIG_MISSING", "Agent模型配置不是合法JSON", e);
+            throw new AgentModelException("CONFIG_MISSING", "AI模型配置不是合法JSON", e);
         }
     }
 
@@ -196,7 +196,7 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
         try {
             return DurationStyle.detectAndParse(valueNode.asText().trim());
         } catch (Exception e) {
-            throw new AgentModelException("CONFIG_MISSING", "Agent模型超时配置不合法", e);
+            throw new AgentModelException("CONFIG_MISSING", "AI模型超时配置不合法", e);
         }
     }
 

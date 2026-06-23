@@ -89,7 +89,20 @@ export function statusLabel(value?: string | null) {
   return labels[value] ?? value;
 }
 
+export function humanizeText(value?: string | null) {
+  if (!value) return '';
+  return value
+    .replace(/Agent预审/g, 'AI 预审')
+    .replace(/Agent任务/g, 'AI 任务')
+    .replace(/Agent会话/g, 'AI 会话')
+    .replace(/Agent 不存在/g, 'AI 助手不存在')
+    .replace(/Agent不存在/g, 'AI 助手不存在')
+    .replace(/IM会话/g, '消息会话')
+    .replace(/IM 会话/g, '消息会话')
+    .replace(/Agent/g, 'AI 助手');
+}
+
 export function errorMessage(error: unknown, fallback = '请求失败') {
-  if (error instanceof Error && error.message) return error.message;
+  if (error instanceof Error && error.message) return humanizeText(error.message);
   return fallback;
 }

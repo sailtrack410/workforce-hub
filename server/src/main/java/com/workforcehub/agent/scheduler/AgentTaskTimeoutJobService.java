@@ -73,7 +73,7 @@ public class AgentTaskTimeoutJobService {
         String ownerId = "agent-timeout-" + UUID.randomUUID();
 
         if (!createJobRunAndAcquireLock(jobRunId, ownerId, normalizedTriggerType, safeBatchSize, startedAt)) {
-            String message = "已有实例正在执行Agent超时扫描";
+            String message = "已有实例正在执行AI任务超时扫描";
             return buildResponse(jobRunId, normalizedTriggerType, "SKIPPED", safeBatchSize, 0L, 0L, 1L, message, startedAt);
         }
 
@@ -120,7 +120,7 @@ public class AgentTaskTimeoutJobService {
             timeoutRepository.createTaskTimeoutJobRun(jobRunId, triggerType, safeBatchSize, ownerId, startedAt);
 
             if (!timeoutRepository.tryAcquireJobLock(LOCK_NAME, ownerId, startedAt, lockUntil)) {
-                timeoutRepository.finishTaskTimeoutJobRun(jobRunId, "SKIPPED", 0L, 0L, 1L, "已有实例正在执行Agent超时扫描");
+                timeoutRepository.finishTaskTimeoutJobRun(jobRunId, "SKIPPED", 0L, 0L, 1L, "已有实例正在执行AI任务超时扫描");
                 return false;
             }
             return true;
@@ -198,7 +198,7 @@ public class AgentTaskTimeoutJobService {
     private String normalizeTriggerType(String triggerType) {
         String normalized = StringUtils.hasText(triggerType) ? triggerType.trim().toUpperCase() : "SERVICE";
         if (!TRIGGER_TYPES.contains(normalized)) {
-            throw new BizException(400, "Agent超时扫描触发类型不支持");
+            throw new BizException(400, "AI任务超时扫描触发类型不支持");
         }
         return normalized;
     }
@@ -228,7 +228,7 @@ public class AgentTaskTimeoutJobService {
 
     private String safeSummary(String value) {
         if (!StringUtils.hasText(value)) {
-            return "Agent超时扫描失败";
+            return "AI任务超时扫描失败";
         }
         String trimmed = value.trim();
         return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;

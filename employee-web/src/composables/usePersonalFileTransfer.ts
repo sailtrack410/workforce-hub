@@ -17,17 +17,20 @@ export type EmployeeUploadOwnerType = 'PERSONAL_FILE' | 'USER_AVATAR' | 'IM_MESS
 export interface EmployeeAttachmentUploadOptions {
   ownerType: EmployeeUploadOwnerType;
   ownerId?: EntityId | null;
+  folderId?: EntityId | null;
   clientRequestPrefix?: string;
 }
 
 export function usePersonalFileTransfer() {
   async function uploadAttachment(file: File, options: EmployeeAttachmentUploadOptions): Promise<PersonalAttachmentUploadResult> {
     const ownerId = options.ownerId ?? null;
+    const folderId = options.ownerType === 'PERSONAL_FILE' ? (options.folderId ?? null) : null;
     const clientRequestPrefix = options.clientRequestPrefix ?? options.ownerType.toLowerCase();
     const contentSha256 = await sha256Hex(file);
     const ticket = await employeeApi.files.createUploadTicket({
       ownerType: options.ownerType,
       ownerId,
+      folderId,
       fileName: file.name,
       mimeType: file.type || 'application/octet-stream',
       fileSize: file.size,
@@ -64,6 +67,7 @@ export function usePersonalFileTransfer() {
       fileSize: file.size,
       ownerType: options.ownerType,
       ownerId,
+      folderId,
       displayName: file.name,
     });
 
@@ -78,10 +82,15 @@ export function usePersonalFileTransfer() {
     };
   }
 
-  async function uploadPersonalAttachment(file: File, clientRequestPrefix = 'personal'): Promise<PersonalAttachmentUploadResult> {
+  async function uploadPersonalAttachment(
+    file: File,
+    clientRequestPrefix = 'personal',
+    folderId?: EntityId | null,
+  ): Promise<PersonalAttachmentUploadResult> {
     return uploadAttachment(file, {
       ownerType: 'PERSONAL_FILE',
       ownerId: null,
+      folderId,
       clientRequestPrefix,
     });
   }

@@ -41,15 +41,30 @@ public class AgentRepository {
     public void insertAgent(Long agentId,
                             String agentCode,
                             String agentName,
+                            Long avatarAttachmentRefId,
                             String agentType,
                             String identityMode,
                             Long operatorId) {
         jdbcTemplate.update("""
             INSERT INTO agt_agent
-                (id, agent_code, agent_name, agent_type, identity_mode, status, created_by, updated_by)
+                (id, agent_code, agent_name, avatar_attachment_ref_id, agent_type, identity_mode, status, created_by, updated_by)
             VALUES
-                (?, ?, ?, ?, ?, 'DRAFT', ?, ?)
-            """, agentId, agentCode, agentName, agentType, identityMode, operatorId, operatorId);
+                (?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?)
+            """, agentId, agentCode, agentName, avatarAttachmentRefId, agentType, identityMode, operatorId, operatorId);
+    }
+
+    public void updateAgentProfile(Long agentId,
+                                   String agentName,
+                                   Long avatarAttachmentRefId,
+                                   Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_agent
+            SET agent_name = ?,
+                avatar_attachment_ref_id = ?,
+                updated_by = ?
+            WHERE id = ?
+              AND is_deleted = 0
+            """, agentName, avatarAttachmentRefId, operatorId, agentId);
     }
 
     public void insertAgentVersion(Long versionId,
@@ -336,7 +351,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapAgent, agentId);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent不存在");
+            throw new BizException(404, "AI助手不存在");
         }
         return rows.get(0);
     }
@@ -359,7 +374,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapVersion, versionId);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent版本不存在");
+            throw new BizException(404, "AI助手版本不存在");
         }
         return rows.get(0);
     }
@@ -386,7 +401,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapTool, toolId);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent工具不存在");
+            throw new BizException(404, "AI助手工具不存在");
         }
         return rows.get(0);
     }
@@ -397,7 +412,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapTool, toolCode);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent工具不存在或未启用");
+            throw new BizException(404, "AI助手工具不存在或未启用");
         }
         return rows.get(0);
     }
@@ -448,7 +463,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapBinding, bindingId);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent工具绑定不存在");
+            throw new BizException(404, "AI助手工具绑定不存在");
         }
         return rows.get(0);
     }
@@ -464,7 +479,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapAcl, agentId, subjectType, subjectId, permCode);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent授权记录不存在");
+            throw new BizException(404, "AI助手授权记录不存在");
         }
         return rows.get(0);
     }
@@ -475,7 +490,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapTask, taskId);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent任务不存在");
+            throw new BizException(404, "AI任务不存在");
         }
         return rows.get(0);
     }
@@ -487,7 +502,7 @@ public class AgentRepository {
             FOR UPDATE
             """, this::mapTask, taskId);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent任务不存在");
+            throw new BizException(404, "AI任务不存在");
         }
         return rows.get(0);
     }
@@ -819,7 +834,7 @@ public class AgentRepository {
             LIMIT 1
             """, this::mapAdminTask, taskId);
         if (rows.isEmpty()) {
-            throw new BizException(404, "Agent任务不存在");
+            throw new BizException(404, "AI任务不存在");
         }
         return rows.get(0);
     }
@@ -928,7 +943,7 @@ public class AgentRepository {
 
     private String agentSelectSql() {
         return """
-            SELECT aa.id, aa.agent_code, aa.agent_name, aa.agent_type, aa.identity_mode,
+            SELECT aa.id, aa.agent_code, aa.agent_name, aa.avatar_attachment_ref_id, aa.agent_type, aa.identity_mode,
                    aa.published_version_id, pv.version_no AS published_version_no, pv.version_label AS published_version_label,
                    aa.status, aa.created_at, aa.updated_at
             FROM agt_agent aa
@@ -1069,6 +1084,7 @@ public class AgentRepository {
             rs.getLong("id"),
             rs.getString("agent_code"),
             rs.getString("agent_name"),
+            rs.getObject("avatar_attachment_ref_id", Long.class),
             rs.getString("agent_type"),
             rs.getString("identity_mode"),
             rs.getObject("published_version_id", Long.class),

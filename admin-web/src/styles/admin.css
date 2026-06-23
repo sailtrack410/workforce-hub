@@ -3,48 +3,49 @@
    ========================================================= */
 :root {
   /* ---- 品牌色系 ---- */
-  --green:        #0089FF;
-  --green-dark:   #0070D9;
-  --green-deep:   #005BB5;
-  --green-light:  #33A0FF;
-  --red:          #b33131;
-  --red-dark:     #8d2020;
-  --amber:        #a7651a;
+  --green:        #1677FF;
+  --green-dark:   #0F66E8;
+  --green-deep:   #0958D9;
+  --green-light:  #69B1FF;
+  --success:      #1FAD66;
+  --red:          #D93026;
+  --red-dark:     #B9231B;
+  --amber:        #FF9F18;
 
   /* ---- 文本色系 ---- */
-  --ink:          #1a1a2e;
-  --muted:        #6b7280;
-  --muted-light:  #9ca3af;
-  --sidebar-text: #b0c4de;
+  --ink:          #1F2329;
+  --muted:        #646A73;
+  --muted-light:  #A5ADBA;
+  --sidebar-text: #C9CDD4;
   --sidebar-text-active: #ffffff;
   --sidebar-brand-text: #e0ecff;
 
   /* ---- 填充/背景色系 ---- */
-  --surface:      #f0f5ff;
-  --panel:        #f8faff;
+  --surface:      #F7F8FA;
+  --panel:        #FFFFFF;
   --panel-strong: #ffffff;
-  --line:         #d0ddef;
+  --line:         #E5E6EB;
 
   /* ---- 语义背景 ---- */
-  --hover-bg:     #e8f3ff;
-  --pill-bg:      #dbeafe;
+  --hover-bg:     #E8F3FF;
+  --pill-bg:      #E8F3FF;
   --error-bg:     #fbe7e7;
-  --success-bg:   #e6f5ea;
-  --avatar-bg:    #d0e4ff;
+  --success-bg:   #E8F8F0;
+  --avatar-bg:    #E8F3FF;
   --ring-bg:      #b3d9ff;
-  --brand-mark-bg:#b3e0ff;
+  --brand-mark-bg:#E8F3FF;
 
   /* ---- 侧边栏 ---- */
-  --sidebar-bg:   #0a1628;
-  --sidebar-hover:#132240;
+  --sidebar-bg:   #1F2329;
+  --sidebar-hover:#2B2F36;
 
   /* ---- 阴影 ---- */
-  --shadow:       0 18px 45px rgba(0, 80, 180, 0.12);
-  --shadow-sm:    0 8px 22px rgba(0, 80, 180, 0.06);
+  --shadow:       0 16px 40px rgba(31, 35, 41, 0.12);
+  --shadow-sm:    0 8px 20px rgba(31, 35, 41, 0.06);
 
   /* ---- 圆角 ---- */
   --radius-sm:    6px;
-  --radius-md:    7px;
+  --radius-md:    8px;
   --radius-lg:    8px;
   --radius-pill:  999px;
   --radius-circle: 50%;
@@ -54,9 +55,9 @@
   --text-sm:      13px;
   --text-base:    14px;
   --text-md:      17px;
-  --text-lg:      22px;
+  --text-lg:      20px;
   --text-xl:      24px;
-  --text-2xl:     30px;
+  --text-2xl:     28px;
 
   /* ---- 间距 ---- */
   --space-xs:     6px;
@@ -69,13 +70,13 @@
   --space-3xl:    28px;
 
   /* ---- 控件 ---- */
-  --control-h:    38px;
-  --control-px:   13px;
+  --control-h:    36px;
+  --control-px:   12px;
 
   /* ---- 全局基础 ---- */
   color: var(--ink);
   background: var(--surface);
-  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -90,9 +91,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    linear-gradient(135deg, rgba(240, 245, 255, 0.96), rgba(224, 235, 255, 0.94)),
-    repeating-linear-gradient(90deg, rgba(0, 80, 180, 0.04) 0 1px, transparent 1px 48px);
+  background: var(--surface);
 }
 
 button, input, select, textarea { font: inherit; }
@@ -156,10 +155,10 @@ input:focus, select:focus, textarea:focus {
 
 .panel {
   min-width: 0;
-  padding: var(--space-xl);
-  border: 1px solid rgba(0, 80, 180, 0.1);
+  padding: 16px;
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: rgba(248, 250, 255, 0.94);
+  background: var(--panel);
   box-shadow: var(--shadow-sm);
 }
 
@@ -173,7 +172,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .panel-title h2,
-.toolbar h2 { font-size: var(--text-md); }
+.toolbar h2 { font-size: 16px; }
 
 .panel-title span {
   color: var(--muted);

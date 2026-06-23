@@ -77,12 +77,12 @@ public class AgentTaskExecutionService {
         Long senderId = command.triggerUserId();
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
-            throw new BizException(409, "Agent未发布或未启用");
+            throw new BizException(409, "AI助手未发布或未启用");
         }
         if (!agentRepository.canUseAgent(agentId, senderId)) {
-            throw new BizException(403, "无权使用该Agent");
+            throw new BizException(403, "无权使用该AI助手");
         }
-        String normalizedMessageContent = normalizeJson(command.messageContentJson(), "会话Agent输入内容不是合法JSON");
+        String normalizedMessageContent = normalizeJson(command.messageContentJson(), "AI会话输入内容不是合法JSON");
         Long taskId = IdWorker.getId();
         agentRepository.insertTask(
             taskId,
@@ -97,7 +97,7 @@ public class AgentTaskExecutionService {
             null,
             senderId
         );
-        audit(taskId, "TASK_CREATED", "AGENT", agent.id(), "IM会话触发Agent任务", false);
+        audit(taskId, "TASK_CREATED", "AGENT", agent.id(), "消息会话触发AI任务", false);
         scheduleConversationExecution(taskId, command);
         return toTaskResponse(agentRepository.getTaskOrThrow(taskId));
     }
@@ -162,12 +162,12 @@ public class AgentTaskExecutionService {
             if (workflowParser.isWorkflowConfig(version.workflowConfigJson())) {
                 agentRepository.updateTaskWorkflowSnapshot(taskId, version.workflowConfigJson(), command.triggerUserId());
             }
-            audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "Agent会话任务开始执行", false);
+            audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "AI会话任务开始执行", false);
             return new ConversationExecutionContext(
                 taskId,
                 agent,
                 version,
-                normalizeJson(command.messageContentJson(), "会话Agent输入内容不是合法JSON")
+                normalizeJson(command.messageContentJson(), "AI会话输入内容不是合法JSON")
             );
         });
     }
@@ -183,7 +183,7 @@ public class AgentTaskExecutionService {
                 }
                 agentRepository.finishTask(context.taskId(), "SUCCEEDED", null, command.triggerUserId());
                 audit(context.taskId(), "TASK_SUCCEEDED", "AGENT_TASK",
-                    context.taskId(), "Agent会话任务执行成功", false);
+                    context.taskId(), "AI会话任务执行成功", false);
                 notifyImAgentSucceeded(command, context.agent(), context.taskId(), replyText);
             });
         } catch (Exception e) {
@@ -205,7 +205,7 @@ public class AgentTaskExecutionService {
         try {
             notifyImAgentFailed(command, context.agent(), taskId, safeFailureType, errorMessage);
         } catch (Exception e) {
-            log.warn("Agent会话失败结果回写IM失败 taskId={} conversationId={}",
+            log.warn("AI会话失败结果回写IM失败 taskId={} conversationId={}",
                 taskId,
                 command.conversationId(),
                 e
@@ -219,7 +219,7 @@ public class AgentTaskExecutionService {
                                         String replyText) {
         ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
         if (callback == null) {
-            throw new BizException(501, "IM Agent结果回写服务未接入");
+            throw new BizException(501, "消息会话AI结果回写服务未接入");
         }
         AgentConversationReplyContent replyContent = buildConversationReplyContent(replyText, taskId, agent.agentCode());
         callback.onAgentReply(new ImAgentReplyResult(
@@ -272,7 +272,7 @@ public class AgentTaskExecutionService {
                                      String failureMessage) {
         ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
         if (callback == null) {
-            throw new BizException(501, "IM Agent结果回写服务未接入");
+            throw new BizException(501, "消息会话AI结果回写服务未接入");
         }
         callback.onAgentReply(new ImAgentReplyResult(
             command.conversationId(),

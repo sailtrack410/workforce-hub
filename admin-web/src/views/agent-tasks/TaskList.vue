@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AdminAgentTaskResponse } from '@/api/types';
 import type { EntityId } from '@/api/types';
-import { formatDateTime, shortId, statusLabel } from '@/utils/format';
+import { formatDateTime, humanizeText, shortId, statusLabel } from '@/utils/format';
 import { useAgentTasksStore } from '@/stores/agentTasks';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
@@ -22,7 +22,7 @@ const store = useAgentTasksStore();
 
 const columns: TableColumn[] = [
   { key: 'taskId', label: '任务' },
-  { key: 'agentName', label: 'Agent' },
+  { key: 'agentName', label: 'AI 助手' },
   { key: 'status', label: '状态' },
   { key: 'createdAt', label: '创建时间' },
 ];
@@ -55,7 +55,7 @@ const columns: TableColumn[] = [
         #{{ shortId(row.taskId) }}
       </template>
       <template #cell-agentName="{ row }">
-        {{ row.agentName || row.agentCode || shortId(row.agentId) }}
+        {{ humanizeText(row.agentName) || row.agentCode || shortId(row.agentId) }}
       </template>
       <template #cell-status="{ row }">
         <span class="status-pill">{{ statusLabel(row.status) }}</span>

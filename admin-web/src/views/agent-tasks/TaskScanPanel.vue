@@ -6,7 +6,7 @@ import type {
   AdminAgentTaskTimeoutRunResponse,
   PageResult,
 } from '@/api/types';
-import { formatDateTime, statusLabel } from '@/utils/format';
+import { formatDateTime, humanizeText, statusLabel } from '@/utils/format';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminCompactList from '@/components/AdminCompactList.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
@@ -37,7 +37,7 @@ defineExpose({ setScanResult: (msg: string) => { scanResult.value = msg; } });
   <AdminPanel :span="6" title="失败聚合">
     <AdminCompactList :empty="failures.length === 0">
       <article v-for="failure in failures" :key="failure.errorMessage || 'empty'">
-        <strong>{{ failure.errorMessage || '-' }}</strong>
+        <strong>{{ humanizeText(failure.errorMessage) || '-' }}</strong>
         <span>任务 {{ failure.taskCount }} · 工具调用 {{ failure.toolCallCount }} · {{ formatDateTime(failure.lastOccurredAt) }}</span>
       </article>
     </AdminCompactList>
@@ -63,7 +63,7 @@ defineExpose({ setScanResult: (msg: string) => { scanResult.value = msg; } });
   <AdminConfirmDialog
     v-model:visible="confirmVisible"
     title="确认执行超时扫描"
-    message="确认执行 Agent 超时扫描？"
+    message="确认执行 AI 任务超时扫描？"
     confirm-label="执行"
     :danger="true"
     @confirm="onConfirm"

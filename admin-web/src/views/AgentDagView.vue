@@ -11,7 +11,7 @@ import type {
   LlmModelResponse,
   WorkflowValidationResponse,
 } from '@/api/types';
-import { errorMessage, statusLabel } from '@/utils/format';
+import { errorMessage, humanizeText, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AgentDagEditor from '@/components/AgentDagEditor.vue';
 
@@ -283,7 +283,7 @@ async function handlePublish() {
     return;
   }
   if (!hasActiveAcl.value) {
-    toast.error('请先配置Agent可用范围');
+    toast.error('请先配置 AI 助手可用范围');
     return;
   }
   if (!lastWorkflowTestPassed.value || lastWorkflowTestSignature.value !== workflowSignature.value) {
@@ -388,7 +388,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
           <ArrowLeft :size="16" />
         </button>
         <div class="dag-title-group">
-          <span class="bar-title">{{ agent.agentName || agent.agentCode }}</span>
+          <span class="bar-title">{{ humanizeText(agent.agentName) || agent.agentCode }}</span>
           <span class="dag-agent-code">{{ agent.agentCode }}</span>
         </div>
         <span :class="['version-state', selectedVersion?.publishStatus?.toLowerCase()]">{{ versionStateText }}</span>
@@ -460,7 +460,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
     </div>
   </div>
   <div v-else class="dag-fullscreen">
-    <div class="empty-state">Agent 不存在</div>
+    <div class="empty-state">AI 助手不存在</div>
   </div>
 </template>
 

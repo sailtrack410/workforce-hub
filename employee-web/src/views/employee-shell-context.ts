@@ -70,6 +70,9 @@ export interface FilesSectionContext {
   currentMeta: ReadonlyRef<SectionMeta>;
   backToList: () => void;
   runAction: RunSectionAction;
+  showToast: (message: string) => void;
+  setUploadFolderId: (folderId: PersonalFileRecord['folderId']) => void;
+  refreshFileCenter: () => Promise<void>;
   sendSelectedFileToConversation: (file: PersonalFileRecord) => Promise<void>;
   openPersonalFilePreview: (file: PersonalFileRecord) => Promise<void>;
   downloadPersonalFile: (file: PersonalFileRecord) => Promise<void>;

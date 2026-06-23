@@ -847,10 +847,10 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data", hasSize(2)))
             .andExpect(jsonPath("$.data[0].senderType").value("USER"))
             .andExpect(jsonPath("$.data[1].senderType").value("SYSTEM"))
-            .andExpect(jsonPath("$.data[1].contentText").value("Agent 暂时无法回复，请稍后再试"));
+            .andExpect(jsonPath("$.data[1].contentText").value("AI助手暂时无法回复，请稍后再试"));
 
         awaitTaskStatus(agentId, conversationId, "FAILED");
-        assertEquals("Agent模型配置缺失", jdbcTemplate.queryForObject("""
+        assertEquals("AI模型配置缺失", jdbcTemplate.queryForObject("""
             SELECT error_message
             FROM agt_task
             WHERE agent_id = ?
@@ -991,7 +991,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             Long.class,
             conversationId
         ));
-        assertEquals("Agent 暂时无法回复，请稍后再试", jdbcTemplate.queryForObject("""
+        assertEquals("AI助手暂时无法回复，请稍后再试", jdbcTemplate.queryForObject("""
             SELECT JSON_UNQUOTE(JSON_EXTRACT(content_json, '$.text'))
             FROM im_message
             WHERE conversation_id = ?
@@ -1042,7 +1042,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data", hasSize(2)))
             .andExpect(jsonPath("$.data[0].senderType").value("USER"))
             .andExpect(jsonPath("$.data[1].senderType").value("SYSTEM"))
-            .andExpect(jsonPath("$.data[1].contentText").value("Agent 暂时无法回复，请稍后再试"));
+            .andExpect(jsonPath("$.data[1].contentText").value("AI助手暂时无法回复，请稍后再试"));
 
         assertEquals(0L, jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
@@ -1072,7 +1072,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                     """.formatted(agentId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(403))
-            .andExpect(jsonPath("$.message").value("无权使用该Agent"));
+            .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
 
         assertEquals(0L, jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM im_conversation WHERE conversation_type = 'AGENT'",

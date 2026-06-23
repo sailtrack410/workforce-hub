@@ -66,6 +66,7 @@ public class FileUploadTicketService {
     public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
+        validateEmployeeFolder(request.getOwnerType(), userId, request.getFolderId());
         UploadTicketResponse existingTicket = findUploadTicketByClientRequestId("USER", userId, request.getClientRequestId());
         if (existingTicket != null) {
             return existingTicket;
@@ -93,7 +94,8 @@ public class FileUploadTicketService {
                     request.getFileName(),
                     request.getFileName(),
                     "USER",
-                    userId
+                    userId,
+                    request.getFolderId()
                 );
             } catch (DuplicateKeyException e) {
                 UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(
@@ -147,7 +149,8 @@ public class FileUploadTicketService {
                     request.getFileName(),
                     request.getFileName(),
                     "ADMIN",
-                    adminId
+                    adminId,
+                    null
                 );
             } catch (DuplicateKeyException e) {
                 UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(
@@ -257,6 +260,27 @@ public class FileUploadTicketService {
         }
         if (ownerId != null) {
             throw new BizException(400, "员工端文件不应指定业务归属ID");
+        }
+    }
+
+    private void validateEmployeeFolder(String ownerType, Long userId, Long folderId) {
+        if (folderId == null) {
+            return;
+        }
+        if (!"PERSONAL_FILE".equals(ownerType)) {
+            throw new BizException(400, "仅个人文件支持选择文件夹");
+        }
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_file_folder
+            WHERE id = ? AND user_id = ? AND is_deleted = 0
+            """,
+            Integer.class,
+            folderId,
+            userId
+        );
+        if (count == null || count == 0) {
+            throw new BizException(404, "文件夹不存在");
         }
     }
 
@@ -394,7 +418,8 @@ public class FileUploadTicketService {
                                      String originalFileName,
                                      String displayName,
                                      String uploaderType,
-                                     Long uploaderId) {
+                                     Long uploaderId,
+                                     Long folderId) {
         Long attachmentRefId = IdWorker.getId();
         attachmentRefRepository.create(
             attachmentRefId,
@@ -405,7 +430,8 @@ public class FileUploadTicketService {
             originalFileName,
             displayName,
             uploaderType,
-            uploaderId
+            uploaderId,
+            folderId
         );
         return attachmentRefId;
     }

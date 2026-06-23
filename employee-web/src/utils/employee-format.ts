@@ -6,6 +6,19 @@ export function displayField(value: unknown) {
   return '-';
 }
 
+export function humanizeText(value?: string | null) {
+  if (!value) return '';
+  return value
+    .replace(/Agent预审/g, 'AI 预审')
+    .replace(/Agent任务/g, 'AI 任务')
+    .replace(/Agent会话/g, 'AI 会话')
+    .replace(/Agent 不存在/g, 'AI 助手不存在')
+    .replace(/Agent不存在/g, 'AI 助手不存在')
+    .replace(/IM会话/g, '消息会话')
+    .replace(/IM 会话/g, '消息会话')
+    .replace(/Agent/g, 'AI 助手');
+}
+
 export function employmentStatusLabel(status?: string | null) {
   if (status === 'ACTIVE' || status === 'IN_SERVICE') return '在职';
   if (status === 'DISABLED') return '停用';
@@ -69,7 +82,7 @@ export function actionTypeLabel(type?: string | null) {
   if (type === 'APPROVE') return '通过';
   if (type === 'REJECT') return '驳回';
   if (type === 'WITHDRAW') return '撤回';
-  if (type === 'AGENT_PRE_REVIEW') return 'Agent预审';
+  if (type === 'AGENT_PRE_REVIEW') return 'AI 预审';
   return displayField(type);
 }
 

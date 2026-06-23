@@ -181,7 +181,7 @@ public class WorkflowRepository {
             UPDATE wf_request
             SET status = 'PENDING_REVIEW',
                 current_step_key = 'agent_pre_review',
-                current_step_name = 'Agent预审',
+                current_step_name = 'AI预审',
                 agent_pre_review_task_id = ?,
                 updated_by = ?
             WHERE id = ?
@@ -384,7 +384,7 @@ public class WorkflowRepository {
                 (id, request_id, flowable_task_id, step_key, step_name, actor_type,
                  actor_id, action_type, action_comment, agent_decision_json, before_status, after_status)
             VALUES
-                (?, ?, NULL, 'agent_pre_review', 'Agent预审', 'AGENT',
+                (?, ?, NULL, 'agent_pre_review', 'AI预审', 'AGENT',
                  ?, 'AGENT_PRE_REVIEW', NULL, CAST(? AS JSON), ?, ?)
             """,
             IdWorker.getId(),

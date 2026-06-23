@@ -133,7 +133,7 @@ export function useMessagesState({
         conversation = await im.createGroupConversation(title, memberUserIds);
       } else {
         const agentId = createConversationForm.value.agentId.trim();
-        if (!agentId) throw new Error('请选择Agent');
+        if (!agentId) throw new Error('请选择 AI 助手');
         conversation = await im.startAgentConversation(agentId);
       }
       shell.mergeBackendConversations(im.conversations);
@@ -344,8 +344,8 @@ export function useMessagesState({
   }
 
   function insertAgentMention() {
-    if (!draft.value.includes('@Agent')) {
-      draft.value = draft.value ? `${draft.value} @Agent ` : '@Agent ';
+    if (!draft.value.includes('@AI')) {
+      draft.value = draft.value ? `${draft.value} @AI ` : '@AI ';
     }
   }
 
@@ -372,7 +372,7 @@ export function useMessagesState({
     const loadingMessage = {
       id: agentLoadingId,
       type: 'knowledge-card' as const,
-      author: 'Agent',
+      author: 'AI 助手',
       role: 'AI 助手',
       body: '正在查询',
       side: 'left' as const,

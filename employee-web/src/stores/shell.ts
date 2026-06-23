@@ -17,7 +17,7 @@ import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 
 export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'reports' | 'settings';
 export type ConversationTone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
-export type SectionFilter = '全部' | '未处理' | 'Agent' | '群聊' | '私聊';
+export type SectionFilter = '全部' | '未处理' | 'AI' | '群聊' | '私聊';
 export type ThemeMode = 'light' | 'dark';
 export type MessageDensity = 'cozy' | 'compact';
 
@@ -198,6 +198,7 @@ export interface PersonalFileRecord {
   createdAt: string;
   status: string;
   attachmentRefId?: EntityId;
+  folderId?: EntityId | null;
   mimeType?: string;
   downloadUrl?: string;
 }
@@ -335,7 +336,7 @@ export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = 
 
 export const primaryNavItems: NavRailItem[] = navItems;
 
-export const sectionFilters: SectionFilter[] = ['全部', '未处理', 'Agent', '群聊', '私聊'];
+export const sectionFilters: SectionFilter[] = ['全部', '未处理', 'AI', '群聊', '私聊'];
 
 const currentUser = {
   name: '员工',
@@ -563,9 +564,9 @@ const workbenchItems: WorkbenchRecord[] = [
   },
   {
     id: 'agent',
-    title: 'Agent任务',
-    label: 'Agent',
-    subtitle: 'Agent任务',
+    title: 'AI 任务',
+    label: 'AI',
+    subtitle: 'AI 助手任务',
     note: '',
     tone: 'green',
     status: '',
@@ -697,6 +698,7 @@ function mapEmployeeFile(file: EmployeeFileResponse): PersonalFileRecord {
     createdAt: formatDisplayDateTime(file.createdAt) || '刚刚',
     status: file.deletedAt ? '回收站' : fileStatusValue(file.scanStatus),
     attachmentRefId: file.attachmentRefId,
+    folderId: file.folderId ?? null,
     mimeType: file.mimeType ?? undefined,
   };
 }
@@ -708,7 +710,7 @@ function isPendingStatus(status: string) {
 function matchesConversationFilter(item: ConversationRecord, filter: SectionFilter) {
   if (filter === '全部') return true;
   if (filter === '未处理') return item.unread > 0 || isPendingStatus(item.status);
-  if (filter === 'Agent') return item.kind === 'agent' || item.title.includes('Agent') || item.tag.includes('Agent');
+  if (filter === 'AI') return item.kind === 'agent' || item.title.includes('AI') || item.tag.includes('AI');
   if (filter === '群聊') return item.kind === 'team';
   if (filter === '私聊') return item.kind === 'approval' || item.kind === 'attendance' || item.kind === 'file' || item.kind === 'private';
   return true;
@@ -814,7 +816,8 @@ export const useShellStore = defineStore('employee-shell', {
           item.status,
           item.panel.members.map((member) => `${member.name} ${member.role}`).join(' '),
           item.panel.attachments.map((file) => file.name).join(' '),
-        ], state.search.messages));
+        ], state.search.messages))
+        .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
     },
     filteredTodos(state): TodoRecord[] {
       return state.todos
@@ -1051,6 +1054,7 @@ export const useShellStore = defineStore('employee-shell', {
       size: string;
       status: string;
       attachmentRefId?: EntityId;
+      folderId?: EntityId | null;
       mimeType?: string;
       downloadUrl?: string;
       createdAt?: string;
@@ -1066,6 +1070,7 @@ export const useShellStore = defineStore('employee-shell', {
         createdAt: file.createdAt ?? '刚刚',
         status: file.status,
         attachmentRefId: file.attachmentRefId,
+        folderId: file.folderId ?? null,
         mimeType: file.mimeType,
         downloadUrl: file.downloadUrl,
       };

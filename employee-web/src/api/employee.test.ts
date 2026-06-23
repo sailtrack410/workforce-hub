@@ -112,11 +112,27 @@ describe('createEmployeeApi', () => {
     await api.files.createUploadTicket({
       ownerType: 'PERSONAL_FILE',
       ownerId: null,
+      folderId: 'folder-1',
       fileName: '个人文件.pdf',
       mimeType: 'application/pdf',
       fileSize: 1024,
       contentSha256: 'a'.repeat(64),
     });
+    await api.files.confirmUpload({
+      uploadTicketId: 'ticket-1',
+      objectKey: 'uploads/a.pdf',
+      contentSha256: 'a'.repeat(64),
+      fileSize: 1024,
+      ownerType: 'PERSONAL_FILE',
+      ownerId: null,
+      folderId: 'folder-1',
+      displayName: '个人文件.pdf',
+    });
+    await api.files.browser({ folderId: 'folder-1', keyword: '个人', fileType: 'document' });
+    await api.files.folders();
+    await api.files.createFolder({ parentFolderId: 'folder-1', folderName: '报销' });
+    await api.files.move('2053928981082898444', { targetFolderId: 'folder-1' });
+    await api.files.copy('2053928981082898444', { targetFolderId: 'folder-1', displayName: '个人文件副本.pdf' });
     await api.files.createDownloadTicket('2053928981082898444', { downloadType: 'PERSONAL_FILE', reason: '查看材料' });
     await api.files.trash('2053928981082898444', { reason: '删除' });
     await api.files.restore('2053928981082898444', { reason: '恢复' });
@@ -134,11 +150,27 @@ describe('createEmployeeApi', () => {
       ['post', '/api/employee/files/upload-tickets', {
         ownerType: 'PERSONAL_FILE',
         ownerId: null,
+        folderId: 'folder-1',
         fileName: '个人文件.pdf',
         mimeType: 'application/pdf',
         fileSize: 1024,
         contentSha256: 'a'.repeat(64),
       }],
+      ['post', '/api/employee/files/confirm-upload', {
+        uploadTicketId: 'ticket-1',
+        objectKey: 'uploads/a.pdf',
+        contentSha256: 'a'.repeat(64),
+        fileSize: 1024,
+        ownerType: 'PERSONAL_FILE',
+        ownerId: null,
+        folderId: 'folder-1',
+        displayName: '个人文件.pdf',
+      }],
+      ['get', '/api/employee/files/browser', { query: { folderId: 'folder-1', keyword: '个人', fileType: 'document' } }],
+      ['get', '/api/employee/files/folders', undefined],
+      ['post', '/api/employee/files/folders', { parentFolderId: 'folder-1', folderName: '报销' }],
+      ['post', '/api/employee/files/2053928981082898444/move', { targetFolderId: 'folder-1' }],
+      ['post', '/api/employee/files/2053928981082898444/copy', { targetFolderId: 'folder-1', displayName: '个人文件副本.pdf' }],
       ['post', '/api/employee/files/2053928981082898444/download-tickets', { downloadType: 'PERSONAL_FILE', reason: '查看材料' }],
       ['post', '/api/employee/files/2053928981082898444/trash', { reason: '删除' }],
       ['post', '/api/employee/files/2053928981082898444/restore', { reason: '恢复' }],

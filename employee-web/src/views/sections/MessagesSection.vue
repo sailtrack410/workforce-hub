@@ -22,7 +22,7 @@ import { useMessagesSectionContext } from '../employee-shell-context';
 import { useGroupFiles } from '@/composables/useGroupFiles';
 import { useMessagesState } from '@/composables/useMessagesState';
 import { useMessagesWorkflowEntry } from '@/composables/useMessagesWorkflowEntry';
-import { formatDateTime, statusText } from '@/utils/employee-format';
+import { formatDateTime, humanizeText, statusText } from '@/utils/employee-format';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { fileIconOf, fileToneOf } from '@/utils/file-record';
 import AppButton from '../../components/ui/AppButton.vue';
@@ -218,7 +218,7 @@ function messageAvatarUrl(message: ConversationMessage) {
         <MessageBubble
           v-else
           :message="message"
-          :agent="message.role.includes('Agent') || message.author.includes('助手')"
+          :agent="message.role.includes('AI') || message.author.includes('助手')"
           :avatar-url="messageAvatarUrl(message)"
           @action="openMessageAction"
           @attachment="openImAttachment"
@@ -238,7 +238,7 @@ function messageAvatarUrl(message: ConversationMessage) {
         </AppButton>
         <AppButton variant="secondary" size="sm" @click="openCreateConversation('agent')">
           <Sparkles :size="16" />
-          Agent
+          AI
         </AppButton>
       </div>
     </AppEmptyState>
@@ -256,16 +256,16 @@ function messageAvatarUrl(message: ConversationMessage) {
       </button>
       <button class="composer-tool-button" type="button" @click="insertAgentMention">
         <AtSign :size="16" />
-        Agent
+        AI
       </button>
       <button class="composer-tool-button" type="button" @click="openCreateConversation('agent')">
         <Sparkles :size="16" />
-        Agent会话
+        AI 会话
       </button>
     </div>
     <div class="composer-main-row">
       <div class="composer-input">
-        <AppInput v-model="draft" placeholder="输入消息，支持 @Agent" :disabled="im.messageSending" @keydown.enter.prevent="sendMessage" />
+        <AppInput v-model="draft" placeholder="输入消息，支持 @AI" :disabled="im.messageSending" @keydown.enter.prevent="sendMessage" />
       </div>
       <AppButton variant="primary" :disabled="im.messageSending" @click="sendMessage">
         <Send :size="18" />
@@ -278,7 +278,7 @@ function messageAvatarUrl(message: ConversationMessage) {
     <form class="conversation-dialog" @submit.prevent="submitCreateConversation">
       <header class="dialog-head dialog-head-row">
         <div>
-          <h2>{{ createConversationMode === 'private' ? '新建私聊' : createConversationMode === 'group' ? '新建群聊' : 'Agent会话' }}</h2>
+          <h2>{{ createConversationMode === 'private' ? '新建私聊' : createConversationMode === 'group' ? '新建群聊' : 'AI 会话' }}</h2>
         </div>
         <button class="field-icon-button" type="button" :disabled="createConversationSubmitting" aria-label="关闭" @click="closeCreateConversation">
           <X :size="15" />
@@ -288,7 +288,7 @@ function messageAvatarUrl(message: ConversationMessage) {
       <div class="conversation-mode-row">
         <button type="button" :class="{ active: createConversationMode === 'private' }" @click="createConversationMode = 'private'">私聊</button>
         <button type="button" :class="{ active: createConversationMode === 'group' }" @click="createConversationMode = 'group'">群聊</button>
-        <button type="button" :class="{ active: createConversationMode === 'agent' }" @click="openCreateConversation('agent')">Agent</button>
+        <button type="button" :class="{ active: createConversationMode === 'agent' }" @click="openCreateConversation('agent')">AI</button>
       </div>
 
       <label v-if="createConversationMode === 'private'" class="security-field">
@@ -309,7 +309,7 @@ function messageAvatarUrl(message: ConversationMessage) {
 
       <template v-else>
         <label class="security-field">
-          <span>搜索Agent</span>
+          <span>搜索 AI 助手</span>
           <div class="agent-search-row">
             <input v-model="createConversationForm.agentKeyword" class="ui-inline-input" @keydown.enter.prevent="searchAgents" />
             <AppButton variant="secondary" type="button" :disabled="agentsLoading" @click="searchAgents">
@@ -326,10 +326,10 @@ function messageAvatarUrl(message: ConversationMessage) {
             :class="{ active: createConversationForm.agentId === String(agent.agentId) }"
             @click="createConversationForm.agentId = String(agent.agentId)"
           >
-            <strong>{{ agent.agentName }}</strong>
+            <strong>{{ humanizeText(agent.agentName) }}</strong>
             <span>{{ agent.agentCode }} · {{ agent.agentType }}</span>
           </button>
-          <p v-if="!agentsLoading && agentKeyword && !agents.length" class="agent-empty">未找到Agent</p>
+          <p v-if="!agentsLoading && agentKeyword && !agents.length" class="agent-empty">未找到 AI 助手</p>
         </div>
       </template>
 

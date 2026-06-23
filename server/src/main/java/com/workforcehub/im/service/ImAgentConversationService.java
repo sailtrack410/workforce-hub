@@ -85,27 +85,27 @@ public class ImAgentConversationService implements ImAgentResultCallback {
 
         return imRepository.findConversationSummaryForUser(conversationId, currentUserId)
             .map(this::toConversationSummaryResponse)
-            .orElseThrow(() -> new BizException(500, "Agent会话创建失败"));
+            .orElseThrow(() -> new BizException(500, "AI会话创建失败"));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void onAgentReply(ImAgentReplyResult result) {
         if (result == null) {
-            throw new BizException(400, "Agent回复结果不能为空");
+            throw new BizException(400, "AI回复结果不能为空");
         }
         Long conversationId = result.conversationId();
         Long agentId = result.agentId();
         Long agentTaskId = result.agentTaskId();
         if (!imRepository.existsActiveAgentConversation(conversationId, agentId)) {
-            throw new BizException(403, "Agent无权写入该会话");
+            throw new BizException(403, "AI助手无权写入该会话");
         }
         if ("FAILED".equals(result.status())) {
             writeAgentFailureSystemMessage(conversationId, agentId, agentFailureMessageClientId(result));
             return;
         }
         if (!"SUCCEEDED".equals(result.status())) {
-            throw new BizException(400, "Agent回复状态不支持");
+            throw new BizException(400, "AI回复状态不支持");
         }
         Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(conversationId);
         if (lastSeq == null) {
@@ -231,14 +231,14 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         );
         if (!inserted) {
             return imRepository.findActiveConversationIdByKey(conversationKey)
-                .orElseThrow(() -> new BizException(409, "Agent会话创建冲突"));
+                .orElseThrow(() -> new BizException(409, "AI会话创建冲突"));
         }
         try {
             imRepository.insertUserMember(IdWorker.getId(), conversationId, userId, "MEMBER", "AGENT_CHAT");
             imRepository.insertAgentMember(IdWorker.getId(), conversationId, agent.agentId(), "AGENT_CHAT");
         } catch (DuplicateKeyException e) {
             return imRepository.findActiveConversationIdByKey(conversationKey)
-                .orElseThrow(() -> new BizException(409, "Agent会话成员写入冲突"));
+                .orElseThrow(() -> new BizException(409, "AI会话成员写入冲突"));
         }
         return conversationId;
     }
@@ -316,7 +316,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         }
         String normalized = messageType.trim().toUpperCase();
         if (!Set.of("TEXT", "CARD", "SYSTEM").contains(normalized)) {
-            throw new BizException(400, "Agent消息类型不支持");
+            throw new BizException(400, "AI消息类型不支持");
         }
         return normalized;
     }
@@ -336,7 +336,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 "agentTaskId", agentTaskId
             ));
         } catch (Exception e) {
-            throw new BizException(400, "Agent消息内容不是合法JSON");
+            throw new BizException(400, "AI消息内容不是合法JSON");
         }
     }
 
@@ -379,7 +379,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 "contentJson", userMessage.getContentJson()
             ));
         } catch (Exception e) {
-            throw new BizException(500, "Agent输入内容序列化失败");
+            throw new BizException(500, "AI输入内容序列化失败");
         }
     }
 
@@ -402,7 +402,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 Long seqNo = lastSeq + 1;
                 Long messageId = IdWorker.getId();
                 LocalDateTime sentAt = LocalDateTime.now();
-                String contentJson = buildSystemContentJson("Agent 暂时无法回复，请稍后再试");
+                String contentJson = buildSystemContentJson("AI助手暂时无法回复，请稍后再试");
                 try {
                     imMessageRepository.insertMessage(
                         messageId,
@@ -455,7 +455,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
     private ImAgentTriggerService requireImAgentTriggerService() {
         ImAgentTriggerService service = imAgentTriggerServiceProvider.getIfAvailable();
         if (service == null) {
-            throw new BizException(501, "Agent会话触发服务未接入");
+            throw new BizException(501, "AI会话触发服务未接入");
         }
         return service;
     }

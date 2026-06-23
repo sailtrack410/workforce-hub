@@ -134,7 +134,7 @@ async function submitAdjustment() {
           <input v-model.number="adjustment.changeMinutes" type="number" />
         </label>
         <label>
-          <span>幂等键</span>
+          <span>防重复编号</span>
           <input v-model="adjustment.sourceTxnKey" maxlength="128" />
         </label>
         <label>

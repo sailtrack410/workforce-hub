@@ -6,6 +6,7 @@ public record AgentRow(
     Long id,
     String agentCode,
     String agentName,
+    Long avatarAttachmentRefId,
     String agentType,
     String identityMode,
     Long publishedVersionId,

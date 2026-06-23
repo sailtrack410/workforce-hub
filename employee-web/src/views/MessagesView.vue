@@ -17,6 +17,8 @@ import {
   MoonStar,
   PanelLeftClose,
   PanelLeftOpen,
+  Pin,
+  PinOff,
   Search,
   Send,
   Settings,
@@ -56,6 +58,7 @@ import { syncShellSessionProfile } from '../composables/useShellSessionProfileSy
 import { fileSizeLabel, fileTypeLabel } from '@/utils/file-format';
 import {
   statusText,
+  humanizeText,
   toneOfConversation,
   toneOfStatus,
 } from '@/utils/employee-format';
@@ -155,7 +158,14 @@ const filterOptions = computed(() => {
 });
 const activeFilter = computed(() => shell.filters[activeSection.value]);
 const filteredConversations = computed(() => shell.filteredConversations);
+const conversationContextMenu = ref<{ conversationId: string; x: number; y: number } | null>(null);
+const contextConversation = computed(() => {
+  const menu = conversationContextMenu.value;
+  if (!menu) return null;
+  return shell.conversations.find((item) => item.id === menu.conversationId) ?? null;
+});
 const searchAgentResults = ref<AgentResponse[]>([]);
+const searchAgentAvatarUrls = ref<Record<string, string>>({});
 const searchAgentsLoading = ref(false);
 const searchAgentsError = ref('');
 let searchAgentsTimer: number | undefined;
@@ -190,6 +200,7 @@ const approvalTodos = computed(() => filteredTodos.value.filter((item) => item.p
 const deferredTodos = computed(() => filteredTodos.value.filter((item) => item.priority === '低'));
 const workbenchLaunchers = computed(() => filteredWorkbench.value);
 const hasActiveConversation = computed(() => Boolean(activeConversation.value.id));
+const uploadFolderId = ref<EntityId | null>(null);
 const { resolveDownloadUrl } = usePersonalFileTransfer();
 const {
   personalFileInput,
@@ -223,6 +234,7 @@ const {
   shell,
   activeFile,
   activeSection,
+  uploadFolderId,
   hasActiveConversation,
   showToast,
   sendSelectedFileToConversation,
@@ -305,6 +317,19 @@ async function refreshContactAvatarUrls() {
   }));
 }
 
+async function refreshSearchAgentAvatarUrls(agents: AgentResponse[]) {
+  const entries = await Promise.all(agents.map(async (agent) => {
+    if (!agent.avatarAttachmentRefId) return [String(agent.agentId), ''] as const;
+    try {
+      const ticket = await employeeApi.files.createDownloadTicket(agent.avatarAttachmentRefId, { downloadType: 'INLINE' });
+      return [String(agent.agentId), resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo))] as const;
+    } catch {
+      return [String(agent.agentId), ''] as const;
+    }
+  }));
+  searchAgentAvatarUrls.value = Object.fromEntries(entries);
+}
+
 const {
   authMode,
   loginName,
@@ -339,6 +364,7 @@ const {
 function runAction(action?: SectionAction) {
   if (!action) return;
   if (action.action === 'upload-personal-file') {
+    if (activeSection.value !== 'files') uploadFolderId.value = null;
     openUploadPanel();
     return;
   }
@@ -414,6 +440,7 @@ async function confirmSendFileTarget(conversationId: EntityId) {
   }
 }
 function selectNav(section: SectionId) {
+  closeConversationContextMenu();
   navigateSection(section);
   shell.setMobileView('list');
 }
@@ -471,7 +498,7 @@ async function loadAuthenticatedWorkspace() {
     refreshFileCenter(),
     hydrateUserPreferences(),
   ]);
-  await im.loadVisibleConversationDetails();
+  await im.loadVisibleConversationDetails(undefined, undefined, session.user?.userId);
   shell.mergeBackendConversations(im.conversations);
   syncShellSessionProfile(shell, session);
   await refreshCurrentUserAvatarUrl();
@@ -497,7 +524,7 @@ async function syncConversationMessages(id: string) {
   if (!session.isAuthenticated) return;
   await Promise.all([
     im.loadMessages(conversationId, session.user?.userId),
-    im.loadConversationDetail(conversationId).catch(() => undefined),
+    im.loadConversationDetail(conversationId, undefined, session.user?.userId).catch(() => undefined),
   ]);
   shell.mergeBackendConversations(im.conversations);
   syncShellSessionProfile(shell, session);
@@ -544,8 +571,40 @@ function navigateMessagesConversation(id: string) {
 }
 
 function selectConversation(id: string) {
+  closeConversationContextMenu();
   navigateMessagesConversation(id);
   void syncConversationMessages(id);
+}
+
+function openConversationContextMenu(event: MouseEvent, conversationId: string) {
+  const menuWidth = 176;
+  const menuHeight = 48;
+  conversationContextMenu.value = {
+    conversationId,
+    x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+    y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+  };
+}
+
+function closeConversationContextMenu() {
+  conversationContextMenu.value = null;
+}
+
+async function toggleConversationPinnedFromMenu() {
+  const conversation = contextConversation.value;
+  if (!conversation || im.actionLoading) return;
+  const nextPinned = !conversation.pinned;
+  try {
+    await im.updatePreference(conversation.id, {
+      pin: nextPinned,
+      mute: Boolean(conversation.muted),
+    });
+    shell.mergeBackendConversations(im.conversations);
+    closeConversationContextMenu();
+    showToast(nextPinned ? '已置顶' : '已取消置顶');
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '会话偏好保存失败');
+  }
 }
 
 async function startAgentConversationFromSearch(agent: AgentResponse) {
@@ -555,9 +614,9 @@ async function startAgentConversationFromSearch(agent: AgentResponse) {
     navigateMessagesConversation(conversation.id);
     await syncConversationMessages(conversation.id);
     shell.search.messages = '';
-    showToast('Agent会话已创建');
+    showToast('AI 会话已创建');
   } catch (error) {
-    showToast(error instanceof Error ? error.message : 'Agent会话创建失败');
+    showToast(error instanceof Error ? error.message : 'AI 会话创建失败');
   }
 }
 
@@ -608,6 +667,7 @@ async function sendSelectedFileToConversation(file: PersonalFileRecord) {
 }
 
 function selectFilter(filter: SectionFilter) {
+  closeConversationContextMenu();
   shell.setFilter(activeSection.value, filter);
 }
 
@@ -664,6 +724,10 @@ function startResize(event: PointerEvent) {
 }
 
 function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && conversationContextMenu.value) {
+    closeConversationContextMenu();
+    return;
+  }
   if (event.key === 'Escape' && detailVisible.value) closeDetail();
 }
 
@@ -679,6 +743,7 @@ async function retryTodos() {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
+  window.addEventListener('click', closeConversationContextMenu);
   window.addEventListener('resize', updateFilterOverflow);
   if (!session.initialized) {
     await session.loadCurrentUser().catch(() => undefined);
@@ -694,6 +759,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('click', closeConversationContextMenu);
   window.removeEventListener('resize', updateFilterOverflow);
   if (toastTimer) window.clearTimeout(toastTimer);
   if (searchAgentsTimer) window.clearTimeout(searchAgentsTimer);
@@ -725,12 +791,15 @@ watch(
       const requestSeq = ++searchAgentsRequestSeq;
       employeeApi.agents.list({ keyword: trimmed })
         .then((agents) => {
-          if (requestSeq === searchAgentsRequestSeq) searchAgentResults.value = agents;
+          if (requestSeq === searchAgentsRequestSeq) {
+            searchAgentResults.value = agents;
+            void refreshSearchAgentAvatarUrls(agents);
+          }
         })
         .catch((error) => {
           if (requestSeq !== searchAgentsRequestSeq) return;
           searchAgentResults.value = [];
-          searchAgentsError.value = error instanceof Error ? error.message : 'Agent搜索失败';
+          searchAgentsError.value = error instanceof Error ? error.message : 'AI 助手搜索失败';
         })
         .finally(() => {
           if (requestSeq === searchAgentsRequestSeq) searchAgentsLoading.value = false;
@@ -837,6 +906,11 @@ const employeeShellContexts = {
     currentMeta,
     backToList,
     runAction,
+    showToast,
+    setUploadFolderId: (folderId) => {
+      uploadFolderId.value = folderId ?? null;
+    },
+    refreshFileCenter,
     sendSelectedFileToConversation,
     openPersonalFilePreview,
     downloadPersonalFile,
@@ -875,7 +949,7 @@ provideEmployeeShellContexts(employeeShellContexts);
   <main v-else-if="!session.isAuthenticated" class="auth-shell" :data-theme="shell.theme">
     <section class="auth-hero" aria-label="员工端登录">
       <div class="auth-brand-row">
-        <div class="brand-mark">企</div>
+        <AppAvatar label="企业" kind="org" tone="neutral" size="md" />
         <button class="theme-toggle auth-theme-toggle" type="button" @click="shell.toggleTheme()">
           <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="16" />
           <span>{{ themeLabel }}</span>
@@ -988,7 +1062,7 @@ provideEmployeeShellContexts(employeeShellContexts);
 
     <aside class="side-rail" aria-label="员工端功能">
       <div class="brand-block">
-        <div class="brand-mark">企</div>
+        <AppAvatar label="企业" kind="org" tone="neutral" size="md" />
         <div class="brand-copy">
           <strong>企业协同</strong>
         </div>
@@ -1100,7 +1174,9 @@ provideEmployeeShellContexts(employeeShellContexts);
                 <div class="message-row-main">
                   <div class="message-avatar-wrap">
                     <AppAvatar
-                      :label="agent.agentName.slice(0, 2)"
+                      :label="humanizeText(agent.agentName)"
+                      :image="searchAgentAvatarUrls[String(agent.agentId)]"
+                      kind="agent"
                       tone="success"
                       status="online"
                     />
@@ -1110,7 +1186,7 @@ provideEmployeeShellContexts(employeeShellContexts);
                   </div>
                   <div class="message-copy">
                     <div class="message-title-line">
-                      <strong>{{ agent.agentName }}</strong>
+                      <strong>{{ humanizeText(agent.agentName) }}</strong>
                       <span class="conversation-kind-pill pill-agent">可添加</span>
                     </div>
                     <p>{{ agent.agentCode }} · {{ agent.agentType }}</p>
@@ -1121,13 +1197,14 @@ provideEmployeeShellContexts(employeeShellContexts);
                 </div>
               </div>
             </AppListItem>
-            <div v-if="searchAgentsLoading" class="agent-search-hint">正在搜索可添加Agent</div>
+            <div v-if="searchAgentsLoading" class="agent-search-hint">正在搜索可添加 AI 助手</div>
             <div v-else-if="searchAgentsError" class="agent-search-hint error">{{ searchAgentsError }}</div>
             <AppListItem
               v-for="item in filteredConversations"
               :key="item.id"
               :active="item.id === activeConversation.id"
               @click="selectConversation(item.id)"
+              @contextmenu.stop.prevent="openConversationContextMenu($event, item.id)"
             >
               <div class="message-row" :class="`message-row-${item.kind === 'team' ? 'team' : item.kind === 'agent' ? 'agent' : 'private'}`">
                 <div class="message-row-main">
@@ -1135,11 +1212,10 @@ provideEmployeeShellContexts(employeeShellContexts);
                     <AppAvatar
                       :label="item.title"
                       :image="item.avatarUrl"
+                      :kind="item.kind === 'agent' ? 'agent' : 'user'"
                       :tone="toneOfConversation(item.tone)"
                       :status="item.kind === 'agent' ? 'online' : ''"
-                    >
-                      <UserRound :size="20" />
-                    </AppAvatar>
+                    />
                     <span v-if="item.kind === 'team'" class="conversation-kind-glyph kind-team" aria-hidden="true">
                       <UsersRound :size="11" />
                     </span>
@@ -1153,6 +1229,10 @@ provideEmployeeShellContexts(employeeShellContexts);
                       <span v-if="item.kind === 'team'" class="conversation-kind-pill pill-team">群{{ item.memberCount ? ` · ${item.memberCount}` : '' }}</span>
                       <span v-else-if="item.kind === 'agent'" class="conversation-kind-pill pill-agent">AI</span>
                       <span v-else class="conversation-kind-pill pill-private">私聊</span>
+                      <span v-if="item.pinned" class="conversation-kind-pill pill-pinned">
+                        <Pin :size="11" />
+                        置顶
+                      </span>
                     </div>
                     <p>{{ item.subtitle }}</p>
                   </div>
@@ -1244,7 +1324,7 @@ provideEmployeeShellContexts(employeeShellContexts);
             @click="shell.selectItem('contacts', item.id)"
           >
             <div class="generic-row">
-              <AppAvatar :label="item.name.slice(0, 1)" :image="item.avatarUrl" tone="primary" />
+              <AppAvatar :label="item.name" :image="item.avatarUrl" tone="primary" />
               <div class="generic-copy">
                 <div class="title-line">
                   <strong>{{ item.name }}</strong>
@@ -1325,7 +1405,7 @@ provideEmployeeShellContexts(employeeShellContexts);
           </section>
 
           <section class="context-block">
-            <h3>Agent 审核依据</h3>
+            <h3>AI 预审依据</h3>
             <div v-if="activeConversation.panel.agentEvidence?.length" class="stack-list">
               <span v-for="item in activeConversation.panel.agentEvidence" :key="item.label">
                 <small>{{ item.label }}</small>
@@ -1422,6 +1502,18 @@ provideEmployeeShellContexts(employeeShellContexts);
 
     <div v-if="toastMessage" class="toast-message" role="status" aria-live="polite">
       {{ toastMessage }}
+    </div>
+
+    <div
+      v-if="conversationContextMenu"
+      class="conversation-context-menu"
+      :style="{ left: `${conversationContextMenu.x}px`, top: `${conversationContextMenu.y}px` }"
+      @click.stop
+    >
+      <button type="button" :disabled="im.actionLoading" @click="toggleConversationPinnedFromMenu">
+        <component :is="contextConversation?.pinned ? PinOff : Pin" :size="15" />
+        <span>{{ contextConversation?.pinned ? '取消置顶' : '置顶会话' }}</span>
+      </button>
     </div>
 
     <AppDialog v-if="todoActionMode">
@@ -1539,7 +1631,7 @@ provideEmployeeShellContexts(employeeShellContexts);
               :disabled="fileSendTarget.submitting"
               @click="confirmSendFileTarget(conv.id)"
             >
-              <AppAvatar :label="conv.badge || conv.title.slice(0, 2)" :tone="toneOfConversation(conv.tone)" size="sm" />
+              <AppAvatar :label="conv.title" :kind="conv.kind === 'agent' ? 'agent' : 'user'" :tone="toneOfConversation(conv.tone)" size="sm" />
               <div>
                 <strong>{{ conv.title }}</strong>
                 <small>{{ conv.subtitle || conv.tag || conv.flow }}</small>

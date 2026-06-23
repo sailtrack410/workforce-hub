@@ -235,6 +235,17 @@ describe('useShellStore', () => {
     expect(shell.filteredConversations.map((item) => item.id)).toEqual(['operation-team']);
   });
 
+  it('shows pinned conversations first', () => {
+    const shell = useShellStore();
+    shell.mergeBackendConversations([
+      shellDemoConversations[0],
+      { ...shellDemoConversations[1], pinned: true },
+      shellDemoConversations[2],
+    ]);
+
+    expect(shell.filteredConversations.map((item) => item.id)).toEqual(['operation-team', 'leave-approval', 'hr-agent']);
+  });
+
   it('keeps approval progress data with one current step', () => {
     const shell = useShellStore();
     shell.mergeBackendConversations(shellDemoConversations);

@@ -1,15 +1,26 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { Bot, Building2, UserRound } from 'lucide-vue-next';
+
 const props = withDefaults(defineProps<{
   label: string;
   image?: string;
+  kind?: 'user' | 'agent' | 'org';
   tone?: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
   size?: 'sm' | 'md' | 'lg' | 'xl';
   status?: 'online' | 'busy' | 'away' | 'offline' | '';
 }>(), {
   image: '',
+  kind: 'user',
   tone: 'primary',
   size: 'md',
   status: '',
+});
+
+const fallbackIcon = computed(() => {
+  if (props.kind === 'agent') return Bot;
+  if (props.kind === 'org') return Building2;
+  return UserRound;
 });
 </script>
 
@@ -17,7 +28,7 @@ const props = withDefaults(defineProps<{
   <span class="ui-avatar-wrap">
     <span class="ui-avatar" :class="[props.tone, props.size, { 'has-image': !!props.image }]">
       <img v-if="props.image" :src="props.image" :alt="props.label" />
-      <slot v-else>{{ props.label.slice(0, 2) }}</slot>
+      <component :is="fallbackIcon" v-else :size="props.size === 'sm' ? 15 : props.size === 'xl' ? 34 : 20" aria-hidden="true" />
     </span>
     <span v-if="props.status" class="ui-avatar-status" :class="props.status" />
   </span>
@@ -36,6 +47,10 @@ const props = withDefaults(defineProps<{
   font-size: var(--text-caption-md);
   font-weight: 750;
   overflow: hidden;
+}
+
+.ui-avatar svg {
+  stroke-width: 2;
 }
 
 .ui-avatar img {
@@ -68,13 +83,13 @@ const props = withDefaults(defineProps<{
 }
 
 .ui-avatar.primary {
-  background: linear-gradient(135deg, #4fa2ff, #1677ff);
-  color: #fff;
+  background: #e8f3ff;
+  color: #1677ff;
 }
 
 .ui-avatar.success {
-  background: linear-gradient(135deg, #53d18a, #16a36a);
-  color: #fff;
+  background: #e8f8f0;
+  color: #1fad66;
 }
 
 .ui-avatar.warning {

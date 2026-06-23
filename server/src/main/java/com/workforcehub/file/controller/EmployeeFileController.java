@@ -4,15 +4,20 @@ import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.response.R;
 import com.workforcehub.file.dto.AttachmentRefResponse;
 import com.workforcehub.file.dto.ConfirmUploadRequest;
+import com.workforcehub.file.dto.CopyEmployeeFileRequest;
+import com.workforcehub.file.dto.CreateEmployeeFileFolderRequest;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.CreateUploadTicketRequest;
 import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
+import com.workforcehub.file.dto.EmployeeFileBrowserResponse;
+import com.workforcehub.file.dto.EmployeeFileFolderResponse;
 import com.workforcehub.file.dto.EmployeeFileResponse;
 import com.workforcehub.file.dto.FilePurgeResponse;
 import com.workforcehub.file.dto.FileRestoreResponse;
 import com.workforcehub.file.dto.FileTrashRequest;
 import com.workforcehub.file.dto.FileTrashResponse;
+import com.workforcehub.file.dto.MoveEmployeeFileRequest;
 import com.workforcehub.file.dto.QuotaResponse;
 import com.workforcehub.file.dto.UploadTicketResponse;
 import com.workforcehub.file.service.FileCenterService;
@@ -27,6 +32,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 员工端文件中心接口。
@@ -56,6 +63,23 @@ public class EmployeeFileController {
         return R.ok(fileCenterService.listEmployeeFiles(pageNo, pageSize, true));
     }
 
+    @GetMapping("/browser")
+    public R<EmployeeFileBrowserResponse> browser(@RequestParam(required = false) Long folderId,
+                                                  @RequestParam(required = false) String keyword,
+                                                  @RequestParam(required = false) String fileType) {
+        return R.ok(fileCenterService.browseEmployeeFiles(folderId, keyword, fileType));
+    }
+
+    @GetMapping("/folders")
+    public R<List<EmployeeFileFolderResponse>> listFolders() {
+        return R.ok(fileCenterService.listEmployeeFolders());
+    }
+
+    @PostMapping("/folders")
+    public R<EmployeeFileFolderResponse> createFolder(@RequestBody CreateEmployeeFileFolderRequest request) {
+        return R.ok(fileCenterService.createEmployeeFolder(request));
+    }
+
     @PostMapping("/upload-tickets")
     public R<UploadTicketResponse> createUploadTicket(@Valid @RequestBody CreateUploadTicketRequest request) {
         return R.ok(fileCenterService.createEmployeeUploadTicket(request));
@@ -75,6 +99,18 @@ public class EmployeeFileController {
     public R<DownloadTicketResponse> createDownloadTicket(@PathVariable Long attachmentRefId,
                                                           @Valid @RequestBody CreateDownloadTicketRequest request) {
         return R.ok(fileCenterService.createEmployeeDownloadTicket(attachmentRefId, request));
+    }
+
+    @PostMapping("/{attachmentRefId}/move")
+    public R<EmployeeFileResponse> move(@PathVariable Long attachmentRefId,
+                                        @RequestBody MoveEmployeeFileRequest request) {
+        return R.ok(fileCenterService.moveEmployeeFile(attachmentRefId, request));
+    }
+
+    @PostMapping("/{attachmentRefId}/copy")
+    public R<EmployeeFileResponse> copy(@PathVariable Long attachmentRefId,
+                                        @RequestBody CopyEmployeeFileRequest request) {
+        return R.ok(fileCenterService.copyEmployeeFile(attachmentRefId, request));
     }
 
     @GetMapping("/download/{ticketNo}")
