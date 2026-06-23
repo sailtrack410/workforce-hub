@@ -370,14 +370,54 @@ public class ImService {
         }
         ensureCanAccessConversation(request.getTargetConversationId(), userId);
         String text = extractText(message.contentJson());
-        if (!StringUtils.hasText(text)) {
-            throw new BizException(400, "当前仅支持转发文本消息");
+        List<ImAttachmentRow> sourceAttachments = imRepository.listMessageAttachments(messageId);
+        sourceAttachments.forEach(attachment -> ensureDownloadableMessageAttachment(attachment, messageId));
+        if (!StringUtils.hasText(text) && sourceAttachments.isEmpty()) {
+            throw new BizException(400, "当前消息无可转发内容");
         }
-        SendImMessageRequest sendRequest = new SendImMessageRequest();
-        sendRequest.setMessageType("TEXT");
-        sendRequest.setText(text);
-        sendRequest.setClientMessageId("forward-%s-%s-%s".formatted(request.getTargetConversationId(), messageId, System.currentTimeMillis()));
-        return sendCurrentEmployeeMessage(request.getTargetConversationId(), sendRequest);
+        Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(request.getTargetConversationId());
+        if (lastSeq == null) {
+            throw new BizException(404, "会话不存在");
+        }
+        Long seqNo = lastSeq + 1;
+        Long forwardedMessageId = IdWorker.getId();
+        LocalDateTime sentAt = LocalDateTime.now();
+        String messageType = sourceAttachments.isEmpty() || StringUtils.hasText(text) ? "TEXT" : "FILE";
+        String contentJson = buildContentJson(text, sourceAttachments);
+        imMessageRepository.insertMessage(
+            forwardedMessageId,
+            request.getTargetConversationId(),
+            seqNo,
+            USER_SENDER_TYPE,
+            userId,
+            messageType,
+            "forward-%s-%s-%s".formatted(request.getTargetConversationId(), messageId, System.currentTimeMillis()),
+            null,
+            contentJson,
+            sentAt
+        );
+        for (int i = 0; i < sourceAttachments.size(); i++) {
+            imRepository.createImMessageAttachmentRef(forwardedMessageId, sourceAttachments.get(i), userId, i);
+        }
+        imMessageRepository.updateConversationLastMessage(request.getTargetConversationId(), seqNo, forwardedMessageId, sentAt, userId);
+        imMessageRepository.updateMemberLastReadSeq(request.getTargetConversationId(), userId, seqNo);
+        ImMessageResponse response = toMessageResponse(new ImMessageRow(
+            forwardedMessageId,
+            request.getTargetConversationId(),
+            seqNo,
+            USER_SENDER_TYPE,
+            userId,
+            messageType,
+            contentJson,
+            null,
+            "NORMAL",
+            sentAt
+        ));
+        pushConversationEventAfterCommit(
+            request.getTargetConversationId(),
+            ImWebSocketEvent.of(ImWebSocketEventTypes.MESSAGE_CREATED, request.getTargetConversationId(), forwardedMessageId, seqNo, userId, response)
+        );
+        return response;
     }
 
     @Transactional(rollbackFor = Exception.class)

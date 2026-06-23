@@ -71,6 +71,9 @@ export function useMessagesState({
   const messageEditText = ref('');
   const messageActionError = ref('');
   const messageForwardOpen = ref(false);
+  const messageForwardSearch = ref('');
+  const messageForwardNote = ref('');
+  const messageForwardSelectedIds = ref<string[]>([]);
   const quotedMessageId = ref<EntityId | null>(null);
 
   const {
@@ -101,6 +104,15 @@ export function useMessagesState({
     ];
   });
   const hasActiveConversation = computed(() => Boolean(activeConversation.value.id));
+  const messageForwardConversations = computed(() => {
+    const keyword = messageForwardSearch.value.trim().toLowerCase();
+    return shell.conversations
+      .filter((item) => item.id !== activeConversationId())
+      .filter((item) => {
+        if (!keyword) return true;
+        return `${item.title} ${item.summaryTitle} ${item.summaryBody}`.toLowerCase().includes(keyword);
+      });
+  });
 
   function activeConversationId() {
     return shell.active.messages.trim();
@@ -303,11 +315,11 @@ export function useMessagesState({
 
   function closeMessageAction() {
     if (im.actionLoading) return;
+    if (messageForwardOpen.value) return;
     messageActionTarget.value = null;
     messageActionMenu.value = null;
     messageEditText.value = '';
     messageActionError.value = '';
-    messageForwardOpen.value = false;
   }
 
   async function runMessageMenuAction(action: MessageMenuAction) {
@@ -325,6 +337,11 @@ export function useMessagesState({
     }
     if (action === 'forward') {
       messageForwardOpen.value = true;
+      messageActionMenu.value = null;
+      messageActionError.value = '';
+      messageForwardSearch.value = '';
+      messageForwardNote.value = '';
+      messageForwardSelectedIds.value = [];
       return;
     }
     if (action === 'favorite') {
@@ -381,15 +398,48 @@ export function useMessagesState({
     }
   }
 
-  async function submitMessageForward(targetConversationId: EntityId) {
+  function closeMessageForward() {
+    if (im.actionLoading) return;
+    messageForwardOpen.value = false;
+    messageActionTarget.value = null;
+    messageActionMenu.value = null;
+    messageActionError.value = '';
+    messageForwardSearch.value = '';
+    messageForwardNote.value = '';
+    messageForwardSelectedIds.value = [];
+  }
+
+  function toggleMessageForwardTarget(conversationId: EntityId) {
+    const id = String(conversationId);
+    messageForwardSelectedIds.value = messageForwardSelectedIds.value.includes(id)
+      ? messageForwardSelectedIds.value.filter((item) => item !== id)
+      : [...messageForwardSelectedIds.value, id];
+  }
+
+  async function submitMessageForward() {
     const message = messageActionTarget.value;
     const conversationId = activeConversationId();
     if (!message || !conversationId) return;
+    if (!messageForwardSelectedIds.value.length) {
+      messageActionError.value = '请选择会话';
+      return;
+    }
     messageActionError.value = '';
     try {
-      await employeeApi.im.forwardMessage(conversationId, message.id, { targetConversationId });
-      closeMessageAction();
-      showToast('已转发');
+      const targetCount = messageForwardSelectedIds.value.length;
+      const note = messageForwardNote.value.trim();
+      await Promise.all(messageForwardSelectedIds.value.map(async (targetConversationId) => {
+        await employeeApi.im.forwardMessage(conversationId, message.id, { targetConversationId });
+        if (note) {
+          await employeeApi.im.sendMessage(targetConversationId, {
+            messageType: 'TEXT',
+            text: note,
+            clientMessageId: `forward-note-${targetConversationId}-${message.id}-${Date.now()}`,
+          });
+        }
+      }));
+      closeMessageForward();
+      showToast(`已转发给 ${targetCount} 个会话`);
     } catch (error) {
       messageActionError.value = error instanceof Error ? error.message : '转发失败';
     }
@@ -615,6 +665,10 @@ export function useMessagesState({
     messageEditText,
     messageActionError,
     messageForwardOpen,
+    messageForwardSearch,
+    messageForwardNote,
+    messageForwardSelectedIds,
+    messageForwardConversations,
     messageActionCanRecall,
     activeConversation,
     activeConversationTitle,
@@ -639,6 +693,8 @@ export function useMessagesState({
     openMessageAction,
     closeMessageAction,
     runMessageMenuAction,
+    closeMessageForward,
+    toggleMessageForwardTarget,
     submitMessageForward,
     submitMessageEdit,
     submitMessageRecall,

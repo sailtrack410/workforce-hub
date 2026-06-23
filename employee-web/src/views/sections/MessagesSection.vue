@@ -16,6 +16,7 @@ import {
   Plus,
   Quote,
   RotateCcw,
+  Search,
   Send,
   Sparkles,
   Star,
@@ -78,6 +79,10 @@ const {
   messageActionMenu,
   messageActionError,
   messageForwardOpen,
+  messageForwardSearch,
+  messageForwardNote,
+  messageForwardSelectedIds,
+  messageForwardConversations,
   messageActionCanRecall,
   activeConversation,
   activeConversationTitle,
@@ -102,6 +107,8 @@ const {
   openMessageAction,
   closeMessageAction,
   runMessageMenuAction,
+  closeMessageForward,
+  toggleMessageForwardTarget,
   submitMessageForward,
   openImAttachment,
   insertAgentMention,
@@ -586,20 +593,70 @@ function messageAvatarUrl(message: ConversationMessage) {
       <component :is="messageActionCanRecall ? RotateCcw : Trash2" :size="15" />
       <span>{{ messageActionCanRecall ? '撤回' : '删除' }}</span>
     </button>
-    <div v-if="messageForwardOpen" class="message-forward-panel">
-      <button
-        v-for="conversation in shell.conversations.filter((item) => item.id !== activeConversationId())"
-        :key="conversation.id"
-        type="button"
-        :disabled="im.actionLoading"
-        @click="submitMessageForward(conversation.id)"
-      >
-        <Forward :size="14" />
-        <span>{{ conversation.title }}</span>
-      </button>
-    </div>
     <p v-if="messageActionError" class="message-context-error">{{ messageActionError }}</p>
   </div>
+
+  <AppDialog v-if="messageForwardOpen">
+    <section class="forward-dialog" @click.stop>
+      <aside class="forward-picker">
+        <label class="forward-search">
+          <Search :size="16" />
+          <input v-model="messageForwardSearch" type="search" placeholder="搜索" autofocus />
+        </label>
+        <div class="forward-list-head">
+          <strong>最近聊天</strong>
+          <span>{{ messageForwardSelectedIds.length }} 已选</span>
+        </div>
+        <div class="forward-conversation-list">
+          <button
+            v-for="conversation in messageForwardConversations"
+            :key="conversation.id"
+            type="button"
+            class="forward-conversation-row"
+            :class="{ selected: messageForwardSelectedIds.includes(conversation.id) }"
+            @click="toggleMessageForwardTarget(conversation.id)"
+          >
+            <span class="forward-check" aria-hidden="true">
+              <span v-if="messageForwardSelectedIds.includes(conversation.id)" />
+            </span>
+            <AppAvatar :label="conversation.title" :image="conversation.avatarUrl" tone="primary" size="sm" />
+            <span class="forward-row-text">
+              <strong>{{ conversation.title }}</strong>
+              <small>{{ conversation.summaryBody || conversation.flow }}</small>
+            </span>
+          </button>
+          <p v-if="!messageForwardConversations.length" class="forward-empty">没有匹配会话</p>
+        </div>
+      </aside>
+
+      <main class="forward-preview">
+        <header class="forward-preview-head">
+          <h2>发送给</h2>
+          <button class="field-icon-button" type="button" :disabled="im.actionLoading" aria-label="关闭" @click="closeMessageForward">
+            <X :size="15" />
+          </button>
+        </header>
+        <section class="forward-content-preview">
+          <p v-if="messageActionTarget?.body" class="forward-text-preview">{{ messageActionTarget.body }}</p>
+          <div v-if="messageActionTarget?.attachments?.length" class="forward-attachment-preview">
+            <span v-for="file in messageActionTarget.attachments" :key="file.id">
+              {{ file.name }}
+            </span>
+          </div>
+        </section>
+        <label class="forward-note">
+          <input v-model="messageForwardNote" placeholder="给朋友留言" />
+        </label>
+        <p v-if="messageActionError" class="message-context-error">{{ messageActionError }}</p>
+        <footer class="forward-actions">
+          <AppButton variant="ghost" type="button" :disabled="im.actionLoading" @click="closeMessageForward">取消</AppButton>
+          <AppButton variant="primary" type="button" :disabled="im.actionLoading || !messageForwardSelectedIds.length" @click="submitMessageForward">
+            发送
+          </AppButton>
+        </footer>
+      </main>
+    </section>
+  </AppDialog>
 </div>
 </template>
 
@@ -652,12 +709,208 @@ function messageAvatarUrl(message: ConversationMessage) {
   font-size: 0.75rem;
 }
 
-.message-forward-panel {
+.forward-dialog {
   display: grid;
-  max-height: 10rem;
-  margin-top: var(--space-6, 0.375rem);
-  padding-top: var(--space-6, 0.375rem);
-  border-top: 1px solid var(--border-subtle, #e2e8f0);
+  grid-template-columns: minmax(17rem, 0.95fr) minmax(20rem, 1.25fr);
+  width: min(50rem, calc(100vw - 2rem));
+  height: min(34rem, calc(100vh - 4rem));
+  overflow: hidden;
+  border-radius: var(--radius-8, 0.5rem);
+  background: var(--surface-panel);
+}
+
+.forward-picker {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: var(--space-12, 0.75rem);
+  min-width: 0;
+  padding: var(--space-16, 1rem);
+  border-right: 1px solid var(--border-subtle, #e2e8f0);
+  background: var(--surface-muted, #f8fafc);
+}
+
+.forward-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8, 0.5rem);
+  min-height: 2.25rem;
+  padding: 0 var(--space-10, 0.625rem);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: var(--radius-8, 0.5rem);
+  background: var(--surface-panel);
+  color: var(--text-tertiary);
+}
+
+.forward-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.forward-list-head,
+.forward-preview-head,
+.forward-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12, 0.75rem);
+}
+
+.forward-list-head {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.forward-list-head span {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+.forward-conversation-list {
+  display: grid;
+  align-content: start;
+  gap: var(--space-6, 0.375rem);
+  min-height: 0;
   overflow: auto;
+}
+
+.forward-conversation-row {
+  display: grid;
+  grid-template-columns: 1.25rem auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-10, 0.625rem);
+  width: 100%;
+  min-height: 3.25rem;
+  padding: var(--space-6, 0.375rem);
+  border: 0;
+  border-radius: var(--radius-8, 0.5rem);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.forward-conversation-row:hover,
+.forward-conversation-row.selected {
+  background: var(--surface-accent);
+}
+
+.forward-check {
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-panel);
+}
+
+.forward-check span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--primary-600, #2563eb);
+}
+
+.forward-row-text {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.forward-row-text strong,
+.forward-row-text small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forward-row-text small {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+.forward-preview {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto auto;
+  gap: var(--space-14, 0.875rem);
+  min-width: 0;
+  padding: var(--space-20, 1.25rem);
+}
+
+.forward-preview-head h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.forward-content-preview {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: var(--space-16, 1rem);
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  overflow: auto;
+}
+
+.forward-text-preview {
+  width: min(100%, 22rem);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.forward-attachment-preview {
+  display: grid;
+  gap: var(--space-8, 0.5rem);
+  width: min(100%, 22rem);
+  margin-top: var(--space-12, 0.75rem);
+}
+
+.forward-attachment-preview span {
+  padding: var(--space-8, 0.5rem);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: var(--radius-8, 0.5rem);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.forward-note input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-12, 0.75rem);
+  border: 0;
+  border-radius: var(--radius-8, 0.5rem);
+  background: var(--surface-muted, #f8fafc);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.forward-empty {
+  margin: var(--space-12, 0.75rem) 0 0;
+  color: var(--text-tertiary);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .forward-dialog {
+    grid-template-columns: 1fr;
+    height: min(42rem, calc(100vh - 2rem));
+  }
+
+  .forward-picker {
+    min-height: 16rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  }
 }
 </style>
