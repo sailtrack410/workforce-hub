@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AgentTaskResponse;
-import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.model.AgentModelException;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
@@ -45,7 +45,7 @@ public class AgentTaskExecutionService {
 
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
-    private final AgentModelClient agentModelClient;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
     private final ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider;
     private final Executor agentExecutor;
     private final TransactionTemplate transactionTemplate;
@@ -54,7 +54,7 @@ public class AgentTaskExecutionService {
 
     public AgentTaskExecutionService(AgentRepository agentRepository,
                                      ObjectMapper objectMapper,
-                                     AgentModelClient agentModelClient,
+                                     OpenAiCompatibleAgentModelClient agentModelClient,
                                      ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider,
                                      @Qualifier("agentExecutor") Executor agentExecutor,
                                      PlatformTransactionManager transactionManager,

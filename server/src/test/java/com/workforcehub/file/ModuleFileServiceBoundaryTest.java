@@ -15,11 +15,18 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * module-file 内部服务边界测试。
  */
 class ModuleFileServiceBoundaryTest {
+
+    @Test
+    @DisplayName("文件中心不应保留纯透传FileCenterService")
+    void fileCenterPassThroughServiceShouldBeRemoved() {
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.workforcehub.file.service.FileCenterService"));
+    }
 
     @Test
     @DisplayName("上传确认应从FileCenterService拆到独立服务")

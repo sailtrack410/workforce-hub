@@ -13,7 +13,7 @@ import com.workforcehub.agent.dto.AdminAgentTaskTimeoutRunResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.CancelAgentTaskRequest;
 import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
-import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.dto.AgentAclResponse;
 import com.workforcehub.agent.dto.AgentResponse;
@@ -114,7 +114,7 @@ public class AgentService implements ImAgentTriggerService {
     private final WorkflowParser workflowParser;
     private final WorkflowValidator workflowValidator;
     private final WorkflowExecutor workflowExecutor;
-    private final AgentModelClient agentModelClient;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
 
     public AgentService(AgentRepository agentRepository,
                         AgentTaskTimeoutRepository timeoutRepository,
@@ -124,7 +124,7 @@ public class AgentService implements ImAgentTriggerService {
                         WorkflowParser workflowParser,
                         WorkflowValidator workflowValidator,
                         WorkflowExecutor workflowExecutor,
-                        AgentModelClient agentModelClient) {
+                        OpenAiCompatibleAgentModelClient agentModelClient) {
         this.agentRepository = agentRepository;
         this.timeoutRepository = timeoutRepository;
         this.objectMapper = objectMapper;

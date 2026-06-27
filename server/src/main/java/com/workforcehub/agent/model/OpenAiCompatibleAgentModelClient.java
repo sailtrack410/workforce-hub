@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
  */
 @Service
 @EnableConfigurationProperties(AgentModelProperties.class)
-public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
+public class OpenAiCompatibleAgentModelClient {
 
     private static final String CHAT_COMPLETIONS_SUFFIX = "/chat/completions";
     private static final String VERSIONED_CHAT_COMPLETIONS_SUFFIX = "/v1/chat/completions";
@@ -46,7 +46,6 @@ public class OpenAiCompatibleAgentModelClient implements AgentModelClient {
         this.chatClientFactory = chatClientFactory;
     }
 
-    @Override
     public AgentModelResponse generateReply(AgentModelRequest request) {
         SpringAiOpenAiChatClientFactory.ResolvedAgentModelConfig config = resolveConfig(request.modelConfigJson());
         try {

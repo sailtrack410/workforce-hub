@@ -31,6 +31,7 @@ import com.workforcehub.spi.AttendanceClockCorrectionService;
 import com.workforcehub.spi.AttendanceQueryService;
 import com.workforcehub.spi.AttendanceRecalculationService;
 import com.workforcehub.spi.LeaveQueryService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -82,11 +83,11 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              LeaveQueryService leaveQueryService,
-                             Clock clock,
+                             ObjectProvider<Clock> clockProvider,
                              TransactionTemplate transactionTemplate) {
         this.attendanceRepository = attendanceRepository;
         this.leaveQueryService = leaveQueryService;
-        this.clock = clock;
+        this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -294,6 +295,9 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         String punchType = normalizePunchType(request.getPunchType());
         String sourceType = normalizeEmployeePunchSourceType(request.getSourceType());
         LocalDateTime punchAt = LocalDateTime.now(clock);
+        if (attendanceRepository.existsNormalPunchRecordOnDate(userId, punchAt.toLocalDate(), punchType)) {
+            throw new BizException(409, "当天同类型打卡已存在");
+        }
         Long punchRecordId = IdWorker.getId();
         attendanceRepository.insertPunchRecord(
             punchRecordId,

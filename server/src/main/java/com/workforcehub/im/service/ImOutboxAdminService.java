@@ -71,7 +71,7 @@ public class ImOutboxAdminService {
             "SUCCESS",
             retryAuditDetail(row, updatedRow)
         );
-        return ImOutboxAdminResponseMapper.toEventResponse(updatedRow);
+        return toEventResponse(updatedRow);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -123,6 +123,27 @@ public class ImOutboxAdminService {
         } catch (Exception e) {
             throw new BizException(409, "outbox事件payload不是合法JSON，需人工核查后再重试");
         }
+    }
+
+    static AdminImOutboxEventResponse toEventResponse(AdminImOutboxEventRow row) {
+        AdminImOutboxEventResponse response = new AdminImOutboxEventResponse();
+        response.setEventId(row.eventId());
+        response.setEventType(row.eventType());
+        response.setConversationId(row.conversationId());
+        response.setMessageId(row.messageId());
+        response.setSeqNo(row.seqNo());
+        response.setActorUserId(row.actorUserId());
+        response.setRecipientUserIdsJson(row.recipientUserIdsJson());
+        response.setPayloadJson(row.payloadJson());
+        response.setStatus(row.status());
+        response.setRetryCount(row.retryCount());
+        response.setNextRetryAt(row.nextRetryAt());
+        response.setLastError(row.lastError());
+        response.setClaimedAt(row.claimedAt());
+        response.setSentAt(row.sentAt());
+        response.setCreatedAt(row.createdAt());
+        response.setUpdatedAt(row.updatedAt());
+        return response;
     }
 
     private List<Long> normalizeBatchEventIds(List<Long> eventIds) {

@@ -6,9 +6,9 @@ import type { useImStore } from '@/stores/im';
 import type { useSessionStore } from '@/stores/session';
 import { useAgentDirectory } from './useAgentDirectory';
 import { usePersonalFileTransfer } from './usePersonalFileTransfer';
-import { syncShellSessionProfile } from './useShellSessionProfileSync';
 import { entityIdListFromText } from '@/utils/employee-format';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { createClientId } from '@/utils/request-id';
 import { scrollElementToBottomAfterLayout } from '@/utils/scroll';
 
 type FieldRows = Array<[string, string]>;
@@ -205,7 +205,8 @@ export function useMessagesState({
     try {
       await im.addGroupMembers(conversationId, memberUserIds);
       groupProfileForm.value.memberUserIds = '';
-      syncShellSessionProfile(shell, session);
+      shell.setColleagues(session.colleagues);
+      shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
       showToast('成员已添加');
     } catch (error) {
       groupActionError.value = error instanceof Error ? error.message : '添加失败';
@@ -220,7 +221,8 @@ export function useMessagesState({
     try {
       await im.removeGroupMembers(conversationId, memberUserIds);
       groupProfileForm.value.removeMemberUserIds = '';
-      syncShellSessionProfile(shell, session);
+      shell.setColleagues(session.colleagues);
+      shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
       showToast('成员已移除');
     } catch (error) {
       groupActionError.value = error instanceof Error ? error.message : '移除失败';
@@ -367,7 +369,7 @@ export function useMessagesState({
       return;
     }
     const conversationKey = String(conversationId);
-    const agentLoadingId = `agent-loading-${Date.now()}`;
+    const agentLoadingId = createClientId('agent-loading');
     const isAgentConversation = activeConversation.value.kind === 'agent';
     const loadingMessage = {
       id: agentLoadingId,

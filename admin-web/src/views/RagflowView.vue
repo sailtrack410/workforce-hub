@@ -369,7 +369,7 @@ function addAcl() {
   if (!settingsSpace.value || !subjectId) return;
   aclItems.value = [
     {
-      aclId: `tmp-${Date.now()}`,
+      aclId: createClientId('tmp'),
       spaceId: settingsSpace.value.spaceId,
       subjectType: aclForm.subjectType,
       subjectId,
@@ -406,7 +406,7 @@ async function uploadDocument() {
       mimeType: file.type || 'application/octet-stream',
       fileSize: file.size,
       contentSha256,
-      clientRequestId: `ragflow-${selected.value.spaceId}-${Date.now()}-${file.name}`,
+      clientRequestId: createClientId(`ragflow-${selected.value.spaceId}-${file.name}`),
     });
     let attachmentRefId = ticket.attachmentRefId;
     if (!ticket.deduplicated) {
@@ -500,8 +500,14 @@ function numberOrNull(value: string) {
 }
 
 async function sha256Hex(file: File) {
-  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new Error('当前环境不支持安全文件校验，请使用 HTTPS 或 localhost');
+  const digest = await subtle.digest('SHA-256', await file.arrayBuffer());
   return [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, '0')).join('');
+}
+
+function createClientId(prefix: string) {
+  return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 }
 
 function uploadToTicketTarget(uploadUrl: string, file: File, uploadHeaders: Record<string, string>) {

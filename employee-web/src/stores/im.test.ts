@@ -379,6 +379,34 @@ describe('IM store', () => {
     expect(im.messageSending).toBe(false);
   });
 
+  it('uses different client message ids for rapid sends', async () => {
+    const im = useImStore();
+    const requests: SendImMessageRequest[] = [];
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+    const imApi: EmployeeImApi = {
+      ...createImApi(),
+      sendMessage: (_conversationId, request) => {
+        requests.push(request);
+        return Promise.resolve({
+          ...message,
+          messageId: 7200 + requests.length,
+          seqNo: 3 + requests.length,
+          senderId: 2003,
+          contentText: request.text ?? '',
+        });
+      },
+    };
+
+    try {
+      await im.sendMessage(7001, '第一条', 2003, imApi);
+      await im.sendMessage(7001, '第二条', 2003, imApi);
+    } finally {
+      dateNow.mockRestore();
+    }
+
+    expect(new Set(requests.map((request) => request.clientMessageId)).size).toBe(2);
+  });
+
   it('polls agent conversation replies and appends backend agent response', async () => {
     const im = useImStore();
     const agentReply: ImMessageResponse = {

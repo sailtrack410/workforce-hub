@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.node.DecimalNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
-import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
 import com.workforcehub.agent.repository.AgentRepository;
@@ -39,7 +39,7 @@ public class WorkflowExecutor {
     private final WorkflowValidator workflowValidator;
     private final TemplateResolver templateResolver;
     private final AgentToolExecutionService toolExecutionService;
-    private final AgentModelClient agentModelClient;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
     private final OrgDirectoryService orgDirectoryService;
     private final LeaveService leaveService;
 
@@ -49,7 +49,7 @@ public class WorkflowExecutor {
                             WorkflowValidator workflowValidator,
                             TemplateResolver templateResolver,
                             AgentToolExecutionService toolExecutionService,
-                            AgentModelClient agentModelClient,
+                            OpenAiCompatibleAgentModelClient agentModelClient,
                             OrgDirectoryService orgDirectoryService,
                             LeaveService leaveService) {
         this.agentRepository = agentRepository;

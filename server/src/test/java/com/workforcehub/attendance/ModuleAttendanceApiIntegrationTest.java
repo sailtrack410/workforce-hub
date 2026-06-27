@@ -649,6 +649,30 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工同一天同类型重复打卡应返回冲突")
+    void duplicateSameDayPunchTypeShouldBeRejected() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_DUP_PUNCH_" + suffix, "重复打卡日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_DUP_PUNCH_" + suffix, "重复打卡班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_DUP_PUNCH_" + suffix, "重复打卡考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-18T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-18T09:01:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("当天同类型打卡已存在"));
+
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-18"));
+    }
+
+    @Test
     @DisplayName("员工实时打卡不应允许伪造受控来源")
     void employeePunchShouldRejectControlledManualSourceType() throws Exception {
         Cookie employeeSession = loginEmployee("zhangsan.employee");

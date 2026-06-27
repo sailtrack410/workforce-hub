@@ -14,6 +14,7 @@ import type {
 } from '../api';
 import type { KnowledgeAnswerCard } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { createClientId } from '@/utils/request-id';
 
 export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'reports' | 'settings';
 export type ConversationTone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
@@ -1056,7 +1057,7 @@ export const useShellStore = defineStore('employee-shell', {
     }) {
       const personal = this.files.find((item) => item.id === 'personal');
       if (!personal) return;
-      const id = file.attachmentRefId ? `personal-file-${file.attachmentRefId}` : `personal-file-${Date.now()}-${file.name}`;
+      const id = file.attachmentRefId ? `personal-file-${file.attachmentRefId}` : createClientId(`personal-file-${file.name}`);
       const row: PersonalFileRecord = {
         id,
         name: file.name,
@@ -1110,7 +1111,7 @@ export const useShellStore = defineStore('employee-shell', {
     appendMessage(text: string) {
       const conversation = this.activeConversation;
       conversation.messages.push({
-        id: `${conversation.id}-${Date.now()}`,
+        id: createClientId(conversation.id),
         author: currentUser.name,
         role: '申请人',
         body: text,

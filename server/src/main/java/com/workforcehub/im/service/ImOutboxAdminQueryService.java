@@ -47,13 +47,13 @@ public class ImOutboxAdminQueryService {
                 (safePageNo - 1) * safePageSize,
                 safePageSize
             ).stream()
-            .map(ImOutboxAdminResponseMapper::toEventResponse)
+            .map(ImOutboxAdminService::toEventResponse)
             .toList();
         return PageResult.of(safePageNo, safePageSize, total, rows);
     }
 
     public AdminImOutboxEventResponse getOutboxEvent(Long eventId) {
-        return ImOutboxAdminResponseMapper.toEventResponse(outboxAdminEventRepository.getOutboxEventOrThrow(eventId));
+        return ImOutboxAdminService.toEventResponse(outboxAdminEventRepository.getOutboxEventOrThrow(eventId));
     }
 
     public PageResult<AdminImOutboxAuditResponse> pageOutboxAudits(AdminImOutboxAuditQuery query) {

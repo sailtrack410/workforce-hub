@@ -2,9 +2,9 @@ package com.workforcehub.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.workforcehub.agent.model.AgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -1914,8 +1914,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
 
         @Bean
         @Primary
-        AgentModelClient testAgentModelClient() {
-            return new AgentModelClient() {
+        OpenAiCompatibleAgentModelClient testAgentModelClient() {
+            return new OpenAiCompatibleAgentModelClient(null, null, null) {
                 @Override
                 public AgentModelResponse generateReply(AgentModelRequest request) {
                     if (request.userMessage().contains("FORMAT_ARRAY_TEST")) {

@@ -40,6 +40,7 @@ import type {
   KnowledgeAnswerRelatedRef,
 } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { createClientId } from '@/utils/request-id';
 
 export interface EmployeeImApi {
   conversations(query?: ImConversationListQuery): Promise<ImConversationSummaryResponse[]>;
@@ -298,7 +299,7 @@ export const useImStore = defineStore('employee-im', {
         const message = await imApi.sendMessage(conversationId, {
           messageType: 'TEXT',
           text: normalizedText,
-          clientMessageId: `web-${conversationId}-${Date.now()}`,
+          clientMessageId: createClientId(`web-${conversationId}`),
         });
         const record = mapImMessageToConversationMessage(message, currentUserId);
         this.upsertMessage(key, record);
@@ -328,7 +329,7 @@ export const useImStore = defineStore('employee-im', {
           messageType: text.trim() ? 'TEXT' : 'FILE',
           text: text.trim() || undefined,
           attachmentRefIds: [attachmentRefId],
-          clientMessageId: `web-file-${conversationId}-${attachmentRefId}-${Date.now()}`,
+          clientMessageId: createClientId(`web-file-${conversationId}-${attachmentRefId}`),
         });
         const record = mapImMessageToConversationMessage(message, currentUserId);
         this.upsertMessage(key, record);

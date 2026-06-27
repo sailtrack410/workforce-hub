@@ -3,78 +3,22 @@ package com.workforcehub.file.service;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.AdminFileResponse;
-import com.workforcehub.file.dto.AttachmentRefResponse;
-import com.workforcehub.file.dto.ConfirmUploadRequest;
-import com.workforcehub.file.dto.CreateQuotaPolicyRequest;
-import com.workforcehub.file.dto.CreateDownloadTicketRequest;
-import com.workforcehub.file.dto.CreateUploadTicketRequest;
-import com.workforcehub.file.dto.DownloadFileResult;
-import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.file.dto.EmployeeFileResponse;
-import com.workforcehub.file.dto.FilePurgeResponse;
-import com.workforcehub.file.dto.FileRestoreResponse;
-import com.workforcehub.file.dto.FileTrashRequest;
-import com.workforcehub.file.dto.FileTrashResponse;
-import com.workforcehub.file.dto.QuotaPolicyResponse;
-import com.workforcehub.file.dto.QuotaResponse;
-import com.workforcehub.file.dto.StorageSummaryResponse;
-import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
-import com.workforcehub.file.dto.UploadTicketResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 /**
- * 文件中心第一版服务。
- * 当前先落 LOCAL 主链路，Provider 字段保留 MINIO 扩展位。
+ * 文件列表查询服务。
  */
 @Service
-public class FileCenterService {
+public class FileQueryService {
 
     private final JdbcTemplate jdbcTemplate;
-    private final FileUploadTicketService fileUploadTicketService;
-    private final FileUploadConfirmService fileUploadConfirmService;
-    private final FileDownloadService fileDownloadService;
-    private final FileLifecycleService fileLifecycleService;
-    private final FileQuotaPolicyService fileQuotaPolicyService;
 
-    public FileCenterService(JdbcTemplate jdbcTemplate,
-                             FileUploadTicketService fileUploadTicketService,
-                             FileUploadConfirmService fileUploadConfirmService,
-                             FileDownloadService fileDownloadService,
-                             FileLifecycleService fileLifecycleService,
-                             FileQuotaPolicyService fileQuotaPolicyService) {
+    public FileQueryService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.fileUploadTicketService = fileUploadTicketService;
-        this.fileUploadConfirmService = fileUploadConfirmService;
-        this.fileDownloadService = fileDownloadService;
-        this.fileLifecycleService = fileLifecycleService;
-        this.fileQuotaPolicyService = fileQuotaPolicyService;
-    }
-
-    public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
-        return fileUploadTicketService.createEmployeeUploadTicket(request);
-    }
-
-    public UploadTicketResponse createAdminUploadTicket(CreateUploadTicketRequest request) {
-        return fileUploadTicketService.createAdminUploadTicket(request);
-    }
-
-    public AttachmentRefResponse confirmEmployeeUpload(ConfirmUploadRequest request) {
-        return fileUploadConfirmService.confirmEmployeeUpload(request);
-    }
-
-    public AttachmentRefResponse confirmAdminUpload(ConfirmUploadRequest request) {
-        return fileUploadConfirmService.confirmAdminUpload(request);
-    }
-
-    public DownloadTicketResponse createEmployeeDownloadTicket(Long attachmentRefId, CreateDownloadTicketRequest request) {
-        return fileDownloadService.createEmployeeDownloadTicket(attachmentRefId, request);
-    }
-
-    public DownloadFileResult downloadEmployeeFile(String ticketNo) {
-        return fileDownloadService.downloadEmployeeFile(ticketNo);
     }
 
     public PageResult<EmployeeFileResponse> listEmployeeFiles(long pageNo, long pageSize, boolean recycleBin) {
@@ -160,58 +104,6 @@ public class FileCenterService {
         return PageResult.of(safePageNo, safePageSize, total == null ? 0L : total, rows);
     }
 
-    public DownloadTicketResponse createAdminDownloadTicket(Long attachmentRefId, CreateDownloadTicketRequest request) {
-        return fileDownloadService.createAdminDownloadTicket(attachmentRefId, request);
-    }
-
-    public DownloadFileResult downloadAdminFile(String ticketNo) {
-        return fileDownloadService.downloadAdminFile(ticketNo);
-    }
-
-    public QuotaResponse getEmployeeQuota() {
-        return fileQuotaPolicyService.getEmployeeQuota();
-    }
-
-    public StorageSummaryResponse getStorageSummary() {
-        return fileQuotaPolicyService.getStorageSummary();
-    }
-
-    public List<QuotaPolicyResponse> listQuotaPolicies(String scopeType) {
-        return fileQuotaPolicyService.listQuotaPolicies(scopeType);
-    }
-
-    public QuotaPolicyResponse createQuotaPolicy(CreateQuotaPolicyRequest request) {
-        return fileQuotaPolicyService.createQuotaPolicy(request);
-    }
-
-    public QuotaPolicyResponse updateQuotaPolicy(Long policyId, UpdateQuotaPolicyRequest request) {
-        return fileQuotaPolicyService.updateQuotaPolicy(policyId, request);
-    }
-
-    public FileTrashResponse trashEmployeeFile(Long attachmentRefId, FileTrashRequest request) {
-        return fileLifecycleService.trashEmployeeFile(attachmentRefId, request);
-    }
-
-    public FileRestoreResponse restoreEmployeeFile(Long attachmentRefId, FileTrashRequest request) {
-        return fileLifecycleService.restoreEmployeeFile(attachmentRefId, request);
-    }
-
-    public FilePurgeResponse purgeEmployeeFile(Long attachmentRefId) {
-        return fileLifecycleService.purgeEmployeeFile(attachmentRefId);
-    }
-
-    public FileTrashResponse trashAdminFile(Long attachmentRefId, FileTrashRequest request) {
-        return fileLifecycleService.trashAdminFile(attachmentRefId, request);
-    }
-
-    public FileRestoreResponse restoreAdminFile(Long attachmentRefId, FileTrashRequest request) {
-        return fileLifecycleService.restoreAdminFile(attachmentRefId, request);
-    }
-
-    public FilePurgeResponse purgeAdminFile(Long attachmentRefId) {
-        return fileLifecycleService.purgeAdminFile(attachmentRefId);
-    }
-
     private AdminFileResponse mapAdminFile(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
         AdminFileResponse response = new AdminFileResponse();
         response.setAttachmentRefId(rs.getLong("attachment_ref_id"));
@@ -251,5 +143,4 @@ public class FileCenterService {
         response.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
         return response;
     }
-
 }
