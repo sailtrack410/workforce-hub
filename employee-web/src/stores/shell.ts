@@ -1099,19 +1099,13 @@ export const useShellStore = defineStore('employee-shell', {
     },
     mergeBackendConversations(backendConversations: ConversationRecord[]) {
       const backendIds = new Set(backendConversations.map((item) => item.id));
-      useImStore().conversations = backendConversations;
+      useImStore().replaceConversations(backendConversations);
       if (!backendIds.has(this.active.messages)) {
         this.active.messages = this.conversations[0]?.id ?? '';
       }
     },
     mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
-      const conversation = this.conversations.find((item) => item.id === conversationId);
-      if (!conversation || !backendMessages.length) return;
-      conversation.messages = backendMessages;
-      conversation.panel.attachments = collectConversationAttachments(backendMessages);
-      const latestMessage = backendMessages[backendMessages.length - 1];
-      conversation.subtitle = latestMessage.body;
-      conversation.meta = formatListDate(latestMessage.time) || conversation.meta;
+      useImStore().mergeBackendMessages(conversationId, backendMessages);
     },
     appendMessage(text: string) {
       const conversation = this.activeConversation;
@@ -1128,29 +1122,6 @@ export const useShellStore = defineStore('employee-shell', {
     },
   },
 });
-
-function formatListDate(value?: string) {
-  if (!value) return '';
-  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-  const date = new Date(normalized);
-  if (!Number.isNaN(date.getTime())) {
-    return `${date.getMonth() + 1}月${date.getDate()}日`;
-  }
-  const match = value.match(/^\d{4}-(\d{1,2})-(\d{1,2})/);
-  if (match) return `${Number(match[1])}月${Number(match[2])}日`;
-  return value;
-}
-
-function collectConversationAttachments(messages: ConversationMessage[]) {
-  const byId = new Map<string, ConversationAttachment>();
-  for (const message of messages) {
-    for (const attachment of message.attachments ?? []) {
-      const key = attachment.attachmentRefId == null ? attachment.id : String(attachment.attachmentRefId);
-      byId.set(key, attachment);
-    }
-  }
-  return Array.from(byId.values());
-}
 
 export const shellUser = currentUser;
 

@@ -22,6 +22,7 @@ import type {
   UpdateReadPositionRequest,
 } from '../api';
 import type {
+  ConversationAttachment,
   ConversationMessage,
   ConversationRecord,
   ConversationTone,
@@ -553,6 +554,18 @@ export const useImStore = defineStore('employee-im', {
       const detail = this.detailsByConversation[key];
       if (detail) detail.members = members;
     },
+    replaceConversations(records: ConversationRecord[]) {
+      this.conversations = records;
+    },
+    mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
+      const conversation = this.conversations.find((item) => item.id === conversationId);
+      if (!conversation || !backendMessages.length) return;
+      conversation.messages = backendMessages;
+      conversation.panel.attachments = collectConversationAttachments(backendMessages);
+      const latestMessage = backendMessages[backendMessages.length - 1];
+      conversation.subtitle = latestMessage.body;
+      conversation.meta = formatConversationDate(latestMessage.time) || conversation.meta;
+    },
   },
 });
 
@@ -714,6 +727,17 @@ function formatConversationDate(value?: string | null) {
     return `${Number(match[1])}月${Number(match[2])}日`;
   }
   return value.replace('T', ' ').slice(0, 16);
+}
+
+function collectConversationAttachments(messages: ConversationMessage[]) {
+  const byId = new Map<string, ConversationAttachment>();
+  for (const message of messages) {
+    for (const attachment of message.attachments ?? []) {
+      const key = attachment.attachmentRefId == null ? attachment.id : String(attachment.attachmentRefId);
+      byId.set(key, attachment);
+    }
+  }
+  return Array.from(byId.values());
 }
 
 function formatMessageTime(value?: string | null) {
