@@ -179,6 +179,45 @@ public class OrgManagementService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public boolean deleteDepartment(Long deptId) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        OrgDepartment department = departmentMapper.selectById(deptId);
+        if (department == null) {
+            return false;
+        }
+        if (departmentMapper.selectCount(new LambdaQueryWrapper<OrgDepartment>().eq(OrgDepartment::getParentId, deptId)) > 0) {
+            throw new BizException(400, "部门存在子部门");
+        }
+        if (orgUserMapper.selectCount(new LambdaQueryWrapper<OrgUser>().eq(OrgUser::getPrimaryDeptId, deptId)) > 0) {
+            throw new BizException(400, "部门存在员工");
+        }
+
+        List<OrgDepartmentLeader> leaders = departmentLeaderMapper.selectList(
+            new LambdaQueryWrapper<OrgDepartmentLeader>().eq(OrgDepartmentLeader::getDeptId, deptId)
+        );
+        for (OrgDepartmentLeader leader : leaders) {
+            leader.setStatus("INACTIVE");
+            leader.setUpdatedBy(operatorId);
+            departmentLeaderMapper.updateById(leader);
+        }
+        department.setUpdatedBy(operatorId);
+        departmentMapper.updateById(department);
+        departmentMapper.deleteById(deptId);
+        publishDepartmentStructureChangedEvent(
+            "DELETED",
+            department,
+            department.getParentId(),
+            null,
+            department.getLeaderUserId(),
+            null,
+            department.getStatus(),
+            "DELETED",
+            operatorId
+        );
+        return true;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public Long createPosition(OrgPositionSaveRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
         ensurePositionCodeUnique(request.getPositionCode(), null);

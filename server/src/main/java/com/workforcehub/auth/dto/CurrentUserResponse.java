@@ -3,6 +3,8 @@ package com.workforcehub.auth.dto;
 import com.workforcehub.common.enums.UserType;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class CurrentUserResponse {
 
@@ -11,6 +13,8 @@ public class CurrentUserResponse {
     private String displayName;
     private String loginName;
     private String email;
+    private List<String> roleCodes;
+    private List<String> permissionCodes;
 
     /**
      * 业务用户的部门ID（仅 USER 类型）

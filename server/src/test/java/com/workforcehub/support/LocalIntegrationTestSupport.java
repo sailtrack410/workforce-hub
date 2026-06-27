@@ -174,7 +174,11 @@ public abstract class LocalIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM org_user");
             jdbcTemplate.execute("DELETE FROM org_position");
             jdbcTemplate.execute("DELETE FROM org_department");
+            jdbcTemplate.execute("DELETE FROM admin_user_role");
+            jdbcTemplate.execute("DELETE FROM admin_role_permission");
             jdbcTemplate.execute("DELETE FROM admin_user");
+            jdbcTemplate.execute("DELETE FROM admin_role");
+            jdbcTemplate.execute("DELETE FROM admin_permission");
         } finally {
             jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
         }

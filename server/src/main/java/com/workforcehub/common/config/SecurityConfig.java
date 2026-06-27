@@ -1,6 +1,7 @@
 package com.workforcehub.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.auth.security.AdminPermissionFilter;
 import com.workforcehub.auth.security.AdminUserDetailsService;
 import com.workforcehub.auth.security.EmployeeUserDetailsService;
 import com.workforcehub.auth.security.UserTypePathFilter;
@@ -39,15 +40,18 @@ public class SecurityConfig {
     private final EmployeeUserDetailsService employeeUserDetailsService;
     private final AdminUserDetailsService adminUserDetailsService;
     private final UserTypePathFilter userTypePathFilter;
+    private final AdminPermissionFilter adminPermissionFilter;
 
     public SecurityConfig(ObjectMapper objectMapper,
                           @Qualifier("employeeUserDetailsService") EmployeeUserDetailsService employeeUserDetailsService,
                           @Qualifier("adminUserDetailsService") AdminUserDetailsService adminUserDetailsService,
-                          UserTypePathFilter userTypePathFilter) {
+                          UserTypePathFilter userTypePathFilter,
+                          AdminPermissionFilter adminPermissionFilter) {
         this.objectMapper = objectMapper;
         this.employeeUserDetailsService = employeeUserDetailsService;
         this.adminUserDetailsService = adminUserDetailsService;
         this.userTypePathFilter = userTypePathFilter;
+        this.adminPermissionFilter = adminPermissionFilter;
     }
 
     @Bean
@@ -109,6 +113,7 @@ public class SecurityConfig {
 
             // 路径与身份匹配校验
             .addFilterAfter(userTypePathFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(adminPermissionFilter, UserTypePathFilter.class)
 
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {

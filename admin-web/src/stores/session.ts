@@ -26,6 +26,14 @@ export const useSessionStore = defineStore('admin-session', {
     shortName(state): string {
       return (state.user?.displayName || state.user?.loginName || 'A').slice(0, 1);
     },
+    hasPermission(state): (permissionCode?: string) => boolean {
+      return (permissionCode?: string) => {
+        if (!permissionCode) return true;
+        if (!state.user) return false;
+        if (!state.user.permissionCodes?.length) return true;
+        return state.user.permissionCodes.includes(permissionCode);
+      };
+    },
   },
   actions: {
     async loadCurrentUser(authApi: AdminAuthApi = adminApi.auth) {
@@ -62,6 +70,8 @@ export const useSessionStore = defineStore('admin-session', {
       this.error = '';
       try {
         await authApi.logout();
+      } catch (error) {
+        this.error = resolveSessionError(error);
       } finally {
         this.user = null;
         this.loading = false;

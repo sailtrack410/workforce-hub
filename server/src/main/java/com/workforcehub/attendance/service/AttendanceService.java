@@ -106,6 +106,12 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return toCalendarResponse(attendanceRepository.getCalendarOrThrow(calendarId));
     }
 
+    public List<AttendanceCalendarResponse> listCalendars() {
+        return attendanceRepository.listCalendars().stream()
+            .map(this::toCalendarResponse)
+            .toList();
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public AttendanceShiftResponse createShift(CreateAttendanceShiftRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
@@ -132,6 +138,12 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             defaultTime(request.getOffDutyPunchEnd(), request.getEndTime().plusHours(1))
         );
         return toShiftResponse(attendanceRepository.getShiftOrThrow(shiftId));
+    }
+
+    public List<AttendanceShiftResponse> listShifts() {
+        return attendanceRepository.listShifts().stream()
+            .map(this::toShiftResponse)
+            .toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -163,6 +175,12 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return toGroupResponse(attendanceRepository.getGroupOrThrow(groupId));
     }
 
+    public List<AttendanceGroupResponse> listGroups() {
+        return attendanceRepository.listGroups().stream()
+            .map(this::toGroupResponse)
+            .toList();
+    }
+
     public AttendanceGroupMemberResponse addGroupMember(Long groupId, AddAttendanceGroupMemberRequest request) {
         ReentrantLock lock = acquireMembershipLock(request.getUserId());
         try {
@@ -170,6 +188,13 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         } finally {
             releaseMembershipLock(request.getUserId(), lock);
         }
+    }
+
+    public List<AttendanceGroupMemberResponse> listGroupMembers(Long groupId) {
+        attendanceRepository.getGroupOrThrow(groupId);
+        return attendanceRepository.listGroupMembers(groupId).stream()
+            .map(this::toGroupMemberResponse)
+            .toList();
     }
 
     private AttendanceGroupMemberResponse doAddGroupMember(Long groupId, AddAttendanceGroupMemberRequest request) {
@@ -255,6 +280,13 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return toScheduleResponse(attendanceRepository.getScheduleOrThrow(scheduleId));
     }
 
+    public List<AttendanceScheduleResponse> listSchedules(Long userId, LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        return attendanceRepository.listSchedules(userId, startDate, endDate).stream()
+            .map(this::toScheduleResponse)
+            .toList();
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public PunchRecordResponse punch(CreatePunchRecordRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
@@ -289,6 +321,13 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         validateDateRange(startDate, endDate);
         Long userId = CurrentUserHolder.requireUserId();
         return attendanceRepository.listDailyResults(userId, startDate, endDate).stream()
+            .map(this::toDailyResultResponse)
+            .toList();
+    }
+
+    public List<AttendanceDailyResultResponse> listDailyResultsForAdmin(Long userId, LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        return attendanceRepository.listDailyResultsForAdmin(userId, startDate, endDate).stream()
             .map(this::toDailyResultResponse)
             .toList();
     }

@@ -62,6 +62,58 @@ describe('adminApi', () => {
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ ocrBaseUrl: 'http://ocr.local', ocrApiKey: 'test-key', ocrModel: 'ocr-v1', retrievalTopK: 8 });
   });
 
+  it('maps rbac endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.rbac.roles('admin');
+    await api.rbac.assignRolePermissions('6001', ['7001']);
+    await api.rbac.assignAdminRoles('8001', ['6001']);
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/rbac/roles?keyword=admin');
+    expect(fetcher.mock.calls[1][0]).toBe('/api/admin/rbac/roles/6001/permissions');
+    expect(fetcher.mock.calls[1][1]?.method).toBe('PUT');
+    expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body))).toEqual({ permissionIds: ['7001'] });
+    expect(fetcher.mock.calls[2][0]).toBe('/api/admin/rbac/admin-users/8001/roles');
+    expect(JSON.parse(String(fetcher.mock.calls[2][1]?.body))).toEqual({ roleIds: ['6001'] });
+  });
+
+  it('maps attendance governance endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.attendance.shifts();
+    await api.attendance.groups();
+    await api.attendance.schedules({ userId: 2003, startDate: '2026-05-01', endDate: '2026-05-31' });
+    await api.attendance.dailyResults({ userId: 2003, startDate: '2026-05-01', endDate: '2026-05-31' });
+
+    expect(fetcher.mock.calls.map((call) => call[0])).toEqual([
+      '/api/admin/attendance/shifts',
+      '/api/admin/attendance/groups',
+      '/api/admin/attendance/schedules?userId=2003&startDate=2026-05-01&endDate=2026-05-31',
+      '/api/admin/attendance/daily-results?userId=2003&startDate=2026-05-01&endDate=2026-05-31',
+    ]);
+  });
+
+  it('maps org chart users endpoint', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.org.orgChartUsers();
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/users/org-chart');
+  });
+
+  it('maps department delete endpoint', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse(null));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.org.deleteDepartment('110');
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/departments/110');
+    expect(fetcher.mock.calls[0][1]?.method).toBe('DELETE');
+  });
+
   it('preserves unsafe integer identifiers', () => {
     const payload = parseJsonPreservingUnsafeIntegers('{"taskId":9223372036854775807,"publishedVersionId":2057829816590286850,"count":9223372036854775807}');
 
@@ -69,6 +121,15 @@ describe('adminApi', () => {
       taskId: '9223372036854775807',
       publishedVersionId: '2057829816590286850',
       count: 9223372036854776000,
+    });
+  });
+
+  it('preserves generic node ids in organization trees', () => {
+    const payload = parseJsonPreservingUnsafeIntegers('{"id":2070202517426503681,"deptCode":"UI"}');
+
+    expect(payload).toEqual({
+      id: '2070202517426503681',
+      deptCode: 'UI',
     });
   });
 });

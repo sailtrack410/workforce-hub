@@ -60,6 +60,10 @@ public class AccountService {
         response.setUserType(user.getUserType());
         response.setDisplayName(user.getDisplayName());
         response.setLoginName(user.getUsername());
+        if (user.getUserType() == UserType.ADMIN) {
+            response.setRoleCodes(adminUserMapper.selectRoleCodes(user.getUserId()));
+            response.setPermissionCodes(adminUserMapper.selectPermissionCodes(user.getUserId()));
+        }
         if (user.getUserType() == UserType.USER) {
             AuthUserAccount account = accountMapper.selectOne(
                 new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, user.getUserId())

@@ -20,14 +20,19 @@ public class AdminUserDetails implements WfhUserDetails, Serializable {
     private final String passwordHash;
     private final String displayName;
     private final String status;
+    private final List<String> roleCodes;
+    private final List<String> permissionCodes;
 
     public AdminUserDetails(Long userId, String username, String passwordHash,
-                            String displayName, String status) {
+                            String displayName, String status,
+                            List<String> roleCodes, List<String> permissionCodes) {
         this.userId = userId;
         this.username = username;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
         this.status = status;
+        this.roleCodes = roleCodes == null ? List.of() : List.copyOf(roleCodes);
+        this.permissionCodes = permissionCodes == null ? List.of() : List.copyOf(permissionCodes);
     }
 
     @Override
@@ -37,7 +42,10 @@ public class AdminUserDetails implements WfhUserDetails, Serializable {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        return permissionCodes.stream()
+            .map(SimpleGrantedAuthority::new)
+            .map(GrantedAuthority.class::cast)
+            .toList();
     }
 
     @Override

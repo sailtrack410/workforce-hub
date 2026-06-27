@@ -1,5 +1,7 @@
 package com.workforcehub.org;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
 /**
  * module-org 第一批查询接口自动化冒烟
@@ -43,6 +46,9 @@ class ModuleOrgApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     @DisplayName("健康探针应可匿名访问且返回 UP")
@@ -106,6 +112,57 @@ class ModuleOrgApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.userId").value(2002))
             .andExpect(jsonPath("$.data.realName").value("李四"));
+
+        mockMvc.perform(get("/api/admin/users/2003")
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.employeeNo").value("E1003"))
+            .andExpect(jsonPath("$.data.mobile").value("13800000003"))
+            .andExpect(jsonPath("$.data.email").value("zhangsan@example.com"));
+
+        mockMvc.perform(get("/api/admin/users/org-chart")
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[*].userId", hasItems(2002, 2003, 2004)))
+            .andExpect(jsonPath("$.data[?(@.userId == 2003)].primaryDeptId").value(hasItems(111)));
+    }
+
+    @Test
+    @DisplayName("后台应能新增并删除空部门")
+    void adminShouldCreateAndDeleteEmptyDepartment() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = String.valueOf(System.currentTimeMillis());
+        MvcResult created = mockMvc.perform(post("/api/admin/departments")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "parentId": 111,
+                      "deptCode": "TMP_%s",
+                      "deptName": "临时部门%s",
+                      "deptType": "TEAM",
+                      "status": "ACTIVE"
+                    }
+                    """.formatted(suffix, suffix)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+
+        JsonNode payload = objectMapper.readTree(created.getResponse().getContentAsString());
+        long deptId = payload.get("data").asLong();
+
+        mockMvc.perform(delete("/api/admin/departments/{deptId}", deptId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(delete("/api/admin/departments/{deptId}", deptId)
+                .cookie(adminSession))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message").value("部门不存在"));
     }
 
     @Test

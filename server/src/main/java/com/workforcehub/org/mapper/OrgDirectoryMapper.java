@@ -21,6 +21,8 @@ public interface OrgDirectoryMapper {
     Page<OrgUserSummaryResponse> selectUserPage(Page<OrgUserSummaryResponse> page,
                                                 @Param("query") OrgUserListQuery query);
 
+    List<OrgUserSummaryResponse> selectUsersForOrgChart();
+
     OrgUserSummaryResponse selectUserSummaryById(@Param("userId") Long userId);
 
     OrgUserDetailResponse selectUserDetailById(@Param("userId") Long userId);

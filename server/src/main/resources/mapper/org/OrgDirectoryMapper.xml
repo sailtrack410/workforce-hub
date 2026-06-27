@@ -92,6 +92,38 @@
         ORDER BY u.updated_at DESC, u.id DESC
     </select>
 
+    <select id="selectUsersForOrgChart" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            u.avatar_attachment_ref_id AS avatarAttachmentRefId,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            COALESCE(pref.signature, '') AS signature,
+            COALESCE(pref.presence_status, 'ONLINE') AS presenceStatus
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        LEFT JOIN emp_user_preference pref
+            ON pref.user_id = u.id
+        WHERE u.is_deleted = 0
+        ORDER BY d.dept_level ASC, d.dept_name ASC, u.real_name ASC, u.id ASC
+    </select>
+
     <select id="selectUserSummaryById" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
         SELECT
             u.id AS userId,
@@ -132,6 +164,7 @@
             u.real_name AS realName,
             u.gender AS gender,
             u.mobile AS mobile,
+            a.email AS email,
             u.avatar_attachment_ref_id AS avatarAttachmentRefId,
             u.primary_dept_id AS primaryDeptId,
             d.dept_name AS primaryDeptName,
@@ -156,6 +189,9 @@
         LEFT JOIN org_user m
             ON m.id = u.manager_user_id
            AND m.is_deleted = 0
+        LEFT JOIN auth_user_account a
+            ON a.user_id = u.id
+           AND a.is_deleted = 0
         WHERE u.id = #{userId}
           AND u.is_deleted = 0
         LIMIT 1

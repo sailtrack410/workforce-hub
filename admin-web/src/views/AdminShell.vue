@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   BarChart3,
   Bot,
+  CalendarCheck,
   FileArchive,
   LibraryBig,
   GitPullRequestArrow,
@@ -12,6 +13,7 @@ import {
   MapPin,
   PlaneTakeoff,
   Settings,
+  ShieldCheck,
   Tag,
   TreePine,
   Users,
@@ -25,19 +27,22 @@ const session = useSessionStore();
 
 const navItems = [
   { path: '/dashboard', label: '概览', icon: BarChart3 },
-  { path: '/agent-tasks', label: 'Agent 任务', icon: Bot },
-  { path: '/agent-config', label: 'Agent 配置', icon: LayoutGrid },
-  { path: '/workflow', label: '审批治理', icon: GitPullRequestArrow },
-  { path: '/leave', label: '假期余额', icon: PlaneTakeoff },
-  { path: '/leave-types', label: '假种管理', icon: Tag },
-  { path: '/departments', label: '部门管理', icon: TreePine },
-  { path: '/positions', label: '岗位管理', icon: MapPin },
-  { path: '/users', label: '人员管理', icon: Users },
-  { path: '/files', label: '文件清理', icon: FileArchive },
-  { path: '/ragflow', label: 'RAGFlow', icon: LibraryBig },
+  { path: '/agent-tasks', label: 'Agent 任务', icon: Bot, permission: 'ADMIN_AGENT_TASK_MANAGE' },
+  { path: '/agent-config', label: 'Agent 配置', icon: LayoutGrid, permission: 'ADMIN_AGENT_MANAGE' },
+  { path: '/workflow', label: '审批治理', icon: GitPullRequestArrow, permission: 'ADMIN_WORKFLOW_MANAGE' },
+  { path: '/leave', label: '假期余额', icon: PlaneTakeoff, permission: 'ADMIN_LEAVE_MANAGE' },
+  { path: '/leave-types', label: '假种管理', icon: Tag, permission: 'ADMIN_LEAVE_MANAGE' },
+  { path: '/roles', label: '角色权限', icon: ShieldCheck, permission: 'ADMIN_RBAC_MANAGE' },
+  { path: '/attendance', label: '考勤管理', icon: CalendarCheck, permission: 'ADMIN_ATTENDANCE_MANAGE' },
+  { path: '/departments', label: '部门管理', icon: TreePine, permission: 'ADMIN_ORG_MANAGE' },
+  { path: '/positions', label: '岗位管理', icon: MapPin, permission: 'ADMIN_ORG_MANAGE' },
+  { path: '/users', label: '人员管理', icon: Users, permission: 'ADMIN_ORG_MANAGE' },
+  { path: '/files', label: '文件清理', icon: FileArchive, permission: 'ADMIN_FILE_MANAGE' },
+  { path: '/ragflow', label: 'RAGFlow', icon: LibraryBig, permission: 'ADMIN_RAGFLOW_MANAGE' },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
+const visibleNavItems = computed(() => navItems.filter((item) => session.hasPermission(item.permission)));
 const activeTitle = computed(() => navItems.find((item) => route.path.startsWith(item.path))?.label ?? '后台运营');
 
 async function logout() {
@@ -59,7 +64,7 @@ async function logout() {
 
       <nav class="admin-nav" aria-label="后台运营导航">
         <RouterLink
-          v-for="item in navItems"
+          v-for="item in visibleNavItems"
           :key="item.path"
           :to="item.path"
           class="admin-nav-item"

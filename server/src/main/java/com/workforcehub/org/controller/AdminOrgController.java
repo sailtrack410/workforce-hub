@@ -16,6 +16,8 @@ import com.workforcehub.org.dto.OrgUserUpdateRequest;
 import com.workforcehub.org.service.OrgDirectoryService;
 import com.workforcehub.org.service.OrgManagementService;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -59,6 +61,14 @@ public class AdminOrgController {
         return R.ok();
     }
 
+    @DeleteMapping("/departments/{deptId}")
+    public ResponseEntity<R<Void>> deleteDepartment(@PathVariable Long deptId) {
+        if (!orgManagementService.deleteDepartment(deptId)) {
+            return ResponseEntity.status(404).body(R.fail(404, "部门不存在"));
+        }
+        return ResponseEntity.ok(R.ok());
+    }
+
     @GetMapping("/positions")
     public R<List<OrgPositionResponse>> positions() {
         return R.ok(orgDirectoryService.listPositions());
@@ -79,6 +89,11 @@ public class AdminOrgController {
     @GetMapping("/users")
     public R<PageResult<OrgUserSummaryResponse>> users(@Valid OrgUserListQuery query) {
         return R.ok(orgDirectoryService.pageUsers(query));
+    }
+
+    @GetMapping("/users/org-chart")
+    public R<List<OrgUserSummaryResponse>> orgChartUsers() {
+        return R.ok(orgDirectoryService.listUsersForOrgChart());
     }
 
     @PostMapping("/users")

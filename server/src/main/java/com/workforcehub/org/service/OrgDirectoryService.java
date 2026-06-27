@@ -100,6 +100,10 @@ public class OrgDirectoryService {
         return PageResult.of(result.getCurrent(), result.getSize(), result.getTotal(), result.getRecords());
     }
 
+    public List<OrgUserSummaryResponse> listUsersForOrgChart() {
+        return orgDirectoryMapper.selectUsersForOrgChart();
+    }
+
     public OrgUserSummaryResponse getUserSummary(Long userId) {
         OrgUserSummaryResponse user = orgDirectoryMapper.selectUserSummaryById(userId);
         if (user == null) {

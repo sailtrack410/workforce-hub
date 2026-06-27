@@ -123,6 +123,66 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("后台应能查询考勤配置、排班和日结果")
+    void adminShouldListAttendanceGovernanceData() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+
+        long calendarId = createCalendar(adminSession, "CAL_LIST_" + suffix, "查询日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_LIST_" + suffix, "查询班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_LIST_" + suffix, "查询考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        MvcResult scheduleResult = createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-17", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        punch(employeeSession, "2026-05-17T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-17T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(get("/api/admin/attendance/calendars").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.calendarId==%d)]".formatted(calendarId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/shifts").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.shiftId==%d)]".formatted(shiftId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/groups").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.groupId==%d)]".formatted(groupId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/groups/{groupId}/members", groupId).cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].userId").value(EMPLOYEE_USER_ID));
+        mockMvc.perform(get("/api/admin/attendance/schedules")
+                .cookie(adminSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("startDate", "2026-05-17")
+                .param("endDate", "2026-05-17"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].scheduleId").value(scheduleId));
+        mockMvc.perform(get("/api/admin/attendance/daily-results")
+                .cookie(adminSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("startDate", "2026-05-17")
+                .param("endDate", "2026-05-17"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"));
+    }
+
+    @Test
     @DisplayName("同一员工考勤组生效区间重叠时应拒绝写入")
     void overlappingGroupMembershipShouldBeRejected() throws Exception {
         Cookie adminSession = loginAdmin();
