@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.org.mapper.OrgDepartmentMapper">
+
+    <resultMap id="BaseResultMap" type="com.workforcehub.org.domain.OrgDepartment">
+        <id column="id" property="id"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="tree_path" property="treePath"/>
+        <result column="dept_code" property="deptCode"/>
+        <result column="dept_name" property="deptName"/>
+        <result column="dept_type" property="deptType"/>
+        <result column="dept_level" property="deptLevel"/>
+        <result column="leader_user_id" property="leaderUserId"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="is_deleted" property="isDeleted"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM org_department
+        WHERE id = #{id}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO org_department
+            (id, parent_id, tree_path, dept_code, dept_name, dept_type, dept_level,
+             leader_user_id, status, created_by, updated_by)
+        VALUES
+            (#{id}, #{parentId}, #{treePath}, #{deptCode}, #{deptName}, #{deptType}, #{deptLevel},
+             #{leaderUserId}, #{status}, #{createdBy}, #{updatedBy})
+    </insert>
+
+    <update id="updateById">
+        UPDATE org_department
+        SET parent_id = #{parentId},
+            tree_path = #{treePath},
+            dept_code = #{deptCode},
+            dept_name = #{deptName},
+            dept_type = #{deptType},
+            dept_level = #{deptLevel},
+            leader_user_id = #{leaderUserId},
+            status = #{status},
+            updated_by = #{updatedBy},
+            updated_at = NOW(),
+            is_deleted = #{isDeleted}
+        WHERE id = #{id}
+          AND is_deleted = 0
+    </update>
+
+    <update id="deleteById">
+        UPDATE org_department
+        SET is_deleted = 1,
+            updated_at = NOW()
+        WHERE id = #{id}
+          AND is_deleted = 0
+    </update>
+
+    <select id="countByParentId" resultType="long">
+        SELECT COUNT(*) FROM org_department
+        WHERE parent_id = #{parentId}
+          AND is_deleted = 0
+    </select>
+
+    <select id="countByDeptCode" resultType="long">
+        SELECT COUNT(*) FROM org_department
+        WHERE dept_code = #{deptCode}
+          AND (#{exceptId} IS NULL OR id &lt;&gt; #{exceptId})
+          AND is_deleted = 0
+    </select>
+
+    <select id="listByTreePathPrefixExcludingId" resultMap="BaseResultMap">
+        SELECT * FROM org_department
+        WHERE tree_path LIKE CONCAT(#{treePath}, '%')
+          AND id &lt;&gt; #{exceptId}
+          AND is_deleted = 0
+        ORDER BY dept_level ASC, id ASC
+    </select>
+
+</mapper>

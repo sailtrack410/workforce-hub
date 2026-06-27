@@ -1,6 +1,6 @@
 package com.workforcehub.workflow.repository;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.file.repository.DownloadAttachmentRow;
 import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
@@ -141,7 +141,7 @@ public class WorkflowRepository {
             VALUES
                 (?, ?, ?, ?, ?)
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             requestId,
             attachmentRefId,
             sortOrder,
@@ -152,7 +152,7 @@ public class WorkflowRepository {
     public Long createWorkflowAttachmentRef(Long requestId,
                                             WorkflowAttachmentRow sourceAttachment,
                                             Long uploaderId) {
-        Long workflowAttachmentRefId = IdWorker.getId();
+        Long workflowAttachmentRefId = IdGenerator.nextId();
         jdbcTemplate.update("""
             INSERT INTO sys_attachment_ref
                 (id, owner_type, owner_id, file_object_id, original_file_name,
@@ -243,7 +243,7 @@ public class WorkflowRepository {
             VALUES
                 (?, 'USER', ?, 'WORKFLOW_TASK', ?, ?, ?, ?, 'PENDING', 'NORMAL')
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             ownerUserId,
             requestId,
             title,
@@ -363,7 +363,7 @@ public class WorkflowRepository {
                 (?, ?, ?, 'manager_approval', (SELECT step_name FROM wf_step_config WHERE step_key = 'manager_approval'), 'USER',
                  ?, ?, ?, ?, ?)
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             requestId,
             taskId,
             actorId,
@@ -387,7 +387,7 @@ public class WorkflowRepository {
                 (?, ?, NULL, 'agent_pre_review', (SELECT step_name FROM wf_step_config WHERE step_key = 'agent_pre_review'), 'AGENT',
                  ?, 'AGENT_PRE_REVIEW', NULL, CAST(? AS JSON), ?, ?)
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             requestId,
             agentTaskId,
             decisionJson,
@@ -789,7 +789,7 @@ public class WorkflowRepository {
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             operatorType,
             operatorId,
             actionType,

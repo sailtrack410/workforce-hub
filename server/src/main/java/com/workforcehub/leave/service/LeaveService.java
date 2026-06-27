@@ -1,6 +1,6 @@
 package com.workforcehub.leave.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.leave.dto.AdjustLeaveAccountRequest;
@@ -21,6 +21,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import static com.workforcehub.common.util.TextValues.trimToNull;
 
 /**
  * module-leave 第一版假期账户服务。
@@ -56,7 +58,7 @@ public class LeaveService {
             throw new BizException(409, "假种编码已存在");
         }
 
-        Long leaveTypeId = IdWorker.getId();
+        Long leaveTypeId = IdGenerator.nextId();
         leaveRepository.insertLeaveType(leaveTypeId, leaveCode, leaveName, balanceMode, status, operatorId);
         return toLeaveTypeResponse(leaveRepository.getLeaveTypeOrThrow(leaveTypeId));
     }
@@ -81,7 +83,7 @@ public class LeaveService {
 
         LeaveAccountRow account = leaveRepository.getAccountForUpdate(request.getUserId(), leaveType.id());
         if (account == null) {
-            Long accountId = IdWorker.getId();
+            Long accountId = IdGenerator.nextId();
             leaveRepository.insertAccount(accountId, request.getUserId(), leaveType.id(), operatorId);
             account = leaveRepository.getAccountForUpdate(request.getUserId(), leaveType.id());
         }
@@ -92,7 +94,7 @@ public class LeaveService {
 
         leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_ADJUST,
             request.getChangeMinutes(),
@@ -174,7 +176,7 @@ public class LeaveService {
         int frozenAfter = account.frozenMinutes() + durationMinutes;
         leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_FREEZE,
             -durationMinutes,
@@ -234,7 +236,7 @@ public class LeaveService {
             throw new BizException(400, "冻结假期余额不足");
         }
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_DEDUCT,
             -durationMinutes,
@@ -286,7 +288,7 @@ public class LeaveService {
         int frozenAfter = account.frozenMinutes() - durationMinutes;
         leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_UNFREEZE,
             durationMinutes,
@@ -449,7 +451,4 @@ public class LeaveService {
         return SOURCE_TYPE_WORKFLOW_REQUEST + ":" + requestId + ":UNFREEZE:" + status;
     }
 
-    private String trimToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
 }

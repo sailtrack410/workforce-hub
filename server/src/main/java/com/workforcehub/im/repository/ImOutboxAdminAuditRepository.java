@@ -1,6 +1,6 @@
 package com.workforcehub.im.repository;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.im.support.ImOutboxAdminAuditActions;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -72,7 +72,7 @@ public class ImOutboxAdminAuditRepository {
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             operatorType,
             operatorId,
             actionType,

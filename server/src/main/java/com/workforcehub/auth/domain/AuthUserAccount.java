@@ -1,10 +1,5 @@
 package com.workforcehub.auth.domain;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -15,10 +10,8 @@ import java.time.LocalDateTime;
  * 员工与领导共用此账号体系
  */
 @Data
-@TableName("auth_user_account")
 public class AuthUserAccount {
 
-    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
@@ -45,7 +38,5 @@ public class AuthUserAccount {
     private Long createdBy;
     private Long updatedBy;
 
-    @TableLogic
-    @TableField("is_deleted")
     private Integer isDeleted;
 }

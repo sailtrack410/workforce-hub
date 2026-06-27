@@ -1,6 +1,6 @@
 package com.workforcehub.agent.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AgentTaskResponse;
@@ -32,6 +32,10 @@ import org.springframework.util.StringUtils;
 
 import java.util.Map;
 import java.util.concurrent.Executor;
+
+import static com.workforcehub.common.util.JsonValues.normalize;
+import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.safeSummary;
 
 /**
  * Agent 任务执行服务。
@@ -80,8 +84,8 @@ public class AgentTaskExecutionService {
         if (!agentRepository.canUseAgent(agentId, senderId)) {
             throw new BizException(403, "无权使用该Agent");
         }
-        String normalizedMessageContent = normalizeJson(command.messageContentJson(), "会话Agent输入内容不是合法JSON");
-        Long taskId = IdWorker.getId();
+        String normalizedMessageContent = normalize(objectMapper, command.messageContentJson(), "会话Agent输入内容不是合法JSON");
+        Long taskId = IdGenerator.nextId();
         agentRepository.insertTask(
             taskId,
             agent.id(),
@@ -165,7 +169,7 @@ public class AgentTaskExecutionService {
                 taskId,
                 agent,
                 version,
-                normalizeJson(command.messageContentJson(), "会话Agent输入内容不是合法JSON")
+                normalize(objectMapper, command.messageContentJson(), "会话Agent输入内容不是合法JSON")
             );
         });
     }
@@ -240,9 +244,9 @@ public class AgentTaskExecutionService {
         if (cardNode instanceof com.fasterxml.jackson.databind.node.ObjectNode objectNode) {
             objectNode.put("agentTaskId", taskId);
             objectNode.put("agentCode", agentCode);
-            return new AgentConversationReplyContent("CARD", writeJson(objectNode));
+            return new AgentConversationReplyContent("CARD", write(objectMapper, objectNode));
         }
-        return new AgentConversationReplyContent("TEXT", writeJson(Map.of(
+        return new AgentConversationReplyContent("TEXT", write(objectMapper, Map.of(
             "text", safeText,
             "agentTaskId", taskId,
             "agentCode", agentCode
@@ -314,7 +318,7 @@ public class AgentTaskExecutionService {
                        String decisionSummary,
                        boolean riskFlag) {
         agentRepository.insertAuditLog(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             taskId,
             actionType,
             targetType,
@@ -322,33 +326,6 @@ public class AgentTaskExecutionService {
             safeSummary(decisionSummary),
             riskFlag
         );
-    }
-
-    private String normalizeJson(String value, String errorMessage) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(objectMapper.readTree(value));
-        } catch (Exception e) {
-            throw new BizException(400, errorMessage);
-        }
-    }
-
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
-    }
-
-    private String safeSummary(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;
     }
 
     private AgentTaskResponse toTaskResponse(AgentTaskRow row) {

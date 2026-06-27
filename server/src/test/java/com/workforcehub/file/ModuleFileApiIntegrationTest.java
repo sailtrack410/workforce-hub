@@ -90,8 +90,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "clientRequestId": "wf-owner-should-reject"
                     }
                     """.formatted(content.length, sha256(content))))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message", containsString("不支持该文件归属")));
     }
 
@@ -384,7 +384,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
                     List<Integer> resultCodes = List.of(first.get(), second.get());
                     long successCount = resultCodes.stream().filter(code -> code == 0).count();
-                    long conflictCount = resultCodes.stream().filter(code -> code == 409).count();
+                    long conflictCount = resultCodes.stream().filter(code -> code == 100409).count();
                     assertEquals(1L, successCount);
                     assertEquals(1L, conflictCount);
                 } finally {
@@ -423,8 +423,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(get("/api/employee/files/download/{ticketNo}", ticketNo)
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(410))
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.code").value(100410))
             .andExpect(jsonPath("$.message", containsString("下载链接已过期")));
 
         assertEquals("EXPIRED", downloadTicketStatus(ticketNo));
@@ -577,8 +577,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "申请人不能删除审批归档附件"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message", containsString("个人文件接口仅允许操作个人文件")));
 
         jdbcTemplate.update("""
@@ -595,14 +595,14 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "申请人不能恢复审批归档附件"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message", containsString("个人文件接口仅允许操作个人文件")));
 
         mockMvc.perform(delete("/api/employee/files/{attachmentRefId}", workflowAttachmentRefId)
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message", containsString("个人文件接口仅允许操作个人文件")));
 
         Integer activeWorkflowRefCount = jdbcTemplate.queryForObject("""
@@ -649,8 +649,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "恢复时企业空间已不足"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(507))
+            .andExpect(status().is(507))
+            .andExpect(jsonPath("$.code").value(100507))
             .andExpect(jsonPath("$.message", containsString("企业文件总空间不足")));
     }
 
@@ -681,8 +681,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(delete("/api/employee/files/{attachmentRefId}", firstAttachmentRefId)
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(100404))
             .andExpect(jsonPath("$.message", containsString("附件引用不存在")));
 
         assertEquals(remainingBytes, usedBytes("USER", EMPLOYEE_USER_ID));
@@ -723,7 +723,7 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
                     List<Integer> resultCodes = List.of(first.get(), second.get());
                     long successCount = resultCodes.stream().filter(code -> code == 0).count();
-                    long notFoundCount = resultCodes.stream().filter(code -> code == 404).count();
+                    long notFoundCount = resultCodes.stream().filter(code -> code == 100404).count();
                     assertEquals(1L, successCount);
                     assertEquals(1L, notFoundCount);
                 } finally {
@@ -800,8 +800,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         byte[] content = "too-large".getBytes(StandardCharsets.UTF_8);
 
         createUploadTicket(employeeSession, "空间不足.txt", content.length, sha256(content))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(507))
+            .andExpect(status().is(507))
+            .andExpect(jsonPath("$.code").value(100507))
             .andExpect(jsonPath("$.message", containsString("个人云空间不足")));
     }
 
@@ -813,8 +813,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         byte[] content = "unsafe-executable-content".getBytes(StandardCharsets.UTF_8);
 
         createUploadTicket(employeeSession, "木马.exe", "application/x-msdownload", content.length, sha256(content))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(415))
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(jsonPath("$.code").value(100415))
             .andExpect(jsonPath("$.message", containsString("当前场景不支持该文件类型")));
     }
 
@@ -827,8 +827,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         byte[] content = "oversized-content-fingerprint".getBytes(StandardCharsets.UTF_8);
 
         createUploadTicket(employeeSession, "超大归档.zip", "application/zip", fileSize, sha256(content))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(413))
+            .andExpect(status().is(413))
+            .andExpect(jsonPath("$.code").value(100413))
             .andExpect(jsonPath("$.message", containsString("文件超过当前场景大小限制")));
     }
 
@@ -931,8 +931,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "displayName": "归属校验.txt"
                     }
                     """.formatted(uploadTicketId, objectKey, sha256, content.length)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(422))
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.code").value(100422))
             .andExpect(jsonPath("$.message", containsString("业务归属不匹配")));
     }
 
@@ -1046,8 +1046,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "status": "ENABLED"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message", containsString("预警阈值必须小于阻断阈值")));
 
         mockMvc.perform(post("/api/admin/files/quota-policies")
@@ -1066,8 +1066,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "status": "ENABLED"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message", containsString("配额不能低于当前已用量")));
     }
 
@@ -1111,8 +1111,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "status": "ENABLED"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message", containsString("同一作用域已存在配额策略")));
     }
 
@@ -1195,8 +1195,8 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
                       "status": "ENABLED"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message", containsString("配额策略编码已存在")));
     }
 

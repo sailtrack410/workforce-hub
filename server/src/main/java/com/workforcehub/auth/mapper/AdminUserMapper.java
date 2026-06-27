@@ -1,6 +1,5 @@
 package com.workforcehub.auth.mapper;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.workforcehub.auth.domain.AdminUser;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -8,7 +7,11 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 @Mapper
-public interface AdminUserMapper extends BaseMapper<AdminUser> {
+public interface AdminUserMapper {
+
+    AdminUser selectById(@Param("id") Long id);
+
+    int updateById(AdminUser adminUser);
 
     /**
      * 按用户名查询管理员

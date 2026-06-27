@@ -1,6 +1,6 @@
 package com.workforcehub.im.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.service.AgentService;
@@ -121,7 +121,7 @@ public class ImAgentConversationService {
             return;
         }
         Long seqNo = lastSeq + 1;
-        Long messageId = IdWorker.getId();
+        Long messageId = IdGenerator.nextId();
         LocalDateTime sentAt = LocalDateTime.now();
         try {
             imMessageRepository.insertMessage(
@@ -219,7 +219,7 @@ public class ImAgentConversationService {
     private Long createAgentConversation(Long userId,
                                          ImAgentDescriptor agent,
                                          String conversationKey) {
-        Long conversationId = IdWorker.getId();
+        Long conversationId = IdGenerator.nextId();
         boolean inserted = imRepository.tryInsertAgentConversation(
             conversationId,
             conversationKey,
@@ -232,8 +232,8 @@ public class ImAgentConversationService {
                 .orElseThrow(() -> new BizException(409, "Agent会话创建冲突"));
         }
         try {
-            imRepository.insertUserMember(IdWorker.getId(), conversationId, userId, "MEMBER", "AGENT_CHAT");
-            imRepository.insertAgentMember(IdWorker.getId(), conversationId, agent.agentId(), "AGENT_CHAT");
+            imRepository.insertUserMember(IdGenerator.nextId(), conversationId, userId, "MEMBER", "AGENT_CHAT");
+            imRepository.insertAgentMember(IdGenerator.nextId(), conversationId, agent.agentId(), "AGENT_CHAT");
         } catch (DuplicateKeyException e) {
             return imRepository.findActiveConversationIdByKey(conversationKey)
                 .orElseThrow(() -> new BizException(409, "Agent会话成员写入冲突"));
@@ -398,7 +398,7 @@ public class ImAgentConversationService {
                     return;
                 }
                 Long seqNo = lastSeq + 1;
-                Long messageId = IdWorker.getId();
+                Long messageId = IdGenerator.nextId();
                 LocalDateTime sentAt = LocalDateTime.now();
                 String contentJson = buildSystemContentJson("Agent 暂时无法回复，请稍后再试");
                 try {

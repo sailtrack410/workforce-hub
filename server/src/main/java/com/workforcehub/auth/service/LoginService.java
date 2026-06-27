@@ -159,10 +159,7 @@ public class LoginService {
 
         // 3. 员工端：邮箱二次验证分支（受 workforce.auth.email-verify.enabled 开关控制）
         if (emailVerifyEnabled && userType == UserType.USER) {
-            AuthUserAccount account = accountMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AuthUserAccount>()
-                    .eq(AuthUserAccount::getUserId, user.getUserId())
-            );
+            AuthUserAccount account = accountMapper.selectByUserId(user.getUserId());
             String boundEmail = account != null ? account.getEmail() : null;
             boolean hasEmail = boundEmail != null && !boundEmail.isBlank();
             if (hasEmail) {
@@ -295,10 +292,7 @@ public class LoginService {
     private void updateLastLogin(UserType userType, Long userId) {
         try {
             if (userType == UserType.USER) {
-                AuthUserAccount account = accountMapper.selectOne(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AuthUserAccount>()
-                        .eq(AuthUserAccount::getUserId, userId)
-                );
+                AuthUserAccount account = accountMapper.selectByUserId(userId);
                 if (account != null) {
                     account.setLastLoginAt(LocalDateTime.now());
                     accountMapper.updateById(account);

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
@@ -63,6 +63,8 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+
+import static com.workforcehub.common.util.TextValues.blankToNull;
 
 /**
  * module-workflow 第一版审批服务。
@@ -131,8 +133,8 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             workflowRepository.getPublishedTemplateVersion(LEAVE_PROCESS_CODE);
         String title = applicant.getRealName() + "的请假申请";
         String requestNo = buildRequestNo();
-        Long requestId = IdWorker.getId();
-        Long leaveDetailId = IdWorker.getId();
+        Long requestId = IdGenerator.nextId();
+        Long leaveDetailId = IdGenerator.nextId();
         workflowRepository.insertWorkflowRequest(
             requestId,
             requestNo,
@@ -196,8 +198,8 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             workflowRepository.getPublishedTemplateVersion(CLOCK_CORRECTION_PROCESS_CODE);
         String title = applicant.getRealName() + "的补卡申请";
         String requestNo = buildRequestNo(CLOCK_CORRECTION_BIZ_TYPE);
-        Long requestId = IdWorker.getId();
-        Long detailId = IdWorker.getId();
+        Long requestId = IdGenerator.nextId();
+        Long detailId = IdGenerator.nextId();
         workflowRepository.insertWorkflowRequest(
             requestId,
             requestNo,
@@ -452,7 +454,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
         WorkflowAttachmentRow attachment = workflowRepository.getWorkflowAttachmentOrThrow(requestId, attachmentRefId);
         ensureDownloadableWorkflowAttachment(attachment);
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         String ticketNo = "WFDL" + ticketId;
         LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
         String downloadUrl = "/api/employee/workflow/attachments/download/" + ticketNo;
@@ -834,7 +836,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
     private String buildRequestNo(String bizType) {
         return "WF-" + bizType + "-" + java.time.LocalDateTime.now().format(REQUEST_NO_TIME_FORMATTER)
-            + "-" + IdWorker.getIdStr();
+            + "-" + IdGenerator.nextIdString();
     }
 
     private String requestSummary(WorkflowLeaveDetailRow leaveDetail,
@@ -854,10 +856,6 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             throw new BizException(400, "补卡类型仅支持 ON_DUTY/OFF_DUTY");
         }
         return normalized;
-    }
-
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
     }
 
     private String compactJson(String json) {

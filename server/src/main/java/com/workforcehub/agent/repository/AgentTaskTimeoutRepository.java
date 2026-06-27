@@ -1,6 +1,6 @@
 package com.workforcehub.agent.repository;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -76,7 +76,7 @@ public class AgentTaskTimeoutRepository {
             VALUES
                 (?, ?, ?, 'RUNNING', ?, ?, ?)
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             jobRunId,
             triggerType,
             batchSize,

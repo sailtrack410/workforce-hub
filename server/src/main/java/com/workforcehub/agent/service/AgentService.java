@@ -1,6 +1,6 @@
 package com.workforcehub.agent.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -80,6 +80,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+
+import static com.workforcehub.common.util.JsonValues.normalize;
+import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.safeSummary;
+import static com.workforcehub.common.util.TextValues.trimToNull;
 
 /**
  * module-agent 第一批治理、授权、任务和工具调用服务。
@@ -244,7 +249,7 @@ public class AgentService {
         if (agentRepository.existsAgentCode(agentCode)) {
             throw new BizException(409, "Agent编码已存在");
         }
-        Long agentId = IdWorker.getId();
+        Long agentId = IdGenerator.nextId();
         agentRepository.insertAgent(
             agentId,
             agentCode,
@@ -268,15 +273,15 @@ public class AgentService {
         if (versionLabel != null && agentRepository.existsAgentVersionLabel(agentId, versionLabel)) {
             throw new BizException(409, "Agent显示版本号已存在");
         }
-        Long versionId = IdWorker.getId();
+        Long versionId = IdGenerator.nextId();
         agentRepository.insertAgentVersion(
             versionId,
             agentId,
             versionNo,
             versionLabel,
-            normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON"),
+            normalize(objectMapper, request.getModelConfigJson(), "模型配置不是合法JSON"),
             trimToNull(request.getSystemPrompt()),
-            normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON"),
+            normalize(objectMapper, request.getWorkflowConfigJson(), "工作流配置不是合法JSON"),
             operatorId
         );
         return toVersionResponse(agentRepository.getVersionOrThrow(versionId));
@@ -291,9 +296,9 @@ public class AgentService {
         }
         agentRepository.updateAgentVersion(
             versionId,
-            normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON"),
+            normalize(objectMapper, request.getModelConfigJson(), "模型配置不是合法JSON"),
             trimToNull(request.getSystemPrompt()),
-            normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON"),
+            normalize(objectMapper, request.getWorkflowConfigJson(), "工作流配置不是合法JSON"),
             operatorId
         );
         return toVersionResponse(agentRepository.getVersionOrThrow(versionId));
@@ -307,7 +312,7 @@ public class AgentService {
             throw new BizException(409, "工具编码已存在");
         }
         String toolType = normalizeIn(request.getToolType(), TOOL_TYPES, "工具类型不支持");
-        Long toolId = IdWorker.getId();
+        Long toolId = IdGenerator.nextId();
         agentRepository.insertTool(
             toolId,
             toolCode,
@@ -333,14 +338,14 @@ public class AgentService {
         if (!"ACTIVE".equals(tool.status())) {
             throw new BizException(409, "工具未启用");
         }
-        Long bindingId = IdWorker.getId();
+        Long bindingId = IdGenerator.nextId();
         agentRepository.insertToolBinding(
             bindingId,
             versionId,
             request.getToolId(),
             normalizeDefault(request.getApprovalMode(), "AUTO", APPROVAL_MODES, "工具审批模式不支持"),
-            normalizeJson(request.getArgSchemaJson(), "参数Schema不是合法JSON"),
-            normalizeJson(request.getRiskControlJson(), "风控配置不是合法JSON"),
+            normalize(objectMapper, request.getArgSchemaJson(), "参数Schema不是合法JSON"),
+            normalize(objectMapper, request.getRiskControlJson(), "风控配置不是合法JSON"),
             normalizeDefault(request.getStatus(), "ACTIVE", RECORD_STATUSES, "工具绑定状态不支持"),
             operatorId
         );
@@ -354,7 +359,7 @@ public class AgentService {
         String subjectType = normalizeIn(request.getSubjectType(), SUBJECT_TYPES, "授权主体类型不支持");
         String permCode = normalizePermission(request.getPermCode());
         agentRepository.upsertAcl(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             agentId,
             subjectType,
             request.getSubjectId(),
@@ -449,7 +454,7 @@ public class AgentService {
         if (!agentRepository.canUseAgent(agentId, userId)) {
             throw new BizException(403, "无权使用该Agent");
         }
-        String inputPayloadJson = normalizeJson(request.getInputPayloadJson(), "输入载荷不是合法JSON");
+        String inputPayloadJson = normalize(objectMapper, request.getInputPayloadJson(), "输入载荷不是合法JSON");
         String triggerType = normalizeIn(request.getTriggerType(), TRIGGER_TYPES, "触发类型不支持");
         AgentVersionRow version = agentRepository.getVersionOrThrow(agent.publishedVersionId());
         boolean workflowTask = workflowParser.isWorkflowConfig(version.workflowConfigJson()) && safeToolCalls(request).isEmpty();
@@ -460,7 +465,7 @@ public class AgentService {
 
         boolean requireHumanConfirm = preparedToolCalls.stream()
             .anyMatch(call -> "REQUIRE_CONFIRM".equals(call.binding().approvalMode()));
-        Long taskId = IdWorker.getId();
+        Long taskId = IdGenerator.nextId();
         String initialStatus = requireHumanConfirm ? "WAITING_HUMAN_CONFIRM" : "PENDING";
         LocalDateTime waitingDeadlineAt = requireHumanConfirm ? LocalDateTime.now().plusHours(24) : null;
         agentRepository.insertTask(
@@ -484,7 +489,7 @@ public class AgentService {
         if (requireHumanConfirm) {
             for (PreparedToolCall call : preparedToolCalls) {
                 agentRepository.insertToolCallLog(
-                    IdWorker.getId(),
+                    IdGenerator.nextId(),
                     taskId,
                     call.binding().toolId(),
                     call.requestPayloadJson(),
@@ -533,7 +538,7 @@ public class AgentService {
             String summary = safeSummary(request.getComment());
             agentRepository.rejectWaitingTask(
                 task.id(),
-                writeJson(Map.of("status", "REJECTED", "comment", summary == null ? "" : summary)),
+                write(objectMapper, Map.of("status", "REJECTED", "comment", summary == null ? "" : summary)),
                 userId
             );
             audit(task.id(), "TASK_HUMAN_REJECTED", "AGENT_TASK", task.id(), summary, true);
@@ -567,7 +572,7 @@ public class AgentService {
         String reason = safeSummary(request.getReason());
         agentRepository.cancelWaitingTask(
             task.id(),
-            writeJson(Map.of("status", "CANCELLED", "reason", reason == null ? "" : reason)),
+            write(objectMapper, Map.of("status", "CANCELLED", "reason", reason == null ? "" : reason)),
             userId
         );
         audit(task.id(), "TASK_CANCELLED", "AGENT_TASK", task.id(), reason, true);
@@ -599,14 +604,14 @@ public class AgentService {
             agentRepository.getActiveToolByCodeOrThrow(toolCode);
             throw new BizException(403, "Agent未授权调用该工具");
         }
-        return new PreparedToolCall(binding, normalizeJson(toolCall.getRequestPayloadJson(), "工具请求载荷不是合法JSON"));
+        return new PreparedToolCall(binding, normalize(objectMapper, toolCall.getRequestPayloadJson(), "工具请求载荷不是合法JSON"));
     }
 
     private void executeAndLogToolCall(Long taskId, PreparedToolCall call) {
         try {
             String responsePayload = toolExecutionService.execute(call.binding(), call.requestPayloadJson());
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 call.binding().toolId(),
                 call.requestPayloadJson(),
@@ -617,11 +622,11 @@ public class AgentService {
         } catch (BizException e) {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 call.binding().toolId(),
                 call.requestPayloadJson(),
-                writeJson(Map.of(
+                write(objectMapper, Map.of(
                     "status", "FAILED",
                     "errorMessage", errorMessage == null ? "工具执行失败" : errorMessage
                 )),
@@ -654,7 +659,7 @@ public class AgentService {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.markToolCallApprovedFailed(
                 pendingToolCall.logId(),
-                writeJson(Map.of(
+                write(objectMapper, Map.of(
                     "status", "FAILED",
                     "errorMessage", errorMessage == null ? "工具执行失败" : errorMessage
                 ))
@@ -670,7 +675,7 @@ public class AgentService {
                        String decisionSummary,
                        boolean riskFlag) {
         agentRepository.insertAuditLog(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             taskId,
             actionType,
             targetType,
@@ -678,25 +683,6 @@ public class AgentService {
             safeSummary(decisionSummary),
             riskFlag
         );
-    }
-
-    private String normalizeJson(String value, String errorMessage) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(objectMapper.readTree(value));
-        } catch (Exception e) {
-            throw new BizException(400, errorMessage);
-        }
-    }
-
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
     }
 
     private String normalizeIn(String value, Set<String> allowed, String message) {
@@ -729,10 +715,6 @@ public class AgentService {
         return value.trim();
     }
 
-    private String trimToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
-
     private AgentTaskQueryCriteria toTaskQueryCriteria(AgentTaskListQuery query) {
         return new AgentTaskQueryCriteria(
             normalizeOptionalIn(query.getStatus(), TASK_STATUSES, "Agent任务状态不支持"),
@@ -763,14 +745,6 @@ public class AgentService {
             throw new BizException(400, message);
         }
         return normalized;
-    }
-
-    private String safeSummary(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;
     }
 
     private AgentResponse toAgentResponse(AgentRow row) {
@@ -992,7 +966,7 @@ public class AgentService {
     }
 
     public LlmModelResponse createLlmModel(CreateLlmModelRequest request) {
-        Long modelId = IdWorker.getId();
+        Long modelId = IdGenerator.nextId();
         agentRepository.insertLlmModel(modelId, request.provider(), request.modelName(),
             request.displayName(), request.endpoint(), request.apiKey(),
             request.status() != null ? request.status() : "ACTIVE", 0L);
@@ -1218,8 +1192,8 @@ public class AgentService {
                 return new WorkflowRunResponse(false, null, steps, "工作流未到达 END 节点", System.currentTimeMillis() - start);
             }
             if (version != null) {
-                String normalizedWorkflow = normalizeJson(workflowConfigJson, "工作流配置不是合法JSON");
-                String normalizedModel = normalizeJson(modelConfigJson, "模型配置不是合法JSON");
+                String normalizedWorkflow = normalize(objectMapper, workflowConfigJson, "工作流配置不是合法JSON");
+                String normalizedModel = normalize(objectMapper, modelConfigJson, "模型配置不是合法JSON");
                 String normalizedPrompt = trimToNull(systemPrompt);
                 agentRepository.updateAgentVersionWorkflowTest(
                     version.id(),

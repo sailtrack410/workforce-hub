@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.org.mapper.OrgDepartmentLeaderMapper">
+
+    <resultMap id="BaseResultMap" type="com.workforcehub.org.domain.OrgDepartmentLeader">
+        <id column="id" property="id"/>
+        <result column="dept_id" property="deptId"/>
+        <result column="user_id" property="userId"/>
+        <result column="leader_type" property="leaderType"/>
+        <result column="is_primary" property="isPrimary"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="updated_by" property="updatedBy"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO org_department_leader
+            (id, dept_id, user_id, leader_type, is_primary, sort_order, status, created_by, updated_by)
+        VALUES
+            (#{id}, #{deptId}, #{userId}, #{leaderType}, #{isPrimary}, #{sortOrder}, #{status}, #{createdBy}, #{updatedBy})
+    </insert>
+
+    <update id="updateById">
+        UPDATE org_department_leader
+        SET dept_id = #{deptId},
+            user_id = #{userId},
+            leader_type = #{leaderType},
+            is_primary = #{isPrimary},
+            sort_order = #{sortOrder},
+            status = #{status},
+            updated_by = #{updatedBy},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="listByDeptId" resultMap="BaseResultMap">
+        SELECT * FROM org_department_leader
+        WHERE dept_id = #{deptId}
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="listPrimaryByDeptId" resultMap="BaseResultMap">
+        SELECT * FROM org_department_leader
+        WHERE dept_id = #{deptId}
+          AND is_primary = 1
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="selectByDeptIdAndUserIdAndLeaderType" resultMap="BaseResultMap">
+        SELECT * FROM org_department_leader
+        WHERE dept_id = #{deptId}
+          AND user_id = #{userId}
+          AND leader_type = #{leaderType}
+        LIMIT 1
+    </select>
+
+</mapper>

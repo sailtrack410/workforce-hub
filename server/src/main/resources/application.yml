@@ -85,15 +85,9 @@ spring:
           ssl:
             enable: ${MAIL_SMTP_SSL_ENABLE:false}
 
-# ==================== MyBatis-Plus ====================
-mybatis-plus:
+# ==================== MyBatis ====================
+mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
-  global-config:
-    db-config:
-      id-type: ASSIGN_ID
-      logic-delete-field: isDeleted
-      logic-delete-value: 1
-      logic-not-delete-value: 0
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

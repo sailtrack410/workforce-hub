@@ -4,23 +4,41 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.workforcehub.common.exception.BizException;
+import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.im.dto.AdminImOutboxAuditQuery;
+import com.workforcehub.im.dto.AdminImOutboxAuditResponse;
 import com.workforcehub.im.dto.AdminImOutboxBatchRetryRequest;
 import com.workforcehub.im.dto.AdminImOutboxBatchRetryResponse;
 import com.workforcehub.im.dto.AdminImOutboxDispatchResponse;
+import com.workforcehub.im.dto.AdminImOutboxEventQuery;
 import com.workforcehub.im.dto.AdminImOutboxEventResponse;
+import com.workforcehub.im.dto.AdminImOutboxFailureSummaryResponse;
+import com.workforcehub.im.dto.AdminImOutboxSummaryResponse;
+import com.workforcehub.im.repository.AdminImOutboxAuditQueryCriteria;
+import com.workforcehub.im.repository.AdminImOutboxAuditRow;
 import com.workforcehub.im.repository.ImOutboxAdminAuditRepository;
 import com.workforcehub.im.repository.ImOutboxAdminEventRepository;
 import com.workforcehub.im.repository.AdminImOutboxEventRow;
+import com.workforcehub.im.repository.AdminImOutboxEventQueryCriteria;
+import com.workforcehub.im.repository.AdminImOutboxFailureSummaryRow;
+import com.workforcehub.im.repository.AdminImOutboxStatusSummaryRow;
+import com.workforcehub.im.repository.AdminImOutboxSummaryAggregateRow;
+import com.workforcehub.im.repository.ImOutboxAdminMetricsRepository;
 import com.workforcehub.im.support.ImOutboxAdminAuditActions;
+import com.workforcehub.im.websocket.ImWebSocketEventTypes;
 import com.workforcehub.im.websocket.ImWebSocketOutboxDispatchResult;
 import com.workforcehub.im.websocket.ImWebSocketOutboxDispatcher;
+import com.workforcehub.im.websocket.ImWebSocketOutboxProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -33,20 +51,90 @@ public class ImOutboxAdminService {
     private static final String AUDIT_TARGET_TYPE_OUTBOX_EVENT = "IM_EVENT_OUTBOX";
     private static final String AUDIT_TARGET_TYPE_OUTBOX_DISPATCH = "IM_EVENT_OUTBOX_DISPATCH";
     private static final String AUDIT_TARGET_TYPE_OUTBOX_BATCH_RETRY = "IM_EVENT_OUTBOX_BATCH_RETRY";
+    private static final Set<String> OUTBOX_STATUSES = Set.of("PENDING", "SENDING", "SENT", "FAILED", "DEAD");
+    private static final List<String> OUTBOX_STATUS_ORDER = List.of("PENDING", "SENDING", "SENT", "FAILED", "DEAD");
+    private static final int FAILURE_SUMMARY_LIMIT = 20;
 
     private final ImOutboxAdminEventRepository outboxAdminEventRepository;
     private final ImOutboxAdminAuditRepository outboxAdminAuditRepository;
+    private final ImOutboxAdminMetricsRepository outboxAdminMetricsRepository;
     private final ImWebSocketOutboxDispatcher outboxDispatcher;
+    private final ImWebSocketOutboxProperties outboxProperties;
     private final ObjectMapper objectMapper;
 
     public ImOutboxAdminService(ImOutboxAdminEventRepository outboxAdminEventRepository,
                                 ImOutboxAdminAuditRepository outboxAdminAuditRepository,
+                                ImOutboxAdminMetricsRepository outboxAdminMetricsRepository,
                                 ImWebSocketOutboxDispatcher outboxDispatcher,
+                                ImWebSocketOutboxProperties outboxProperties,
                                 ObjectMapper objectMapper) {
         this.outboxAdminEventRepository = outboxAdminEventRepository;
         this.outboxAdminAuditRepository = outboxAdminAuditRepository;
+        this.outboxAdminMetricsRepository = outboxAdminMetricsRepository;
         this.outboxDispatcher = outboxDispatcher;
+        this.outboxProperties = outboxProperties;
         this.objectMapper = objectMapper;
+    }
+
+    public PageResult<AdminImOutboxEventResponse> pageOutboxEvents(AdminImOutboxEventQuery query) {
+        long safePageNo = Math.max(query.getPageNo(), 1L);
+        long safePageSize = Math.min(Math.max(query.getPageSize(), 1L), 100L);
+        AdminImOutboxEventQueryCriteria criteria = toCriteria(query);
+        long total = outboxAdminEventRepository.countOutboxEvents(criteria);
+        List<AdminImOutboxEventResponse> rows = outboxAdminEventRepository.pageOutboxEvents(
+                criteria,
+                (safePageNo - 1) * safePageSize,
+                safePageSize
+            ).stream()
+            .map(ImOutboxAdminService::toEventResponse)
+            .toList();
+        return PageResult.of(safePageNo, safePageSize, total, rows);
+    }
+
+    public AdminImOutboxSummaryResponse summarizeOutboxEvents() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleSendingBefore = now.minus(Duration.ofMillis(outboxProperties.getSendingStaleMs()));
+        AdminImOutboxSummaryAggregateRow aggregate =
+            outboxAdminMetricsRepository.summarizeOutboxEvents(now, staleSendingBefore);
+        List<AdminImOutboxStatusSummaryRow> rows = outboxAdminMetricsRepository.countOutboxEventsByStatus();
+
+        AdminImOutboxSummaryResponse response = new AdminImOutboxSummaryResponse();
+        response.setTotalCount(aggregate.totalCount());
+        response.setDueDispatchCount(aggregate.dueDispatchCount());
+        response.setStaleSendingCount(aggregate.staleSendingCount());
+        response.setEarliestCreatedAt(aggregate.earliestCreatedAt());
+        response.setEarliestNextRetryAt(aggregate.earliestNextRetryAt());
+        response.setGeneratedAt(now);
+        response.setSendingStaleBefore(staleSendingBefore);
+        response.setStatusCounts(OUTBOX_STATUS_ORDER.stream()
+            .map(status -> AdminImOutboxSummaryResponse.StatusCount.of(status, countStatus(rows, status)))
+            .toList());
+        return response;
+    }
+
+    public List<AdminImOutboxFailureSummaryResponse> listOutboxFailureSummary() {
+        return outboxAdminMetricsRepository.listOutboxFailureSummary(FAILURE_SUMMARY_LIMIT).stream()
+            .map(this::toFailureSummaryResponse)
+            .toList();
+    }
+
+    public PageResult<AdminImOutboxAuditResponse> pageOutboxAudits(AdminImOutboxAuditQuery query) {
+        long safePageNo = Math.max(query.getPageNo(), 1L);
+        long safePageSize = Math.min(Math.max(query.getPageSize(), 1L), 100L);
+        AdminImOutboxAuditQueryCriteria criteria = toAuditCriteria(query);
+        long total = outboxAdminAuditRepository.countOutboxAudits(criteria);
+        List<AdminImOutboxAuditResponse> rows = outboxAdminAuditRepository.pageOutboxAudits(
+                criteria,
+                (safePageNo - 1) * safePageSize,
+                safePageSize
+            ).stream()
+            .map(this::toAuditResponse)
+            .toList();
+        return PageResult.of(safePageNo, safePageSize, total, rows);
+    }
+
+    public AdminImOutboxEventResponse getOutboxEvent(Long eventId) {
+        return toEventResponse(outboxAdminEventRepository.getOutboxEventOrThrow(eventId));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -125,6 +213,47 @@ public class ImOutboxAdminService {
         }
     }
 
+    private AdminImOutboxEventQueryCriteria toCriteria(AdminImOutboxEventQuery query) {
+        if (query.getCreatedFrom() != null && query.getCreatedTo() != null
+            && query.getCreatedFrom().isAfter(query.getCreatedTo())) {
+            throw new BizException(400, "创建时间起始不能晚于结束");
+        }
+        return new AdminImOutboxEventQueryCriteria(
+            normalizeIn(query.getStatus(), OUTBOX_STATUSES, "outbox事件状态不支持"),
+            normalizeIn(query.getEventType(), ImWebSocketEventTypes.OUTBOX_EVENT_TYPES, "outbox事件类型不支持"),
+            query.getConversationId(),
+            query.getMessageId(),
+            query.getActorUserId(),
+            query.getCreatedFrom(),
+            query.getCreatedTo()
+        );
+    }
+
+    private AdminImOutboxAuditQueryCriteria toAuditCriteria(AdminImOutboxAuditQuery query) {
+        if (query.getOccurredFrom() != null && query.getOccurredTo() != null
+            && query.getOccurredFrom().isAfter(query.getOccurredTo())) {
+            throw new BizException(400, "发生时间起始不能晚于结束");
+        }
+        return new AdminImOutboxAuditQueryCriteria(
+            normalizeIn(query.getActionType(), ImOutboxAdminAuditActions.SUPPORTED_ACTION_TYPES, "outbox审计动作不支持"),
+            query.getEventId(),
+            query.getOperatorId(),
+            query.getOccurredFrom(),
+            query.getOccurredTo()
+        );
+    }
+
+    private String normalizeIn(String value, Set<String> candidates, String message) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!candidates.contains(normalized)) {
+            throw new BizException(400, message);
+        }
+        return normalized;
+    }
+
     static AdminImOutboxEventResponse toEventResponse(AdminImOutboxEventRow row) {
         AdminImOutboxEventResponse response = new AdminImOutboxEventResponse();
         response.setEventId(row.eventId());
@@ -143,6 +272,39 @@ public class ImOutboxAdminService {
         response.setSentAt(row.sentAt());
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
+        return response;
+    }
+
+    private Long countStatus(List<AdminImOutboxStatusSummaryRow> rows, String status) {
+        return rows.stream()
+            .filter(row -> status.equals(row.status()))
+            .map(AdminImOutboxStatusSummaryRow::eventCount)
+            .findFirst()
+            .orElse(0L);
+    }
+
+    private AdminImOutboxFailureSummaryResponse toFailureSummaryResponse(AdminImOutboxFailureSummaryRow row) {
+        AdminImOutboxFailureSummaryResponse response = new AdminImOutboxFailureSummaryResponse();
+        response.setStatus(row.status());
+        response.setLastError(row.lastError());
+        response.setEventCount(row.eventCount());
+        response.setMaxRetryCount(row.maxRetryCount());
+        response.setFirstOccurredAt(row.firstOccurredAt());
+        response.setLastOccurredAt(row.lastOccurredAt());
+        return response;
+    }
+
+    private AdminImOutboxAuditResponse toAuditResponse(AdminImOutboxAuditRow row) {
+        AdminImOutboxAuditResponse response = new AdminImOutboxAuditResponse();
+        response.setAuditId(row.auditId());
+        response.setOperatorType(row.operatorType());
+        response.setOperatorId(row.operatorId());
+        response.setActionType(row.actionType());
+        response.setTargetType(row.targetType());
+        response.setTargetId(row.targetId());
+        response.setResult(row.result());
+        response.setDetailJson(row.detailJson());
+        response.setOccurredAt(row.occurredAt());
         return response;
     }
 

@@ -1,6 +1,6 @@
 package com.workforcehub.file.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.audit.AuditLogWriter;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.FilePurgeResponse;
@@ -28,17 +28,20 @@ public class FileLifecycleService {
     private final FileObjectRepository fileObjectRepository;
     private final AttachmentRefRepository attachmentRefRepository;
     private final FileQuotaPolicyService fileQuotaPolicyService;
+    private final AuditLogWriter auditLogWriter;
 
     public FileLifecycleService(JdbcTemplate jdbcTemplate,
                                 StorageUsageLedgerService storageUsageLedgerService,
                                 FileObjectRepository fileObjectRepository,
                                 AttachmentRefRepository attachmentRefRepository,
-                                FileQuotaPolicyService fileQuotaPolicyService) {
+                                FileQuotaPolicyService fileQuotaPolicyService,
+                                AuditLogWriter auditLogWriter) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageUsageLedgerService = storageUsageLedgerService;
         this.fileObjectRepository = fileObjectRepository;
         this.attachmentRefRepository = attachmentRefRepository;
         this.fileQuotaPolicyService = fileQuotaPolicyService;
+        this.auditLogWriter = auditLogWriter;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -67,7 +70,7 @@ public class FileLifecycleService {
             return buildTrashResponse(attachmentRefId, latest.deletedAt(), latest.purgeAfter());
         }
 
-        audit("USER", userId, "FILE_TRASHED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("USER", userId, "FILE_TRASHED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
         return buildTrashResponse(attachmentRefId, deletedAt, purgeAfter);
     }
@@ -101,7 +104,7 @@ public class FileLifecycleService {
             return buildRestoreResponse(attachmentRefId);
         }
 
-        audit("USER", userId, "FILE_RESTORED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("USER", userId, "FILE_RESTORED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
         return buildRestoreResponse(attachmentRefId);
     }
@@ -133,7 +136,7 @@ public class FileLifecycleService {
         storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
         boolean cleanupScheduled = refreshFileObjectCleanupState(attachment);
 
-        audit("USER", userId, "FILE_PURGED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("USER", userId, "FILE_PURGED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"physicalCleanupScheduled\":%s}".formatted(cleanupScheduled));
         return buildPurgeResponse(attachmentRefId, cleanupScheduled);
     }
@@ -164,7 +167,7 @@ public class FileLifecycleService {
             return buildTrashResponse(attachmentRefId, latest.deletedAt(), latest.purgeAfter());
         }
 
-        audit("ADMIN", adminId, "FILE_ADMIN_TRASHED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_TRASHED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
         return buildTrashResponse(attachmentRefId, deletedAt, purgeAfter);
     }
@@ -197,7 +200,7 @@ public class FileLifecycleService {
             return buildRestoreResponse(attachmentRefId);
         }
 
-        audit("ADMIN", adminId, "FILE_ADMIN_RESTORED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_RESTORED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"reason\":\"%s\"}".formatted(safeJsonText(request.getReason())));
         return buildRestoreResponse(attachmentRefId);
     }
@@ -228,7 +231,7 @@ public class FileLifecycleService {
         storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
         boolean cleanupScheduled = refreshFileObjectCleanupState(attachment);
 
-        audit("ADMIN", adminId, "FILE_ADMIN_PURGED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_PURGED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"physicalCleanupScheduled\":%s}".formatted(cleanupScheduled));
         return buildPurgeResponse(attachmentRefId, cleanupScheduled);
     }
@@ -278,25 +281,6 @@ public class FileLifecycleService {
         response.setPurgedAt(LocalDateTime.now());
         response.setPhysicalCleanupScheduled(cleanupScheduled);
         return response;
-    }
-
-    private void audit(String operatorType, Long operatorId, String actionType,
-                       String targetType, Long targetId, String result, String detailJson) {
-        jdbcTemplate.update("""
-            INSERT INTO sys_audit_log
-                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
-            """,
-            IdWorker.getId(),
-            operatorType,
-            operatorId,
-            actionType,
-            targetType,
-            targetId,
-            result,
-            detailJson
-        );
     }
 
     private String safeJsonText(String text) {

@@ -1,6 +1,6 @@
 package com.workforcehub.attendance.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.attendance.dto.AddAttendanceGroupMemberRequest;
 import com.workforcehub.attendance.dto.AttendanceCalendarResponse;
 import com.workforcehub.attendance.dto.AttendanceDailyResultResponse;
@@ -49,6 +49,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static com.workforcehub.common.util.TextValues.trimToNull;
 
 /**
  * module-attendance 第一版考勤服务。
@@ -100,7 +102,7 @@ public class AttendanceService {
             throw new BizException(409, "日历编码已存在");
         }
 
-        Long calendarId = IdWorker.getId();
+        Long calendarId = IdGenerator.nextId();
         attendanceRepository.insertCalendar(calendarId, calendarCode, calendarName, calendarType, status, operatorId);
         return toCalendarResponse(attendanceRepository.getCalendarOrThrow(calendarId));
     }
@@ -124,10 +126,10 @@ public class AttendanceService {
             throw new BizException(400, "第一版班次不支持跨天");
         }
 
-        Long shiftId = IdWorker.getId();
+        Long shiftId = IdGenerator.nextId();
         attendanceRepository.insertShift(shiftId, shiftCode, shiftName, status, operatorId);
         attendanceRepository.insertShiftSegment(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             shiftId,
             request.getStartTime(),
             request.getEndTime(),
@@ -159,7 +161,7 @@ public class AttendanceService {
             throw new BizException(409, "考勤组编码已存在");
         }
 
-        Long groupId = IdWorker.getId();
+        Long groupId = IdGenerator.nextId();
         attendanceRepository.insertGroup(
             groupId,
             groupCode,
@@ -213,7 +215,7 @@ public class AttendanceService {
             throw new BizException(409, "员工考勤组生效区间重叠");
         }
 
-        Long memberId = IdWorker.getId();
+        Long memberId = IdGenerator.nextId();
         attendanceRepository.insertGroupMember(
             memberId,
             group.groupId(),
@@ -240,7 +242,7 @@ public class AttendanceService {
             throw new BizException(409, "员工当天已存在排班，请通过修改原排班恢复或改班");
         }
 
-        Long scheduleId = IdWorker.getId();
+        Long scheduleId = IdGenerator.nextId();
         attendanceRepository.insertSchedule(
             scheduleId,
             request.getUserId(),
@@ -296,7 +298,7 @@ public class AttendanceService {
         if (attendanceRepository.existsNormalPunchRecordOnDate(userId, punchAt.toLocalDate(), punchType)) {
             throw new BizException(409, "当天同类型打卡已存在");
         }
-        Long punchRecordId = IdWorker.getId();
+        Long punchRecordId = IdGenerator.nextId();
         attendanceRepository.insertPunchRecord(
             punchRecordId,
             userId,
@@ -411,7 +413,7 @@ public class AttendanceService {
         }
         if (!attendanceRepository.existsNormalPunchRecord(userId, expectedPunchAt, normalizedPunchType)) {
             attendanceRepository.insertPunchRecord(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 userId,
                 expectedPunchAt,
                 normalizedPunchType,
@@ -519,7 +521,7 @@ public class AttendanceService {
                                                        boolean exceptionFlag) {
         LocalDateTime calculatedAt = LocalDateTime.now();
         attendanceRepository.upsertDailyResult(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             userId,
             workDate,
             scheduleId,
@@ -543,7 +545,7 @@ public class AttendanceService {
         attendanceRepository.deleteExceptionsByDailyResultId(dailyResultId);
         if (lateMinutes > 0) {
             attendanceRepository.insertException(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 dailyResultId,
                 EXCEPTION_LATE,
                 "迟到%s分钟".formatted(lateMinutes)
@@ -551,7 +553,7 @@ public class AttendanceService {
         }
         if (earlyLeaveMinutes > 0) {
             attendanceRepository.insertException(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 dailyResultId,
                 EXCEPTION_EARLY_LEAVE,
                 "早退%s分钟".formatted(earlyLeaveMinutes)
@@ -559,7 +561,7 @@ public class AttendanceService {
         }
         if (absenceMinutes > 0) {
             attendanceRepository.insertException(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 dailyResultId,
                 EXCEPTION_MISS_PUNCH,
                 "缺卡导致缺勤%s分钟".formatted(absenceMinutes)
@@ -896,13 +898,6 @@ public class AttendanceService {
 
     private LocalTime defaultTime(LocalTime value, LocalTime defaultValue) {
         return value == null ? defaultValue : value;
-    }
-
-    private String trimToNull(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.trim();
     }
 
     private int minutesBetween(LocalDateTime start, LocalDateTime end) {

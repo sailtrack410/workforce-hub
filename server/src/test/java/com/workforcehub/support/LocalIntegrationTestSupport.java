@@ -71,6 +71,7 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("workforce.auth.redis-key-prefix", LocalIntegrationTestSupport::testAuthRedisKeyPrefix);
         registry.add("spring.autoconfigure.exclude", LocalIntegrationTestSupport::resolveAutoConfigurationExcludes);
         registry.add("workforce.workflow.enabled", () -> "false");
+        registry.add("workforce.file.local-root", () -> env("TEST_FILE_LOCAL_ROOT", "target/test-file-storage"));
         registry.add("workforce.auth.email-verify.enabled", () -> env(
             "TEST_WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED",
             System.getProperty("test.workforce.auth.email-verify.enabled", "false")

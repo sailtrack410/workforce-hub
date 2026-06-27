@@ -1,6 +1,6 @@
 package com.workforcehub.im.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
@@ -38,6 +38,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static com.workforcehub.common.util.TextValues.blankToNull;
 
 /**
  * module-im 群聊资料与成员治理服务。
@@ -81,12 +83,12 @@ public class ImGroupService {
             throw new BizException(404, "目标成员不存在或不可加入群聊");
         }
 
-        Long conversationId = IdWorker.getId();
+        Long conversationId = IdGenerator.nextId();
         imGroupRepository.insertGroupConversation(conversationId, title, ownerUserId);
-        imGroupRepository.insertGroupProfile(IdWorker.getId(), conversationId, "CUSTOM", ownerUserId, ownerUserId);
-        imGroupRepository.insertUserMember(IdWorker.getId(), conversationId, ownerUserId, "OWNER", "CREATE");
+        imGroupRepository.insertGroupProfile(IdGenerator.nextId(), conversationId, "CUSTOM", ownerUserId, ownerUserId);
+        imGroupRepository.insertUserMember(IdGenerator.nextId(), conversationId, ownerUserId, "OWNER", "CREATE");
         for (Long memberUserId : normalizedMemberIds) {
-            imGroupRepository.insertUserMember(IdWorker.getId(), conversationId, memberUserId, "MEMBER", "CREATE");
+            imGroupRepository.insertUserMember(IdGenerator.nextId(), conversationId, memberUserId, "MEMBER", "CREATE");
         }
         return imRepository.findConversationSummaryForUser(conversationId, ownerUserId)
             .map(this::toConversationSummaryResponse)
@@ -126,7 +128,7 @@ public class ImGroupService {
             throw new BizException(400, "第一版仅支持单文件下载");
         }
 
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         String ticketNo = "IMDL" + ticketId;
         LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
         String downloadUrl = "/api/employee/im/attachments/download/" + ticketNo;
@@ -264,7 +266,7 @@ public class ImGroupService {
             throw new BizException(404, "目标成员不存在或不可加入群聊");
         }
         for (Long memberUserId : normalizedMemberIds) {
-            imGroupRepository.upsertUserMember(IdWorker.getId(), conversationId, memberUserId, "MEMBER", "OWNER_INVITE");
+            imGroupRepository.upsertUserMember(IdGenerator.nextId(), conversationId, memberUserId, "MEMBER", "OWNER_INVITE");
         }
         List<ImConversationMemberResponse> response = listActiveConversationMemberResponses(conversationId);
         pushConversationEventAfterCommit(
@@ -527,10 +529,6 @@ public class ImGroupService {
             return null;
         }
         return text.trim();
-    }
-
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private String safeJsonText(String text) {

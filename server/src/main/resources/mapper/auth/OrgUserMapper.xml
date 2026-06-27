@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.auth.mapper.OrgUserMapper">
+
+    <resultMap id="BaseResultMap" type="com.workforcehub.auth.domain.OrgUser">
+        <id column="id" property="id"/>
+        <result column="employee_no" property="employeeNo"/>
+        <result column="real_name" property="realName"/>
+        <result column="gender" property="gender"/>
+        <result column="mobile" property="mobile"/>
+        <result column="avatar_attachment_ref_id" property="avatarAttachmentRefId"/>
+        <result column="primary_dept_id" property="primaryDeptId"/>
+        <result column="position_id" property="positionId"/>
+        <result column="manager_user_id" property="managerUserId"/>
+        <result column="employment_status" property="employmentStatus"/>
+        <result column="hire_date" property="hireDate"/>
+        <result column="regularized_at" property="regularizedAt"/>
+        <result column="service_start_date" property="serviceStartDate"/>
+        <result column="annual_leave_start_date" property="annualLeaveStartDate"/>
+        <result column="work_location" property="workLocation"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="is_deleted" property="isDeleted"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM org_user
+        WHERE id = #{id}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO org_user
+            (id, employee_no, real_name, gender, mobile, avatar_attachment_ref_id,
+             primary_dept_id, position_id, manager_user_id, employment_status,
+             hire_date, regularized_at, service_start_date, annual_leave_start_date,
+             work_location, status, created_by, updated_by)
+        VALUES
+            (#{id}, #{employeeNo}, #{realName}, #{gender}, #{mobile}, #{avatarAttachmentRefId},
+             #{primaryDeptId}, #{positionId}, #{managerUserId}, #{employmentStatus},
+             #{hireDate}, #{regularizedAt}, #{serviceStartDate}, #{annualLeaveStartDate},
+             #{workLocation}, #{status}, #{createdBy}, #{updatedBy})
+    </insert>
+
+    <update id="updateById">
+        UPDATE org_user
+        SET employee_no = #{employeeNo},
+            real_name = #{realName},
+            gender = #{gender},
+            mobile = #{mobile},
+            avatar_attachment_ref_id = #{avatarAttachmentRefId},
+            primary_dept_id = #{primaryDeptId},
+            position_id = #{positionId},
+            manager_user_id = #{managerUserId},
+            employment_status = #{employmentStatus},
+            hire_date = #{hireDate},
+            regularized_at = #{regularizedAt},
+            service_start_date = #{serviceStartDate},
+            annual_leave_start_date = #{annualLeaveStartDate},
+            work_location = #{workLocation},
+            status = #{status},
+            updated_by = #{updatedBy},
+            updated_at = NOW(),
+            is_deleted = #{isDeleted}
+        WHERE id = #{id}
+          AND is_deleted = 0
+    </update>
+
+    <select id="countByPrimaryDeptId" resultType="long">
+        SELECT COUNT(*) FROM org_user
+        WHERE primary_dept_id = #{deptId}
+          AND is_deleted = 0
+    </select>
+
+    <select id="countByEmployeeNo" resultType="long">
+        SELECT COUNT(*) FROM org_user
+        WHERE employee_no = #{employeeNo}
+          AND (#{exceptId} IS NULL OR id &lt;&gt; #{exceptId})
+          AND is_deleted = 0
+    </select>
+
+</mapper>

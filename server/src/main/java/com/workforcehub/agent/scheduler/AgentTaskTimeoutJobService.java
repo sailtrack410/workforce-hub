@@ -1,6 +1,6 @@
 package com.workforcehub.agent.scheduler;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AgentTaskTimeoutScanResponse;
 import com.workforcehub.agent.repository.AgentExpiredTaskRow;
@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.safeSummary;
 
 /**
  * Agent 等待人工确认任务的超时收口服务。
@@ -69,7 +72,7 @@ public class AgentTaskTimeoutJobService {
         int safeBatchSize = normalizeBatchSize(batchSize);
         String normalizedTriggerType = normalizeTriggerType(triggerType);
         LocalDateTime startedAt = LocalDateTime.now();
-        String jobRunId = "AGT-TIMEOUT-" + IdWorker.getId();
+        String jobRunId = "AGT-TIMEOUT-" + IdGenerator.nextId();
         String ownerId = "agent-timeout-" + UUID.randomUUID();
 
         if (!createJobRunAndAcquireLock(jobRunId, ownerId, normalizedTriggerType, safeBatchSize, startedAt)) {
@@ -86,7 +89,7 @@ public class AgentTaskTimeoutJobService {
             finishJobRun(jobRunId, "SUCCESS", stats.scannedCount, stats.cancelledCount, 0L, null);
             return buildResponse(jobRunId, normalizedTriggerType, "SUCCESS", safeBatchSize, stats.scannedCount, stats.cancelledCount, 0L, null, startedAt);
         } catch (RuntimeException e) {
-            String errorMessage = safeSummary(e.getMessage());
+            String errorMessage = safeSummary(e.getMessage(), "Agent超时扫描失败");
             log.warn("Agent人工确认超时扫描批次失败，jobRunId={}", jobRunId, e);
             finishJobRun(jobRunId, "FAILED", stats.scannedCount, stats.cancelledCount, 0L, errorMessage);
             return buildResponse(jobRunId, normalizedTriggerType, "FAILED", safeBatchSize, stats.scannedCount, stats.cancelledCount, 0L, errorMessage, startedAt);
@@ -150,7 +153,7 @@ public class AgentTaskTimeoutJobService {
     }
 
     private ScanStats cancelExpiredWaitingTasksInTransaction(int safeBatchSize, LocalDateTime now) {
-        String timeoutPayload = writeJson(Map.of(
+        String timeoutPayload = write(objectMapper, Map.of(
             "decision", "TIMEOUT",
             "status", "CANCELLED",
             "reason", TIMEOUT_SUMMARY
@@ -162,7 +165,7 @@ public class AgentTaskTimeoutJobService {
         for (AgentExpiredTaskRow expiredTask : expiredTasks) {
             if (timeoutRepository.cancelExpiredWaitingTask(expiredTask.taskId(), now, timeoutPayload)) {
                 agentRepository.insertAuditLog(
-                    IdWorker.getId(),
+                    IdGenerator.nextId(),
                     expiredTask.taskId(),
                     "TASK_TIMEOUT_CANCELLED",
                     "AGENT_TASK",
@@ -224,22 +227,6 @@ public class AgentTaskTimeoutJobService {
         response.setStartedAt(startedAt);
         response.setFinishedAt(LocalDateTime.now());
         return response;
-    }
-
-    private String safeSummary(String value) {
-        if (!StringUtils.hasText(value)) {
-            return "Agent超时扫描失败";
-        }
-        String trimmed = value.trim();
-        return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;
-    }
-
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
     }
 
     private static class ScanStats {

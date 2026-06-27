@@ -22,7 +22,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <mybatis.version>3.0.3</mybatis.version>
         <flowable.version>7.0.1</flowable.version>
         <spring-ai.version>0.8.1</spring-ai.version>
         <!-- Lombok 由 spring-boot-starter-parent 锁定，但显式声明便于注解处理器路径引用 -->
@@ -99,11 +99,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ==================== MyBatis-Plus ==================== -->
+        <!-- ==================== MyBatis ==================== -->
         <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <version>${mybatis-plus.version}</version>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+            <version>${mybatis.version}</version>
         </dependency>
 
         <!-- ==================== Flyway ==================== -->

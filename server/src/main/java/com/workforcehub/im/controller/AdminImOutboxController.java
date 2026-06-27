@@ -12,8 +12,6 @@ import com.workforcehub.im.dto.AdminImOutboxEventQuery;
 import com.workforcehub.im.dto.AdminImOutboxEventResponse;
 import com.workforcehub.im.dto.AdminImOutboxFailureSummaryResponse;
 import com.workforcehub.im.dto.AdminImOutboxSummaryResponse;
-import com.workforcehub.im.service.ImOutboxAdminMetricsService;
-import com.workforcehub.im.service.ImOutboxAdminQueryService;
 import com.workforcehub.im.service.ImOutboxAdminService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,35 +31,29 @@ import java.util.List;
 public class AdminImOutboxController {
 
     private final ImOutboxAdminService imOutboxAdminService;
-    private final ImOutboxAdminQueryService imOutboxAdminQueryService;
-    private final ImOutboxAdminMetricsService imOutboxAdminMetricsService;
 
-    public AdminImOutboxController(ImOutboxAdminService imOutboxAdminService,
-                                   ImOutboxAdminQueryService imOutboxAdminQueryService,
-                                   ImOutboxAdminMetricsService imOutboxAdminMetricsService) {
+    public AdminImOutboxController(ImOutboxAdminService imOutboxAdminService) {
         this.imOutboxAdminService = imOutboxAdminService;
-        this.imOutboxAdminQueryService = imOutboxAdminQueryService;
-        this.imOutboxAdminMetricsService = imOutboxAdminMetricsService;
     }
 
     @GetMapping
     public R<PageResult<AdminImOutboxEventResponse>> listEvents(@Valid AdminImOutboxEventQuery query) {
-        return R.ok(imOutboxAdminQueryService.pageOutboxEvents(query));
+        return R.ok(imOutboxAdminService.pageOutboxEvents(query));
     }
 
     @GetMapping("/summary")
     public R<AdminImOutboxSummaryResponse> summarizeEvents() {
-        return R.ok(imOutboxAdminMetricsService.summarizeOutboxEvents());
+        return R.ok(imOutboxAdminService.summarizeOutboxEvents());
     }
 
     @GetMapping("/failure-summary")
     public R<List<AdminImOutboxFailureSummaryResponse>> failureSummary() {
-        return R.ok(imOutboxAdminMetricsService.listOutboxFailureSummary());
+        return R.ok(imOutboxAdminService.listOutboxFailureSummary());
     }
 
     @GetMapping("/audits")
     public R<PageResult<AdminImOutboxAuditResponse>> listAudits(@Valid AdminImOutboxAuditQuery query) {
-        return R.ok(imOutboxAdminQueryService.pageOutboxAudits(query));
+        return R.ok(imOutboxAdminService.pageOutboxAudits(query));
     }
 
     @PostMapping("/batch-retry")
@@ -79,7 +71,7 @@ public class AdminImOutboxController {
 
     @GetMapping("/{eventId}")
     public R<AdminImOutboxEventResponse> getEvent(@PathVariable Long eventId) {
-        return R.ok(imOutboxAdminQueryService.getOutboxEvent(eventId));
+        return R.ok(imOutboxAdminService.getOutboxEvent(eventId));
     }
 
     @PostMapping("/{eventId}/retry")

@@ -50,7 +50,7 @@ public class StorageUsageLedgerService {
             ON DUPLICATE KEY UPDATE
                 used_bytes = used_bytes + VALUES(used_bytes),
                 file_count = file_count + VALUES(file_count)
-            """, com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(), scopeType, scopeId, bytes, fileCount);
+            """, com.workforcehub.common.util.IdGenerator.nextId(), scopeType, scopeId, bytes, fileCount);
     }
 
     public void releaseUsage(String scopeType, Long scopeId, Long bytes, int fileCount) {

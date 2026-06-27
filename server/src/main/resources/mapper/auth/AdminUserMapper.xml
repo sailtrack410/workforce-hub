@@ -19,6 +19,29 @@
         <result column="is_deleted" property="isDeleted"/>
     </resultMap>
 
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM admin_user
+        WHERE id = #{id}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <update id="updateById">
+        UPDATE admin_user
+        SET username = #{username},
+            password_hash = #{passwordHash},
+            password_salt = #{passwordSalt},
+            display_name = #{displayName},
+            email = #{email},
+            status = #{status},
+            last_login_at = #{lastLoginAt},
+            updated_by = #{updatedBy},
+            updated_at = NOW(),
+            is_deleted = #{isDeleted}
+        WHERE id = #{id}
+          AND is_deleted = 0
+    </update>
+
     <select id="selectByUsername" resultMap="BaseResultMap">
         SELECT * FROM admin_user
         WHERE username = #{username}

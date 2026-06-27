@@ -1,6 +1,7 @@
 package com.workforcehub.file.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.audit.AuditLogWriter;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.config.FileStorageProperties;
@@ -36,15 +37,18 @@ public class FileQuotaPolicyService {
     private final StorageProviderRegistry storageProviderRegistry;
     private final FileStorageProperties fileStorageProperties;
     private final StorageUsageLedgerService storageUsageLedgerService;
+    private final AuditLogWriter auditLogWriter;
 
     public FileQuotaPolicyService(JdbcTemplate jdbcTemplate,
                                   StorageProviderRegistry storageProviderRegistry,
                                   FileStorageProperties fileStorageProperties,
-                                  StorageUsageLedgerService storageUsageLedgerService) {
+                                  StorageUsageLedgerService storageUsageLedgerService,
+                                  AuditLogWriter auditLogWriter) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.fileStorageProperties = fileStorageProperties;
         this.storageUsageLedgerService = storageUsageLedgerService;
+        this.auditLogWriter = auditLogWriter;
     }
 
     public QuotaResponse getEmployeeQuota() {
@@ -125,7 +129,7 @@ public class FileQuotaPolicyService {
         );
         ensureQuotaPolicyCodeNotExists(request.getPolicyCode());
         ensureQuotaPolicyScopeNotExists(request.getScopeType(), request.getScopeId(), null);
-        Long policyId = IdWorker.getId();
+        Long policyId = IdGenerator.nextId();
         jdbcTemplate.update("""
             INSERT INTO sys_storage_quota_policy
                 (id, policy_code, policy_name, scope_type, scope_id, quota_bytes,
@@ -145,7 +149,7 @@ public class FileQuotaPolicyService {
             request.getStatus(),
             adminId
         );
-        audit("ADMIN", adminId, "FILE_QUOTA_POLICY_CREATED", "STORAGE_QUOTA_POLICY", policyId, "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_QUOTA_POLICY_CREATED", "STORAGE_QUOTA_POLICY", policyId, "SUCCESS",
             "{\"scopeType\":\"%s\",\"scopeId\":%s}".formatted(request.getScopeType(), request.getScopeId()));
         return getQuotaPolicyOrThrow(policyId);
     }
@@ -183,7 +187,7 @@ public class FileQuotaPolicyService {
             adminId,
             policyId
         );
-        audit("ADMIN", adminId, "FILE_QUOTA_POLICY_UPDATED", "STORAGE_QUOTA_POLICY", policyId, "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_QUOTA_POLICY_UPDATED", "STORAGE_QUOTA_POLICY", policyId, "SUCCESS",
             "{\"scopeType\":\"%s\",\"scopeId\":%s}".formatted(existing.scopeType(), existing.scopeId()));
         return getQuotaPolicyOrThrow(policyId);
     }
@@ -369,25 +373,6 @@ public class FileQuotaPolicyService {
     private long countLong(String sql) {
         Long count = jdbcTemplate.queryForObject(sql, Long.class);
         return count == null ? 0L : count;
-    }
-
-    private void audit(String operatorType, Long operatorId, String actionType,
-                       String targetType, Long targetId, String result, String detailJson) {
-        jdbcTemplate.update("""
-            INSERT INTO sys_audit_log
-                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
-            """,
-            IdWorker.getId(),
-            operatorType,
-            operatorId,
-            actionType,
-            targetType,
-            targetId,
-            result,
-            detailJson
-        );
     }
 
     private record QuotaPolicyRow(

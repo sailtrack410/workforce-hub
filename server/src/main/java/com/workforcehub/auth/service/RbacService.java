@@ -1,6 +1,6 @@
 package com.workforcehub.auth.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.auth.dto.RbacDtos.AdminUserRoleResponse;
 import com.workforcehub.auth.dto.RbacDtos.AssignAdminRolesRequest;
 import com.workforcehub.auth.dto.RbacDtos.AssignRolePermissionsRequest;
@@ -70,7 +70,7 @@ public class RbacService {
         if (existsRoleCode(request.getRoleCode().trim(), null)) {
             throw new BizException(409, "角色编码已存在");
         }
-        Long roleId = IdWorker.getId();
+        Long roleId = IdGenerator.nextId();
         Long operatorId = CurrentUserHolder.requireUserId();
         jdbcTemplate.update("""
             INSERT INTO admin_role (id, role_code, role_name, status, created_by, updated_by, is_deleted)
@@ -114,7 +114,7 @@ public class RbacService {
             jdbcTemplate.update("""
                 INSERT INTO admin_role_permission (id, role_id, permission_id, created_by)
                 VALUES (?, ?, ?, ?)
-                """, IdWorker.getId(), roleId, permissionId, operatorId);
+                """, IdGenerator.nextId(), roleId, permissionId, operatorId);
         }
         return getRole(roleId);
     }
@@ -153,7 +153,7 @@ public class RbacService {
             jdbcTemplate.update("""
                 INSERT INTO admin_user_role (id, admin_user_id, role_id, created_by)
                 VALUES (?, ?, ?, ?)
-                """, IdWorker.getId(), adminUserId, roleId, operatorId);
+                """, IdGenerator.nextId(), adminUserId, roleId, operatorId);
         }
         return getAdminUserRoles(adminUserId);
     }

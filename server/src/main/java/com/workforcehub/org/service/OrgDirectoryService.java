@@ -1,7 +1,5 @@
 package com.workforcehub.org.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.workforcehub.auth.domain.OrgUser;
 import com.workforcehub.auth.mapper.OrgUserMapper;
 import com.workforcehub.common.exception.BizException;
@@ -75,11 +73,7 @@ public class OrgDirectoryService {
     }
 
     public List<OrgPositionResponse> listPositions() {
-        List<OrgPosition> positions = orgPositionMapper.selectList(
-            new LambdaQueryWrapper<OrgPosition>()
-                .eq(OrgPosition::getIsDeleted, 0)
-                .orderByAsc(OrgPosition::getPositionName)
-        );
+        List<OrgPosition> positions = orgPositionMapper.listActiveOrderByName();
 
         List<OrgPositionResponse> result = new ArrayList<>(positions.size());
         for (OrgPosition position : positions) {
@@ -95,9 +89,15 @@ public class OrgDirectoryService {
     }
 
     public PageResult<OrgUserSummaryResponse> pageUsers(OrgUserListQuery query) {
-        Page<OrgUserSummaryResponse> page = new Page<>(query.getPageNo(), query.getPageSize());
-        Page<OrgUserSummaryResponse> result = orgDirectoryMapper.selectUserPage(page, query);
-        return PageResult.of(result.getCurrent(), result.getSize(), result.getTotal(), result.getRecords());
+        long safePageNo = Math.max(query.getPageNo(), 1L);
+        long safePageSize = Math.min(Math.max(query.getPageSize(), 1L), 100L);
+        long total = orgDirectoryMapper.countUserPage(query);
+        List<OrgUserSummaryResponse> rows = orgDirectoryMapper.selectUserPage(
+            query,
+            (safePageNo - 1) * safePageSize,
+            safePageSize
+        );
+        return PageResult.of(safePageNo, safePageSize, total, rows);
     }
 
     public List<OrgUserSummaryResponse> listUsersForOrgChart() {

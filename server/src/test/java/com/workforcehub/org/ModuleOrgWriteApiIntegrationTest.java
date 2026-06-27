@@ -182,18 +182,18 @@ class ModuleOrgWriteApiIntegrationTest extends LocalIntegrationTestSupport {
                       "accountStatus": "ACTIVE"
                     }
                     """.formatted(suffix, suffix)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message", containsString("不允许启用登录账号")));
 
         mockMvc.perform(put("/api/admin/users/{userId}/employment-status", userId)
                 .cookie(adminSession)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {
-                      "employmentStatus": "PROBATION"
-                    }
-                    """))
+            .content("""
+                {
+                  "employmentStatus": "PROBATION"
+                }
+                """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));
 
@@ -302,17 +302,17 @@ class ModuleOrgWriteApiIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(put("/api/admin/departments/{deptId}", parentDeptId)
                 .cookie(adminSession)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {
-                      "parentId": %s,
-                      "deptCode": "OPS-%s",
-                      "deptName": "运维组-%s",
-                      "deptType": "TEAM",
-                      "status": "ACTIVE"
-                    }
-                    """.formatted(childDeptId, suffix, suffix)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .content("""
+                {
+                  "parentId": %s,
+                  "deptCode": "OPS-%s",
+                  "deptName": "运维组-%s",
+                  "deptType": "TEAM",
+                  "status": "ACTIVE"
+                }
+                """.formatted(childDeptId, suffix, suffix)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message", containsString("子部门")));
 
         Long userAId = createResourceAndReadId("/api/admin/users", adminSession, """
@@ -354,8 +354,8 @@ class ModuleOrgWriteApiIntegrationTest extends LocalIntegrationTestSupport {
                       "status": "ACTIVE"
                     }
                     """.formatted(suffix, suffix, userBId)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message", containsString("下级")));
     }
 

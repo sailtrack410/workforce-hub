@@ -18,6 +18,8 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static com.workforcehub.common.util.JsonValues.write;
+
 /**
  * Agent 工具执行器，供同步任务和人工确认恢复执行复用。
  */
@@ -71,7 +73,7 @@ public class AgentToolExecutionService {
             );
             default -> throw new BizException(400, "暂不支持该工具执行");
         };
-        return writeJson(Map.of("status", "SUCCESS", "result", result == null ? Map.of() : result));
+        return write(objectMapper, Map.of("status", "SUCCESS", "result", result == null ? Map.of() : result));
     }
 
     private Map<String, Object> getUserSummary(Long userId) {
@@ -160,11 +162,4 @@ public class AgentToolExecutionService {
         return node == null || !node.canConvertToInt() ? defaultValue : node.asInt();
     }
 
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
-    }
 }
