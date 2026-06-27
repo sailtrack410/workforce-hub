@@ -30,8 +30,10 @@ export const useSessionStore = defineStore('admin-session', {
       return (permissionCode?: string) => {
         if (!permissionCode) return true;
         if (!state.user) return false;
-        if (!state.user.permissionCodes?.length) return true;
-        return state.user.permissionCodes.includes(permissionCode);
+        // 后端已对 ADMIN 用户返回 permissionCodes（AccountService.java:65）。
+        // 字段缺失或为空时默认拒绝，避免后端漏传导致越权。
+        const codes = state.user.permissionCodes;
+        return Array.isArray(codes) && codes.includes(permissionCode);
       };
     },
   },

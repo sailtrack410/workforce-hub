@@ -33,22 +33,22 @@ describe('admin session store', () => {
     expect(session.initialized).toBe(true);
   });
 
-  it('keeps admin menus visible when legacy session omits permissions', async () => {
+  it('denies permission when legacy session omits permissions', async () => {
     const session = useSessionStore();
 
     await session.loadCurrentUser(authApi());
 
-    expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(true);
+    expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(false);
   });
 
-  it('keeps admin menus visible when legacy session returns empty permissions', async () => {
+  it('denies permission when session returns empty permissions', async () => {
     const session = useSessionStore();
 
     await session.loadCurrentUser(authApi({
       me: async () => ({ ...user, permissionCodes: [] }),
     }));
 
-    expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(true);
+    expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(false);
   });
 
   it('clears local session when logout request is already expired', async () => {
