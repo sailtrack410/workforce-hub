@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref } from 'vue';
+import { ref } from 'vue';
 import { parseJsonPreservingUnsafeIntegers } from '@/api';
 import type { ImMessageResponse } from '@/api';
 import type { useImStore } from '@/stores/im';
@@ -162,8 +162,6 @@ export function useImSocket({ im, session, shell, syncConversationMessages }: Us
     if (!value || typeof value !== 'object') return false;
     return 'messageId' in value && 'conversationId' in value && 'seqNo' in value;
   }
-
-  onBeforeUnmount(closeImSocket);
 
   return {
     wsConnected,
