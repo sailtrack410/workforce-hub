@@ -1,4 +1,4 @@
-package com.workforcehub.spi;
+package com.workforcehub.workflow.service;
 
 /**
  * 流程预审 Agent 触发接口

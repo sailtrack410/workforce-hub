@@ -2,10 +2,10 @@ package com.workforcehub.attendance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.support.FixedClockTestConfiguration;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import com.workforcehub.support.MutableTestClock;
-import com.workforcehub.spi.AttendanceRecalculationService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,7 +64,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     private MutableTestClock mutableTestClock;
 
     @Autowired
-    private AttendanceRecalculationService attendanceRecalculationService;
+    private AttendanceService attendanceRecalculationService;
 
     @Test
     @DisplayName("后台配置考勤基础数据后，员工应能打卡并生成正常日结果，直属上级应能查询团队结果")

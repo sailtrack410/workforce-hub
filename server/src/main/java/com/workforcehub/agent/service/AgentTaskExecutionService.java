@@ -16,9 +16,7 @@ import com.workforcehub.agent.workflow.WorkflowExecutionResult;
 import com.workforcehub.agent.workflow.WorkflowExecutor;
 import com.workforcehub.agent.workflow.WorkflowParser;
 import com.workforcehub.common.exception.BizException;
-import com.workforcehub.spi.ImAgentReplyResult;
-import com.workforcehub.spi.ImAgentResultCallback;
-import com.workforcehub.spi.ImAgentTriggerCommand;
+import com.workforcehub.im.service.ImAgentConversationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -46,7 +44,7 @@ public class AgentTaskExecutionService {
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
     private final OpenAiCompatibleAgentModelClient agentModelClient;
-    private final ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider;
+    private final ObjectProvider<ImAgentConversationService> imAgentConversationServiceProvider;
     private final Executor agentExecutor;
     private final TransactionTemplate transactionTemplate;
     private final WorkflowParser workflowParser;
@@ -55,7 +53,7 @@ public class AgentTaskExecutionService {
     public AgentTaskExecutionService(AgentRepository agentRepository,
                                      ObjectMapper objectMapper,
                                      OpenAiCompatibleAgentModelClient agentModelClient,
-                                     ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider,
+                                     ObjectProvider<ImAgentConversationService> imAgentConversationServiceProvider,
                                      @Qualifier("agentExecutor") Executor agentExecutor,
                                      PlatformTransactionManager transactionManager,
                                      WorkflowParser workflowParser,
@@ -63,7 +61,7 @@ public class AgentTaskExecutionService {
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
         this.agentModelClient = agentModelClient;
-        this.imAgentResultCallbackProvider = imAgentResultCallbackProvider;
+        this.imAgentConversationServiceProvider = imAgentConversationServiceProvider;
         this.agentExecutor = agentExecutor;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.workflowParser = workflowParser;
@@ -217,7 +215,7 @@ public class AgentTaskExecutionService {
                                         AgentRow agent,
                                         Long taskId,
                                         String replyText) {
-        ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
+        ImAgentConversationService callback = imAgentConversationServiceProvider.getIfAvailable();
         if (callback == null) {
             throw new BizException(501, "IM Agent结果回写服务未接入");
         }
@@ -270,7 +268,7 @@ public class AgentTaskExecutionService {
                                      Long taskId,
                                      String failureType,
                                      String failureMessage) {
-        ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
+        ImAgentConversationService callback = imAgentConversationServiceProvider.getIfAvailable();
         if (callback == null) {
             throw new BizException(501, "IM Agent结果回写服务未接入");
         }

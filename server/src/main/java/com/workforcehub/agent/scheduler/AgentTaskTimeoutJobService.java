@@ -7,7 +7,7 @@ import com.workforcehub.agent.repository.AgentExpiredTaskRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentTaskTimeoutRepository;
 import com.workforcehub.common.exception.BizException;
-import com.workforcehub.spi.WorkflowAgentResultCallback;
+import com.workforcehub.workflow.service.WorkflowAgentResultCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;

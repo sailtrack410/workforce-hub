@@ -1,4 +1,4 @@
-package com.workforcehub.spi;
+package com.workforcehub.workflow.service;
 
 /**
  * Agent 预审结果回调接口

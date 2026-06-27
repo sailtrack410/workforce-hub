@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
@@ -18,10 +19,6 @@ import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.leave.service.LeaveService;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
-import com.workforcehub.spi.AttendanceClockCorrectionService;
-import com.workforcehub.spi.AttendanceRecalculationService;
-import com.workforcehub.spi.WorkflowAgentPreReviewTrigger;
-import com.workforcehub.spi.WorkflowAgentResultCallback;
 import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
@@ -95,8 +92,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private final StorageProviderRegistry storageProviderRegistry;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
     private final LeaveService leaveService;
-    private final AttendanceRecalculationService attendanceRecalculationService;
-    private final AttendanceClockCorrectionService attendanceClockCorrectionService;
+    private final AttendanceService attendanceService;
     private final ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider;
     private final ObjectMapper objectMapper;
 
@@ -107,8 +103,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                            StorageProviderRegistry storageProviderRegistry,
                            DownloadTicketExecutionService downloadTicketExecutionService,
                            LeaveService leaveService,
-                           AttendanceRecalculationService attendanceRecalculationService,
-                           AttendanceClockCorrectionService attendanceClockCorrectionService,
+                           AttendanceService attendanceService,
                            ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider,
                            ObjectMapper objectMapper) {
         this.workflowRepository = workflowRepository;
@@ -118,8 +113,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         this.storageProviderRegistry = storageProviderRegistry;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
         this.leaveService = leaveService;
-        this.attendanceRecalculationService = attendanceRecalculationService;
-        this.attendanceClockCorrectionService = attendanceClockCorrectionService;
+        this.attendanceService = attendanceService;
         this.agentPreReviewTriggerProvider = agentPreReviewTriggerProvider;
         this.objectMapper = objectMapper;
     }
@@ -587,7 +581,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             recalculateAttendanceForApprovedLeave(workflowRequest.applicantUserId(), approvedLeaveDetail);
         }
         if (approvedClockCorrectionDetail != null) {
-            attendanceClockCorrectionService.applyApprovedClockCorrection(
+            attendanceService.applyApprovedClockCorrection(
                 workflowRequest.applicantUserId(),
                 approvedClockCorrectionDetail.targetDate(),
                 approvedClockCorrectionDetail.missingPunchType(),
@@ -621,7 +615,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         LocalDate workDate = leaveDetail.startAt().toLocalDate();
         LocalDate endDate = leaveDetail.endAt().toLocalDate();
         while (!workDate.isAfter(endDate)) {
-            attendanceRecalculationService.recalculateDailyResultForExternalEvent(userId, workDate);
+            attendanceService.recalculateDailyResultForExternalEvent(userId, workDate);
             workDate = workDate.plusDays(1);
         }
     }

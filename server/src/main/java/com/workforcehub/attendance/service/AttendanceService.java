@@ -27,10 +27,8 @@ import com.workforcehub.attendance.repository.AttendanceShiftRow;
 import com.workforcehub.attendance.repository.PunchRecordRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
-import com.workforcehub.spi.AttendanceClockCorrectionService;
-import com.workforcehub.spi.AttendanceQueryService;
-import com.workforcehub.spi.AttendanceRecalculationService;
-import com.workforcehub.spi.LeaveQueryService;
+import com.workforcehub.leave.repository.ApprovedLeavePeriod;
+import com.workforcehub.leave.service.LeaveService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,7 +54,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * module-attendance 第一版考勤服务。
  */
 @Service
-public class AttendanceService implements AttendanceQueryService, AttendanceRecalculationService, AttendanceClockCorrectionService {
+public class AttendanceService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_INACTIVE = "INACTIVE";
@@ -76,17 +74,17 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
     private static final String SOURCE_TEMPLATE = "TEMPLATE";
 
     private final AttendanceRepository attendanceRepository;
-    private final LeaveQueryService leaveQueryService;
+    private final LeaveService leaveService;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
     private final ConcurrentMap<Long, ReentrantLock> membershipLocks = new ConcurrentHashMap<>();
 
     public AttendanceService(AttendanceRepository attendanceRepository,
-                             LeaveQueryService leaveQueryService,
+                             LeaveService leaveService,
                              ObjectProvider<Clock> clockProvider,
                              TransactionTemplate transactionTemplate) {
         this.attendanceRepository = attendanceRepository;
-        this.leaveQueryService = leaveQueryService;
+        this.leaveService = leaveService;
         this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
         this.transactionTemplate = transactionTemplate;
     }
@@ -358,7 +356,6 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             .toList();
     }
 
-    @Override
     public List<Map<String, Object>> getMonthlyExceptions(Long userId, String yearMonth) {
         LocalDate startDate = LocalDate.parse(yearMonth + "-01");
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
@@ -377,7 +374,6 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             .toList();
     }
 
-    @Override
     public Map<String, Object> getDailyResult(Long userId, LocalDate workDate) {
         AttendanceDailyResultRow row = attendanceRepository.getDailyResult(userId, workDate);
         if (row == null) {
@@ -396,13 +392,11 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return value;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public void recalculateDailyResultForExternalEvent(Long userId, LocalDate workDate) {
         recalculateDailyResult(userId, workDate);
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public void applyApprovedClockCorrection(Long userId,
                                              LocalDate targetDate,
@@ -442,8 +436,8 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
         LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
         LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
-        List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods =
-            leaveQueryService.listApprovedLeavePeriodsOnDate(userId, workDate);
+        List<ApprovedLeavePeriod> approvedLeavePeriods =
+            leaveService.listApprovedLeavePeriodsOnDate(userId, workDate);
         int requiredWorkMinutes = minutesBetween(shift.startTime(), shift.endTime());
         int approvedLeaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(
             approvedLeavePeriods,
@@ -577,7 +571,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                      LocalDate workDate,
                                      LocalTime startTime,
                                      int graceMinutes,
-                                     List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
+                                     List<ApprovedLeavePeriod> approvedLeavePeriods) {
         if (firstPunchAt == null) {
             return 0;
         }
@@ -594,7 +588,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                            LocalDate workDate,
                                            LocalTime endTime,
                                            int graceMinutes,
-                                           List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
+                                           List<ApprovedLeavePeriod> approvedLeavePeriods) {
         if (lastPunchAt == null) {
             return 0;
         }
@@ -612,7 +606,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                         LocalDate workDate,
                                         LocalTime startTime,
                                         LocalTime endTime,
-                                        List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
+                                        List<ApprovedLeavePeriod> approvedLeavePeriods) {
         int rawAbsenceMinutes;
         if (firstPunchAt == null && lastPunchAt == null) {
             rawAbsenceMinutes = minutesBetween(startTime, endTime);
@@ -644,7 +638,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return 0;
     }
 
-    private int calculateApprovedLeaveCoveredMinutes(List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods,
+    private int calculateApprovedLeaveCoveredMinutes(List<ApprovedLeavePeriod> approvedLeavePeriods,
                                                      LocalDate workDate,
                                                      LocalTime startTime,
                                                      LocalTime endTime) {
@@ -656,7 +650,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, expectedStart, expectedEnd);
     }
 
-    private int calculateApprovedLeaveCoveredMinutes(List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods,
+    private int calculateApprovedLeaveCoveredMinutes(List<ApprovedLeavePeriod> approvedLeavePeriods,
                                                      LocalDateTime expectedStart,
                                                      LocalDateTime expectedEnd) {
         if (approvedLeavePeriods.isEmpty() || !expectedEnd.isAfter(expectedStart)) {
@@ -689,7 +683,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             .sum();
     }
 
-    private TimeRange overlapRange(LeaveQueryService.ApprovedLeavePeriod period,
+    private TimeRange overlapRange(ApprovedLeavePeriod period,
                                    LocalDateTime expectedStart,
                                    LocalDateTime expectedEnd) {
         LocalDateTime overlapStart = period.startAt().isAfter(expectedStart) ? period.startAt() : expectedStart;

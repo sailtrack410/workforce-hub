@@ -1,4 +1,4 @@
-package com.workforcehub.spi;
+package com.workforcehub.agent.service;
 
 /**
  * Agent 会话回复回写 IM 的跨模块结果。

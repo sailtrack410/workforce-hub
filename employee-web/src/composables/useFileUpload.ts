@@ -1,15 +1,14 @@
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { employeeApi } from '@/api';
-import type { DownloadTicketResponse, EntityId, WorkflowRequestAttachmentResponse } from '@/api';
+import type { EntityId } from '@/api';
 import type { FileSpaceRecord, PersonalFileRecord, SectionId, useShellStore } from '@/stores/shell';
 import { fileSizeLabel, fileTypeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { formatDateTime, statusText } from '@/utils/employee-format';
 import {
-  canInlinePreview,
-  fileMimeOf,
   fileNameOf,
   isFileTrashed,
 } from '@/utils/file-record';
+import { useFilePreview } from './useFilePreview';
 import { usePersonalFileTransfer } from './usePersonalFileTransfer';
 
 interface UseFileUploadOptions {
@@ -40,12 +39,16 @@ export function useFileUpload({
   const uploadDraftFile = ref<File | null>(null);
   const uploadDragActive = ref(false);
   const uploadResult = ref<{ status: 'success' | 'error'; text: string } | null>(null);
-  const filePreview = ref<{ file: PersonalFileRecord | WorkflowRequestAttachmentResponse; url: string; inline: boolean; objectUrl?: string } | null>(null);
-  const filePreviewLoading = ref(false);
   const fileActionLoading = ref<Record<string, boolean>>({});
-
-  const filePreviewTitle = computed(() => (filePreview.value ? fileNameOf(filePreview.value.file) : ''));
-  const filePreviewType = computed(() => (filePreview.value ? fileMimeOf(filePreview.value.file) : ''));
+  const {
+    filePreview,
+    filePreviewLoading,
+    filePreviewTitle,
+    filePreviewType,
+    openFilePreviewFromUrl,
+    closeFilePreview,
+    openPreviewExternal,
+  } = useFilePreview();
 
   async function refreshFileQuota() {
     try {
@@ -204,28 +207,6 @@ export function useFileUpload({
     }
   }
 
-  async function openFilePreviewFromUrl(file: PersonalFileRecord | WorkflowRequestAttachmentResponse, url: string) {
-    closeFilePreview();
-    const inline = canInlinePreview(file);
-    if (!inline) {
-      filePreview.value = { file, url, inline: false };
-      return;
-    }
-    filePreviewLoading.value = true;
-    try {
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) throw new Error('文件预览失败');
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      filePreview.value = { file, url: objectUrl, inline: true, objectUrl };
-    } catch (error) {
-      filePreview.value = { file, url, inline: false };
-      throw error;
-    } finally {
-      filePreviewLoading.value = false;
-    }
-  }
-
   async function downloadPersonalFile(file: PersonalFileRecord) {
     if (isFileTrashed(file)) return;
     const actionKey = `download-${file.id}`;
@@ -286,18 +267,6 @@ export function useFileUpload({
     } finally {
       fileActionLoading.value = { ...fileActionLoading.value, [actionKey]: false };
     }
-  }
-
-  function closeFilePreview() {
-    if (filePreview.value?.objectUrl) {
-      URL.revokeObjectURL(filePreview.value.objectUrl);
-    }
-    filePreview.value = null;
-  }
-
-  function openPreviewExternal() {
-    if (!filePreview.value?.url) return;
-    window.open(filePreview.value.url, '_blank', 'noopener');
   }
 
   return {

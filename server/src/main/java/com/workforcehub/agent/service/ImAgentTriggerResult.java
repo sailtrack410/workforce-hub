@@ -1,4 +1,4 @@
-package com.workforcehub.spi;
+package com.workforcehub.agent.service;
 
 /**
  * IM 会话 Agent 触发结果。

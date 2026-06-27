@@ -24,13 +24,9 @@ import {
   statusText,
   toApiDateTime,
 } from '@/utils/employee-format';
-import {
-  canInlinePreview,
-  fileMimeOf,
-  fileNameOf,
-  isFileTrashed,
-} from '@/utils/file-record';
+import { isFileTrashed } from '@/utils/file-record';
 import { ref } from 'vue';
+import { useFilePreview } from './useFilePreview';
 
 type FieldRows = Array<[string, string]>;
 
@@ -76,8 +72,15 @@ export function useWorkbenchState({
   const workflowDetailError = ref('');
   const withdrawComment = ref('');
   const withdrawSubmitting = ref(false);
-  const workflowFilePreview = ref<{ file: WorkflowRequestAttachmentResponse; url: string; inline: boolean; objectUrl?: string } | null>(null);
-  const workflowFilePreviewLoading = ref(false);
+  const {
+    filePreview: workflowFilePreview,
+    filePreviewLoading: workflowFilePreviewLoading,
+    filePreviewTitle: workflowFilePreviewTitle,
+    filePreviewType: workflowFilePreviewType,
+    openFilePreviewFromUrl: openWorkflowFilePreviewFromUrl,
+    closeFilePreview: closeWorkflowFilePreview,
+    openPreviewExternal: openWorkflowPreviewExternal,
+  } = useFilePreview();
   let workflowDetailRequestSeq = 0;
 
   const selectedLeaveAccount = computed(() => (
@@ -134,9 +137,6 @@ export function useWorkbenchState({
     }
     return rows;
   });
-  const workflowFilePreviewTitle = computed(() => (workflowFilePreview.value ? fileNameOf(workflowFilePreview.value.file) : ''));
-  const workflowFilePreviewType = computed(() => (workflowFilePreview.value ? fileMimeOf(workflowFilePreview.value.file) : ''));
-
   const {
     agentTaskForm,
     agentTaskSubmitting,
@@ -337,40 +337,6 @@ export function useWorkbenchState({
     } catch (error) {
       showToast(error instanceof Error ? error.message : '预览失败');
     }
-  }
-
-  async function openWorkflowFilePreviewFromUrl(file: WorkflowRequestAttachmentResponse, url: string) {
-    closeWorkflowFilePreview();
-    const inline = canInlinePreview(file);
-    if (!inline) {
-      workflowFilePreview.value = { file, url, inline: false };
-      return;
-    }
-    workflowFilePreviewLoading.value = true;
-    try {
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) throw new Error('文件预览失败');
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      workflowFilePreview.value = { file, url: objectUrl, inline: true, objectUrl };
-    } catch (error) {
-      workflowFilePreview.value = { file, url, inline: false };
-      throw error;
-    } finally {
-      workflowFilePreviewLoading.value = false;
-    }
-  }
-
-  function closeWorkflowFilePreview() {
-    if (workflowFilePreview.value?.objectUrl) {
-      URL.revokeObjectURL(workflowFilePreview.value.objectUrl);
-    }
-    workflowFilePreview.value = null;
-  }
-
-  function openWorkflowPreviewExternal() {
-    if (!workflowFilePreview.value?.url) return;
-    window.open(workflowFilePreview.value.url, '_blank', 'noopener');
   }
 
   function activeUploadableFiles() {

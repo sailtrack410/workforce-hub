@@ -2,6 +2,8 @@ package com.workforcehub.leave;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.common.exception.BizException;
+import com.workforcehub.leave.repository.LeaveRepository;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +20,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -34,6 +37,7 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
     private static final long MANAGER_USER_ID = 2002L;
+    private static final long ADMIN_USER_ID = 8001L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,6 +47,9 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private LeaveRepository leaveRepository;
 
     @Test
     @DisplayName("后台应能创建假种、调整员工余额，员工应能查询自己的假期账户")
@@ -130,6 +137,25 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
 
         assertEquals(1L, accountCount(EMPLOYEE_USER_ID, leaveTypeId));
         assertEquals(1L, txnCount(EMPLOYEE_USER_ID, leaveTypeId, "ADJUST", 960));
+    }
+
+    @Test
+    @DisplayName("余额更新应按读取到的version收口")
+    void accountBalanceUpdateShouldRejectStaleVersion() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        long leaveTypeId = createLeaveType(adminSession, "CAS_" + suffix, "版本测试-" + suffix);
+        adjustBalance(adminSession, leaveTypeId, 480, "cas-init-" + suffix);
+        long accountId = accountId(EMPLOYEE_USER_ID, leaveTypeId);
+        int version = accountVersion(accountId);
+
+        BizException exception = assertThrows(
+            BizException.class,
+            () -> leaveRepository.updateAccountBalance(accountId, 960, ADMIN_USER_ID, version + 1)
+        );
+
+        assertEquals("假期账户已被其他事务更新", exception.getMessage());
+        assertEquals(480, availableMinutes(EMPLOYEE_USER_ID, leaveTypeId));
     }
 
     @Test
@@ -288,6 +314,24 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
             ), 0)
             """, Integer.class, userId, leaveTypeId);
         return minutes == null ? 0 : minutes;
+    }
+
+    private long accountId(long userId, long leaveTypeId) {
+        Long accountId = jdbcTemplate.queryForObject("""
+            SELECT id
+            FROM lv_account
+            WHERE user_id = ? AND leave_type_id = ?
+            """, Long.class, userId, leaveTypeId);
+        return accountId == null ? 0L : accountId;
+    }
+
+    private int accountVersion(long accountId) {
+        Integer version = jdbcTemplate.queryForObject("""
+            SELECT version
+            FROM lv_account
+            WHERE id = ?
+            """, Integer.class, accountId);
+        return version == null ? 0 : version;
     }
 
     private String uniqueSuffix() {

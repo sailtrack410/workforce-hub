@@ -1,4 +1,4 @@
-package com.workforcehub.spi;
+package com.workforcehub.agent.service;
 
 /**
  * IM 创建 Agent 会话所需的最小 Agent 元信息。

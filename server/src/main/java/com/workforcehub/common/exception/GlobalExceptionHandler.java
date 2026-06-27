@@ -3,6 +3,7 @@ package com.workforcehub.common.exception;
 import com.workforcehub.common.response.R;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BindException;
@@ -21,9 +22,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
-    public R<Void> handleBizException(BizException e) {
-        log.warn("业务异常: code={}, message={}", e.getCode(), e.getMessage());
-        return R.fail(e.getCode(), e.getMessage());
+    public ResponseEntity<R<Void>> handleBizException(BizException e) {
+        log.warn("业务异常: httpStatus={}, code={}, message={}", e.getHttpStatus().value(), e.getCode(), e.getMessage());
+        return ResponseEntity.status(e.getHttpStatus()).body(R.fail(e.getCode(), e.getMessage()));
     }
 
     @ExceptionHandler(BadCredentialsException.class)

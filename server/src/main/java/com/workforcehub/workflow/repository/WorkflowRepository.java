@@ -83,7 +83,7 @@ public class WorkflowRepository {
                  current_step_key, current_step_name, submitted_at, created_by, updated_by)
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL',
-                 'manager_approval', '直属上级审批', NOW(), ?, ?)
+                 'manager_approval', (SELECT step_name FROM wf_step_config WHERE step_key = 'manager_approval'), NOW(), ?, ?)
             """,
             requestId,
             requestNo,
@@ -181,7 +181,7 @@ public class WorkflowRepository {
             UPDATE wf_request
             SET status = 'PENDING_REVIEW',
                 current_step_key = 'agent_pre_review',
-                current_step_name = 'Agent预审',
+                current_step_name = (SELECT step_name FROM wf_step_config WHERE step_key = 'agent_pre_review'),
                 agent_pre_review_task_id = ?,
                 updated_by = ?
             WHERE id = ?
@@ -200,7 +200,7 @@ public class WorkflowRepository {
             UPDATE wf_request
             SET status = 'IN_APPROVAL',
                 current_step_key = 'manager_approval',
-                current_step_name = '直属上级审批',
+                current_step_name = (SELECT step_name FROM wf_step_config WHERE step_key = 'manager_approval'),
                 flowable_process_instance_id = ?,
                 updated_by = ?
             WHERE id = ?
@@ -360,7 +360,7 @@ public class WorkflowRepository {
                 (id, request_id, flowable_task_id, step_key, step_name, actor_type,
                  actor_id, action_type, action_comment, before_status, after_status)
             VALUES
-                (?, ?, ?, 'manager_approval', '直属上级审批', 'USER',
+                (?, ?, ?, 'manager_approval', (SELECT step_name FROM wf_step_config WHERE step_key = 'manager_approval'), 'USER',
                  ?, ?, ?, ?, ?)
             """,
             IdWorker.getId(),
@@ -384,7 +384,7 @@ public class WorkflowRepository {
                 (id, request_id, flowable_task_id, step_key, step_name, actor_type,
                  actor_id, action_type, action_comment, agent_decision_json, before_status, after_status)
             VALUES
-                (?, ?, NULL, 'agent_pre_review', 'Agent预审', 'AGENT',
+                (?, ?, NULL, 'agent_pre_review', (SELECT step_name FROM wf_step_config WHERE step_key = 'agent_pre_review'), 'AGENT',
                  ?, 'AGENT_PRE_REVIEW', NULL, CAST(? AS JSON), ?, ?)
             """,
             IdWorker.getId(),

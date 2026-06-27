@@ -7,11 +7,11 @@ import com.workforcehub.leave.dto.AdjustLeaveAccountRequest;
 import com.workforcehub.leave.dto.CreateLeaveTypeRequest;
 import com.workforcehub.leave.dto.LeaveAccountResponse;
 import com.workforcehub.leave.dto.LeaveTypeResponse;
+import com.workforcehub.leave.repository.ApprovedLeavePeriod;
 import com.workforcehub.leave.repository.LeaveAccountRow;
 import com.workforcehub.leave.repository.LeaveAccountTxnRow;
 import com.workforcehub.leave.repository.LeaveRepository;
 import com.workforcehub.leave.repository.LeaveTypeRow;
-import com.workforcehub.spi.LeaveQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,7 +26,7 @@ import java.util.Map;
  * module-leave 第一版假期账户服务。
  */
 @Service
-public class LeaveService implements LeaveQueryService {
+public class LeaveService {
 
     private static final String BALANCE_MODE_DEDUCT = "DEDUCT";
     private static final String BALANCE_MODE_NO_DEDUCT = "NO_DEDUCT";
@@ -90,7 +90,7 @@ public class LeaveService implements LeaveQueryService {
             throw new BizException(400, "假期余额不能调整为负数");
         }
 
-        leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId);
+        leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
             IdWorker.getId(),
             account.accountId(),
@@ -172,7 +172,7 @@ public class LeaveService implements LeaveQueryService {
 
         int availableAfter = account.availableMinutes() - durationMinutes;
         int frozenAfter = account.frozenMinutes() + durationMinutes;
-        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId);
+        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
             IdWorker.getId(),
             account.accountId(),
@@ -224,11 +224,12 @@ public class LeaveService implements LeaveQueryService {
                 account.accountId(),
                 account.availableMinutes(),
                 account.frozenMinutes() - durationMinutes,
-                operatorId
+                operatorId,
+                account.version()
             );
         } else if (freezeTxn == null && account.availableMinutes() >= durationMinutes) {
             balanceAfter = account.availableMinutes() - durationMinutes;
-            leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId);
+            leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId, account.version());
         } else {
             throw new BizException(400, "冻结假期余额不足");
         }
@@ -283,7 +284,7 @@ public class LeaveService implements LeaveQueryService {
 
         int availableAfter = account.availableMinutes() + durationMinutes;
         int frozenAfter = account.frozenMinutes() - durationMinutes;
-        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId);
+        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
             IdWorker.getId(),
             account.accountId(),
@@ -297,7 +298,6 @@ public class LeaveService implements LeaveQueryService {
         );
     }
 
-    @Override
     public List<Map<String, Object>> getLeaveBalances(Long userId) {
         return leaveRepository.listUserAccounts(userId).stream()
             .map(row -> Map.<String, Object>of(
@@ -312,12 +312,10 @@ public class LeaveService implements LeaveQueryService {
             .toList();
     }
 
-    @Override
     public int getAvailableMinutes(Long userId, Long leaveTypeId) {
         return leaveRepository.getAvailableMinutes(userId, leaveTypeId);
     }
 
-    @Override
     public List<ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate) {
         return leaveRepository.listApprovedLeavePeriodsOnDate(userId, workDate);
     }

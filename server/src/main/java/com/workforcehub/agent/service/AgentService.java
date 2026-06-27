@@ -67,10 +67,6 @@ import com.workforcehub.agent.workflow.WorkflowValidator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
-import com.workforcehub.spi.ImAgentDescriptor;
-import com.workforcehub.spi.ImAgentTriggerCommand;
-import com.workforcehub.spi.ImAgentTriggerResult;
-import com.workforcehub.spi.ImAgentTriggerService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -89,7 +85,7 @@ import java.util.TreeMap;
  * module-agent 第一批治理、授权、任务和工具调用服务。
  */
 @Service
-public class AgentService implements ImAgentTriggerService {
+public class AgentService {
 
     private static final Set<String> AGENT_TYPES = Set.of("QA", "PRE_REVIEW", "REMINDER", "AUTOMATION");
     private static final Set<String> IDENTITY_MODES = Set.of("SYSTEM_IDENTITY", "USER_DELEGATED");
@@ -421,7 +417,6 @@ public class AgentService implements ImAgentTriggerService {
             .toList();
     }
 
-    @Override
     public ImAgentDescriptor requireUsableAgent(Long agentId, Long userId) {
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
@@ -433,7 +428,6 @@ public class AgentService implements ImAgentTriggerService {
         return new ImAgentDescriptor(agent.id(), agent.agentCode(), agent.agentName());
     }
 
-    @Override
     public ImAgentTriggerResult triggerConversationReply(ImAgentTriggerCommand command) {
         if (command == null) {
             throw new BizException(400, "Agent会话触发命令不能为空");
