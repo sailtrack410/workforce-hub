@@ -1,6 +1,5 @@
 package com.workforcehub.common.enums;
 
-import com.baomidou.mybatisplus.annotation.EnumValue;
 import lombok.Getter;
 
 /**
@@ -16,7 +15,6 @@ public enum RequestStatus {
     REJECTED("REJECTED", "已驳回"),
     WITHDRAWN("WITHDRAWN", "已撤回");
 
-    @EnumValue
     private final String code;
     private final String desc;
 

@@ -1,7 +1,6 @@
 package com.workforcehub.org.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.auth.domain.AuthUserAccount;
@@ -44,6 +43,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+
+import static com.workforcehub.common.util.TextValues.trimToNull;
 
 /**
  * module-org 第二批写侧治理服务
@@ -104,7 +105,7 @@ public class OrgManagementService {
         validateLeaderUser(request.getLeaderUserId());
 
         OrgDepartment department = new OrgDepartment();
-        department.setId(IdWorker.getId());
+        department.setId(IdGenerator.nextId());
         department.setParentId(parent == null ? null : parent.getId());
         department.setDeptCode(request.getDeptCode().trim());
         department.setDeptName(request.getDeptName().trim());
@@ -179,12 +180,50 @@ public class OrgManagementService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public boolean deleteDepartment(Long deptId) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        OrgDepartment department = departmentMapper.selectById(deptId);
+        if (department == null) {
+            return false;
+        }
+        if (departmentMapper.countByParentId(deptId) > 0) {
+            throw new BizException(400, "部门存在子部门");
+        }
+        if (orgUserMapper.countByPrimaryDeptId(deptId) > 0) {
+            throw new BizException(400, "部门存在员工");
+        }
+
+        List<OrgDepartmentLeader> leaders = departmentLeaderMapper.listByDeptId(deptId);
+        for (OrgDepartmentLeader leader : leaders) {
+            leader.setStatus("INACTIVE");
+            leader.setUpdatedBy(operatorId);
+            departmentLeaderMapper.updateById(leader);
+        }
+        department.setUpdatedBy(operatorId);
+        departmentMapper.updateById(department);
+        departmentMapper.deleteById(deptId);
+        publishDepartmentStructureChangedEvent(
+            "DELETED",
+            department,
+            department.getParentId(),
+            null,
+            department.getLeaderUserId(),
+            null,
+            department.getStatus(),
+            "DELETED",
+            operatorId
+        );
+        return true;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public Long createPosition(OrgPositionSaveRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
         ensurePositionCodeUnique(request.getPositionCode(), null);
         validateRecordStatus(request.getStatus());
 
         OrgPosition position = new OrgPosition();
+        position.setId(IdGenerator.nextId());
         position.setPositionCode(request.getPositionCode().trim());
         position.setPositionName(request.getPositionName().trim());
         position.setPositionCategory(trimToNull(request.getPositionCategory()));
@@ -220,6 +259,7 @@ public class OrgManagementService {
         validateDateFields(request.getHireDate(), request.getRegularizedAt());
 
         OrgUser user = new OrgUser();
+        user.setId(IdGenerator.nextId());
         user.setEmployeeNo(request.getEmployeeNo().trim());
         user.setRealName(request.getRealName().trim());
         user.setGender(trimToNull(request.getGender()));
@@ -343,9 +383,7 @@ public class OrgManagementService {
     public void upsertUserAccount(Long userId, OrgUserAccountUpsertRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
         OrgUser user = getUserOrThrow(userId);
-        AuthUserAccount existing = authUserAccountMapper.selectOne(
-            new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, userId)
-        );
+        AuthUserAccount existing = authUserAccountMapper.selectByUserId(userId);
 
         if (existing == null) {
             AccountMutation created = createUserAccount(user, request, operatorId);
@@ -417,6 +455,7 @@ public class OrgManagementService {
         }
 
         AuthUserAccount account = new AuthUserAccount();
+        account.setId(IdGenerator.nextId());
         account.setUserId(user.getId());
         account.setLoginName(loginName);
         account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -444,11 +483,7 @@ public class OrgManagementService {
                                                  Integer newLevel,
                                                  Long selfDeptId,
                                                  Long operatorId) {
-        List<OrgDepartment> descendants = departmentMapper.selectList(
-            new LambdaQueryWrapper<OrgDepartment>()
-                .likeRight(OrgDepartment::getTreePath, oldTreePath)
-                .ne(OrgDepartment::getId, selfDeptId)
-        );
+        List<OrgDepartment> descendants = departmentMapper.listByTreePathPrefixExcludingId(oldTreePath, selfDeptId);
         int delta = newLevel - oldLevel;
         for (OrgDepartment descendant : descendants) {
             descendant.setTreePath(newTreePath + descendant.getTreePath().substring(oldTreePath.length()));
@@ -459,11 +494,7 @@ public class OrgManagementService {
     }
 
     private void syncPrimaryDepartmentLeader(Long deptId, Long leaderUserId, Long operatorId) {
-        List<OrgDepartmentLeader> primaryLeaders = departmentLeaderMapper.selectList(
-            new LambdaQueryWrapper<OrgDepartmentLeader>()
-                .eq(OrgDepartmentLeader::getDeptId, deptId)
-                .eq(OrgDepartmentLeader::getIsPrimary, 1)
-        );
+        List<OrgDepartmentLeader> primaryLeaders = departmentLeaderMapper.listPrimaryByDeptId(deptId);
         for (OrgDepartmentLeader leader : primaryLeaders) {
             leader.setStatus("INACTIVE");
             leader.setUpdatedBy(operatorId);
@@ -474,14 +505,14 @@ public class OrgManagementService {
             return;
         }
 
-        OrgDepartmentLeader target = departmentLeaderMapper.selectOne(
-            new LambdaQueryWrapper<OrgDepartmentLeader>()
-                .eq(OrgDepartmentLeader::getDeptId, deptId)
-                .eq(OrgDepartmentLeader::getUserId, leaderUserId)
-                .eq(OrgDepartmentLeader::getLeaderType, "PRIMARY")
+        OrgDepartmentLeader target = departmentLeaderMapper.selectByDeptIdAndUserIdAndLeaderType(
+            deptId,
+            leaderUserId,
+            "PRIMARY"
         );
         if (target == null) {
             target = new OrgDepartmentLeader();
+            target.setId(IdGenerator.nextId());
             target.setDeptId(deptId);
             target.setUserId(leaderUserId);
             target.setLeaderType("PRIMARY");
@@ -602,45 +633,25 @@ public class OrgManagementService {
     }
 
     private void ensureDepartmentCodeUnique(String deptCode, Long selfDeptId) {
-        LambdaQueryWrapper<OrgDepartment> wrapper = new LambdaQueryWrapper<OrgDepartment>()
-            .eq(OrgDepartment::getDeptCode, deptCode.trim());
-        if (selfDeptId != null) {
-            wrapper.ne(OrgDepartment::getId, selfDeptId);
-        }
-        if (departmentMapper.selectCount(wrapper) > 0) {
+        if (departmentMapper.countByDeptCode(deptCode.trim(), selfDeptId) > 0) {
             throw new BizException(400, "部门编码已存在");
         }
     }
 
     private void ensurePositionCodeUnique(String positionCode, Long selfPositionId) {
-        LambdaQueryWrapper<OrgPosition> wrapper = new LambdaQueryWrapper<OrgPosition>()
-            .eq(OrgPosition::getPositionCode, positionCode.trim());
-        if (selfPositionId != null) {
-            wrapper.ne(OrgPosition::getId, selfPositionId);
-        }
-        if (positionMapper.selectCount(wrapper) > 0) {
+        if (positionMapper.countByPositionCode(positionCode.trim(), selfPositionId) > 0) {
             throw new BizException(400, "岗位编码已存在");
         }
     }
 
     private void ensureEmployeeNoUnique(String employeeNo, Long selfUserId) {
-        LambdaQueryWrapper<OrgUser> wrapper = new LambdaQueryWrapper<OrgUser>()
-            .eq(OrgUser::getEmployeeNo, employeeNo.trim());
-        if (selfUserId != null) {
-            wrapper.ne(OrgUser::getId, selfUserId);
-        }
-        if (orgUserMapper.selectCount(wrapper) > 0) {
+        if (orgUserMapper.countByEmployeeNo(employeeNo.trim(), selfUserId) > 0) {
             throw new BizException(400, "工号已存在");
         }
     }
 
     private void ensureLoginNameUnique(String loginName, Long selfAccountId) {
-        LambdaQueryWrapper<AuthUserAccount> wrapper = new LambdaQueryWrapper<AuthUserAccount>()
-            .eq(AuthUserAccount::getLoginName, loginName);
-        if (selfAccountId != null) {
-            wrapper.ne(AuthUserAccount::getId, selfAccountId);
-        }
-        if (authUserAccountMapper.selectCount(wrapper) > 0) {
+        if (authUserAccountMapper.countByLoginName(loginName, selfAccountId) > 0) {
             throw new BizException(400, "登录名已存在");
         }
     }
@@ -649,12 +660,7 @@ public class OrgManagementService {
         if (!StringUtils.hasText(email)) {
             return;
         }
-        LambdaQueryWrapper<AuthUserAccount> wrapper = new LambdaQueryWrapper<AuthUserAccount>()
-            .eq(AuthUserAccount::getEmail, email.trim());
-        if (selfAccountId != null) {
-            wrapper.ne(AuthUserAccount::getId, selfAccountId);
-        }
-        if (authUserAccountMapper.selectCount(wrapper) > 0) {
+        if (authUserAccountMapper.countByEmail(email.trim(), selfAccountId) > 0) {
             throw new BizException(400, "邮箱已被其他账号占用");
         }
     }
@@ -715,9 +721,7 @@ public class OrgManagementService {
     }
 
     private AccountMutation forceDisableAccountIfExists(Long userId, Long operatorId) {
-        AuthUserAccount account = authUserAccountMapper.selectOne(
-            new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, userId)
-        );
+        AuthUserAccount account = authUserAccountMapper.selectByUserId(userId);
         if (account == null) {
             return null;
         }
@@ -763,6 +767,7 @@ public class OrgManagementService {
                                      Map<String, Object> afterSnapshot,
                                      Long operatorId) {
         HrEmployeeEvent event = new HrEmployeeEvent();
+        event.setId(IdGenerator.nextId());
         event.setUserId(userId);
         event.setChangeType(changeType);
         event.setBeforeSnapshotJson(toJson(beforeSnapshot));
@@ -890,9 +895,7 @@ public class OrgManagementService {
     }
 
     private AuthUserAccount findUserAccount(Long userId) {
-        return authUserAccountMapper.selectOne(
-            new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, userId)
-        );
+        return authUserAccountMapper.selectByUserId(userId);
     }
 
     private AccountMutation buildAccountMutation(String changeAction,
@@ -943,13 +946,6 @@ public class OrgManagementService {
             return "/" + deptId + "/";
         }
         return parent.getTreePath() + deptId + "/";
-    }
-
-    private String trimToNull(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
     }
 
     private String normalizeUpper(String value) {

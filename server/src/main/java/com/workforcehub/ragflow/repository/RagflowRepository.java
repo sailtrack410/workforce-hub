@@ -332,7 +332,7 @@ public class RagflowRepository {
                  token_count, vector_row_id, status)
                 VALUES
                     (?, ?, ?, ?, SHA2(?, 256), ?, ?, ?, ?, 'ACTIVE')
-                """, com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(), documentId, jobId, chunkNo, chunk, spaceId, chunk, chunk.length(), vectorIds.get(chunkNo - 1));
+                """, com.workforcehub.common.util.IdGenerator.nextId(), documentId, jobId, chunkNo, chunk, spaceId, chunk, chunk.length(), vectorIds.get(chunkNo - 1));
             chunkNo++;
         }
     }

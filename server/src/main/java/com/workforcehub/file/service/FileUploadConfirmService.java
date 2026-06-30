@@ -1,8 +1,10 @@
 package com.workforcehub.file.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
+import com.workforcehub.common.audit.AuditLogWriter;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.common.util.TextValues;
 import com.workforcehub.file.dto.AttachmentRefResponse;
 import com.workforcehub.file.dto.ConfirmUploadRequest;
 import com.workforcehub.file.repository.AttachmentRefRepository;
@@ -10,12 +12,10 @@ import com.workforcehub.file.repository.AttachmentRow;
 import com.workforcehub.file.repository.FileObjectRepository;
 import com.workforcehub.file.repository.FileObjectRow;
 import com.workforcehub.file.storage.StorageProviderRegistry;
-import com.workforcehub.im.repository.ImRepository;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,7 +35,8 @@ public class FileUploadConfirmService {
     private final FileObjectRepository fileObjectRepository;
     private final AttachmentRefRepository attachmentRefRepository;
     private final FileQuotaPolicyService fileQuotaPolicyService;
-    private final ImRepository imRepository;
+    private final FileUploadRules fileUploadRules;
+    private final AuditLogWriter auditLogWriter;
 
     public FileUploadConfirmService(JdbcTemplate jdbcTemplate,
                                     StorageProviderRegistry storageProviderRegistry,
@@ -43,14 +44,16 @@ public class FileUploadConfirmService {
                                     FileObjectRepository fileObjectRepository,
                                     AttachmentRefRepository attachmentRefRepository,
                                     FileQuotaPolicyService fileQuotaPolicyService,
-                                    ImRepository imRepository) {
+                                    FileUploadRules fileUploadRules,
+                                    AuditLogWriter auditLogWriter) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.storageUsageLedgerService = storageUsageLedgerService;
         this.fileObjectRepository = fileObjectRepository;
         this.attachmentRefRepository = attachmentRefRepository;
         this.fileQuotaPolicyService = fileQuotaPolicyService;
-        this.imRepository = imRepository;
+        this.fileUploadRules = fileUploadRules;
+        this.auditLogWriter = auditLogWriter;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -81,12 +84,12 @@ public class FileUploadConfirmService {
         if (!ticket.bizType().equals(request.getOwnerType()) || !sameId(ticket.bizId(), request.getOwnerId())) {
             throw new BizException(422, "业务归属不匹配，请重新申请上传票据");
         }
-        validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
-        validateEmployeeFolder(request.getOwnerType(), userId, request.getFolderId());
+        fileUploadRules.validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
+        fileUploadRules.validateEmployeeFolder(request.getOwnerType(), userId, request.getFolderId());
 
         storageProviderRegistry.require(ticket.storageProvider())
             .verifyObject(ticket.bucketName(), request.getObjectKey(), request.getContentSha256(), request.getFileSize());
-        ensureEmployeeQuota(request.getOwnerType(), userId, request.getFileSize());
+        fileUploadRules.ensureEmployeeQuota(request.getOwnerType(), userId, request.getFileSize());
         fileQuotaPolicyService.ensureGlobalQuota(request.getFileSize());
 
         boolean deduplicated = false;
@@ -123,13 +126,13 @@ public class FileUploadConfirmService {
             throw e;
         }
         fileObjectRepository.increaseRefCount(fileObject.id());
-        increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
+        fileUploadRules.increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
         storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
         if (deduplicated) {
             scheduleDeduplicatedUploadObjectCleanup(ticket, fileObject);
         }
         markUploadTicketConfirmed(ticket.id());
-        audit("USER", userId, "FILE_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("USER", userId, "FILE_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
         return buildAttachmentResponse(attachmentRefId, deduplicated);
     }
@@ -162,7 +165,7 @@ public class FileUploadConfirmService {
         if (!ticket.bizType().equals(request.getOwnerType()) || !sameId(ticket.bizId(), request.getOwnerId())) {
             throw new BizException(422, "业务归属不匹配，请重新申请上传票据");
         }
-        validateAdminOwner(request.getOwnerType(), request.getOwnerId());
+        fileUploadRules.validateAdminOwner(request.getOwnerType(), request.getOwnerId());
 
         storageProviderRegistry.require(ticket.storageProvider())
             .verifyObject(ticket.bucketName(), request.getObjectKey(), request.getContentSha256(), request.getFileSize());
@@ -207,83 +210,13 @@ public class FileUploadConfirmService {
             scheduleDeduplicatedUploadObjectCleanup(ticket, fileObject);
         }
         markUploadTicketConfirmed(ticket.id());
-        audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_UPLOAD_CONFIRMED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
             "{\"fileObjectId\":%s,\"deduplicated\":%s}".formatted(fileObject.id(), deduplicated));
         return buildAttachmentResponse(attachmentRefId, deduplicated);
     }
 
-    private void validateEmployeeOwner(String ownerType, Long ownerId) {
-        if (!"PERSONAL_FILE".equals(ownerType)
-            && !"USER_AVATAR".equals(ownerType)
-            && !"IM_MESSAGE_PENDING".equals(ownerType)
-            && !"IM_GROUP_FILE".equals(ownerType)) {
-            throw new BizException(400, "员工端不支持该文件归属");
-        }
-        if ("IM_GROUP_FILE".equals(ownerType)) {
-            Long userId = CurrentUserHolder.requireUserId();
-            if (ownerId == null) {
-                throw new BizException(400, "群文件必须指定群聊");
-            }
-            if (!imRepository.existsActiveUserMembership(ownerId, userId)) {
-                throw new BizException(403, "无权访问该群聊");
-            }
-            return;
-        }
-        if (ownerId != null) {
-            throw new BizException(400, "员工端文件不应指定业务归属ID");
-        }
-    }
-
-    private void validateEmployeeFolder(String ownerType, Long userId, Long folderId) {
-        if (folderId == null) {
-            return;
-        }
-        if (!"PERSONAL_FILE".equals(ownerType)) {
-            throw new BizException(400, "仅个人文件支持选择文件夹");
-        }
-        Integer count = jdbcTemplate.queryForObject("""
-            SELECT COUNT(*)
-            FROM sys_file_folder
-            WHERE id = ? AND user_id = ? AND is_deleted = 0
-            """,
-            Integer.class,
-            folderId,
-            userId
-        );
-        if (count == null || count == 0) {
-            throw new BizException(404, "文件夹不存在");
-        }
-    }
-
-    private void validateAdminOwner(String ownerType, Long ownerId) {
-        if (!"ADMIN_FILE".equals(ownerType) && !"RAGFLOW_DOCUMENT".equals(ownerType)) {
-            throw new BizException(400, "后台第一版仅支持后台治理文件");
-        }
-        if ("RAGFLOW_DOCUMENT".equals(ownerType)) {
-            if (ownerId == null) {
-                throw new BizException(400, "知识库文件必须指定知识库");
-            }
-            return;
-        }
-        if (ownerId != null) {
-            throw new BizException(400, "后台治理文件不应指定业务归属ID");
-        }
-    }
-
-    private void ensureEmployeeQuota(String ownerType, Long userId, Long incomingBytes) {
-        if (!"IM_GROUP_FILE".equals(ownerType)) {
-            fileQuotaPolicyService.ensurePersonalQuota(userId, incomingBytes);
-        }
-    }
-
-    private void increaseEmployeeUsage(String ownerType, Long userId, Long incomingBytes) {
-        if (!"IM_GROUP_FILE".equals(ownerType)) {
-            storageUsageLedgerService.increaseUsage("USER", userId, incomingBytes, 1);
-        }
-    }
-
     private FileObjectRow createFileObject(UploadTicketRow ticket, ConfirmUploadRequest request, Long userId) {
-        Long fileObjectId = IdWorker.getId();
+        Long fileObjectId = IdGenerator.nextId();
         String fileExt = extractExt(ticket.fileName());
         try {
             jdbcTemplate.update("""
@@ -303,7 +236,7 @@ public class FileUploadConfirmService {
                 ticket.mimeType(),
                 ticket.fileSize(),
                 request.getContentSha256().toLowerCase(),
-                blankToNull(ticket.contentMd5()),
+                TextValues.blankToNull(ticket.contentMd5()),
                 request.getContentSha256().toLowerCase(),
                 userId
             );
@@ -329,7 +262,7 @@ public class FileUploadConfirmService {
                                      String uploaderType,
                                      Long uploaderId,
                                      Long folderId) {
-        Long attachmentRefId = IdWorker.getId();
+        Long attachmentRefId = IdGenerator.nextId();
         attachmentRefRepository.create(
             attachmentRefId,
             ownerType,
@@ -356,7 +289,7 @@ public class FileUploadConfirmService {
             VALUES
                 (?, ?, ?, 'UPLOAD_TICKET', ?, ?, ?, ?, 'PENDING')
             """,
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             "FILE-CLEAN-DEDUP-" + ticket.id(),
             CLEANUP_DEDUPLICATED_UPLOAD_OBJECT,
             ticket.id(),
@@ -426,35 +359,12 @@ public class FileUploadConfirmService {
         return rows.get(0);
     }
 
-    private void audit(String operatorType, Long operatorId, String actionType,
-                       String targetType, Long targetId, String result, String detailJson) {
-        jdbcTemplate.update("""
-            INSERT INTO sys_audit_log
-                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
-            """,
-            IdWorker.getId(),
-            operatorType,
-            operatorId,
-            actionType,
-            targetType,
-            targetId,
-            result,
-            detailJson
-        );
-    }
-
     private String extractExt(String fileName) {
         int dotIndex = fileName == null ? -1 : fileName.lastIndexOf('.');
         if (dotIndex < 0 || dotIndex == fileName.length() - 1) {
             return null;
         }
         return fileName.substring(dotIndex + 1).toLowerCase();
-    }
-
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
     }
 
     private boolean sameId(Long left, Long right) {

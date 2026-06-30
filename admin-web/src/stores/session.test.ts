@@ -33,6 +33,37 @@ describe('admin session store', () => {
     expect(session.initialized).toBe(true);
   });
 
+  it('denies permission when legacy session omits permissions', async () => {
+    const session = useSessionStore();
+
+    await session.loadCurrentUser(authApi());
+
+    expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(false);
+  });
+
+  it('denies permission when session returns empty permissions', async () => {
+    const session = useSessionStore();
+
+    await session.loadCurrentUser(authApi({
+      me: async () => ({ ...user, permissionCodes: [] }),
+    }));
+
+    expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(false);
+  });
+
+  it('clears local session when logout request is already expired', async () => {
+    const session = useSessionStore();
+    await session.loadCurrentUser(authApi());
+
+    await expect(session.logout(authApi({
+      logout: async () => {
+        throw new Error('Unauthorized');
+      },
+    }))).resolves.toBeUndefined();
+
+    expect(session.isAuthenticated).toBe(false);
+  });
+
   it('clears session when current user request fails', async () => {
     const session = useSessionStore();
 

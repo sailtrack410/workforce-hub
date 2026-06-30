@@ -1,6 +1,7 @@
 package com.workforcehub.common.exception;
 
 import lombok.Getter;
+import org.springframework.http.HttpStatus;
 
 /**
  * 业务异常
@@ -9,13 +10,19 @@ import lombok.Getter;
 public class BizException extends RuntimeException {
 
     private final int code;
+    private final HttpStatus httpStatus;
 
     public BizException(String message) {
-        this(1, message);
+        this(BusinessErrorCode.GENERAL, message);
     }
 
-    public BizException(int code, String message) {
+    public BizException(int httpStatus, String message) {
+        this(BusinessErrorCode.fromHttpStatus(httpStatus), message);
+    }
+
+    public BizException(BusinessErrorCode errorCode, String message) {
         super(message);
-        this.code = code;
+        this.code = errorCode.code();
+        this.httpStatus = errorCode.httpStatus();
     }
 }

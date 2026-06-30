@@ -1,11 +1,13 @@
 package com.workforcehub.file.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.common.audit.AuditLogWriter;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.common.util.TextValues;
 import com.workforcehub.file.config.FileStorageProperties;
 import com.workforcehub.file.dto.CreateUploadTicketRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
@@ -15,7 +17,6 @@ import com.workforcehub.file.repository.FileObjectRow;
 import com.workforcehub.file.storage.StorageProvider;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.file.storage.StorageUploadTarget;
-import com.workforcehub.im.repository.ImRepository;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,8 @@ public class FileUploadTicketService {
     private final FileObjectRepository fileObjectRepository;
     private final AttachmentRefRepository attachmentRefRepository;
     private final FileQuotaPolicyService fileQuotaPolicyService;
-    private final ImRepository imRepository;
+    private final FileUploadRules fileUploadRules;
+    private final AuditLogWriter auditLogWriter;
 
     public FileUploadTicketService(JdbcTemplate jdbcTemplate,
                                    StorageProviderRegistry storageProviderRegistry,
@@ -50,7 +52,8 @@ public class FileUploadTicketService {
                                    FileObjectRepository fileObjectRepository,
                                    AttachmentRefRepository attachmentRefRepository,
                                    FileQuotaPolicyService fileQuotaPolicyService,
-                                   ImRepository imRepository) {
+                                   FileUploadRules fileUploadRules,
+                                   AuditLogWriter auditLogWriter) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.fileStorageProperties = fileStorageProperties;
@@ -59,20 +62,21 @@ public class FileUploadTicketService {
         this.fileObjectRepository = fileObjectRepository;
         this.attachmentRefRepository = attachmentRefRepository;
         this.fileQuotaPolicyService = fileQuotaPolicyService;
-        this.imRepository = imRepository;
+        this.fileUploadRules = fileUploadRules;
+        this.auditLogWriter = auditLogWriter;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
-        validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
-        validateEmployeeFolder(request.getOwnerType(), userId, request.getFolderId());
+        fileUploadRules.validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
+        fileUploadRules.validateEmployeeFolder(request.getOwnerType(), userId, request.getFolderId());
         UploadTicketResponse existingTicket = findUploadTicketByClientRequestId("USER", userId, request.getClientRequestId());
         if (existingTicket != null) {
             return existingTicket;
         }
         ensureUploadPolicy(request);
-        ensureEmployeeQuota(request.getOwnerType(), userId, request.getFileSize());
+        fileUploadRules.ensureEmployeeQuota(request.getOwnerType(), userId, request.getFileSize());
         fileQuotaPolicyService.ensureGlobalQuota(request.getFileSize());
 
         FileObjectRow existing = fileObjectRepository.findReusableForUploader(
@@ -109,9 +113,9 @@ public class FileUploadTicketService {
                 throw e;
             }
             fileObjectRepository.increaseRefCount(existing.id());
-            increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
+            fileUploadRules.increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
             storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
-            audit("USER", userId, "FILE_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+            auditLogWriter.write("USER", userId, "FILE_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
             return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);
         }
@@ -122,7 +126,7 @@ public class FileUploadTicketService {
     @Transactional(rollbackFor = Exception.class)
     public UploadTicketResponse createAdminUploadTicket(CreateUploadTicketRequest request) {
         Long adminId = CurrentUserHolder.requireUserId();
-        validateAdminOwner(request.getOwnerType(), request.getOwnerId());
+        fileUploadRules.validateAdminOwner(request.getOwnerType(), request.getOwnerId());
         UploadTicketResponse existingTicket = findUploadTicketByClientRequestId("ADMIN", adminId, request.getClientRequestId());
         if (existingTicket != null) {
             return existingTicket;
@@ -165,7 +169,7 @@ public class FileUploadTicketService {
             }
             fileObjectRepository.increaseRefCount(existing.id());
             storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
-            audit("ADMIN", adminId, "FILE_ADMIN_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
+            auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
             return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);
         }
@@ -177,7 +181,7 @@ public class FileUploadTicketService {
                                                            Long uploaderId,
                                                            CreateUploadTicketRequest request,
                                                            String auditAction) {
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         String ticketNo = "UP" + ticketId;
         String objectKey = buildObjectKey(request.getContentSha256(), request.getFileName(), ticketId);
         String providerCode = fileStorageProperties.getStorageProvider();
@@ -206,10 +210,10 @@ public class FileUploadTicketService {
                 request.getFileName(),
                 request.getMimeType(),
                 request.getFileSize(),
-                blankToNull(request.getContentMd5()),
+                TextValues.blankToNull(request.getContentMd5()),
                 request.getContentSha256().toLowerCase(),
                 objectKey,
-                blankToNull(request.getClientRequestId()),
+                TextValues.blankToNull(request.getClientRequestId()),
                 uploadTarget.expireAt(),
                 uploaderId
             );
@@ -236,79 +240,9 @@ public class FileUploadTicketService {
         response.setUploadUrl(uploadTarget.uploadUrl());
         response.setHeaders(uploadTarget.headers());
         response.setExpireAt(uploadTarget.expireAt());
-        audit(uploaderType, uploaderId, auditAction, "UPLOAD_TICKET", ticketId, "SUCCESS",
+        auditLogWriter.write(uploaderType, uploaderId, auditAction, "UPLOAD_TICKET", ticketId, "SUCCESS",
             "{\"objectKey\":\"%s\"}".formatted(objectKey));
         return response;
-    }
-
-    private void validateEmployeeOwner(String ownerType, Long ownerId) {
-        if (!"PERSONAL_FILE".equals(ownerType)
-            && !"USER_AVATAR".equals(ownerType)
-            && !"IM_MESSAGE_PENDING".equals(ownerType)
-            && !"IM_GROUP_FILE".equals(ownerType)) {
-            throw new BizException(400, "员工端不支持该文件归属");
-        }
-        if ("IM_GROUP_FILE".equals(ownerType)) {
-            Long userId = CurrentUserHolder.requireUserId();
-            if (ownerId == null) {
-                throw new BizException(400, "群文件必须指定群聊");
-            }
-            if (!imRepository.existsActiveUserMembership(ownerId, userId)) {
-                throw new BizException(403, "无权访问该群聊");
-            }
-            return;
-        }
-        if (ownerId != null) {
-            throw new BizException(400, "员工端文件不应指定业务归属ID");
-        }
-    }
-
-    private void validateEmployeeFolder(String ownerType, Long userId, Long folderId) {
-        if (folderId == null) {
-            return;
-        }
-        if (!"PERSONAL_FILE".equals(ownerType)) {
-            throw new BizException(400, "仅个人文件支持选择文件夹");
-        }
-        Integer count = jdbcTemplate.queryForObject("""
-            SELECT COUNT(*)
-            FROM sys_file_folder
-            WHERE id = ? AND user_id = ? AND is_deleted = 0
-            """,
-            Integer.class,
-            folderId,
-            userId
-        );
-        if (count == null || count == 0) {
-            throw new BizException(404, "文件夹不存在");
-        }
-    }
-
-    private void ensureEmployeeQuota(String ownerType, Long userId, Long incomingBytes) {
-        if (!"IM_GROUP_FILE".equals(ownerType)) {
-            fileQuotaPolicyService.ensurePersonalQuota(userId, incomingBytes);
-        }
-    }
-
-    private void increaseEmployeeUsage(String ownerType, Long userId, Long incomingBytes) {
-        if (!"IM_GROUP_FILE".equals(ownerType)) {
-            storageUsageLedgerService.increaseUsage("USER", userId, incomingBytes, 1);
-        }
-    }
-
-    private void validateAdminOwner(String ownerType, Long ownerId) {
-        if (!"ADMIN_FILE".equals(ownerType) && !"RAGFLOW_DOCUMENT".equals(ownerType)) {
-            throw new BizException(400, "后台第一版仅支持后台治理文件");
-        }
-        if ("RAGFLOW_DOCUMENT".equals(ownerType)) {
-            if (ownerId == null) {
-                throw new BizException(400, "知识库文件必须指定知识库");
-            }
-            return;
-        }
-        if (ownerId != null) {
-            throw new BizException(400, "后台治理文件不应指定业务归属ID");
-        }
     }
 
     private void ensureUploadPolicy(CreateUploadTicketRequest request) {
@@ -380,7 +314,7 @@ public class FileUploadTicketService {
                                                          Long uploaderId,
                                                          CreateUploadTicketRequest request,
                                                          FileObjectRow fileObject) {
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         jdbcTemplate.update("""
             INSERT INTO sys_upload_ticket
                 (id, ticket_no, uploader_type, uploader_id, biz_type, biz_id,
@@ -401,10 +335,10 @@ public class FileUploadTicketService {
             request.getFileName(),
             request.getMimeType(),
             request.getFileSize(),
-            blankToNull(request.getContentMd5()),
+            TextValues.blankToNull(request.getContentMd5()),
             request.getContentSha256().toLowerCase(),
             fileObject.objectKey(),
-            blankToNull(request.getClientRequestId()),
+            TextValues.blankToNull(request.getClientRequestId()),
             LocalDateTime.now(),
             uploaderId
         );
@@ -420,7 +354,7 @@ public class FileUploadTicketService {
                                      String uploaderType,
                                      Long uploaderId,
                                      Long folderId) {
-        Long attachmentRefId = IdWorker.getId();
+        Long attachmentRefId = IdGenerator.nextId();
         attachmentRefRepository.create(
             attachmentRefId,
             ownerType,
@@ -523,29 +457,6 @@ public class FileUploadTicketService {
             return null;
         }
         return fileName.substring(dotIndex + 1).toLowerCase();
-    }
-
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
-    }
-
-    private void audit(String operatorType, Long operatorId, String actionType,
-                       String targetType, Long targetId, String result, String detailJson) {
-        jdbcTemplate.update("""
-            INSERT INTO sys_audit_log
-                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
-            """,
-            IdWorker.getId(),
-            operatorType,
-            operatorId,
-            actionType,
-            targetType,
-            targetId,
-            result,
-            detailJson
-        );
     }
 
     private record UploadPolicyRow(

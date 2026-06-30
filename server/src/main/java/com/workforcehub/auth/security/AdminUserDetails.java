@@ -5,7 +5,6 @@ import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 
@@ -13,21 +12,17 @@ import java.util.List;
  * 后台管理员用户主体
  */
 @Getter
-public class AdminUserDetails implements WfhUserDetails, Serializable {
+public class AdminUserDetails extends AbstractWfhUserDetails {
 
-    private final Long userId;
-    private final String username;
-    private final String passwordHash;
-    private final String displayName;
-    private final String status;
+    private final List<String> roleCodes;
+    private final List<String> permissionCodes;
 
     public AdminUserDetails(Long userId, String username, String passwordHash,
-                            String displayName, String status) {
-        this.userId = userId;
-        this.username = username;
-        this.passwordHash = passwordHash;
-        this.displayName = displayName;
-        this.status = status;
+                            String displayName, String status,
+                            List<String> roleCodes, List<String> permissionCodes) {
+        super(userId, username, passwordHash, displayName, status);
+        this.roleCodes = roleCodes == null ? List.of() : List.copyOf(roleCodes);
+        this.permissionCodes = permissionCodes == null ? List.of() : List.copyOf(permissionCodes);
     }
 
     @Override
@@ -37,36 +32,9 @@ public class AdminUserDetails implements WfhUserDetails, Serializable {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
-    }
-
-    @Override
-    public String getPassword() {
-        return passwordHash;
-    }
-
-    @Override
-    public String getUsername() {
-        return username;
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return !"LOCKED".equals(status);
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return "ACTIVE".equals(status);
+        return permissionCodes.stream()
+            .map(SimpleGrantedAuthority::new)
+            .map(GrantedAuthority.class::cast)
+            .toList();
     }
 }

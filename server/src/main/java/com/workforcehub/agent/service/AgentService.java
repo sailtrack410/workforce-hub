@@ -1,6 +1,6 @@
 package com.workforcehub.agent.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -13,7 +13,7 @@ import com.workforcehub.agent.dto.AdminAgentTaskTimeoutRunResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.CancelAgentTaskRequest;
 import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
-import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.dto.AgentAclResponse;
 import com.workforcehub.agent.dto.AgentResponse;
@@ -68,10 +68,6 @@ import com.workforcehub.agent.workflow.WorkflowValidator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
-import com.workforcehub.spi.ImAgentDescriptor;
-import com.workforcehub.spi.ImAgentTriggerCommand;
-import com.workforcehub.spi.ImAgentTriggerResult;
-import com.workforcehub.spi.ImAgentTriggerService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -86,11 +82,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import static com.workforcehub.common.util.JsonValues.normalize;
+import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.safeSummary;
+import static com.workforcehub.common.util.TextValues.trimToNull;
+
 /**
  * module-agent 第一批治理、授权、任务和工具调用服务。
  */
 @Service
-public class AgentService implements ImAgentTriggerService {
+public class AgentService {
 
     private static final Set<String> AGENT_TYPES = Set.of("QA", "PRE_REVIEW", "REMINDER", "AUTOMATION");
     private static final Set<String> IDENTITY_MODES = Set.of("SYSTEM_IDENTITY", "USER_DELEGATED");
@@ -115,7 +116,7 @@ public class AgentService implements ImAgentTriggerService {
     private final WorkflowParser workflowParser;
     private final WorkflowValidator workflowValidator;
     private final WorkflowExecutor workflowExecutor;
-    private final AgentModelClient agentModelClient;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
 
     public AgentService(AgentRepository agentRepository,
                         AgentTaskTimeoutRepository timeoutRepository,
@@ -125,7 +126,7 @@ public class AgentService implements ImAgentTriggerService {
                         WorkflowParser workflowParser,
                         WorkflowValidator workflowValidator,
                         WorkflowExecutor workflowExecutor,
-                        AgentModelClient agentModelClient) {
+                        OpenAiCompatibleAgentModelClient agentModelClient) {
         this.agentRepository = agentRepository;
         this.timeoutRepository = timeoutRepository;
         this.objectMapper = objectMapper;
@@ -250,7 +251,7 @@ public class AgentService implements ImAgentTriggerService {
         if (agentRepository.existsAgentCode(agentCode)) {
             throw new BizException(409, "AI助手编码已存在");
         }
-        Long agentId = IdWorker.getId();
+        Long agentId = IdGenerator.nextId();
         agentRepository.insertAgent(
             agentId,
             agentCode,
@@ -288,10 +289,10 @@ public class AgentService implements ImAgentTriggerService {
         if (versionLabel != null && agentRepository.existsAgentVersionLabel(agentId, versionLabel)) {
             throw new BizException(409, "AI助手显示版本号已存在");
         }
-        Long versionId = IdWorker.getId();
-        String modelConfigJson = normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON");
+        Long versionId = IdGenerator.nextId();
+        String modelConfigJson = normalize(objectMapper, request.getModelConfigJson(), "模型配置不是合法JSON");
         String systemPrompt = trimToNull(request.getSystemPrompt());
-        String workflowConfigJson = normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON");
+        String workflowConfigJson = normalize(objectMapper, request.getWorkflowConfigJson(), "工作流配置不是合法JSON");
         agentRepository.insertAgentVersion(
             versionId,
             agentId,
@@ -322,9 +323,9 @@ public class AgentService implements ImAgentTriggerService {
         if (!"DRAFT".equals(version.publishStatus())) {
             throw new BizException(409, "只有草稿版本可以修改");
         }
-        String modelConfigJson = normalizeJson(request.getModelConfigJson(), "模型配置不是合法JSON");
+        String modelConfigJson = normalize(objectMapper, request.getModelConfigJson(), "模型配置不是合法JSON");
         String systemPrompt = trimToNull(request.getSystemPrompt());
-        String workflowConfigJson = normalizeJson(request.getWorkflowConfigJson(), "工作流配置不是合法JSON");
+        String workflowConfigJson = normalize(objectMapper, request.getWorkflowConfigJson(), "工作流配置不是合法JSON");
         boolean oldWorkflow = workflowParser.isWorkflowConfig(version.workflowConfigJson());
         agentRepository.updateAgentVersion(
             versionId,
@@ -354,7 +355,7 @@ public class AgentService implements ImAgentTriggerService {
             throw new BizException(409, "工具编码已存在");
         }
         String toolType = normalizeIn(request.getToolType(), TOOL_TYPES, "工具类型不支持");
-        Long toolId = IdWorker.getId();
+        Long toolId = IdGenerator.nextId();
         agentRepository.insertTool(
             toolId,
             toolCode,
@@ -380,14 +381,14 @@ public class AgentService implements ImAgentTriggerService {
         if (!"ACTIVE".equals(tool.status())) {
             throw new BizException(409, "工具未启用");
         }
-        Long bindingId = IdWorker.getId();
+        Long bindingId = IdGenerator.nextId();
         agentRepository.insertToolBinding(
             bindingId,
             versionId,
             request.getToolId(),
             normalizeDefault(request.getApprovalMode(), "AUTO", APPROVAL_MODES, "工具审批模式不支持"),
-            normalizeJson(request.getArgSchemaJson(), "参数Schema不是合法JSON"),
-            normalizeJson(request.getRiskControlJson(), "风控配置不是合法JSON"),
+            normalize(objectMapper, request.getArgSchemaJson(), "参数Schema不是合法JSON"),
+            normalize(objectMapper, request.getRiskControlJson(), "风控配置不是合法JSON"),
             normalizeDefault(request.getStatus(), "ACTIVE", RECORD_STATUSES, "工具绑定状态不支持"),
             operatorId
         );
@@ -401,7 +402,7 @@ public class AgentService implements ImAgentTriggerService {
         String subjectType = normalizeIn(request.getSubjectType(), SUBJECT_TYPES, "授权主体类型不支持");
         String permCode = normalizePermission(request.getPermCode());
         agentRepository.upsertAcl(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             agentId,
             subjectType,
             request.getSubjectId(),
@@ -464,7 +465,6 @@ public class AgentService implements ImAgentTriggerService {
             .toList();
     }
 
-    @Override
     public ImAgentDescriptor requireUsableAgent(Long agentId, Long userId) {
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
@@ -476,7 +476,6 @@ public class AgentService implements ImAgentTriggerService {
         return new ImAgentDescriptor(agent.id(), agent.agentCode(), agent.agentName());
     }
 
-    @Override
     public ImAgentTriggerResult triggerConversationReply(ImAgentTriggerCommand command) {
         if (command == null) {
             throw new BizException(400, "AI会话触发命令不能为空");
@@ -498,7 +497,7 @@ public class AgentService implements ImAgentTriggerService {
         if (!agentRepository.canUseAgent(agentId, userId)) {
             throw new BizException(403, "无权使用该AI助手");
         }
-        String inputPayloadJson = normalizeJson(request.getInputPayloadJson(), "输入载荷不是合法JSON");
+        String inputPayloadJson = normalize(objectMapper, request.getInputPayloadJson(), "输入载荷不是合法JSON");
         String triggerType = normalizeIn(request.getTriggerType(), TRIGGER_TYPES, "触发类型不支持");
         AgentVersionRow version = agentRepository.getVersionOrThrow(agent.publishedVersionId());
         boolean workflowTask = workflowParser.isWorkflowConfig(version.workflowConfigJson()) && safeToolCalls(request).isEmpty();
@@ -509,7 +508,7 @@ public class AgentService implements ImAgentTriggerService {
 
         boolean requireHumanConfirm = preparedToolCalls.stream()
             .anyMatch(call -> "REQUIRE_CONFIRM".equals(call.binding().approvalMode()));
-        Long taskId = IdWorker.getId();
+        Long taskId = IdGenerator.nextId();
         String initialStatus = requireHumanConfirm ? "WAITING_HUMAN_CONFIRM" : "PENDING";
         LocalDateTime waitingDeadlineAt = requireHumanConfirm ? LocalDateTime.now().plusHours(24) : null;
         agentRepository.insertTask(
@@ -533,7 +532,7 @@ public class AgentService implements ImAgentTriggerService {
         if (requireHumanConfirm) {
             for (PreparedToolCall call : preparedToolCalls) {
                 agentRepository.insertToolCallLog(
-                    IdWorker.getId(),
+                    IdGenerator.nextId(),
                     taskId,
                     call.binding().toolId(),
                     call.requestPayloadJson(),
@@ -582,7 +581,7 @@ public class AgentService implements ImAgentTriggerService {
             String summary = safeSummary(request.getComment());
             agentRepository.rejectWaitingTask(
                 task.id(),
-                writeJson(Map.of("status", "REJECTED", "comment", summary == null ? "" : summary)),
+                write(objectMapper, Map.of("status", "REJECTED", "comment", summary == null ? "" : summary)),
                 userId
             );
             audit(task.id(), "TASK_HUMAN_REJECTED", "AGENT_TASK", task.id(), summary, true);
@@ -616,7 +615,7 @@ public class AgentService implements ImAgentTriggerService {
         String reason = safeSummary(request.getReason());
         agentRepository.cancelWaitingTask(
             task.id(),
-            writeJson(Map.of("status", "CANCELLED", "reason", reason == null ? "" : reason)),
+            write(objectMapper, Map.of("status", "CANCELLED", "reason", reason == null ? "" : reason)),
             userId
         );
         audit(task.id(), "TASK_CANCELLED", "AGENT_TASK", task.id(), reason, true);
@@ -648,14 +647,14 @@ public class AgentService implements ImAgentTriggerService {
             agentRepository.getActiveToolByCodeOrThrow(toolCode);
             throw new BizException(403, "AI助手未授权调用该工具");
         }
-        return new PreparedToolCall(binding, normalizeJson(toolCall.getRequestPayloadJson(), "工具请求载荷不是合法JSON"));
+        return new PreparedToolCall(binding, normalize(objectMapper, toolCall.getRequestPayloadJson(), "工具请求载荷不是合法JSON"));
     }
 
     private void executeAndLogToolCall(Long taskId, PreparedToolCall call) {
         try {
             String responsePayload = toolExecutionService.execute(call.binding(), call.requestPayloadJson());
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 call.binding().toolId(),
                 call.requestPayloadJson(),
@@ -666,11 +665,11 @@ public class AgentService implements ImAgentTriggerService {
         } catch (BizException e) {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 call.binding().toolId(),
                 call.requestPayloadJson(),
-                writeJson(Map.of(
+                write(objectMapper, Map.of(
                     "status", "FAILED",
                     "errorMessage", errorMessage == null ? "工具执行失败" : errorMessage
                 )),
@@ -703,7 +702,7 @@ public class AgentService implements ImAgentTriggerService {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.markToolCallApprovedFailed(
                 pendingToolCall.logId(),
-                writeJson(Map.of(
+                write(objectMapper, Map.of(
                     "status", "FAILED",
                     "errorMessage", errorMessage == null ? "工具执行失败" : errorMessage
                 ))
@@ -719,7 +718,7 @@ public class AgentService implements ImAgentTriggerService {
                        String decisionSummary,
                        boolean riskFlag) {
         agentRepository.insertAuditLog(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             taskId,
             actionType,
             targetType,
@@ -727,25 +726,6 @@ public class AgentService implements ImAgentTriggerService {
             safeSummary(decisionSummary),
             riskFlag
         );
-    }
-
-    private String normalizeJson(String value, String errorMessage) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(objectMapper.readTree(value));
-        } catch (Exception e) {
-            throw new BizException(400, errorMessage);
-        }
-    }
-
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
     }
 
     private String normalizeIn(String value, Set<String> allowed, String message) {
@@ -778,10 +758,6 @@ public class AgentService implements ImAgentTriggerService {
         return value.trim();
     }
 
-    private String trimToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
-
     private AgentTaskQueryCriteria toTaskQueryCriteria(AgentTaskListQuery query) {
         return new AgentTaskQueryCriteria(
             normalizeOptionalIn(query.getStatus(), TASK_STATUSES, "AI任务状态不支持"),
@@ -812,14 +788,6 @@ public class AgentService implements ImAgentTriggerService {
             throw new BizException(400, message);
         }
         return normalized;
-    }
-
-    private String safeSummary(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;
     }
 
     private AgentResponse toAgentResponse(AgentRow row) {
@@ -1042,7 +1010,7 @@ public class AgentService implements ImAgentTriggerService {
     }
 
     public LlmModelResponse createLlmModel(CreateLlmModelRequest request) {
-        Long modelId = IdWorker.getId();
+        Long modelId = IdGenerator.nextId();
         agentRepository.insertLlmModel(modelId, request.provider(), request.modelName(),
             request.displayName(), request.endpoint(), request.apiKey(),
             request.status() != null ? request.status() : "ACTIVE", 0L);
@@ -1270,8 +1238,8 @@ public class AgentService implements ImAgentTriggerService {
                 return new WorkflowRunResponse(false, null, steps, "工作流未到达 END 节点", System.currentTimeMillis() - start);
             }
             if (version != null) {
-                String normalizedWorkflow = normalizeJson(workflowConfigJson, "工作流配置不是合法JSON");
-                String normalizedModel = normalizeJson(modelConfigJson, "模型配置不是合法JSON");
+                String normalizedWorkflow = normalize(objectMapper, workflowConfigJson, "工作流配置不是合法JSON");
+                String normalizedModel = normalize(objectMapper, modelConfigJson, "模型配置不是合法JSON");
                 String normalizedPrompt = trimToNull(systemPrompt);
                 agentRepository.updateAgentVersionWorkflowTest(
                     version.id(),

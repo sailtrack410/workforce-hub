@@ -4,14 +4,13 @@ import com.workforcehub.ragflow.repository.RagflowRepository;
 import com.workforcehub.ragflow.repository.RagflowSearchHitRow;
 import com.workforcehub.ragflow.repository.RagflowSpaceRow;
 import com.workforcehub.ragflow.repository.RagflowVectorRepository;
-import com.workforcehub.spi.KnowledgeSearchService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
 
 @Service
-public class RagflowKnowledgeSearchService implements KnowledgeSearchService {
+public class RagflowKnowledgeSearchService {
 
     private final RagflowRepository ragflowRepository;
     private final RagflowEmbeddingClient embeddingClient;
@@ -25,14 +24,12 @@ public class RagflowKnowledgeSearchService implements KnowledgeSearchService {
         this.vectorRepository = vectorRepository;
     }
 
-    @Override
     public List<String> searchChunks(Long spaceId, String query, int topK) {
         return searchRows(spaceId, query, topK).stream()
             .map(RagflowSearchHitRow::contentText)
             .toList();
     }
 
-    @Override
     public List<String> searchChunks(List<Long> spaceIds, String query, int topK) {
         return spaceIds.stream()
             .flatMap(spaceId -> searchChunks(spaceId, query, topK).stream())

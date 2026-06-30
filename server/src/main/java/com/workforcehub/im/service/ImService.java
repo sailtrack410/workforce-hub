@@ -7,6 +7,7 @@ import com.workforcehub.agent.model.AgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.LlmModelRow;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
@@ -51,6 +52,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static com.workforcehub.common.util.TextValues.blankToNull;
 
 /**
  * module-im 员工端会话读取服务。
@@ -219,7 +222,7 @@ public class ImService {
             .peek(attachment -> ensureUsableSourceAttachment(attachment, userId))
             .toList();
         Long seqNo = lastSeq + 1;
-        Long messageId = IdWorker.getId();
+        Long messageId = IdGenerator.nextId();
         LocalDateTime sentAt = LocalDateTime.now();
         String contentJson = buildContentJson(text, sourceAttachments);
         try {
@@ -469,7 +472,7 @@ public class ImService {
             .orElseThrow(() -> new BizException(404, "消息附件不存在"));
         ensureDownloadableMessageAttachment(attachment, messageId);
 
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         String ticketNo = "IMDL" + ticketId;
         LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
         String downloadUrl = "/api/employee/im/attachments/download/" + ticketNo;
@@ -654,7 +657,7 @@ public class ImService {
     private Long createPrivateConversation(ImUserRelationRow currentUser,
                                            ImUserRelationRow targetUser,
                                            String conversationKey) {
-        Long conversationId = IdWorker.getId();
+        Long conversationId = IdGenerator.nextId();
         String title = privateConversationTitle(currentUser, targetUser);
         boolean inserted = imRepository.tryInsertPrivateConversation(
             conversationId,
@@ -667,8 +670,8 @@ public class ImService {
                 .orElseThrow(() -> new BizException(409, "私聊会话创建冲突"));
         }
         try {
-            imRepository.insertUserMember(IdWorker.getId(), conversationId, currentUser.userId(), "MEMBER", "DIRECT_RELATION");
-            imRepository.insertUserMember(IdWorker.getId(), conversationId, targetUser.userId(), "MEMBER", "DIRECT_RELATION");
+            imRepository.insertUserMember(IdGenerator.nextId(), conversationId, currentUser.userId(), "MEMBER", "DIRECT_RELATION");
+            imRepository.insertUserMember(IdGenerator.nextId(), conversationId, targetUser.userId(), "MEMBER", "DIRECT_RELATION");
         } catch (DuplicateKeyException e) {
             return imRepository.findActiveConversationIdByKey(conversationKey)
                 .orElseThrow(() -> new BizException(409, "私聊成员写入冲突"));
@@ -976,7 +979,4 @@ public class ImService {
         }
     }
 
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
 }

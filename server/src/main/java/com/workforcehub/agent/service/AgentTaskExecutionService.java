@@ -1,10 +1,10 @@
 package com.workforcehub.agent.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.dto.AgentTaskResponse;
-import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.model.AgentModelException;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
@@ -16,9 +16,7 @@ import com.workforcehub.agent.workflow.WorkflowExecutionResult;
 import com.workforcehub.agent.workflow.WorkflowExecutor;
 import com.workforcehub.agent.workflow.WorkflowParser;
 import com.workforcehub.common.exception.BizException;
-import com.workforcehub.spi.ImAgentReplyResult;
-import com.workforcehub.spi.ImAgentResultCallback;
-import com.workforcehub.spi.ImAgentTriggerCommand;
+import com.workforcehub.im.service.ImAgentConversationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -35,6 +33,10 @@ import org.springframework.util.StringUtils;
 import java.util.Map;
 import java.util.concurrent.Executor;
 
+import static com.workforcehub.common.util.JsonValues.normalize;
+import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.safeSummary;
+
 /**
  * Agent 任务执行服务。
  */
@@ -45,8 +47,8 @@ public class AgentTaskExecutionService {
 
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
-    private final AgentModelClient agentModelClient;
-    private final ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
+    private final ObjectProvider<ImAgentConversationService> imAgentConversationServiceProvider;
     private final Executor agentExecutor;
     private final TransactionTemplate transactionTemplate;
     private final WorkflowParser workflowParser;
@@ -54,8 +56,8 @@ public class AgentTaskExecutionService {
 
     public AgentTaskExecutionService(AgentRepository agentRepository,
                                      ObjectMapper objectMapper,
-                                     AgentModelClient agentModelClient,
-                                     ObjectProvider<ImAgentResultCallback> imAgentResultCallbackProvider,
+                                     OpenAiCompatibleAgentModelClient agentModelClient,
+                                     ObjectProvider<ImAgentConversationService> imAgentConversationServiceProvider,
                                      @Qualifier("agentExecutor") Executor agentExecutor,
                                      PlatformTransactionManager transactionManager,
                                      WorkflowParser workflowParser,
@@ -63,7 +65,7 @@ public class AgentTaskExecutionService {
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
         this.agentModelClient = agentModelClient;
-        this.imAgentResultCallbackProvider = imAgentResultCallbackProvider;
+        this.imAgentConversationServiceProvider = imAgentConversationServiceProvider;
         this.agentExecutor = agentExecutor;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.workflowParser = workflowParser;
@@ -82,8 +84,8 @@ public class AgentTaskExecutionService {
         if (!agentRepository.canUseAgent(agentId, senderId)) {
             throw new BizException(403, "无权使用该AI助手");
         }
-        String normalizedMessageContent = normalizeJson(command.messageContentJson(), "AI会话输入内容不是合法JSON");
-        Long taskId = IdWorker.getId();
+        String normalizedMessageContent = normalize(objectMapper, command.messageContentJson(), "AI会话输入内容不是合法JSON");
+        Long taskId = IdGenerator.nextId();
         agentRepository.insertTask(
             taskId,
             agent.id(),
@@ -167,7 +169,7 @@ public class AgentTaskExecutionService {
                 taskId,
                 agent,
                 version,
-                normalizeJson(command.messageContentJson(), "AI会话输入内容不是合法JSON")
+                normalize(objectMapper, command.messageContentJson(), "AI会话输入内容不是合法JSON")
             );
         });
     }
@@ -217,7 +219,7 @@ public class AgentTaskExecutionService {
                                         AgentRow agent,
                                         Long taskId,
                                         String replyText) {
-        ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
+        ImAgentConversationService callback = imAgentConversationServiceProvider.getIfAvailable();
         if (callback == null) {
             throw new BizException(501, "消息会话AI结果回写服务未接入");
         }
@@ -242,9 +244,9 @@ public class AgentTaskExecutionService {
         if (cardNode instanceof com.fasterxml.jackson.databind.node.ObjectNode objectNode) {
             objectNode.put("agentTaskId", taskId);
             objectNode.put("agentCode", agentCode);
-            return new AgentConversationReplyContent("CARD", writeJson(objectNode));
+            return new AgentConversationReplyContent("CARD", write(objectMapper, objectNode));
         }
-        return new AgentConversationReplyContent("TEXT", writeJson(Map.of(
+        return new AgentConversationReplyContent("TEXT", write(objectMapper, Map.of(
             "text", safeText,
             "agentTaskId", taskId,
             "agentCode", agentCode
@@ -270,7 +272,7 @@ public class AgentTaskExecutionService {
                                      Long taskId,
                                      String failureType,
                                      String failureMessage) {
-        ImAgentResultCallback callback = imAgentResultCallbackProvider.getIfAvailable();
+        ImAgentConversationService callback = imAgentConversationServiceProvider.getIfAvailable();
         if (callback == null) {
             throw new BizException(501, "消息会话AI结果回写服务未接入");
         }
@@ -316,7 +318,7 @@ public class AgentTaskExecutionService {
                        String decisionSummary,
                        boolean riskFlag) {
         agentRepository.insertAuditLog(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             taskId,
             actionType,
             targetType,
@@ -324,33 +326,6 @@ public class AgentTaskExecutionService {
             safeSummary(decisionSummary),
             riskFlag
         );
-    }
-
-    private String normalizeJson(String value, String errorMessage) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(objectMapper.readTree(value));
-        } catch (Exception e) {
-            throw new BizException(400, errorMessage);
-        }
-    }
-
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
-    }
-
-    private String safeSummary(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;
     }
 
     private AgentTaskResponse toTaskResponse(AgentTaskRow row) {

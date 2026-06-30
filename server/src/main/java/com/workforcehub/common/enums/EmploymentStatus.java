@@ -1,6 +1,5 @@
 package com.workforcehub.common.enums;
 
-import com.baomidou.mybatisplus.annotation.EnumValue;
 import lombok.Getter;
 
 /**
@@ -15,7 +14,6 @@ public enum EmploymentStatus {
     PENDING_OFFBOARD("PENDING_OFFBOARD", "待离职"),
     OFFBOARDED("OFFBOARDED", "已离职");
 
-    @EnumValue
     private final String code;
     private final String desc;
 

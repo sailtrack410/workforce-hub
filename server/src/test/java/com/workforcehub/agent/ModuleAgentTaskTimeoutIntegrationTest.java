@@ -3,8 +3,8 @@ package com.workforcehub.agent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.scheduler.AgentTaskTimeoutJobService;
-import com.workforcehub.spi.WorkflowAgentResultCallback;
 import com.workforcehub.support.LocalIntegrationTestSupport;
+import com.workforcehub.workflow.service.WorkflowAgentResultCallback;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -321,9 +321,9 @@ class ModuleAgentTaskTimeoutIntegrationTest extends LocalIntegrationTestSupport 
         mockMvc.perform(get("/api/admin/agent-tasks/timeout-scan-runs")
                 .cookie(adminSession)
                 .param("status", "UNKNOWN_STATUS"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
-            .andExpect(jsonPath("$.message").value("AI任务超时扫描批次状态不支持"));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
+            .andExpect(jsonPath("$.message").value("Agent超时扫描批次状态不支持"));
     }
 
     private long createWaitingTask(Cookie adminSession, Cookie employeeSession) throws Exception {

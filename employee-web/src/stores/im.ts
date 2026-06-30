@@ -26,6 +26,7 @@ import type {
   UpdateReadPositionRequest,
 } from '../api';
 import type {
+  ConversationAttachment,
   ConversationMessage,
   ConversationRecord,
   ConversationTone,
@@ -43,6 +44,7 @@ import type {
   KnowledgeAnswerRelatedRef,
 } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { createClientId } from '@/utils/request-id';
 
 export const DEFAULT_USER_AVATAR_URL = '/default-user-avatar.svg';
 export const DEFAULT_GROUP_AVATAR_URL = '/default-group-avatar.svg';
@@ -318,7 +320,7 @@ export const useImStore = defineStore('employee-im', {
         const request: SendImMessageRequest = {
           messageType: 'TEXT',
           text: normalizedText,
-          clientMessageId: `web-${conversationId}-${Date.now()}`,
+          clientMessageId: createClientId(`web-${conversationId}`),
         };
         if (quotedMessageId !== undefined) request.quotedMessageId = quotedMessageId;
         const message = await imApi.sendMessage(conversationId, request);
@@ -350,7 +352,7 @@ export const useImStore = defineStore('employee-im', {
           messageType: text.trim() ? 'TEXT' : 'FILE',
           text: text.trim() || undefined,
           attachmentRefIds: [attachmentRefId],
-          clientMessageId: `web-file-${conversationId}-${attachmentRefId}-${Date.now()}`,
+          clientMessageId: createClientId(`web-file-${conversationId}-${attachmentRefId}`),
         });
         const record = mapImMessageToConversationMessage(message, currentUserId);
         this.upsertMessage(key, record);
@@ -594,6 +596,18 @@ export const useImStore = defineStore('employee-im', {
       const detail = this.detailsByConversation[key];
       if (detail) detail.members = members;
     },
+    replaceConversations(records: ConversationRecord[]) {
+      this.conversations = records;
+    },
+    mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
+      const conversation = this.conversations.find((item) => item.id === conversationId);
+      if (!conversation || !backendMessages.length) return;
+      conversation.messages = backendMessages;
+      conversation.panel.attachments = collectConversationAttachments(backendMessages);
+      const latestMessage = backendMessages[backendMessages.length - 1];
+      conversation.subtitle = latestMessage.body;
+      conversation.meta = formatConversationDate(latestMessage.time) || conversation.meta;
+    },
   },
 });
 
@@ -774,6 +788,17 @@ function formatConversationDate(value?: string | null) {
     return `${Number(match[1])}月${Number(match[2])}日`;
   }
   return value.replace('T', ' ').slice(0, 16);
+}
+
+function collectConversationAttachments(messages: ConversationMessage[]) {
+  const byId = new Map<string, ConversationAttachment>();
+  for (const message of messages) {
+    for (const attachment of message.attachments ?? []) {
+      const key = attachment.attachmentRefId == null ? attachment.id : String(attachment.attachmentRefId);
+      byId.set(key, attachment);
+    }
+  }
+  return Array.from(byId.values());
 }
 
 function formatMessageTime(value?: string | null) {

@@ -31,7 +31,9 @@ public class AdminUserDetailsService implements UserDetailsService {
             admin.getUsername(),
             admin.getPasswordHash(),
             admin.getDisplayName(),
-            admin.getStatus()
+            admin.getStatus(),
+            adminUserMapper.selectRoleCodes(admin.getId()),
+            adminUserMapper.selectPermissionCodes(admin.getId())
         );
     }
 }

@@ -2,9 +2,9 @@ package com.workforcehub.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.workforcehub.agent.model.AgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -490,8 +490,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     void dataSourceWorkflowNodeShouldKeepOnlyConfiguredArrayItemFields() throws Exception {
         Cookie adminSession = loginAdmin();
         long agentId = createAgent(adminSession, "DAG_DATA_ARRAY_FORMAT_AGENT", "数据数组格式助手", "QA");
-        long leaveTypeId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
-        long accountId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long leaveTypeId = com.workforcehub.common.util.IdGenerator.nextId();
+        long accountId = com.workforcehub.common.util.IdGenerator.nextId();
         jdbcTemplate.update("""
             INSERT INTO lv_type
                 (id, leave_code, leave_name, balance_mode, status)
@@ -655,8 +655,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     void workflowRunShouldReturnConfiguredReplyJson() throws Exception {
         Cookie adminSession = loginAdmin();
         long agentId = createAgent(adminSession, "DAG_REPLY_JSON_AGENT", "JSON回复助手", "QA");
-        long leaveTypeId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
-        long accountId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long leaveTypeId = com.workforcehub.common.util.IdGenerator.nextId();
+        long accountId = com.workforcehub.common.util.IdGenerator.nextId();
         jdbcTemplate.update("""
             INSERT INTO lv_type
                 (id, leave_code, leave_name, balance_mode, status)
@@ -1914,8 +1914,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
 
         @Bean
         @Primary
-        AgentModelClient testAgentModelClient() {
-            return new AgentModelClient() {
+        OpenAiCompatibleAgentModelClient testAgentModelClient() {
+            return new OpenAiCompatibleAgentModelClient(null, null, null) {
                 @Override
                 public AgentModelResponse generateReply(AgentModelRequest request) {
                     if (request.userMessage().contains("FORMAT_ARRAY_TEST")) {

@@ -33,10 +33,44 @@ export interface LoginResponse {
 
 export interface CurrentUserResponse extends LoginResponse {
   email?: string | null;
+  roleCodes?: string[];
+  permissionCodes?: string[];
   primaryDeptId?: EntityId | null;
   positionId?: EntityId | null;
   managerUserId?: EntityId | null;
   employmentStatus?: string | null;
+}
+
+export interface RbacPermissionResponse {
+  permissionId: EntityId;
+  permCode: string;
+  permName: string;
+  moduleCode?: string | null;
+  actionCode?: string | null;
+  status: string;
+}
+
+export interface RbacRoleResponse {
+  roleId: EntityId;
+  roleCode: string;
+  roleName: string;
+  status: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  permissions?: RbacPermissionResponse[];
+}
+
+export interface RbacRoleSaveRequest {
+  roleCode: string;
+  roleName: string;
+  status: string;
+}
+
+export interface RbacAdminUserRoleResponse {
+  adminUserId: EntityId;
+  username: string;
+  displayName?: string | null;
+  roles: RbacRoleResponse[];
 }
 
 export interface AdminAgentTaskResponse {
@@ -328,6 +362,131 @@ export interface AdminAuditLogResponse {
   result?: string | null;
   detailJson?: string | null;
   occurredAt?: string | null;
+}
+
+export interface AttendanceCalendarResponse {
+  calendarId: EntityId;
+  calendarCode: string;
+  calendarName: string;
+  calendarType: string;
+  status: string;
+}
+
+export interface CreateAttendanceCalendarRequest {
+  calendarCode: string;
+  calendarName: string;
+  calendarType: string;
+  status: string;
+}
+
+export interface AttendanceShiftResponse {
+  shiftId: EntityId;
+  shiftCode: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  onDutyPunchStart?: string | null;
+  onDutyPunchEnd?: string | null;
+  offDutyPunchStart?: string | null;
+  offDutyPunchEnd?: string | null;
+  status: string;
+}
+
+export interface CreateAttendanceShiftRequest {
+  shiftCode: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  onDutyPunchStart?: string | null;
+  onDutyPunchEnd?: string | null;
+  offDutyPunchStart?: string | null;
+  offDutyPunchEnd?: string | null;
+  status: string;
+}
+
+export interface AttendanceGroupResponse {
+  groupId: EntityId;
+  groupCode: string;
+  groupName: string;
+  calendarId: EntityId;
+  defaultShiftId: EntityId;
+  lateGraceMinutes: number;
+  earlyLeaveGraceMinutes: number;
+  status: string;
+}
+
+export interface CreateAttendanceGroupRequest {
+  groupCode: string;
+  groupName: string;
+  calendarId: EntityId;
+  defaultShiftId: EntityId;
+  lateGraceMinutes: number;
+  earlyLeaveGraceMinutes: number;
+  status: string;
+}
+
+export interface AttendanceGroupMemberResponse {
+  memberId: EntityId;
+  groupId: EntityId;
+  userId: EntityId;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  sourceType: string;
+  status: string;
+}
+
+export interface AddAttendanceGroupMemberRequest {
+  userId: EntityId;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  sourceType: string;
+}
+
+export interface AttendanceScheduleResponse {
+  scheduleId: EntityId;
+  userId: EntityId;
+  workDate: string;
+  shiftId: EntityId;
+  calendarId?: EntityId | null;
+  scheduleSource: string;
+  status: string;
+}
+
+export interface CreateAttendanceScheduleRequest {
+  userId: EntityId;
+  workDate: string;
+  shiftId: EntityId;
+  calendarId?: EntityId | null;
+  scheduleSource: string;
+}
+
+export interface UpdateAttendanceScheduleRequest {
+  shiftId: EntityId;
+  calendarId?: EntityId | null;
+  scheduleSource: string;
+  status: string;
+}
+
+export interface AttendanceDailyResultResponse {
+  dailyResultId: EntityId;
+  userId: EntityId;
+  workDate: string;
+  scheduleId?: EntityId | null;
+  groupId?: EntityId | null;
+  shiftId?: EntityId | null;
+  resultStatus: string;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  absenceMinutes: number;
+  workMinutes: number;
+  exceptionFlag: boolean;
+  calculatedAt?: string | null;
+}
+
+export interface AttendanceDateRangeQuery extends QueryParams {
+  userId?: EntityId;
+  startDate: string;
+  endDate: string;
 }
 
 export interface StorageSummaryResponse {
@@ -644,6 +803,7 @@ export interface OrgUserDetailResponse {
   realName: string;
   gender?: string | null;
   mobile?: string | null;
+  email?: string | null;
   avatarAttachmentRefId?: EntityId | null;
   primaryDeptId?: EntityId | null;
   primaryDeptName?: string | null;

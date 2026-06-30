@@ -1,8 +1,5 @@
 package com.workforcehub.org.domain;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -11,10 +8,8 @@ import java.time.LocalDateTime;
  * 部门领导成员
  */
 @Data
-@TableName("org_department_leader")
 public class OrgDepartmentLeader {
 
-    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long deptId;

@@ -1,6 +1,5 @@
 package com.workforcehub.org.mapper;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.workforcehub.org.dto.OrgDepartmentSummaryResponse;
 import com.workforcehub.org.dto.OrgDepartmentTreeNodeResponse;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
@@ -18,8 +17,13 @@ public interface OrgDirectoryMapper {
 
     OrgDepartmentSummaryResponse selectDepartmentSummaryById(@Param("deptId") Long deptId);
 
-    Page<OrgUserSummaryResponse> selectUserPage(Page<OrgUserSummaryResponse> page,
-                                                @Param("query") OrgUserListQuery query);
+    List<OrgUserSummaryResponse> selectUserPage(@Param("query") OrgUserListQuery query,
+                                                @Param("offset") long offset,
+                                                @Param("limit") long limit);
+
+    long countUserPage(@Param("query") OrgUserListQuery query);
+
+    List<OrgUserSummaryResponse> selectUsersForOrgChart();
 
     OrgUserSummaryResponse selectUserSummaryById(@Param("userId") Long userId);
 

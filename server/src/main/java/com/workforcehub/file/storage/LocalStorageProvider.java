@@ -21,7 +21,7 @@ public class LocalStorageProvider implements StorageProvider {
 
     private final Path localRoot;
 
-    public LocalStorageProvider(@Value("${workforce.file.local-root:target/test-file-storage}") String localRoot) {
+    public LocalStorageProvider(@Value("${workforce.file.local-root:${user.home}/.workforce-hub/files}") String localRoot) {
         this.localRoot = Path.of(localRoot);
     }
 

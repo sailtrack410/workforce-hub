@@ -21,7 +21,12 @@ import com.workforcehub.file.dto.StorageSummaryResponse;
 import com.workforcehub.file.dto.UpdateQuotaPolicyRequest;
 import com.workforcehub.file.dto.UploadTicketResponse;
 import com.workforcehub.file.service.FileCleanupJobService;
-import com.workforcehub.file.service.FileCenterService;
+import com.workforcehub.file.service.FileDownloadService;
+import com.workforcehub.file.service.FileLifecycleService;
+import com.workforcehub.file.service.FileQueryService;
+import com.workforcehub.file.service.FileQuotaPolicyService;
+import com.workforcehub.file.service.FileUploadConfirmService;
+import com.workforcehub.file.service.FileUploadTicketService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
@@ -44,14 +49,29 @@ import java.util.List;
 @RequestMapping("/api/admin/files")
 public class AdminFileController {
 
-    private final FileCenterService fileCenterService;
+    private final FileQueryService fileQueryService;
+    private final FileUploadTicketService fileUploadTicketService;
+    private final FileUploadConfirmService fileUploadConfirmService;
+    private final FileDownloadService fileDownloadService;
+    private final FileQuotaPolicyService fileQuotaPolicyService;
+    private final FileLifecycleService fileLifecycleService;
     private final FileCleanupJobService fileCleanupJobService;
     private final FileDownloadResponseFactory downloadResponseFactory;
 
-    public AdminFileController(FileCenterService fileCenterService,
+    public AdminFileController(FileQueryService fileQueryService,
+                               FileUploadTicketService fileUploadTicketService,
+                               FileUploadConfirmService fileUploadConfirmService,
+                               FileDownloadService fileDownloadService,
+                               FileQuotaPolicyService fileQuotaPolicyService,
+                               FileLifecycleService fileLifecycleService,
                                FileCleanupJobService fileCleanupJobService,
                                FileDownloadResponseFactory downloadResponseFactory) {
-        this.fileCenterService = fileCenterService;
+        this.fileQueryService = fileQueryService;
+        this.fileUploadTicketService = fileUploadTicketService;
+        this.fileUploadConfirmService = fileUploadConfirmService;
+        this.fileDownloadService = fileDownloadService;
+        this.fileQuotaPolicyService = fileQuotaPolicyService;
+        this.fileLifecycleService = fileLifecycleService;
         this.fileCleanupJobService = fileCleanupJobService;
         this.downloadResponseFactory = downloadResponseFactory;
     }
@@ -59,57 +79,57 @@ public class AdminFileController {
     @GetMapping
     public R<PageResult<AdminFileResponse>> listFiles(@RequestParam(defaultValue = "1") long pageNo,
                                                       @RequestParam(defaultValue = "20") long pageSize) {
-        return R.ok(fileCenterService.listAdminFiles(pageNo, pageSize, false));
+        return R.ok(fileQueryService.listAdminFiles(pageNo, pageSize, false));
     }
 
     @GetMapping("/recycle-bin")
     public R<PageResult<AdminFileResponse>> listRecycleBin(@RequestParam(defaultValue = "1") long pageNo,
                                                            @RequestParam(defaultValue = "20") long pageSize) {
-        return R.ok(fileCenterService.listAdminFiles(pageNo, pageSize, true));
+        return R.ok(fileQueryService.listAdminFiles(pageNo, pageSize, true));
     }
 
     @PostMapping("/upload-tickets")
     public R<UploadTicketResponse> createUploadTicket(@Valid @RequestBody CreateUploadTicketRequest request) {
-        return R.ok(fileCenterService.createAdminUploadTicket(request));
+        return R.ok(fileUploadTicketService.createAdminUploadTicket(request));
     }
 
     @PostMapping("/confirm-upload")
     public R<AttachmentRefResponse> confirmUpload(@Valid @RequestBody ConfirmUploadRequest request) {
-        return R.ok(fileCenterService.confirmAdminUpload(request));
+        return R.ok(fileUploadConfirmService.confirmAdminUpload(request));
     }
 
     @GetMapping("/storage-summary")
     public R<StorageSummaryResponse> storageSummary() {
-        return R.ok(fileCenterService.getStorageSummary());
+        return R.ok(fileQuotaPolicyService.getStorageSummary());
     }
 
     @PostMapping("/{attachmentRefId}/download-tickets")
     public R<DownloadTicketResponse> createDownloadTicket(@PathVariable Long attachmentRefId,
                                                           @Valid @RequestBody CreateDownloadTicketRequest request) {
-        return R.ok(fileCenterService.createAdminDownloadTicket(attachmentRefId, request));
+        return R.ok(fileDownloadService.createAdminDownloadTicket(attachmentRefId, request));
     }
 
     @GetMapping("/download/{ticketNo}")
     public ResponseEntity<Resource> download(@PathVariable String ticketNo) {
-        DownloadFileResult result = fileCenterService.downloadAdminFile(ticketNo);
+        DownloadFileResult result = fileDownloadService.downloadAdminFile(ticketNo);
         return downloadResponseFactory.attachment(result);
     }
 
     @PostMapping("/{attachmentRefId}/trash")
     public R<FileTrashResponse> trash(@PathVariable Long attachmentRefId,
                                       @Valid @RequestBody FileTrashRequest request) {
-        return R.ok(fileCenterService.trashAdminFile(attachmentRefId, request));
+        return R.ok(fileLifecycleService.trashAdminFile(attachmentRefId, request));
     }
 
     @PostMapping("/{attachmentRefId}/restore")
     public R<FileRestoreResponse> restore(@PathVariable Long attachmentRefId,
                                           @Valid @RequestBody FileTrashRequest request) {
-        return R.ok(fileCenterService.restoreAdminFile(attachmentRefId, request));
+        return R.ok(fileLifecycleService.restoreAdminFile(attachmentRefId, request));
     }
 
     @DeleteMapping("/{attachmentRefId}")
     public R<FilePurgeResponse> purge(@PathVariable Long attachmentRefId) {
-        return R.ok(fileCenterService.purgeAdminFile(attachmentRefId));
+        return R.ok(fileLifecycleService.purgeAdminFile(attachmentRefId));
     }
 
     @PostMapping("/cleanup-jobs/run")
@@ -119,17 +139,17 @@ public class AdminFileController {
 
     @GetMapping("/quota-policies")
     public R<List<QuotaPolicyResponse>> listQuotaPolicies(@RequestParam(required = false) String scopeType) {
-        return R.ok(fileCenterService.listQuotaPolicies(scopeType));
+        return R.ok(fileQuotaPolicyService.listQuotaPolicies(scopeType));
     }
 
     @PostMapping("/quota-policies")
     public R<QuotaPolicyResponse> createQuotaPolicy(@Valid @RequestBody CreateQuotaPolicyRequest request) {
-        return R.ok(fileCenterService.createQuotaPolicy(request));
+        return R.ok(fileQuotaPolicyService.createQuotaPolicy(request));
     }
 
     @PutMapping("/quota-policies/{policyId}")
     public R<QuotaPolicyResponse> updateQuotaPolicy(@PathVariable Long policyId,
                                                     @Valid @RequestBody UpdateQuotaPolicyRequest request) {
-        return R.ok(fileCenterService.updateQuotaPolicy(policyId, request));
+        return R.ok(fileQuotaPolicyService.updateQuotaPolicy(policyId, request));
     }
 }

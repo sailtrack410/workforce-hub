@@ -2,10 +2,10 @@ package com.workforcehub.im;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.service.ImAgentReplyResult;
+import com.workforcehub.im.service.ImAgentConversationService;
 import com.workforcehub.im.websocket.ImWebSocketOutboxDispatcher;
 import com.workforcehub.im.websocket.ImWebSocketSessionRegistry;
-import com.workforcehub.spi.ImAgentReplyResult;
-import com.workforcehub.spi.ImAgentResultCallback;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -86,7 +86,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     private ImWebSocketOutboxDispatcher imWebSocketOutboxDispatcher;
 
     @Autowired
-    private ImAgentResultCallback imAgentResultCallback;
+    private ImAgentConversationService imAgentResultCallback;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
@@ -113,6 +113,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         registry.add("workforce.agent.model.base-url", () -> "");
         registry.add("workforce.agent.model.api-key", () -> "");
         registry.add("workforce.agent.model.model", () -> "");
+        registry.add("workforce.file.local-root", () -> "target/test-file-storage");
     }
 
     @BeforeEach
@@ -224,23 +225,23 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/employee/im/conversations")
                 .queryParam("size", "0")
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("分页大小必须大于0"));
 
         mockMvc.perform(get("/api/employee/im/conversations")
                 .queryParam("beforeLastMessageAt", "2026-05-09T10:10:00")
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("会话分页游标必须同时包含时间和会话ID"));
 
         mockMvc.perform(get("/api/employee/im/conversations")
                 .queryParam("beforeLastMessageAt", "bad-time")
                 .queryParam("beforeConversationId", "7001")
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("会话分页时间游标格式错误"));
     }
 
@@ -290,8 +291,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(get("/api/employee/im/conversations/{conversationId}", 7002L)
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该会话"));
     }
 
@@ -433,8 +434,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", 7002L)
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该会话"));
     }
 
@@ -455,8 +456,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "clientMessageId": "client-msg-offboarded"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("当前员工状态不允许使用会话"));
 
         assertEquals(2L, jdbcTemplate.queryForObject(
@@ -734,7 +735,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                     }
                   ]
                 },
-                { "id": "leave_query", "type": "END", "config": { "replyJson": { "intent": "查询假期", "target": "LEAVE_BALANCE", "leaveAccounts": "{{leaveData.leaveBalance}}" } } },
+                { "id": "leave_query", "type": "END", "config": { "replyJson": { "intent": "查询假期", "target": "LEAVE_BALANCE", "leaveAccounts": "{{leaveData}}" } } },
                 { "id": "qa", "type": "END", "config": { "replyJson": { "intent": "问答", "target": "QA" } } },
                 { "id": "other", "type": "END", "config": { "replyJson": { "intent": "其他", "target": "QA" } } }
               ],
@@ -1144,8 +1145,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "agentId": %d
                     }
                     """.formatted(agentId)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
 
         assertEquals(0L, jdbcTemplate.queryForObject(
@@ -1348,8 +1349,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "clientMessageId": "client-msg-file-forbidden"
                     }
                     """.formatted(otherAttachmentRefId)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权使用该附件引用"));
 
         assertEquals(2L, jdbcTemplate.queryForObject(
@@ -1439,8 +1440,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "越权查看"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该会话"));
     }
 
@@ -1469,8 +1470,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "尝试绕过IM附件授权入口"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("员工端文件接口仅允许下载个人文件或头像"));
     }
 
@@ -1515,8 +1516,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "text": "不应编辑别人消息"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("只能操作自己发送的消息"));
 
         assertEquals("NORMAL", messageStatus(7102L));
@@ -1545,8 +1546,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "text": "附件消息不支持编辑"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("当前仅支持编辑文本消息"));
 
         assertEquals("NORMAL", messageStatus(messageId));
@@ -1609,8 +1610,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "撤回后下载"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("当前消息状态不允许下载附件"));
     }
 
@@ -1634,14 +1635,14 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "text": "撤回后不应编辑"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("当前消息状态不允许编辑"));
 
         mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages/{messageId}/recall", 7001L, 7101L)
                 .cookie(employeeSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("当前消息状态不允许撤回"));
     }
 
@@ -1704,8 +1705,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "clientMessageId": "client-msg-forbidden"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该会话"));
 
         assertEquals(1L, jdbcTemplate.queryForObject(
@@ -1780,8 +1781,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "targetUserId": 2004
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("只能和直属上级、直属下级或同群成员发起私聊"));
 
         assertEquals(0L, jdbcTemplate.queryForObject(
@@ -1899,8 +1900,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(employeeSession)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("会话偏好更新内容不能为空"));
     }
 
@@ -1918,8 +1919,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "pin": true
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该会话"));
     }
 
@@ -1989,8 +1990,8 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "lastReadSeq": 1
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该会话"));
 
         assertEquals(0L, jdbcTemplate.queryForObject(

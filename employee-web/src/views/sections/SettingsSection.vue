@@ -25,7 +25,6 @@ import type {
 import { createEmailCodeCooldown } from '@/composables/emailCodeCooldown';
 import { useCurrentUserAvatarUrl } from '@/composables/useCurrentUserAvatarUrl';
 import { usePersonalFileTransfer } from '@/composables/usePersonalFileTransfer';
-import { syncShellSessionProfile } from '@/composables/useShellSessionProfileSync';
 import { useSettingsSectionContext } from '../employee-shell-context';
 import { displayField, employmentStatusLabel } from '@/utils/employee-format';
 import { normalizeSettingsPanel, shellUser } from '@/stores/shell';
@@ -262,7 +261,8 @@ async function submitMobileUpdate() {
     await employeeApi.me.updateProfile({ mobile: mobile || null });
     await session.loadCurrentUser();
     await session.loadOrgProfile();
-    syncShellSessionProfile(shell, session);
+    shell.setColleagues(session.colleagues);
+    shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
     mobileDraft.value = session.profile?.mobile ?? '';
     mobileUpdateNotice.value = '手机号已更新';
     showToast('手机号已更新');
@@ -309,7 +309,8 @@ async function submitBindEmail() {
     bindEmailCodeCooldown.reset();
     await session.loadCurrentUser();
     await session.loadOrgProfile();
-    syncShellSessionProfile(shell, session);
+    shell.setColleagues(session.colleagues);
+    shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
     bindEmailNotice.value = hadEmail ? '邮箱已换绑' : '邮箱已绑定';
     showToast(bindEmailNotice.value);
   } catch (error) {
@@ -401,7 +402,8 @@ async function handleAvatarSelected(event: Event) {
     const attachment = await uploadAvatarAttachment(file);
     await employeeApi.me.updateProfile({ avatarAttachmentRefId: attachment.attachmentRefId });
     await session.loadOrgProfile();
-    syncShellSessionProfile(shell, session);
+    shell.setColleagues(session.colleagues);
+    shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
     await refreshCurrentUserAvatarUrl();
     showToast('头像已更新');
   } catch (error) {

@@ -161,8 +161,8 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/admin/im/outbox-events")
                 .queryParam("status", "UNKNOWN")
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("outbox事件状态不支持"));
 
         mockMvc.perform(post("/api/admin/im/outbox-events/dispatch")
@@ -219,8 +219,8 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/admin/im/outbox-events/audits")
                 .queryParam("actionType", "UNKNOWN")
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("outbox审计动作不支持"));
 
         assertSocketEvent(employeeSocket, "IM_MESSAGE_CREATED", 7001L);
@@ -229,8 +229,8 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(post("/api/admin/im/outbox-events/{eventId}/retry", eventId)
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("当前outbox事件状态不允许手动重试"));
 
         FailingOnceWebSocketSession batchEmployeeSocket = new FailingOnceWebSocketSession(EMPLOYEE_USER_ID);
@@ -317,8 +317,8 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
                       "eventIds": [0]
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("outbox事件ID必须大于0"));
 
         mockMvc.perform(post("/api/admin/im/outbox-events/batch-retry")

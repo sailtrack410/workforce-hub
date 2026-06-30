@@ -1,6 +1,5 @@
 package com.workforcehub.common.enums;
 
-import com.baomidou.mybatisplus.annotation.EnumValue;
 import lombok.Getter;
 
 /**
@@ -17,7 +16,6 @@ public enum AgentTaskStatus {
     FAILED("FAILED", "执行失败"),
     CANCELLED("CANCELLED", "已取消");
 
-    @EnumValue
     private final String code;
     private final String desc;
 

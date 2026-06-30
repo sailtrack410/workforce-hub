@@ -1,6 +1,6 @@
 package com.workforcehub.ragflow.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
@@ -32,6 +32,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+
+import static com.workforcehub.common.util.TextValues.trimToNull;
 
 @Service
 public class RagflowAdminService {
@@ -108,7 +110,7 @@ public class RagflowAdminService {
         if (ragflowRepository.existsSpaceCode(spaceCode)) {
             throw new BizException(409, "知识库编码已存在");
         }
-        Long spaceId = IdWorker.getId();
+        Long spaceId = IdGenerator.nextId();
         ragflowRepository.insertSpace(
             spaceId,
             trimRequired(request.getSpaceName(), "知识库名称不能为空"),
@@ -180,8 +182,8 @@ public class RagflowAdminService {
                 .findFirst()
                 .orElseThrow(() -> new BizException(409, "文档已存在"));
         }
-        Long documentId = IdWorker.getId();
-        Long jobId = IdWorker.getId();
+        Long documentId = IdGenerator.nextId();
+        Long jobId = IdGenerator.nextId();
         ragflowRepository.insertDocument(
             documentId,
             spaceId,
@@ -217,7 +219,7 @@ public class RagflowAdminService {
         Long operatorId = CurrentUserHolder.requireUserId();
         ragflowRepository.getSpaceOrThrow(spaceId);
         RagflowDocumentRow document = ragflowRepository.getDocumentOrThrow(spaceId, documentId);
-        Long jobId = IdWorker.getId();
+        Long jobId = IdGenerator.nextId();
         ragflowRepository.insertIngestJob(jobId, documentId, spaceId, document.sourceFileObjectId(), operatorId);
         ragflowRepository.bindLatestIngestJob(documentId, jobId, operatorId);
         ragflowIngestService.ingest(
@@ -279,7 +281,7 @@ public class RagflowAdminService {
             }
             String subjectType = normalizeDefault(item.getSubjectType(), "", SUBJECT_TYPES, "授权主体类型不支持");
             String permCode = normalizePermission(item.getPermCode());
-            ragflowRepository.insertAcl(IdWorker.getId(), spaceId, subjectType, item.getSubjectId(), permCode, operatorId);
+            ragflowRepository.insertAcl(IdGenerator.nextId(), spaceId, subjectType, item.getSubjectId(), permCode, operatorId);
         }
         return listAcl(spaceId);
     }
@@ -384,13 +386,6 @@ public class RagflowAdminService {
             throw new BizException(400, message);
         }
         return trimmed;
-    }
-
-    private String trimToNull(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
     }
 
     private String normalizeDefault(String value, String fallback, Set<String> allowed, String message) {

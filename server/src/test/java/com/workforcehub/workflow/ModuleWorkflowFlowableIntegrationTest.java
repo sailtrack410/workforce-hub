@@ -116,6 +116,28 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     }
 
     @Test
+    @DisplayName("审批当前节点名称应从库表读取")
+    void workflowCurrentStepNameShouldComeFromDatabaseConfig() throws Exception {
+        try {
+            jdbcTemplate.update("""
+                UPDATE wf_step_config
+                SET step_name = '部门负责人审批'
+                WHERE step_key = 'manager_approval'
+                """);
+            Cookie employeeSession = loginEmployee();
+            LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+            assertEquals("部门负责人审批", currentStepName(scenario.requestId()));
+        } finally {
+            jdbcTemplate.update("""
+                UPDATE wf_step_config
+                SET step_name = '直属上级审批'
+                WHERE step_key = 'manager_approval'
+                """);
+        }
+    }
+
+    @Test
     @DisplayName("补卡申请审批通过后应写入人工补卡打卡并重算考勤日结果")
     void approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -953,6 +975,14 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     private String requestStatus(long requestId) {
         return jdbcTemplate.queryForObject(
             "SELECT status FROM wf_request WHERE id = ?",
+            String.class,
+            requestId
+        );
+    }
+
+    private String currentStepName(long requestId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT current_step_name FROM wf_request WHERE id = ?",
             String.class,
             requestId
         );

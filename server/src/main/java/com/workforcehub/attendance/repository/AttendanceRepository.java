@@ -81,6 +81,18 @@ public class AttendanceRepository {
         return rows.get(0);
     }
 
+    public List<AttendanceCalendarRow> listCalendars() {
+        return jdbcTemplate.query("""
+            SELECT id, calendar_code, calendar_name, calendar_type, status
+            FROM att_work_calendar
+            WHERE is_deleted = 0
+            ORDER BY id DESC
+            LIMIT 200
+            """,
+            this::mapCalendar
+        );
+    }
+
     public boolean existsShiftCode(String shiftCode) {
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
@@ -167,6 +179,28 @@ public class AttendanceRepository {
         return rows.get(0);
     }
 
+    public List<AttendanceShiftRow> listShifts() {
+        return jdbcTemplate.query("""
+            SELECT s.id,
+                   s.shift_code,
+                   s.shift_name,
+                   ss.start_time,
+                   ss.end_time,
+                   ss.on_duty_punch_start,
+                   ss.on_duty_punch_end,
+                   ss.off_duty_punch_start,
+                   ss.off_duty_punch_end,
+                   s.status
+            FROM att_shift s
+            JOIN att_shift_segment ss ON ss.shift_id = s.id
+            WHERE s.is_deleted = 0
+            ORDER BY s.id DESC, ss.segment_no ASC
+            LIMIT 200
+            """,
+            this::mapShift
+        );
+    }
+
     public boolean existsGroupCode(String groupCode) {
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)
@@ -223,6 +257,19 @@ public class AttendanceRepository {
             throw new BizException(404, "考勤组不存在");
         }
         return rows.get(0);
+    }
+
+    public List<AttendanceGroupRow> listGroups() {
+        return jdbcTemplate.query("""
+            SELECT id, group_code, group_name, calendar_id, default_shift_id,
+                   late_grace_minutes, early_leave_grace_minutes, status
+            FROM att_group
+            WHERE is_deleted = 0
+            ORDER BY id DESC
+            LIMIT 200
+            """,
+            this::mapGroup
+        );
     }
 
     public boolean existsActiveUser(Long userId) {
@@ -328,6 +375,19 @@ public class AttendanceRepository {
             throw new BizException(404, "考勤组成员不存在");
         }
         return rows.get(0);
+    }
+
+    public List<AttendanceGroupMemberRow> listGroupMembers(Long groupId) {
+        return jdbcTemplate.query("""
+            SELECT id, group_id, user_id, effective_from, effective_to, source_type, status
+            FROM att_group_member
+            WHERE group_id = ?
+            ORDER BY effective_from DESC, id DESC
+            LIMIT 500
+            """,
+            this::mapGroupMember,
+            groupId
+        );
     }
 
     public boolean existsSchedule(Long userId, LocalDate workDate) {
@@ -449,6 +509,35 @@ public class AttendanceRepository {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
+    public List<AttendanceScheduleRow> listSchedules(Long userId, LocalDate startDate, LocalDate endDate) {
+        if (userId == null) {
+            return jdbcTemplate.query("""
+                SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
+                FROM att_schedule
+                WHERE work_date BETWEEN ? AND ?
+                ORDER BY work_date DESC, id DESC
+                LIMIT 500
+                """,
+                this::mapSchedule,
+                startDate,
+                endDate
+            );
+        }
+        return jdbcTemplate.query("""
+            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
+            FROM att_schedule
+            WHERE user_id = ?
+              AND work_date BETWEEN ? AND ?
+            ORDER BY work_date DESC, id DESC
+            LIMIT 500
+            """,
+            this::mapSchedule,
+            userId,
+            startDate,
+            endDate
+        );
+    }
+
     public Long getScheduleId(Long userId, LocalDate workDate) {
         List<Long> rows = jdbcTemplate.query("""
             SELECT id
@@ -516,6 +605,18 @@ public class AttendanceRepository {
               AND punch_type = ?
               AND status = 'NORMAL'
             """, Long.class, userId, punchAt, punchType);
+        return count != null && count > 0;
+    }
+
+    public boolean existsNormalPunchRecordOnDate(Long userId, LocalDate punchDate, String punchType) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_punch_record
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = ?
+              AND status = 'NORMAL'
+            """, Long.class, userId, Date.valueOf(punchDate), punchType);
         return count != null && count > 0;
     }
 
@@ -725,6 +826,31 @@ public class AttendanceRepository {
         );
     }
 
+    public List<AttendanceDailyResultRow> listDailyResultsForAdmin(Long userId, LocalDate startDate, LocalDate endDate) {
+        if (userId == null) {
+            return jdbcTemplate.query(dailyResultSelectSql() + """
+                WHERE work_date BETWEEN ? AND ?
+                ORDER BY work_date DESC, id DESC
+                LIMIT 500
+                """,
+                this::mapDailyResult,
+                startDate,
+                endDate
+            );
+        }
+        return jdbcTemplate.query(dailyResultSelectSql() + """
+            WHERE user_id = ?
+              AND work_date BETWEEN ? AND ?
+            ORDER BY work_date DESC, id DESC
+            LIMIT 500
+            """,
+            this::mapDailyResult,
+            userId,
+            startDate,
+            endDate
+        );
+    }
+
     public List<AttendanceExceptionRow> listExceptions(Long userId, LocalDate startDate, LocalDate endDate) {
         return jdbcTemplate.query("""
             SELECT ae.id,
@@ -765,6 +891,16 @@ public class AttendanceRepository {
                    absence_minutes, work_minutes, exception_flag, calculated_at
             FROM att_daily_result
             """;
+    }
+
+    private AttendanceCalendarRow mapCalendar(ResultSet rs, int rowNum) throws SQLException {
+        return new AttendanceCalendarRow(
+            rs.getLong("id"),
+            rs.getString("calendar_code"),
+            rs.getString("calendar_name"),
+            rs.getString("calendar_type"),
+            rs.getString("status")
+        );
     }
 
     private AttendanceShiftRow mapShift(ResultSet rs, int rowNum) throws SQLException {

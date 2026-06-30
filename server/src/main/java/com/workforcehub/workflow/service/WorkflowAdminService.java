@@ -1,6 +1,6 @@
 package com.workforcehub.workflow.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -40,6 +40,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+import static com.workforcehub.common.util.JsonValues.normalize;
+import static com.workforcehub.common.util.TextValues.blankToNull;
+
 /**
  * module-workflow 后台流程模板治理服务。
  */
@@ -67,7 +70,7 @@ public class WorkflowAdminService {
             throw new BizException(409, "流程编码已存在");
         }
 
-        Long processTypeId = IdWorker.getId();
+        Long processTypeId = IdGenerator.nextId();
         workflowAdminRepository.insertProcessType(
             processTypeId,
             processCode,
@@ -90,7 +93,7 @@ public class WorkflowAdminService {
             throw new BizException(409, "流程模板编码已存在");
         }
 
-        Long templateId = IdWorker.getId();
+        Long templateId = IdGenerator.nextId();
         workflowAdminRepository.insertTemplate(
             templateId,
             request.getProcessTypeId(),
@@ -113,9 +116,9 @@ public class WorkflowAdminService {
             throw new BizException(409, "流程模板版本号已存在");
         }
 
-        String formSchemaJson = normalizeJson(request.getFormSchemaJson(), "formSchemaJson 不是合法 JSON");
-        String ruleSnapshotJson = normalizeJson(request.getRuleSnapshotJson(), "ruleSnapshotJson 不是合法 JSON");
-        Long versionId = IdWorker.getId();
+        String formSchemaJson = normalize(objectMapper, request.getFormSchemaJson(), "formSchemaJson 不是合法 JSON");
+        String ruleSnapshotJson = normalize(objectMapper, request.getRuleSnapshotJson(), "ruleSnapshotJson 不是合法 JSON");
+        Long versionId = IdGenerator.nextId();
         workflowAdminRepository.insertTemplateVersion(
             versionId,
             templateId,
@@ -357,17 +360,6 @@ public class WorkflowAdminService {
         return normalized;
     }
 
-    private String normalizeJson(String value, String errorMessage) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(objectMapper.readTree(value));
-        } catch (Exception e) {
-            throw new BizException(400, errorMessage);
-        }
-    }
-
     private String compactJson(String value) {
         if (!StringUtils.hasText(value)) {
             return null;
@@ -405,7 +397,4 @@ public class WorkflowAdminService {
         return value.trim();
     }
 
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
 }

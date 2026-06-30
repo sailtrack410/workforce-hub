@@ -26,6 +26,16 @@ export const useSessionStore = defineStore('admin-session', {
     shortName(state): string {
       return (state.user?.displayName || state.user?.loginName || 'A').slice(0, 1);
     },
+    hasPermission(state): (permissionCode?: string) => boolean {
+      return (permissionCode?: string) => {
+        if (!permissionCode) return true;
+        if (!state.user) return false;
+        // 后端已对 ADMIN 用户返回 permissionCodes（AccountService.java:65）。
+        // 字段缺失或为空时默认拒绝，避免后端漏传导致越权。
+        const codes = state.user.permissionCodes;
+        return Array.isArray(codes) && codes.includes(permissionCode);
+      };
+    },
   },
   actions: {
     async loadCurrentUser(authApi: AdminAuthApi = adminApi.auth) {
@@ -62,6 +72,8 @@ export const useSessionStore = defineStore('admin-session', {
       this.error = '';
       try {
         await authApi.logout();
+      } catch (error) {
+        this.error = resolveSessionError(error);
       } finally {
         this.user = null;
         this.loading = false;

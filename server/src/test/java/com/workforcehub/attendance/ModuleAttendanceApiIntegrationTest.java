@@ -2,10 +2,10 @@ package com.workforcehub.attendance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.support.FixedClockTestConfiguration;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import com.workforcehub.support.MutableTestClock;
-import com.workforcehub.spi.AttendanceRecalculationService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,7 +64,7 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
     private MutableTestClock mutableTestClock;
 
     @Autowired
-    private AttendanceRecalculationService attendanceRecalculationService;
+    private AttendanceService attendanceRecalculationService;
 
     @Test
     @DisplayName("后台配置考勤基础数据后，员工应能打卡并生成正常日结果，直属上级应能查询团队结果")
@@ -120,6 +120,66 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
 
         assertEquals(2L, punchCount(EMPLOYEE_USER_ID, "2026-05-07"));
         assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-05-07"));
+    }
+
+    @Test
+    @DisplayName("后台应能查询考勤配置、排班和日结果")
+    void adminShouldListAttendanceGovernanceData() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+
+        long calendarId = createCalendar(adminSession, "CAL_LIST_" + suffix, "查询日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_LIST_" + suffix, "查询班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_LIST_" + suffix, "查询考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        MvcResult scheduleResult = createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-17", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        punch(employeeSession, "2026-05-17T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-17T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(get("/api/admin/attendance/calendars").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.calendarId==%d)]".formatted(calendarId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/shifts").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.shiftId==%d)]".formatted(shiftId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/groups").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.groupId==%d)]".formatted(groupId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/groups/{groupId}/members", groupId).cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].userId").value(EMPLOYEE_USER_ID));
+        mockMvc.perform(get("/api/admin/attendance/schedules")
+                .cookie(adminSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("startDate", "2026-05-17")
+                .param("endDate", "2026-05-17"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].scheduleId").value(scheduleId));
+        mockMvc.perform(get("/api/admin/attendance/daily-results")
+                .cookie(adminSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("startDate", "2026-05-17")
+                .param("endDate", "2026-05-17"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"));
     }
 
     @Test
@@ -586,6 +646,30 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.punchAt").value("2026-05-15T09:05:00"));
 
         assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-15"));
+    }
+
+    @Test
+    @DisplayName("员工同一天同类型重复打卡应返回冲突")
+    void duplicateSameDayPunchTypeShouldBeRejected() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_DUP_PUNCH_" + suffix, "重复打卡日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_DUP_PUNCH_" + suffix, "重复打卡班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_DUP_PUNCH_" + suffix, "重复打卡考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-18T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-18T09:01:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(jsonPath("$.message").value("当天同类型打卡已存在"));
+
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-18"));
     }
 
     @Test

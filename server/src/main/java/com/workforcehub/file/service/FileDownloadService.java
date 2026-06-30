@@ -1,8 +1,10 @@
 package com.workforcehub.file.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.audit.AuditLogWriter;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.common.util.TextValues;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
@@ -30,15 +32,18 @@ public class FileDownloadService {
     private final StorageProviderRegistry storageProviderRegistry;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
     private final AttachmentRefRepository attachmentRefRepository;
+    private final AuditLogWriter auditLogWriter;
 
     public FileDownloadService(JdbcTemplate jdbcTemplate,
                                StorageProviderRegistry storageProviderRegistry,
                                DownloadTicketExecutionService downloadTicketExecutionService,
-                               AttachmentRefRepository attachmentRefRepository) {
+                               AttachmentRefRepository attachmentRefRepository,
+                               AuditLogWriter auditLogWriter) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
         this.attachmentRefRepository = attachmentRefRepository;
+        this.auditLogWriter = auditLogWriter;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -61,7 +66,7 @@ public class FileDownloadService {
             throw new BizException(403, "无权访问该文件");
         }
 
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         String ticketNo = "DL" + ticketId;
         LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
         String downloadUrl = "/api/employee/files/download/" + ticketNo;
@@ -78,7 +83,7 @@ public class FileDownloadService {
             userId,
             downloadType,
             downloadUrl,
-            blankToNull(request.getReason()),
+            TextValues.blankToNull(request.getReason()),
             expireAt
         );
 
@@ -89,7 +94,7 @@ public class FileDownloadService {
         response.setExpireAt(expireAt);
         response.setFileName(attachment.displayName());
         response.setFileSize(attachment.fileSize());
-        audit("USER", userId, "FILE_DOWNLOAD_TICKET_CREATED", "DOWNLOAD_TICKET", ticketId, "SUCCESS",
+        auditLogWriter.write("USER", userId, "FILE_DOWNLOAD_TICKET_CREATED", "DOWNLOAD_TICKET", ticketId, "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachmentRefId));
         return response;
     }
@@ -125,7 +130,7 @@ public class FileDownloadService {
         downloadTicketExecutionService.claimActiveTicket(ticket.id());
         StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
             .loadObject(attachment.bucketName(), attachment.objectKey());
-        audit("USER", userId, "FILE_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
+        auditLogWriter.write("USER", userId, "FILE_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
         return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
     }
@@ -142,7 +147,7 @@ public class FileDownloadService {
             throw new BizException(400, "第一版仅支持单文件下载");
         }
 
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         String ticketNo = "DL" + ticketId;
         LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
         String downloadUrl = "/api/admin/files/download/" + ticketNo;
@@ -158,7 +163,7 @@ public class FileDownloadService {
             attachmentRefId,
             adminId,
             downloadUrl,
-            blankToNull(request.getReason()),
+            TextValues.blankToNull(request.getReason()),
             expireAt
         );
 
@@ -169,7 +174,7 @@ public class FileDownloadService {
         response.setExpireAt(expireAt);
         response.setFileName(attachment.displayName());
         response.setFileSize(attachment.fileSize());
-        audit("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_TICKET_CREATED", "DOWNLOAD_TICKET", ticketId, "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_TICKET_CREATED", "DOWNLOAD_TICKET", ticketId, "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachmentRefId));
         return response;
     }
@@ -198,7 +203,7 @@ public class FileDownloadService {
         downloadTicketExecutionService.claimActiveTicket(ticket.id());
         StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
             .loadObject(attachment.bucketName(), attachment.objectKey());
-        audit("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
+        auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
         return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
     }
@@ -266,29 +271,6 @@ public class FileDownloadService {
             throw new BizException(404, "下载票据不存在");
         }
         return rows.get(0);
-    }
-
-    private void audit(String operatorType, Long operatorId, String actionType,
-                       String targetType, Long targetId, String result, String detailJson) {
-        jdbcTemplate.update("""
-            INSERT INTO sys_audit_log
-                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
-            """,
-            IdWorker.getId(),
-            operatorType,
-            operatorId,
-            actionType,
-            targetType,
-            targetId,
-            result,
-            detailJson
-        );
-    }
-
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
     }
 
     private record DownloadTicketRow(

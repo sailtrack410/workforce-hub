@@ -372,7 +372,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
 
                     List<Integer> resultCodes = List.of(first.get(), second.get());
                     long successCount = resultCodes.stream().filter(code -> code == 0).count();
-                    long conflictCount = resultCodes.stream().filter(code -> code == 409).count();
+                    long conflictCount = resultCodes.stream().filter(code -> code == 100409).count();
                     assertEquals(1L, successCount);
                     assertEquals(1L, conflictCount);
                 } finally {
@@ -399,8 +399,8 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(get("/api/admin/files/download/{ticketNo}", ticketNo)
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(410))
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.code").value(100410))
             .andExpect(jsonPath("$.message", containsString("下载链接已过期")));
 
         assertEquals("EXPIRED", downloadTicketStatus(ticketNo));
@@ -437,7 +437,7 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
 
                     List<Integer> resultCodes = List.of(first.get(), second.get());
                     long successCount = resultCodes.stream().filter(code -> code == 0).count();
-                    long notFoundCount = resultCodes.stream().filter(code -> code == 404).count();
+                    long notFoundCount = resultCodes.stream().filter(code -> code == 100404).count();
                     assertEquals(1L, successCount);
                     assertEquals(1L, notFoundCount);
                 } finally {

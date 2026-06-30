@@ -1,8 +1,12 @@
 package com.workforcehub.im.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.service.AgentService;
+import com.workforcehub.agent.service.ImAgentDescriptor;
+import com.workforcehub.agent.service.ImAgentReplyResult;
+import com.workforcehub.agent.service.ImAgentTriggerCommand;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
@@ -17,11 +21,6 @@ import com.workforcehub.im.repository.ImRepository;
 import com.workforcehub.im.websocket.ImWebSocketEvent;
 import com.workforcehub.im.websocket.ImWebSocketEventTypes;
 import com.workforcehub.im.websocket.ImWebSocketPushService;
-import com.workforcehub.spi.ImAgentDescriptor;
-import com.workforcehub.spi.ImAgentReplyResult;
-import com.workforcehub.spi.ImAgentResultCallback;
-import com.workforcehub.spi.ImAgentTriggerCommand;
-import com.workforcehub.spi.ImAgentTriggerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -43,7 +42,7 @@ import java.util.Set;
  * IM 会话中的 Agent 创建、触发和回写服务。
  */
 @Service
-public class ImAgentConversationService implements ImAgentResultCallback {
+public class ImAgentConversationService {
 
     private static final Logger log = LoggerFactory.getLogger(ImAgentConversationService.class);
 
@@ -56,27 +55,27 @@ public class ImAgentConversationService implements ImAgentResultCallback {
     private final ImMessageRepository imMessageRepository;
     private final ObjectMapper objectMapper;
     private final ImWebSocketPushService webSocketPushService;
-    private final ObjectProvider<ImAgentTriggerService> imAgentTriggerServiceProvider;
+    private final ObjectProvider<AgentService> agentServiceProvider;
     private final TransactionTemplate transactionTemplate;
 
     public ImAgentConversationService(ImRepository imRepository,
                                       ImMessageRepository imMessageRepository,
                                       ObjectMapper objectMapper,
                                       ImWebSocketPushService webSocketPushService,
-                                      ObjectProvider<ImAgentTriggerService> imAgentTriggerServiceProvider,
+                                      ObjectProvider<AgentService> agentServiceProvider,
                                       PlatformTransactionManager transactionManager) {
         this.imRepository = imRepository;
         this.imMessageRepository = imMessageRepository;
         this.objectMapper = objectMapper;
         this.webSocketPushService = webSocketPushService;
-        this.imAgentTriggerServiceProvider = imAgentTriggerServiceProvider;
+        this.agentServiceProvider = agentServiceProvider;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public ImConversationSummaryResponse startCurrentEmployeeAgentConversation(StartAgentConversationRequest request) {
         Long currentUserId = requireActiveEmployeeUserId();
-        ImAgentDescriptor agent = requireImAgentTriggerService()
+        ImAgentDescriptor agent = requireAgentService()
             .requireUsableAgent(request.getAgentId(), currentUserId);
 
         String conversationKey = agentConversationKey(currentUserId, agent.agentId());
@@ -88,7 +87,6 @@ public class ImAgentConversationService implements ImAgentResultCallback {
             .orElseThrow(() -> new BizException(500, "AI会话创建失败"));
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public void onAgentReply(ImAgentReplyResult result) {
         if (result == null) {
@@ -123,7 +121,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
             return;
         }
         Long seqNo = lastSeq + 1;
-        Long messageId = IdWorker.getId();
+        Long messageId = IdGenerator.nextId();
         LocalDateTime sentAt = LocalDateTime.now();
         try {
             imMessageRepository.insertMessage(
@@ -174,7 +172,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         }
         Runnable trigger = () -> {
             try {
-                ImAgentTriggerService triggerService = requireImAgentTriggerService();
+                AgentService triggerService = requireAgentService();
                 triggerService.triggerConversationReply(new ImAgentTriggerCommand(
                     userMessage.getConversationId(),
                     userMessage.getMessageId(),
@@ -222,7 +220,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
     private Long createAgentConversation(Long userId,
                                          ImAgentDescriptor agent,
                                          String conversationKey) {
-        Long conversationId = IdWorker.getId();
+        Long conversationId = IdGenerator.nextId();
         boolean inserted = imRepository.tryInsertAgentConversation(
             conversationId,
             conversationKey,
@@ -235,8 +233,8 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                 .orElseThrow(() -> new BizException(409, "AI会话创建冲突"));
         }
         try {
-            imRepository.insertUserMember(IdWorker.getId(), conversationId, userId, "MEMBER", "AGENT_CHAT");
-            imRepository.insertAgentMember(IdWorker.getId(), conversationId, agent.agentId(), "AGENT_CHAT");
+            imRepository.insertUserMember(IdGenerator.nextId(), conversationId, userId, "MEMBER", "AGENT_CHAT");
+            imRepository.insertAgentMember(IdGenerator.nextId(), conversationId, agent.agentId(), "AGENT_CHAT");
         } catch (DuplicateKeyException e) {
             return imRepository.findActiveConversationIdByKey(conversationKey)
                 .orElseThrow(() -> new BizException(409, "AI会话成员写入冲突"));
@@ -401,7 +399,7 @@ public class ImAgentConversationService implements ImAgentResultCallback {
                     return;
                 }
                 Long seqNo = lastSeq + 1;
-                Long messageId = IdWorker.getId();
+                Long messageId = IdGenerator.nextId();
                 LocalDateTime sentAt = LocalDateTime.now();
                 String contentJson = buildSystemContentJson("AI助手暂时无法回复，请稍后再试");
                 try {
@@ -454,8 +452,8 @@ public class ImAgentConversationService implements ImAgentResultCallback {
         }
     }
 
-    private ImAgentTriggerService requireImAgentTriggerService() {
-        ImAgentTriggerService service = imAgentTriggerServiceProvider.getIfAvailable();
+    private AgentService requireAgentService() {
+        AgentService service = agentServiceProvider.getIfAvailable();
         if (service == null) {
             throw new BizException(501, "AI会话触发服务未接入");
         }

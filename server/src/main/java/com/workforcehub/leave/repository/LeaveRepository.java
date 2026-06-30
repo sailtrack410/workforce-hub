@@ -1,7 +1,6 @@
 package com.workforcehub.leave.repository;
 
 import com.workforcehub.common.exception.BizException;
-import com.workforcehub.spi.LeaveQueryService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
@@ -233,23 +232,28 @@ public class LeaveRepository {
         );
     }
 
-    public void updateAccountBalance(Long accountId, int availableMinutes, Long operatorId) {
-        jdbcTemplate.update("""
+    public void updateAccountBalance(Long accountId, int availableMinutes, Long operatorId, int expectedVersion) {
+        int updated = jdbcTemplate.update("""
             UPDATE lv_account
             SET available_minutes = ?,
                 version = version + 1,
                 updated_by = ?
             WHERE id = ?
               AND status = 'ACTIVE'
+              AND version = ?
             """,
             availableMinutes,
             operatorId,
-            accountId
+            accountId,
+            expectedVersion
         );
+        if (updated == 0) {
+            throw new BizException(409, "假期账户已被其他事务更新");
+        }
     }
 
-    public void updateAccountBalances(Long accountId, int availableMinutes, int frozenMinutes, Long operatorId) {
-        jdbcTemplate.update("""
+    public void updateAccountBalances(Long accountId, int availableMinutes, int frozenMinutes, Long operatorId, int expectedVersion) {
+        int updated = jdbcTemplate.update("""
             UPDATE lv_account
             SET available_minutes = ?,
                 frozen_minutes = ?,
@@ -257,12 +261,17 @@ public class LeaveRepository {
                 updated_by = ?
             WHERE id = ?
               AND status = 'ACTIVE'
+              AND version = ?
             """,
             availableMinutes,
             frozenMinutes,
             operatorId,
-            accountId
+            accountId,
+            expectedVersion
         );
+        if (updated == 0) {
+            throw new BizException(409, "假期账户已被其他事务更新");
+        }
     }
 
     public void insertAccountTxn(Long txnId,
@@ -345,7 +354,7 @@ public class LeaveRepository {
         return minutes == null ? 0 : minutes;
     }
 
-    public List<LeaveQueryService.ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate) {
+    public List<ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate) {
         LocalDateTime dayStart = workDate.atStartOfDay();
         LocalDateTime nextDayStart = workDate.plusDays(1).atStartOfDay();
         return jdbcTemplate.query("""
@@ -359,7 +368,7 @@ public class LeaveRepository {
               AND wrl.end_at > ?
               AND wr.is_deleted = 0
             """,
-            (rs, rowNum) -> new LeaveQueryService.ApprovedLeavePeriod(
+            (rs, rowNum) -> new ApprovedLeavePeriod(
                 rs.getTimestamp("start_at").toLocalDateTime(),
                 rs.getTimestamp("end_at").toLocalDateTime()
             ),

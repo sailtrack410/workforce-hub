@@ -1,6 +1,5 @@
 package com.workforcehub.common.enums;
 
-import com.baomidou.mybatisplus.annotation.EnumValue;
 import lombok.Getter;
 
 /**
@@ -16,7 +15,6 @@ public enum IngestStatus {
     FAILED("FAILED", "入库失败"),
     OFFLINE("OFFLINE", "已下线");
 
-    @EnumValue
     private final String code;
     private final String desc;
 

@@ -1,6 +1,5 @@
 package com.workforcehub.auth.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.workforcehub.auth.domain.AuthUserAccount;
 import com.workforcehub.auth.dto.BindEmailRequest;
 import com.workforcehub.auth.dto.CurrentUserResponse;
@@ -60,10 +59,12 @@ public class AccountService {
         response.setUserType(user.getUserType());
         response.setDisplayName(user.getDisplayName());
         response.setLoginName(user.getUsername());
+        if (user.getUserType() == UserType.ADMIN) {
+            response.setRoleCodes(adminUserMapper.selectRoleCodes(user.getUserId()));
+            response.setPermissionCodes(adminUserMapper.selectPermissionCodes(user.getUserId()));
+        }
         if (user.getUserType() == UserType.USER) {
-            AuthUserAccount account = accountMapper.selectOne(
-                new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, user.getUserId())
-            );
+            AuthUserAccount account = accountMapper.selectByUserId(user.getUserId());
             if (account != null) {
                 response.setEmail(account.getEmail());
             }
@@ -102,9 +103,7 @@ public class AccountService {
             throw new BizException(400, "该邮箱已被其他账号绑定");
         }
 
-        AuthUserAccount account = accountMapper.selectOne(
-            new LambdaQueryWrapper<AuthUserAccount>().eq(AuthUserAccount::getUserId, currentUserId)
-        );
+        AuthUserAccount account = accountMapper.selectByUserId(currentUserId);
         if (account == null) {
             throw new BizException(404, "账号不存在");
         }

@@ -1,17 +1,17 @@
 package com.workforcehub.leave.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.leave.dto.AdjustLeaveAccountRequest;
 import com.workforcehub.leave.dto.CreateLeaveTypeRequest;
 import com.workforcehub.leave.dto.LeaveAccountResponse;
 import com.workforcehub.leave.dto.LeaveTypeResponse;
+import com.workforcehub.leave.repository.ApprovedLeavePeriod;
 import com.workforcehub.leave.repository.LeaveAccountRow;
 import com.workforcehub.leave.repository.LeaveAccountTxnRow;
 import com.workforcehub.leave.repository.LeaveRepository;
 import com.workforcehub.leave.repository.LeaveTypeRow;
-import com.workforcehub.spi.LeaveQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,11 +22,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static com.workforcehub.common.util.TextValues.trimToNull;
+
 /**
  * module-leave 第一版假期账户服务。
  */
 @Service
-public class LeaveService implements LeaveQueryService {
+public class LeaveService {
 
     private static final String BALANCE_MODE_DEDUCT = "DEDUCT";
     private static final String BALANCE_MODE_NO_DEDUCT = "NO_DEDUCT";
@@ -56,7 +58,7 @@ public class LeaveService implements LeaveQueryService {
             throw new BizException(409, "假种编码已存在");
         }
 
-        Long leaveTypeId = IdWorker.getId();
+        Long leaveTypeId = IdGenerator.nextId();
         leaveRepository.insertLeaveType(leaveTypeId, leaveCode, leaveName, balanceMode, status, operatorId);
         return toLeaveTypeResponse(leaveRepository.getLeaveTypeOrThrow(leaveTypeId));
     }
@@ -108,7 +110,7 @@ public class LeaveService implements LeaveQueryService {
 
         LeaveAccountRow account = leaveRepository.getAccountForUpdate(request.getUserId(), leaveType.id());
         if (account == null) {
-            Long accountId = IdWorker.getId();
+            Long accountId = IdGenerator.nextId();
             leaveRepository.insertAccount(accountId, request.getUserId(), leaveType.id(), operatorId);
             account = leaveRepository.getAccountForUpdate(request.getUserId(), leaveType.id());
         }
@@ -117,9 +119,9 @@ public class LeaveService implements LeaveQueryService {
             throw new BizException(400, "假期余额不能调整为负数");
         }
 
-        leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId);
+        leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_ADJUST,
             request.getChangeMinutes(),
@@ -199,9 +201,9 @@ public class LeaveService implements LeaveQueryService {
 
         int availableAfter = account.availableMinutes() - durationMinutes;
         int frozenAfter = account.frozenMinutes() + durationMinutes;
-        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId);
+        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_FREEZE,
             -durationMinutes,
@@ -251,16 +253,17 @@ public class LeaveService implements LeaveQueryService {
                 account.accountId(),
                 account.availableMinutes(),
                 account.frozenMinutes() - durationMinutes,
-                operatorId
+                operatorId,
+                account.version()
             );
         } else if (freezeTxn == null && account.availableMinutes() >= durationMinutes) {
             balanceAfter = account.availableMinutes() - durationMinutes;
-            leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId);
+            leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId, account.version());
         } else {
             throw new BizException(400, "冻结假期余额不足");
         }
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_DEDUCT,
             -durationMinutes,
@@ -310,9 +313,9 @@ public class LeaveService implements LeaveQueryService {
 
         int availableAfter = account.availableMinutes() + durationMinutes;
         int frozenAfter = account.frozenMinutes() - durationMinutes;
-        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId);
+        leaveRepository.updateAccountBalances(account.accountId(), availableAfter, frozenAfter, operatorId, account.version());
         leaveRepository.insertAccountTxn(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             account.accountId(),
             TXN_TYPE_UNFREEZE,
             durationMinutes,
@@ -324,7 +327,6 @@ public class LeaveService implements LeaveQueryService {
         );
     }
 
-    @Override
     public List<Map<String, Object>> getLeaveBalances(Long userId) {
         return leaveRepository.listUserAccounts(userId).stream()
             .map(row -> Map.<String, Object>of(
@@ -339,12 +341,10 @@ public class LeaveService implements LeaveQueryService {
             .toList();
     }
 
-    @Override
     public int getAvailableMinutes(Long userId, Long leaveTypeId) {
         return leaveRepository.getAvailableMinutes(userId, leaveTypeId);
     }
 
-    @Override
     public List<ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate) {
         return leaveRepository.listApprovedLeavePeriodsOnDate(userId, workDate);
     }
@@ -478,7 +478,4 @@ public class LeaveService implements LeaveQueryService {
         return SOURCE_TYPE_WORKFLOW_REQUEST + ":" + requestId + ":UNFREEZE:" + status;
     }
 
-    private String trimToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
 }

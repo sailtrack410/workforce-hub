@@ -1,6 +1,7 @@
 import { employeeApi } from '@/api';
 import type { DownloadTicketResponse, EntityId } from '@/api';
 import { sha256Hex } from '@/utils/file-record';
+import { createClientId } from '@/utils/request-id';
 
 export interface PersonalAttachmentUploadResult {
   attachmentRefId: EntityId;
@@ -35,7 +36,7 @@ export function usePersonalFileTransfer() {
       mimeType: file.type || 'application/octet-stream',
       fileSize: file.size,
       contentSha256,
-      clientRequestId: `${clientRequestPrefix}-${Date.now()}-${file.name}`,
+      clientRequestId: createClientId(`${clientRequestPrefix}-${file.name}`),
     });
 
     if (ticket.deduplicated && ticket.attachmentRefId) {

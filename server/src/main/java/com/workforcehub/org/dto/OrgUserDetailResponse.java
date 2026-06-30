@@ -15,6 +15,7 @@ public class OrgUserDetailResponse {
     private String realName;
     private String gender;
     private String mobile;
+    private String email;
     private Long avatarAttachmentRefId;
     private Long primaryDeptId;
     private String primaryDeptName;

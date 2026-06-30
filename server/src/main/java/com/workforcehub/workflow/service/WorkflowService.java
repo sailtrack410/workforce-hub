@@ -4,7 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
+import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
@@ -18,10 +19,6 @@ import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.leave.service.LeaveService;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
-import com.workforcehub.spi.AttendanceClockCorrectionService;
-import com.workforcehub.spi.AttendanceRecalculationService;
-import com.workforcehub.spi.WorkflowAgentPreReviewTrigger;
-import com.workforcehub.spi.WorkflowAgentResultCallback;
 import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
@@ -67,6 +64,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
+import static com.workforcehub.common.util.TextValues.blankToNull;
+
 /**
  * module-workflow 第一版审批服务。
  */
@@ -95,8 +94,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private final StorageProviderRegistry storageProviderRegistry;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
     private final LeaveService leaveService;
-    private final AttendanceRecalculationService attendanceRecalculationService;
-    private final AttendanceClockCorrectionService attendanceClockCorrectionService;
+    private final AttendanceService attendanceService;
     private final ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider;
     private final ObjectMapper objectMapper;
 
@@ -107,8 +105,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                            StorageProviderRegistry storageProviderRegistry,
                            DownloadTicketExecutionService downloadTicketExecutionService,
                            LeaveService leaveService,
-                           AttendanceRecalculationService attendanceRecalculationService,
-                           AttendanceClockCorrectionService attendanceClockCorrectionService,
+                           AttendanceService attendanceService,
                            ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider,
                            ObjectMapper objectMapper) {
         this.workflowRepository = workflowRepository;
@@ -118,8 +115,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         this.storageProviderRegistry = storageProviderRegistry;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
         this.leaveService = leaveService;
-        this.attendanceRecalculationService = attendanceRecalculationService;
-        this.attendanceClockCorrectionService = attendanceClockCorrectionService;
+        this.attendanceService = attendanceService;
         this.agentPreReviewTriggerProvider = agentPreReviewTriggerProvider;
         this.objectMapper = objectMapper;
     }
@@ -137,8 +133,8 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             workflowRepository.getPublishedTemplateVersion(LEAVE_PROCESS_CODE);
         String title = applicant.getRealName() + "的请假申请";
         String requestNo = buildRequestNo();
-        Long requestId = IdWorker.getId();
-        Long leaveDetailId = IdWorker.getId();
+        Long requestId = IdGenerator.nextId();
+        Long leaveDetailId = IdGenerator.nextId();
         workflowRepository.insertWorkflowRequest(
             requestId,
             requestNo,
@@ -202,8 +198,8 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             workflowRepository.getPublishedTemplateVersion(CLOCK_CORRECTION_PROCESS_CODE);
         String title = applicant.getRealName() + "的补卡申请";
         String requestNo = buildRequestNo(CLOCK_CORRECTION_BIZ_TYPE);
-        Long requestId = IdWorker.getId();
-        Long detailId = IdWorker.getId();
+        Long requestId = IdGenerator.nextId();
+        Long detailId = IdGenerator.nextId();
         workflowRepository.insertWorkflowRequest(
             requestId,
             requestNo,
@@ -458,7 +454,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
         WorkflowAttachmentRow attachment = workflowRepository.getWorkflowAttachmentOrThrow(requestId, attachmentRefId);
         ensureDownloadableWorkflowAttachment(attachment);
-        Long ticketId = IdWorker.getId();
+        Long ticketId = IdGenerator.nextId();
         String ticketNo = "WFDL" + ticketId;
         LocalDateTime expireAt = LocalDateTime.now().plusMinutes(10);
         String downloadUrl = "/api/employee/workflow/attachments/download/" + ticketNo;
@@ -587,7 +583,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             recalculateAttendanceForApprovedLeave(workflowRequest.applicantUserId(), approvedLeaveDetail);
         }
         if (approvedClockCorrectionDetail != null) {
-            attendanceClockCorrectionService.applyApprovedClockCorrection(
+            attendanceService.applyApprovedClockCorrection(
                 workflowRequest.applicantUserId(),
                 approvedClockCorrectionDetail.targetDate(),
                 approvedClockCorrectionDetail.missingPunchType(),
@@ -621,7 +617,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         LocalDate workDate = leaveDetail.startAt().toLocalDate();
         LocalDate endDate = leaveDetail.endAt().toLocalDate();
         while (!workDate.isAfter(endDate)) {
-            attendanceRecalculationService.recalculateDailyResultForExternalEvent(userId, workDate);
+            attendanceService.recalculateDailyResultForExternalEvent(userId, workDate);
             workDate = workDate.plusDays(1);
         }
     }
@@ -840,7 +836,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
     private String buildRequestNo(String bizType) {
         return "WF-" + bizType + "-" + java.time.LocalDateTime.now().format(REQUEST_NO_TIME_FORMATTER)
-            + "-" + IdWorker.getIdStr();
+            + "-" + IdGenerator.nextIdString();
     }
 
     private String requestSummary(WorkflowLeaveDetailRow leaveDetail,
@@ -860,10 +856,6 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             throw new BizException(400, "补卡类型仅支持 ON_DUTY/OFF_DUTY");
         }
         return normalized;
-    }
-
-    private String blankToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
     }
 
     private String compactJson(String json) {

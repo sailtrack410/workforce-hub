@@ -36,3 +36,7 @@ output/ui-audit-*
 
 # Local declaration materials
 docs/申报材料/
+
+# Local log files
+*.log
+server-8080.log

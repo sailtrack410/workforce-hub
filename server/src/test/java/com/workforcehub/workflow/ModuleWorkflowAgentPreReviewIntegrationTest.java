@@ -3,11 +3,11 @@ package com.workforcehub.workflow;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.common.exception.BizException;
-import com.workforcehub.spi.WorkflowAgentResultCallback;
 import com.workforcehub.support.WorkflowAgentPreReviewTestConfiguration;
 import com.workforcehub.support.WorkflowAgentPreReviewTestConfiguration.TestWorkflowAgentPreReviewTrigger;
 import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
 import com.workforcehub.support.WorkflowFlowableTestConfiguration;
+import com.workforcehub.workflow.service.WorkflowAgentResultCallback;
 import jakarta.servlet.http.Cookie;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -311,9 +311,9 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
 
                     List<Integer> resultCodes = List.of(first.get(), second.get());
                     long successCount = resultCodes.stream().filter(code -> code == 0).count();
-                    long rejectedCount = resultCodes.stream().filter(code -> code == 400).count();
-                    assertEquals(1L, successCount);
-                    assertEquals(1L, rejectedCount);
+                    long rejectedCount = resultCodes.stream().filter(code -> code == 100400).count();
+                    assertEquals(1L, successCount, () -> "resultCodes=" + resultCodes);
+                    assertEquals(1L, rejectedCount, () -> "resultCodes=" + resultCodes);
                 } finally {
                     executor.shutdownNow();
                 }

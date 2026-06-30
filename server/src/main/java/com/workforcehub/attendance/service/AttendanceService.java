@@ -1,6 +1,6 @@
 package com.workforcehub.attendance.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.attendance.dto.AddAttendanceGroupMemberRequest;
 import com.workforcehub.attendance.dto.AttendanceCalendarResponse;
 import com.workforcehub.attendance.dto.AttendanceDailyResultResponse;
@@ -27,10 +27,9 @@ import com.workforcehub.attendance.repository.AttendanceShiftRow;
 import com.workforcehub.attendance.repository.PunchRecordRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
-import com.workforcehub.spi.AttendanceClockCorrectionService;
-import com.workforcehub.spi.AttendanceQueryService;
-import com.workforcehub.spi.AttendanceRecalculationService;
-import com.workforcehub.spi.LeaveQueryService;
+import com.workforcehub.leave.repository.ApprovedLeavePeriod;
+import com.workforcehub.leave.service.LeaveService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -51,11 +50,13 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static com.workforcehub.common.util.TextValues.trimToNull;
+
 /**
  * module-attendance 第一版考勤服务。
  */
 @Service
-public class AttendanceService implements AttendanceQueryService, AttendanceRecalculationService, AttendanceClockCorrectionService {
+public class AttendanceService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_INACTIVE = "INACTIVE";
@@ -75,18 +76,18 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
     private static final String SOURCE_TEMPLATE = "TEMPLATE";
 
     private final AttendanceRepository attendanceRepository;
-    private final LeaveQueryService leaveQueryService;
+    private final LeaveService leaveService;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
     private final ConcurrentMap<Long, ReentrantLock> membershipLocks = new ConcurrentHashMap<>();
 
     public AttendanceService(AttendanceRepository attendanceRepository,
-                             LeaveQueryService leaveQueryService,
-                             Clock clock,
+                             LeaveService leaveService,
+                             ObjectProvider<Clock> clockProvider,
                              TransactionTemplate transactionTemplate) {
         this.attendanceRepository = attendanceRepository;
-        this.leaveQueryService = leaveQueryService;
-        this.clock = clock;
+        this.leaveService = leaveService;
+        this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -101,9 +102,15 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             throw new BizException(409, "日历编码已存在");
         }
 
-        Long calendarId = IdWorker.getId();
+        Long calendarId = IdGenerator.nextId();
         attendanceRepository.insertCalendar(calendarId, calendarCode, calendarName, calendarType, status, operatorId);
         return toCalendarResponse(attendanceRepository.getCalendarOrThrow(calendarId));
+    }
+
+    public List<AttendanceCalendarResponse> listCalendars() {
+        return attendanceRepository.listCalendars().stream()
+            .map(this::toCalendarResponse)
+            .toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -119,10 +126,10 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             throw new BizException(400, "第一版班次不支持跨天");
         }
 
-        Long shiftId = IdWorker.getId();
+        Long shiftId = IdGenerator.nextId();
         attendanceRepository.insertShift(shiftId, shiftCode, shiftName, status, operatorId);
         attendanceRepository.insertShiftSegment(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             shiftId,
             request.getStartTime(),
             request.getEndTime(),
@@ -132,6 +139,12 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             defaultTime(request.getOffDutyPunchEnd(), request.getEndTime().plusHours(1))
         );
         return toShiftResponse(attendanceRepository.getShiftOrThrow(shiftId));
+    }
+
+    public List<AttendanceShiftResponse> listShifts() {
+        return attendanceRepository.listShifts().stream()
+            .map(this::toShiftResponse)
+            .toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -148,7 +161,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             throw new BizException(409, "考勤组编码已存在");
         }
 
-        Long groupId = IdWorker.getId();
+        Long groupId = IdGenerator.nextId();
         attendanceRepository.insertGroup(
             groupId,
             groupCode,
@@ -163,6 +176,12 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return toGroupResponse(attendanceRepository.getGroupOrThrow(groupId));
     }
 
+    public List<AttendanceGroupResponse> listGroups() {
+        return attendanceRepository.listGroups().stream()
+            .map(this::toGroupResponse)
+            .toList();
+    }
+
     public AttendanceGroupMemberResponse addGroupMember(Long groupId, AddAttendanceGroupMemberRequest request) {
         ReentrantLock lock = acquireMembershipLock(request.getUserId());
         try {
@@ -170,6 +189,13 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         } finally {
             releaseMembershipLock(request.getUserId(), lock);
         }
+    }
+
+    public List<AttendanceGroupMemberResponse> listGroupMembers(Long groupId) {
+        attendanceRepository.getGroupOrThrow(groupId);
+        return attendanceRepository.listGroupMembers(groupId).stream()
+            .map(this::toGroupMemberResponse)
+            .toList();
     }
 
     private AttendanceGroupMemberResponse doAddGroupMember(Long groupId, AddAttendanceGroupMemberRequest request) {
@@ -189,7 +215,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             throw new BizException(409, "员工考勤组生效区间重叠");
         }
 
-        Long memberId = IdWorker.getId();
+        Long memberId = IdGenerator.nextId();
         attendanceRepository.insertGroupMember(
             memberId,
             group.groupId(),
@@ -216,7 +242,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             throw new BizException(409, "员工当天已存在排班，请通过修改原排班恢复或改班");
         }
 
-        Long scheduleId = IdWorker.getId();
+        Long scheduleId = IdGenerator.nextId();
         attendanceRepository.insertSchedule(
             scheduleId,
             request.getUserId(),
@@ -255,6 +281,13 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return toScheduleResponse(attendanceRepository.getScheduleOrThrow(scheduleId));
     }
 
+    public List<AttendanceScheduleResponse> listSchedules(Long userId, LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        return attendanceRepository.listSchedules(userId, startDate, endDate).stream()
+            .map(this::toScheduleResponse)
+            .toList();
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public PunchRecordResponse punch(CreatePunchRecordRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
@@ -262,7 +295,10 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         String punchType = normalizePunchType(request.getPunchType());
         String sourceType = normalizeEmployeePunchSourceType(request.getSourceType());
         LocalDateTime punchAt = LocalDateTime.now(clock);
-        Long punchRecordId = IdWorker.getId();
+        if (attendanceRepository.existsNormalPunchRecordOnDate(userId, punchAt.toLocalDate(), punchType)) {
+            throw new BizException(409, "当天同类型打卡已存在");
+        }
+        Long punchRecordId = IdGenerator.nextId();
         attendanceRepository.insertPunchRecord(
             punchRecordId,
             userId,
@@ -293,6 +329,13 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             .toList();
     }
 
+    public List<AttendanceDailyResultResponse> listDailyResultsForAdmin(Long userId, LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        return attendanceRepository.listDailyResultsForAdmin(userId, startDate, endDate).stream()
+            .map(this::toDailyResultResponse)
+            .toList();
+    }
+
     public List<AttendanceExceptionResponse> listCurrentEmployeeExceptions(LocalDate startDate,
                                                                             LocalDate endDate) {
         validateDateRange(startDate, endDate);
@@ -315,7 +358,6 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             .toList();
     }
 
-    @Override
     public List<Map<String, Object>> getMonthlyExceptions(Long userId, String yearMonth) {
         LocalDate startDate = LocalDate.parse(yearMonth + "-01");
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
@@ -334,7 +376,6 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             .toList();
     }
 
-    @Override
     public Map<String, Object> getDailyResult(Long userId, LocalDate workDate) {
         AttendanceDailyResultRow row = attendanceRepository.getDailyResult(userId, workDate);
         if (row == null) {
@@ -353,13 +394,11 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return value;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public void recalculateDailyResultForExternalEvent(Long userId, LocalDate workDate) {
         recalculateDailyResult(userId, workDate);
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public void applyApprovedClockCorrection(Long userId,
                                              LocalDate targetDate,
@@ -374,7 +413,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         }
         if (!attendanceRepository.existsNormalPunchRecord(userId, expectedPunchAt, normalizedPunchType)) {
             attendanceRepository.insertPunchRecord(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 userId,
                 expectedPunchAt,
                 normalizedPunchType,
@@ -399,8 +438,8 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
         LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
         LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
-        List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods =
-            leaveQueryService.listApprovedLeavePeriodsOnDate(userId, workDate);
+        List<ApprovedLeavePeriod> approvedLeavePeriods =
+            leaveService.listApprovedLeavePeriodsOnDate(userId, workDate);
         int requiredWorkMinutes = minutesBetween(shift.startTime(), shift.endTime());
         int approvedLeaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(
             approvedLeavePeriods,
@@ -482,7 +521,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                                        boolean exceptionFlag) {
         LocalDateTime calculatedAt = LocalDateTime.now();
         attendanceRepository.upsertDailyResult(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             userId,
             workDate,
             scheduleId,
@@ -506,7 +545,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         attendanceRepository.deleteExceptionsByDailyResultId(dailyResultId);
         if (lateMinutes > 0) {
             attendanceRepository.insertException(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 dailyResultId,
                 EXCEPTION_LATE,
                 "迟到%s分钟".formatted(lateMinutes)
@@ -514,7 +553,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         }
         if (earlyLeaveMinutes > 0) {
             attendanceRepository.insertException(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 dailyResultId,
                 EXCEPTION_EARLY_LEAVE,
                 "早退%s分钟".formatted(earlyLeaveMinutes)
@@ -522,7 +561,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         }
         if (absenceMinutes > 0) {
             attendanceRepository.insertException(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 dailyResultId,
                 EXCEPTION_MISS_PUNCH,
                 "缺卡导致缺勤%s分钟".formatted(absenceMinutes)
@@ -534,7 +573,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                      LocalDate workDate,
                                      LocalTime startTime,
                                      int graceMinutes,
-                                     List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
+                                     List<ApprovedLeavePeriod> approvedLeavePeriods) {
         if (firstPunchAt == null) {
             return 0;
         }
@@ -551,7 +590,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                            LocalDate workDate,
                                            LocalTime endTime,
                                            int graceMinutes,
-                                           List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
+                                           List<ApprovedLeavePeriod> approvedLeavePeriods) {
         if (lastPunchAt == null) {
             return 0;
         }
@@ -569,7 +608,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
                                         LocalDate workDate,
                                         LocalTime startTime,
                                         LocalTime endTime,
-                                        List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods) {
+                                        List<ApprovedLeavePeriod> approvedLeavePeriods) {
         int rawAbsenceMinutes;
         if (firstPunchAt == null && lastPunchAt == null) {
             rawAbsenceMinutes = minutesBetween(startTime, endTime);
@@ -601,7 +640,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return 0;
     }
 
-    private int calculateApprovedLeaveCoveredMinutes(List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods,
+    private int calculateApprovedLeaveCoveredMinutes(List<ApprovedLeavePeriod> approvedLeavePeriods,
                                                      LocalDate workDate,
                                                      LocalTime startTime,
                                                      LocalTime endTime) {
@@ -613,7 +652,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
         return calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, expectedStart, expectedEnd);
     }
 
-    private int calculateApprovedLeaveCoveredMinutes(List<LeaveQueryService.ApprovedLeavePeriod> approvedLeavePeriods,
+    private int calculateApprovedLeaveCoveredMinutes(List<ApprovedLeavePeriod> approvedLeavePeriods,
                                                      LocalDateTime expectedStart,
                                                      LocalDateTime expectedEnd) {
         if (approvedLeavePeriods.isEmpty() || !expectedEnd.isAfter(expectedStart)) {
@@ -646,7 +685,7 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
             .sum();
     }
 
-    private TimeRange overlapRange(LeaveQueryService.ApprovedLeavePeriod period,
+    private TimeRange overlapRange(ApprovedLeavePeriod period,
                                    LocalDateTime expectedStart,
                                    LocalDateTime expectedEnd) {
         LocalDateTime overlapStart = period.startAt().isAfter(expectedStart) ? period.startAt() : expectedStart;
@@ -859,13 +898,6 @@ public class AttendanceService implements AttendanceQueryService, AttendanceReca
 
     private LocalTime defaultTime(LocalTime value, LocalTime defaultValue) {
         return value == null ? defaultValue : value;
-    }
-
-    private String trimToNull(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.trim();
     }
 
     private int minutesBetween(LocalDateTime start, LocalDateTime end) {

@@ -1,6 +1,6 @@
 package com.workforcehub.agent.workflow;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.node.DecimalNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
-import com.workforcehub.agent.model.AgentModelClient;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
 import com.workforcehub.agent.repository.AgentRepository;
@@ -28,6 +28,9 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.safeSummary;
+
 @Component
 public class WorkflowExecutor {
 
@@ -39,7 +42,7 @@ public class WorkflowExecutor {
     private final WorkflowValidator workflowValidator;
     private final TemplateResolver templateResolver;
     private final AgentToolExecutionService toolExecutionService;
-    private final AgentModelClient agentModelClient;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
     private final OrgDirectoryService orgDirectoryService;
     private final LeaveService leaveService;
 
@@ -49,7 +52,7 @@ public class WorkflowExecutor {
                             WorkflowValidator workflowValidator,
                             TemplateResolver templateResolver,
                             AgentToolExecutionService toolExecutionService,
-                            AgentModelClient agentModelClient,
+                            OpenAiCompatibleAgentModelClient agentModelClient,
                             OrgDirectoryService orgDirectoryService,
                             LeaveService leaveService) {
         this.agentRepository = agentRepository;
@@ -103,7 +106,7 @@ public class WorkflowExecutor {
         if (replyText == null) {
             throw new BizException(400, "工作流未到达 END 节点");
         }
-        return new WorkflowExecutionResult(replyText, writeJson(trace));
+        return new WorkflowExecutionResult(replyText, write(objectMapper, trace));
     }
 
     private StepOutcome executeNode(Long taskId,
@@ -160,11 +163,11 @@ public class WorkflowExecutor {
             throw new BizException(403, "AI助手未授权调用该工具");
         }
         JsonNode args = templateResolver.resolveJson(node.config().path("args"), context);
-        String requestPayloadJson = writeJson(args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
+        String requestPayloadJson = write(objectMapper, args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
         try {
             String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson);
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 binding.toolId(),
                 requestPayloadJson,
@@ -180,11 +183,11 @@ public class WorkflowExecutor {
         } catch (BizException e) {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 binding.toolId(),
                 requestPayloadJson,
-                writeJson(java.util.Map.of(
+                write(objectMapper, java.util.Map.of(
                     "status", "FAILED",
                     "errorMessage", errorMessage == null ? "工具执行失败" : errorMessage
                 )),
@@ -310,11 +313,11 @@ public class WorkflowExecutor {
             throw new BizException(403, "AI助手未授权调用该工具");
         }
         JsonNode args = templateResolver.resolveJson(toolCall.path("args"), context);
-        String requestPayloadJson = writeJson(args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
+        String requestPayloadJson = write(objectMapper, args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
         try {
             String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson);
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 binding.toolId(),
                 requestPayloadJson,
@@ -331,11 +334,11 @@ public class WorkflowExecutor {
         } catch (BizException e) {
             String errorMessage = safeSummary(e.getMessage());
             agentRepository.insertToolCallLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 binding.toolId(),
                 requestPayloadJson,
-                writeJson(java.util.Map.of(
+                write(objectMapper, java.util.Map.of(
                     "status", "FAILED",
                     "errorMessage", errorMessage == null ? "工具执行失败" : errorMessage
                 )),
@@ -406,7 +409,7 @@ public class WorkflowExecutor {
     private String resolveEndReply(WorkflowNode node, WorkflowContext context) {
         JsonNode replyJson = node.config().path("replyJson");
         if (!replyJson.isMissingNode() && !replyJson.isNull()) {
-            return writeJson(templateResolver.resolveJson(replyJson, context));
+            return write(objectMapper, templateResolver.resolveJson(replyJson, context));
         }
         String template = node.config().path("reply").asText(null);
         if (StringUtils.hasText(template)) {
@@ -646,7 +649,7 @@ public class WorkflowExecutor {
     }
 
     private String outputFormatInstruction(JsonNode outputFormat) {
-        return writeJson(outputFormat);
+        return write(objectMapper, outputFormat);
     }
 
     private JsonNode applyOutputFormat(WorkflowNode node, JsonNode output) {
@@ -773,7 +776,7 @@ public class WorkflowExecutor {
                 ? agentRepository.getLlmModel(Long.parseLong(modelIdText.trim()))
                 : firstActiveModel();
             if (model != null && StringUtils.hasText(model.apiKey())) {
-                return writeJson(java.util.Map.of(
+                return write(objectMapper, java.util.Map.of(
                     "baseUrl", model.endpoint() == null ? "" : model.endpoint(),
                     "apiKey", model.apiKey(),
                     "model", model.modelName()
@@ -792,24 +795,8 @@ public class WorkflowExecutor {
             .orElse(null);
     }
 
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
-    }
-
     private long elapsedMillis(long startedNanos) {
         return (System.nanoTime() - startedNanos) / 1_000_000L;
-    }
-
-    private String safeSummary(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.length() > 512 ? trimmed.substring(0, 512) : trimmed;
     }
 
     private record StepOutcome(String nextNodeId, ObjectNode traceStep) {
@@ -864,7 +851,7 @@ public class WorkflowExecutor {
                     } else {
                         String toolCode = node.config().path("toolCode").asText("").trim().toUpperCase();
                         JsonNode args = templateResolver.resolveJson(node.config().path("args"), context);
-                        String requestPayloadJson = writeJson(args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
+                        String requestPayloadJson = write(objectMapper, args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
                         result.put("toolCode", toolCode);
                         result.set("request", readJson(requestPayloadJson));
                         if (version != null) {

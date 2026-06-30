@@ -1,14 +1,15 @@
 package com.workforcehub.ragflow.repository;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.ragflow.config.RagflowVectorProperties;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import jakarta.annotation.PreDestroy;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
-import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -21,6 +22,7 @@ public class RagflowVectorRepository {
 
     private final RagflowVectorProperties properties;
     private JdbcTemplate jdbcTemplate;
+    private HikariDataSource dataSource;
 
     public RagflowVectorRepository(RagflowVectorProperties properties) {
         this.properties = properties;
@@ -36,7 +38,7 @@ public class RagflowVectorRepository {
         jdbcTemplate.update("UPDATE kb_vector_chunk SET is_active = FALSE WHERE kb_document_id = ? AND is_active = TRUE", documentId);
         List<Long> vectorIds = new ArrayList<>();
         for (int index = 0; index < chunks.size(); index++) {
-            Long vectorId = IdWorker.getId();
+            Long vectorId = IdGenerator.nextId();
             jdbcTemplate.update("""
                 INSERT INTO kb_vector_chunk
                     (id, kb_document_id, space_id, ingest_job_id, chunk_no, chunk_text, embedding, content_hash, is_active)
@@ -99,14 +101,25 @@ public class RagflowVectorRepository {
         }
     }
 
+    @PreDestroy
+    public void close() {
+        if (dataSource != null) {
+            dataSource.close();
+        }
+    }
+
     private JdbcTemplate jdbcTemplate() {
         requireAvailable();
         if (jdbcTemplate == null) {
-            DriverManagerDataSource dataSource = new DriverManagerDataSource();
-            dataSource.setDriverClassName("org.postgresql.Driver");
-            dataSource.setUrl(properties.getUrl());
-            dataSource.setUsername(properties.getUsername());
-            dataSource.setPassword(properties.getPassword());
+            HikariConfig config = new HikariConfig();
+            config.setDriverClassName("org.postgresql.Driver");
+            config.setJdbcUrl(properties.getUrl());
+            config.setUsername(properties.getUsername());
+            config.setPassword(properties.getPassword());
+            config.setMaximumPoolSize(5);
+            config.setMinimumIdle(1);
+            config.setPoolName("ragflow-vector");
+            dataSource = new HikariDataSource(config);
             jdbcTemplate = new JdbcTemplate(dataSource);
         }
         return jdbcTemplate;

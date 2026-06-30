@@ -55,7 +55,6 @@ import { useEmployeeAuthFlow } from '../composables/useEmployeeAuthFlow';
 import { useFileUpload } from '../composables/useFileUpload';
 import { useImSocket } from '../composables/useImSocket';
 import { usePersonalFileTransfer } from '../composables/usePersonalFileTransfer';
-import { syncShellSessionProfile } from '../composables/useShellSessionProfileSync';
 import { fileSizeLabel, fileTypeLabel } from '@/utils/file-format';
 import {
   statusText,
@@ -496,7 +495,8 @@ async function loadAuthenticatedWorkspace() {
   if (!session.isAuthenticated) return;
   await Promise.all([
     session.loadOrgProfile().then(() => {
-      syncShellSessionProfile(shell, session);
+      shell.setColleagues(session.colleagues);
+      shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
     }),
     workflow.loadTodos().then(() => {
       shell.mergeBackendTodos(workflow.todos);
@@ -509,7 +509,8 @@ async function loadAuthenticatedWorkspace() {
   ]);
   await im.loadVisibleConversationDetails(undefined, undefined, session.user?.userId);
   shell.mergeBackendConversations(im.conversations);
-  syncShellSessionProfile(shell, session);
+  shell.setColleagues(session.colleagues);
+  shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
   await refreshCurrentUserAvatarUrl();
   await refreshContactAvatarUrls();
   if (shell.conversations.length) {
@@ -536,7 +537,8 @@ async function syncConversationMessages(id: string) {
     im.loadConversationDetail(conversationId, undefined, session.user?.userId).catch(() => undefined),
   ]);
   shell.mergeBackendConversations(im.conversations);
-  syncShellSessionProfile(shell, session);
+  shell.setColleagues(session.colleagues);
+  shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
   void refreshContactAvatarUrls();
   const messages = im.messagesByConversation[id];
   if (messages?.length) {

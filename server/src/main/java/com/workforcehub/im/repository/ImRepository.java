@@ -307,7 +307,7 @@ public class ImRepository {
                                              ImAttachmentRow sourceAttachment,
                                              Long uploaderId,
                                              int sortOrder) {
-        Long attachmentRefId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        Long attachmentRefId = com.workforcehub.common.util.IdGenerator.nextId();
         jdbcTemplate.update("""
             INSERT INTO sys_attachment_ref
                 (id, owner_type, owner_id, file_object_id, original_file_name,
@@ -442,7 +442,7 @@ public class ImRepository {
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
             """,
-            com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),
+            com.workforcehub.common.util.IdGenerator.nextId(),
             operatorType,
             operatorId,
             actionType,

@@ -1,6 +1,6 @@
 package com.workforcehub.im.websocket;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.workforcehub.common.util.IdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+
+import static com.workforcehub.common.util.JsonValues.write;
 
 /**
  * IM WebSocket 事件 outbox 写入服务。
@@ -34,14 +36,14 @@ public class ImWebSocketOutboxService {
         }
         LocalDateTime dueNow = LocalDateTime.now().minusSeconds(1);
         outboxRepository.insertEvent(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             event.eventType(),
             event.conversationId(),
             event.messageId(),
             event.seqNo(),
             event.actorUserId(),
-            writeJson(recipients),
-            writeJson(event),
+            write(objectMapper, recipients),
+            write(objectMapper, event),
             dueNow
         );
     }
@@ -59,11 +61,4 @@ public class ImWebSocketOutboxService {
         return recipients;
     }
 
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new IllegalStateException("IM WebSocket outbox JSON序列化失败", e);
-        }
-    }
 }

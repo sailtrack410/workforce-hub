@@ -14,6 +14,7 @@ import type {
 } from '../api';
 import type { KnowledgeAnswerCard } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { createClientId } from '@/utils/request-id';
 
 export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'reports' | 'settings';
 export type ConversationTone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
@@ -1121,7 +1122,7 @@ export const useShellStore = defineStore('employee-shell', {
     }) {
       const personal = this.files.find((item) => item.id === 'personal');
       if (!personal) return;
-      const id = file.attachmentRefId ? `personal-file-${file.attachmentRefId}` : `personal-file-${Date.now()}-${file.name}`;
+      const id = file.attachmentRefId ? `personal-file-${file.attachmentRefId}` : createClientId(`personal-file-${file.name}`);
       const row: PersonalFileRecord = {
         id,
         name: file.name,
@@ -1184,7 +1185,7 @@ export const useShellStore = defineStore('employee-shell', {
     appendMessage(text: string) {
       const conversation = this.activeConversation;
       conversation.messages.push({
-        id: `${conversation.id}-${Date.now()}`,
+        id: createClientId(conversation.id),
         author: currentUser.name,
         role: '申请人',
         body: text,
@@ -1196,29 +1197,6 @@ export const useShellStore = defineStore('employee-shell', {
     },
   },
 });
-
-function formatListDate(value?: string) {
-  if (!value) return '';
-  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-  const date = new Date(normalized);
-  if (!Number.isNaN(date.getTime())) {
-    return `${date.getMonth() + 1}月${date.getDate()}日`;
-  }
-  const match = value.match(/^\d{4}-(\d{1,2})-(\d{1,2})/);
-  if (match) return `${Number(match[1])}月${Number(match[2])}日`;
-  return value;
-}
-
-function collectConversationAttachments(messages: ConversationMessage[]) {
-  const byId = new Map<string, ConversationAttachment>();
-  for (const message of messages) {
-    for (const attachment of message.attachments ?? []) {
-      const key = attachment.attachmentRefId == null ? attachment.id : String(attachment.attachmentRefId);
-      byId.set(key, attachment);
-    }
-  }
-  return Array.from(byId.values());
-}
 
 export const shellUser = currentUser;
 

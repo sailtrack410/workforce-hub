@@ -16,7 +16,9 @@ import { fileSizeLabel } from './file-format';
 export type FileLikeRecord = PersonalFileRecord | WorkflowRequestAttachmentResponse;
 
 export async function sha256Hex(file: File) {
-  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new Error('当前环境不支持安全文件校验，请使用 HTTPS 或 localhost');
+  const digest = await subtle.digest('SHA-256', await file.arrayBuffer());
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
