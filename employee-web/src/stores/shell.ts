@@ -1200,6 +1200,24 @@ export const useShellStore = defineStore('employee-shell', {
 
 export const shellUser = currentUser;
 
+function formatListDate(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function collectConversationAttachments(messages: ConversationMessage[]) {
+  const byId = new Map<string, ConversationAttachment>();
+  for (const message of messages) {
+    for (const attachment of message.attachments ?? []) {
+      const key = attachment.attachmentRefId == null ? attachment.id : String(attachment.attachmentRefId);
+      byId.set(key, attachment);
+    }
+  }
+  return Array.from(byId.values());
+}
+
 function contactFromOrgUser(user: OrgUserSummaryResponse, relation: string, source: string): ContactRecord {
   return {
     id: `user-${user.userId}`,
