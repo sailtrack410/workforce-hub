@@ -2,9 +2,8 @@ package com.workforcehub.im.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.workforcehub.agent.model.AgentModelClient;
 import com.workforcehub.agent.model.AgentModelRequest;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.LlmModelRow;
 import com.workforcehub.common.util.IdGenerator;
@@ -77,7 +76,7 @@ public class ImService {
     private final ImAgentConversationService imAgentConversationService;
     private final ImGroupService imGroupService;
     private final AgentRepository agentRepository;
-    private final AgentModelClient agentModelClient;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
 
     public ImService(ImRepository imRepository,
                      ImMessageRepository imMessageRepository,
@@ -89,7 +88,7 @@ public class ImService {
                      ImAgentConversationService imAgentConversationService,
                      ImGroupService imGroupService,
                      AgentRepository agentRepository,
-                     AgentModelClient agentModelClient) {
+                     OpenAiCompatibleAgentModelClient agentModelClient) {
         this.imRepository = imRepository;
         this.imMessageRepository = imMessageRepository;
         this.objectMapper = objectMapper;
@@ -383,7 +382,7 @@ public class ImService {
             throw new BizException(404, "会话不存在");
         }
         Long seqNo = lastSeq + 1;
-        Long forwardedMessageId = IdWorker.getId();
+        Long forwardedMessageId = IdGenerator.nextId();
         LocalDateTime sentAt = LocalDateTime.now();
         String messageType = sourceAttachments.isEmpty() || StringUtils.hasText(text) ? "TEXT" : "FILE";
         String contentJson = buildContentJson(text, sourceAttachments);
@@ -427,7 +426,7 @@ public class ImService {
     public ImMessageActionResponse favoriteCurrentEmployeeMessage(Long conversationId, Long messageId) {
         Long userId = requireActiveEmployeeUserId();
         requireReadableMessage(conversationId, messageId, userId);
-        imMessageRepository.upsertUserAction(IdWorker.getId(), conversationId, messageId, userId, "FAVORITE", "{}", null);
+        imMessageRepository.upsertUserAction(IdGenerator.nextId(), conversationId, messageId, userId, "FAVORITE", "{}", null);
         return new ImMessageActionResponse(messageId, "FAVORITE", "ACTIVE");
     }
 
@@ -439,7 +438,7 @@ public class ImService {
         requireReadableMessage(conversationId, messageId, userId);
         String note = blankToNull(request.getNote());
         String payloadJson = writeJson(Map.of("note", note == null ? "" : note));
-        imMessageRepository.upsertUserAction(IdWorker.getId(), conversationId, messageId, userId, "REMINDER", payloadJson, request.getRemindAt());
+        imMessageRepository.upsertUserAction(IdGenerator.nextId(), conversationId, messageId, userId, "REMINDER", payloadJson, request.getRemindAt());
         return new ImMessageActionResponse(messageId, "REMINDER", "ACTIVE");
     }
 
@@ -447,7 +446,7 @@ public class ImService {
     public ImMessageActionResponse deleteCurrentEmployeeMessage(Long conversationId, Long messageId) {
         Long userId = requireActiveEmployeeUserId();
         requireReadableMessage(conversationId, messageId, userId);
-        imMessageRepository.upsertUserAction(IdWorker.getId(), conversationId, messageId, userId, "DELETE", "{}", null);
+        imMessageRepository.upsertUserAction(IdGenerator.nextId(), conversationId, messageId, userId, "DELETE", "{}", null);
         return new ImMessageActionResponse(messageId, "DELETE", "ACTIVE");
     }
 

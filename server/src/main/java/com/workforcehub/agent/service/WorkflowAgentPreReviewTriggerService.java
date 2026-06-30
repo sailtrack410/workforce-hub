@@ -1,12 +1,12 @@
 package com.workforcehub.agent.service;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.common.exception.BizException;
-import com.workforcehub.spi.WorkflowAgentPreReviewTrigger;
-import com.workforcehub.spi.WorkflowAgentResultCallback;
+import com.workforcehub.common.util.IdGenerator;
+import com.workforcehub.workflow.service.WorkflowAgentPreReviewTrigger;
+import com.workforcehub.workflow.service.WorkflowAgentResultCallback;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -50,7 +50,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
         if (callback == null || agent == null || agent.publishedVersionId() == null) {
             return null;
         }
-        Long taskId = IdWorker.getId();
+        Long taskId = IdGenerator.nextId();
         agentRepository.insertTask(
             taskId,
             agent.id(),
@@ -65,7 +65,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
             applicantUserId
         );
         agentRepository.insertAuditLog(
-            IdWorker.getId(),
+            IdGenerator.nextId(),
             taskId,
             "TASK_CREATED",
             "AGENT",
@@ -97,7 +97,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
         transactionTemplate.executeWithoutResult(status -> {
             agentRepository.markTaskRunning(taskId, applicantUserId);
             agentRepository.insertAuditLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 "TASK_RUNNING",
                 "AGENT_TASK",
@@ -107,7 +107,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
             );
             agentRepository.finishTask(taskId, "SUCCEEDED", null, applicantUserId);
             agentRepository.insertAuditLog(
-                IdWorker.getId(),
+                IdGenerator.nextId(),
                 taskId,
                 "TASK_SUCCEEDED",
                 "AGENT_TASK",
