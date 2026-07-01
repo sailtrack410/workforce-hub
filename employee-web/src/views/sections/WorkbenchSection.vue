@@ -45,6 +45,8 @@ const {
 
 const {
   leaveAccounts,
+  leaveTypes,
+  selectableLeaveTypes,
   attendanceExceptions,
   agentTaskForm,
   agentTaskSubmitting,
@@ -84,6 +86,8 @@ const {
   activeWorkbench,
   workbenchHighlights,
   selectedLeaveAccount,
+  selectedLeaveType,
+  canSubmitLeave,
   activeWorkbenchTitle,
   selectedRequest,
   workflowDetailRows,
@@ -297,7 +301,7 @@ watch(agents, (items) => {
       </div>
     </div>
     <div class="head-actions">
-      <AppButton v-if="activeWorkbench.id === 'requests'" variant="secondary" size="sm" :disabled="workflowRequestsLoading" @click="loadWorkflowRequests">
+      <AppButton v-if="activeWorkbench.id === 'oa'" variant="secondary" size="sm" :disabled="workflowRequestsLoading" @click="loadWorkflowRequests">
         {{ workflowRequestsLoading ? '刷新中' : '刷新' }}
       </AppButton>
       <AppButton v-if="activeWorkbench.id === 'attendance'" variant="secondary" size="sm" :disabled="attendanceLoading" @click="refreshAttendancePanel">
@@ -307,7 +311,7 @@ watch(agents, (items) => {
   </header>
 
   <section class="content-stack">
-    <template v-if="activeWorkbench.id === 'leave'">
+    <template v-if="activeWorkbench.id === 'oa'">
       <AppErrorState
         v-if="workbenchError"
         title="工作台数据加载失败"
@@ -325,15 +329,15 @@ watch(agents, (items) => {
           </article>
         </section>
 
-        <section class="detail-grid">
+        <section class="detail-grid workbench-split">
           <article class="detail-card">
             <h3>请假申请</h3>
             <form class="workbench-form" @submit.prevent="submitLeaveRequest">
               <label class="security-field">
                 <span>假期类型</span>
                 <select v-model="leaveForm.leaveTypeId" class="ui-inline-input">
-                  <option v-for="account in leaveAccounts" :key="account.leaveTypeId" :value="String(account.leaveTypeId)">
-                    {{ account.leaveName }}
+                  <option v-for="item in selectableLeaveTypes" :key="item.leaveTypeId" :value="String(item.leaveTypeId)">
+                    {{ item.leaveName }}
                   </option>
                 </select>
               </label>
@@ -346,8 +350,8 @@ watch(agents, (items) => {
                 <input v-model="leaveForm.endAt" class="ui-inline-input" type="datetime-local" />
               </label>
               <label class="security-field">
-                <span>请假分钟</span>
-                <input v-model="leaveForm.durationMinutes" class="ui-inline-input" type="number" min="1" step="1" />
+                <span>请假时长</span>
+                <input :value="leaveForm.durationMinutes ? minutesToDayLabel(Number(leaveForm.durationMinutes)) : ''" class="ui-inline-input" type="text" readonly />
               </label>
               <label class="security-field form-full">
                 <span>请假原因</span>
@@ -373,7 +377,7 @@ watch(agents, (items) => {
               <p v-if="leaveError" class="dialog-error form-full">{{ leaveError }}</p>
               <p v-if="leaveResult" class="form-result form-full">申请编号：{{ leaveResult.requestNo }} · {{ statusText(leaveResult.status) }}</p>
               <div class="form-actions form-full">
-                <AppButton variant="primary" type="submit" :disabled="leaveSubmitting || !leaveAccounts.length">
+                <AppButton variant="primary" type="submit" :disabled="leaveSubmitting || !canSubmitLeave">
                   {{ leaveSubmitting ? '提交中' : '提交申请' }}
                 </AppButton>
               </div>
@@ -381,113 +385,107 @@ watch(agents, (items) => {
           </article>
 
           <article class="detail-card">
+            <div class="title-line">
+              <h3>我的申请</h3>
+              <span class="meta-time">{{ workflowRequestsTotal }} 条</span>
+            </div>
+            <AppErrorState
+              v-if="workflowRequestsError"
+              title="申请加载失败"
+              :description="workflowRequestsError"
+              action-label="重试"
+              @retry="loadWorkflowRequests"
+            />
+            <AppLoadingState v-else-if="workflowRequestsLoading" />
+            <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" description="暂无申请" />
+            <div v-else class="request-list">
+              <button
+                v-for="request in workflowRequests"
+                :key="request.requestId"
+                type="button"
+                :class="{ active: request.requestId === selectedRequestId }"
+                @click="loadWorkflowRequestDetail(request.requestId)"
+              >
+                <strong>{{ request.title }}</strong>
+                <span>{{ request.requestNo }}</span>
+                <small>{{ bizTypeLabel(request.bizType) }} · {{ statusText(request.status) }} · {{ formatDateTime(request.submittedAt) }}</small>
+              </button>
+            </div>
+
+            <div class="title-line request-detail-heading">
+              <h3>申请详情</h3>
+              <AppTag v-if="selectedRequest" :tone="toneOfStatus(selectedRequest.status)">{{ statusText(selectedRequest.status) }}</AppTag>
+            </div>
+            <AppLoadingState v-if="workflowDetailLoading" />
+            <AppEmptyState v-else-if="!workflowDetail" title="暂无详情" description="暂无详情" />
+            <div v-else class="request-detail-stack">
+              <dl class="field-grid">
+                <div v-for="row in workflowDetailRows" :key="row[0]">
+                  <dt>{{ row[0] }}</dt>
+                  <dd>{{ row[1] }}</dd>
+                </div>
+              </dl>
+              <div v-if="workflowDetail.attachments.length" class="file-list">
+                <div v-for="file in workflowDetail.attachments" :key="file.attachmentRefId" class="file-row">
+                  <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
+                    <component :is="fileIconOf(file)" :size="18" />
+                  </span>
+                  <div>
+                    <strong>{{ file.displayName }}</strong>
+                    <small>{{ fileTypeLabelFromName(file.displayName, file.mimeType) }} · {{ fileSizeLabel(file.fileSize) }} · {{ statusText(file.scanStatus) }}</small>
+                  </div>
+                  <div class="file-actions">
+                    <button type="button" @click="previewWorkflowAttachment(file)">
+                      <Eye :size="15" />
+                      预览
+                    </button>
+                    <button type="button" @click="downloadWorkflowAttachment(file)">
+                      <Download :size="15" />
+                      下载
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-list">
+                <span v-for="action in workflowActions" :key="action.actionId">
+                  <strong>{{ actionTypeLabel(action.actionType) }}</strong>
+                  <small>{{ displayField(action.stepName) }} · {{ formatDateTime(action.actedAt) }}</small>
+                  <em v-if="action.comment">{{ action.comment }}</em>
+                </span>
+              </div>
+              <div v-if="workflowDetail.status === 'IN_APPROVAL'" class="withdraw-box">
+                <textarea v-model="withdrawComment" class="ui-textarea compact-textarea" placeholder="撤回原因" rows="3" />
+                <AppButton variant="secondary" size="sm" :disabled="withdrawSubmitting" @click="withdrawWorkflowRequest">
+                  {{ withdrawSubmitting ? '撤回中' : '撤回申请' }}
+                </AppButton>
+              </div>
+              <p v-if="workflowDetailError" class="dialog-error">{{ workflowDetailError }}</p>
+            </div>
+          </article>
+
+          <article class="detail-card">
             <h3>假期账户</h3>
             <dl class="field-grid">
               <div>
                 <dt>假期类型</dt>
-                <dd>{{ selectedLeaveAccount?.leaveName ?? '暂无' }}</dd>
+                <dd>{{ selectedLeaveType?.leaveName ?? '暂无' }}</dd>
               </div>
               <div>
                 <dt>可用余额</dt>
-                <dd>{{ minutesToDayLabel(selectedLeaveAccount?.availableMinutes) }}</dd>
+                <dd>{{ selectedLeaveAccount ? minutesToDayLabel(selectedLeaveAccount.availableMinutes) : (selectedLeaveType?.balanceMode === 'NO_DEDUCT' ? '无需扣减' : '暂无') }}</dd>
               </div>
               <div>
                 <dt>冻结余额</dt>
-                <dd>{{ minutesToDayLabel(selectedLeaveAccount?.frozenMinutes) }}</dd>
+                <dd>{{ selectedLeaveAccount ? minutesToDayLabel(selectedLeaveAccount.frozenMinutes) : (selectedLeaveType?.balanceMode === 'NO_DEDUCT' ? '无需冻结' : '暂无') }}</dd>
               </div>
               <div>
                 <dt>状态</dt>
-                <dd>{{ statusText(selectedLeaveAccount?.status ?? '') }}</dd>
+                <dd>{{ statusText(selectedLeaveAccount?.status ?? selectedLeaveType?.status ?? '') }}</dd>
               </div>
             </dl>
           </article>
         </section>
       </template>
-    </template>
-
-    <template v-else-if="activeWorkbench.id === 'requests'">
-      <AppErrorState
-        v-if="workflowRequestsError"
-        title="申请加载失败"
-        :description="workflowRequestsError"
-        action-label="重试"
-        @retry="loadWorkflowRequests"
-      />
-      <section class="detail-grid workbench-split">
-        <article class="detail-card">
-          <div class="title-line">
-            <h3>我的申请</h3>
-            <span class="meta-time">{{ workflowRequestsTotal }} 条</span>
-          </div>
-          <AppLoadingState v-if="workflowRequestsLoading" />
-          <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" description="暂无申请" />
-          <div v-else class="request-list">
-            <button
-              v-for="request in workflowRequests"
-              :key="request.requestId"
-              type="button"
-              :class="{ active: request.requestId === selectedRequestId }"
-              @click="loadWorkflowRequestDetail(request.requestId)"
-            >
-              <strong>{{ request.title }}</strong>
-              <span>{{ request.requestNo }}</span>
-              <small>{{ bizTypeLabel(request.bizType) }} · {{ statusText(request.status) }} · {{ formatDateTime(request.submittedAt) }}</small>
-            </button>
-          </div>
-        </article>
-
-        <article class="detail-card">
-          <div class="title-line">
-            <h3>申请详情</h3>
-            <AppTag v-if="selectedRequest" :tone="toneOfStatus(selectedRequest.status)">{{ statusText(selectedRequest.status) }}</AppTag>
-          </div>
-          <AppLoadingState v-if="workflowDetailLoading" />
-          <AppEmptyState v-else-if="!workflowDetail" title="暂无详情" description="暂无详情" />
-          <div v-else class="request-detail-stack">
-            <dl class="field-grid">
-              <div v-for="row in workflowDetailRows" :key="row[0]">
-                <dt>{{ row[0] }}</dt>
-                <dd>{{ row[1] }}</dd>
-              </div>
-            </dl>
-            <div v-if="workflowDetail.attachments.length" class="file-list">
-              <div v-for="file in workflowDetail.attachments" :key="file.attachmentRefId" class="file-row">
-                <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
-                  <component :is="fileIconOf(file)" :size="18" />
-                </span>
-                <div>
-                  <strong>{{ file.displayName }}</strong>
-                  <small>{{ fileTypeLabelFromName(file.displayName, file.mimeType) }} · {{ fileSizeLabel(file.fileSize) }} · {{ statusText(file.scanStatus) }}</small>
-                </div>
-                <div class="file-actions">
-                  <button type="button" @click="previewWorkflowAttachment(file)">
-                    <Eye :size="15" />
-                    预览
-                  </button>
-                  <button type="button" @click="downloadWorkflowAttachment(file)">
-                    <Download :size="15" />
-                    下载
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="timeline-list">
-              <span v-for="action in workflowActions" :key="action.actionId">
-                <strong>{{ actionTypeLabel(action.actionType) }}</strong>
-                <small>{{ displayField(action.stepName) }} · {{ formatDateTime(action.actedAt) }}</small>
-                <em v-if="action.comment">{{ action.comment }}</em>
-              </span>
-            </div>
-            <div v-if="workflowDetail.status === 'IN_APPROVAL'" class="withdraw-box">
-              <textarea v-model="withdrawComment" class="ui-textarea compact-textarea" placeholder="撤回原因" rows="3" />
-              <AppButton variant="secondary" size="sm" :disabled="withdrawSubmitting" @click="withdrawWorkflowRequest">
-                {{ withdrawSubmitting ? '撤回中' : '撤回申请' }}
-              </AppButton>
-            </div>
-            <p v-if="workflowDetailError" class="dialog-error">{{ workflowDetailError }}</p>
-          </div>
-        </article>
-      </section>
     </template>
 
     <template v-else-if="activeWorkbench.id === 'attendance'">

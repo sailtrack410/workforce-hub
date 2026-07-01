@@ -3,6 +3,7 @@ import { employeeApi } from '@/api';
 import type {
   EntityId,
   LeaveAccountResponse,
+  LeaveTypeResponse,
   WorkflowRequestAttachmentResponse,
   WorkflowRequestCreateResponse,
   WorkflowRequestDetailResponse,
@@ -36,6 +37,63 @@ interface UseWorkbenchStateOptions {
   showToast: (message: string) => void;
 }
 
+const HALF_DAY_MINUTES = 240;
+
+function overlapMinutes(rangeStart: Date, rangeEnd: Date, segmentStart: Date, segmentEnd: Date) {
+  const start = Math.max(rangeStart.getTime(), segmentStart.getTime());
+  const end = Math.min(rangeEnd.getTime(), segmentEnd.getTime());
+  if (end <= start) return 0;
+  return Math.round((end - start) / 60000);
+}
+
+function calculateLeaveDurationMinutes(startAt: string, endAt: string) {
+  if (!startAt || !endAt) return 0;
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
+  let minutes = 0;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const day = new Date(cursor);
+    day.setHours(0, 0, 0, 0);
+    const morningStart = new Date(day);
+    morningStart.setHours(9, 0, 0, 0);
+    const morningEnd = new Date(day);
+    morningEnd.setHours(12, 0, 0, 0);
+    const afternoonStart = new Date(day);
+    afternoonStart.setHours(13, 0, 0, 0);
+    const afternoonEnd = new Date(day);
+    afternoonEnd.setHours(18, 0, 0, 0);
+    minutes += overlapMinutes(start, end, morningStart, morningEnd);
+    minutes += overlapMinutes(start, end, afternoonStart, afternoonEnd);
+    cursor.setDate(cursor.getDate() + 1);
+    cursor.setHours(0, 0, 0, 0);
+  }
+  if (minutes <= 0) return 0;
+  return Math.ceil(minutes / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
+}
+
+function accountAsLeaveType(account: LeaveAccountResponse): LeaveTypeResponse {
+  return {
+    leaveTypeId: account.leaveTypeId,
+    leaveCode: account.leaveCode,
+    leaveName: account.leaveName,
+    balanceMode: account.balanceMode,
+    status: account.status,
+  };
+}
+
+function resolveSelectableLeaveTypes(types: LeaveTypeResponse[], accounts: LeaveAccountResponse[]) {
+  if (types.length) return types;
+  const seen = new Set<string>();
+  return accounts.filter((account) => {
+    const key = String(account.leaveTypeId);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(accountAsLeaveType);
+}
+
 export function useWorkbenchState({
   shell,
   session,
@@ -48,6 +106,7 @@ export function useWorkbenchState({
   const activeFile = computed(() => shell.activeFile);
   const activeWorkbenchTitle = computed(() => activeWorkbench.value.title || '工作台');
   const leaveAccounts = ref<LeaveAccountResponse[]>([]);
+  const leaveTypes = ref<LeaveTypeResponse[]>([]);
   const workbenchLoading = ref(false);
   const workbenchError = ref('');
   const leaveForm = ref({
@@ -86,9 +145,22 @@ export function useWorkbenchState({
   const selectedLeaveAccount = computed(() => (
     leaveAccounts.value.find((item) => String(item.leaveTypeId) === leaveForm.value.leaveTypeId)
   ));
+  const selectableLeaveTypes = computed(() => (
+    resolveSelectableLeaveTypes(leaveTypes.value, leaveAccounts.value)
+  ));
+  const selectedLeaveType = computed(() => (
+    selectableLeaveTypes.value.find((item) => String(item.leaveTypeId) === leaveForm.value.leaveTypeId)
+    ?? (selectedLeaveAccount.value ? accountAsLeaveType(selectedLeaveAccount.value) : null)
+  ));
   const annualLeaveAccount = computed(() => (
     leaveAccounts.value.find((item) => item.leaveCode === 'ANNUAL' || item.leaveName.includes('年假')) ?? leaveAccounts.value[0]
   ));
+  const canSubmitLeave = computed(() => {
+    if (!leaveForm.value.leaveTypeId) return false;
+    if (!selectedLeaveType.value) return false;
+    if (selectedLeaveType.value.balanceMode === 'NO_DEDUCT') return true;
+    return Boolean(selectedLeaveAccount.value);
+  });
   const selectedRequest = computed(() => (
     workflowRequests.value.find((item) => item.requestId === selectedRequestId.value) ?? workflowRequests.value[0] ?? null
   ));
@@ -109,6 +181,9 @@ export function useWorkbenchState({
       note: annualLeaveAccount.value?.leaveName ?? '假期',
     },
   ]);
+  const computedLeaveDurationMinutes = computed(() => (
+    calculateLeaveDurationMinutes(leaveForm.value.startAt, leaveForm.value.endAt)
+  ));
   const workflowDetailRows = computed<FieldRows>(() => {
     const detail = workflowDetail.value;
     if (!detail) return [];
@@ -185,25 +260,35 @@ export function useWorkbenchState({
     workbenchError.value = '';
     const dateRange = thisMonthRange();
     try {
-      const [accountsResult, exceptionsResult, dailyResultsResult] = await Promise.allSettled([
+      const [typesResult, accountsResult, exceptionsResult, dailyResultsResult] = await Promise.allSettled([
+        employeeApi.leave.types(),
         employeeApi.leave.accounts(),
         employeeApi.attendance.exceptions(dateRange),
         employeeApi.attendance.dailyResults(dateRange),
       ]);
-      const failedCount = [accountsResult, exceptionsResult, dailyResultsResult]
+      const failedCount = [typesResult, accountsResult, exceptionsResult, dailyResultsResult]
         .filter((result) => result.status === 'rejected')
         .length;
-      if (failedCount === 3) {
+      if (failedCount === 4) {
         workbenchError.value = '工作台数据加载失败';
       }
+      const types = typesResult.status === 'fulfilled' ? typesResult.value : [];
       const accounts = accountsResult.status === 'fulfilled' ? accountsResult.value : [];
       const exceptions = exceptionsResult.status === 'fulfilled' ? exceptionsResult.value : [];
       const dailyResults = dailyResultsResult.status === 'fulfilled' ? dailyResultsResult.value : [];
+      leaveTypes.value = types;
       leaveAccounts.value = accounts;
       attendanceExceptions.value = exceptions;
       attendanceDailyResults.value = dailyResults;
-      if (!leaveForm.value.leaveTypeId && accounts[0]) {
-        leaveForm.value.leaveTypeId = String(accounts[0].leaveTypeId);
+      const selectableTypes = resolveSelectableLeaveTypes(types, accounts);
+      if (
+        !leaveForm.value.leaveTypeId
+        || !selectableTypes.some((item) => String(item.leaveTypeId) === leaveForm.value.leaveTypeId)
+      ) {
+        const initialLeaveTypeId = selectableTypes[0]?.leaveTypeId ?? accounts[0]?.leaveTypeId;
+        if (initialLeaveTypeId !== undefined && initialLeaveTypeId !== null) {
+          leaveForm.value.leaveTypeId = String(initialLeaveTypeId);
+        }
       }
     } finally {
       workbenchLoading.value = false;
@@ -214,7 +299,7 @@ export function useWorkbenchState({
     leaveError.value = '';
     leaveResult.value = null;
     const leaveTypeId = leaveForm.value.leaveTypeId.trim();
-    const durationMinutes = Number(leaveForm.value.durationMinutes);
+    const durationMinutes = computedLeaveDurationMinutes.value;
     const reason = leaveForm.value.reason.trim();
     if (!leaveTypeId || !leaveForm.value.startAt || !leaveForm.value.endAt || !durationMinutes || !reason) {
       leaveError.value = '请完整填写请假申请';
@@ -240,6 +325,14 @@ export function useWorkbenchState({
       leaveSubmitting.value = false;
     }
   }
+
+  watch(
+    computedLeaveDurationMinutes,
+    (minutes) => {
+      leaveForm.value.durationMinutes = minutes > 0 ? String(minutes) : '';
+    },
+    { immediate: true },
+  );
 
   async function loadWorkflowRequests() {
     if (!session.isAuthenticated || workflowRequestsLoading.value) return;
@@ -346,8 +439,8 @@ export function useWorkbenchState({
   async function refreshActiveWorkbench() {
     if (!session.isAuthenticated) return;
     const id = shell.active.workbench;
-    if (id === 'requests') {
-      await loadWorkflowRequests();
+    if (id === 'oa') {
+      await Promise.all([refreshWorkbenchData(), loadWorkflowRequests()]);
       return;
     }
     if (id === 'attendance') {
@@ -358,7 +451,7 @@ export function useWorkbenchState({
       await loadAgents();
       return;
     }
-    if (id === 'balance' || id === 'leave') {
+    if (id === 'balance') {
       await refreshWorkbenchData();
     }
   }
@@ -382,6 +475,7 @@ export function useWorkbenchState({
     activeFile,
     activeWorkbenchTitle,
     leaveAccounts,
+    leaveTypes,
     workbenchLoading,
     workbenchError,
     leaveForm,
@@ -390,6 +484,9 @@ export function useWorkbenchState({
     leaveResult,
     leaveError,
     selectedLeaveAccount,
+    selectableLeaveTypes,
+    selectedLeaveType,
+    canSubmitLeave,
     workflowRequests,
     workflowRequestsTotal,
     workflowRequestsLoading,

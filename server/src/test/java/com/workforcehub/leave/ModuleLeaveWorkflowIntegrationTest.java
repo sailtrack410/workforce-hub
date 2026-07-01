@@ -224,6 +224,31 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
     }
 
     @Test
+    @DisplayName("跨天请假提交时应自动扣除非工作时段，仅按工作时间计算分钟数")
+    void crossDayLeaveShouldOnlyCountWorkingMinutes() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+
+        mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(leaveRequestJson(
+                    leaveTypeId,
+                    "2026-05-07 17:00:00",
+                    "2026-05-08 10:00:00",
+                    240,
+                    "跨天请假"
+                )))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"));
+
+        assertEquals(720, availableMinutes(leaveTypeId));
+        assertEquals(240, frozenMinutes(leaveTypeId));
+    }
+
+    @Test
     @DisplayName("重叠小时假审批通过后不应重复抵扣同一段缺勤")
     void overlappingApprovedHourlyLeavesShouldNotDoubleOffsetAbsenceMinutes() throws Exception {
         Cookie employeeSession = loginEmployee();

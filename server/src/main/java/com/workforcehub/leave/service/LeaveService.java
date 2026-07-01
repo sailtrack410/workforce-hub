@@ -137,6 +137,7 @@ public class LeaveService {
 
     public List<LeaveTypeResponse> listLeaveTypes() {
         return leaveRepository.listLeaveTypes().stream()
+            .filter(row -> !"ANNUAL_DEMO".equals(row.leaveCode()))
             .map(this::toLeaveTypeResponse)
             .toList();
     }

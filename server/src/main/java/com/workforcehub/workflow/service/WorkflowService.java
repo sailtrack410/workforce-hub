@@ -82,8 +82,11 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private static final String STATUS_REJECTED = "REJECTED";
     private static final String PUNCH_TYPE_ON_DUTY = "ON_DUTY";
     private static final String PUNCH_TYPE_OFF_DUTY = "OFF_DUTY";
+    private static final long HALF_DAY_MINUTES = 240L;
+    private static final LocalTime WORK_START = LocalTime.of(9, 0);
     private static final LocalTime LUNCH_BREAK_START = LocalTime.of(12, 0);
     private static final LocalTime LUNCH_BREAK_END = LocalTime.of(13, 0);
+    private static final LocalTime WORK_END = LocalTime.of(18, 0);
     private static final DateTimeFormatter REQUEST_NO_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
@@ -688,7 +691,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         if (!request.getEndAt().isAfter(request.getStartAt())) {
             throw new BizException(400, "结束时间必须晚于开始时间");
         }
-        long actualDurationMinutes = calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt());
+        long actualDurationMinutes = roundLeaveDurationMinutes(calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt()));
         if (actualDurationMinutes != request.getDurationMinutes()) {
             throw new BizException(400, "请假时长与开始结束时间不一致");
         }
@@ -709,20 +712,34 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     }
 
     private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
-        long durationMinutes = Duration.between(startAt, endAt).toMinutes();
+        long durationMinutes = 0;
         LocalDate currentDate = startAt.toLocalDate();
         LocalDate endDate = endAt.toLocalDate();
         while (!currentDate.isAfter(endDate)) {
-            LocalDateTime lunchStart = currentDate.atTime(LUNCH_BREAK_START);
-            LocalDateTime lunchEnd = currentDate.atTime(LUNCH_BREAK_END);
-            LocalDateTime overlapStart = startAt.isAfter(lunchStart) ? startAt : lunchStart;
-            LocalDateTime overlapEnd = endAt.isBefore(lunchEnd) ? endAt : lunchEnd;
-            if (overlapEnd.isAfter(overlapStart)) {
-                durationMinutes -= Duration.between(overlapStart, overlapEnd).toMinutes();
-            }
+            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(WORK_START), currentDate.atTime(LUNCH_BREAK_START));
+            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(LUNCH_BREAK_END), currentDate.atTime(WORK_END));
             currentDate = currentDate.plusDays(1);
         }
         return durationMinutes;
+    }
+
+    private long roundLeaveDurationMinutes(long durationMinutes) {
+        if (durationMinutes <= 0) {
+            return 0;
+        }
+        return ((durationMinutes + HALF_DAY_MINUTES - 1) / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
+    }
+
+    private long overlapMinutes(LocalDateTime rangeStart,
+                                LocalDateTime rangeEnd,
+                                LocalDateTime segmentStart,
+                                LocalDateTime segmentEnd) {
+        LocalDateTime overlapStart = rangeStart.isAfter(segmentStart) ? rangeStart : segmentStart;
+        LocalDateTime overlapEnd = rangeEnd.isBefore(segmentEnd) ? rangeEnd : segmentEnd;
+        if (!overlapEnd.isAfter(overlapStart)) {
+            return 0;
+        }
+        return Duration.between(overlapStart, overlapEnd).toMinutes();
     }
 
     private WorkflowTodoResponse toTodoResponse(WorkflowTodoRow row) {

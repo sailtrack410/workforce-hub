@@ -173,6 +173,22 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工端假种列表不应返回演示假种")
+    void employeeLeaveTypesShouldHideDemoLeaveType() throws Exception {
+        Cookie adminSession = loginAdmin();
+        createLeaveType(adminSession, "ANNUAL_DEMO", "演示年假");
+        createLeaveType(adminSession, "SICK", "病假");
+        Cookie employeeSession = loginEmployee();
+
+        mockMvc.perform(get("/api/employee/leave/types")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.leaveCode=='ANNUAL_DEMO')]").isEmpty())
+            .andExpect(jsonPath("$.data[?(@.leaveCode=='SICK')]").isNotEmpty());
+    }
+
+    @Test
     @DisplayName("后台余额调整幂等键被不同操作参数复用时应拒绝")
     void adjustmentSourceTxnKeyShouldRejectDifferentOperationFingerprint() throws Exception {
         Cookie adminSession = loginAdmin();

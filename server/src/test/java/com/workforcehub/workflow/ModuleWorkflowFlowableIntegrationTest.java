@@ -443,9 +443,31 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                       "reason": "试图少填请假时长"
                     }
                     """.formatted(annualLeaveTypeId)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("请假时长与开始结束时间不一致"));
+    }
+
+    @Test
+    @DisplayName("请假时长按半天向上取整")
+    void leaveRequestShouldRoundUpToHalfDay() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Long annualLeaveTypeId = seedWorkflowAndLeaveType();
+
+        mockMvc.perform(post("/api/employee/workflow/leave-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "leaveTypeId": %d,
+                      "startAt": "2026-05-07 17:00:00",
+                      "endAt": "2026-05-08 10:00:00",
+                      "durationMinutes": 240,
+                      "reason": "半天起算"
+                    }
+                    """.formatted(annualLeaveTypeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
     }
 
     @Test

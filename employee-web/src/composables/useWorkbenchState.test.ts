@@ -26,8 +26,8 @@ function createDeferred<T>(): Deferred<T> {
 
 function createShell() {
   return reactive({
-    active: { workbench: 'leave' },
-    activeWorkbench: { id: 'leave', title: '请假', subtitle: '' },
+    active: { workbench: 'oa' },
+    activeWorkbench: { id: 'oa', title: 'OA 申请', subtitle: '' },
     activeFile: { files: [] },
     pendingTodoCount: 0,
     mergeBackendTodos: vi.fn(),
@@ -50,6 +50,18 @@ const leaveAccount: LeaveAccountResponse = {
   leaveName: '年假',
   balanceMode: 'MINUTES',
   availableMinutes: 480,
+  frozenMinutes: 0,
+  status: 'ACTIVE',
+};
+
+const sickLeaveAccount: LeaveAccountResponse = {
+  accountId: 'A-2',
+  userId: '1001',
+  leaveTypeId: 'L-2',
+  leaveCode: 'SICK',
+  leaveName: '病假',
+  balanceMode: 'NO_DEDUCT',
+  availableMinutes: 0,
   frozenMinutes: 0,
   status: 'ACTIVE',
 };
@@ -121,5 +133,97 @@ describe('useWorkbenchState', () => {
     expect(state.selectedRequestId.value).toBe('B');
     expect(state.workflowDetail.value?.requestId).toBe('B');
     expect(state.workflowDetailLoading.value).toBe(false);
+  });
+
+  it('loads workflow requests for oa workbench', async () => {
+    vi.spyOn(employeeApi.workflow, 'requests').mockResolvedValue({
+      pageNo: 1,
+      pageSize: 20,
+      total: 1,
+      list: [{
+        requestId: 'REQ-1',
+        requestNo: 'REQ-1',
+        bizType: 'LEAVE',
+        bizId: 1,
+        title: '申请 REQ-1',
+        status: 'IN_APPROVAL',
+        currentStepKey: 'manager_approval',
+        currentStepName: '直属上级审批',
+        submittedAt: '2026-05-15T09:30:00',
+        finishedAt: null,
+      }],
+    });
+    vi.spyOn(employeeApi.workflow, 'requestDetail').mockResolvedValue(workflowDetail('REQ-1'));
+    vi.spyOn(employeeApi.workflow, 'requestActions').mockResolvedValue([] as WorkflowTaskActionResponse[]);
+    const state = useWorkbenchState({
+      shell: createShell(),
+      session: { ...createSession(), isAuthenticated: true },
+      showToast: vi.fn(),
+    });
+
+    await state.refreshActiveWorkbench();
+
+    expect(state.workflowRequests.value).toHaveLength(1);
+    expect(state.workflowRequests.value[0]?.requestId).toBe('REQ-1');
+  });
+
+  it('computes leave minutes from datetime range and rounds up to half day', async () => {
+    vi.spyOn(employeeApi.leave, 'types').mockResolvedValue([
+      { leaveTypeId: 'L-1', leaveCode: 'ANNUAL', leaveName: '年假', balanceMode: 'DEDUCT', status: 'ACTIVE' },
+      { leaveTypeId: 'L-2', leaveCode: 'SICK', leaveName: '病假', balanceMode: 'NO_DEDUCT', status: 'ACTIVE' },
+    ]);
+    vi.spyOn(employeeApi.leave, 'accounts').mockResolvedValue([leaveAccount, sickLeaveAccount]);
+    vi.spyOn(employeeApi.attendance, 'exceptions').mockResolvedValue([]);
+    vi.spyOn(employeeApi.attendance, 'dailyResults').mockResolvedValue([]);
+    const state = useWorkbenchState({
+      shell: createShell(),
+      session: createSession(),
+      showToast: vi.fn(),
+    });
+
+    await state.refreshWorkbenchData();
+    state.leaveForm.value.startAt = '2026-05-07T17:00';
+    state.leaveForm.value.endAt = '2026-05-08T10:00';
+    await nextTick();
+
+    expect(state.leaveForm.value.durationMinutes).toBe('240');
+  });
+
+  it('keeps no-deduct leave types selectable without annual leave default bias', async () => {
+    vi.spyOn(employeeApi.leave, 'types').mockResolvedValue([
+      { leaveTypeId: 'L-2', leaveCode: 'SICK', leaveName: '病假', balanceMode: 'NO_DEDUCT', status: 'ACTIVE' },
+      { leaveTypeId: 'L-1', leaveCode: 'ANNUAL', leaveName: '年假', balanceMode: 'DEDUCT', status: 'ACTIVE' },
+    ]);
+    vi.spyOn(employeeApi.leave, 'accounts').mockResolvedValue([sickLeaveAccount, leaveAccount]);
+    vi.spyOn(employeeApi.attendance, 'exceptions').mockResolvedValue([]);
+    vi.spyOn(employeeApi.attendance, 'dailyResults').mockResolvedValue([]);
+    const state = useWorkbenchState({
+      shell: createShell(),
+      session: createSession(),
+      showToast: vi.fn(),
+    });
+
+    await state.refreshWorkbenchData();
+
+    expect(state.leaveAccounts.value.map((item) => item.leaveName)).toEqual(['病假', '年假']);
+    expect(state.leaveForm.value.leaveTypeId).toBe('L-2');
+  });
+
+  it('falls back to leave accounts when leave type list is unavailable', async () => {
+    vi.spyOn(employeeApi.leave, 'types').mockResolvedValue([]);
+    vi.spyOn(employeeApi.leave, 'accounts').mockResolvedValue([sickLeaveAccount, leaveAccount]);
+    vi.spyOn(employeeApi.attendance, 'exceptions').mockResolvedValue([]);
+    vi.spyOn(employeeApi.attendance, 'dailyResults').mockResolvedValue([]);
+    const state = useWorkbenchState({
+      shell: createShell(),
+      session: createSession(),
+      showToast: vi.fn(),
+    });
+
+    await state.refreshWorkbenchData();
+
+    expect(state.selectableLeaveTypes.value.map((item) => item.leaveName)).toEqual(['病假', '年假']);
+    expect(state.leaveForm.value.leaveTypeId).toBe('L-2');
+    expect(state.canSubmitLeave.value).toBe(true);
   });
 });
