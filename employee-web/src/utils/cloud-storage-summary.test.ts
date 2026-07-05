@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildStorageOverview } from './cloud-storage-summary';
+import { buildStorageOverview, parseStorageSizeBytes } from './cloud-storage-summary';
 import type { PersonalFileRecord } from '@/stores/shell';
 
 describe('cloud storage summary', () => {
@@ -10,7 +10,7 @@ describe('cloud storage summary', () => {
       { id: 'video', name: 'video.mp4', type: 'MP4', size: '100B', createdAt: '', status: '已确认', mimeType: 'video/mp4', fileSizeBytes: 100 },
     ];
 
-    const overview = buildStorageOverview(files, 25);
+    const overview = buildStorageOverview(files, 250, 1000);
 
     expect(overview.usedPercent).toBe(25);
     expect(overview.segments.map((item) => [item.key, item.percent])).toEqual([
@@ -19,5 +19,11 @@ describe('cloud storage summary', () => {
       ['video', 10],
       ['other', 0],
     ]);
+  });
+
+  it('derives tiny quota usage from used and total labels', () => {
+    const overview = buildStorageOverview([], parseStorageSizeBytes('1.4 MB'), parseStorageSizeBytes('10 GB'));
+
+    expect(overview.usedPercent).toBeCloseTo(0.0137, 3);
   });
 });

@@ -984,7 +984,7 @@
 
 .cloud-summary-grid {
   display: grid;
-  grid-template-columns: minmax(22rem, 0.95fr) minmax(28rem, 1.6fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-16);
   align-items: stretch;
 }

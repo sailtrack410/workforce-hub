@@ -10,9 +10,9 @@ export interface StorageSegment {
   percent: number;
 }
 
-export function buildStorageOverview(files: PersonalFileRecord[], usedPercent: number) {
+export function buildStorageOverview(files: PersonalFileRecord[], usedBytes: number, totalBytes: number) {
   const totals = files.reduce<Record<StorageSegmentKey, number>>((next, file) => {
-    next[storageTypeOf(file)] += file.fileSizeBytes ?? parseSizeBytes(file.size);
+    next[storageTypeOf(file)] += file.fileSizeBytes ?? parseStorageSizeBytes(file.size);
     return next;
   }, {
     document: 0,
@@ -21,8 +21,9 @@ export function buildStorageOverview(files: PersonalFileRecord[], usedPercent: n
     other: 0,
   });
   const total = Math.max(0, Object.values(totals).reduce((sum, value) => sum + value, 0));
+  const usage = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
   return {
-    usedPercent: Math.max(0, Math.min(100, usedPercent)),
+    usedPercent: Math.max(0, Math.min(100, usage)),
     segments: [
       { key: 'document', label: '文档', color: '#ef4444', value: totals.document },
       { key: 'image', label: '图像', color: '#2f80ed', value: totals.image },
@@ -35,7 +36,7 @@ export function buildStorageOverview(files: PersonalFileRecord[], usedPercent: n
   };
 }
 
-function parseSizeBytes(value?: string) {
+export function parseStorageSizeBytes(value?: string) {
   const match = String(value ?? '').trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
   if (!match) return 0;
   const size = Number(match[1]);

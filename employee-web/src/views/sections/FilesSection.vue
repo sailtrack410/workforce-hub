@@ -20,7 +20,7 @@ import { employeeApi, type EmployeeFileFolderResponse, type EmployeeFileResponse
 import { useFilesSectionContext } from '../employee-shell-context';
 import { fileIconOf, fileToneOf, isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
-import { buildStorageOverview } from '@/utils/cloud-storage-summary';
+import { buildStorageOverview, parseStorageSizeBytes } from '@/utils/cloud-storage-summary';
 import { formatDateTime, statusText } from '@/utils/employee-format';
 import type { PersonalFileRecord } from '@/stores/shell';
 import cloudFolderImage from '@/assets/cloud-folder.png';
@@ -33,7 +33,6 @@ const {
   im,
   fileUploading,
   activeFile,
-  activeFileUsage,
   currentMeta,
   backToList,
   runAction,
@@ -88,8 +87,11 @@ const fileQuickCards = computed(() => [
 ]);
 const storageUsedLabel = computed(() => formatStorageLabel(activeFile.value.summary[0]?.[0] ?? '0B'));
 const storageTotalLabel = computed(() => formatStorageLabel(activeFile.value.summary[1]?.[0] ?? '0B'));
-const storageOverview = computed(() => buildStorageOverview(activeFiles.value, activeFileUsage.value));
+const storageUsedBytes = computed(() => parseStorageSizeBytes(storageUsedLabel.value));
+const storageTotalBytes = computed(() => parseStorageSizeBytes(storageTotalLabel.value));
+const storageOverview = computed(() => buildStorageOverview(activeFiles.value, storageUsedBytes.value, storageTotalBytes.value));
 const storageSegments = computed(() => storageOverview.value.segments);
+const storageUsagePercentLabel = computed(() => formatUsagePercent(storageOverview.value.usedPercent));
 
 function mapBrowserFile(file: EmployeeFileResponse): PersonalFileRecord {
   const name = file.displayName || file.originalFileName || '未命名文件';
@@ -161,6 +163,11 @@ function isFavorite(file: PersonalFileRecord) {
 
 function formatStorageLabel(value: string) {
   return value.replace(/^([\d.]+)([A-Z]+)$/i, '$1 $2');
+}
+
+function formatUsagePercent(value: number) {
+  if (value > 0 && value < 0.01) return '<0.01';
+  return value < 1 ? value.toFixed(2) : String(Math.round(value));
 }
 
 function folderLabel(folder: EmployeeFileFolderResponse) {
@@ -353,7 +360,7 @@ onMounted(() => {
             </span>
           </div>
         </div>
-        <footer>已使用 {{ activeFileUsage }}%</footer>
+        <footer>已使用 {{ storageUsagePercentLabel }}%</footer>
       </article>
     </section>
 
