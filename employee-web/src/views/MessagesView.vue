@@ -1762,6 +1762,7 @@ provideEmployeeShellContexts(employeeShellContexts);
           <div v-else class="preview-fallback">
             <component :is="fileIconOf(filePreview.file)" :size="42" />
             <strong>{{ filePreviewTitle }}</strong>
+            <p>当前格式暂不支持网页内预览</p>
           </div>
         </div>
 

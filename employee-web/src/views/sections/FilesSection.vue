@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   Copy,
   Download,
-  Eye,
   FolderPlus,
   Home,
   MoreHorizontal,
@@ -21,7 +20,7 @@ import { useFilesSectionContext } from '../employee-shell-context';
 import { isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { buildStorageOverview, parseStorageSizeBytes } from '@/utils/cloud-storage-summary';
-import { formatDateTime, statusText } from '@/utils/employee-format';
+import { formatDateTime } from '@/utils/employee-format';
 import type { PersonalFileRecord } from '@/stores/shell';
 import cloudFolderImage from '@/assets/cloud-folder.png';
 import archiveFileIcon from '@/assets/file-icons/archive.png';
@@ -112,7 +111,7 @@ function mapBrowserFile(file: EmployeeFileResponse): PersonalFileRecord {
     createdAt: formatDateTime(file.createdAt),
     rawCreatedAt: file.createdAt ?? undefined,
     fileSizeBytes: file.fileSize,
-    status: file.deletedAt ? '回收站' : statusText(file.scanStatus),
+    status: file.deletedAt ? '回收站' : '已上传',
     attachmentRefId: file.attachmentRefId,
     folderId: file.folderId ?? null,
     mimeType: file.mimeType ?? undefined,
@@ -456,8 +455,16 @@ onMounted(() => {
         />
 
         <div v-else class="file-list cloud-file-list">
-          <div v-for="folder in browserFolders" :key="folder.folderId" class="file-row folder-row">
-            <input v-model="selectedFileRows" type="checkbox" :value="folderSelectionValue(folder)" :aria-label="`选择${folder.folderName}`" />
+          <div
+            v-for="folder in browserFolders"
+            :key="folder.folderId"
+            class="file-row folder-row"
+            role="button"
+            tabindex="0"
+            @click="openFolder(folder.folderId)"
+            @keydown.enter.prevent="openFolder(folder.folderId)"
+          >
+            <input v-model="selectedFileRows" type="checkbox" :value="folderSelectionValue(folder)" :aria-label="`选择${folder.folderName}`" @click.stop />
             <span class="file-thumb" aria-hidden="true">
               <img class="file-thumb-img" :src="folderFileIcon" alt="" />
             </span>
@@ -468,11 +475,6 @@ onMounted(() => {
                 <span>{{ formatDateTime(folder.createdAt) }}</span>
               </small>
             </div>
-            <div class="file-actions">
-              <button type="button" @click="openFolder(folder.folderId)">
-                打开
-              </button>
-            </div>
           </div>
 
           <div v-for="file in browserFiles" :key="file.id" class="file-row">
@@ -481,7 +483,9 @@ onMounted(() => {
               <img class="file-thumb-img" :src="fileIconAssetOf(file)" alt="" />
             </span>
             <div>
-              <strong>{{ file.name }}</strong>
+              <button class="file-name-button" type="button" :disabled="!file.attachmentRefId" @click="previewBrowserFile(file)">
+                {{ file.name }}
+              </button>
               <small class="file-meta-line">
                 <span>{{ file.type }}</span>
                 <span>{{ file.size }}</span>
@@ -493,10 +497,6 @@ onMounted(() => {
               <button type="button" :disabled="!file.attachmentRefId || im.messageSending" @click="sendSelectedFileToConversation(file)">
                 <Send :size="15" />
                 发送
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId" @click="previewBrowserFile(file)">
-                <Eye :size="15" />
-                预览
               </button>
               <button type="button" :disabled="!file.attachmentRefId" @click="downloadBrowserFile(file)">
                 <Download :size="15" />

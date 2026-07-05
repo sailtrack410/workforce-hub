@@ -11,7 +11,7 @@ export function useFilePreview() {
   const filePreviewTitle = computed(() => (filePreview.value ? fileNameOf(filePreview.value.file) : ''));
   const filePreviewType = computed(() => (filePreview.value ? fileMimeOf(filePreview.value.file) : ''));
 
-  // 可内联预览的文件（图片、PDF、文本）先 fetch 到内存再用 objectUrl 展示
+  // 可内联预览的文件（图片、PDF、文本）先 fetch 到内存，避开下载接口的安全响应头
   async function openFilePreviewFromUrl(file: FilePreviewTarget, url: string) {
     closeFilePreview();
     const inline = canInlinePreview(file);
@@ -22,12 +22,25 @@ export function useFilePreview() {
     filePreviewLoading.value = true;
     try {
       const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) throw new Error('文件预览失败');
+      if (!response.ok) {
+        let message = '文件预览失败';
+        try {
+          if ((response.headers.get('Content-Type') ?? '').includes('application/json')) {
+            const payload = await response.json() as { message?: string };
+            message = payload.message || message;
+          } else {
+            message = await response.text() || message;
+          }
+        } catch {
+          message = '文件预览失败';
+        }
+        throw new Error(message);
+      }
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
       filePreview.value = { file, url: objectUrl, inline: true, objectUrl };
     } catch (error) {
-      filePreview.value = { file, url, inline: false };
+      closeFilePreview();
       throw error;
     } finally {
       filePreviewLoading.value = false;

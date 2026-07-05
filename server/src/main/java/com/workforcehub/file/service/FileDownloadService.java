@@ -128,9 +128,9 @@ public class FileDownloadService {
             throw new BizException(409, "文件已删除");
         }
 
-        downloadTicketExecutionService.claimActiveTicket(ticket.id());
         StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
             .loadObject(attachment.bucketName(), attachment.objectKey());
+        downloadTicketExecutionService.claimActiveTicket(ticket.id());
         auditLogWriter.write("USER", userId, "FILE_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
         return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
@@ -201,9 +201,9 @@ public class FileDownloadService {
             throw new BizException(409, "文件已删除");
         }
 
-        downloadTicketExecutionService.claimActiveTicket(ticket.id());
         StorageObjectResource resource = storageProviderRegistry.require(attachment.storageProvider())
             .loadObject(attachment.bucketName(), attachment.objectKey());
+        downloadTicketExecutionService.claimActiveTicket(ticket.id());
         auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_DOWNLOAD_EXECUTED", "DOWNLOAD_TICKET", ticket.id(), "SUCCESS",
             "{\"attachmentRefId\":%s}".formatted(attachment.attachmentRefId()));
         return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());

@@ -1668,6 +1668,10 @@
   background: color-mix(in srgb, var(--surface-panel-muted) 58%, transparent);
 }
 
+.cloud-file-list .folder-row {
+  cursor: pointer;
+}
+
 .cloud-file-list input[type='checkbox'] {
   width: 1rem;
   height: 1rem;
@@ -1750,6 +1754,33 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-name-button {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.file-name-button:hover:not(:disabled),
+.file-name-button:focus-visible {
+  color: var(--text-accent);
+  outline: none;
+}
+
+.file-name-button:disabled {
+  cursor: default;
 }
 
 .file-meta-line {
@@ -3559,6 +3590,12 @@
   justify-items: center;
   gap: var(--space-12);
   color: var(--text-secondary);
+  text-align: center;
+}
+
+.preview-fallback p {
+  margin: 0;
+  color: var(--text-tertiary);
 }
 
 .todo-card.compact-card {

@@ -943,11 +943,22 @@ public class AgentRepository {
 
     private String agentSelectSql() {
         return """
-            SELECT aa.id, aa.agent_code, aa.agent_name, aa.avatar_attachment_ref_id, aa.agent_type, aa.identity_mode,
+            SELECT aa.id, aa.agent_code, aa.agent_name,
+                   CASE WHEN agent_avatar_ref.id IS NULL OR agent_avatar_file.id IS NULL THEN NULL ELSE aa.avatar_attachment_ref_id END AS avatar_attachment_ref_id,
+                   aa.agent_type, aa.identity_mode,
                    aa.published_version_id, pv.version_no AS published_version_no, pv.version_label AS published_version_label,
                    aa.status, aa.created_at, aa.updated_at
             FROM agt_agent aa
             LEFT JOIN agt_agent_version pv ON pv.id = aa.published_version_id
+            LEFT JOIN sys_attachment_ref agent_avatar_ref
+                   ON agent_avatar_ref.id = aa.avatar_attachment_ref_id
+                  AND agent_avatar_ref.owner_type = 'USER_AVATAR'
+                  AND agent_avatar_ref.uploader_type = 'USER'
+                  AND agent_avatar_ref.deleted_at IS NULL
+                  AND agent_avatar_ref.is_deleted = 0
+            LEFT JOIN sys_file_object agent_avatar_file
+                   ON agent_avatar_file.id = agent_avatar_ref.file_object_id
+                  AND agent_avatar_file.is_deleted = 0
             """;
     }
 

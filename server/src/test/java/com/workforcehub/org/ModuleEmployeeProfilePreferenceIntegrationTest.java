@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -38,10 +40,14 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     @DisplayName("员工更新手机号与头像应回写并被 profile 读取到")
     void employeeShouldUpdateMobileAndAvatar() throws Exception {
         Cookie session = loginEmployee("zhangsan.employee", "Employee@123456", "test-profile-update-001");
+        seedAttachment(7777L, 2003L, "USER_AVATAR");
 
         mockMvc.perform(put("/api/employee/me/profile")
                 .cookie(session)
@@ -81,6 +87,7 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
     @DisplayName("同部门同事列表应返回联系人头像、签名和在线状态")
     void colleaguesShouldExposePersonalizationFields() throws Exception {
         Cookie colleagueSession = loginEmployee("wangwu.employee", "Employee@123456", "test-colleague-personalization-wangwu");
+        seedAttachment(8888L, 2004L, "USER_AVATAR");
         mockMvc.perform(put("/api/employee/me/profile")
                 .cookie(colleagueSession)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -111,6 +118,40 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
             .andExpect(jsonPath("$.data[0].avatarAttachmentRefId").value(8888))
             .andExpect(jsonPath("$.data[0].signature").value("专注项目推进"))
             .andExpect(jsonPath("$.data[0].presenceStatus").value("AWAY"));
+    }
+
+    @Test
+    @DisplayName("员工头像只能绑定本人头像附件")
+    void employeeAvatarShouldRequireOwnAvatarAttachment() throws Exception {
+        Cookie session = loginEmployee("zhangsan.employee", "Employee@123456", "test-profile-avatar-invalid");
+        seedAttachment(8899L, 2003L, "PERSONAL_FILE");
+
+        mockMvc.perform(put("/api/employee/me/profile")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "avatarAttachmentRefId": 8899
+                    }
+                    """))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403));
+    }
+
+    @Test
+    @DisplayName("同部门同事列表不应暴露无效头像附件")
+    void colleaguesShouldHideInvalidAvatarAttachment() throws Exception {
+        seedAttachment(8900L, 2004L, "PERSONAL_FILE");
+        jdbcTemplate.update("UPDATE org_user SET avatar_attachment_ref_id = ? WHERE id = ?", 8900L, 2004L);
+
+        Cookie session = loginEmployee("zhangsan.employee", "Employee@123456", "test-colleague-invalid-avatar");
+
+        mockMvc.perform(get("/api/employee/me/colleagues")
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].userId").value(2004))
+            .andExpect(jsonPath("$.data[0].avatarAttachmentRefId").value(nullValue()));
     }
 
     @Test
@@ -300,5 +341,42 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
         Cookie session = result.getResponse().getCookie("SESSION");
         assertNotNull(session, "登录后应返回 SESSION Cookie");
         return session;
+    }
+
+    private void seedAttachment(long attachmentRefId, long uploaderId, String ownerType) {
+        long fileObjectId = attachmentRefId + 100000L;
+        String contentSha256 = "%064x".formatted(attachmentRefId);
+        jdbcTemplate.update("""
+            INSERT INTO sys_file_object
+                (id, storage_provider, bucket_name, object_key, file_name, file_ext,
+                 mime_type, file_size, file_hash, content_sha256, ref_count,
+                 upload_status, scan_status, created_by, is_deleted)
+            VALUES
+                (?, 'LOCAL', 'local', ?, '头像.png', 'png',
+                 'image/png', 10, ?, ?, 1,
+                 'UPLOADED', 'PASSED', ?, 0)
+            """,
+            fileObjectId,
+            "org-avatar-test/" + attachmentRefId + ".png",
+            contentSha256,
+            contentSha256,
+            uploaderId
+        );
+        jdbcTemplate.update("""
+            INSERT INTO sys_attachment_ref
+                (id, owner_type, owner_id, file_object_id, original_file_name,
+                 display_name, uploader_type, uploader_id, visibility_scope,
+                 sort_order, created_by, is_deleted)
+            VALUES
+                (?, ?, NULL, ?, '头像.png',
+                 '头像.png', 'USER', ?, 'OWNER',
+                 0, ?, 0)
+            """,
+            attachmentRefId,
+            ownerType,
+            fileObjectId,
+            uploaderId,
+            uploaderId
+        );
     }
 }

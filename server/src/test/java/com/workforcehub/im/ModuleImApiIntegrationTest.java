@@ -125,7 +125,17 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
     @DisplayName("员工应只能看到自己参与的活跃会话并返回最后消息和未读数")
     void employeeShouldListOnlyJoinedActiveConversations() throws Exception {
         Cookie employeeSession = loginEmployee("zhangsan.employee");
-        jdbcTemplate.update("UPDATE org_user SET avatar_attachment_ref_id = ? WHERE id = ?", 9901L, MANAGER_USER_ID);
+        long avatarAttachmentRefId = seedAttachmentRef(
+            MANAGER_USER_ID,
+            "manager-avatar.png",
+            "manager-avatar-content",
+            "CLEAN",
+            0,
+            false,
+            "USER_AVATAR",
+            "PUBLIC"
+        );
+        jdbcTemplate.update("UPDATE org_user SET avatar_attachment_ref_id = ? WHERE id = ?", avatarAttachmentRefId, MANAGER_USER_ID);
         seedPrivateConversation();
         seedOtherConversation();
         seedInactiveConversation();
@@ -140,7 +150,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[0].conversationId").value(7001))
             .andExpect(jsonPath("$.data[0].conversationType").value("PRIVATE"))
             .andExpect(jsonPath("$.data[0].title").value("张三与李四"))
-            .andExpect(jsonPath("$.data[0].avatarFileId").value(9901))
+            .andExpect(jsonLong("$.data[0].avatarFileId", avatarAttachmentRefId))
             .andExpect(jsonPath("$.data[0].lastMessageSeq").value(2))
             .andExpect(jsonPath("$.data[0].lastMessage.senderType").value("USER"))
             .andExpect(jsonLong("$.data[0].lastMessage.senderId", MANAGER_USER_ID))
@@ -148,6 +158,31 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[0].unreadCount").value(1))
             .andExpect(jsonPath("$.data[0].pin").value(false))
             .andExpect(jsonPath("$.data[0].mute").value(false));
+    }
+
+    @Test
+    @DisplayName("私聊对方头像不是有效头像附件时会话列表不返回头像ID")
+    void conversationListShouldHideInvalidPrivateAvatarAttachment() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long invalidAvatarAttachmentRefId = seedPersonalAttachmentRef(
+            MANAGER_USER_ID,
+            "manager-file.txt",
+            "manager-file-content",
+            "CLEAN",
+            0,
+            false
+        );
+        jdbcTemplate.update("UPDATE org_user SET avatar_attachment_ref_id = ? WHERE id = ?", invalidAvatarAttachmentRefId, MANAGER_USER_ID);
+        seedPrivateConversation();
+        jdbcTemplate.update("UPDATE im_conversation SET avatar_file_id = ? WHERE id = ?", invalidAvatarAttachmentRefId, 7001L);
+
+        mockMvc.perform(get("/api/employee/im/conversations")
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].conversationId").value(7001))
+            .andExpect(jsonPath("$.data[0].avatarFileId").value(Matchers.nullValue()));
     }
 
     @Test

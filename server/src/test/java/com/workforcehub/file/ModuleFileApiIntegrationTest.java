@@ -431,6 +431,30 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("文件对象缺失时不应消耗下载票据")
+    void missingFileObjectShouldNotConsumeDownloadTicket() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        Long attachmentRefId = createConfirmedPersonalFile(employeeSession, "对象缺失.txt", "missing-object-content");
+        String ticketNo = createEmployeeDownloadTicket(employeeSession, attachmentRefId);
+        String objectKey = jdbcTemplate.queryForObject("""
+            SELECT fo.object_key
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE ar.id = ?
+            """, String.class, attachmentRefId);
+        Files.deleteIfExists(Path.of(localRoot).resolve(objectKey));
+
+        mockMvc.perform(get("/api/employee/files/download/{ticketNo}", ticketNo)
+                .cookie(employeeSession))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(100404))
+            .andExpect(jsonPath("$.message", containsString("文件对象不存在")));
+
+        assertEquals("ACTIVE", downloadTicketStatus(ticketNo));
+    }
+
+    @Test
     @DisplayName("员工文件应支持回收站删除、恢复和彻底删除引用")
     void employeeShouldTrashRestoreAndPurgeAttachmentReference() throws Exception {
         Cookie employeeSession = loginEmployee();

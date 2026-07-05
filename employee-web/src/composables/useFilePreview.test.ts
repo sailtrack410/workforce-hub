@@ -30,4 +30,26 @@ describe('useFilePreview', () => {
     createObjectURL.mockRestore();
     revokeObjectURL.mockRestore();
   });
+
+  it('uses backend preview error messages when inline downloads fail', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: 100404,
+      message: '文件对象不存在',
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+    const state = useFilePreview();
+
+    await expect(state.openFilePreviewFromUrl({
+      id: 'file-1',
+      name: '说明.txt',
+      type: 'TXT',
+      size: '5B',
+      createdAt: '',
+      status: '已确认',
+      mimeType: 'text/plain',
+    }, '/api/files/download/T1')).rejects.toThrow('文件对象不存在');
+    expect(state.filePreview.value).toBeNull();
+  });
 });

@@ -7,7 +7,7 @@
         u.id AS userId,
         u.employee_no AS employeeNo,
         u.real_name AS realName,
-        u.avatar_attachment_ref_id AS avatarAttachmentRefId,
+        CASE WHEN avatar_ref.id IS NULL OR avatar_file.id IS NULL THEN NULL ELSE u.avatar_attachment_ref_id END AS avatarAttachmentRefId,
         u.primary_dept_id AS primaryDeptId,
         d.dept_name AS primaryDeptName,
         u.position_id AS positionId,
@@ -32,6 +32,16 @@
            AND m.is_deleted = 0
         LEFT JOIN emp_user_preference pref
             ON pref.user_id = u.id
+        LEFT JOIN sys_attachment_ref avatar_ref
+            ON avatar_ref.id = u.avatar_attachment_ref_id
+           AND avatar_ref.owner_type = 'USER_AVATAR'
+           AND avatar_ref.uploader_type = 'USER'
+           AND avatar_ref.uploader_id = u.id
+           AND avatar_ref.deleted_at IS NULL
+           AND avatar_ref.is_deleted = 0
+        LEFT JOIN sys_file_object avatar_file
+            ON avatar_file.id = avatar_ref.file_object_id
+           AND avatar_file.is_deleted = 0
     </sql>
 
     <select id="selectFriends" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">

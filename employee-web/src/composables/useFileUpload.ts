@@ -196,9 +196,9 @@ export function useFileUpload({
     }
   }
 
-  async function createPersonalDownloadTicket(file: PersonalFileRecord) {
+  async function createPersonalDownloadTicket(file: PersonalFileRecord, downloadType = 'SINGLE', reason?: string) {
     if (!file.attachmentRefId) throw new Error('文件不可下载');
-    return employeeApi.files.createDownloadTicket(file.attachmentRefId, { downloadType: 'SINGLE' });
+    return employeeApi.files.createDownloadTicket(file.attachmentRefId, { downloadType, reason });
   }
 
   // 文件预览：先获取下载凭证，再通过 objectUrl 内联展示
@@ -207,11 +207,8 @@ export function useFileUpload({
     const actionKey = `preview-${file.id}`;
     fileActionLoading.value = { ...fileActionLoading.value, [actionKey]: true };
     try {
-      let url = file.downloadUrl;
-      if (!url) {
-        const ticket = await createPersonalDownloadTicket(file);
-        url = resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo));
-      }
+      const ticket = await createPersonalDownloadTicket(file, 'INLINE', '预览');
+      const url = resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo));
       await openFilePreviewFromUrl(file, url);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '预览失败');

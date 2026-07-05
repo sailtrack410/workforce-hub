@@ -15,6 +15,7 @@ import com.workforcehub.org.dto.OrgUserSummaryResponse;
 import com.workforcehub.org.dto.UpdateEmployeeProfileRequest;
 import com.workforcehub.org.mapper.OrgDirectoryMapper;
 import com.workforcehub.org.mapper.OrgPositionMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,13 +36,16 @@ public class OrgDirectoryService {
     private final OrgDirectoryMapper orgDirectoryMapper;
     private final OrgPositionMapper orgPositionMapper;
     private final OrgUserMapper orgUserMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public OrgDirectoryService(OrgDirectoryMapper orgDirectoryMapper,
                                OrgPositionMapper orgPositionMapper,
-                               OrgUserMapper orgUserMapper) {
+                               OrgUserMapper orgUserMapper,
+                               JdbcTemplate jdbcTemplate) {
         this.orgDirectoryMapper = orgDirectoryMapper;
         this.orgPositionMapper = orgPositionMapper;
         this.orgUserMapper = orgUserMapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public List<OrgDepartmentTreeNodeResponse> getDepartmentTree() {
@@ -190,10 +194,32 @@ public class OrgDirectoryService {
             String mobile = request.getMobile().trim();
             entity.setMobile(mobile.isEmpty() ? null : mobile);
         }
+        ensureEmployeeAvatarAttachment(userId, request.getAvatarAttachmentRefId());
         entity.setAvatarAttachmentRefId(request.getAvatarAttachmentRefId());
         entity.setUpdatedBy(userId);
         orgUserMapper.updateById(entity);
         return getUserDetail(userId);
+    }
+
+    private void ensureEmployeeAvatarAttachment(Long userId, Long attachmentRefId) {
+        if (attachmentRefId == null) {
+            return;
+        }
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE ar.id = ?
+              AND ar.owner_type = 'USER_AVATAR'
+              AND ar.uploader_type = 'USER'
+              AND ar.uploader_id = ?
+              AND ar.deleted_at IS NULL
+              AND ar.is_deleted = 0
+              AND fo.is_deleted = 0
+            """, Integer.class, attachmentRefId, userId);
+        if (count == null || count == 0) {
+            throw new BizException(403, "无权使用该头像");
+        }
     }
 
     private void ensureEmployeeContext() {

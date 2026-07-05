@@ -102,8 +102,13 @@ public class ImRepository {
                    c.conversation_key,
                    c.title,
                    COALESCE(
-                       CASE WHEN c.conversation_type = 'PRIVATE' THEN private_user.avatar_attachment_ref_id END,
-                       c.avatar_file_id
+                       CASE
+                           WHEN c.conversation_type = 'PRIVATE'
+                                AND private_avatar_ref.id IS NOT NULL
+                                AND private_avatar_file.id IS NOT NULL
+                           THEN private_user.avatar_attachment_ref_id
+                       END,
+                       CASE WHEN conversation_avatar_ref.id IS NULL OR conversation_avatar_file.id IS NULL THEN NULL ELSE c.avatar_file_id END
                    ) AS avatar_file_id,
                    c.bound_agent_id,
                    c.last_message_seq,
@@ -134,6 +139,25 @@ public class ImRepository {
             LEFT JOIN org_user private_user
                    ON private_user.id = private_peer.member_id
                   AND private_user.is_deleted = 0
+            LEFT JOIN sys_attachment_ref private_avatar_ref
+                   ON private_avatar_ref.id = private_user.avatar_attachment_ref_id
+                  AND private_avatar_ref.owner_type = 'USER_AVATAR'
+                  AND private_avatar_ref.uploader_type = 'USER'
+                  AND private_avatar_ref.uploader_id = private_user.id
+                  AND private_avatar_ref.deleted_at IS NULL
+                  AND private_avatar_ref.is_deleted = 0
+            LEFT JOIN sys_file_object private_avatar_file
+                   ON private_avatar_file.id = private_avatar_ref.file_object_id
+                  AND private_avatar_file.is_deleted = 0
+            LEFT JOIN sys_attachment_ref conversation_avatar_ref
+                   ON conversation_avatar_ref.id = c.avatar_file_id
+                  AND conversation_avatar_ref.owner_type = 'USER_AVATAR'
+                  AND conversation_avatar_ref.uploader_type = 'USER'
+                  AND conversation_avatar_ref.deleted_at IS NULL
+                  AND conversation_avatar_ref.is_deleted = 0
+            LEFT JOIN sys_file_object conversation_avatar_file
+                   ON conversation_avatar_file.id = conversation_avatar_ref.file_object_id
+                  AND conversation_avatar_file.is_deleted = 0
             LEFT JOIN im_message lm ON lm.id = c.last_message_id
             """;
     }
