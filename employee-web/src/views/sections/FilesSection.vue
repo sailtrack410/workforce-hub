@@ -5,9 +5,9 @@ import {
   Copy,
   Download,
   Eye,
-  Folder,
   FolderPlus,
   Home,
+  MoreHorizontal,
   MoveRight,
   RotateCcw,
   Search,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-vue-next';
 import { employeeApi, type EmployeeFileFolderResponse, type EmployeeFileResponse, type EntityId } from '@/api';
 import { useFilesSectionContext } from '../employee-shell-context';
-import { fileIconOf, fileToneOf, isFileTrashed } from '@/utils/file-record';
+import { fileToneOf, isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { buildStorageOverview, parseStorageSizeBytes } from '@/utils/cloud-storage-summary';
 import { formatDateTime, statusText } from '@/utils/employee-format';
@@ -69,6 +69,7 @@ const accessStorageKey = 'workforce-hub.employee.file-access.v1';
 const favoriteStorageKey = 'workforce-hub.employee.file-favorites.v1';
 const recentAccessLog = ref<Record<string, number>>(readRecentAccessLog());
 const favoriteFileIds = ref<string[]>(readFavoriteFileIds());
+const selectedFileRows = ref<string[]>([]);
 let searchTimer: number | undefined;
 
 const activeFiles = computed(() => activeFile.value.files.filter((file: PersonalFileRecord) => !isFileTrashed(file)));
@@ -174,6 +175,20 @@ function formatUsagePercent(value: number) {
 function folderLabel(folder: EmployeeFileFolderResponse) {
   const parent = allFolders.value.find((item) => String(item.folderId) === String(folder.parentFolderId));
   return parent ? `${parent.folderName} / ${folder.folderName}` : folder.folderName;
+}
+
+function folderSelectionValue(folder: EmployeeFileFolderResponse) {
+  return `folder:${folder.folderId}`;
+}
+
+function fileSelectionValue(file: PersonalFileRecord) {
+  return `file:${fileIdentity(file)}`;
+}
+
+function fileBadgeOf(file: PersonalFileRecord) {
+  const ext = file.name.includes('.') ? file.name.split('.').pop()?.trim().toUpperCase() : '';
+  if (ext) return ext === 'JPEG' ? 'JPG' : ext.slice(0, 4);
+  return file.type ? file.type.slice(0, 4).toUpperCase() : 'FILE';
 }
 
 async function loadBrowser() {
@@ -428,14 +443,18 @@ onMounted(() => {
           :description="emptyDescription"
         />
 
-        <div v-else class="file-list">
+        <div v-else class="file-list cloud-file-list">
           <div v-for="folder in browserFolders" :key="folder.folderId" class="file-row folder-row">
-            <span class="file-icon folder-icon">
-              <Folder :size="18" />
+            <input v-model="selectedFileRows" type="checkbox" :value="folderSelectionValue(folder)" :aria-label="`选择${folder.folderName}`" />
+            <span class="file-thumb folder-thumb" aria-hidden="true">
+              <i />
             </span>
             <div>
               <strong>{{ folder.folderName }}</strong>
-              <small>文件夹 · {{ formatDateTime(folder.createdAt) }}</small>
+              <small class="file-meta-line">
+                <span>文件夹</span>
+                <span>{{ formatDateTime(folder.createdAt) }}</span>
+              </small>
             </div>
             <div class="file-actions">
               <button type="button" @click="openFolder(folder.folderId)">
@@ -445,12 +464,19 @@ onMounted(() => {
           </div>
 
           <div v-for="file in browserFiles" :key="file.id" class="file-row">
-            <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
-              <component :is="fileIconOf(file)" :size="18" />
+            <input v-model="selectedFileRows" type="checkbox" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" />
+            <span class="file-thumb file-doc-thumb" :class="`file-thumb-${fileToneOf(file)}`" aria-hidden="true">
+              <i />
+              <b>{{ fileBadgeOf(file) }}</b>
             </span>
             <div>
               <strong>{{ file.name }}</strong>
-              <small>{{ file.type }} · {{ file.size }} · {{ file.createdAt }} · {{ file.status }}</small>
+              <small class="file-meta-line">
+                <span>{{ file.type }}</span>
+                <span>{{ file.size }}</span>
+                <span>{{ file.createdAt }}</span>
+                <span>{{ file.status }}</span>
+              </small>
             </div>
             <div class="file-actions">
               <button type="button" :disabled="!file.attachmentRefId || im.messageSending" @click="sendSelectedFileToConversation(file)">
@@ -465,22 +491,30 @@ onMounted(() => {
                 <Download :size="15" />
                 下载
               </button>
-              <button type="button" :disabled="!file.attachmentRefId" @click="toggleFavorite(file)">
-                <Star :size="15" />
-                {{ isFavorite(file) ? '已收藏' : '收藏' }}
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId" @click="openPlacement(file, 'move')">
-                <MoveRight :size="15" />
-                移动
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId" @click="openPlacement(file, 'copy')">
-                <Copy :size="15" />
-                复制
-              </button>
-              <button type="button" :disabled="!file.attachmentRefId" @click="trashBrowserFile(file)">
-                <Trash2 :size="15" />
-                删除
-              </button>
+              <details class="file-more-menu">
+                <summary>
+                  <MoreHorizontal :size="15" />
+                  更多
+                </summary>
+                <div class="file-more-panel">
+                  <button type="button" :disabled="!file.attachmentRefId" @click="toggleFavorite(file)">
+                    <Star :size="15" />
+                    {{ isFavorite(file) ? '已收藏' : '收藏' }}
+                  </button>
+                  <button type="button" :disabled="!file.attachmentRefId" @click="openPlacement(file, 'move')">
+                    <MoveRight :size="15" />
+                    移动
+                  </button>
+                  <button type="button" :disabled="!file.attachmentRefId" @click="openPlacement(file, 'copy')">
+                    <Copy :size="15" />
+                    复制
+                  </button>
+                  <button type="button" :disabled="!file.attachmentRefId" @click="trashBrowserFile(file)">
+                    <Trash2 :size="15" />
+                    删除
+                  </button>
+                </div>
+              </details>
             </div>
           </div>
         </div>
@@ -488,14 +522,21 @@ onMounted(() => {
 
       <template v-else>
         <AppEmptyState v-if="!visibleTrashFiles.length" :title="emptyTitle" :description="emptyDescription" />
-        <div v-else class="file-list">
+        <div v-else class="file-list cloud-file-list">
           <div v-for="file in visibleTrashFiles" :key="file.id" class="file-row">
-            <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
-              <component :is="fileIconOf(file)" :size="18" />
+            <input v-model="selectedFileRows" type="checkbox" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" />
+            <span class="file-thumb file-doc-thumb" :class="`file-thumb-${fileToneOf(file)}`" aria-hidden="true">
+              <i />
+              <b>{{ fileBadgeOf(file) }}</b>
             </span>
             <div>
               <strong>{{ file.name }}</strong>
-              <small>{{ file.type }} · {{ file.size }} · {{ file.createdAt }} · {{ file.status }}</small>
+              <small class="file-meta-line">
+                <span>{{ file.type }}</span>
+                <span>{{ file.size }}</span>
+                <span>{{ file.createdAt }}</span>
+                <span>{{ file.status }}</span>
+              </small>
             </div>
             <div class="file-actions">
               <button type="button" :disabled="!file.attachmentRefId" @click="restorePersonalFile(file)">
