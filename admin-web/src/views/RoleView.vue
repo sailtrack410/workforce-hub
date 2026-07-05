@@ -260,6 +260,12 @@ onMounted(loadPage);
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
   color: var(--ink);
+  transition: all 200ms ease;
+}
+
+.check-row:hover {
+  border-color: var(--green-light);
+  background: var(--hover-bg);
 }
 
 .check-row input {
@@ -271,6 +277,7 @@ onMounted(loadPage);
 .button-row {
   display: flex;
   gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .field-readonly {

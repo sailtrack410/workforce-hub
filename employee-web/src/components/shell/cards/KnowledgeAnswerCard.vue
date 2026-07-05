@@ -444,7 +444,7 @@ function shouldShowEmptyCitation() {
   z-index: 1;
   padding: 0.25rem;
   border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.38);
+  background: var(--surface-panel);
   filter: drop-shadow(0 3px 5px rgba(15, 23, 42, 0.18));
 }
 
@@ -651,7 +651,7 @@ function shouldShowEmptyCitation() {
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--surface-panel);
   content: '';
 }
 
@@ -661,7 +661,7 @@ function shouldShowEmptyCitation() {
   z-index: 1;
   padding: 0.2rem;
   border-radius: 0.625rem;
-  background: rgba(255, 255, 255, 0.38);
+  background: var(--surface-panel);
   filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.14));
 }
 

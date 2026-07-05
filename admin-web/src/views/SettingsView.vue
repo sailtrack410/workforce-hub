@@ -317,12 +317,13 @@ onMounted(loadList);
 .detail-actions {
   display: flex;
   gap: var(--space-sm);
-  margin-top: 14px;
+  flex-wrap: wrap;
+  margin-top: var(--space-base);
 }
 
 .test-result {
-  margin-top: 12px;
-  padding: 10px 12px;
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   display: grid;
@@ -344,10 +345,10 @@ onMounted(loadList);
 .test-reply {
   font-family: ui-monospace, monospace;
   font-size: 12px;
-  margin-top: 4px;
-  padding: 6px 8px;
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
   background: var(--panel-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   white-space: pre-wrap;
 }
 </style>

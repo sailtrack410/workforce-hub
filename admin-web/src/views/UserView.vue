@@ -642,6 +642,7 @@ onBeforeUnmount(() => {
   color: var(--ink);
   padding: var(--space-sm) var(--space-md);
   text-align: left;
+  transition: all 200ms ease;
 }
 
 .org-user:hover,
@@ -676,7 +677,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel-strong);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
   padding: var(--space-xl);
 }
 

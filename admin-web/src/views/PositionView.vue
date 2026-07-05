@@ -128,6 +128,7 @@ onMounted(loadList);
 
 <style scoped>
 .detail-actions {
-  margin-top: 14px;
+  display: flex;
+  margin-top: var(--space-base);
 }
 </style>

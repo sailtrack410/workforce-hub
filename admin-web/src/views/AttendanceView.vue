@@ -569,13 +569,19 @@ onMounted(loadPage);
 }
 
 .attendance-tabs button {
-  min-height: 34px;
+  min-height: var(--control-h);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  padding: 0 var(--space-lg);
+  padding: 0 var(--control-px);
   background: var(--panel-strong);
   color: var(--ink);
   font-weight: 700;
+  transition: all 200ms ease;
+}
+
+.attendance-tabs button:hover {
+  border-color: var(--green-light);
+  color: var(--green-dark);
 }
 
 .attendance-tabs button.active {
@@ -612,6 +618,7 @@ onMounted(loadPage);
 .button-row {
   display: flex;
   gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 @media (max-width: 900px) {

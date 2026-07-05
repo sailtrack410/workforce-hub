@@ -78,6 +78,11 @@ const storageCards = computed(() => {
 
 <style scoped>
 .leave-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 56px;
+  color: var(--green-dark);
   font-size: 28px;
+  line-height: 1;
 }
 </style>

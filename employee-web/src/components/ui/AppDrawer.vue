@@ -10,6 +10,5 @@
   padding: var(--space-24);
   border-left: 1px solid var(--border-subtle);
   background: var(--surface-panel);
-  backdrop-filter: none;
 }
 </style>

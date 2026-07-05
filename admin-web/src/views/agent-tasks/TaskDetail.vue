@@ -71,10 +71,12 @@ const executionTrace = computed(() => {
 .trace-block {
   max-height: 260px;
   overflow: auto;
-  padding: 10px;
+  padding: var(--space-md);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--panel-strong);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-wrap;

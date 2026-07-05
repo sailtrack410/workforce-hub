@@ -258,6 +258,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <main class="page-grid">
     <AdminPanel :span="12" title="AI 助手">
     <template #actions>
       <form class="agent-search" @submit.prevent="handleSearch">
@@ -399,6 +400,7 @@ onMounted(() => {
       </div>
     </div>
   </AdminPanel>
+  </main>
 
   <AdminConfirmDialog
     v-model:visible="createVisible"
@@ -472,23 +474,16 @@ onMounted(() => {
 .agent-search {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .agent-search input {
   width: 220px;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-strong);
-  color: var(--ink);
-  font-size: 13px;
 }
 
 .row-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--space-sm);
   flex-wrap: nowrap;
   align-items: center;
 }
@@ -522,8 +517,8 @@ onMounted(() => {
 }
 
 .action-btn {
-  min-height: 30px;
-  padding: 0 8px;
+  min-height: 32px;
+  padding: 0 var(--space-sm);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -545,46 +540,43 @@ onMounted(() => {
 .model-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .model-form label {
   display: grid;
-  gap: 6px;
+  gap: var(--space-xs);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 700;
 }
 
 .model-form input,
 .model-form select {
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-strong);
-  color: var(--ink);
+  min-height: var(--control-h);
 }
 
 .model-form-actions {
   display: flex;
   align-items: end;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .model-list {
   display: grid;
-  gap: 8px;
-  margin-top: 14px;
+  gap: var(--space-sm);
+  margin-top: var(--space-base);
 }
 
 .model-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-strong);
 }
 
 .model-row > div:first-child {

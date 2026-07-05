@@ -179,13 +179,13 @@ onMounted(loadList);
 <style scoped>
 .detail-edit-form {
   display: grid;
-  gap: 10px;
-  margin-top: 16px;
+  gap: var(--space-md);
+  margin-top: var(--space-base);
 }
 
 .detail-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 

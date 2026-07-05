@@ -603,7 +603,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition: all 200ms ease;
 }
 
 .bar-btn:disabled {
@@ -681,12 +681,12 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 
 .acl-state.ok {
   color: var(--green-dark);
-  background: rgba(34, 197, 94, 0.12);
+  background: var(--success-bg);
 }
 
 .acl-state.warn {
   color: var(--red-dark);
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--error-bg);
 }
 
 .acl-form {
@@ -719,6 +719,12 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   color: var(--panel-strong);
   font-size: 12px;
   font-weight: 700;
+  transition: all 200ms ease;
+}
+
+.acl-form button:hover:not(:disabled) {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
 }
 
 .acl-form button:disabled {

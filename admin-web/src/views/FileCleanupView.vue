@@ -184,9 +184,10 @@ async function runCleanupJob() {
   border: 12px solid var(--ring-bg);
   border-radius: var(--radius-circle);
   background: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
 }
 
-.usage-ring strong { font-size: 28px; }
+.usage-ring strong { color: var(--green-dark); font-size: 28px; }
 .usage-ring span { color: var(--muted); font-size: var(--text-xs); }
 
 .metric-strip {
@@ -200,10 +201,11 @@ async function runCleanupJob() {
   display: grid;
   gap: var(--space-xs);
   min-height: 76px;
-  padding: 13px;
+  padding: var(--space-md);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .metric-card span {

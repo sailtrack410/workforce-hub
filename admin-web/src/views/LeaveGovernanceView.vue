@@ -180,10 +180,11 @@ async function submitAdjustment() {
   display: grid;
   gap: var(--space-xs);
   min-height: 76px;
-  padding: 13px;
+  padding: var(--space-md);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .mini-card span {

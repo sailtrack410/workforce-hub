@@ -21,22 +21,23 @@ const emit = defineEmits<{
   width: 100%;
   gap: var(--space-12);
   padding: var(--space-12) var(--space-16);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--surface-panel);
   color: inherit;
   text-align: left;
-  border-bottom: 1px solid #eef1f5;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: all 200ms ease;
 }
 
 .ui-list-item:hover:not(:disabled) {
-  background: #eef4ff;
+  border-color: var(--border-accent);
+  background: var(--surface-accent);
   color: var(--text-primary);
 }
 
 .ui-list-item.active {
-  background: #e8f2ff;
+  border-color: var(--border-accent);
+  background: var(--surface-accent);
   color: var(--text-primary);
 }
 

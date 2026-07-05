@@ -1062,12 +1062,13 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 
 .model-setting-grid div {
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
   min-height: 72px;
   padding: var(--space-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   background: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .model-setting-grid span,
@@ -1171,8 +1172,9 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 .hit-item {
   padding: var(--space-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   background: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .hit-item strong,
@@ -1272,7 +1274,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
   padding: var(--space-xl);
 }
 
@@ -1309,6 +1311,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
   background: var(--surface);
   color: var(--muted);
   text-align: center;
+  transition: all 200ms ease;
 }
 
 .upload-dropzone:hover,
