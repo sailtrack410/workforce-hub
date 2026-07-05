@@ -1,14 +1,7 @@
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/InterVariable.woff2') format('woff2-variations');
-  font-weight: 100 900;
-  font-display: swap;
-}
-
 :root {
   color-scheme: light;
   --font-family-body: 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
-  --font-family-display-en: 'HarmonyOS Sans SC', 'Avenir Next', sans-serif;
+  --font-family-display-en: 'HarmonyOS Sans SC', 'Microsoft YaHei UI', sans-serif;
   --font-family-display-cn: 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   --font-family-display: var(--font-family-display-en), var(--font-family-display-cn);
 
@@ -105,15 +98,9 @@
   --text-accent: var(--primary-700);
   --text-danger: var(--danger-700);
 
-  --shadow-sm:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.04);
-  --shadow-md:
-    0 2px 4px rgba(0, 0, 0, 0.05),
-    0 16px 40px rgba(0, 0, 0, 0.06);
-  --shadow-lg:
-    0 4px 8px rgba(0, 0, 0, 0.06),
-    0 24px 64px rgba(0, 0, 0, 0.10);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 8px 18px rgba(16, 24, 40, 0.08);
+  --shadow-lg: var(--shadow-md);
 
   --font-size-12: 0.75rem;
   --font-size-14: 0.875rem;
@@ -160,8 +147,8 @@
 
   --layout-content-pad: clamp(1.25rem, 2vw, 2rem);
   --layout-pane-width: 22rem;
-  --transition-fast: 140ms ease;
-  --transition-base: 180ms ease;
+  --transition-fast: 160ms ease;
+  --transition-base: 200ms ease;
 }
 
 [data-theme='dark'] {
@@ -189,13 +176,7 @@
   --text-accent: var(--primary-200);
   --text-danger: var(--danger-200);
 
-  --shadow-sm:
-    0 1px 2px rgba(0, 0, 0, 0.18),
-    0 8px 24px rgba(0, 0, 0, 0.24);
-  --shadow-md:
-    0 2px 4px rgba(0, 0, 0, 0.22),
-    0 16px 40px rgba(0, 0, 0, 0.32);
-  --shadow-lg:
-    0 4px 8px rgba(0, 0, 0, 0.26),
-    0 24px 64px rgba(0, 0, 0, 0.42);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 8px 18px rgba(0, 0, 0, 0.24);
+  --shadow-lg: var(--shadow-md);
 }

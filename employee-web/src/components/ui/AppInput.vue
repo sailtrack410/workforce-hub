@@ -26,17 +26,14 @@ const props = withDefaults(defineProps<{
 .ui-input {
   width: 100%;
   min-height: 2.5rem;
-  padding: 0 var(--space-14, 0.875rem);
-  border: 1px solid #dfe5ee;
-  border-radius: 999px;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid #d0d5dd;
+  border-radius: var(--radius-8);
   background: #fff;
   color: var(--text-primary);
   font-family: var(--font-family-body);
   font-size: var(--text-body-md);
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast),
-    box-shadow var(--transition-fast);
+  transition: all 200ms ease;
 }
 
 .ui-input::placeholder {
@@ -51,7 +48,7 @@ const props = withDefaults(defineProps<{
   outline: none;
   border-color: var(--border-accent);
   background: var(--surface-panel);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-200) 48%, transparent);
+  box-shadow: 0 0 0 2px var(--surface-panel), 0 0 0 4px color-mix(in srgb, var(--primary-500) 34%, transparent);
 }
 
 .ui-input:disabled {

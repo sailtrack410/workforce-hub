@@ -75,6 +75,7 @@ async function submitLogin() {
   display: grid;
   place-items: center;
   padding: var(--space-3xl);
+  background: var(--surface);
 }
 
 .login-panel {
@@ -85,7 +86,7 @@ async function submitLogin() {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
 }
 
 .eyebrow {

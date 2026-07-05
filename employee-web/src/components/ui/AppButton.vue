@@ -37,30 +37,24 @@ const props = withDefaults(defineProps<{
   align-items: center;
   justify-content: center;
   gap: var(--space-8);
-  min-height: 2.375rem;
-  padding: 0 var(--space-14, 0.875rem);
+  min-height: 2.5rem;
+  padding: var(--space-8) var(--space-16);
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-8);
   font-family: var(--font-family-body);
   font-size: var(--text-body-sm);
   font-weight: 600;
   line-height: 1;
-  transition:
-    transform var(--transition-fast),
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast),
-    box-shadow var(--transition-fast);
+  transition: all 200ms ease;
 }
 
-.ui-button:hover:not(:disabled),
-.ui-button:focus-visible {
-  transform: none;
+.ui-button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .ui-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-300) 45%, transparent);
+  box-shadow: 0 0 0 2px var(--surface-panel), 0 0 0 4px color-mix(in srgb, var(--primary-500) 34%, transparent);
 }
 
 .ui-button:disabled {
@@ -78,7 +72,6 @@ const props = withDefaults(defineProps<{
 .ui-button.size-sm {
   min-height: 2rem;
   padding-inline: var(--space-12);
-  border-radius: var(--radius-6);
   font-size: var(--text-caption-md);
 }
 
@@ -91,7 +84,6 @@ const props = withDefaults(defineProps<{
 .ui-button.variant-primary {
   background: #1677ff;
   color: var(--text-inverse);
-  box-shadow: 0 6px 14px rgba(22, 119, 255, 0.18);
 }
 
 .ui-button.variant-primary:hover:not(:disabled),
@@ -135,7 +127,6 @@ const props = withDefaults(defineProps<{
 .ui-button.variant-link {
   min-height: auto;
   padding: 0;
-  border-radius: 0;
   background: transparent;
   color: var(--text-accent);
 }

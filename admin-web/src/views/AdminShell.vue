@@ -107,9 +107,9 @@ async function logout() {
   top: 0;
   height: 100vh;
   padding: var(--space-base) var(--space-md);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid var(--line);
   background: var(--sidebar-bg);
-  color: var(--sidebar-brand-text);
+  color: var(--ink);
 }
 
 .brand-block {
@@ -122,7 +122,7 @@ async function logout() {
 .brand-block div { display: grid; gap: 3px; }
 
 .brand-block span {
-  color: var(--muted-light);
+  color: var(--muted);
   font-size: var(--text-xs);
 }
 
@@ -135,20 +135,22 @@ async function logout() {
   min-height: 38px;
   padding: 0 var(--space-md);
   border-radius: var(--radius-sm);
-  color: var(--sidebar-text);
+  color: var(--muted);
   text-decoration: none;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
+  transition: all 200ms ease;
 }
 
 .admin-nav-item:hover {
   background: var(--sidebar-hover);
-  color: var(--sidebar-text-active);
+  color: var(--green-dark);
 }
 
 .admin-nav-item.router-link-active {
   background: var(--sidebar-active);
-  color: var(--sidebar-text-active);
+  color: var(--green-dark);
+  font-weight: 700;
 }
 
 .admin-main { min-width: 0; padding: var(--space-xl); }
@@ -187,7 +189,7 @@ async function logout() {
     z-index: 100;
     padding: var(--space-sm) var(--space-base);
     border-right: none;
-    border-bottom: 1px solid rgba(0, 80, 180, 0.12);
+    border-bottom: 1px solid var(--line);
   }
   .brand-block { padding-bottom: var(--space-sm); }
   .brand-block div { display: none; }

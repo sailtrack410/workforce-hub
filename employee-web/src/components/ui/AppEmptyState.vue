@@ -29,9 +29,7 @@ const props = defineProps<{
   padding: var(--space-32) var(--space-20);
   border: 0;
   border-radius: var(--radius-8);
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--primary-50) 42%, transparent), transparent 64%),
-    color-mix(in srgb, var(--surface-panel) 72%, transparent);
+  background: var(--surface-panel);
   text-align: center;
 }
 
@@ -42,7 +40,7 @@ const props = defineProps<{
   height: 3.25rem;
   place-items: center;
   border-radius: var(--radius-16);
-  background: linear-gradient(135deg, #eaf4ff, #f7fbff);
+  background: var(--primary-50);
   box-shadow: inset 0 0 0 1px #dbeafe;
 }
 
@@ -76,7 +74,7 @@ const props = defineProps<{
 }
 
 .empty-mark.todos {
-  background: linear-gradient(135deg, #fff8e6, #fffdf5);
+  background: var(--warning-50);
   box-shadow: inset 0 0 0 1px #f8e6b8;
 }
 
@@ -86,7 +84,7 @@ const props = defineProps<{
 }
 
 .empty-mark.files {
-  background: linear-gradient(135deg, #f0fdf4, #fbfffd);
+  background: var(--success-50);
   box-shadow: inset 0 0 0 1px #cdebd8;
 }
 
@@ -96,7 +94,7 @@ const props = defineProps<{
 }
 
 .empty-mark.contacts {
-  background: linear-gradient(135deg, #f5f3ff, #fbfaff);
+  background: var(--surface-panel-muted);
   box-shadow: inset 0 0 0 1px #ddd6fe;
 }
 

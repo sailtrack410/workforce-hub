@@ -371,8 +371,7 @@ function shouldShowEmptyCitation() {
   padding: var(--space-16);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-8);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 94%, var(--surface-accent)), var(--surface-panel));
+  background: var(--surface-panel);
   box-shadow: var(--shadow-sm);
 }
 
@@ -405,62 +404,39 @@ function shouldShowEmptyCitation() {
   overflow: hidden;
   width: 3.25rem;
   height: 3.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--success-200);
   border-radius: 1rem;
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0) 38%),
-    linear-gradient(145deg, #d7f8e7 0%, #75d69b 54%, #17895a 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 12px 24px rgba(28, 93, 61, 0.2);
+  background: var(--success-50);
+  box-shadow: var(--shadow-sm);
 }
 
 .state-mark::after {
-  position: absolute;
-  right: -0.65rem;
-  bottom: -0.75rem;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.34);
-  content: '';
+  content: none;
 }
 
 .no-match .state-mark {
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0) 38%),
-    linear-gradient(145deg, #fff1b8 0%, #f5bf47 52%, #b66b0d 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    0 12px 24px rgba(139, 91, 10, 0.18);
+  border-color: var(--warning-200);
+  background: var(--warning-50);
+  box-shadow: var(--shadow-sm);
 }
 
 .low-confidence .state-mark {
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0) 38%),
-    linear-gradient(145deg, #ffd6b2 0%, #f8893d 54%, #a33c10 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    0 12px 24px rgba(163, 60, 16, 0.18);
+  border-color: var(--warning-300);
+  background: var(--warning-50);
+  box-shadow: var(--shadow-sm);
 }
 
 .no-permission .state-mark,
 .search-failed .state-mark {
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0) 38%),
-    linear-gradient(145deg, #ffc8c2 0%, #ec6b5d 54%, #a9322b 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    0 12px 24px rgba(169, 50, 43, 0.18);
+  border-color: var(--danger-200);
+  background: var(--danger-50);
+  box-shadow: var(--shadow-sm);
 }
 
 .ingesting .state-mark {
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0) 38%),
-    linear-gradient(145deg, #cceeff 0%, #61bbe8 54%, #126e9f 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    0 12px 24px rgba(18, 110, 159, 0.18);
+  border-color: var(--info-200);
+  background: var(--info-50);
+  box-shadow: var(--shadow-sm);
 }
 
 .state-mark :deep(.i-icon) {
@@ -537,8 +513,7 @@ function shouldShowEmptyCitation() {
 .loading-row span {
   height: 0.75rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--surface-panel-muted), var(--surface-accent), var(--surface-panel-muted));
-  background-size: 220% 100%;
+  background: var(--surface-panel-muted);
   animation: loading-shimmer 1.1s linear infinite;
 }
 
@@ -656,23 +631,16 @@ function shouldShowEmptyCitation() {
   overflow: hidden;
   width: 2.625rem;
   height: 2.625rem;
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--primary-200);
   border-radius: 0.875rem;
-  background:
-    radial-gradient(circle at 28% 20%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 40%),
-    linear-gradient(145deg, #d9efff 0%, #7ab8f4 52%, #2d6fbf 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 8px 18px rgba(31, 80, 140, 0.14);
+  background: var(--primary-50);
+  box-shadow: var(--shadow-sm);
 }
 
 .flow-mark {
-  background:
-    radial-gradient(circle at 28% 20%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 40%),
-    linear-gradient(145deg, #cef9ec 0%, #69d7c2 52%, #138579 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 8px 18px rgba(19, 133, 121, 0.14);
+  border-color: var(--success-200);
+  background: var(--success-50);
+  box-shadow: var(--shadow-sm);
 }
 
 .file-mark::after,

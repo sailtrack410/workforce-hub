@@ -10,7 +10,7 @@
   --primary:      var(--green);
   --primary-hover: var(--green-dark);
   --primary-soft: #E8F3FF;
-  --success:      #1FAD66;
+  --success:      #168A50;
   --red:          #D93026;
   --red-dark:     #B9231B;
   --amber:        #FF9F18;
@@ -24,13 +24,13 @@
   --sidebar-brand-text: #F2F4F7;
 
   /* ---- 填充/背景色系 ---- */
-  --surface:      #F5F7FA;
+  --surface:      #F7F8FA;
   --panel:        #FFFFFF;
   --panel-strong: #ffffff;
   --line:         #DDE3EC;
 
   /* ---- 语义背景 ---- */
-  --hover-bg:     #F0F7FF;
+  --hover-bg:     #F0F6FF;
   --pill-bg:      #E8F3FF;
   --error-bg:     #FCE9E8;
   --success-bg:   #E8F8F0;
@@ -39,18 +39,18 @@
   --brand-mark-bg:#E8F3FF;
 
   /* ---- 侧边栏 ---- */
-  --sidebar-bg:   #172033;
-  --sidebar-hover:#243149;
-  --sidebar-active:#0F66E8;
+  --sidebar-bg:   #FFFFFF;
+  --sidebar-hover:#F0F6FF;
+  --sidebar-active:#E8F3FF;
 
   /* ---- 阴影 ---- */
-  --shadow:       0 18px 42px rgba(16, 24, 40, 0.14);
-  --shadow-sm:    0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow:       0 8px 18px rgba(16, 24, 40, 0.08);
+  --shadow-sm:    0 1px 2px rgba(16, 24, 40, 0.06);
 
   /* ---- 圆角 ---- */
-  --radius-sm:    6px;
+  --radius-sm:    8px;
   --radius-md:    8px;
-  --radius-lg:    8px;
+  --radius-lg:    12px;
   --radius-pill:  999px;
   --radius-circle: 50%;
 
@@ -74,8 +74,8 @@
   --space-3xl:    32px;
 
   /* ---- 控件 ---- */
-  --control-h:    36px;
-  --control-px:   14px;
+  --control-h:    40px;
+  --control-px:   16px;
 
   /* ---- 全局基础 ---- */
   color: var(--ink);
@@ -114,19 +114,32 @@ body::-webkit-scrollbar {
 }
 
 button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
+button {
+  cursor: pointer;
+  transition: all 200ms ease;
+}
 button:disabled { cursor: not-allowed; opacity: 0.62; }
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(22, 119, 255, 0.34);
+}
 
 input, select, textarea {
   width: 100%;
-  border: 1px solid var(--line);
+  border: 1px solid #D0D5DD;
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
   color: var(--ink);
   font-size: var(--text-base);
   min-height: var(--control-h);
-  padding: 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   outline: none;
+  transition: all 200ms ease;
 }
 
 textarea {
@@ -137,7 +150,7 @@ textarea {
 
 input:focus, select:focus, textarea:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(22, 119, 255, 0.34);
 }
 
 /* =========================================================
@@ -179,7 +192,7 @@ input:focus, select:focus, textarea:focus {
 
 .panel {
   min-width: 0;
-  padding: var(--space-lg);
+  padding: var(--space-xl);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
@@ -199,6 +212,8 @@ input:focus, select:focus, textarea:focus {
 .toolbar h2 {
   margin: 0;
   font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
   line-height: 1.35;
 }
 
@@ -229,9 +244,10 @@ input:focus, select:focus, textarea:focus {
   border-radius: var(--radius-sm);
   padding: 0 var(--control-px);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
+  transition: all 200ms ease;
 }
 
 .primary-button {
@@ -257,6 +273,21 @@ input:focus, select:focus, textarea:focus {
 .secondary-button:hover,
 .icon-button:hover { border-color: var(--green-light); color: var(--green-dark); }
 .danger-button:hover { background: var(--red-dark); border-color: var(--red-dark); }
+
+.primary-button:active,
+.secondary-button:active,
+.danger-button:active,
+.icon-button:active {
+  transform: scale(0.98);
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.danger-button:focus-visible,
+.icon-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(22, 119, 255, 0.34);
+}
 
 /* =========================================================
    Feedback
@@ -331,4 +362,14 @@ input:focus, select:focus, textarea:focus {
 
 @media (max-width: 640px) {
   .toolbar { align-items: stretch; flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }

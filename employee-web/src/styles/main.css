@@ -29,7 +29,7 @@ body {
 }
 
 button,
-input,
+input:not([type='checkbox']):not([type='radio']):not([type='file']),
 textarea,
 select {
   font: inherit;
@@ -37,10 +37,31 @@ select {
 
 button {
   cursor: pointer;
+  transition: all 200ms ease;
 }
 
 button:disabled {
   cursor: not-allowed;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface-panel), 0 0 0 4px color-mix(in srgb, var(--primary-500) 34%, transparent);
+}
+
+input,
+textarea,
+select {
+  border: 1px solid #d0d5dd;
+  border-radius: var(--radius-8);
+  padding: var(--space-8) var(--space-12);
 }
 
 h1,
@@ -68,4 +89,14 @@ svg {
 
 ::selection {
   background: color-mix(in srgb, var(--primary-200) 72%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }

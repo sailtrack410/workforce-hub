@@ -27,18 +27,11 @@ withDefaults(
 
 .skeleton-line {
   border-radius: var(--radius-sm);
-  background: linear-gradient(
-    90deg,
-    var(--line) 25%,
-    rgba(217, 222, 211, 0.4) 50%,
-    var(--line) 75%
-  );
-  background-size: 200% 100%;
+  background: var(--line);
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes skeleton-pulse {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  50% { opacity: 0.42; }
 }
 </style>

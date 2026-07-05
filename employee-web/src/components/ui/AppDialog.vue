@@ -24,7 +24,6 @@ const props = defineProps<{
   place-items: center;
   padding: var(--space-24);
   background: rgba(15, 20, 18, 0.42);
-  backdrop-filter: blur(10px);
   overflow: auto;
 }
 
@@ -36,7 +35,7 @@ const props = defineProps<{
   border: 1px solid var(--border-default);
   border-radius: var(--radius-12);
   background: var(--surface-panel);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .ui-dialog.wide {

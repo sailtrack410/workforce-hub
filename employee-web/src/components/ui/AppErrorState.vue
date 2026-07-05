@@ -34,7 +34,7 @@ const emit = defineEmits<{
   padding: var(--space-20);
   border: 1px solid color-mix(in srgb, var(--danger-300) 80%, transparent);
   border-radius: var(--radius-16);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--danger-50) 80%, transparent), var(--surface-panel));
+  background: var(--danger-50);
 }
 
 .error-mark {

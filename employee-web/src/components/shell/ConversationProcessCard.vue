@@ -105,8 +105,7 @@ function toneOf(statusTone: ProcessCard['statusTone']) {
   padding: var(--space-16);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-12);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 96%, var(--surface-accent)), var(--surface-panel));
+  background: var(--surface-panel);
   color: var(--text-primary);
   text-align: left;
   box-shadow: none;

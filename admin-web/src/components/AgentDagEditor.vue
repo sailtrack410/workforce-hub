@@ -2141,11 +2141,7 @@ if (typeof window !== 'undefined') {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  background:
-    linear-gradient(90deg, rgba(221, 227, 236, 0.64) 1px, transparent 1px),
-    linear-gradient(rgba(221, 227, 236, 0.64) 1px, transparent 1px),
-    var(--surface);
-  background-size: 36px 36px;
+  background: var(--surface);
   cursor: default;
 }
 
