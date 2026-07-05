@@ -993,7 +993,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-16);
-  align-items: start;
+  align-items: stretch;
 }
 
 .cloud-folder-card,
@@ -1010,7 +1010,8 @@
   align-content: start;
   gap: var(--space-10);
   min-height: 8.75rem;
-  padding: var(--space-16) var(--space-18) var(--space-18);
+  height: 100%;
+  padding: var(--space-18) var(--space-20);
 }
 
 .cloud-folder-card img {
