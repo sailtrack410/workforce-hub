@@ -299,7 +299,7 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
   },
   files: {
     kicker: '',
-    title: '文档',
+    title: '云空间',
     subtitle: '',
     search: '搜索文件、材料、状态',
     primaryAction: {
@@ -358,7 +358,7 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
 export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = [
   { id: 'messages', label: '消息', glyph: '息' },
   { id: 'todos', label: '待办', glyph: '办' },
-  { id: 'files', label: '文档', glyph: '档' },
+  { id: 'files', label: '云空间', glyph: '云' },
   { id: 'workbench', label: '仪表盘', glyph: '表' },
   { id: 'contacts', label: '通讯录', glyph: '录' },
   { id: 'agents', label: 'AI 助手', glyph: '助' },
@@ -571,7 +571,7 @@ const emptyTodo: TodoRecord = {
 function createFileSpaces(files: PersonalFileRecord[] = []): FileSpaceRecord[] {
   return [{
     id: 'personal',
-    title: '我的云空间',
+    title: '云空间',
     subtitle: '个人空间',
     note: '',
     usage: 0,

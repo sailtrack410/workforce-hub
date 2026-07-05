@@ -924,7 +924,7 @@ onBeforeUnmount(() => {
         <header class="settings-card-head">
           <h3>文件空间</h3>
           <AppButton variant="secondary" size="sm" @click="goPersonalFiles">
-            打开文档
+            打开云空间
           </AppButton>
         </header>
         <div class="settings-storage-layout">

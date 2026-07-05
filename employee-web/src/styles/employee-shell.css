@@ -214,6 +214,14 @@
   grid-template-columns: 4.75rem clamp(24rem, var(--list-width, 25rem), 32.5rem) minmax(0, 1fr) 0;
 }
 
+.employee-shell.section-files {
+  grid-template-columns: 4.75rem minmax(0, 1fr) 0;
+}
+
+.employee-shell.section-files .main-pane {
+  grid-column: 2;
+}
+
 .side-rail,
 .list-pane,
 .resize-handle,
@@ -4293,6 +4301,14 @@
     grid-template-rows: minmax(0, 100dvh);
     min-height: 100dvh;
     height: 100dvh;
+  }
+
+  .employee-shell.section-files {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-shell.section-files .main-pane {
+    grid-column: 1;
   }
 
   .side-rail,

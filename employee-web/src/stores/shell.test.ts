@@ -236,6 +236,15 @@ describe('useShellStore', () => {
     expect(sectionMeta.workbench.title).toBe('仪表盘');
   });
 
+  it('labels the files section as cloud space', () => {
+    const shell = useShellStore();
+    const filesNav = navItems.find((item) => item.id === 'files');
+
+    expect(filesNav?.label).toBe('云空间');
+    expect(sectionMeta.files.title).toBe('云空间');
+    expect(shell.activeFile.title).toBe('云空间');
+  });
+
   it('filters message conversations by title and member keyword', () => {
     const shell = useShellStore();
     shell.mergeBackendConversations(shellDemoConversations);

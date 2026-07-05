@@ -1192,7 +1192,7 @@ provideEmployeeShellContexts(employeeShellContexts);
       </div>
     </aside>
 
-    <section class="list-pane" :class="{ 'mobile-visible': mobileStage === 'list' }">
+    <section v-if="activeSection !== 'files'" class="list-pane" :class="{ 'mobile-visible': mobileStage === 'list' }">
       <header class="pane-head">
         <div class="pane-title-row">
           <div class="pane-head-copy">
@@ -1364,28 +1364,6 @@ provideEmployeeShellContexts(employeeShellContexts);
           </AppListItem>
         </div>
 
-        <div v-else-if="activeSection === 'files'" class="list-items">
-          <AppEmptyState v-if="!filteredFiles.length" title="文件空间为空" :description="listEmptyText" icon="files" />
-          <AppListItem
-            v-for="item in filteredFiles"
-            v-else
-            :key="item.id"
-            :active="item.id === activeFile.id"
-            @click="shell.selectItem('files', item.id)"
-          >
-            <div class="generic-row">
-              <AppAvatar :label="item.label" tone="neutral" />
-              <div class="generic-copy">
-                <div class="title-line">
-                  <strong>{{ item.title }}</strong>
-                  <span class="meta-time">{{ item.subtitle }}</span>
-                </div>
-                <p>{{ item.note }}</p>
-              </div>
-            </div>
-          </AppListItem>
-        </div>
-
         <div v-else-if="activeSection === 'workbench'" class="list-items">
           <AppListItem
             v-for="item in workbenchLaunchers"
@@ -1451,9 +1429,9 @@ provideEmployeeShellContexts(employeeShellContexts);
       </div>
     </section>
 
-    <div class="resize-handle" role="separator" aria-orientation="vertical" aria-label="调整列表宽度" @pointerdown.prevent="startResize" />
+    <div v-if="activeSection !== 'files'" class="resize-handle" role="separator" aria-orientation="vertical" aria-label="调整列表宽度" @pointerdown.prevent="startResize" />
 
-    <section class="main-pane" :class="{ 'mobile-visible': mobileStage === 'detail' }">
+    <section class="main-pane" :class="{ 'mobile-visible': mobileStage === 'detail' || activeSection === 'files' }">
       <RouterView v-slot="{ Component }">
         <component :is="Component" />
       </RouterView>
