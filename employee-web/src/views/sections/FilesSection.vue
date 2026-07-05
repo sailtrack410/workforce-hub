@@ -20,6 +20,7 @@ import { employeeApi, type EmployeeFileFolderResponse, type EmployeeFileResponse
 import { useFilesSectionContext } from '../employee-shell-context';
 import { fileIconOf, fileToneOf, isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { buildStorageOverview } from '@/utils/cloud-storage-summary';
 import { formatDateTime, statusText } from '@/utils/employee-format';
 import type { PersonalFileRecord } from '@/stores/shell';
 import cloudFolderImage from '@/assets/cloud-folder.png';
@@ -87,28 +88,8 @@ const fileQuickCards = computed(() => [
 ]);
 const storageUsedLabel = computed(() => formatStorageLabel(activeFile.value.summary[0]?.[0] ?? '0B'));
 const storageTotalLabel = computed(() => formatStorageLabel(activeFile.value.summary[1]?.[0] ?? '0B'));
-const storageSegments = computed(() => {
-  const totals = activeFiles.value.reduce((next, file) => {
-    const key = storageTypeOf(file);
-    next[key] += file.fileSizeBytes ?? parseSizeBytes(file.size);
-    return next;
-  }, {
-    document: 0,
-    image: 0,
-    video: 0,
-    other: 0,
-  });
-  const total = Math.max(0, Object.values(totals).reduce((sum, value) => sum + value, 0));
-  return [
-    { key: 'document', label: '文档', color: '#ef4444', value: totals.document },
-    { key: 'image', label: '图像', color: '#2f80ed', value: totals.image },
-    { key: 'video', label: '视频', color: '#f4c20d', value: totals.video },
-    { key: 'other', label: '其他', color: '#22c55e', value: totals.other },
-  ].map((item) => ({
-    ...item,
-    percent: total > 0 ? (item.value / total) * 100 : 0,
-  }));
-});
+const storageOverview = computed(() => buildStorageOverview(activeFiles.value, activeFileUsage.value));
+const storageSegments = computed(() => storageOverview.value.segments);
 
 function mapBrowserFile(file: EmployeeFileResponse): PersonalFileRecord {
   const name = file.displayName || file.originalFileName || '未命名文件';
@@ -178,33 +159,8 @@ function isFavorite(file: PersonalFileRecord) {
   return favoriteFileIds.value.includes(fileIdentity(file));
 }
 
-function parseSizeBytes(value?: string) {
-  const match = String(value ?? '').trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
-  if (!match) return 0;
-  const size = Number(match[1]);
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const unitIndex = units.indexOf(match[2].toUpperCase());
-  return Number.isFinite(size) && unitIndex >= 0 ? size * (1024 ** unitIndex) : 0;
-}
-
 function formatStorageLabel(value: string) {
   return value.replace(/^([\d.]+)([A-Z]+)$/i, '$1 $2');
-}
-
-function storageTypeOf(file: PersonalFileRecord): 'document' | 'image' | 'video' | 'other' {
-  const mime = file.mimeType?.toLowerCase() ?? '';
-  const type = file.type.toLowerCase();
-  const name = file.name.toLowerCase();
-  if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].some((ext) => type.includes(ext) || name.endsWith(`.${ext}`))) return 'image';
-  if (mime.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].some((ext) => type.includes(ext) || name.endsWith(`.${ext}`))) return 'video';
-  if (
-    mime.includes('pdf')
-    || mime.includes('document')
-    || mime.includes('spreadsheet')
-    || mime.includes('presentation')
-    || ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv'].some((ext) => type.includes(ext) || name.endsWith(`.${ext}`))
-  ) return 'document';
-  return 'other';
 }
 
 function folderLabel(folder: EmployeeFileFolderResponse) {
@@ -381,12 +337,14 @@ onMounted(() => {
             <span>of {{ storageTotalLabel }}</span>
           </div>
           <div class="storage-ratio-bar" aria-hidden="true">
-            <span
-              v-for="item in storageSegments"
-              v-show="item.percent > 0"
-              :key="item.key"
-              :style="{ width: `${item.percent}%`, background: item.color }"
-            />
+            <div class="storage-used-fill" :style="{ width: `${storageOverview.usedPercent}%` }">
+              <span
+                v-for="item in storageSegments"
+                v-show="item.percent > 0"
+                :key="item.key"
+                :style="{ width: `${item.percent}%`, background: item.color }"
+              />
+            </div>
           </div>
           <div class="storage-legend">
             <span v-for="item in storageSegments" :key="item.key">
