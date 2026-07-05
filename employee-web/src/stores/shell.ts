@@ -217,6 +217,8 @@ export interface PersonalFileRecord {
   type: string;
   size: string;
   createdAt: string;
+  rawCreatedAt?: string;
+  fileSizeBytes?: number;
   status: string;
   attachmentRefId?: EntityId;
   folderId?: EntityId | null;
@@ -748,6 +750,8 @@ function mapEmployeeFile(file: EmployeeFileResponse): PersonalFileRecord {
     type: fileTypeLabelFromName(name, file.mimeType ?? ''),
     size: fileSizeLabel(file.fileSize),
     createdAt: formatDisplayDateTime(file.createdAt) || '刚刚',
+    rawCreatedAt: file.createdAt ?? undefined,
+    fileSizeBytes: file.fileSize,
     status: file.deletedAt ? '回收站' : fileStatusValue(file.scanStatus),
     attachmentRefId: file.attachmentRefId,
     folderId: file.folderId ?? null,
@@ -1201,6 +1205,8 @@ export const useShellStore = defineStore('employee-shell', {
       mimeType?: string;
       downloadUrl?: string;
       createdAt?: string;
+      rawCreatedAt?: string;
+      fileSizeBytes?: number;
     }) {
       const personal = this.files.find((item) => item.id === 'personal');
       if (!personal) return;
@@ -1211,6 +1217,8 @@ export const useShellStore = defineStore('employee-shell', {
         type: file.type,
         size: file.size,
         createdAt: file.createdAt ?? '刚刚',
+        rawCreatedAt: file.rawCreatedAt,
+        fileSizeBytes: file.fileSizeBytes,
         status: file.status,
         attachmentRefId: file.attachmentRefId,
         folderId: file.folderId ?? null,

@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Search,
   Send,
+  Star,
   Trash2,
   X,
 } from 'lucide-vue-next';
@@ -21,6 +22,7 @@ import { fileIconOf, fileToneOf, isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { formatDateTime, statusText } from '@/utils/employee-format';
 import type { PersonalFileRecord } from '@/stores/shell';
+import cloudFolderImage from '@/assets/cloud-folder.png';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
@@ -30,9 +32,7 @@ const {
   im,
   fileUploading,
   activeFile,
-  fileUsageCircumference,
   activeFileUsage,
-  activeFileUsageOffset,
   currentMeta,
   backToList,
   runAction,
@@ -65,6 +65,10 @@ const folderActionError = ref('');
 const placementTarget = ref<{ mode: FilePlacementMode; file: PersonalFileRecord } | null>(null);
 const placementFolderId = ref('root');
 const copyNameDraft = ref('');
+const accessStorageKey = 'workforce-hub.employee.file-access.v1';
+const favoriteStorageKey = 'workforce-hub.employee.file-favorites.v1';
+const recentAccessLog = ref<Record<string, number>>(readRecentAccessLog());
+const favoriteFileIds = ref<string[]>(readFavoriteFileIds());
 let searchTimer: number | undefined;
 
 const activeFiles = computed(() => activeFile.value.files.filter((file: PersonalFileRecord) => !isFileTrashed(file)));
@@ -73,6 +77,38 @@ const visibleTrashFiles = computed(() => trashedFiles.value);
 const emptyTitle = computed(() => fileTab.value === 'trash' ? '回收站为空' : '暂无文件');
 const emptyDescription = computed(() => fileTab.value === 'trash' ? '删除的文件会暂存在这里' : '上传或新建文件夹后开始管理');
 const placementTitle = computed(() => placementTarget.value?.mode === 'copy' ? '复制到' : '移动到');
+const recentUploadCount = computed(() => activeFiles.value.filter((file) => isWithinLastWeek(file.rawCreatedAt ?? file.createdAt)).length);
+const recentAccessCount = computed(() => activeFiles.value.filter((file) => (recentAccessLog.value[fileIdentity(file)] ?? 0) >= weekAgoTime()).length);
+const favoriteFileCount = computed(() => activeFiles.value.filter((file) => favoriteFileIds.value.includes(fileIdentity(file))).length);
+const fileQuickCards = computed(() => [
+  { title: '最近访问', count: recentAccessCount.value },
+  { title: '最近上传', count: recentUploadCount.value },
+  { title: '收藏夹', count: favoriteFileCount.value },
+]);
+const storageUsedLabel = computed(() => formatStorageLabel(activeFile.value.summary[0]?.[0] ?? '0B'));
+const storageTotalLabel = computed(() => formatStorageLabel(activeFile.value.summary[1]?.[0] ?? '0B'));
+const storageSegments = computed(() => {
+  const totals = activeFiles.value.reduce((next, file) => {
+    const key = storageTypeOf(file);
+    next[key] += file.fileSizeBytes ?? parseSizeBytes(file.size);
+    return next;
+  }, {
+    document: 0,
+    image: 0,
+    video: 0,
+    other: 0,
+  });
+  const total = Math.max(0, Object.values(totals).reduce((sum, value) => sum + value, 0));
+  return [
+    { key: 'document', label: '文档', color: '#ef4444', value: totals.document },
+    { key: 'image', label: '图像', color: '#2f80ed', value: totals.image },
+    { key: 'video', label: '视频', color: '#f4c20d', value: totals.video },
+    { key: 'other', label: '其他', color: '#22c55e', value: totals.other },
+  ].map((item) => ({
+    ...item,
+    percent: total > 0 ? (item.value / total) * 100 : 0,
+  }));
+});
 
 function mapBrowserFile(file: EmployeeFileResponse): PersonalFileRecord {
   const name = file.displayName || file.originalFileName || '未命名文件';
@@ -82,11 +118,93 @@ function mapBrowserFile(file: EmployeeFileResponse): PersonalFileRecord {
     type: fileTypeLabelFromName(name, file.mimeType ?? ''),
     size: fileSizeLabel(file.fileSize),
     createdAt: formatDateTime(file.createdAt),
+    rawCreatedAt: file.createdAt ?? undefined,
+    fileSizeBytes: file.fileSize,
     status: file.deletedAt ? '回收站' : statusText(file.scanStatus),
     attachmentRefId: file.attachmentRefId,
     folderId: file.folderId ?? null,
     mimeType: file.mimeType ?? undefined,
   };
+}
+
+function weekAgoTime() {
+  return Date.now() - 7 * 24 * 60 * 60 * 1000;
+}
+
+function isWithinLastWeek(value?: string | null) {
+  if (!value) return false;
+  if (value === '刚刚') return true;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) && time >= weekAgoTime();
+}
+
+function readRecentAccessLog() {
+  try {
+    return JSON.parse(globalThis.localStorage?.getItem(accessStorageKey) || '{}') as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+function readFavoriteFileIds() {
+  try {
+    const value = JSON.parse(globalThis.localStorage?.getItem(favoriteStorageKey) || '[]') as unknown;
+    return Array.isArray(value) ? value.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function fileIdentity(file: PersonalFileRecord) {
+  return String(file.attachmentRefId ?? file.id);
+}
+
+function recordFileAccess(file: PersonalFileRecord) {
+  const next = { ...recentAccessLog.value, [fileIdentity(file)]: Date.now() };
+  recentAccessLog.value = next;
+  globalThis.localStorage?.setItem(accessStorageKey, JSON.stringify(next));
+}
+
+function toggleFavorite(file: PersonalFileRecord) {
+  const id = fileIdentity(file);
+  const next = favoriteFileIds.value.includes(id)
+    ? favoriteFileIds.value.filter((item) => item !== id)
+    : [...favoriteFileIds.value, id];
+  favoriteFileIds.value = next;
+  globalThis.localStorage?.setItem(favoriteStorageKey, JSON.stringify(next));
+}
+
+function isFavorite(file: PersonalFileRecord) {
+  return favoriteFileIds.value.includes(fileIdentity(file));
+}
+
+function parseSizeBytes(value?: string) {
+  const match = String(value ?? '').trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
+  if (!match) return 0;
+  const size = Number(match[1]);
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const unitIndex = units.indexOf(match[2].toUpperCase());
+  return Number.isFinite(size) && unitIndex >= 0 ? size * (1024 ** unitIndex) : 0;
+}
+
+function formatStorageLabel(value: string) {
+  return value.replace(/^([\d.]+)([A-Z]+)$/i, '$1 $2');
+}
+
+function storageTypeOf(file: PersonalFileRecord): 'document' | 'image' | 'video' | 'other' {
+  const mime = file.mimeType?.toLowerCase() ?? '';
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].some((ext) => type.includes(ext) || name.endsWith(`.${ext}`))) return 'image';
+  if (mime.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].some((ext) => type.includes(ext) || name.endsWith(`.${ext}`))) return 'video';
+  if (
+    mime.includes('pdf')
+    || mime.includes('document')
+    || mime.includes('spreadsheet')
+    || mime.includes('presentation')
+    || ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv'].some((ext) => type.includes(ext) || name.endsWith(`.${ext}`))
+  ) return 'document';
+  return 'other';
 }
 
 function folderLabel(folder: EmployeeFileFolderResponse) {
@@ -186,6 +304,16 @@ async function trashBrowserFile(file: PersonalFileRecord) {
   await loadBrowser();
 }
 
+async function previewBrowserFile(file: PersonalFileRecord) {
+  recordFileAccess(file);
+  await openPersonalFilePreview(file);
+}
+
+async function downloadBrowserFile(file: PersonalFileRecord) {
+  recordFileAccess(file);
+  await downloadPersonalFile(file);
+}
+
 function uploadToCurrentFolder() {
   setUploadFolderId(currentFolderId.value);
   runAction(currentMeta.value.primaryAction);
@@ -234,35 +362,42 @@ onMounted(() => {
   </header>
 
   <section class="content-stack">
-    <article class="hero-panel">
-      <div>
-        <h3>{{ activeFile.subtitle }}</h3>
-        <p>{{ activeFile.note }}</p>
-        <dl class="hero-stats">
-          <div v-for="item in activeFile.summary" :key="item[0]">
-            <dt>{{ item[1] }}</dt>
-            <dd>{{ item[0] }}</dd>
+    <section class="cloud-summary-grid" aria-label="云空间概览">
+      <div class="cloud-quick-grid">
+        <article v-for="card in fileQuickCards" :key="card.title" class="cloud-folder-card">
+          <img :src="cloudFolderImage" alt="" aria-hidden="true" />
+          <div>
+            <h3>{{ card.title }}</h3>
+            <p>{{ card.count }} 个文件</p>
           </div>
-        </dl>
+        </article>
       </div>
-      <div class="progress-ring">
-        <svg viewBox="0 0 120 120" aria-hidden="true">
-          <circle class="progress-ring-track" cx="60" cy="60" r="52" />
-          <circle
-            class="progress-ring-value"
-            cx="60"
-            cy="60"
-            r="52"
-            :stroke-dasharray="fileUsageCircumference"
-            :stroke-dashoffset="activeFileUsageOffset"
-          />
-        </svg>
-        <div class="progress-ring-text">
-          <strong>{{ activeFileUsage }}%</strong>
-          <span>已用空间</span>
+
+      <article class="storage-overview-card">
+        <header>储存概览</header>
+        <div class="storage-overview-body">
+          <div class="storage-usage-line">
+            <strong>{{ storageUsedLabel }}</strong>
+            <span>of {{ storageTotalLabel }}</span>
+          </div>
+          <div class="storage-ratio-bar" aria-hidden="true">
+            <span
+              v-for="item in storageSegments"
+              v-show="item.percent > 0"
+              :key="item.key"
+              :style="{ width: `${item.percent}%`, background: item.color }"
+            />
+          </div>
+          <div class="storage-legend">
+            <span v-for="item in storageSegments" :key="item.key">
+              <i :style="{ background: item.color }" />
+              {{ item.label }}
+            </span>
+          </div>
         </div>
-      </div>
-    </article>
+        <footer>已使用 {{ activeFileUsage }}%</footer>
+      </article>
+    </section>
 
     <section class="detail-card">
       <div class="title-line file-tabs">
@@ -356,13 +491,17 @@ onMounted(() => {
                 <Send :size="15" />
                 发送
               </button>
-              <button type="button" :disabled="!file.attachmentRefId" @click="openPersonalFilePreview(file)">
+              <button type="button" :disabled="!file.attachmentRefId" @click="previewBrowserFile(file)">
                 <Eye :size="15" />
                 预览
               </button>
-              <button type="button" :disabled="!file.attachmentRefId" @click="downloadPersonalFile(file)">
+              <button type="button" :disabled="!file.attachmentRefId" @click="downloadBrowserFile(file)">
                 <Download :size="15" />
                 下载
+              </button>
+              <button type="button" :disabled="!file.attachmentRefId" @click="toggleFavorite(file)">
+                <Star :size="15" />
+                {{ isFavorite(file) ? '已收藏' : '收藏' }}
               </button>
               <button type="button" :disabled="!file.attachmentRefId" @click="openPlacement(file, 'move')">
                 <MoveRight :size="15" />

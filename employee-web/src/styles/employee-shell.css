@@ -982,6 +982,157 @@
   gap: var(--space-16);
 }
 
+.cloud-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(22rem, 0.95fr) minmax(28rem, 1.6fr);
+  gap: var(--space-16);
+  align-items: stretch;
+}
+
+.cloud-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-16);
+}
+
+.cloud-folder-card,
+.storage-overview-card {
+  min-width: 0;
+  border: 1px solid #dde1e7;
+  border-radius: var(--radius-16);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.cloud-folder-card {
+  display: grid;
+  align-content: space-between;
+  gap: var(--space-18);
+  min-height: 13.5rem;
+  padding: var(--space-18) var(--space-18) var(--space-20);
+}
+
+.cloud-folder-card img {
+  display: block;
+  width: min(9.5rem, 82%);
+  aspect-ratio: 1.28;
+  justify-self: center;
+  object-fit: contain;
+}
+
+.cloud-folder-card h3 {
+  margin: 0;
+  color: #111827;
+  font-size: var(--text-subtitle-md);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.cloud-folder-card p {
+  margin: var(--space-8) 0 0;
+  color: #7b818c;
+  font-size: var(--text-body-md);
+  line-height: 1.25;
+}
+
+.storage-overview-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.storage-overview-card header,
+.storage-overview-card footer {
+  display: flex;
+  align-items: center;
+  min-height: 3.25rem;
+  padding: 0 var(--space-20);
+  color: #7b818c;
+  font-size: var(--text-body-md);
+  line-height: 1;
+}
+
+.storage-overview-card header {
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.storage-overview-card footer {
+  border-top: 1px solid #e1e4e8;
+}
+
+.storage-overview-body {
+  display: grid;
+  align-content: center;
+  gap: var(--space-18);
+  padding: var(--space-20);
+}
+
+.storage-usage-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+}
+
+.storage-usage-line strong {
+  color: #111827;
+  font-size: var(--font-size-32);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.storage-usage-line span {
+  color: #7b818c;
+  font-size: var(--text-subtitle-md);
+  line-height: 1;
+}
+
+.storage-ratio-bar {
+  display: flex;
+  width: 100%;
+  height: 1rem;
+  overflow: hidden;
+  border-radius: var(--radius-8);
+  background: #f1f3f6;
+}
+
+.storage-ratio-bar span {
+  min-width: 0;
+}
+
+.storage-ratio-bar span:first-child {
+  border-radius: var(--radius-8) 0 0 var(--radius-8);
+}
+
+.storage-ratio-bar span:last-child {
+  border-radius: 0 var(--radius-8) var(--radius-8) 0;
+}
+
+.storage-legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-12) var(--space-20);
+}
+
+.storage-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  color: #7b818c;
+  font-size: var(--text-body-md);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.storage-legend i {
+  width: 0.625rem;
+  height: 0.625rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
 .card-section {
   display: grid;
   gap: var(--space-16);
@@ -4236,6 +4387,10 @@
     align-items: stretch;
   }
 
+  .cloud-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .settings-card-grid,
   .settings-list.two-column,
   .personal-profile-grid,
@@ -4274,6 +4429,15 @@
 
   .file-browser-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .cloud-quick-grid,
+  .storage-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-folder-card {
+    min-height: 11rem;
   }
 
   .workflow-node-map {

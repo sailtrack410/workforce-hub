@@ -141,6 +141,8 @@ export function useFileUpload({
           type: fileTypeLabelFromName(attachment.displayName || file.name, attachment.mimeType || file.type),
           size: fileSizeLabel(attachment.fileSize || file.size),
           createdAt: attachment.createdAt ? formatDateTime(attachment.createdAt) : '',
+          rawCreatedAt: attachment.createdAt ?? undefined,
+          fileSizeBytes: attachment.fileSize || file.size,
           status: attachment.scanStatus ? statusText(attachment.scanStatus) : '已确认',
           attachmentRefId: attachment.attachmentRefId,
           mimeType: attachment.mimeType || file.type,
@@ -159,6 +161,8 @@ export function useFileUpload({
           attachmentRefId,
           folderId: uploadFolderId.value,
           mimeType: file.type,
+          rawCreatedAt: new Date().toISOString(),
+          fileSizeBytes: file.size,
         });
         uploadResult.value = { status: 'success', text: '上传成功' };
         await refreshFileCenter();
@@ -176,6 +180,8 @@ export function useFileUpload({
         folderId: uploadFolderId.value,
         mimeType: attachment.mimeType || file.type,
         createdAt: formatDateTime(attachment.createdAt),
+        rawCreatedAt: attachment.createdAt ?? new Date().toISOString(),
+        fileSizeBytes: attachment.fileSize || file.size,
       });
       uploadResult.value = { status: 'success', text: '上传成功' };
       await refreshFileCenter();
