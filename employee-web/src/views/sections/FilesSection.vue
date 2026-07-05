@@ -18,12 +18,19 @@ import {
 } from 'lucide-vue-next';
 import { employeeApi, type EmployeeFileFolderResponse, type EmployeeFileResponse, type EntityId } from '@/api';
 import { useFilesSectionContext } from '../employee-shell-context';
-import { fileToneOf, isFileTrashed } from '@/utils/file-record';
+import { isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { buildStorageOverview, parseStorageSizeBytes } from '@/utils/cloud-storage-summary';
 import { formatDateTime, statusText } from '@/utils/employee-format';
 import type { PersonalFileRecord } from '@/stores/shell';
 import cloudFolderImage from '@/assets/cloud-folder.png';
+import archiveFileIcon from '@/assets/file-icons/archive.png';
+import excelFileIcon from '@/assets/file-icons/excel.png';
+import fileIcon from '@/assets/file-icons/file.png';
+import folderFileIcon from '@/assets/file-icons/folder.png';
+import pdfFileIcon from '@/assets/file-icons/pdf.png';
+import pptFileIcon from '@/assets/file-icons/ppt.png';
+import wordFileIcon from '@/assets/file-icons/word.png';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
@@ -185,10 +192,15 @@ function fileSelectionValue(file: PersonalFileRecord) {
   return `file:${fileIdentity(file)}`;
 }
 
-function fileBadgeOf(file: PersonalFileRecord) {
-  const ext = file.name.includes('.') ? file.name.split('.').pop()?.trim().toUpperCase() : '';
-  if (ext) return ext === 'JPEG' ? 'JPG' : ext.slice(0, 4);
-  return file.type ? file.type.slice(0, 4).toUpperCase() : 'FILE';
+function fileIconAssetOf(file: PersonalFileRecord) {
+  const name = file.name.toLowerCase();
+  const mime = file.mimeType?.toLowerCase() ?? '';
+  if (mime.includes('pdf') || name.endsWith('.pdf')) return pdfFileIcon;
+  if (/\.(doc|docx)$/i.test(name) || mime.includes('wordprocessingml') || mime.includes('msword')) return wordFileIcon;
+  if (/\.(xls|xlsx|csv)$/i.test(name) || mime.includes('spreadsheet')) return excelFileIcon;
+  if (/\.(ppt|pptx)$/i.test(name) || mime.includes('presentation')) return pptFileIcon;
+  if (/\.(zip|rar|7z|tar|gz)$/i.test(name)) return archiveFileIcon;
+  return fileIcon;
 }
 
 async function loadBrowser() {
@@ -446,8 +458,8 @@ onMounted(() => {
         <div v-else class="file-list cloud-file-list">
           <div v-for="folder in browserFolders" :key="folder.folderId" class="file-row folder-row">
             <input v-model="selectedFileRows" type="checkbox" :value="folderSelectionValue(folder)" :aria-label="`选择${folder.folderName}`" />
-            <span class="file-thumb folder-thumb" aria-hidden="true">
-              <i />
+            <span class="file-thumb" aria-hidden="true">
+              <img class="file-thumb-img" :src="folderFileIcon" alt="" />
             </span>
             <div>
               <strong>{{ folder.folderName }}</strong>
@@ -465,9 +477,8 @@ onMounted(() => {
 
           <div v-for="file in browserFiles" :key="file.id" class="file-row">
             <input v-model="selectedFileRows" type="checkbox" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" />
-            <span class="file-thumb file-doc-thumb" :class="`file-thumb-${fileToneOf(file)}`" aria-hidden="true">
-              <i />
-              <b>{{ fileBadgeOf(file) }}</b>
+            <span class="file-thumb" aria-hidden="true">
+              <img class="file-thumb-img" :src="fileIconAssetOf(file)" alt="" />
             </span>
             <div>
               <strong>{{ file.name }}</strong>
@@ -525,9 +536,8 @@ onMounted(() => {
         <div v-else class="file-list cloud-file-list">
           <div v-for="file in visibleTrashFiles" :key="file.id" class="file-row">
             <input v-model="selectedFileRows" type="checkbox" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" />
-            <span class="file-thumb file-doc-thumb" :class="`file-thumb-${fileToneOf(file)}`" aria-hidden="true">
-              <i />
-              <b>{{ fileBadgeOf(file) }}</b>
+            <span class="file-thumb" aria-hidden="true">
+              <img class="file-thumb-img" :src="fileIconAssetOf(file)" alt="" />
             </span>
             <div>
               <strong>{{ file.name }}</strong>
