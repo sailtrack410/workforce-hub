@@ -44,6 +44,7 @@ import java.util.Set;
 /**
  * 后台 IM outbox 治理服务。
  */
+// Outbox 治理：消息投递状态审计、失败摘要、批量重试、调度指标查询
 @Service
 public class ImOutboxAdminService {
 

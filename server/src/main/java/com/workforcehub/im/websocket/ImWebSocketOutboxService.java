@@ -15,6 +15,7 @@ import static com.workforcehub.common.util.JsonValues.write;
 /**
  * IM WebSocket 事件 outbox 写入服务。
  */
+// Outbox 写入：将 IM 事件序列化写入数据库，保证消息不丢失，由 Dispatcher 异步推送
 @Service
 @EnableConfigurationProperties(ImWebSocketOutboxProperties.class)
 public class ImWebSocketOutboxService {

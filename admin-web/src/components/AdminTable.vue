@@ -120,19 +120,31 @@ function toggleSort(col: TableColumn) {
 </template>
 
 <style scoped>
-.data-table { overflow: auto; }
+.data-table {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+}
 
 table { width: 100%; border-collapse: collapse; }
 
 th, td {
   border-bottom: 1px solid var(--line);
-  padding: 11px var(--space-md);
+  padding: var(--space-md);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   font-size: var(--text-sm);
 }
 
-th { color: var(--muted); font-size: var(--text-xs); }
+th {
+  background: #F8FAFC;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+tbody tr:last-child td { border-bottom: 0; }
 
 td strong, td span { display: block; }
 

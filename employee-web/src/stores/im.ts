@@ -89,6 +89,7 @@ export interface EmployeeFilesApi {
   downloadUrl(ticketNo: string): string;
 }
 
+// IM 会话 Pinia Store：管理会话列表、消息收发、群组操作、AI 会话轮询
 export const useImStore = defineStore('employee-im', {
   state: () => ({
     conversations: [] as ConversationRecord[],
@@ -107,6 +108,7 @@ export const useImStore = defineStore('employee-im', {
     _loadDetailSeq: 0,
   }),
   actions: {
+    // 加载会话列表：并行获取每个会话的头像下载凭证
     async loadConversations(
       query: ImConversationListQuery = {},
       imApi: EmployeeImApi = employeeApi.im,
@@ -225,6 +227,7 @@ export const useImStore = defineStore('employee-im', {
     ) {
       return this.loadMessages(conversationId, currentUserId, { beforeSeq, size }, imApi);
     },
+    // AI 会话轮询：定时刷新消息列表，检测 AI 是否已回复，超时返回 false
     async pollAgentReply(
       conversationId: string | number,
       afterSeq: number,
@@ -304,6 +307,7 @@ export const useImStore = defineStore('employee-im', {
         this.loading = false;
       }
     },
+    // 发送文本消息：生成 clientMessageId 保证幂等，同时更新已读位置
     async sendMessage(
       conversationId: string | number,
       text: string,
@@ -548,6 +552,7 @@ export const useImStore = defineStore('employee-im', {
         this.readPositionUpdating = false;
       }
     },
+    // 会话 upsert：已存在则合并更新，不存在则插入到列表头部
     upsertConversation(conversation: ImConversationSummaryResponse) {
       const record = mapImConversationToRecord(conversation);
       const key = String(conversation.conversationId);
@@ -568,6 +573,7 @@ export const useImStore = defineStore('employee-im', {
       this.lastReadSeqByConversation[key] = conversation.lastReadSeq;
       return record;
     },
+    // 消息 upsert：去重 agent-loading 占位消息，更新会话列表的最后消息预览
     upsertMessage(conversationId: string, message: ConversationMessage) {
       const existing = (this.messagesByConversation[conversationId] ?? [])
         .filter((item) => !(message.senderType === 'AGENT' && item.id.startsWith('agent-loading-')));
@@ -833,6 +839,7 @@ function businessTextFromContent(content: Record<string, unknown> | null) {
   return '';
 }
 
+// 解析知识库/Agent 结果卡片：从消息 contentJson 中提取结构化卡片数据
 function parseKnowledgeAnswerCard(content: Record<string, unknown> | null): KnowledgeAnswerCard | undefined {
   if (!content) return undefined;
   if (content.cardType === 'agent_result') return parseAgentResultCard(content);

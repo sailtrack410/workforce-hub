@@ -9,6 +9,7 @@ interface UseAgentTasksOptions {
   showToast: (message: string) => void;
 }
 
+// Agent 任务 composable：创建任务、确认/拒绝、取消
 export function useAgentTasks({ session, showToast }: UseAgentTasksOptions) {
   const agentTaskForm = ref({
     agentId: '',

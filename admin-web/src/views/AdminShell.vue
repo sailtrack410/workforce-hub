@@ -99,14 +99,14 @@ async function logout() {
 .admin-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 212px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
 }
 
 .admin-sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
-  padding: 16px 12px;
+  padding: var(--space-base) var(--space-md);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--sidebar-bg);
   color: var(--sidebar-brand-text);
@@ -115,8 +115,8 @@ async function logout() {
 .brand-block {
   display: flex;
   align-items: center;
-  gap: var(--space-base);
-  padding: 4px 8px 20px;
+  gap: var(--space-md);
+  padding: var(--space-xs) var(--space-sm) var(--space-lg);
 }
 
 .brand-block div { display: grid; gap: 3px; }
@@ -131,39 +131,51 @@ async function logout() {
 .admin-nav-item {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   min-height: 38px;
-  padding: 0 10px;
+  padding: 0 var(--space-md);
   border-radius: var(--radius-sm);
   color: var(--sidebar-text);
   text-decoration: none;
   font-size: var(--text-sm);
+  font-weight: 700;
 }
 
-.admin-nav-item:hover,
-.admin-nav-item.router-link-active {
+.admin-nav-item:hover {
   background: var(--sidebar-hover);
   color: var(--sidebar-text-active);
 }
 
-.admin-main { min-width: 0; padding: 24px; }
+.admin-nav-item.router-link-active {
+  background: var(--sidebar-active);
+  color: var(--sidebar-text-active);
+}
+
+.admin-main { min-width: 0; padding: var(--space-xl); }
 
 .admin-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-base);
   min-height: 52px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-base);
 }
 
-.admin-topbar h1 { font-size: 22px; margin: 0; letter-spacing: 0; }
+.admin-topbar h1 {
+  font-size: 22px;
+  margin: 0;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
 
 .admin-user {
   display: inline-flex;
   align-items: center;
   gap: var(--space-md);
   color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
 }
 
 @media (max-width: 980px) {
@@ -182,7 +194,7 @@ async function logout() {
   .admin-nav {
     display: flex;
     overflow-x: auto;
-    gap: 2px;
+    gap: var(--space-xs);
     -webkit-overflow-scrolling: touch;
   }
   .admin-nav-item {
@@ -196,7 +208,7 @@ async function logout() {
 }
 
 @media (max-width: 640px) {
-  .admin-main { padding: var(--space-lg); }
+  .admin-main { padding: var(--space-base); }
   .admin-topbar { align-items: stretch; flex-direction: column; }
   .admin-nav-item span { display: inline; }
   .admin-nav { flex-wrap: wrap; }

@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 下载票据状态机执行服务。
  */
+// 下载凭证状态机：ACTIVE → USED（单次下载）或保持 ACTIVE（多次下载），校验过期和权限
 @Service
 public class DownloadTicketExecutionService {
 

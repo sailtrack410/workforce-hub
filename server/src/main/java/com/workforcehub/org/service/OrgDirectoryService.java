@@ -28,6 +28,7 @@ import java.util.Map;
  * 组织目录查询服务
  * 第一批先收口读侧能力，为审批、IM、Agent 提供稳定底座。
  */
+// 组织目录查询：部门树、员工列表、上级链、岗位查询，供审批/IM/Agent 复用
 @Service
 public class OrgDirectoryService {
 

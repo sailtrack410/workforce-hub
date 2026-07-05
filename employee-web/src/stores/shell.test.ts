@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import {
+  normalizeWorkbenchApp,
   normalizeSettingsPanel,
   useShellStore,
   type ConversationMessage,
@@ -215,6 +216,15 @@ describe('useShellStore', () => {
     expect(shell.todos).toEqual([]);
     expect(shell.activeConversation.id).toBe('');
     expect(shell.activeTodo.id).toBe('');
+  });
+
+  it('keeps oa workbench route instead of falling back to leave', () => {
+    expect(normalizeWorkbenchApp('oa')).toBe('oa');
+  });
+
+  it('maps legacy leave and requests workbench routes into oa', () => {
+    expect(normalizeWorkbenchApp('leave')).toBe('oa');
+    expect(normalizeWorkbenchApp('requests')).toBe('oa');
   });
 
   it('filters message conversations by title and member keyword', () => {
@@ -540,11 +550,12 @@ describe('useShellStore', () => {
     expect(restored.messageDensity).toBe('compact');
   });
 
-  it('exposes personal center panels for profile, security, preferences and storage', () => {
+  it('exposes account settings panels without a separate profile homepage', () => {
     const shell = useShellStore();
 
-    expect(shell.profile.map((item) => item.id)).toEqual(['profile', 'organization', 'security', 'preferences', 'storage']);
-    expect(normalizeSettingsPanel('center')).toBe('profile');
+    expect(shell.profile.map((item) => item.id)).toEqual(['organization', 'security', 'preferences', 'storage']);
+    expect(normalizeSettingsPanel('center')).toBe('security');
+    expect(normalizeSettingsPanel('profile')).toBe('security');
     expect(normalizeSettingsPanel('storage')).toBe('storage');
   });
 

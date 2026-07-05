@@ -72,6 +72,7 @@ public class AgentTaskExecutionService {
         this.workflowExecutor = workflowExecutor;
     }
 
+    // IM 会话触发 AI 任务：先入库任务记录，事务提交后再异步执行
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public AgentTaskResponse createConversationReplyTask(ImAgentTriggerCommand command) {
         Long conversationId = command.conversationId();
@@ -104,6 +105,7 @@ public class AgentTaskExecutionService {
         return toTaskResponse(agentRepository.getTaskOrThrow(taskId));
     }
 
+    // 事务提交后再异步执行，避免任务执行期间持有数据库连接
     private void scheduleConversationExecution(Long taskId, ImAgentTriggerCommand command) {
         Runnable execution = () -> agentExecutor.execute(() -> executeConversationReplyTask(taskId, command));
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -118,6 +120,7 @@ public class AgentTaskExecutionService {
         execution.run();
     }
 
+    // AI 任务执行：先尝试工作流模式，降级到单轮对话模式
     private void executeConversationReplyTask(Long taskId, ImAgentTriggerCommand command) {
         ConversationExecutionContext context = startConversationExecution(taskId, command);
         if (context == null) {
@@ -152,6 +155,7 @@ public class AgentTaskExecutionService {
         }
     }
 
+    // 开启新事务标记任务为运行中，只有 PENDING 状态的任务才能被拾取
     private ConversationExecutionContext startConversationExecution(Long taskId, ImAgentTriggerCommand command) {
         return transactionTemplate.execute(status -> {
             AgentTaskRow task = agentRepository.getTaskOrThrow(taskId);
@@ -161,6 +165,7 @@ public class AgentTaskExecutionService {
             AgentRow agent = agentRepository.getAgentOrThrow(task.agentId());
             AgentVersionRow version = agentRepository.getVersionOrThrow(task.agentVersionId());
             agentRepository.markTaskRunning(taskId, command.triggerUserId());
+            // 工作流模式需要把配置快照写入任务，防止执行期间版本被修改
             if (workflowParser.isWorkflowConfig(version.workflowConfigJson())) {
                 agentRepository.updateTaskWorkflowSnapshot(taskId, version.workflowConfigJson(), command.triggerUserId());
             }

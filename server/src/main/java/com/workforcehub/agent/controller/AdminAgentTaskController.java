@@ -27,6 +27,7 @@ import java.util.List;
 /**
  * 后台 Agent 任务治理接口。
  */
+// Agent 任务后台接口：任务列表、详情、工具调用记录、指标统计、超时扫描
 @RestController
 @RequestMapping("/api/admin/agent-tasks")
 public class AdminAgentTaskController {

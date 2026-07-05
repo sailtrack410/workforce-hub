@@ -60,13 +60,13 @@ const icon = computed(() => {
 }
 
 .admin-icon-avatar.agent {
-  background: #e8f8f0;
+  background: var(--success-bg);
   color: var(--success);
 }
 
 .admin-icon-avatar.org {
   border-radius: var(--radius-lg);
-  background: #e8f3ff;
+  background: var(--avatar-bg);
   color: var(--green);
 }
 </style>

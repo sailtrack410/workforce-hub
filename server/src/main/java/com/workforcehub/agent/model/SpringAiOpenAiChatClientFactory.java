@@ -14,6 +14,7 @@ import java.time.Duration;
 /**
  * Spring AI OpenAI 兼容 ChatClient 工厂。
  */
+// ChatClient 工厂：根据模型配置创建 OpenAiChatClient，支持自定义超时和 HTTP 客户端
 @Component
 public class SpringAiOpenAiChatClientFactory {
 

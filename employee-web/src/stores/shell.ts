@@ -7,16 +7,33 @@ import type {
   EmployeeFileResponse,
   EntityId,
   FontScale,
+  OrgDepartmentTreeNodeResponse,
   OrgUserDetailResponse,
   OrgUserSummaryResponse,
   PresenceStatus,
   QuotaResponse,
 } from '../api';
+
+export type {
+  AccentColor,
+  BubbleStyle,
+  CurrentUserResponse,
+  EmployeeFileResponse,
+  EntityId,
+  FontScale,
+  OrgDepartmentTreeNodeResponse,
+  OrgUserDetailResponse,
+  OrgUserSummaryResponse,
+  PresenceStatus,
+  QuotaResponse,
+} from '../api';
+import type { ContactCategoryItem } from '../components/contact-category';
 import type { KnowledgeAnswerCard } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { createClientId } from '@/utils/request-id';
 
-export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'reports' | 'settings';
+export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'agents' | 'reports' | 'settings';
+export type ContactsViewMode = 'list' | 'tree';
 export type ConversationTone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
 export type SectionFilter = '全部' | '未处理' | 'AI' | '群聊' | '私聊';
 export type ThemeMode = 'light' | 'dark';
@@ -238,6 +255,7 @@ export interface ContactRecord {
   remarkName?: string;
   role: string;
   department: string;
+  primaryDeptId?: EntityId | null;
   relation: string;
   source: string;
   userId?: string | number;
@@ -293,11 +311,11 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     kicker: '',
     title: '工作台',
     subtitle: '',
-    search: '搜索请假、考勤、假期、文件',
+    search: '搜索申请、请假、考勤、假期',
     primaryAction: {
-      label: '请假申请',
+      label: 'OA 申请',
       action: 'switch-item',
-      item: 'leave',
+      item: 'oa',
     },
     secondaryAction: {
       label: '我的考勤',
@@ -316,6 +334,12 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     title: '通讯录',
     subtitle: '',
     search: '搜索姓名、部门、岗位',
+  },
+  agents: {
+    kicker: '',
+    title: 'AI 助手',
+    subtitle: '',
+    search: '搜索 AI 助手名称、代码',
   },
   reports: {
     kicker: '',
@@ -337,6 +361,7 @@ export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = 
   { id: 'files', label: '文档', glyph: '档' },
   { id: 'workbench', label: '工作台', glyph: '台' },
   { id: 'contacts', label: '通讯录', glyph: '录' },
+  { id: 'agents', label: 'AI 助手', glyph: '助' },
   { id: 'settings', label: '个人中心', glyph: '心' },
 ];
 
@@ -485,6 +510,18 @@ function writeStoredContactRemarks(ownerId: string | number | null | undefined, 
   }
 }
 
+function buildContactCategoryItems(deptTree: OrgDepartmentTreeNodeResponse[]): ContactCategoryItem[] {
+  return deptTree.map((node) => ({
+    id: `dept-${node.id}`,
+    type: 'dept' as const,
+    label: node.deptName,
+    icon: 'folder',
+    deptId: node.id,
+    deptName: node.deptName,
+    children: node.children?.length ? buildContactCategoryItems(node.children) : undefined,
+  }));
+}
+
 const emptyConversation: ConversationRecord = {
   id: '',
   kind: 'team',
@@ -548,25 +585,13 @@ const fileSpaces = createFileSpaces();
 
 const workbenchItems: WorkbenchRecord[] = [
   {
-    id: 'leave',
-    title: '请假申请',
-    label: 'leave',
-    subtitle: '请假审批',
+    id: 'oa',
+    title: 'OA 申请',
+    label: 'oa',
+    subtitle: '请假申请 / 我的申请',
     note: '',
     tone: 'blue',
     status: '可用',
-    fields: [],
-    stats: [],
-    steps: [],
-  },
-  {
-    id: 'requests',
-    title: '我的申请',
-    label: 'requests',
-    subtitle: '申请记录',
-    note: '',
-    tone: 'gray',
-    status: '',
     fields: [],
     stats: [],
     steps: [],
@@ -613,15 +638,6 @@ const contactItems: ContactRecord[] = [];
 
 const profileItems: ProfileRecord[] = [
   {
-    id: 'profile',
-    title: '个人主页',
-    subtitle: '资料与组织',
-    note: '',
-    tone: 'blue',
-    stats: [],
-    fields: [],
-  },
-  {
     id: 'organization',
     title: '组织关系',
     subtitle: '同部门 / 上下级',
@@ -660,23 +676,26 @@ const profileItems: ProfileRecord[] = [
 ];
 
 const SETTINGS_ALIAS: Record<string, string> = {
-  center: 'profile',
+  center: 'security',
+  profile: 'security',
 };
 
 export function normalizeSettingsPanel(id?: string | null): string {
-  if (!id) return 'profile';
+  if (!id) return 'security';
   if (SETTINGS_ALIAS[id]) return SETTINGS_ALIAS[id];
-  return profileItems.some((item) => item.id === id) ? id : 'profile';
+  return profileItems.some((item) => item.id === id) ? id : 'security';
 }
 
 const WORKBENCH_ALIAS: Record<string, string> = {
-  files: 'leave',
+  files: 'oa',
+  leave: 'oa',
+  requests: 'oa',
 };
 
 export function normalizeWorkbenchApp(id?: string | null): string {
-  if (!id) return workbenchItems[0]?.id ?? 'leave';
+  if (!id) return workbenchItems[0]?.id ?? 'oa';
   if (WORKBENCH_ALIAS[id]) return WORKBENCH_ALIAS[id];
-  return workbenchItems.some((item) => item.id === id) ? id : (workbenchItems[0]?.id ?? 'leave');
+  return workbenchItems.some((item) => item.id === id) ? id : (workbenchItems[0]?.id ?? 'oa');
 }
 
 function findById<T extends { id: string }>(items: T[], id: string, fallback: T) {
@@ -775,6 +794,7 @@ export const useShellStore = defineStore('employee-shell', {
       workbench: '',
       processes: '',
       contacts: '',
+      agents: '',
       reports: '',
       settings: '',
     },
@@ -785,6 +805,7 @@ export const useShellStore = defineStore('employee-shell', {
       workbench: '全部' as SectionFilter,
       processes: '全部' as SectionFilter,
       contacts: '全部' as SectionFilter,
+      agents: '全部' as SectionFilter,
       reports: '全部' as SectionFilter,
       settings: '全部' as SectionFilter,
     },
@@ -792,11 +813,12 @@ export const useShellStore = defineStore('employee-shell', {
       messages: '',
       todos: '',
       files: 'personal',
-      workbench: 'leave',
+      workbench: 'oa',
       processes: 'requests',
       contacts: '',
+      agents: '',
       reports: 'overview',
-      settings: 'profile',
+      settings: 'security',
     },
     todos: [] as TodoRecord[],
     files: createFileSpaces(),
@@ -804,6 +826,11 @@ export const useShellStore = defineStore('employee-shell', {
     workbench: workbenchItems,
     contacts: contactItems,
     contactRemarks: readStoredContactRemarks('') as Record<string, string>,
+    friends: [] as OrgUserSummaryResponse[],
+    deptTree: [] as OrgDepartmentTreeNodeResponse[],
+    contactsViewMode: 'list' as ContactsViewMode,
+    contactsCategoryId: 'friends' as string,
+    contactsExpandedCategoryIds: new Set(['enterprise']) as Set<string>,
     profile: profileItems,
     colleagues: [] as OrgUserSummaryResponse[],
     avatarUrl: '' as string,
@@ -905,6 +932,39 @@ export const useShellStore = defineStore('employee-shell', {
         item.relation,
         item.source,
       ], state.search.contacts));
+    },
+    friendUserIds(state): Set<string> {
+      return new Set(state.friends.map((item) => String(item.userId)));
+    },
+    contactsCategoryItems(state): ContactCategoryItem[] {
+      const deptCategories = buildContactCategoryItems(state.deptTree).map((item) => ({ ...item, type: 'dept' as const }));
+      return [
+        { id: 'friends', type: 'category', label: '我的好友', icon: 'users' },
+        { id: 'new-friends', type: 'category', label: '新的好友', icon: 'userPlus' },
+        { id: 'invitations', type: 'category', label: '企业/团队邀请', icon: 'mail' },
+        { id: 'create-join-org', type: 'category', label: '创建或加入企业/团队', icon: 'building' },
+        {
+          id: 'enterprise',
+          type: 'category',
+          label: '企业内',
+          icon: 'building',
+          children: [
+            { id: 'org-structure', type: 'category', label: '组织架构', icon: 'sitemap' },
+            ...deptCategories,
+          ],
+        },
+        { id: 'ai', type: 'ai', label: 'AI 助理', icon: 'sparkles' },
+        {
+          id: 'enterprise-service',
+          type: 'category',
+          label: '企业服务',
+          icon: 'briefcase',
+          children: [
+            { id: 'service-window', type: 'service', label: '服务窗', icon: 'monitor' },
+            { id: 'customer-management', type: 'service', label: '客户管理', icon: 'briefcase' },
+          ],
+        },
+      ];
     },
   },
   actions: {
@@ -1047,6 +1107,27 @@ export const useShellStore = defineStore('employee-shell', {
     setColleagues(rows: OrgUserSummaryResponse[]) {
       this.colleagues = rows ?? [];
     },
+    setFriends(rows: OrgUserSummaryResponse[]) {
+      this.friends = rows ?? [];
+    },
+    setDeptTree(tree: OrgDepartmentTreeNodeResponse[]) {
+      this.deptTree = tree ?? [];
+    },
+    setContactsViewMode(mode: ContactsViewMode) {
+      this.contactsViewMode = mode;
+    },
+    setContactsCategoryId(id: string) {
+      this.contactsCategoryId = id;
+    },
+    setContactsExpandedCategoryIds(ids: Set<string> | string[]) {
+      this.contactsExpandedCategoryIds = new Set(ids);
+    },
+    toggleContactsExpandedCategoryId(id: string) {
+      const next = new Set(this.contactsExpandedCategoryIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      this.contactsExpandedCategoryIds = next;
+    },
     setAvatarUrl(url: string | null | undefined) {
       this.avatarUrl = url ?? '';
       const ownerId = this.personalFileOwnerId;
@@ -1068,7 +1149,7 @@ export const useShellStore = defineStore('employee-shell', {
       }
       this.profile = profileItems;
       if (!this.profile.some((item) => item.id === this.active.settings)) {
-        this.active.settings = this.profile[0]?.id ?? 'profile';
+        this.active.settings = this.profile[0]?.id ?? 'security';
       }
       this.contacts = collectContacts({
         user,
@@ -1076,6 +1157,7 @@ export const useShellStore = defineStore('employee-shell', {
         manager,
         colleagues: this.colleagues,
         subordinates,
+        friends: this.friends,
         signature: this.signature,
         presenceStatus: this.presenceStatus,
       }).map((contact) => applyContactRemark(contact, this.contactRemarks));
@@ -1157,6 +1239,7 @@ export const useShellStore = defineStore('employee-shell', {
       ));
       writeStoredPersonalFiles(personal.files, this.personalFileOwnerId);
     },
+    // 后端待办同步到本地，如果当前选中的待办被删了就自动切到第一条
     mergeBackendTodos(backendTodos: TodoRecord[]) {
       const backendIds = new Set(backendTodos.map((item) => item.id));
       this.todos = backendTodos;
@@ -1164,6 +1247,7 @@ export const useShellStore = defineStore('employee-shell', {
         this.active.todos = this.todos[0]?.id ?? '';
       }
     },
+    // 会话列表同步，顺便把本地备注名刷上去
     mergeBackendConversations(backendConversations: ConversationRecord[]) {
       const backendIds = new Set(backendConversations.map((item) => item.id));
       useImStore().conversations = backendConversations.map((conversation) => (
@@ -1173,6 +1257,7 @@ export const useShellStore = defineStore('employee-shell', {
         this.active.messages = this.conversations[0]?.id ?? '';
       }
     },
+    // 单个会话的消息同步，同时刷新附件列表和最后一条消息摘要
     mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
       const conversation = this.conversations.find((item) => item.id === conversationId);
       if (!conversation || !backendMessages.length) return;
@@ -1225,6 +1310,7 @@ function contactFromOrgUser(user: OrgUserSummaryResponse, relation: string, sour
     originalName: user.realName,
     role: displayValue(user.positionName),
     department: displayValue(user.primaryDeptName),
+    primaryDeptId: user.primaryDeptId,
     relation,
     source,
     userId: user.userId,
@@ -1242,12 +1328,13 @@ interface CollectContactsInput {
   manager: OrgUserSummaryResponse | null;
   colleagues: OrgUserSummaryResponse[];
   subordinates: OrgUserSummaryResponse[];
+  friends?: OrgUserSummaryResponse[];
   signature: string;
   presenceStatus: PresenceStatus;
 }
 
 function collectContacts(input: CollectContactsInput): ContactRecord[] {
-  const { user, profile, manager, colleagues, subordinates, signature, presenceStatus } = input;
+  const { user, profile, manager, colleagues, subordinates, friends, signature, presenceStatus } = input;
   const contacts = new Map<string, ContactRecord>();
   const add = (contact: ContactRecord) => {
     if (contact.name && contact.name !== '暂无') {
@@ -1263,6 +1350,7 @@ function collectContacts(input: CollectContactsInput): ContactRecord[] {
         originalName: profile?.realName || user?.displayName || currentUser.name,
         role: displayValue(profile?.positionName),
         department: displayValue(profile?.primaryDeptName),
+        primaryDeptId: profile?.primaryDeptId ?? user?.primaryDeptId,
         relation: '本人',
         source: '个人资料',
         userId,
@@ -1280,6 +1368,7 @@ function collectContacts(input: CollectContactsInput): ContactRecord[] {
   if (manager) add(contactFromOrgUser(manager, '直属上级', '组织关系'));
   colleagues.forEach((item) => add(contactFromOrgUser(item, '同部门', '组织通讯录')));
   subordinates.forEach((item) => add(contactFromOrgUser(item, '直属下级', '组织关系')));
+  friends?.forEach((item) => add(contactFromOrgUser(item, '好友', '我的好友')));
   return [...contacts.values()];
 }
 

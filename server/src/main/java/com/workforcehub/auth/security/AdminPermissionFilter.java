@@ -20,6 +20,7 @@ import java.util.List;
 /**
  * 后台接口权限校验。
  */
+// 权限过滤器：拦截 /api/admin/** 请求，校验用户是否拥有对应路径所需的权限码
 @Component
 public class AdminPermissionFilter extends OncePerRequestFilter {
 

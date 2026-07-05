@@ -17,6 +17,7 @@ import java.util.List;
 /**
  * 员工端组织与个人档案接口
  */
+// 员工组织接口：部门树查询、个人档案查看/更新
 @RestController
 @RequestMapping("/api/employee/me")
 public class EmployeeOrgController {

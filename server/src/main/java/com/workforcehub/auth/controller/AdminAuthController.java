@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 后台管理员认证接口
  */
+// 管理员认证：登录、当前用户信息
 @RestController
 @RequestMapping("/api/admin/auth")
 public class AdminAuthController {

@@ -45,10 +45,7 @@ public class R<T> implements Serializable {
         return fail(1, message);
     }
 
-    /**
-     * 从请求上下文获取 requestId
-     * 非 Web 请求（如单元测试、异步任务）时返回 null
-     */
+    // 非 Web 环境（单测、异步线程）拿不到 request，返回 null 不报错
     private static String resolveRequestId() {
         RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
         if (attrs instanceof ServletRequestAttributes servletAttrs) {

@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * 统一文件下载响应头，避免员工端和后台端下载行为分叉。
  */
+// 下载响应工厂：统一 Content-Disposition、Content-Type 处理，支持内联和附件两种模式
 @Component
 public class FileDownloadResponseFactory {
 

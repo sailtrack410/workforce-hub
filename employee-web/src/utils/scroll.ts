@@ -8,6 +8,7 @@ function waitForAnimationFrame() {
   return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 }
 
+// 消息列表滚动到底部：多次尝试，等 DOM 渲染完成后再判断是否到达底部
 export async function scrollElementToBottomAfterLayout(
   getElement: () => HTMLElement | null | undefined,
   options: ScrollToBottomOptions = {},

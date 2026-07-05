@@ -10,6 +10,7 @@ import {
 export { ApiClientError };
 export type { ApiClient, ApiClientOptions, ApiRequestOptions };
 
+// 后端用雪花算法生成 ID，超出 JS Number 安全整数范围，需要字符串保留精度
 const unsafeIntegerFieldNames = new Set([
   'accountId',
   'aclId',

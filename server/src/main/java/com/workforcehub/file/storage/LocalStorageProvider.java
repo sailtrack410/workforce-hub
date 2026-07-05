@@ -44,6 +44,7 @@ public class LocalStorageProvider implements StorageProvider {
         );
     }
 
+    // 上传完成后校验：文件大小 + SHA-256 哈希，防止传输损坏或篡改
     @Override
     public void verifyObject(String bucketName, String objectKey, String expectedSha256, Long expectedSize) {
         Path path = objectPath(objectKey);

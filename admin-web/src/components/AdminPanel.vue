@@ -25,6 +25,9 @@ withDefaults(
 <style scoped>
 .panel-subtitle {
   color: var(--muted);
-  font-size: 13px;
+  display: inline-block;
+  margin-top: var(--space-xs);
+  font-size: var(--text-sm);
+  line-height: 1.45;
 }
 </style>

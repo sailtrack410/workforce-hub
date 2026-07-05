@@ -22,15 +22,16 @@ defineProps<{
 .metric-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
-  gap: var(--space-md);
+  gap: var(--space-base);
   width: 100%;
 }
 
 .metric-card {
   display: grid;
-  gap: var(--space-xs);
-  min-height: 76px;
-  padding: 13px;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 84px;
+  padding: var(--space-base);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel-strong);
@@ -39,9 +40,13 @@ defineProps<{
 .metric-card span {
   color: var(--muted);
   font-size: var(--text-xs);
+  font-weight: 700;
 }
 
-.metric-card strong { font-size: var(--text-lg); }
+.metric-card strong {
+  font-size: var(--text-lg);
+  line-height: 1.2;
+}
 
 @media (max-width: 820px) {
   .metric-strip {

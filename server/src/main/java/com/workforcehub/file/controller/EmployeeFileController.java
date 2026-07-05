@@ -43,6 +43,7 @@ import java.util.List;
 /**
  * 员工端文件中心接口。
  */
+// 员工文件接口：上传凭证/确认、下载凭证、文件列表/回收站、文件夹、配额查询
 @RestController
 @RequestMapping("/api/employee/files")
 public class EmployeeFileController {

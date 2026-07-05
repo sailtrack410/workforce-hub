@@ -17,6 +17,7 @@ import java.util.List;
 /**
  * 后台系统治理接口。
  */
+// 系统后台接口：审计日志查询、角色/权限列表
 @RestController
 @RequestMapping("/api/admin/system")
 public class AdminSystemController {

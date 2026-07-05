@@ -13,6 +13,7 @@ import java.util.List;
 /**
  * 后台系统治理查询服务。
  */
+// 系统治理查询：审计日志分页、角色列表、权限列表
 @Service
 public class AdminSystemService {
 

@@ -13,6 +13,7 @@ interface UseMessagesWorkflowEntryOptions {
   runAction: (action?: SectionAction) => void;
 }
 
+// 消息面板快捷入口：待办/请假/申请/考勤，点击后切换到对应 section
 const workflowEntryActions: WorkflowEntryAction[] = [
   {
     key: 'todos',

@@ -18,6 +18,7 @@ import java.io.IOException;
 
 /**
  * 用户类型路径校验
+ * 路径隔离过滤器：/api/admin/** 仅允许管理员访问，/api/employee/** 仅允许员工访问
  *
  * 保证 /api/employee/** 只允许 UserType=USER 访问
  *      /api/admin/**    只允许 UserType=ADMIN 访问

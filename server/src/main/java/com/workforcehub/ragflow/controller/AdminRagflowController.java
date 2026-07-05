@@ -2,6 +2,13 @@ package com.workforcehub.ragflow.controller;
 
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.response.R;
+import com.workforcehub.common.exception.BizException;
+import com.workforcehub.file.dto.AttachmentRefResponse;
+import com.workforcehub.file.dto.ConfirmUploadRequest;
+import com.workforcehub.file.dto.CreateUploadTicketRequest;
+import com.workforcehub.file.dto.UploadTicketResponse;
+import com.workforcehub.file.service.FileUploadConfirmService;
+import com.workforcehub.file.service.FileUploadTicketService;
 import com.workforcehub.ragflow.dto.AddRagflowDocumentRequest;
 import com.workforcehub.ragflow.dto.CreateRagflowSpaceRequest;
 import com.workforcehub.ragflow.dto.RagflowAclResponse;
@@ -32,9 +39,15 @@ import java.util.List;
 public class AdminRagflowController {
 
     private final RagflowAdminService ragflowAdminService;
+    private final FileUploadTicketService fileUploadTicketService;
+    private final FileUploadConfirmService fileUploadConfirmService;
 
-    public AdminRagflowController(RagflowAdminService ragflowAdminService) {
+    public AdminRagflowController(RagflowAdminService ragflowAdminService,
+                                  FileUploadTicketService fileUploadTicketService,
+                                  FileUploadConfirmService fileUploadConfirmService) {
         this.ragflowAdminService = ragflowAdminService;
+        this.fileUploadTicketService = fileUploadTicketService;
+        this.fileUploadConfirmService = fileUploadConfirmService;
     }
 
     @GetMapping("/settings")
@@ -57,6 +70,18 @@ public class AdminRagflowController {
     @PostMapping("/spaces")
     public R<RagflowSpaceResponse> createSpace(@Valid @RequestBody CreateRagflowSpaceRequest request) {
         return R.ok(ragflowAdminService.createSpace(request));
+    }
+
+    @PostMapping("/files/upload-tickets")
+    public R<UploadTicketResponse> createDocumentUploadTicket(@Valid @RequestBody CreateUploadTicketRequest request) {
+        ensureRagflowDocumentOwner(request.getOwnerType());
+        return R.ok(fileUploadTicketService.createAdminUploadTicket(request));
+    }
+
+    @PostMapping("/files/confirm-upload")
+    public R<AttachmentRefResponse> confirmDocumentUpload(@Valid @RequestBody ConfirmUploadRequest request) {
+        ensureRagflowDocumentOwner(request.getOwnerType());
+        return R.ok(fileUploadConfirmService.confirmAdminUpload(request));
     }
 
     @GetMapping("/spaces/{spaceId}")
@@ -109,5 +134,11 @@ public class AdminRagflowController {
     public R<RagflowSearchTestResponse> searchTest(@PathVariable Long spaceId,
                                                    @Valid @RequestBody RagflowSearchTestRequest request) {
         return R.ok(ragflowAdminService.searchTest(spaceId, request));
+    }
+
+    private void ensureRagflowDocumentOwner(String ownerType) {
+        if (!"RAGFLOW_DOCUMENT".equals(ownerType)) {
+            throw new BizException(400, "知识库上传仅支持知识库文件");
+        }
     }
 }

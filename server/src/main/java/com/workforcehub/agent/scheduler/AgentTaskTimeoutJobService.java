@@ -29,6 +29,7 @@ import static com.workforcehub.common.util.TextValues.safeSummary;
 /**
  * Agent 等待人工确认任务的超时收口服务。
  */
+// 超时扫描：定时检查 PENDING_CONFIRM 状态的 Agent 任务，超时自动标记为 TIMEOUT
 @Service
 public class AgentTaskTimeoutJobService {
 

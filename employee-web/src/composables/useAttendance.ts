@@ -19,6 +19,7 @@ interface UseAttendanceOptions {
   showToast: (message: string) => void;
 }
 
+// 获取本月日期范围，用于考勤查询
 export function thisMonthRange() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -62,6 +63,7 @@ export function useAttendance({
   ]);
   const teamAttendanceRows = computed(() => teamAttendanceDailyResults.value.slice(0, 12));
 
+  // 并行加载本月考勤日结果、异常、团队考勤
   async function refreshAttendancePanel() {
     if (attendanceLoading.value) return;
     attendanceLoading.value = true;
@@ -74,6 +76,7 @@ export function useAttendance({
       ]);
       attendanceDailyResults.value = dailyResults;
       attendanceExceptions.value = exceptions;
+      // 团队考勤：逐个下属查询，任一失败不影响其他
       const subordinateResults = await Promise.all(
         session.subordinates.map((user) => employeeApi.attendance.teamDailyResults({ ...range, userId: user.userId }).catch(() => [])),
       );
@@ -104,6 +107,7 @@ export function useAttendance({
     }
   }
 
+  // 提交补卡申请后刷新待办和申请列表
   async function submitClockCorrectionRequest() {
     clockCorrectionError.value = '';
     clockCorrectionResult.value = null;

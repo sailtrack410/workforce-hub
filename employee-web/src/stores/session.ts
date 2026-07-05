@@ -77,10 +77,12 @@ export const useSessionStore = defineStore('employee-session', {
       this.error = '';
       try {
         const loginResult = await authApi.login(request);
+        // 后端返回二验/绑定标记时不签发会话，等前端完成二验后再登录
         if (loginResult.requiresEmailCode || loginResult.requiresEmailBinding) {
           this.user = null;
           return loginResult;
         }
+        // login 接口可能不返回完整用户信息，用 me() 补全；失败则降级用 login 返回值
         this.user = await authApi.me().catch(() => loginResult as CurrentUserResponse);
         return loginResult;
       } catch (error) {
@@ -101,6 +103,7 @@ export const useSessionStore = defineStore('employee-session', {
         throw error;
       }
     },
+    // 并行加载组织档案：个人信息、上级、下属、同事，任一失败不影响其他
     async loadOrgProfile(orgApi: EmployeeOrgApi = employeeApi.me) {
       if (!this.user) return;
       this.profileLoading = true;

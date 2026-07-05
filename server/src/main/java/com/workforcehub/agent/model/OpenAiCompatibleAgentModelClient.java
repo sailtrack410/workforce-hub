@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 /**
  * Spring AI OpenAI 兼容 Chat Completions 模型客户端。
  */
+// LLM 客户端：封装 OpenAI 兼容 API 调用，支持流式/同步、tool-call 解析、错误分类
 @Service
 @EnableConfigurationProperties(AgentModelProperties.class)
 public class OpenAiCompatibleAgentModelClient {

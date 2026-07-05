@@ -135,6 +135,26 @@ export interface OrgUserSummaryResponse {
   managerName?: string | null;
   employmentStatus?: string | null;
   status?: string | null;
+  signature?: string | null;
+  presenceStatus?: string | null;
+}
+
+export interface FriendRequest {
+  remark?: string;
+}
+
+export interface OrgDepartmentTreeNodeResponse {
+  id: EntityId;
+  parentId?: EntityId | null;
+  treePath?: string | null;
+  deptCode?: string | null;
+  deptName: string;
+  deptType?: string | null;
+  deptLevel?: number | null;
+  leaderUserId?: EntityId | null;
+  leaderName?: string | null;
+  status?: string | null;
+  children: OrgDepartmentTreeNodeResponse[];
 }
 
 export interface WorkflowRequestListQuery extends QueryParams {
@@ -487,6 +507,16 @@ export interface LeaveAccountResponse {
   status: string;
   lastTxnType?: string | null;
   lastChangeMinutes?: number | null;
+}
+
+export interface LeaveTypeResponse {
+  leaveTypeId: EntityId;
+  leaveCode: string;
+  leaveName: string;
+  balanceMode: string;
+  status: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface CreateUploadTicketRequest {

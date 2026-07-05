@@ -23,6 +23,7 @@ export interface EmployeeAttachmentUploadOptions {
 }
 
 export function usePersonalFileTransfer() {
+  // 上传流程：先申请上传票（秒传校验），再上传到对象存储，最后确认上传
   async function uploadAttachment(file: File, options: EmployeeAttachmentUploadOptions): Promise<PersonalAttachmentUploadResult> {
     const ownerId = options.ownerId ?? null;
     const folderId = options.ownerType === 'PERSONAL_FILE' ? (options.folderId ?? null) : null;
@@ -39,6 +40,7 @@ export function usePersonalFileTransfer() {
       clientRequestId: createClientId(`${clientRequestPrefix}-${file.name}`),
     });
 
+    // 秒传：文件已存在，直接返回附件引用
     if (ticket.deduplicated && ticket.attachmentRefId) {
       return {
         attachmentRefId: ticket.attachmentRefId,

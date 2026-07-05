@@ -11,7 +11,8 @@ describe('message dialog and bubble markup', () => {
     const messagesSource = readFileSync(resolve(currentDir, '../../views/sections/MessagesSection.vue'), 'utf8');
 
     expect(dialogSource).toContain('flush?: boolean');
-    expect(dialogSource).toContain(':class="{ flush: props.flush }"');
+    expect(dialogSource).toContain('wide?: boolean');
+    expect(dialogSource).toContain(':class="{ flush: props.flush, wide: props.wide }"');
     expect(messagesSource).toContain('<AppDialog v-if="messageForwardOpen" flush>');
   });
 

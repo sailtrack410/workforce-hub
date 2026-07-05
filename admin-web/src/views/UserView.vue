@@ -72,6 +72,7 @@ const detailRows = computed<DetailRow[]>(() => {
   ];
 });
 
+// 递归展平部门树，保留层级深度用于下拉框缩进显示
 function flattenDepts(nodes: OrgDepartmentTreeNodeResponse[], depth = 0): { node: OrgDepartmentTreeNodeResponse; depth: number }[] {
   return nodes.flatMap(n => [{ node: n, depth }, ...flattenDepts(n.children ?? [], depth + 1)]);
 }
@@ -537,23 +538,23 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .create-section {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-md);
 }
 
 .create-summary {
   cursor: pointer;
   color: var(--green);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 13px;
 }
 
 .create-form {
-  margin-top: 10px;
+  margin-top: var(--space-sm);
 }
 
 .department-form {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
   border-bottom: 1px solid var(--line);
 }
 
@@ -567,14 +568,10 @@ onBeforeUnmount(() => {
   height: min(68vh, 720px);
   overflow: auto;
   position: relative;
-  padding: 18px 18px 24px;
-  border: 1px solid rgba(0, 80, 180, 0.08);
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(rgba(208, 221, 239, 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(208, 221, 239, 0.28) 1px, transparent 1px),
-    rgba(248, 250, 255, 0.62);
-  background-size: 28px 28px;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   cursor: grab;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -613,7 +610,7 @@ onBeforeUnmount(() => {
 
 .org-link-path {
   fill: none;
-  stroke: rgba(0, 137, 255, 0.42);
+  stroke: rgba(22, 119, 255, 0.42);
   stroke-width: 2;
   stroke-linecap: round;
 }
@@ -622,9 +619,9 @@ onBeforeUnmount(() => {
   min-width: 420px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
+  gap: var(--space-sm);
+  margin-top: var(--space-base);
+  padding-top: var(--space-base);
   border-top: 1px solid var(--line);
 }
 
@@ -643,7 +640,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--ink);
-  padding: 7px 10px;
+  padding: var(--space-sm) var(--space-md);
   text-align: left;
 }
 
@@ -668,7 +665,7 @@ onBeforeUnmount(() => {
   z-index: 9999;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--space-xl);
   background: rgba(0, 20, 60, 0.4);
 }
 
@@ -677,10 +674,10 @@ onBeforeUnmount(() => {
   max-height: min(720px, 86vh);
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   background: var(--panel-strong);
   box-shadow: var(--shadow);
-  padding: 20px;
+  padding: var(--space-xl);
 }
 
 .user-detail-header {
@@ -688,7 +685,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-base);
 }
 
 .user-detail-header h3 {

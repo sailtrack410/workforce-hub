@@ -106,6 +106,7 @@ describe('createEmployeeApi', () => {
     await api.attendance.teamDailyResults({ userId: 42, startDate: '2026-05-01', endDate: '2026-05-09' });
     await api.attendance.punch({ punchType: 'ON_DUTY', sourceType: 'PC' });
     await api.leave.accounts();
+    await api.leave.types();
     await api.files.list({ pageNo: 1, pageSize: 20 });
     await api.files.recycleBin({ pageNo: 1, pageSize: 20 });
     await api.files.quota();
@@ -144,6 +145,7 @@ describe('createEmployeeApi', () => {
       ['get', '/api/employee/attendance/team/daily-results', { query: { userId: 42, startDate: '2026-05-01', endDate: '2026-05-09' } }],
       ['post', '/api/employee/attendance/punch', { punchType: 'ON_DUTY', sourceType: 'PC' }],
       ['get', '/api/employee/leave/accounts', undefined],
+      ['get', '/api/employee/leave/types', undefined],
       ['get', '/api/employee/files', { query: { pageNo: 1, pageSize: 20 } }],
       ['get', '/api/employee/files/recycle-bin', { query: { pageNo: 1, pageSize: 20 } }],
       ['get', '/api/employee/files/quota', undefined],

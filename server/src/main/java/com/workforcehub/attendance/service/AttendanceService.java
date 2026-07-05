@@ -288,6 +288,7 @@ public class AttendanceService {
             .toList();
     }
 
+    // 打卡后立即重算当天考勤结果，前端可以实时看到状态变化
     @Transactional(rollbackFor = Exception.class)
     public PunchRecordResponse punch(CreatePunchRecordRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
@@ -295,6 +296,7 @@ public class AttendanceService {
         String punchType = normalizePunchType(request.getPunchType());
         String sourceType = normalizeEmployeePunchSourceType(request.getSourceType());
         LocalDateTime punchAt = LocalDateTime.now(clock);
+        // 防止重复打卡（同一天同一类型只允许一次正常打卡）
         if (attendanceRepository.existsNormalPunchRecordOnDate(userId, punchAt.toLocalDate(), punchType)) {
             throw new BizException(409, "当天同类型打卡已存在");
         }
@@ -399,6 +401,7 @@ public class AttendanceService {
         recalculateDailyResult(userId, workDate);
     }
 
+    // 补卡审批通过后，插入虚拟打卡记录并重算当天考勤
     @Transactional(rollbackFor = Exception.class)
     public void applyApprovedClockCorrection(Long userId,
                                              LocalDate targetDate,
@@ -411,6 +414,7 @@ public class AttendanceService {
         if (!targetDate.equals(expectedPunchAt.toLocalDate())) {
             throw new BizException(400, "补卡时间必须落在补卡日期内");
         }
+        // 幂等：同一次审批不重复插入打卡记录
         if (!attendanceRepository.existsNormalPunchRecord(userId, expectedPunchAt, normalizedPunchType)) {
             attendanceRepository.insertPunchRecord(
                 IdGenerator.nextId(),
@@ -426,6 +430,7 @@ public class AttendanceService {
         recalculateDailyResult(userId, targetDate);
     }
 
+    // 考勤日结果重算核心逻辑：根据排班、打卡记录、请假记录综合判定
     private AttendanceDailyResultRow recalculateDailyResult(Long userId, LocalDate workDate) {
         AttendanceGroupRow group = attendanceRepository.getEffectiveGroupForUpdate(userId, workDate);
         if (group == null) {
@@ -434,10 +439,12 @@ public class AttendanceService {
 
         AttendanceScheduleRow schedule = attendanceRepository.getActiveSchedule(userId, workDate);
         Long scheduleId = schedule == null ? null : schedule.scheduleId();
+        // 没有特殊排班就用考勤组的默认班次
         Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
         AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
         LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
         LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
+        // 获取当天已审批通过的请假时段，用于抵扣迟到/早退/缺勤
         List<ApprovedLeavePeriod> approvedLeavePeriods =
             leaveService.listApprovedLeavePeriodsOnDate(userId, workDate);
         int requiredWorkMinutes = minutesBetween(shift.startTime(), shift.endTime());
@@ -447,6 +454,7 @@ public class AttendanceService {
             shift.startTime(),
             shift.endTime()
         );
+        // 请假覆盖了全部应出勤时间，直接标记为请假状态
         if (approvedLeaveCoveredMinutes >= requiredWorkMinutes) {
             AttendanceDailyResultRow row = upsertDailyResult(
                 userId,

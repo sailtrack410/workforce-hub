@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 /**
  * 文件回收站生命周期服务，负责移入回收站、恢复和彻底删除。
  */
+// 文件生命周期：移入回收站(软删除) → 恢复 → 彻底删除(物理删除+释放配额)
 @Service
 public class FileLifecycleService {
 

@@ -151,6 +151,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         );
         workflowRepository.insertLeaveDetail(leaveDetailId, requestId, request);
         bindAttachments(requestId, applicantUserId, request.getAttachmentRefIds());
+        // 提交时立即冻结余额，防止审批期间重复请假导致超领
         leaveService.freezeForWorkflowSubmission(
             applicantUserId,
             request.getLeaveTypeId(),
@@ -159,6 +160,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             applicantUserId
         );
 
+        // 有 AI 预审配置时先进入 AI 审核，审核通过后再流转到人工审批
         Long agentTaskId = triggerAgentPreReview(requestId, leaveDetailId, applicantUserId);
         if (agentTaskId != null) {
             workflowRepository.markPendingAgentPreReview(requestId, agentTaskId, applicantUserId);
@@ -319,6 +321,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         );
     }
 
+    // 启动 Flowable 人工审批流程，同时在业务表插入待办记录
     private String startHumanApproval(Long requestId,
                                       String title,
                                       String summary,
@@ -329,6 +332,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         variables.put("requestId", requestId);
         variables.put("applicantUserId", String.valueOf(applicant.getUserId()));
         variables.put("managerUserId", String.valueOf(applicant.getManagerUserId()));
+        // 优先用 definitionId（精确版本），降级用 definitionKey（兜底最新版本）
         ProcessInstance processInstance = StringUtils.hasText(templateVersion.flowableDefinitionId())
             ? runtimeService.startProcessInstanceById(
                 templateVersion.flowableDefinitionId(),
@@ -345,6 +349,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             throw new BizException(409, "审批申请已被其他事务处理");
         }
 
+        // Flowable 的任务 assignee 用 userId 字符串，这里查询确认任务已生成
         Task managerTask = taskService.createTaskQuery()
             .processInstanceId(processInstance.getProcessInstanceId())
             .taskAssignee(String.valueOf(applicant.getManagerUserId()))
@@ -410,6 +415,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         if (!STATUS_IN_APPROVAL.equals(workflowRequest.status())) {
             throw new BizException(400, "当前申请状态不允许撤回");
         }
+        // 撤回时释放之前冻结的假期余额
         releaseFrozenLeaveIfNeeded(workflowRequest, "WITHDRAWN", applicantUserId);
 
         workflowRepository.insertTaskAction(
@@ -526,6 +532,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         return new DownloadFileResult(resource.resource(), attachment.displayName(), attachment.mimeType(), resource.size());
     }
 
+    // 审批通过或驳回的统一处理：扣减/释放余额、推进 Flowable 流程、更新业务状态
     private WorkflowRequestStatusResponse completeManagerTask(String taskId,
                                                               String comment,
                                                               String actionType,
@@ -546,6 +553,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         WorkflowLeaveDetailRow approvedLeaveDetail = null;
         WorkflowClockCorrectionDetailRow approvedClockCorrectionDetail = null;
         if ("APPROVE".equals(actionType)) {
+            // 通过时：请假扣减冻结余额，补卡后续写入考勤记录
             if (LEAVE_BIZ_TYPE.equals(workflowRequest.bizType())) {
                 WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(workflowRequest.id());
                 if (leaveDetail == null) {
@@ -568,6 +576,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                 approvedClockCorrectionDetail = clockCorrectionDetail;
             }
         } else if ("REJECT".equals(actionType) && LEAVE_BIZ_TYPE.equals(workflowRequest.bizType())) {
+            // 驳回时释放冻结余额
             releaseFrozenLeaveIfNeeded(workflowRequest, afterStatus, approverUserId);
         }
         workflowRepository.insertTaskAction(
@@ -582,9 +591,11 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         taskService.complete(taskId);
         workflowRepository.finishRequest(workflowRequest.id(), afterStatus, approverUserId);
         workflowRepository.closePendingTodo(workflowRequest.id(), approverUserId);
+        // 请假通过后重新计算考勤结果
         if (approvedLeaveDetail != null) {
             recalculateAttendanceForApprovedLeave(workflowRequest.applicantUserId(), approvedLeaveDetail);
         }
+        // 补卡通过后写入考勤打卡记录
         if (approvedClockCorrectionDetail != null) {
             attendanceService.applyApprovedClockCorrection(
                 workflowRequest.applicantUserId(),
@@ -598,6 +609,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         return statusResponse(workflowRequest.id(), afterStatus);
     }
 
+    // 只有请假类型需要释放冻结余额，补卡/其他类型直接跳过
     private void releaseFrozenLeaveIfNeeded(WorkflowRequestRow workflowRequest, String terminalStatus, Long operatorId) {
         if (!LEAVE_BIZ_TYPE.equals(workflowRequest.bizType())) {
             return;
@@ -616,6 +628,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         );
     }
 
+    // 请假审批通过后，重新计算请假期间每天的考勤结果
     private void recalculateAttendanceForApprovedLeave(Long userId, WorkflowLeaveDetailRow leaveDetail) {
         LocalDate workDate = leaveDetail.startAt().toLocalDate();
         LocalDate endDate = leaveDetail.endAt().toLocalDate();
@@ -884,7 +897,12 @@ public class WorkflowService implements WorkflowAgentResultCallback {
             if (node.isObject()) {
                 ObjectNode ordered = objectMapper.createObjectNode();
                 putIfPresent(ordered, node, "decision");
+                putIfPresent(ordered, node, "conclusion");
                 putIfPresent(ordered, node, "reason");
+                putIfPresent(ordered, node, "suggestion");
+                putIfPresent(ordered, node, "riskLevel");
+                putIfPresent(ordered, node, "reviewMode");
+                putIfPresent(ordered, node, "checks");
                 node.fields().forEachRemaining(entry -> {
                     if (!ordered.has(entry.getKey())) {
                         ordered.set(entry.getKey(), entry.getValue());

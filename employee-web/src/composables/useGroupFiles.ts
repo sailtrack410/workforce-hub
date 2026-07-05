@@ -12,6 +12,7 @@ interface UseGroupFilesOptions {
   showToast: (message: string) => void;
 }
 
+// 群文件 composable：群文件列表加载、上传、预览/下载、删除
 export function useGroupFiles({
   activeConversationId,
   openFilePreviewFromUrl,
@@ -71,6 +72,7 @@ export function useGroupFiles({
     }
   }
 
+  // 打开群文件：先获取下载凭证，preview 走内联预览，download 走新窗口
   async function openGroupFile(file: ImGroupFileResponse, action: 'preview' | 'download') {
     const conversationId = activeConversationId();
     if (!conversationId) return;

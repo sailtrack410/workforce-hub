@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 员工系统偏好（云端持久化）接口
  */
+// 员工偏好接口：主题/密度/通知等个性化设置的读取和更新
 @RestController
 @RequestMapping("/api/employee/me/preferences")
 public class EmployeePreferenceController {

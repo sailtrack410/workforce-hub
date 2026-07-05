@@ -48,6 +48,7 @@ import static com.workforcehub.common.util.TextValues.trimToNull;
 
 /**
  * module-org 第二批写侧治理服务
+ * 组织管理：部门/岗位 CRUD、员工入职/离职/调岗、账号管理，通过领域事件通知下游
  * 收口部门、岗位、员工与账号联动的后台治理能力。
  */
 @Service

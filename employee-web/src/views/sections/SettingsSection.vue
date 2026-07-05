@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import {
   Camera,
-  BriefcaseBusiness,
   ChevronLeft,
-  IdCard,
-  Mail,
-  MapPin,
+  LogOut,
   MoonStar,
-  Phone,
   SunMedium,
   PencilLine,
 } from 'lucide-vue-next';
@@ -72,6 +68,7 @@ const passwordChangeError = ref('');
 const avatarUploading = ref(false);
 const avatarUpdateError = ref('');
 const avatarPickerInput = ref<HTMLInputElement | null>(null);
+const logoutSubmitting = ref(false);
 const colleagueAvatarUrls = ref<Record<string, string>>({});
 const signatureDraft = ref('');
 const signatureSaving = ref(false);
@@ -115,7 +112,7 @@ const bubbleStyleOptions: Array<{ value: BubbleStyle; label: string }> = [
 
 const activeProfile = computed(() => shell.activeProfile);
 const activeFile = computed(() => shell.activeFile);
-const selectedProfileId = computed(() => activeProfile.value.id);
+const selectedProfileId = computed(() => activeProfile.value.id === 'profile' ? 'security' : activeProfile.value.id);
 const currentUserName = computed(() => session.displayName || shellUser.name);
 const currentUserShortName = computed(() => session.shortName || shellUser.shortName);
 const profileStatusLabel = computed(() => employmentStatusLabel(session.profile?.employmentStatus ?? session.user?.employmentStatus));
@@ -127,18 +124,6 @@ const bindEmailCodeButtonText = computed(() => (
 const passwordChangeCodeButtonText = computed(() => (
   passwordChangeCodeSending.value ? '发送中' : passwordChangeCodeCooldown.label.value
 ));
-const profileContactRows = computed<FieldRows>(() => [
-  ['手机号', displayField(session.profile?.mobile)],
-  ['邮箱', displayField(currentEmail.value)],
-  ['工作地点', displayField(session.profile?.workLocation)],
-  ['登录名', displayField(session.user?.loginName)],
-]);
-const profileWorkRows = computed<FieldRows>(() => [
-  ['部门', displayField(session.profile?.primaryDeptName)],
-  ['岗位', displayField(session.profile?.positionName)],
-  ['直属上级', displayField(relationTree.value.managerName || session.profile?.managerName)],
-  ['入职日期', displayField(session.profile?.hireDate)],
-]);
 const accountSecurityRows = computed<FieldRows>(() => [
   ['用户类型', displayField(session.user?.userType)],
   ['会话状态', session.user ? '已登录' : '未登录'],
@@ -414,6 +399,21 @@ async function handleAvatarSelected(event: Event) {
   }
 }
 
+async function handleLogout() {
+  if (logoutSubmitting.value) return;
+  logoutSubmitting.value = true;
+  try {
+    await session.logout();
+    shell.setAvatarUrl('');
+    showToast('已退出登录');
+    void router.replace({ name: 'employee-messages' });
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '退出登录失败');
+  } finally {
+    logoutSubmitting.value = false;
+  }
+}
+
 async function saveSignature() {
   if (signatureSaving.value) return;
   signatureSaving.value = true;
@@ -549,106 +549,7 @@ onBeforeUnmount(() => {
   </header>
 
   <section class="content-stack settings-dashboard">
-    <section v-if="selectedProfileId === 'profile'" class="personal-center">
-      <article class="personal-hero">
-        <div class="personal-hero-cover">
-          <span>{{ session.departmentName || '组织成员' }}</span>
-        </div>
-        <div class="personal-hero-body">
-          <button
-            class="personal-avatar"
-            type="button"
-            :aria-label="avatarUploading ? '头像上传中' : '更换头像'"
-            :disabled="avatarUploading"
-            @click="openAvatarPicker"
-          >
-            <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="xl" status="online" />
-            <span class="personal-avatar-overlay">
-              <Camera :size="14" />
-            </span>
-          </button>
-          <div class="personal-hero-copy">
-            <div class="personal-name-row">
-              <h3>{{ currentUserName }}</h3>
-              <span class="personal-status-pill">{{ profileStatusLabel }}</span>
-            </div>
-            <p class="personal-role-line">
-              <BriefcaseBusiness :size="15" />
-              <span>{{ session.positionName || '未设置岗位' }}</span>
-              <span v-if="session.departmentName">{{ session.departmentName }}</span>
-            </p>
-            <p class="personal-signature">{{ shell.signature || '未设置个性签名' }}</p>
-          </div>
-        </div>
-        <input
-          ref="avatarPickerInput"
-          type="file"
-          accept="image/*"
-          hidden
-          @change="handleAvatarSelected"
-        />
-        <div class="personal-hero-actions">
-          <button type="button" class="personal-action-button" :disabled="avatarUploading" @click="openAvatarPicker">
-            <Camera :size="15" />
-            {{ avatarUploading ? '上传中' : '更换头像' }}
-          </button>
-          <button type="button" class="personal-action-button primary" @click="openMobileReset">
-            <PencilLine :size="15" />
-            编辑资料
-          </button>
-        </div>
-        <div class="personal-contact-strip">
-          <div>
-            <span class="personal-contact-icon"><IdCard :size="16" /></span>
-            <small>工号</small>
-            <strong>{{ displayField(session.profile?.employeeNo) }}</strong>
-          </div>
-          <div>
-            <span class="personal-contact-icon"><Phone :size="16" /></span>
-            <small>手机号</small>
-            <strong>{{ displayField(session.profile?.mobile) }}</strong>
-          </div>
-          <div>
-            <span class="personal-contact-icon"><Mail :size="16" /></span>
-            <small>邮箱</small>
-            <strong>{{ displayField(currentEmail) }}</strong>
-          </div>
-          <div>
-            <span class="personal-contact-icon"><MapPin :size="16" /></span>
-            <small>办公地</small>
-            <strong>{{ displayField(session.profile?.workLocation) }}</strong>
-          </div>
-        </div>
-        <p v-if="avatarUpdateError" class="dialog-error personal-hero-error">{{ avatarUpdateError }}</p>
-      </article>
-
-      <section class="personal-profile-grid">
-        <article class="settings-card personal-info-card">
-          <header class="settings-card-head">
-            <h3>联系信息</h3>
-          </header>
-          <dl class="settings-list">
-            <div v-for="row in profileContactRows" :key="row[0]">
-              <dt>{{ row[0] }}</dt>
-              <dd>{{ row[1] }}</dd>
-            </div>
-          </dl>
-        </article>
-        <article class="settings-card personal-info-card">
-          <header class="settings-card-head">
-            <h3>组织信息</h3>
-          </header>
-          <dl class="settings-list">
-            <div v-for="row in profileWorkRows" :key="row[0]">
-              <dt>{{ row[0] }}</dt>
-              <dd>{{ row[1] }}</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
-    </section>
-
-    <section v-else-if="selectedProfileId === 'organization'" class="settings-card-grid">
+    <section v-if="selectedProfileId === 'organization'" class="settings-card-grid">
       <article class="settings-card settings-wide-card">
         <header class="settings-card-head">
           <h3>所在部门</h3>
@@ -702,6 +603,33 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else-if="selectedProfileId === 'security'" class="settings-card-grid">
+      <article class="settings-card settings-wide-card personal-compact-card">
+        <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="xl" status="online" />
+        <div class="personal-compact-copy">
+          <h3>{{ currentUserName }}</h3>
+          <p>{{ session.positionName || '未设置岗位' }}<span v-if="session.departmentName"> · {{ session.departmentName }}</span></p>
+          <span>{{ profileStatusLabel }}</span>
+        </div>
+        <input
+          ref="avatarPickerInput"
+          type="file"
+          accept="image/*"
+          hidden
+          @change="handleAvatarSelected"
+        />
+        <div class="personal-compact-actions">
+          <button type="button" class="personal-action-button" :disabled="avatarUploading" @click="openAvatarPicker">
+            <Camera :size="15" />
+            {{ avatarUploading ? '上传中' : '更换头像' }}
+          </button>
+          <button type="button" class="personal-action-button danger" :disabled="logoutSubmitting" @click="handleLogout">
+            <LogOut :size="15" />
+            {{ logoutSubmitting ? '退出中' : '退出登录' }}
+          </button>
+        </div>
+        <p v-if="avatarUpdateError" class="dialog-error personal-hero-error">{{ avatarUpdateError }}</p>
+      </article>
+
       <article class="settings-card">
         <header class="settings-card-head">
           <h3>账号概览</h3>

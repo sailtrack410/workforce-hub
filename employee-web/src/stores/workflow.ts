@@ -14,6 +14,7 @@ export interface EmployeeWorkflowApi {
   rejectTask(taskId: string, request: WorkflowTaskRejectRequest): Promise<WorkflowRequestStatusResponse>;
 }
 
+// 审批待办 Store：加载待办列表、审批通过/驳回后自动刷新
 export const useWorkflowStore = defineStore('employee-workflow', {
   state: () => ({
     todos: [] as TodoRecord[],

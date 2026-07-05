@@ -24,6 +24,7 @@ import java.util.List;
 /**
  * 后台角色与权限管理接口。
  */
+// RBAC 接口：角色 CRUD、权限列表、角色权限分配、用户角色绑定
 @RestController
 @RequestMapping("/api/admin/rbac")
 public class AdminRbacController {

@@ -7,6 +7,7 @@ const TodosSection = () => import('@/views/sections/TodosSection.vue');
 const WorkbenchSection = () => import('@/views/sections/WorkbenchSection.vue');
 const FilesSection = () => import('@/views/sections/FilesSection.vue');
 const ContactsSection = () => import('@/views/sections/ContactsSection.vue');
+const AgentsSection = () => import('@/views/sections/AgentsSection.vue');
 const SettingsSection = () => import('@/views/sections/SettingsSection.vue');
 
 export const employeeRoutes = [
@@ -67,6 +68,12 @@ export const employeeRoutes = [
         meta: { section: 'contacts' },
       },
       {
+        path: 'agents',
+        name: 'employee-agents',
+        component: AgentsSection,
+        meta: { section: 'agents' },
+      },
+      {
         path: 'settings',
         name: 'employee-settings',
         component: SettingsSection,
@@ -94,6 +101,7 @@ export const employeeRoutes = [
   },
 ] satisfies RouteRecordRaw[];
 
+// employee-web 没有路由守卫，认证逻辑在 MessagesView.vue 的 onMounted 中处理
 const router = createRouter({
   history: createWebHashHistory(),
   routes: employeeRoutes,

@@ -30,6 +30,7 @@ import java.util.List;
 /**
  * 后台考勤治理接口。
  */
+// 考勤后台接口：考勤组/班次/日历/排班 CRUD，假期类型管理
 @RestController
 @RequestMapping("/api/admin/attendance")
 public class AdminAttendanceController {

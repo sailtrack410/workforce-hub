@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 员工端认证接口
  */
+// 员工认证：登录/注册、邮箱验证码、密码重置、绑定邮箱、当前用户信息
 @RestController
 @RequestMapping("/api/employee/auth")
 public class EmployeeAuthController {

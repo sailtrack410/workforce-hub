@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 /**
  * IM 实时事件推送门面。
  */
+// 推送策略：事务提交后推送，连接在线则直接 WebSocket 推送，否则写 outbox 表待轮询
 @Service
 public class ImWebSocketPushService {
 

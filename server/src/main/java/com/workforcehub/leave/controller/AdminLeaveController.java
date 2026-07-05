@@ -22,6 +22,7 @@ import java.util.List;
 /**
  * 后台假期治理接口。
  */
+// 假期后台接口：假期类型 CRUD、余额调整、账户查询
 @RestController
 @RequestMapping("/api/admin/leave")
 public class AdminLeaveController {

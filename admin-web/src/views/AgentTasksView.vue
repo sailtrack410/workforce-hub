@@ -37,6 +37,7 @@ function getSelected() {
 
 onMounted(() => { void loadPage(); });
 
+  // 并行加载指标、失败汇总、任务列表、超时扫描记录
 async function loadPage() {
   loading.value = true;
   try {
@@ -57,6 +58,7 @@ async function loadPage() {
     items.value = tasksResult.list;
     store.pagination.total = tasksResult.total;
     timeoutRuns.value = timeoutRunsResult;
+    // 保持之前选中的任务，如果还在列表中的话
     if (store.selectedTaskId && tasksResult.list.some((t) => t.taskId === store.selectedTaskId)) {
       await selectTask(tasksResult.list.find((t) => t.taskId === store.selectedTaskId)!);
     } else if (tasksResult.list.length > 0) {

@@ -16,11 +16,11 @@ withDefaults(
 </template>
 
 <style scoped>
-.compact-list { display: grid; gap: 9px; }
+.compact-list { display: grid; gap: var(--space-sm); }
 
 .compact-list :slotted(article) {
   display: grid;
-  gap: 5px;
+  gap: var(--space-xs);
   padding: var(--space-md);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);

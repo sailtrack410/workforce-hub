@@ -150,6 +150,8 @@ export function parseJsonPreservingUnsafeIntegers(json: string, unsafeIntegerFie
   return JSON.parse(preserveUnsafeIntegers(json, unsafeIntegerFieldNames));
 }
 
+// 手动扫描 JSON 字符串，把超过 JS 安全整数范围的数字字段加引号变成字符串
+// 比 {"id": 12345678901234567} 变成 {"id": "12345678901234567"}
 function preserveUnsafeIntegers(json: string, unsafeIntegerFieldNames: Set<string>) {
   let output = '';
   let index = 0;

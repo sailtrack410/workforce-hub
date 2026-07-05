@@ -17,6 +17,7 @@ import java.util.Set;
 /**
  * 文件中心清理任务服务，集中处理过期票据、到期回收站引用和无引用物理对象。
  */
+// 清理任务编排：分阶段执行（数据库清理 → 物理对象删除），支持按类型单独触发或全量执行
 @Service
 public class FileCleanupJobService {
 

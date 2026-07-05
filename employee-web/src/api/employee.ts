@@ -32,6 +32,7 @@ import type {
   FileTrashRequest,
   FileTrashResponse,
   ForwardImMessageRequest,
+  FriendRequest,
   GroupMemberUserIdsRequest,
   ImConversationListQuery,
   ImConversationDetailResponse,
@@ -43,11 +44,13 @@ import type {
   ImMessageResponse,
   LeaveRequestCreateRequest,
   LeaveAccountResponse,
+  LeaveTypeResponse,
   LoginSendCodeRequest,
   LoginSendCodeResponse,
   LoginRequest,
   LoginResponse,
   MoveEmployeeFileRequest,
+  OrgDepartmentTreeNodeResponse,
   OrgUserDetailResponse,
   OrgUserSummaryResponse,
   PageResult,
@@ -78,6 +81,7 @@ import type {
   WorkflowTodoResponse,
 } from './types';
 
+// 雪花 ID 可能是 BigInt，统一转字符串再 URL 编码
 const pathId = (value: EntityId) => encodeURIComponent(String(value));
 
 export function createEmployeeApi(client: ApiClient = defaultApiClient) {
@@ -99,6 +103,15 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
       colleagues: () => client.get<OrgUserSummaryResponse[]>('/api/employee/me/colleagues'),
       preferences: () => client.get<EmployeePreferenceResponse>('/api/employee/me/preferences'),
       updatePreferences: (request: UpdateEmployeePreferenceRequest) => client.put<EmployeePreferenceResponse>('/api/employee/me/preferences', request),
+    },
+    contacts: {
+      friends: () => client.get<OrgUserSummaryResponse[]>('/api/employee/contacts/friends'),
+      friendRequests: () => client.get<OrgUserSummaryResponse[]>('/api/employee/contacts/friends/requests'),
+      addFriend: (userId: EntityId, request: FriendRequest = {}) => client.post<OrgUserSummaryResponse>(`/api/employee/contacts/friends/${pathId(userId)}/requests`, request),
+      acceptFriendRequest: (userId: EntityId) => client.post<OrgUserSummaryResponse>(`/api/employee/contacts/friends/requests/${pathId(userId)}/accept`),
+      removeFriend: (userId: EntityId) => client.delete<void>(`/api/employee/contacts/friends/${pathId(userId)}`),
+      updateFriendRemark: (userId: EntityId, request: FriendRequest) => client.put<OrgUserSummaryResponse>(`/api/employee/contacts/friends/${pathId(userId)}`, request),
+      deptTree: () => client.get<OrgDepartmentTreeNodeResponse[]>('/api/employee/contacts/dept-tree'),
     },
     workflow: {
       submitLeaveRequest: (request: LeaveRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/leave-requests', request),
@@ -123,6 +136,7 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
     },
     leave: {
       accounts: () => client.get<LeaveAccountResponse[]>('/api/employee/leave/accounts'),
+      types: () => client.get<LeaveTypeResponse[]>('/api/employee/leave/types'),
     },
     im: {
       conversations: (query: ImConversationListQuery = {}) => client.get<ImConversationSummaryResponse[]>('/api/employee/im/conversations', { query }),

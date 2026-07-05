@@ -24,6 +24,7 @@ public class FileUploadRules {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    // 员工端文件归属校验：限制 ownerType 白名单，群文件额外校验群成员身份
     public void validateEmployeeOwner(String ownerType, Long ownerId) {
         if (!"PERSONAL_FILE".equals(ownerType)
             && !"USER_AVATAR".equals(ownerType)
@@ -82,6 +83,7 @@ public class FileUploadRules {
         }
     }
 
+    // 配额校验：群文件走群配额，其余走个人配额
     public void ensureEmployeeQuota(String ownerType, Long userId, Long incomingBytes) {
         if (!"IM_GROUP_FILE".equals(ownerType)) {
             fileQuotaPolicyService.ensurePersonalQuota(userId, incomingBytes);

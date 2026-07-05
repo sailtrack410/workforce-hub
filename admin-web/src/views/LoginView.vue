@@ -80,11 +80,11 @@ async function submitLogin() {
 .login-panel {
   width: min(430px, 100%);
   display: grid;
-  gap: var(--space-3xl);
-  padding: 34px;
-  border: 1px solid rgba(0, 80, 180, 0.12);
+  gap: var(--space-xl);
+  padding: var(--space-3xl);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: rgba(248, 250, 255, 0.92);
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -105,7 +105,7 @@ async function submitLogin() {
 
 .login-form {
   display: grid;
-  gap: var(--space-lg);
+  gap: var(--space-base);
 }
 
 .login-form label {

@@ -25,7 +25,7 @@ withDefaults(
 </template>
 
 <style scoped>
-.detail-list { display: grid; gap: 9px; }
+.detail-list { display: grid; gap: var(--space-sm); }
 
 .detail-list div {
   display: flex;
@@ -34,6 +34,7 @@ withDefaults(
   border-bottom: 1px solid var(--line);
   padding-bottom: var(--space-sm);
   font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
 .detail-list span { color: var(--muted); }

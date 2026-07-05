@@ -472,7 +472,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: #edf3f9;
+  background: var(--surface);
 }
 
 .dag-commandbar {
@@ -481,21 +481,20 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--space-base);
   min-height: 58px;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(135deg, #111827, #132033 58%, #0c3b55);
-  color: #ffffff;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  padding: var(--space-sm) var(--space-base);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
 }
 
 .dag-commandbar-main,
 .dag-commandbar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   min-width: 0;
 }
 
@@ -505,14 +504,14 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 }
 
 .dag-back {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--ink);
+  background: var(--panel);
+  border-color: var(--line);
 }
 
 .dag-title-group {
   display: grid;
-  gap: 2px;
+  gap: var(--space-xs);
   min-width: 0;
 }
 
@@ -526,9 +525,9 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 }
 
 .dag-agent-code {
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -537,43 +536,43 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 
 .version-state {
   border-radius: var(--radius-pill);
-  padding: 5px 9px;
-  background: rgba(0, 137, 255, 0.18);
-  color: #cbe8ff;
+  padding: 5px var(--space-sm);
+  background: var(--pill-bg);
+  color: var(--green-dark);
   font-size: 11px;
   font-weight: 900;
   white-space: nowrap;
 }
 
 .version-state.archived {
-  background: rgba(148, 163, 184, 0.18);
-  color: #cbd5e1;
+  background: var(--surface);
+  color: var(--muted);
 }
 
 .version-state.published {
-  background: rgba(34, 197, 94, 0.18);
-  color: #bbf7d0;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .bar-select {
   width: auto;
   min-width: 154px;
   min-height: 34px;
-  padding: 4px 9px;
+  padding: 4px var(--space-sm);
   font-size: 12px;
-  font-weight: 800;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  font-weight: 700;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .bar-select option {
-  color: #111827;
+  color: var(--ink);
 }
 
 .bar-error {
-  color: #fecaca;
+  color: var(--red-dark);
   font-size: 11px;
   font-weight: 900;
   max-width: 220px;
@@ -583,7 +582,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 }
 
 .bar-readonly {
-  color: #fed7aa;
+  color: var(--amber);
   font-size: 11px;
   font-weight: 900;
   white-space: nowrap;
@@ -593,18 +592,18 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-xs);
   min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s, transform 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 
 .bar-btn:disabled {
@@ -613,15 +612,14 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 }
 
 .bar-btn:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, 0.36);
-  background: rgba(255, 255, 255, 0.16);
-  transform: translateY(-1px);
+  border-color: var(--green-light);
+  color: var(--green-dark);
 }
 
 .bar-btn.primary {
   background: var(--green);
   border-color: var(--green);
-  color: #fff;
+  color: var(--panel-strong);
 }
 
 .bar-btn.primary:hover:not(:disabled) {
@@ -638,45 +636,44 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 .dag-acl-panel {
   width: 286px;
   flex-shrink: 0;
-  padding: 16px;
-  border-right: 1px solid rgba(15, 23, 42, 0.1);
-  background:
-    linear-gradient(180deg, #ffffff, #f5f8fc);
-  box-shadow: 12px 0 30px rgba(15, 23, 42, 0.04);
+  padding: var(--space-base);
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
   overflow-y: auto;
 }
 
 .version-create {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 
 .version-create input {
   width: 58px;
   min-height: 34px;
-  padding: 4px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  padding: 4px var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .acl-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
-  color: #111827;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 900;
 }
 
 .acl-state {
-  padding: 4px 8px;
-  border-radius: 999px;
+  padding: 4px var(--space-sm);
+  border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 900;
   white-space: nowrap;
@@ -695,33 +692,33 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 .acl-form {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .acl-form select,
 .acl-form input {
   min-width: 0;
   height: 34px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 7px;
-  background: #ffffff;
-  color: #111827;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .acl-form input {
-  padding: 0 8px;
+  padding: 0 var(--space-sm);
 }
 
 .acl-form button {
   height: 34px;
-  border: 1px solid #0f172a;
-  border-radius: 7px;
-  background: #0f172a;
-  color: #fff;
+  border: 1px solid var(--green);
+  border-radius: var(--radius-sm);
+  background: var(--green);
+  color: var(--panel-strong);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .acl-form button:disabled {
@@ -731,18 +728,18 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 
 .acl-list {
   display: grid;
-  gap: 7px;
-  margin-top: 12px;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
   overflow: auto;
 }
 
 .acl-list span {
   max-width: 100%;
-  padding: 7px 8px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 7px;
-  background: #ffffff;
-  color: #475569;
+  padding: 7px var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--muted);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;

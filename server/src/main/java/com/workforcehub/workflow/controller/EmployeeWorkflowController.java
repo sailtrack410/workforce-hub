@@ -35,6 +35,7 @@ import java.util.List;
 /**
  * 员工端审批流程接口。
  */
+// 员工审批接口：提交请假/补卡、待办列表、审批通过/驳回、撤回、请求详情
 @RestController
 @ConditionalOnProperty(prefix = "workforce.workflow", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequestMapping("/api/employee/workflow")

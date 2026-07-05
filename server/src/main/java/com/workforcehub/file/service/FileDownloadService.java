@@ -25,6 +25,7 @@ import java.util.List;
  * 文件下载服务。
  * 负责下载票据签发、下载票据消费和物理对象读取。
  */
+// 下载流程：创建下载凭证（一次性/多次） → 校验权限 → 从存储提供方读取文件流
 @Service
 public class FileDownloadService {
 

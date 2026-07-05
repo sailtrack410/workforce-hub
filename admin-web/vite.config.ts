@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig, loadEnv } from 'vite';
@@ -51,10 +52,11 @@ function localUploadBridgePlugin(): Plugin {
   };
 }
 
-function resolveLocalUploadTargets(uploadPath: string) {
+export function resolveLocalUploadTargets(uploadPath: string) {
   const workspaceRoot = path.resolve(process.cwd(), '..');
   const serverRoot = path.resolve(workspaceRoot, 'server');
-  const allowedRoots = [workspaceRoot, serverRoot].map((item) => path.normalize(item));
+  const localFileRoot = path.resolve(os.homedir(), '.workforce-hub', 'files');
+  const allowedRoots = [workspaceRoot, serverRoot, localFileRoot].map((item) => path.normalize(item));
   if (path.isAbsolute(uploadPath)) {
     const normalized = path.normalize(uploadPath);
     return allowedRoots.some((root) => normalized.startsWith(root)) ? [normalized] : [];

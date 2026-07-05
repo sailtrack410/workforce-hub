@@ -1,11 +1,28 @@
 import type { EntityId } from '@/api';
 
+export type AgentPreReviewCheck = {
+  name: string;
+  result: string;
+  status: string;
+};
+
+export type AgentPreReviewDecision = {
+  decision: string;
+  conclusion: string;
+  reason: string;
+  suggestion: string;
+  riskLevel: string;
+  reviewMode: string;
+  checks: AgentPreReviewCheck[];
+};
+
 export function displayField(value: unknown) {
   if (typeof value === 'number') return String(value);
   if (typeof value === 'string' && value.trim()) return value;
   return '-';
 }
 
+// 后端返回的术语对用户不友好，统一替换成前端展示用语
 export function humanizeText(value?: string | null) {
   if (!value) return '';
   return value
@@ -51,6 +68,7 @@ export function statusText(status: string) {
   return status;
 }
 
+// 后端存分钟数，前端按 8h/天 展示
 export function minutesToDayLabel(minutes?: number | null) {
   const safeMinutes = Math.max(0, Number(minutes ?? 0));
   const days = safeMinutes / 480;
@@ -84,6 +102,50 @@ export function actionTypeLabel(type?: string | null) {
   if (type === 'WITHDRAW') return '撤回';
   if (type === 'AGENT_PRE_REVIEW') return 'AI 预审';
   return displayField(type);
+}
+
+// 解析 AI 预审的 JSON 结果，兼容后端字段名变化（suggestion/recommendation）
+export function parseAgentPreReviewDecision(value?: string | null): AgentPreReviewDecision | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const decision = textValue(parsed.decision);
+    const approved = decision === 'APPROVED';
+    return {
+      decision,
+      conclusion: textValue(parsed.conclusion) || (approved ? '建议进入直属上级审批' : ''),
+      reason: textValue(parsed.reason),
+      suggestion: textValue(parsed.suggestion ?? parsed.recommendation)
+        || (approved ? '建议直属上级核对请假时段、假期余额、工作交接和必要附件后审批' : ''),
+      riskLevel: textValue(parsed.riskLevel),
+      reviewMode: textValue(parsed.reviewMode),
+      checks: Array.isArray(parsed.checks) ? parsed.checks.map((item) => {
+        const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+        return {
+          name: textValue(row.name),
+          result: textValue(row.result ?? row.message),
+          status: textValue(row.status),
+        };
+      }).filter((item) => item.name || item.result || item.status) : [],
+    };
+  } catch {
+    return {
+      decision: '',
+      conclusion: '',
+      reason: value,
+      suggestion: '',
+      riskLevel: '',
+      reviewMode: '',
+      checks: [],
+    };
+  }
+}
+
+function textValue(value: unknown) {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return String(value);
+  return '';
 }
 
 export function entityIdListFromText(value: string): EntityId[] {

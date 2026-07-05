@@ -15,6 +15,7 @@ import { fileSizeLabel } from './file-format';
 
 export type FileLikeRecord = PersonalFileRecord | WorkflowRequestAttachmentResponse;
 
+// 文件上传前计算 SHA-256，用于秒传校验和完整性验证
 export async function sha256Hex(file: File) {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) throw new Error('当前环境不支持安全文件校验，请使用 HTTPS 或 localhost');
@@ -36,6 +37,7 @@ export function fileMimeOf(file: FileLikeRecord) {
   return file.mimeType ?? '';
 }
 
+// 根据文件名和 MIME 类型返回对应的图标组件，优先用 MIME 判断
 export function fileIconOf(file: FileLikeRecord) {
   const name = fileNameOf(file).toLowerCase();
   const mimeType = fileMimeOf(file).toLowerCase();
@@ -50,6 +52,7 @@ export function fileIconOf(file: FileLikeRecord) {
   return FileType;
 }
 
+// 文件类型对应的色系，用于列表项的左侧色条
 export function fileToneOf(file: FileLikeRecord) {
   const name = fileNameOf(file).toLowerCase();
   const mimeType = fileMimeOf(file).toLowerCase();

@@ -52,6 +52,7 @@ public class FileCleanupPhysicalService {
         return findRetryablePhysicalCleanupDetails(now).size();
     }
 
+    // 失败重试：把之前失败或超时的清理记录复制为新的待处理记录，标记原记录为失败
     public long copyRetryableForRetry(String jobRunId, LocalDateTime now) {
         List<RetryableCleanupDetailRow> rows = findRetryablePhysicalCleanupDetails(now);
         long copied = 0L;
@@ -74,6 +75,7 @@ public class FileCleanupPhysicalService {
         return copied;
     }
 
+    // 执行物理删除：逐条调用存储提供方删除对象，成功/失败分别标记状态
     public void executePendingDeletes(String jobRunId) {
         List<PhysicalCleanupItem> items = jdbcTemplate.query("""
             SELECT id, item_type, storage_provider, bucket_name, object_key
@@ -101,6 +103,7 @@ public class FileCleanupPhysicalService {
         finalizePhysicalCleanup(jobRunId);
     }
 
+    // 查找可重试记录：FAILED 状态或 PENDING 超时（30分钟），排除已有后续操作的记录
     private List<RetryableCleanupDetailRow> findRetryablePhysicalCleanupDetails(LocalDateTime now) {
         LocalDateTime staleBefore = now.minusMinutes(STALE_PENDING_MINUTES);
         return jdbcTemplate.query("""

@@ -48,25 +48,25 @@ provide(toastKey, api);
 <style scoped>
 .toast-container {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: var(--space-base);
+  right: var(--space-base);
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-sm);
   max-width: 380px;
   pointer-events: none;
 }
 
 .toast-item {
-  padding: 10px 16px;
+  padding: var(--space-sm) var(--space-base);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 700;
   cursor: pointer;
   pointer-events: auto;
   animation: toast-in 0.2s ease-out;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-sm);
 }
 
 .toast-error {
@@ -77,7 +77,7 @@ provide(toastKey, api);
 
 .toast-success {
   background: var(--success-bg);
-  color: #16a34a;
+  color: var(--success);
   border: 1px solid rgba(22, 163, 74, 0.2);
 }
 

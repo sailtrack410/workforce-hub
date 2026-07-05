@@ -14,6 +14,7 @@ import { scrollElementToBottomAfterLayout } from '@/utils/scroll';
 type FieldRows = Array<[string, string]>;
 export type MessageMenuAction = 'copy' | 'translate' | 'forward' | 'favorite' | 'remind' | 'quote' | 'delete-or-recall';
 
+// 只能撤回自己发的、2 分钟内的消息
 export function canRecallMessage(message: ConversationMessage, now = new Date()) {
   if (message.side !== 'right' || message.status === 'RECALLED' || !message.time) return false;
   const sentAt = new Date(message.time.replace(' ', 'T'));
@@ -139,6 +140,7 @@ export function useMessagesState({
     createConversationError.value = '';
   }
 
+  // 创建会话：私聊/群聊/AI 会话三种模式复用同一个提交函数
   async function submitCreateConversation() {
     if (createConversationSubmitting.value) return;
     createConversationSubmitting.value = true;

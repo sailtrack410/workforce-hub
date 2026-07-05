@@ -20,10 +20,14 @@ defineEmits<{
 .filter-row {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   width: 100%;
+  flex-wrap: wrap;
 }
 
 .filter-row :deep(input),
-.filter-row :deep(select) { max-width: 210px; }
+.filter-row :deep(select) {
+  max-width: 220px;
+  min-width: 160px;
+}
 </style>

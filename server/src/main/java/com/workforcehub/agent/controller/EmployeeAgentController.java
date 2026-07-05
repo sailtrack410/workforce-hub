@@ -18,6 +18,7 @@ import java.util.List;
 
 /**
  * 员工端 Agent 使用接口。
+ * 员工 Agent 接口：Agent 目录、创建任务、任务详情
  */
 @RestController
 @RequestMapping("/api/employee/agents")

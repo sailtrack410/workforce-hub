@@ -100,6 +100,7 @@ public class LeaveService {
             throw new BizException(404, "员工不存在或不可用");
         }
         LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(request.getLeaveTypeId());
+        // 幂等：同一笔外部业务只允许调整一次，重复请求直接返回原结果
         String sourceTxnKey = trimToNull(request.getSourceTxnKey());
         LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
         if (existingTxn != null) {
@@ -155,8 +156,10 @@ public class LeaveService {
             .toList();
     }
 
+    // 提交请假申请前的余额校验，不扣减，只检查是否够用
     public void ensureLeaveRequestBalance(Long userId, Long leaveTypeId, int durationMinutes) {
         LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
+        // 不扣余额的假种（如调休）跳过校验
         if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
             return;
         }
@@ -169,6 +172,7 @@ public class LeaveService {
         }
     }
 
+    // 请假申请提交时冻结余额，防止并发超领
     @Transactional(rollbackFor = Exception.class)
     public void freezeForWorkflowSubmission(Long userId,
                                             Long leaveTypeId,
@@ -181,6 +185,7 @@ public class LeaveService {
         }
         ensurePositiveDuration(durationMinutes);
         String sourceTxnKey = workflowFreezeSourceTxnKey(requestId);
+        // 幂等：重复提交不重复冻结
         LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
         if (existingTxn != null) {
             LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
@@ -195,6 +200,7 @@ public class LeaveService {
             return;
         }
 
+        // SELECT FOR UPDATE 行锁，防止并发扣减
         LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
         if (account == null || account.availableMinutes() < durationMinutes) {
             throw new BizException(400, "假期余额不足");
@@ -216,6 +222,7 @@ public class LeaveService {
         );
     }
 
+    // 审批通过后，将冻结余额正式扣减
     @Transactional(rollbackFor = Exception.class)
     public void consumeFrozenForWorkflowApproval(Long userId,
                                                  Long leaveTypeId,
@@ -246,6 +253,7 @@ public class LeaveService {
             throw new BizException(400, "假期余额不足");
         }
 
+        // 优先从冻结余额扣，降级到可用余额（兼容历史无冻结记录的申请）
         LeaveAccountTxnRow freezeTxn = leaveRepository.getTxnBySourceTxnKey(workflowFreezeSourceTxnKey(requestId));
         int balanceAfter;
         if (account.frozenMinutes() >= durationMinutes) {
@@ -258,6 +266,7 @@ public class LeaveService {
                 account.version()
             );
         } else if (freezeTxn == null && account.availableMinutes() >= durationMinutes) {
+            // 历史申请没有冻结记录，直接扣可用余额
             balanceAfter = account.availableMinutes() - durationMinutes;
             leaveRepository.updateAccountBalance(account.accountId(), balanceAfter, operatorId, account.version());
         } else {
@@ -276,6 +285,7 @@ public class LeaveService {
         );
     }
 
+    // 请假被驳回/撤回时，释放之前冻结的余额
     @Transactional(rollbackFor = Exception.class)
     public void releaseFrozenForWorkflowTerminal(Long userId,
                                                  Long leaveTypeId,
@@ -288,6 +298,7 @@ public class LeaveService {
             return;
         }
         ensurePositiveDuration(durationMinutes);
+        // 没有冻结记录说明是历史申请，跳过
         LeaveAccountTxnRow freezeTxn = leaveRepository.getTxnBySourceTxnKey(workflowFreezeSourceTxnKey(requestId));
         if (freezeTxn == null) {
             return;

@@ -79,6 +79,7 @@ import AppListItem from '../components/ui/AppListItem.vue';
 import AppLoadingState from '../components/ui/AppLoadingState.vue';
 import AppTag from '../components/ui/AppTag.vue';
 import ShellNavButton from '../components/shell/ShellNavButton.vue';
+import ContactsCategoryNav from '../components/ContactsCategoryNav.vue';
 import { provideEmployeeShellContexts } from './employee-shell-context';
 import type { EmployeeShellContexts } from './employee-shell-context';
 
@@ -109,20 +110,19 @@ const sectionIcons: Record<SectionId, typeof MessageCircle> = {
   workbench: LayoutGrid,
   processes: GitBranch,
   contacts: UsersRound,
+  agents: Sparkles,
   reports: BarChart3,
   settings: UserRound,
 };
 
 const workbenchIcons: Record<string, typeof MessageCircle> = {
-  leave: CalendarDays,
-  requests: ClipboardList,
+  oa: ClipboardList,
   attendance: Clock3,
   balance: Sparkles,
   agent: Sparkles,
 };
 
 const profileIcons: Record<string, typeof MessageCircle> = {
-  profile: UserRound,
   organization: UsersRound,
   security: ShieldCheck,
   preferences: SlidersHorizontal,
@@ -272,6 +272,7 @@ const sectionRouteNames: Partial<Record<SectionId, string>> = {
   files: 'employee-files',
   workbench: 'employee-workbench',
   contacts: 'employee-contacts',
+  agents: 'employee-agents',
   settings: 'employee-settings',
   processes: 'employee-processes',
   reports: 'employee-reports',
@@ -453,6 +454,10 @@ function selectNav(section: SectionId) {
   shell.setMobileView('list');
 }
 
+function openProfileSettings() {
+  selectSettingsItem('security');
+}
+
 function openTodoAction(mode: 'approve' | 'reject') {
   if (!hasActiveTodo.value || workflow.actionLoading) return;
   todoActionMode.value = mode;
@@ -506,6 +511,18 @@ async function loadAuthenticatedWorkspace() {
     }),
     refreshFileCenter(),
     hydrateUserPreferences(),
+    employeeApi.contacts.friends().then((rows) => shell.setFriends(rows)),
+    employeeApi.contacts.deptTree().then((tree) => {
+      shell.setDeptTree(tree);
+      if (shell.contactsCategoryId === 'friends' && tree.length) {
+        const firstRoot = tree[0];
+        if (firstRoot?.children?.length) {
+          const firstChild = firstRoot.children[0];
+          shell.setContactsCategoryId(`dept-${firstChild.id}`);
+          shell.setContactsExpandedCategoryIds(new Set(['enterprise', `dept-${firstRoot.id}`]));
+        }
+      }
+    }),
   ]);
   await im.loadVisibleConversationDetails(undefined, undefined, session.user?.userId);
   shell.mergeBackendConversations(im.conversations);
@@ -999,6 +1016,13 @@ const employeeShellContexts = {
     startPrivateConversationFromContact,
     openContactRemarkEditor,
   },
+  agents: {
+    shell,
+    im,
+    showToast,
+    navigateMessagesConversation,
+    startAgentConversationFromSearch,
+  },
   empty: {
     currentMeta,
     businessEmptyTitle,
@@ -1158,7 +1182,7 @@ provideEmployeeShellContexts(employeeShellContexts);
           <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="16" />
           <span>{{ themeLabel }}</span>
         </button>
-        <button class="profile-button" type="button" @click="selectNav('settings')">
+        <button class="profile-button" type="button" @click="openProfileSettings">
           <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="lg" status="online" />
           <span class="profile-copy">
             <strong>{{ currentUserName }}</strong>
@@ -1385,26 +1409,14 @@ provideEmployeeShellContexts(employeeShellContexts);
           </AppListItem>
         </div>
 
-        <div v-else-if="activeSection === 'contacts'" class="list-items">
-          <AppEmptyState v-if="!filteredContacts.length" title="暂无联系人" description="暂无联系人" icon="contacts" />
-          <AppListItem
-            v-for="item in filteredContacts"
-            v-else
-            :key="item.id"
-            :active="activeContact?.id === item.id"
-            @click="shell.selectItem('contacts', item.id)"
-          >
-            <div class="generic-row">
-              <AppAvatar :label="item.name" :image="item.avatarUrl" tone="primary" />
-              <div class="generic-copy">
-                <div class="title-line">
-                  <strong>{{ item.name }}</strong>
-                  <span class="meta-time">{{ item.relation }}</span>
-                </div>
-                <p>{{ item.department || item.role }}</p>
-              </div>
-            </div>
-          </AppListItem>
+        <div v-else-if="activeSection === 'contacts'" class="list-items contacts-list-pane">
+          <ContactsCategoryNav
+            :items="shell.contactsCategoryItems"
+            :active-id="shell.contactsCategoryId"
+            :expanded-ids="shell.contactsExpandedCategoryIds"
+            @select="shell.setContactsCategoryId($event)"
+            @toggle="shell.toggleContactsExpandedCategoryId($event)"
+          />
         </div>
 
         <div v-else-if="activeSection === 'settings'" class="list-items">
@@ -1427,6 +1439,10 @@ provideEmployeeShellContexts(employeeShellContexts);
               </div>
             </div>
           </AppListItem>
+        </div>
+
+        <div v-else-if="activeSection === 'agents'" class="list-items">
+          <AppEmptyState title="AI 助手" description="请在右侧查看全部 AI 助手" icon="workbench" />
         </div>
 
         <div v-else class="list-items">

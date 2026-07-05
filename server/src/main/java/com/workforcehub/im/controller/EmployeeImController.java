@@ -44,6 +44,7 @@ import java.util.List;
 /**
  * 员工端 IM 会话接口。
  */
+// IM REST 接口：会话 CRUD、消息收发/撤回/编辑、群成员管理、群文件、已读位置
 @RestController
 @RequestMapping("/api/employee/im")
 public class EmployeeImController {

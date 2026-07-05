@@ -11,6 +11,7 @@ export function useFilePreview() {
   const filePreviewTitle = computed(() => (filePreview.value ? fileNameOf(filePreview.value.file) : ''));
   const filePreviewType = computed(() => (filePreview.value ? fileMimeOf(filePreview.value.file) : ''));
 
+  // 可内联预览的文件（图片、PDF、文本）先 fetch 到内存再用 objectUrl 展示
   async function openFilePreviewFromUrl(file: FilePreviewTarget, url: string) {
     closeFilePreview();
     const inline = canInlinePreview(file);
@@ -33,6 +34,7 @@ export function useFilePreview() {
     }
   }
 
+  // 关闭预览时释放 objectUrl，防止内存泄漏
   function closeFilePreview() {
     if (filePreview.value?.objectUrl) {
       URL.revokeObjectURL(filePreview.value.objectUrl);

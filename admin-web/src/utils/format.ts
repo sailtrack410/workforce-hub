@@ -42,6 +42,7 @@ export function formatBytes(value?: number | null) {
   return `${size.toFixed(size >= 10 ? 1 : 2)} ${units[index]}`;
 }
 
+// 后端存分钟数，按 8h/天 换算，优先显示天数
 export function formatMinutes(value?: number | null) {
   if (value === undefined || value === null) return '-';
   const abs = Math.abs(value);
@@ -57,6 +58,7 @@ export function formatId(value?: EntityId | null) {
   return String(value);
 }
 
+// 雪花 ID 太长，列表页只显示后 8 位
 export function shortId(value?: EntityId | null) {
   const text = formatId(value);
   if (text === '-') return text;
@@ -89,6 +91,7 @@ export function statusLabel(value?: string | null) {
   return labels[value] ?? value;
 }
 
+// 后端返回的术语对用户不友好，统一替换成前端展示用语
 export function humanizeText(value?: string | null) {
   if (!value) return '';
   return value
@@ -102,6 +105,7 @@ export function humanizeText(value?: string | null) {
     .replace(/Agent/g, 'AI 助手');
 }
 
+// 统一的错误消息提取，顺便做术语替换
 export function errorMessage(error: unknown, fallback = '请求失败') {
   if (error instanceof Error && error.message) return humanizeText(error.message);
   return fallback;

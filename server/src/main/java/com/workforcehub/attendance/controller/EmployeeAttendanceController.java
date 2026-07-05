@@ -20,6 +20,7 @@ import java.util.List;
 /**
  * 员工端考勤接口。
  */
+// 员工考勤接口：打卡、日结果查询、补卡申请、考勤异常
 @RestController
 @RequestMapping("/api/employee/attendance")
 public class EmployeeAttendanceController {

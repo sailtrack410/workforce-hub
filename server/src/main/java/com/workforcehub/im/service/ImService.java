@@ -155,6 +155,7 @@ public class ImService {
         return response;
     }
 
+    // 私聊发起：同一对用户只会创建一个会话，重复发起返回已有会话
     @Transactional(rollbackFor = Exception.class)
     public ImConversationSummaryResponse startCurrentEmployeePrivateConversation(StartPrivateConversationRequest request) {
         Long currentUserId = requireActiveEmployeeUserId();
@@ -163,6 +164,7 @@ public class ImService {
             throw new BizException(400, "不能和自己发起私聊");
         }
 
+        // 权限校验：只允许直属上下级或同群成员之间私聊
         ImUserRelationRow currentUser = imRepository.findActiveOrgUser(currentUserId)
             .orElseThrow(() -> new BizException(403, "当前员工不可发起私聊"));
         ImUserRelationRow targetUser = imRepository.findActiveOrgUser(targetUserId)
@@ -172,6 +174,7 @@ public class ImService {
             throw new BizException(403, "只能和直属上级、直属下级或同群成员发起私聊");
         }
 
+        // 用 conversationKey 保证同一对用户只有一个私聊会话
         String conversationKey = privateConversationKey(currentUserId, targetUserId);
         Long conversationId = imRepository.findActiveConversationIdByKey(conversationKey)
             .orElseGet(() -> createPrivateConversation(currentUser, targetUser, conversationKey));
@@ -195,6 +198,7 @@ public class ImService {
         if (!StringUtils.hasText(text) && attachmentRefIds.isEmpty()) {
             throw new BizException(400, "消息内容不能为空");
         }
+        // SELECT FOR UPDATE 锁住会话，保证 seqNo 单调递增不冲突
         Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(conversationId);
         if (lastSeq == null) {
             throw new BizException(404, "会话不存在");
@@ -203,6 +207,7 @@ public class ImService {
         String messageType = normalizeMessageType(request.getMessageType(), StringUtils.hasText(text), !attachmentRefIds.isEmpty());
         String clientMessageId = normalizeClientMessageId(request.getClientMessageId());
         Long quotedMessageId = normalizeQuotedMessageId(conversationId, request.getQuotedMessageId());
+        // 幂等：客户端带了 clientMessageId 时，重复发送返回已有消息
         if (clientMessageId != null) {
             ImMessageResponse existing = imMessageRepository.findMessageByClientMessageId(
                 conversationId,

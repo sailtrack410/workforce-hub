@@ -41,6 +41,7 @@ import java.util.Set;
 /**
  * IM 会话中的 Agent 创建、触发和回写服务。
  */
+// Agent 会话生命周期：创建会话 → 用户发消息触发 AI → 异步执行 → 回写消息到会话
 @Service
 public class ImAgentConversationService {
 

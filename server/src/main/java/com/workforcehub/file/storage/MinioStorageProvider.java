@@ -53,6 +53,7 @@ public class MinioStorageProvider implements StorageProvider {
         return bucketName;
     }
 
+    // 生成预签名 PUT URL，前端直传 MinIO 不经过后端，减轻服务器压力
     @Override
     public StorageUploadTarget buildUploadTarget(String bucketName, String objectKey, String mimeType, int expireMinutes) {
         try {
@@ -68,6 +69,7 @@ public class MinioStorageProvider implements StorageProvider {
         }
     }
 
+    // 上传后校验：statObject 取大小 + 全量读取计算 SHA-256，防止传输损坏
     @Override
     public void verifyObject(String bucketName, String objectKey, String expectedSha256, Long expectedSize) {
         try {

@@ -29,6 +29,7 @@ import java.util.List;
 /**
  * 后台流程模板治理接口。
  */
+// 流程后台接口：模板/版本/流程类型 CRUD，请求列表，审批操作
 @RestController
 @ConditionalOnProperty(prefix = "workforce.workflow", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequestMapping("/api/admin/workflow")

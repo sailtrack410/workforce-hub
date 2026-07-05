@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 /**
  * 后台管理员 UserDetailsService
  */
+// Spring Security 加载管理员用户：从 admin_user 表查询，构建 GrantedAuthority 列表
 @Service("adminUserDetailsService")
 public class AdminUserDetailsService implements UserDetailsService {
 

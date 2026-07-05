@@ -66,6 +66,7 @@ public class WorkflowExecutor {
         this.leaveService = leaveService;
     }
 
+    // 工作流执行入口：验证配置、初始化上下文、按节点顺序执行
     public WorkflowExecutionResult execute(Long taskId,
                                            Long agentId,
                                            String agentName,

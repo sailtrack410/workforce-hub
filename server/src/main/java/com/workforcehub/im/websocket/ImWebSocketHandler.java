@@ -36,6 +36,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
             """.formatted(LocalDateTime.now())));
     }
 
+    // 心跳响应：兼容纯文本 PING 和 JSON 格式 {"PING"}
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String payload = message.getPayload();

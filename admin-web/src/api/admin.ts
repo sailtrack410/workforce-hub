@@ -86,6 +86,7 @@ import type {
   UpdateRagflowSpaceRequest,
 } from './types';
 
+// 雪花 ID 可能是 BigInt，统一转字符串再 URL 编码
 const pathId = (value: EntityId) => encodeURIComponent(String(value));
 
 export function createAdminApi(client: ApiClient = defaultApiClient) {
@@ -197,6 +198,8 @@ export function createAdminApi(client: ApiClient = defaultApiClient) {
       updateSpace: (spaceId: EntityId, request: UpdateRagflowSpaceRequest) => client.put<RagflowSpaceResponse>(`/api/admin/ragflow/spaces/${pathId(spaceId)}`, request),
       acl: (spaceId: EntityId) => client.get<RagflowAclResponse[]>(`/api/admin/ragflow/spaces/${pathId(spaceId)}/acl`),
       saveAcl: (spaceId: EntityId, request: SaveRagflowAclRequest) => client.put<RagflowAclResponse[]>(`/api/admin/ragflow/spaces/${pathId(spaceId)}/acl`, request),
+      createUploadTicket: (request: CreateUploadTicketRequest) => client.post<UploadTicketResponse>('/api/admin/ragflow/files/upload-tickets', request),
+      confirmUpload: (request: ConfirmUploadRequest) => client.post<AttachmentRefResponse>('/api/admin/ragflow/files/confirm-upload', request),
       documents: (spaceId: EntityId) => client.get<RagflowDocumentResponse[]>(`/api/admin/ragflow/spaces/${pathId(spaceId)}/documents`),
       addDocument: (spaceId: EntityId, attachmentRefId: EntityId) => client.post<RagflowDocumentResponse>(`/api/admin/ragflow/spaces/${pathId(spaceId)}/documents`, { attachmentRefId }),
       reingestDocument: (spaceId: EntityId, documentId: EntityId) => client.post<RagflowDocumentResponse>(`/api/admin/ragflow/spaces/${pathId(spaceId)}/documents/${pathId(documentId)}/reingest`),

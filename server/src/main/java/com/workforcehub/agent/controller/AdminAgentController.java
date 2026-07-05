@@ -41,6 +41,7 @@ import java.util.List;
 /**
  * 后台 Agent 治理接口。
  */
+// Agent 后台接口：Agent/版本/工具/ACL CRUD，LLM 模型管理，任务列表，试运行
 @RestController
 @RequestMapping("/api/admin/agents")
 public class AdminAgentController {

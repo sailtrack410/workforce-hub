@@ -25,6 +25,7 @@ public class RagflowEmbeddingClient {
         this.restClient = restClientBuilder.build();
     }
 
+    // 批量向量化：调用 Embedding API，校验返回数量和维度一致性
     public List<List<Double>> embed(List<String> inputs) {
         RagflowGlobalSettingRow setting = ragflowRepository.getGlobalSetting();
         if (!StringUtils.hasText(setting.embeddingBaseUrl()) || !StringUtils.hasText(setting.embeddingModel())) {
@@ -69,6 +70,7 @@ public class RagflowEmbeddingClient {
         return embed(List.of(input)).get(0);
     }
 
+    // 自动补全 Embedding API 路径：兼容 /v1、/v1/embeddings、裸地址等格式
     private String embeddingUrl(String baseUrl) {
         String trimmed = baseUrl.trim();
         if (trimmed.endsWith("/embeddings")) {

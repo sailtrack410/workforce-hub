@@ -21,6 +21,7 @@ interface UseFileUploadOptions {
   sendSelectedFileToConversation: (file: PersonalFileRecord) => Promise<void>;
 }
 
+// 文件上传 composable：统一处理个人文件上传、IM 附件发送、预览/下载/删除等操作
 export function useFileUpload({
   shell,
   activeFile,
@@ -126,6 +127,7 @@ export function useFileUpload({
     return activeFile.value.files.find((item) => item.attachmentRefId === attachmentRefId);
   }
 
+  // 上传流程：当前在消息页且有活跃会话时走 IM 附件通道，否则走个人文件通道
   async function uploadPersonalFile(file: File): Promise<EntityId | null> {
     fileUploading.value = true;
     uploadResult.value = null;
@@ -193,6 +195,7 @@ export function useFileUpload({
     return employeeApi.files.createDownloadTicket(file.attachmentRefId, { downloadType: 'SINGLE' });
   }
 
+  // 文件预览：先获取下载凭证，再通过 objectUrl 内联展示
   async function openPersonalFilePreview(file: PersonalFileRecord) {
     if (isFileTrashed(file)) return;
     const actionKey = `preview-${file.id}`;

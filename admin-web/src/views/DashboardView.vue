@@ -61,7 +61,7 @@ const storageCards = computed(() => {
 
 <template>
   <AdminSkeleton v-if="loading" :lines="4" />
-  <template v-else>
+  <main v-else class="page-grid">
     <AdminPanel :span="12" title="AI 任务概览">
       <AdminMetricStrip :cards="taskCards" />
     </AdminPanel>
@@ -73,7 +73,7 @@ const storageCards = computed(() => {
     <AdminPanel :span="6" title="存储概览">
       <AdminMetricStrip :cards="storageCards" />
     </AdminPanel>
-  </template>
+  </main>
 </template>
 
 <style scoped>

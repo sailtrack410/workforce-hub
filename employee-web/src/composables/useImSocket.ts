@@ -48,6 +48,7 @@ export function useImSocket({ im, session, shell, syncConversationMessages }: Us
     wsConnected.value = false;
   }
 
+  // 重连策略：前几次快重试，超过阈值后降频到 60s，避免打满服务端
   function scheduleImSocketReconnect() {
     if (!session.isAuthenticated || reconnectTimer) return;
     const delay = reconnectAttempts >= slowReconnectAfterAttempts
@@ -69,6 +70,7 @@ export function useImSocket({ im, session, shell, syncConversationMessages }: Us
         wsConnected.value = true;
         reconnectAttempts = 0;
         void refreshImAfterReconnect();
+        // 30s 心跳保活，防止运营商/网关断开空闲连接
         if (heartbeatTimer) window.clearInterval(heartbeatTimer);
         heartbeatTimer = window.setInterval(() => {
           if (nextSocket.readyState === WebSocket.OPEN) nextSocket.send('PING');
@@ -87,6 +89,7 @@ export function useImSocket({ im, session, shell, syncConversationMessages }: Us
         scheduleImSocketReconnect();
       };
       nextSocket.onerror = () => {
+        // onerror 后浏览器会自动触发 onclose，这里只做兜底关闭
         nextSocket.close();
       };
     } catch {

@@ -146,7 +146,7 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
   --org-line-y: 34px;
   min-width: max-content;
   display: grid;
-  gap: 14px;
+  gap: var(--space-base);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -168,8 +168,8 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
 
 .org-people-branch {
   display: grid;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-base);
 }
 
 .org-dept-node {
@@ -179,12 +179,12 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
   color: var(--ink);
-  padding: 8px;
+  padding: var(--space-sm);
   text-align: left;
   box-shadow: var(--shadow-sm);
 }
@@ -198,7 +198,7 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
   border: 2px solid var(--green);
   border-radius: var(--radius-circle);
   background: var(--panel-strong);
-  box-shadow: 0 0 0 3px rgba(0, 137, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
 }
 
 .org-link-port.left { left: -5px; }
@@ -212,7 +212,7 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
 }
 
 .org-dept-node.virtual {
-  background: #eef6ff;
+  background: var(--hover-bg);
 }
 
 .org-dept-main {
@@ -221,7 +221,7 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   border: 0;
   background: transparent;
   color: inherit;
@@ -260,7 +260,7 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
 .org-node-count {
   gap: 4px;
   color: var(--green);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .org-node-actions {
@@ -298,14 +298,14 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--ink);
-  padding: 7px 10px;
+  padding: var(--space-sm) var(--space-md);
   text-align: left;
 }
 
 .org-employee-meta {
   min-width: 0;
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .org-employee-meta span {

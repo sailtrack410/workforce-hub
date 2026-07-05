@@ -26,6 +26,7 @@ type StoreWorkflow = ReturnType<typeof useWorkflowStore>;
 type ReadonlyRef<T> = ComputedRef<T> | Readonly<Ref<T>>;
 type RunSectionAction = (action?: SectionAction) => void;
 
+// Shell 上下文 provide/inject：将 Store、refs、actions 通过类型安全的 InjectionKey 注入子组件
 export interface MessagesSectionContext {
   shell: StoreShell;
   im: StoreIm;
@@ -95,6 +96,14 @@ export interface ContactsSectionContext {
   openContactRemarkEditor: (contact: ContactRecord) => void;
 }
 
+export interface AgentsSectionContext {
+  shell: StoreShell;
+  im: StoreIm;
+  showToast: (message: string) => void;
+  navigateMessagesConversation: (id: string) => void;
+  startAgentConversationFromSearch: (agent: AgentResponse) => Promise<void>;
+}
+
 export interface EmptySectionContext {
   currentMeta: ReadonlyRef<SectionMeta>;
   businessEmptyTitle: ReadonlyRef<string>;
@@ -108,6 +117,7 @@ export interface EmployeeShellContexts {
   files: FilesSectionContext;
   settings: SettingsSectionContext;
   contacts: ContactsSectionContext;
+  agents: AgentsSectionContext;
   empty: EmptySectionContext;
 }
 
@@ -117,6 +127,7 @@ const workbenchSectionContextKey: InjectionKey<WorkbenchSectionContext> = Symbol
 const filesSectionContextKey: InjectionKey<FilesSectionContext> = Symbol('files-section-context');
 const settingsSectionContextKey: InjectionKey<SettingsSectionContext> = Symbol('settings-section-context');
 const contactsSectionContextKey: InjectionKey<ContactsSectionContext> = Symbol('contacts-section-context');
+const agentsSectionContextKey: InjectionKey<AgentsSectionContext> = Symbol('agents-section-context');
 const emptySectionContextKey: InjectionKey<EmptySectionContext> = Symbol('empty-section-context');
 
 function injectStrict<T>(key: InjectionKey<T>, name: string) {
@@ -151,6 +162,10 @@ export function provideContactsSectionContext(context: ContactsSectionContext) {
   provide(contactsSectionContextKey, context);
 }
 
+export function provideAgentsSectionContext(context: AgentsSectionContext) {
+  provide(agentsSectionContextKey, context);
+}
+
 export function provideEmptySectionContext(context: EmptySectionContext) {
   provide(emptySectionContextKey, context);
 }
@@ -162,6 +177,7 @@ export function provideEmployeeShellContexts(contexts: EmployeeShellContexts) {
   provideFilesSectionContext(contexts.files);
   provideSettingsSectionContext(contexts.settings);
   provideContactsSectionContext(contexts.contacts);
+  provideAgentsSectionContext(contexts.agents);
   provideEmptySectionContext(contexts.empty);
 }
 
@@ -187,6 +203,10 @@ export function useSettingsSectionContext() {
 
 export function useContactsSectionContext() {
   return injectStrict(contactsSectionContextKey, 'Contacts section context');
+}
+
+export function useAgentsSectionContext() {
+  return injectStrict(agentsSectionContextKey, 'Agents section context');
 }
 
 export function useEmptySectionContext() {

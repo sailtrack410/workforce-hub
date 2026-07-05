@@ -90,6 +90,7 @@ import static com.workforcehub.common.util.TextValues.trimToNull;
 /**
  * module-agent 第一批治理、授权、任务和工具调用服务。
  */
+// Agent 核心服务：Agent/版本/工具/ACL CRUD，任务创建与执行，LLM 模型管理，试运行
 @Service
 public class AgentService {
 

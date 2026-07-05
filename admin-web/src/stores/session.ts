@@ -56,6 +56,7 @@ export const useSessionStore = defineStore('admin-session', {
       this.error = '';
       try {
         const loginResult = await authApi.login(request);
+        // login 接口可能不返回完整用户信息，用 me() 补全；me() 失败则降级用 login 返回值
         this.user = await authApi.me().catch(() => loginResult as CurrentUserResponse);
         return loginResult;
       } catch (error) {

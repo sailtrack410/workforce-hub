@@ -38,6 +38,7 @@ import static com.workforcehub.common.util.TextValues.trimToNull;
 @Service
 public class RagflowAdminService {
 
+    // 知识库可见范围枚举：PRIVATE 仅自己、ROLE/DEPARTMENT/POSITION 按组织维度、PUBLIC 全员可见
     private static final Set<String> VISIBILITIES = Set.of("PRIVATE", "ROLE", "DEPARTMENT", "POSITION", "PUBLIC");
     private static final Set<String> STATUSES = Set.of("ACTIVE", "INACTIVE");
     private static final Set<String> SUBJECT_TYPES = Set.of("ROLE", "DEPARTMENT", "POSITION");
@@ -165,6 +166,7 @@ public class RagflowAdminService {
             .toList();
     }
 
+    // 添加文档：先校验附件归属，再创建文档记录和入库任务，最后异步触发向量化入库
     @Transactional(rollbackFor = Exception.class)
     public RagflowDocumentResponse addDocument(Long spaceId, AddRagflowDocumentRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
@@ -238,6 +240,7 @@ public class RagflowAdminService {
             .orElseThrow(() -> new BizException(500, "文档重新入库失败"));
     }
 
+    // 删除文档：软删除数据库记录 + 停用向量，向量清理失败不影响主流程
     @Transactional(rollbackFor = Exception.class)
     public void deleteDocument(Long spaceId, Long documentId) {
         Long operatorId = CurrentUserHolder.requireUserId();
@@ -418,6 +421,7 @@ public class RagflowAdminService {
         return value;
     }
 
+    // 根据 MIME 类型和文件名后缀自动选择解析器：PDF/WORD/PPT/OCR/TABLE/TEXT
     private String parserType(String mimeType, String fileName) {
         String text = ((mimeType == null ? "" : mimeType) + " " + (fileName == null ? "" : fileName)).toLowerCase(Locale.ROOT);
         if (text.contains("pdf")) return "PDF";

@@ -44,6 +44,7 @@ import static com.workforcehub.common.util.TextValues.blankToNull;
 /**
  * module-im 群聊资料与成员治理服务。
  */
+// 群聊管理：创建/解散群、成员增删、群资料维护、群文件管理
 @Service
 public class ImGroupService {
 

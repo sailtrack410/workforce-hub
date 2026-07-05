@@ -72,8 +72,9 @@ function handleCancel() {
 
 .confirm-dialog {
   width: min(400px, 90vw);
-  padding: 24px;
-  border-radius: 10px;
+  padding: var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
   background: var(--panel-strong);
   box-shadow: var(--shadow);
 }
@@ -85,13 +86,13 @@ function handleCancel() {
 .confirm-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
 .confirm-header h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--text-md);
 }
 
 .confirm-icon-danger {
@@ -99,16 +100,16 @@ function handleCancel() {
 }
 
 .confirm-dialog p {
-  margin: 0 0 20px;
+  margin: 0 0 var(--space-lg);
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-base);
   line-height: 1.5;
 }
 
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
 }
 </style>

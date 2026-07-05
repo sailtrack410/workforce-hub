@@ -45,6 +45,7 @@ import java.util.List;
 /**
  * 后台文件中心治理接口。
  */
+// 后台文件接口：配额策略 CRUD、清理任务触发、存储摘要、后台文件列表
 @RestController
 @RequestMapping("/api/admin/files")
 public class AdminFileController {

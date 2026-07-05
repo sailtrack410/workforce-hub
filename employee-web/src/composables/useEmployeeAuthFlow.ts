@@ -67,6 +67,7 @@ export function useEmployeeAuthFlow({ session, loadAuthenticatedWorkspace }: Use
     }
   }
 
+  // 登录流程是多步的：先密码验证，再根据后端返回判断是否需要邮箱二验或绑定
   async function submitLogin() {
     authNotice.value = '';
     try {
@@ -76,6 +77,7 @@ export function useEmployeeAuthFlow({ session, loadAuthenticatedWorkspace }: Use
         emailCode: loginRequiresEmailCode.value || loginRequiresEmailBinding.value ? loginEmailCode.value.trim() : undefined,
         bindEmail: loginRequiresEmailBinding.value ? loginBindEmail.value.trim() : undefined,
       });
+      // 后端返回 requiresEmailBinding 说明未绑定邮箱，需要先完成邮箱绑定
       if (result?.requiresEmailBinding) {
         loginRequiresEmailBinding.value = true;
         loginRequiresEmailCode.value = false;
@@ -83,6 +85,7 @@ export function useEmployeeAuthFlow({ session, loadAuthenticatedWorkspace }: Use
         authNotice.value = '请输入邮箱并获取验证码';
         return;
       }
+      // 后端返回 requiresEmailCode 说明已绑定邮箱，需要输入验证码
       if (result?.requiresEmailCode) {
         loginRequiresEmailCode.value = true;
         loginRequiresEmailBinding.value = false;
@@ -90,6 +93,7 @@ export function useEmployeeAuthFlow({ session, loadAuthenticatedWorkspace }: Use
         await sendLoginCode();
         return;
       }
+      // 登录成功，清空敏感字段并加载工作区
       password.value = '';
       loginEmailCode.value = '';
       loginRequiresEmailCode.value = false;

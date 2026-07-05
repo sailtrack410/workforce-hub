@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 /**
  * 文件中心用量账本读写服务。
  */
+// 用量台账：记录每个用户/群的已用字节数和文件数，用于配额校验和统计
 @Service
 public class StorageUsageLedgerService {
 

@@ -24,6 +24,7 @@ import java.util.List;
  * 文件上传确认服务。
  * 负责把已上传对象确认成附件引用，并完成去重、配额记账与审计。
  */
+// 上传确认：校验文件对象 → SHA-256 去重 → 创建附件引用 → 更新配额台账 → 审计日志
 @Service
 public class FileUploadConfirmService {
 

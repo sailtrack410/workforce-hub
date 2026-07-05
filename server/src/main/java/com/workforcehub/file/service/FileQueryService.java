@@ -25,6 +25,7 @@ import java.util.List;
 /**
  * 文件列表查询服务。
  */
+// 文件查询：员工文件列表/回收站、后台文件列表、文件夹树、文件移动/复制
 @Service
 public class FileQueryService {
 

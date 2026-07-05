@@ -42,6 +42,7 @@ public class ImWebSocketOutboxDispatcher {
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
+    // 定时轮询 outbox 表，把待推送的事件发给在线用户的 WebSocket
     @Scheduled(
         fixedDelayString = "${workforce.im.outbox.dispatcher.fixed-delay-ms:3000}",
         initialDelayString = "${workforce.im.outbox.dispatcher.initial-delay-ms:3000}"

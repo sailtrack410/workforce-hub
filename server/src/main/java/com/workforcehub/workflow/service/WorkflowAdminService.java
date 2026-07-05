@@ -46,6 +46,7 @@ import static com.workforcehub.common.util.TextValues.blankToNull;
 /**
  * module-workflow 后台流程模板治理服务。
  */
+// 流程模板治理：模板/版本/流程类型 CRUD，请求列表查询，审批操作记录
 @Service
 @ConditionalOnProperty(prefix = "workforce.workflow", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class WorkflowAdminService {
@@ -369,7 +370,12 @@ public class WorkflowAdminService {
             if (node.isObject()) {
                 ObjectNode ordered = objectMapper.createObjectNode();
                 putIfPresent(ordered, node, "decision");
+                putIfPresent(ordered, node, "conclusion");
                 putIfPresent(ordered, node, "reason");
+                putIfPresent(ordered, node, "suggestion");
+                putIfPresent(ordered, node, "riskLevel");
+                putIfPresent(ordered, node, "reviewMode");
+                putIfPresent(ordered, node, "checks");
                 node.fields().forEachRemaining(entry -> {
                     if (!ordered.has(entry.getKey())) {
                         ordered.set(entry.getKey(), entry.getValue());

@@ -30,6 +30,7 @@ public class WorkflowParser {
         }
     }
 
+    // 解析工作流 JSON：提取节点和边，CONDITION 节点自动从 branches/default 补全边
     public WorkflowDefinition parse(String workflowConfigJson) {
         try {
             JsonNode root = objectMapper.readTree(workflowConfigJson);
@@ -78,6 +79,7 @@ public class WorkflowParser {
         }
     }
 
+    // INTENT 节点边归一化：只有一条直连边时，自动扩展为每个 intent 分支各一条边
     private void normalizeIntentEdges(List<WorkflowEdge> edges, WorkflowNode node) {
         List<WorkflowEdge> direct = edges.stream()
             .filter(edge -> node.id().equals(edge.from()) && StringUtils.hasText(edge.to()))

@@ -104,6 +104,32 @@ describe('adminApi', () => {
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ ocrBaseUrl: 'http://ocr.local', ocrApiKey: 'test-key', ocrModel: 'ocr-v1', retrievalTopK: 8 });
   });
 
+  it('maps ragflow upload endpoints under ragflow permission path', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ uploadTicketId: '1', deduplicated: false, headers: {} }));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.ragflow.createUploadTicket({
+      ownerType: 'RAGFLOW_DOCUMENT',
+      ownerId: '9001',
+      fileName: 'handbook.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 12,
+      contentSha256: 'a'.repeat(64),
+    });
+    await api.ragflow.confirmUpload({
+      uploadTicketId: '1',
+      objectKey: 'uploads/handbook.pdf',
+      contentSha256: 'a'.repeat(64),
+      fileSize: 12,
+      ownerType: 'RAGFLOW_DOCUMENT',
+      ownerId: '9001',
+      displayName: 'handbook.pdf',
+    });
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/ragflow/files/upload-tickets');
+    expect(fetcher.mock.calls[1][0]).toBe('/api/admin/ragflow/files/confirm-upload');
+  });
+
   it('maps rbac endpoints', async () => {
     const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
     const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));

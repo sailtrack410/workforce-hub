@@ -28,6 +28,7 @@ public class WorkflowValidator {
         this.parser = parser;
     }
 
+    // 工作流校验：解析 JSON → 校验节点 → 校验边 → 可达性 → 环路检测
     public WorkflowValidationResult validate(String workflowConfigJson) {
         List<String> messages = new ArrayList<>();
         WorkflowDefinition definition;
@@ -114,6 +115,7 @@ public class WorkflowValidator {
         }
     }
 
+    // 从 START 节点出发做 BFS，检查是否存在不可达的孤立节点
     private void validateReachability(WorkflowDefinition definition, List<String> messages) {
         WorkflowNode start = definition.startNode();
         if (start == null) {
@@ -139,6 +141,7 @@ public class WorkflowValidator {
         }
     }
 
+    // DFS 检测环路：visiting 集合记录当前递归栈，遇到栈中节点即存在环
     private void validateAcyclic(WorkflowDefinition definition, List<String> messages) {
         Map<String, List<String>> outgoing = outgoing(definition);
         Set<String> visiting = new HashSet<>();

@@ -26,6 +26,7 @@ import java.util.List;
 /**
  * 文件中心配额策略服务。
  */
+// 配额管理：策略 CRUD、个人/全局配额计算、超额校验、存储摘要统计
 @Service
 public class FileQuotaPolicyService {
 

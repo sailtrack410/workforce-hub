@@ -21,6 +21,7 @@ import java.util.List;
 /**
  * 后台 RBAC 管理服务。
  */
+// RBAC 权限管理：角色 CRUD、权限分配、用户角色绑定，直接操作数据库而非 ORM
 @Service
 public class RbacService {
 

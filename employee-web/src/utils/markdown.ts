@@ -15,6 +15,7 @@ function renderInlineMarkdown(value: string) {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|mailto:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
 }
 
+// 轻量 Markdown 转 HTML：支持标题、列表、代码块、引用、加粗/斜体/链接
 export function renderMarkdownText(value?: string | null) {
   if (!value) return '';
   const lines = value.replace(/\r\n/g, '\n').split('\n');

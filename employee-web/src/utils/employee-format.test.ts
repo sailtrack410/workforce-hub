@@ -6,6 +6,7 @@ import {
   entityIdListFromText,
   formatDateTime,
   minutesToDayLabel,
+  parseAgentPreReviewDecision,
   percentage,
   punchTypeLabel,
   statusText,
@@ -21,7 +22,18 @@ describe('employee format helpers', () => {
     expect(statusText('UNKNOWN')).toBe('UNKNOWN');
     expect(bizTypeLabel('LEAVE')).toBe('请假');
     expect(punchTypeLabel('OFF_DUTY')).toBe('下班');
-    expect(actionTypeLabel('AGENT_PRE_REVIEW')).toBe('Agent预审');
+    expect(actionTypeLabel('AGENT_PRE_REVIEW')).toBe('AI 预审');
+  });
+
+  it('parses agent pre-review decision suggestions', () => {
+    expect(parseAgentPreReviewDecision('{"decision":"APPROVED","reason":"AI预审通过"}')).toMatchObject({
+      decision: 'APPROVED',
+      conclusion: '建议进入直属上级审批',
+      suggestion: '建议直属上级核对请假时段、假期余额、工作交接和必要附件后审批',
+    });
+    expect(parseAgentPreReviewDecision('{"decision":"APPROVED","suggestion":"核对附件","checks":[{"name":"附件","result":"待核对"}]}')?.checks).toEqual([
+      { name: '附件', result: '待核对', status: '' },
+    ]);
   });
 
   it('keeps date, percent, duration, and id parsing behavior stable', () => {

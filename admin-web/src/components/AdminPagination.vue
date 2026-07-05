@@ -92,7 +92,7 @@ function onPageSizeChange(e: Event) {
 .pagination {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   margin-top: var(--space-lg);
   flex-wrap: wrap;
 }
@@ -108,7 +108,7 @@ function onPageSizeChange(e: Event) {
   background: var(--panel-strong);
   color: var(--ink);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   padding: 0 6px;
 }

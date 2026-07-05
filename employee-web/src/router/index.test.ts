@@ -16,6 +16,7 @@ describe('employee router', () => {
     ['/todos/todo-1001', 'employee-todo-detail', 'todos'],
     ['/workbench', 'employee-workbench', 'workbench'],
     ['/workbench/leave', 'employee-workbench-detail', 'workbench'],
+    ['/workbench/oa', 'employee-workbench-detail', 'workbench'],
     ['/files', 'employee-files', 'files'],
     ['/contacts', 'employee-contacts', 'contacts'],
     ['/settings', 'employee-settings', 'settings'],

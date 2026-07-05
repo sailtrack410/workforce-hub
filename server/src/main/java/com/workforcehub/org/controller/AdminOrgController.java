@@ -31,6 +31,7 @@ import java.util.List;
 /**
  * 后台组织与人员查询接口
  */
+// 组织后台接口：部门/岗位/员工 CRUD，员工状态变更，账号管理
 @RestController
 @RequestMapping("/api/admin")
 public class AdminOrgController {

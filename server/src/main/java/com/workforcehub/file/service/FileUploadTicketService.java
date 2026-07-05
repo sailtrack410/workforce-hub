@@ -66,6 +66,7 @@ public class FileUploadTicketService {
         this.auditLogWriter = auditLogWriter;
     }
 
+    // 员工上传票据：幂等（同 clientRequestId 返回已有票据）、校验配额、秒传检测
     @Transactional(rollbackFor = Exception.class)
     public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();

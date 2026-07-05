@@ -37,6 +37,7 @@ public class RagflowKnowledgeSearchService {
             .toList();
     }
 
+    // 向量检索：先 embed 查询文本，再按相似度阈值过滤，最后补上文档标题
     public List<RagflowSearchHitRow> searchRows(Long spaceId, String query, int topK) {
         RagflowSpaceRow space = ragflowRepository.getSpaceOrThrow(spaceId);
         vectorRepository.requireAvailable();

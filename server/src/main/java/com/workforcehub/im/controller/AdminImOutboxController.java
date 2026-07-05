@@ -26,6 +26,7 @@ import java.util.List;
 /**
  * 后台 IM WebSocket outbox 治理接口。
  */
+// Outbox 治理接口：投递状态摘要、事件列表、审计日志、批量重试
 @RestController
 @RequestMapping("/api/admin/im/outbox-events")
 public class AdminImOutboxController {

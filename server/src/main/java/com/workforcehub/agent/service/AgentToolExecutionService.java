@@ -23,6 +23,7 @@ import static com.workforcehub.common.util.JsonValues.write;
 /**
  * Agent 工具执行器，供同步任务和人工确认恢复执行复用。
  */
+// 工具执行：根据 toolCode 路由到具体实现（组织查询、假期、考勤、知识库搜索）
 @Service
 public class AgentToolExecutionService {
 

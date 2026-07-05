@@ -46,6 +46,7 @@ function overlapMinutes(rangeStart: Date, rangeEnd: Date, segmentStart: Date, se
   return Math.round((end - start) / 60000);
 }
 
+// 按半天（4h）为最小单位计算请假时长，只计算工作时间段（9-12, 13-18）
 function calculateLeaveDurationMinutes(startAt: string, endAt: string) {
   if (!startAt || !endAt) return 0;
   const start = new Date(startAt);
@@ -70,6 +71,7 @@ function calculateLeaveDurationMinutes(startAt: string, endAt: string) {
     cursor.setHours(0, 0, 0, 0);
   }
   if (minutes <= 0) return 0;
+  // 向上取整到半天
   return Math.ceil(minutes / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
 }
 
@@ -254,6 +256,7 @@ export function useWorkbenchState({
     showToast,
   });
 
+  // 用 Promise.allSettled 并行加载，任一接口失败不影响其他数据展示
   async function refreshWorkbenchData() {
     if (workbenchLoading.value) return;
     workbenchLoading.value = true;
@@ -280,6 +283,7 @@ export function useWorkbenchState({
       leaveAccounts.value = accounts;
       attendanceExceptions.value = exceptions;
       attendanceDailyResults.value = dailyResults;
+      // 初始化请假表单的假种选择
       const selectableTypes = resolveSelectableLeaveTypes(types, accounts);
       if (
         !leaveForm.value.leaveTypeId
@@ -358,6 +362,7 @@ export function useWorkbenchState({
     }
   }
 
+  // 用 requestSeq 防止快速切换时旧请求覆盖新数据
   async function loadWorkflowRequestDetail(requestId: EntityId) {
     const requestSeq = workflowDetailRequestSeq + 1;
     workflowDetailRequestSeq = requestSeq;

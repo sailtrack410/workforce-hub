@@ -49,6 +49,7 @@ public class RagflowIngestService {
         this.restClient = restClientBuilder.build();
     }
 
+    // 文档入库主流程：读取文件 → 解析文本 → 分块 → 向量化 → 写入向量库 → 更新状态
     public void ingest(Long spaceId, Long documentId, Long jobId, Long fileObjectId, String title, String mimeType, String parserType) {
         ragflowRepository.markIngestRunning(documentId, jobId);
         try {
@@ -75,6 +76,7 @@ public class RagflowIngestService {
         }
     }
 
+    // 文本提取策略：图片走 OCR，纯文本直接读取，其余用 Tika 自动检测解析
     private String parseText(byte[] bytes, String title, String mimeType, String parserType) {
         String text = ((mimeType == null ? "" : mimeType) + " " + (title == null ? "" : title) + " " + (parserType == null ? "" : parserType)).toLowerCase(Locale.ROOT);
         if (text.contains("image") || text.endsWith(".png") || text.endsWith(".jpg") || text.endsWith(".jpeg") || text.endsWith(".webp") || text.contains("ocr")) {
@@ -136,6 +138,7 @@ public class RagflowIngestService {
         return ragflowRepository.getRawOcrApiKey();
     }
 
+    // 文本分块：按 chunkSize 切分，overlap 保证上下文连续性，避免语义截断
     private List<String> splitChunks(String text, RagflowGlobalSettingRow setting) {
         String normalized = text == null ? "" : text.trim();
         if (!StringUtils.hasText(normalized)) {

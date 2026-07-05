@@ -16,6 +16,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 /**
  * 按员工用户 ID 维护当前活跃 IM WebSocket 连接。
  */
+// WebSocket 会话注册表：ConcurrentHashMap 存储每个用户的多个连接（多标签页），支持广播推送
 @Component
 public class ImWebSocketSessionRegistry {
 

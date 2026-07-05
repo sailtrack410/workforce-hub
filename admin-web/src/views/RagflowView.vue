@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { ArrowLeft, Download, Plus, RefreshCcw, Save, Search, Settings, Trash2, Upload } from 'lucide-vue-next';
+import { ArrowLeft, Download, Plus, RefreshCcw, Save, Search, Settings, Trash2, Upload, X } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type { EntityId, RagflowAclResponse, RagflowDocumentResponse, RagflowGlobalSettingResponse, RagflowSearchTestResponse, RagflowSpaceResponse } from '@/api/types';
 import { errorMessage, formatBytes, formatDateTime, statusLabel } from '@/utils/format';
@@ -29,6 +29,10 @@ const keyword = ref('');
 const createVisible = ref(false);
 const settingsVisible = ref(false);
 const globalSettingsVisible = ref(false);
+const uploadVisible = ref(false);
+const uploadDragActive = ref(false);
+const uploadProgress = ref(0);
+const uploadStatus = ref('');
 const selectedFile = ref<File | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const searchQuery = ref('');
@@ -387,19 +391,48 @@ function removeAcl(row: RagflowAclResponse) {
 
 function handleFileChange(event: Event) {
   selectedFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+  uploadProgress.value = 0;
+  uploadStatus.value = '';
 }
 
 function openFilePicker() {
   fileInputRef.value?.click();
 }
 
+function openUploadDialog() {
+  selectedFile.value = null;
+  uploadDragActive.value = false;
+  uploadProgress.value = 0;
+  uploadStatus.value = '';
+  if (fileInputRef.value) fileInputRef.value.value = '';
+  uploadVisible.value = true;
+}
+
+function closeUploadDialog() {
+  if (uploading.value) return;
+  uploadVisible.value = false;
+  uploadDragActive.value = false;
+}
+
+function handleFileDrop(event: DragEvent) {
+  uploadDragActive.value = false;
+  selectedFile.value = event.dataTransfer?.files?.[0] ?? null;
+  uploadProgress.value = 0;
+  uploadStatus.value = '';
+  if (fileInputRef.value) fileInputRef.value.value = '';
+}
+
 async function uploadDocument() {
   if (!selected.value || !selectedFile.value) return;
   uploading.value = true;
+  uploadProgress.value = 0;
+  uploadStatus.value = '校验文件';
   try {
     const file = selectedFile.value;
     const contentSha256 = await sha256Hex(file);
-    const ticket = await adminApi.files.createUploadTicket({
+    uploadProgress.value = 10;
+    uploadStatus.value = '创建上传票据';
+    const ticket = await adminApi.ragflow.createUploadTicket({
       ownerType: 'RAGFLOW_DOCUMENT',
       ownerId: selected.value.spaceId,
       fileName: file.name,
@@ -408,16 +441,22 @@ async function uploadDocument() {
       contentSha256,
       clientRequestId: createClientId(`ragflow-${selected.value.spaceId}-${file.name}`),
     });
+    uploadProgress.value = 20;
     let attachmentRefId = ticket.attachmentRefId;
     if (!ticket.deduplicated) {
       if (!ticket.uploadTicketId || !ticket.objectKey || !ticket.uploadUrl) {
         throw new Error('上传地址不可用');
       }
-      const uploadResponse = await uploadToTicketTarget(ticket.uploadUrl, file, normalizeUploadHeaders(ticket.headers, file));
+      uploadStatus.value = '上传文件';
+      const uploadResponse = await uploadToTicketTarget(ticket.uploadUrl, file, normalizeUploadHeaders(ticket.headers, file), (percent) => {
+        uploadProgress.value = Math.max(uploadProgress.value, Math.min(80, 20 + Math.round(percent * 0.6)));
+      });
       if (!uploadResponse.ok) {
         throw new Error(await uploadResponse.text().catch(() => '') || '文件上传失败');
       }
-      const attachment = await adminApi.files.confirmUpload({
+      uploadProgress.value = 85;
+      uploadStatus.value = '确认文件';
+      const attachment = await adminApi.ragflow.confirmUpload({
         uploadTicketId: ticket.uploadTicketId,
         objectKey: ticket.objectKey,
         contentSha256,
@@ -427,15 +466,29 @@ async function uploadDocument() {
         displayName: file.name,
       });
       attachmentRefId = attachment.attachmentRefId;
+    } else {
+      uploadProgress.value = 85;
+      uploadStatus.value = '复用文件';
     }
     if (!attachmentRefId) throw new Error('附件引用不可用');
+    uploadProgress.value = 90;
+    uploadStatus.value = '加入知识库';
     await adminApi.ragflow.addDocument(selected.value.spaceId, attachmentRefId);
+    uploadProgress.value = 95;
+    uploadStatus.value = '刷新列表';
     selectedFile.value = null;
+    if (fileInputRef.value) fileInputRef.value.value = '';
     await loadDocuments();
     await loadList();
+    uploadProgress.value = 100;
+    uploadStatus.value = '上传完成';
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    uploadVisible.value = false;
     toast.success('文件已上传');
   } catch (e) {
-    toast.error(errorMessage(e));
+    uploadProgress.value = 0;
+    uploadStatus.value = errorMessage(e);
+    toast.error(uploadStatus.value);
   } finally {
     uploading.value = false;
   }
@@ -510,21 +563,30 @@ function createClientId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 }
 
-function uploadToTicketTarget(uploadUrl: string, file: File, uploadHeaders: Record<string, string>) {
-  if (/^https?:\/\//i.test(uploadUrl)) {
-    return fetch(uploadUrl, {
-      method: 'PUT',
-      body: file,
-      headers: uploadHeaders,
-    });
-  }
-  return fetch('/__admin-local-upload', {
-    method: 'PUT',
-    body: file,
-    headers: {
+function uploadToTicketTarget(uploadUrl: string, file: File, uploadHeaders: Record<string, string>, onProgress: (percent: number) => void) {
+  const remote = /^https?:\/\//i.test(uploadUrl);
+  const requestUrl = remote ? uploadUrl : '/__admin-local-upload';
+  const headers = remote
+    ? uploadHeaders
+    : {
       'Content-Type': uploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
       'X-Upload-Path': uploadUrl,
-    },
+    };
+  return new Promise<Response>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', requestUrl);
+    Object.entries(headers).forEach(([key, value]) => {
+      if (value) xhr.setRequestHeader(key, value);
+    });
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.onload = () => resolve(new Response(xhr.responseText, { status: xhr.status, statusText: xhr.statusText }));
+    xhr.onerror = () => reject(new Error('文件上传失败'));
+    xhr.onabort = () => reject(new Error('文件上传已取消'));
+    xhr.send(file);
   });
 }
 
@@ -627,7 +689,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
           </button>
           <div class="kb-detail-title">
             <h2>{{ currentTitle }}</h2>
-            <span>上传文件、查看向量化进度、测试知识检索</span>
+            <span>文件、向量化进度、知识检索</span>
           </div>
           <div class="kb-detail-actions">
             <button v-if="selected" class="secondary-button" @click="openSettings(selected)">
@@ -650,18 +712,10 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
       <section class="ragflow-detail-layout">
       <AdminPanel title="文件列表">
         <template #actions>
-          <form class="upload-box" @submit.prevent="uploadDocument">
-            <input ref="fileInputRef" class="file-picker-input" type="file" accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.png,.jpg,.jpeg,.webp" @change="handleFileChange" />
-            <button class="ghost-button file-picker-button" type="button" @click="openFilePicker">
-              <Upload :size="16" />
-              <span>选择文件</span>
-            </button>
-            <span class="selected-file-name">{{ selectedFile?.name || '未选择文件' }}</span>
-            <button class="primary-button" :disabled="uploading || !selectedFile" type="submit">
-              <Upload :size="16" />
-              <span>{{ uploading ? '上传中' : '上传文件' }}</span>
-            </button>
-          </form>
+          <button class="primary-button" type="button" @click="openUploadDialog">
+            <Upload :size="16" />
+            <span>上传文件</span>
+          </button>
         </template>
 
         <AdminTable :columns="documentColumns" :rows="documents" :loading="docLoading" row-key="documentId">
@@ -936,6 +990,52 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
         </div>
       </template>
     </AdminConfirmDialog>
+
+    <Teleport to="body">
+      <div v-if="uploadVisible" class="upload-overlay" @click.self="closeUploadDialog">
+        <section class="upload-dialog" role="dialog" aria-modal="true" aria-labelledby="upload-dialog-title">
+          <header class="upload-dialog-head">
+            <h3 id="upload-dialog-title">上传文件</h3>
+            <button class="icon-button" type="button" title="关闭" :disabled="uploading" @click="closeUploadDialog">
+              <X :size="16" />
+            </button>
+          </header>
+
+          <form class="upload-dialog-form" @submit.prevent="uploadDocument">
+            <input ref="fileInputRef" class="file-picker-input" type="file" accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.png,.jpg,.jpeg,.webp" @change="handleFileChange" />
+            <button
+              :class="['upload-dropzone', { active: uploadDragActive }]"
+              type="button"
+              @click="openFilePicker"
+              @dragenter.prevent="uploadDragActive = true"
+              @dragover.prevent="uploadDragActive = true"
+              @dragleave.prevent="uploadDragActive = false"
+              @drop.prevent="handleFileDrop"
+            >
+              <Upload :size="22" />
+              <strong>{{ selectedFile?.name || '拖拽上传' }}</strong>
+              <span>{{ selectedFile ? formatBytes(selectedFile.size) : '选择本地文件' }}</span>
+            </button>
+
+            <div v-if="uploading || uploadStatus" class="upload-progress" role="status" aria-live="polite">
+              <div>
+                <span>{{ uploadStatus || '上传中' }}</span>
+                <strong>{{ uploadProgress }}%</strong>
+              </div>
+              <progress :value="uploadProgress" max="100">{{ uploadProgress }}%</progress>
+            </div>
+
+            <div class="upload-actions">
+              <button class="secondary-button" type="button" :disabled="uploading" @click="openFilePicker">选择本地文件</button>
+              <button class="primary-button" type="submit" :disabled="uploading || !selectedFile">
+                <Upload :size="16" />
+                <span>{{ uploading ? '上传中' : '上传文件' }}</span>
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </Teleport>
   </main>
 </template>
 
@@ -943,7 +1043,6 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 .ragflow-search,
 .acl-form,
 .row-actions,
-.upload-box,
 .search-test,
 .section-head {
   display: flex;
@@ -975,7 +1074,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 .model-setting-grid small {
   color: var(--muted);
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .model-setting-grid strong {
@@ -1037,7 +1136,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
   grid-column: span 12;
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
-  gap: 16px;
+  gap: var(--space-base);
 }
 
 .detail-summary {
@@ -1046,11 +1145,7 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
   gap: var(--space-base);
   color: var(--muted);
   font-size: var(--text-sm);
-  font-weight: 800;
-}
-
-.upload-box {
-  width: min(560px, 100%);
+  font-weight: 700;
 }
 
 .file-picker-input {
@@ -1059,21 +1154,6 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
   height: 1px;
   opacity: 0;
   pointer-events: none;
-}
-
-.file-picker-button {
-  flex: 0 0 auto;
-}
-
-.selected-file-name {
-  min-width: 160px;
-  max-width: 240px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .search-test {
@@ -1177,10 +1257,126 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
   margin-bottom: var(--space-md);
 }
 
+.upload-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: var(--space-xl);
+  background: rgba(0, 20, 60, 0.4);
+}
+
+.upload-dialog {
+  width: min(520px, 92vw);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: var(--space-xl);
+}
+
+.upload-dialog-head,
+.upload-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.upload-dialog-head {
+  margin-bottom: var(--space-base);
+}
+
+.upload-dialog-head h3 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.upload-dialog-form {
+  display: grid;
+  gap: var(--space-base);
+}
+
+.upload-dropzone {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.active {
+  border-color: var(--green);
+  background: var(--hover-bg);
+  color: var(--green-dark);
+}
+
+.upload-dropzone strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-dropzone span {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.upload-progress {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.upload-progress div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.upload-progress strong {
+  color: var(--green-dark);
+}
+
+.upload-progress progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.upload-progress progress::-webkit-progress-bar {
+  background: var(--surface);
+}
+
+.upload-progress progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.upload-progress progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--green);
+}
+
 @media (max-width: 980px) {
   .ragflow-search,
-  .acl-form,
-  .upload-box {
+  .acl-form {
     flex-wrap: wrap;
   }
 
@@ -1209,6 +1405,15 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 @media (max-width: 560px) {
   .model-setting-grid {
     grid-template-columns: 1fr;
+  }
+
+  .upload-dialog {
+    padding: var(--space-base);
+  }
+
+  .upload-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>

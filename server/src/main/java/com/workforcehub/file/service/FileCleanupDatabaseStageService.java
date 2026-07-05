@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// 数据库阶段清理：过期上传/下载票据、回收站过期引用、无引用文件对象
 @Service
 public class FileCleanupDatabaseStageService {
 

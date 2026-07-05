@@ -575,7 +575,7 @@ onMounted(loadPage);
   padding: 0 var(--space-lg);
   background: var(--panel-strong);
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .attendance-tabs button.active {

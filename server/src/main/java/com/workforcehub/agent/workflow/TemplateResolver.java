@@ -20,6 +20,7 @@ public class TemplateResolver {
         this.objectMapper = objectMapper;
     }
 
+    // 字符串模板解析：将 {{variable}} 替换为上下文中的实际值
     public String resolveString(String template, WorkflowContext context) {
         if (template == null) {
             return null;
@@ -34,6 +35,7 @@ public class TemplateResolver {
         return buffer.toString();
     }
 
+    // JSON 模板递归解析：精确匹配 {{var}} 时保留原始类型（数组/对象），否则转为文本替换
     public JsonNode resolveJson(JsonNode node, WorkflowContext context) {
         if (node == null || node.isNull()) {
             return objectMapper.nullNode();

@@ -9,6 +9,7 @@ import {
   Folder,
   Home,
   Search,
+  Upload,
   X,
 } from 'lucide-vue-next';
 import { employeeApi, type AgentResponse, type EmployeeFileFolderResponse, type EmployeeFileResponse, type EntityId, type LeaveAccountResponse } from '@/api';
@@ -22,6 +23,7 @@ import {
   formatDateTime,
   humanizeText,
   minutesToDayLabel,
+  parseAgentPreReviewDecision,
   punchTypeLabel,
   statusText,
   toneOfStatus,
@@ -135,9 +137,12 @@ const attachmentPickerError = ref('');
 const attachmentPickerFolders = ref<EmployeeFileFolderResponse[]>([]);
 const attachmentPickerFiles = ref<PersonalFileRecord[]>([]);
 const attachmentPickerBreadcrumbs = ref<EmployeeFileFolderResponse[]>([]);
+const attachmentUploadInput = ref<HTMLInputElement | null>(null);
+const attachmentUploading = ref(false);
+const attachmentUploadError = ref('');
 let attachmentSearchTimer: number | undefined;
 const agentAvatarUrls = ref<Record<string, string>>({});
-const { resolveDownloadUrl } = usePersonalFileTransfer();
+const { resolveDownloadUrl, uploadPersonalAttachment } = usePersonalFileTransfer();
 
 const currentAttachmentIds = computed(() => (
   attachmentPickerTarget.value === 'leave' ? leaveAttachmentIds.value : clockCorrectionAttachmentIds.value
@@ -207,6 +212,7 @@ function selectedAttachmentFiles(target: AttachmentPickerTarget) {
   const ids = attachmentIdsFor(target);
   return ids.map((id) => (
     activeFile.value.files.find((file) => String(file.attachmentRefId) === String(id))
+    ?? attachmentPickerFiles.value.find((file) => String(file.attachmentRefId) === String(id))
     ?? {
       id: `selected-${id}`,
       name: String(id),
@@ -218,6 +224,34 @@ function selectedAttachmentFiles(target: AttachmentPickerTarget) {
     }
   ));
 }
+
+const workflowProgressSteps = computed(() => {
+  const detail = workflowDetail.value;
+  const hasAgentAction = workflowActions.value.some((action) => action.actionType === 'AGENT_PRE_REVIEW');
+  const currentStepKey = detail?.currentStepKey ?? '';
+  const terminal = detail ? ['APPROVED', 'REJECTED', 'WITHDRAWN'].includes(detail.status) : false;
+  return [
+    { key: 'submitted', label: '提交申请', note: detail ? '已提交' : '待提交', state: detail ? 'done' : 'todo' },
+    {
+      key: 'agent_pre_review',
+      label: 'AI 预审',
+      note: currentStepKey === 'agent_pre_review' ? '当前节点' : (hasAgentAction ? '已通过' : '未触发'),
+      state: currentStepKey === 'agent_pre_review' ? 'active' : (hasAgentAction ? 'done' : 'muted'),
+    },
+    {
+      key: 'manager_approval',
+      label: '直属上级审批',
+      note: currentStepKey === 'manager_approval' ? '当前节点' : (terminal ? '已处理' : '待进入'),
+      state: currentStepKey === 'manager_approval' ? 'active' : (terminal ? 'done' : 'todo'),
+    },
+    { key: 'finished', label: terminal ? statusText(detail?.status ?? '') : '完成', note: terminal ? '已结束' : '未完成', state: terminal ? 'done' : 'todo' },
+  ];
+});
+
+const workflowActionItems = computed(() => workflowActions.value.map((action) => ({
+  action,
+  agentDecision: action.actionType === 'AGENT_PRE_REVIEW' ? parseAgentPreReviewDecision(action.agentDecisionJson) : null,
+})));
 
 async function loadAttachmentPickerFiles() {
   attachmentPickerLoading.value = true;
@@ -241,6 +275,7 @@ async function loadAttachmentPickerFiles() {
 function openAttachmentPicker(target: AttachmentPickerTarget) {
   attachmentPickerTarget.value = target;
   attachmentPickerOpen.value = true;
+  attachmentUploadError.value = '';
   void loadAttachmentPickerFiles();
 }
 
@@ -267,6 +302,50 @@ function toggleAttachment(file: PersonalFileRecord) {
 function removeAttachment(target: AttachmentPickerTarget, attachmentRefId?: EntityId) {
   if (!attachmentRefId) return;
   setAttachmentIdsFor(target, attachmentIdsFor(target).filter((item) => String(item) !== String(attachmentRefId)));
+}
+
+function openAttachmentUpload() {
+  attachmentUploadInput.value?.click();
+}
+
+async function handleAttachmentUploadSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file || attachmentUploading.value) return;
+  attachmentUploading.value = true;
+  attachmentUploadError.value = '';
+  try {
+    const attachment = await uploadPersonalAttachment(file, 'workflow-attachment', attachmentPickerFolderId.value);
+    const uploadedFile: PersonalFileRecord = {
+      id: `workflow-upload-${attachment.attachmentRefId}`,
+      name: attachment.displayName || file.name,
+      type: fileTypeLabelFromName(attachment.displayName || file.name, attachment.mimeType || file.type),
+      size: fileSizeLabel(attachment.fileSize || file.size),
+      createdAt: attachment.createdAt ? formatDateTime(attachment.createdAt) : '',
+      status: attachment.scanStatus ? statusText(attachment.scanStatus) : '已确认',
+      attachmentRefId: attachment.attachmentRefId,
+      folderId: attachmentPickerFolderId.value,
+      mimeType: attachment.mimeType || file.type,
+    };
+    attachmentPickerFiles.value = [
+      uploadedFile,
+      ...attachmentPickerFiles.value.filter((item) => String(item.attachmentRefId) !== String(attachment.attachmentRefId)),
+    ];
+    const ids = attachmentIdsFor(attachmentPickerTarget.value);
+    if (!ids.some((id) => String(id) === String(attachment.attachmentRefId))) {
+      setAttachmentIdsFor(attachmentPickerTarget.value, [...ids, attachment.attachmentRefId]);
+    }
+    await loadAttachmentPickerFiles();
+    if (!attachmentPickerFiles.value.some((item) => String(item.attachmentRefId) === String(attachment.attachmentRefId))) {
+      attachmentPickerFiles.value = [uploadedFile, ...attachmentPickerFiles.value];
+    }
+    showToast('附件已上传');
+  } catch (error) {
+    attachmentUploadError.value = error instanceof Error ? error.message : '附件上传失败';
+  } finally {
+    attachmentUploading.value = false;
+  }
 }
 
 watch([attachmentPickerFolderId, attachmentPickerType], () => {
@@ -419,6 +498,17 @@ watch(agents, (items) => {
             <AppLoadingState v-if="workflowDetailLoading" />
             <AppEmptyState v-else-if="!workflowDetail" title="暂无详情" description="暂无详情" />
             <div v-else class="request-detail-stack">
+              <div class="workflow-node-map" aria-label="流程进度">
+                <span
+                  v-for="step in workflowProgressSteps"
+                  :key="step.key"
+                  :class="`state-${step.state}`"
+                >
+                  <i />
+                  <strong>{{ step.label }}</strong>
+                  <small>{{ step.note }}</small>
+                </span>
+              </div>
               <dl class="field-grid">
                 <div v-for="row in workflowDetailRows" :key="row[0]">
                   <dt>{{ row[0] }}</dt>
@@ -447,10 +537,25 @@ watch(agents, (items) => {
                 </div>
               </div>
               <div class="timeline-list">
-                <span v-for="action in workflowActions" :key="action.actionId">
-                  <strong>{{ actionTypeLabel(action.actionType) }}</strong>
-                  <small>{{ displayField(action.stepName) }} · {{ formatDateTime(action.actedAt) }}</small>
-                  <em v-if="action.comment">{{ action.comment }}</em>
+                <span v-for="item in workflowActionItems" :key="item.action.actionId">
+                  <strong>{{ actionTypeLabel(item.action.actionType) }}</strong>
+                  <small>{{ displayField(item.action.stepName) }} · {{ formatDateTime(item.action.actedAt) }}</small>
+                  <em v-if="item.action.comment">{{ item.action.comment }}</em>
+                  <div v-if="item.agentDecision" class="agent-decision-panel">
+                    <div class="agent-decision-head">
+                      <strong>{{ item.agentDecision.conclusion || statusText(item.agentDecision.decision) }}</strong>
+                      <small v-if="item.agentDecision.riskLevel">风险：{{ item.agentDecision.riskLevel }}</small>
+                      <small v-if="item.agentDecision.reviewMode">{{ item.agentDecision.reviewMode }}</small>
+                    </div>
+                    <p v-if="item.agentDecision.reason">{{ item.agentDecision.reason }}</p>
+                    <p v-if="item.agentDecision.suggestion">建议：{{ item.agentDecision.suggestion }}</p>
+                    <ul v-if="item.agentDecision.checks.length">
+                      <li v-for="check in item.agentDecision.checks" :key="`${check.name}-${check.result}`">
+                        <span>{{ displayField(check.name) }}</span>
+                        <em>{{ displayField(check.result || check.status) }}</em>
+                      </li>
+                    </ul>
+                  </div>
                 </span>
               </div>
               <div v-if="workflowDetail.status === 'IN_APPROVAL'" class="withdraw-box">
@@ -753,7 +858,7 @@ watch(agents, (items) => {
   </section>
 </div>
 
-<AppDialog v-if="attachmentPickerOpen">
+<AppDialog v-if="attachmentPickerOpen" wide>
   <section class="attachment-picker-dialog">
     <header class="dialog-head dialog-head-row">
       <div>
@@ -779,7 +884,13 @@ watch(agents, (items) => {
         <option value="media">音视频</option>
         <option value="code">代码</option>
       </select>
+      <button class="attachment-upload-button" type="button" :disabled="attachmentUploading" @click="openAttachmentUpload">
+        <Upload :size="16" />
+        {{ attachmentUploading ? '上传中' : '上传附件' }}
+      </button>
+      <input ref="attachmentUploadInput" class="visually-hidden-input" type="file" @change="handleAttachmentUploadSelected" />
     </div>
+    <p v-if="attachmentUploadError" class="dialog-error">{{ attachmentUploadError }}</p>
 
     <div class="file-breadcrumb">
       <button type="button" :class="{ active: attachmentPickerFolderId === null }" @click="openAttachmentFolder(null)">

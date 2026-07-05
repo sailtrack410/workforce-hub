@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Bot, Building2, UserRound } from 'lucide-vue-next';
 
 const props = withDefaults(defineProps<{
@@ -22,12 +22,19 @@ const fallbackIcon = computed(() => {
   if (props.kind === 'org') return Building2;
   return UserRound;
 });
+
+const imageFailed = ref(false);
+const showImage = computed(() => Boolean(props.image) && !imageFailed.value);
+
+watch(() => props.image, () => {
+  imageFailed.value = false;
+});
 </script>
 
 <template>
   <span class="ui-avatar-wrap">
-    <span class="ui-avatar" :class="[props.tone, props.size, { 'has-image': !!props.image }]">
-      <img v-if="props.image" :src="props.image" :alt="props.label" />
+    <span class="ui-avatar" :class="[props.tone, props.size, { 'has-image': showImage }]">
+      <img v-if="showImage" :src="props.image" :alt="props.label" @error="imageFailed = true" />
       <component :is="fallbackIcon" v-else :size="props.size === 'sm' ? 15 : props.size === 'xl' ? 34 : 20" aria-hidden="true" />
     </span>
     <span v-if="props.status" class="ui-avatar-status" :class="props.status" />

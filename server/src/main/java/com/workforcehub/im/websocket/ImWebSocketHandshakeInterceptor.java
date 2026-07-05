@@ -21,6 +21,7 @@ import java.util.Map;
 /**
  * 从现有员工登录 Session 解析 WebSocket 身份。
  */
+// WebSocket 握手拦截：从 HTTP Session 中提取已认证的员工身份，拒绝未登录连接
 @Component
 public class ImWebSocketHandshakeInterceptor implements HandshakeInterceptor {
 
