@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.workforcehub.common.util.JsonValues.write;
 import static com.workforcehub.common.util.TextValues.blankToNull;
 
 /**
@@ -442,7 +443,7 @@ public class ImService {
         Long userId = requireActiveEmployeeUserId();
         requireReadableMessage(conversationId, messageId, userId);
         String note = blankToNull(request.getNote());
-        String payloadJson = writeJson(Map.of("note", note == null ? "" : note));
+        String payloadJson = write(objectMapper, Map.of("note", note == null ? "" : note));
         imMessageRepository.upsertUserAction(IdGenerator.nextId(), conversationId, messageId, userId, "REMINDER", payloadJson, request.getRemindAt());
         return new ImMessageActionResponse(messageId, "REMINDER", "ACTIVE");
     }
@@ -720,14 +721,6 @@ public class ImService {
             .filter(model -> "ACTIVE".equals(model.status()) && StringUtils.hasText(model.apiKey()))
             .findFirst()
             .orElse(null);
-    }
-
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new BizException(500, "JSON序列化失败");
-        }
     }
 
     private void pushConversationEventAfterCommit(Long conversationId, ImWebSocketEvent event) {

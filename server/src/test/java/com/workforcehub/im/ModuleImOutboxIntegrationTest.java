@@ -175,7 +175,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/admin/im/outbox-events")
                 .cookie(employeeSession))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(403));
+            .andExpect(jsonPath("$.code").value(100403));
 
         mockMvc.perform(post("/api/admin/im/outbox-events/{eventId}/retry", eventId)
                 .cookie(adminSession))
@@ -306,7 +306,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("outbox事件ID不能为空"));
 
         mockMvc.perform(post("/api/admin/im/outbox-events/batch-retry")
@@ -326,7 +326,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"eventIds\":%s}".formatted(tooManyEventIdsJson())))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("单次批量重试最多支持100个事件"));
     }
 
@@ -356,7 +356,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/admin/im/outbox-events/summary")
                 .cookie(employeeSession))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(403));
+            .andExpect(jsonPath("$.code").value(100403));
     }
 
     @Test
@@ -387,7 +387,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/admin/im/outbox-events/failure-summary")
                 .cookie(employeeSession))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(403));
+            .andExpect(jsonPath("$.code").value(100403));
     }
 
     private void seedPrivateConversation() {

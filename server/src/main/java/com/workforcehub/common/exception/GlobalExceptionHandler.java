@@ -32,14 +32,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public R<Void> handleBadCredentials(BadCredentialsException e) {
-        return R.fail(401, "用户名或密码错误");
+        return R.fail(BusinessErrorCode.UNAUTHORIZED.code(), "用户名或密码错误");
     }
 
     // Spring Security 抛的权限不足，统一返回 403
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public R<Void> handleAccessDenied(AccessDeniedException e) {
-        return R.fail(403, "无权限访问");
+        return R.fail(BusinessErrorCode.FORBIDDEN.code(), "无权限访问");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
     public R<Void> handleValidationException(MethodArgumentNotValidException e) {
         FieldError fieldError = e.getBindingResult().getFieldError();
         String message = fieldError != null ? fieldError.getDefaultMessage() : "参数校验失败";
-        return R.fail(400, message);
+        return R.fail(BusinessErrorCode.BAD_REQUEST.code(), message);
     }
 
     @ExceptionHandler(BindException.class)
@@ -55,13 +55,13 @@ public class GlobalExceptionHandler {
     public R<Void> handleBindException(BindException e) {
         FieldError fieldError = e.getBindingResult().getFieldError();
         String message = fieldError != null ? fieldError.getDefaultMessage() : "参数校验失败";
-        return R.fail(400, message);
+        return R.fail(BusinessErrorCode.BAD_REQUEST.code(), message);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public R<Void> handleNoResourceFound(NoResourceFoundException e) {
-        return R.fail(404, "请求路径不存在");
+        return R.fail(BusinessErrorCode.NOT_FOUND.code(), "请求路径不存在");
     }
 
     // 兜底：未预期的异常统一返回 500，详细信息只记日志不暴露给前端
@@ -69,6 +69,6 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public R<Void> handleException(Exception e) {
         log.error("系统异常", e);
-        return R.fail(500, "系统内部错误");
+        return R.fail(BusinessErrorCode.INTERNAL_ERROR.code(), "系统内部错误");
     }
 }

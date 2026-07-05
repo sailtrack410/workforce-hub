@@ -82,8 +82,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/members", 7301L)
                 .cookie(nonMemberSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该群聊"));
     }
 
@@ -174,8 +174,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "title": "普通成员不应修改"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("只有群主可以管理群成员"));
 
         assertEquals("项目推进群", jdbcTemplate.queryForObject(
@@ -273,8 +273,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "memberUserIds": [2003]
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("群聊至少需要选择1名其他成员"));
     }
 
@@ -292,8 +292,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "memberUserIds": [9999]
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(100404))
             .andExpect(jsonPath("$.message").value("目标成员不存在或不可加入群聊"));
     }
 
@@ -364,8 +364,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "memberUserIds": [2004]
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("只有群主可以管理群成员"));
     }
 
@@ -383,8 +383,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "memberUserIds": [2003]
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("群主不能把自己移出群聊"));
     }
 
@@ -416,8 +416,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/leave", 7301L)
                 .cookie(ownerSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("群主不能直接退群，请先解散群聊或转让群主"));
 
         assertEquals("ACTIVE", jdbcTemplate.queryForObject(
@@ -454,8 +454,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(get("/api/employee/im/group-conversations/{conversationId}/members", 7301L)
                 .cookie(memberSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("仅群聊支持成员列表"));
     }
 
@@ -467,8 +467,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/dismiss", 7301L)
                 .cookie(memberSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("只有群主可以管理群成员"));
 
         assertEquals("ACTIVE", jdbcTemplate.queryForObject(
@@ -579,8 +579,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "downloadType": "SINGLE"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(100404))
             .andExpect(jsonPath("$.message").value("群文件不存在"));
     }
 
@@ -605,8 +605,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "普通成员尝试删除"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("只有群主或群管理员可以删除群文件"));
 
         mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/files/{attachmentRefId}/trash", 7301L, groupFileRefId)
@@ -654,8 +654,8 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
                       "clientRequestId": "group-file-non-member"
                     }
                     """.formatted(content.length, sha256)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权访问该群聊"));
 
         MvcResult ticketResult = mockMvc.perform(post("/api/employee/files/upload-tickets")

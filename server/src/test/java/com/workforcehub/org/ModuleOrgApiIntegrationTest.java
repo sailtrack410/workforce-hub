@@ -73,7 +73,7 @@ class ModuleOrgApiIntegrationTest extends LocalIntegrationTestSupport {
                 .header("X-Request-Id", "test-unauth-001"))
             .andExpect(status().isUnauthorized())
             .andExpect(header().string("X-Request-Id", "test-unauth-001"))
-            .andExpect(jsonPath("$.code").value(401))
+            .andExpect(jsonPath("$.code").value(100401))
             .andExpect(jsonPath("$.message").value("未登录或会话已过期"))
             .andExpect(jsonPath("$.requestId").value("test-unauth-001"));
     }
@@ -161,7 +161,7 @@ class ModuleOrgApiIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(delete("/api/admin/departments/{deptId}", deptId)
                 .cookie(adminSession))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.code").value(100404))
             .andExpect(jsonPath("$.message").value("部门不存在"));
     }
 
@@ -221,13 +221,13 @@ class ModuleOrgApiIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/admin/users")
                 .cookie(employeeSession))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message", containsString("管理员身份")));
 
         mockMvc.perform(get("/api/employee/me/profile")
                 .cookie(adminSession))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message", containsString("员工身份")));
 
         mockMvc.perform(get("/api/admin/users")
@@ -235,7 +235,7 @@ class ModuleOrgApiIntegrationTest extends LocalIntegrationTestSupport {
                 .param("pageNo", "0")
                 .param("pageSize", "20"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("pageNo 最小为 1"));
     }
 

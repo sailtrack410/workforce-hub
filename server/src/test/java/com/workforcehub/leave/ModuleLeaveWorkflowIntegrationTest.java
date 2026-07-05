@@ -74,8 +74,8 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
                 .cookie(employeeSession)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(leaveRequestJson(leaveTypeId)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("假期余额不足"));
 
         assertEquals(0L, workflowRequestCount());
@@ -124,8 +124,8 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
                 .cookie(employeeSession)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(leaveRequestJson(leaveTypeId)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("假期余额不足"));
 
         assertEquals(1L, workflowRequestCount());
@@ -152,8 +152,8 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
                       "comment": "同意，请安排好交接"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("幂等键已被不同假期扣减操作使用"));
 
         assertNotNull(runtimeService.createProcessInstanceQuery()
@@ -205,7 +205,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:00:00",
             "2026-05-07 10:00:00",
-            60,
+            240,
             "上午临时请假一小时"
         );
         approveManagerTask(managerSession, scenario.managerTask().getId());
@@ -262,7 +262,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:00:00",
             "2026-05-07 10:00:00",
-            60,
+            240,
             "上午临时请假一小时"
         );
         approveManagerTask(managerSession, firstScenario.managerTask().getId());
@@ -271,7 +271,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:30:00",
             "2026-05-07 10:30:00",
-            60,
+            240,
             "继续请假一小时"
         );
         approveManagerTask(managerSession, secondScenario.managerTask().getId());
@@ -303,7 +303,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:00:00",
             "2026-05-07 10:00:00",
-            60,
+            240,
             "上午请假一小时"
         );
         approveManagerTask(managerSession, morningScenario.managerTask().getId());
@@ -312,7 +312,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 17:00:00",
             "2026-05-07 18:00:00",
-            60,
+            240,
             "下午请假一小时"
         );
         approveManagerTask(managerSession, eveningScenario.managerTask().getId());

@@ -2,6 +2,7 @@ package com.workforcehub.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.file.storage.LocalStorageProvider;
 import com.workforcehub.support.FixedClockTestConfiguration;
 import com.workforcehub.support.MutableTestClock;
 import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
@@ -18,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -75,8 +75,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     @Autowired
     private MutableTestClock mutableTestClock;
 
-    @Value("${workforce.file.local-root:target/test-file-storage}")
-    private String localRoot;
+    @Autowired
+    private LocalStorageProvider localStorageProvider;
 
     @Test
     @DisplayName("员工提交请假申请后应启动Flowable并由直属上级审批通过")
@@ -233,8 +233,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                       "comment": "我自己审批自己的申请"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("当前用户不是该审批任务处理人"))
             .andExpect(jsonPath("$.data").doesNotExist());
 
@@ -562,8 +562,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                       "reason": "尝试绕过审批附件授权入口"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("员工端文件接口仅允许下载个人文件"));
     }
 
@@ -595,8 +595,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                       "reason": "越权查看"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权查看该审批申请"));
 
         long otherPersonalAttachmentRefId = seedPersonalAttachmentRef(
@@ -619,8 +619,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                       "reason": "错误附件"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(100404))
             .andExpect(jsonPath("$.message").value("审批附件不存在"));
     }
 
@@ -661,8 +661,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
 
         mockMvc.perform(get("/api/employee/workflow/attachments/download/{ticketNo}", ticketNo)
                 .cookie(managerSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("附件安全扫描未通过"));
 
         assertEquals("ACTIVE", downloadTicketStatus(ticketNo));
@@ -678,8 +678,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                 .cookie(employeeSession)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(leaveRequestJson(annualLeaveTypeId, List.of(managerAttachmentRefId))))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权使用该附件引用"));
 
         long deletedAttachmentRefId = seedPersonalAttachmentRef(EMPLOYEE_USER_ID, "已删除证明.pdf", 1, false);
@@ -687,8 +687,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                 .cookie(employeeSession)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(leaveRequestJson(annualLeaveTypeId, List.of(deletedAttachmentRefId))))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(100404))
             .andExpect(jsonPath("$.message").value("附件引用不存在"));
     }
 
@@ -924,7 +924,9 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
 
     private void writeLocalObject(String objectKey, byte[] content) {
         try {
-            Path target = Path.of(localRoot).resolve(objectKey);
+            Path target = Path.of(localStorageProvider
+                .buildUploadTarget("workforce-local", objectKey, "application/pdf", 60)
+                .uploadUrl());
             Files.createDirectories(target.getParent());
             Files.write(target, content);
         } catch (Exception e) {

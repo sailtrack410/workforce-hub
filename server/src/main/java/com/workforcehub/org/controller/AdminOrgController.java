@@ -2,6 +2,7 @@ package com.workforcehub.org.controller;
 
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.response.R;
+import com.workforcehub.common.exception.BusinessErrorCode;
 import com.workforcehub.org.dto.OrgDepartmentTreeNodeResponse;
 import com.workforcehub.org.dto.OrgDepartmentSaveRequest;
 import com.workforcehub.org.dto.OrgEmploymentStatusUpdateRequest;
@@ -65,7 +66,7 @@ public class AdminOrgController {
     @DeleteMapping("/departments/{deptId}")
     public ResponseEntity<R<Void>> deleteDepartment(@PathVariable Long deptId) {
         if (!orgManagementService.deleteDepartment(deptId)) {
-            return ResponseEntity.status(404).body(R.fail(404, "部门不存在"));
+            return ResponseEntity.status(404).body(R.fail(BusinessErrorCode.NOT_FOUND.code(), "部门不存在"));
         }
         return ResponseEntity.ok(R.ok());
     }

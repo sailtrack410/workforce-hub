@@ -39,8 +39,8 @@ class RagflowVectorDisabledIntegrationTest extends LocalIntegrationTestSupport {
                       "query": "请假制度"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(422))
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.code").value(100422))
             .andExpect(jsonPath("$.message").value("向量库未配置"));
     }
 

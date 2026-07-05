@@ -134,8 +134,8 @@ class ModuleWorkflowAdminApiIntegrationTest extends WorkflowFlowableIntegrationT
                       "flowableDefinitionKey": "missing_definition_key"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(100404))
             .andExpect(jsonPath("$.message").value("Flowable流程定义不存在"))
             .andExpect(jsonPath("$.data").doesNotExist());
 

@@ -2,6 +2,7 @@ package com.workforcehub.auth.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.common.enums.UserType;
+import com.workforcehub.common.exception.BusinessErrorCode;
 import com.workforcehub.common.response.R;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -62,9 +63,11 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
         }
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null
-            && auth.isAuthenticated()
-            && auth.getPrincipal() instanceof WfhUserDetails user
+        if (auth == null || !(auth.getPrincipal() instanceof WfhUserDetails user)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        if (auth.isAuthenticated()
             && user.getUserType() == UserType.ADMIN
             && auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).anyMatch(requiredPermission::equals)) {
             filterChain.doFilter(request, response);
@@ -74,7 +77,7 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        objectMapper.writeValue(response.getWriter(), R.fail(403, "无权限访问"));
+        objectMapper.writeValue(response.getWriter(), R.fail(BusinessErrorCode.FORBIDDEN.code(), "无权限访问"));
     }
 
     private String requiredPermission(String uri) {

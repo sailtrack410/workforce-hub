@@ -7,6 +7,7 @@ import com.workforcehub.auth.security.EmployeeUserDetailsService;
 import com.workforcehub.auth.security.UserTypePathFilter;
 import com.workforcehub.auth.security.WfhAuthenticationProvider;
 import com.workforcehub.common.enums.UserType;
+import com.workforcehub.common.exception.BusinessErrorCode;
 import com.workforcehub.common.response.R;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -120,13 +121,13 @@ public class SecurityConfig {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     response.setCharacterEncoding("UTF-8");
-                    objectMapper.writeValue(response.getWriter(), R.fail(401, "未登录或会话已过期"));
+                    objectMapper.writeValue(response.getWriter(), R.fail(BusinessErrorCode.UNAUTHORIZED.code(), "未登录或会话已过期"));
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     response.setCharacterEncoding("UTF-8");
-                    objectMapper.writeValue(response.getWriter(), R.fail(403, "无权限访问"));
+                    objectMapper.writeValue(response.getWriter(), R.fail(BusinessErrorCode.FORBIDDEN.code(), "无权限访问"));
                 })
             );
 

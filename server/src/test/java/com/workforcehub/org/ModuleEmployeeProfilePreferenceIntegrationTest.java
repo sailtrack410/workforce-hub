@@ -279,7 +279,7 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value(400));
+            .andExpect(jsonPath("$.code").value(100400));
     }
 
     private Cookie loginEmployee(String loginName, String password, String requestId) throws Exception {

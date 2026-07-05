@@ -2,6 +2,7 @@ package com.workforcehub.auth.security;
 
 import com.workforcehub.common.enums.UserType;
 import com.workforcehub.common.exception.BizException;
+import com.workforcehub.common.exception.BusinessErrorCode;
 import com.workforcehub.common.response.R;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
@@ -72,6 +73,6 @@ public class UserTypePathFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        objectMapper.writeValue(response.getWriter(), R.fail(403, message));
+        objectMapper.writeValue(response.getWriter(), R.fail(BusinessErrorCode.FORBIDDEN.code(), message));
     }
 }

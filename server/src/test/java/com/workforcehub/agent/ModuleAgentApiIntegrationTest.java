@@ -158,8 +158,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value(containsString("工作流配置无效")));
     }
 
@@ -172,8 +172,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("请先配置AI助手可用范围"));
     }
 
@@ -187,8 +187,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("请先完成一次流程测试"));
 
         runWorkflowTest(adminSession, versionId, simpleWorkflow("{{query}}"));
@@ -224,8 +224,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
 
         mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
                 .cookie(adminSession))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("请先完成一次流程测试"));
     }
 
@@ -801,8 +801,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "systemPrompt": "发布后不能修改"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("只有草稿版本可以修改"));
     }
 
@@ -874,8 +874,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "inputPayloadJson": "{\\"query\\":\\"停用后不应执行\\"}"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("AI助手未发布或未启用"));
 
         mockMvc.perform(post("/api/admin/agents/{agentId}/enable", agentId)
@@ -942,8 +942,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "inputPayloadJson": "{\\"query\\":\\"普通员工不可调用领导Agent\\"}"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
 
         mockMvc.perform(get("/api/employee/agents")
@@ -1032,8 +1032,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/admin/agent-tasks")
                 .cookie(adminSession)
                 .param("status", "UNKNOWN_STATUS"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("AI任务状态不支持"));
     }
 
@@ -1209,8 +1209,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "inputPayloadJson": "{\\"query\\":\\"不应执行\\"}"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
     }
 
@@ -1264,8 +1264,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       ]
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("AI助手未授权调用该工具"));
 
         assertEquals(0L, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM agt_task", Long.class));
@@ -1463,8 +1463,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "comment": "确认继续执行"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("AI任务没有可继续执行的待确认工具"));
 
         assertEquals("WAITING_HUMAN_CONFIRM", taskStatus(taskId));
@@ -1497,8 +1497,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "reason": "他人不能取消"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权操作该AI任务"));
 
         mockMvc.perform(post("/api/employee/agent-tasks/{taskId}/cancel", taskId)
@@ -1573,8 +1573,8 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                       "inputPayloadJson": "{\\"query\\":\\"非群成员不应调用\\"}"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("无权使用该AI助手"));
     }
 

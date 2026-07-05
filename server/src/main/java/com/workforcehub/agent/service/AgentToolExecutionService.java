@@ -72,7 +72,7 @@ public class AgentToolExecutionService {
                 requiredText(payload, "query"),
                 optionalInt(payload, "topK", 5)
             );
-            default -> throw new BizException(400, "暂不支持该工具执行");
+            default -> throw new BizException(400, "暂不支持该" + binding.toolType() + "工具执行");
         };
         return write(objectMapper, Map.of("status", "SUCCESS", "result", result == null ? Map.of() : result));
     }

@@ -197,8 +197,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0));
 
         addGroupMember(adminSession, secondGroupId, EMPLOYEE_USER_ID, "2026-05-15", null)
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("员工考勤组生效区间重叠"));
 
         assertEquals(1L, activeGroupMemberCount(EMPLOYEE_USER_ID));
@@ -238,8 +238,9 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                         "2026-06-01",
                         null
                     )
-                        .andExpect(status().isOk())
                         .andReturn();
+                    int responseStatus = result.getResponse().getStatus();
+                    assertTrue(responseStatus == 200 || responseStatus == 409);
                     return objectMapper.readTree(result.getResponse().getContentAsString()).get("code").asInt();
                 }));
             }
@@ -398,8 +399,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0));
 
         createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-12", shiftId, calendarId)
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("员工当天已存在排班，请通过修改原排班恢复或改班"));
     }
 
@@ -433,8 +434,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.status").value("INACTIVE"));
 
         createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-16", shiftId, calendarId)
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("员工当天已存在排班，请通过修改原排班恢复或改班"));
 
         assertEquals(1L, scheduleCount(EMPLOYEE_USER_ID, "2026-05-16"));
@@ -579,8 +580,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                       "sourceType": "PC"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("员工当前状态不允许打卡"));
 
         assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-09"));
@@ -665,8 +666,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));
         punch(employeeSession, "2026-05-18T09:01:00", "ON_DUTY")
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(409))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
             .andExpect(jsonPath("$.message").value("当天同类型打卡已存在"));
 
         assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-18"));
@@ -687,8 +688,8 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                       "sourceType": "MANUAL"
                     }
                     """))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("员工实时打卡来源仅支持 APP/PC"));
     }
 

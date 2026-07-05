@@ -115,7 +115,7 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
         mockMvc.perform(get("/api/employee/auth/me")
                 .cookie(session))
             .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value(401))
+            .andExpect(jsonPath("$.code").value(100401))
             .andExpect(jsonPath("$.message").value("未登录或会话已过期"));
     }
 
@@ -126,7 +126,7 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
                 .header("X-Request-Id", "auth-unauth-admin-001"))
             .andExpect(status().isUnauthorized())
             .andExpect(header().string("X-Request-Id", "auth-unauth-admin-001"))
-            .andExpect(jsonPath("$.code").value(401))
+            .andExpect(jsonPath("$.code").value(100401))
             .andExpect(jsonPath("$.requestId").value("auth-unauth-admin-001"));
 
         mockMvc.perform(post("/api/employee/auth/email/bind")
@@ -140,7 +140,7 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
                     """))
             .andExpect(status().isUnauthorized())
             .andExpect(header().string("X-Request-Id", "auth-unauth-bind-001"))
-            .andExpect(jsonPath("$.code").value(401))
+            .andExpect(jsonPath("$.code").value(100401))
             .andExpect(jsonPath("$.requestId").value("auth-unauth-bind-001"));
     }
 
@@ -182,8 +182,8 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
                       "purpose": "BIND"
                     }
                     """.formatted(email)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(429))
+            .andExpect(status().is(429))
+            .andExpect(jsonPath("$.code").value(100429))
             .andExpect(jsonPath("$.message").value("验证码发送过于频繁，请稍后再试"));
     }
 
@@ -248,8 +248,8 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
                       "password": "%s"
                     }
                     """.formatted(EMPLOYEE_LOGIN_NAME, EMPLOYEE_PASSWORD)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(401))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(100401))
             .andExpect(jsonPath("$.message").value("用户名或密码错误，剩余尝试次数 4"));
 
         mockMvc.perform(post("/api/employee/auth/login")
@@ -279,8 +279,8 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
                           "password": "WrongPassword@123"
                         }
                         """.formatted(MANAGER_LOGIN_NAME)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(401))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(100401))
                 .andExpect(jsonPath("$.message").value("用户名或密码错误，剩余尝试次数 " + remaining));
         }
 
@@ -292,8 +292,8 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
                       "password": "%s"
                     }
                     """.formatted(MANAGER_LOGIN_NAME, EMPLOYEE_PASSWORD)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(429))
+            .andExpect(status().is(429))
+            .andExpect(jsonPath("$.code").value(100429))
             .andExpect(jsonPath("$.message").value("登录失败次数过多，账号已锁定 30 分钟"));
     }
 
@@ -313,8 +313,8 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
                       "password": "%s"
                     }
                     """.formatted(PROBATION_LOGIN_NAME, EMPLOYEE_PASSWORD)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
             .andExpect(jsonPath("$.message").value("员工已离职，无法登录"));
     }
 

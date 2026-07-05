@@ -110,8 +110,8 @@ class ModuleAuthEmailVerifyIntegrationTest extends LocalIntegrationTestSupport {
                       "identifier": "%s"
                     }
                     """.formatted(EMPLOYEE_EMAIL)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(429));
+            .andExpect(status().is(429))
+            .andExpect(jsonPath("$.code").value(100429));
     }
 
     @Test
@@ -163,8 +163,8 @@ class ModuleAuthEmailVerifyIntegrationTest extends LocalIntegrationTestSupport {
                       "emailCode": "000000"
                     }
                     """.formatted(EMPLOYEE_LOGIN_NAME, EMPLOYEE_PASSWORD)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(401))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(100401))
             .andExpect(jsonPath("$.message").value("邮箱验证码错误或已过期"));
     }
 

@@ -131,6 +131,9 @@ public abstract class LocalIntegrationTestSupport {
             deleteIfExists(jdbcTemplate, "agt_task_timeout_job_run");
             deleteIfExists(jdbcTemplate, "sys_job_lock");
             deleteIfExists(jdbcTemplate, "im_event_outbox");
+            deleteIfExists(jdbcTemplate, "ops_alert_resolution");
+            deleteIfExists(jdbcTemplate, "ops_alert_rule");
+            deleteIfExists(jdbcTemplate, "ops_alert_channel");
             jdbcTemplate.execute("DELETE FROM sys_audit_log");
             jdbcTemplate.execute("DELETE FROM sys_storage_usage");
             jdbcTemplate.execute("DELETE FROM sys_storage_quota_policy");

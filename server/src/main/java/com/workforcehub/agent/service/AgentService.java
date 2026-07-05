@@ -774,7 +774,7 @@ public class AgentService {
     private AgentTaskTimeoutRunQueryCriteria toTimeoutRunQueryCriteria(AgentTaskTimeoutRunQuery query) {
         return new AgentTaskTimeoutRunQueryCriteria(
             normalizeOptionalIn(query.getTriggerType(), TIMEOUT_RUN_TRIGGER_TYPES, "AI任务超时扫描触发类型不支持"),
-            normalizeOptionalIn(query.getStatus(), TIMEOUT_RUN_STATUSES, "AI任务超时扫描批次状态不支持"),
+            normalizeOptionalIn(query.getStatus(), TIMEOUT_RUN_STATUSES, "Agent超时扫描批次状态不支持"),
             query.getStartedFrom(),
             query.getStartedTo()
         );

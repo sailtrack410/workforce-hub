@@ -199,9 +199,9 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
 
         adjustBalance(adminSession, annualLeaveTypeId, 480, sourceTxnKey);
 
-        adjustBalance(adminSession, EMPLOYEE_USER_ID, annualLeaveTypeId, 960, sourceTxnKey, 409);
-        adjustBalance(adminSession, MANAGER_USER_ID, annualLeaveTypeId, 480, sourceTxnKey, 409);
-        adjustBalance(adminSession, EMPLOYEE_USER_ID, sickLeaveTypeId, 480, sourceTxnKey, 409);
+        adjustBalance(adminSession, EMPLOYEE_USER_ID, annualLeaveTypeId, 960, sourceTxnKey, 100409);
+        adjustBalance(adminSession, MANAGER_USER_ID, annualLeaveTypeId, 480, sourceTxnKey, 100409);
+        adjustBalance(adminSession, EMPLOYEE_USER_ID, sickLeaveTypeId, 480, sourceTxnKey, 100409);
 
         assertEquals(480, availableMinutes(EMPLOYEE_USER_ID, annualLeaveTypeId));
         assertEquals(0, availableMinutes(MANAGER_USER_ID, annualLeaveTypeId));
@@ -254,7 +254,7 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
                       "sourceTxnKey": "%s"
                     }
                     """.formatted(userId, leaveTypeId, changeMinutes, sourceTxnKey)))
-            .andExpect(status().isOk())
+            .andExpect(expectedCode == 100409 ? status().isConflict() : status().isOk())
             .andExpect(jsonPath("$.code").value(expectedCode));
     }
 
