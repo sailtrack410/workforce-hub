@@ -1007,8 +1007,10 @@
 
 .cloud-folder-card {
   display: grid;
-  align-content: start;
-  gap: var(--space-10);
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
+  align-items: center;
+  gap: var(--space-12);
   min-height: 8.75rem;
   height: 100%;
   padding: var(--space-18) var(--space-20);
@@ -1016,10 +1018,16 @@
 
 .cloud-folder-card img {
   display: block;
-  width: min(6.75rem, 74%);
+  width: min(8.5rem, 86%);
+  max-height: 8rem;
   aspect-ratio: 1.28;
+  align-self: center;
   justify-self: center;
   object-fit: contain;
+}
+
+.cloud-folder-card div {
+  align-self: end;
 }
 
 .cloud-folder-card h3 {
