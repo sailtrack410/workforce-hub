@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import {
+  navItems,
   normalizeWorkbenchApp,
   normalizeSettingsPanel,
+  sectionMeta,
   useShellStore,
   type ConversationMessage,
   type ConversationRecord,
@@ -225,6 +227,13 @@ describe('useShellStore', () => {
   it('maps legacy leave and requests workbench routes into oa', () => {
     expect(normalizeWorkbenchApp('leave')).toBe('oa');
     expect(normalizeWorkbenchApp('requests')).toBe('oa');
+  });
+
+  it('labels the workbench section as dashboard', () => {
+    const workbenchNav = navItems.find((item) => item.id === 'workbench');
+
+    expect(workbenchNav?.label).toBe('仪表盘');
+    expect(sectionMeta.workbench.title).toBe('仪表盘');
   });
 
   it('filters message conversations by title and member keyword', () => {

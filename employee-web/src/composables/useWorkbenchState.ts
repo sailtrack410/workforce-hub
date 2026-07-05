@@ -106,7 +106,7 @@ export function useWorkbenchState({
 
   const activeWorkbench = computed(() => shell.activeWorkbench);
   const activeFile = computed(() => shell.activeFile);
-  const activeWorkbenchTitle = computed(() => activeWorkbench.value.title || '工作台');
+  const activeWorkbenchTitle = computed(() => activeWorkbench.value.title || '仪表盘');
   const leaveAccounts = ref<LeaveAccountResponse[]>([]);
   const leaveTypes = ref<LeaveTypeResponse[]>([]);
   const workbenchLoading = ref(false);
@@ -273,7 +273,7 @@ export function useWorkbenchState({
         .filter((result) => result.status === 'rejected')
         .length;
       if (failedCount === 4) {
-        workbenchError.value = '工作台数据加载失败';
+        workbenchError.value = '仪表盘数据加载失败';
       }
       const types = typesResult.status === 'fulfilled' ? typesResult.value : [];
       const accounts = accountsResult.status === 'fulfilled' ? accountsResult.value : [];

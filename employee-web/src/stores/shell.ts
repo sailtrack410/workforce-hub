@@ -309,7 +309,7 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
   },
   workbench: {
     kicker: '',
-    title: '工作台',
+    title: '仪表盘',
     subtitle: '',
     search: '搜索申请、请假、考勤、假期',
     primaryAction: {
@@ -359,7 +359,7 @@ export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = 
   { id: 'messages', label: '消息', glyph: '息' },
   { id: 'todos', label: '待办', glyph: '办' },
   { id: 'files', label: '文档', glyph: '档' },
-  { id: 'workbench', label: '工作台', glyph: '台' },
+  { id: 'workbench', label: '仪表盘', glyph: '表' },
   { id: 'contacts', label: '通讯录', glyph: '录' },
   { id: 'agents', label: 'AI 助手', glyph: '助' },
   { id: 'settings', label: '个人中心', glyph: '心' },

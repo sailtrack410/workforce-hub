@@ -393,7 +393,7 @@ watch(agents, (items) => {
     <template v-if="activeWorkbench.id === 'oa'">
       <AppErrorState
         v-if="workbenchError"
-        title="工作台数据加载失败"
+        title="仪表盘数据加载失败"
         :description="workbenchError"
         action-label="重试"
         @retry="refreshActiveWorkbench"
