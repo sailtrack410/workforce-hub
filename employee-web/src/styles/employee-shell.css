@@ -984,14 +984,14 @@
 
 .cloud-summary-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: var(--space-16);
   align-items: stretch;
 }
 
 .cloud-quick-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-16);
   align-items: stretch;
 }
@@ -1004,31 +1004,29 @@
 
 .cloud-folder-card {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-content: stretch;
+  align-content: center;
   align-items: center;
-  gap: var(--space-12);
-  min-height: 8.75rem;
+  gap: var(--space-16);
+  min-height: 9.5rem;
   height: 100%;
   border: 1px solid #e4e8ef;
   background: #fbfcfe;
-  padding: var(--space-18) var(--space-20);
+  padding: var(--space-18) var(--space-14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .cloud-folder-card img {
   display: block;
-  width: min(7.5rem, 78%);
-  max-height: 7.25rem;
+  width: min(6.5rem, 72%);
+  max-height: 6rem;
   aspect-ratio: 1.28;
-  align-self: center;
   justify-self: center;
   opacity: 0.92;
   object-fit: contain;
 }
 
 .cloud-folder-card div {
-  align-self: end;
+  align-self: center;
 }
 
 .cloud-folder-card h3 {
@@ -4412,6 +4410,10 @@
 
   .cloud-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cloud-quick-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .settings-card-grid,

@@ -84,6 +84,7 @@ const fileQuickCards = computed(() => [
   { title: '最近访问', count: recentAccessCount.value },
   { title: '最近上传', count: recentUploadCount.value },
   { title: '收藏夹', count: favoriteFileCount.value },
+  { title: '共享文件', count: 0 },
 ]);
 const storageUsedLabel = computed(() => formatStorageLabel(activeFile.value.summary[0]?.[0] ?? '0B'));
 const storageTotalLabel = computed(() => formatStorageLabel(activeFile.value.summary[1]?.[0] ?? '0B'));
