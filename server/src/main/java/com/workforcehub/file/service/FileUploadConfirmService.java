@@ -322,8 +322,16 @@ public class FileUploadConfirmService {
         response.setContentSha256(row.contentSha256());
         response.setDeduplicated(deduplicated);
         response.setScanStatus(row.scanStatus());
+        response.setScanStatusName(scanStatusName(row.scanStatus()));
         response.setCreatedAt(row.createdAt());
         return response;
+    }
+
+    private String scanStatusName(String value) {
+        if ("CLEAN".equals(value) || "READY".equals(value)) return "已通过";
+        if ("PENDING".equals(value)) return "检测中";
+        if ("FAILED".equals(value) || "INFECTED".equals(value)) return "未通过";
+        return value == null ? null : "未知状态";
     }
 
     private UploadTicketRow getUploadTicketOrThrow(Long ticketId) {

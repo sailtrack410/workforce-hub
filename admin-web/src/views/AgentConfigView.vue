@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { FlaskConical, Pencil, PlayCircle, Plus, PowerOff, RefreshCcw, Save, Search, Send, Trash2 } from 'lucide-vue-next';
+import { AlertCircle, Pencil, PlayCircle, Plus, PowerOff, RefreshCcw, Search, Send, Settings, Trash2 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { adminApi } from '@/api/admin';
-import type { AgentResponse, EntityId, LlmModelResponse } from '@/api/types';
-import { errorMessage, formatDateTime, humanizeText, statusLabel } from '@/utils/format';
+import type { AgentResponse } from '@/api/types';
+import { errorMessage, formatDateTime, humanizeText, safeBusinessMessage, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
-import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
 import AdminIconAvatar from '@/components/AdminIconAvatar.vue';
+import AgentConfigDialogs from '@/components/AgentConfigDialogs.vue';
 
 const router = useRouter();
 const toast = useToast();
@@ -19,7 +19,7 @@ const items = ref<AgentResponse[]>([]);
 const keyword = ref('');
 
 const createVisible = ref(false);
-const createForm = reactive({ agentCode: '', agentName: '', avatarAttachmentRefId: '' });
+const createForm = reactive({ agentCode: 'LEAVE_HELPER', agentName: '假期助手', avatarAttachmentRefId: '' });
 const creating = ref(false);
 const editTarget = ref<AgentResponse | null>(null);
 const editVisible = ref(false);
@@ -31,28 +31,23 @@ const disabling = ref(false);
 const enableTarget = ref<AgentResponse | null>(null);
 const enableVisible = ref(false);
 const enabling = ref(false);
-const modelLoading = ref(false);
-const modelSaving = ref(false);
-const modelTesting = ref<EntityId | null>(null);
-const llmModels = ref<LlmModelResponse[]>([]);
-const modelEditId = ref<EntityId | null>(null);
-const modelForm = reactive({
-  provider: 'openai',
-  modelName: '',
-  displayName: '',
-  endpoint: '',
-  apiKey: '',
-  status: 'ACTIVE',
-});
+const deleteTarget = ref<AgentResponse | null>(null);
+const deleteVisible = ref(false);
+const deleting = ref(false);
+
+const agentOptions = [
+  { value: 'LEAVE_HELPER', label: '假期助手' },
+  { value: 'ATTENDANCE_HELPER', label: '考勤助手' },
+  { value: 'POLICY_HELPER', label: '制度问答助手' },
+];
 
 const columns: TableColumn[] = [
   { key: 'agentName', label: '助手' },
-  { key: 'agentCode', label: '编号' },
   { key: 'agentType', label: '类型' },
   { key: 'status', label: '状态' },
   { key: 'publishedVersionId', label: '发布版本' },
   { key: 'createdAt', label: '创建时间' },
-  { key: '_actions', label: '操作', width: '230px' },
+  { key: '_actions', label: '操作', width: '310px' },
 ];
 
 async function loadList() {
@@ -67,24 +62,22 @@ async function loadList() {
   }
 }
 
-async function loadModels() {
-  modelLoading.value = true;
-  try {
-    llmModels.value = await adminApi.llmModels.list();
-  } catch (e) {
-    toast.error(errorMessage(e));
-  } finally {
-    modelLoading.value = false;
-  }
-}
-
 function handleSearch() {
   void loadList();
 }
 
+function agentTypeLabel(value?: string | null) {
+  if (value === 'QA') return '问答助手';
+  return value ? '其他助手' : '-';
+}
+
+function isDeprecated(agent: AgentResponse) {
+  return agent.status === 'DEPRECATED';
+}
+
 function openCreate() {
-  createForm.agentCode = '';
-  createForm.agentName = '';
+  createForm.agentCode = 'LEAVE_HELPER';
+  createForm.agentName = '假期助手';
   createForm.avatarAttachmentRefId = '';
   createVisible.value = true;
 }
@@ -155,6 +148,11 @@ function askEnable(agent: AgentResponse) {
   enableVisible.value = true;
 }
 
+function askDelete(agent: AgentResponse) {
+  deleteTarget.value = agent;
+  deleteVisible.value = true;
+}
+
 async function handleDisable() {
   if (!disableTarget.value || disabling.value) return;
   disabling.value = true;
@@ -185,75 +183,23 @@ async function handleEnable() {
   }
 }
 
-function resetModelForm() {
-  modelEditId.value = null;
-  modelForm.provider = 'openai';
-  modelForm.modelName = '';
-  modelForm.displayName = '';
-  modelForm.endpoint = '';
-  modelForm.apiKey = '';
-  modelForm.status = 'ACTIVE';
-}
-
-function editModel(model: LlmModelResponse) {
-  modelEditId.value = model.modelId;
-  modelForm.provider = model.provider;
-  modelForm.modelName = model.modelName;
-  modelForm.displayName = model.displayName;
-  modelForm.endpoint = model.endpoint || '';
-  modelForm.apiKey = '';
-  modelForm.status = model.status || 'ACTIVE';
-}
-
-async function saveModel() {
-  if (!modelForm.modelName.trim() || !modelForm.displayName.trim()) return;
-  modelSaving.value = true;
+async function handleDelete() {
+  if (!deleteTarget.value || deleting.value) return;
+  deleting.value = true;
   try {
-    const request = {
-      provider: modelForm.provider.trim() || 'openai',
-      modelName: modelForm.modelName.trim(),
-      displayName: modelForm.displayName.trim(),
-      endpoint: modelForm.endpoint.trim() || null,
-      apiKey: modelForm.apiKey.trim() || null,
-      status: modelForm.status,
-    };
-    if (modelEditId.value) {
-      await adminApi.llmModels.update(modelEditId.value, request);
-    } else {
-      await adminApi.llmModels.create(request);
-    }
-    toast.success('模型配置已保存');
-    resetModelForm();
-    await loadModels();
+    await adminApi.agentConfig.remove(deleteTarget.value.agentId);
+    deleteVisible.value = false;
+    toast.success('AI 助手已弃用');
+    await loadList();
   } catch (e) {
     toast.error(errorMessage(e));
   } finally {
-    modelSaving.value = false;
+    deleting.value = false;
   }
-}
-
-async function testModel(model: LlmModelResponse) {
-  modelTesting.value = model.modelId;
-  try {
-    const res = await adminApi.llmModels.test(model.modelId);
-    res.success ? toast.success(res.message) : toast.error(res.message);
-  } catch (e) {
-    toast.error(errorMessage(e));
-  } finally {
-    modelTesting.value = null;
-  }
-}
-
-async function removeModel(model: LlmModelResponse) {
-  await adminApi.llmModels.remove(model.modelId);
-  if (String(modelEditId.value) === String(model.modelId)) resetModelForm();
-  await loadModels();
-  toast.success('模型配置已删除');
 }
 
 onMounted(() => {
   void loadList();
-  void loadModels();
 });
 </script>
 
@@ -262,13 +208,14 @@ onMounted(() => {
     <AdminPanel :span="12" title="AI 助手">
     <template #actions>
       <form class="agent-search" @submit.prevent="handleSearch">
-        <input v-model="keyword" placeholder="搜索名称 / 编码" />
+        <input v-model="keyword" placeholder="搜索名称" />
         <button class="secondary-button" title="搜索" type="submit">
           <Search :size="16" />
         </button>
       </form>
       <button class="secondary-button" title="刷新" @click="loadList">
         <RefreshCcw :size="16" />
+        <span>刷新</span>
       </button>
       <button class="primary-button" @click="openCreate">
         <Plus :size="16" />
@@ -284,14 +231,24 @@ onMounted(() => {
     >
       <template #cell-agentName="{ row }">
         <div class="agent-name-cell">
-          <AdminIconAvatar :label="humanizeText(row.agentName) || row.agentCode || 'AI助手'" kind="agent" size="sm" />
+          <AdminIconAvatar :label="humanizeText(row.agentName) || 'AI助手'" kind="agent" size="sm" />
           <div>
-            <strong>{{ humanizeText(row.agentName) || row.agentCode }}</strong>
+            <strong>{{ humanizeText(row.agentName) || 'AI 助手' }}</strong>
+            <span v-if="row.knowledgeIssueCount" class="agent-risk-text">
+              <AlertCircle :size="13" />
+              <span>{{ safeBusinessMessage(row.knowledgeIssueMessage, '知识库配置异常') }}</span>
+            </span>
           </div>
         </div>
       </template>
       <template #cell-status="{ row }">
-        <span class="status-pill">{{ statusLabel(row.status) }}</span>
+        <div class="agent-status-cell">
+          <span class="status-pill">{{ statusLabel(row.status) }}</span>
+          <span v-if="row.knowledgeIssueCount" class="status-pill status-danger">知识库异常</span>
+        </div>
+      </template>
+      <template #cell-agentType="{ row }">
+        {{ row.agentTypeName || agentTypeLabel(row.agentType) }}
       </template>
       <template #cell-publishedVersionId="{ row }">
         {{ row.publishedVersionId ? `V${row.publishedVersionLabel || row.publishedVersionNo}` : '未发布' }}
@@ -301,13 +258,13 @@ onMounted(() => {
       </template>
       <template #cell-_actions="{ row }">
         <div class="row-actions">
-          <button class="secondary-button action-btn" title="编辑资料" @click.stop="openEdit(row)">
+          <button class="secondary-button action-btn" title="编辑资料" :disabled="isDeprecated(row)" @click.stop="openEdit(row)">
             <Pencil :size="14" />
             <span>编辑</span>
           </button>
           <button class="primary-button action-btn" title="流程编排" @click.stop="openDagEditor(row)">
             <Send :size="14" />
-            <span>编排</span>
+            <span>{{ isDeprecated(row) ? '查看' : '编排' }}</span>
           </button>
           <button
             v-if="row.status === 'INACTIVE'"
@@ -319,7 +276,7 @@ onMounted(() => {
             <span>启用</span>
           </button>
           <button
-            v-else
+            v-else-if="!isDeprecated(row)"
             class="danger-button action-btn"
             title="停用"
             :disabled="row.status !== 'ACTIVE'"
@@ -328,145 +285,51 @@ onMounted(() => {
             <PowerOff :size="14" />
             <span>停用</span>
           </button>
+          <button
+            class="danger-button action-btn"
+            title="删除"
+            :disabled="isDeprecated(row) || deleting"
+            @click.stop="askDelete(row)"
+          >
+            <Trash2 :size="14" />
+            <span>删除</span>
+          </button>
         </div>
       </template>
     </AdminTable>
   </AdminPanel>
 
-  <AdminPanel :span="12" title="模型配置">
+  <AdminPanel :span="12" title="AI 模型基座">
     <template #actions>
-      <button class="secondary-button" title="刷新" @click="loadModels">
-        <RefreshCcw :size="16" />
+      <button class="primary-button" title="进入基座" @click="router.push('/ai-models')">
+        <Settings :size="16" />
+        <span>进入基座</span>
       </button>
     </template>
-
-    <form class="model-form" @submit.prevent="saveModel">
-      <label>
-        <span>供应商</span>
-        <input v-model="modelForm.provider" placeholder="openai" />
-      </label>
-      <label>
-        <span>模型名称</span>
-        <input v-model="modelForm.modelName" placeholder="gpt-4o-mini" />
-      </label>
-      <label>
-        <span>显示名称</span>
-        <input v-model="modelForm.displayName" placeholder="默认翻译模型" />
-      </label>
-      <label>
-        <span>API 地址</span>
-        <input v-model="modelForm.endpoint" placeholder="https://api.openai.com/v1" />
-      </label>
-      <label>
-        <span>API Key</span>
-        <input v-model="modelForm.apiKey" type="password" placeholder="保存时填写" autocomplete="new-password" />
-      </label>
-      <label>
-        <span>状态</span>
-        <select v-model="modelForm.status">
-          <option value="ACTIVE">启用</option>
-          <option value="INACTIVE">停用</option>
-        </select>
-      </label>
-      <div class="model-form-actions">
-        <button class="primary-button" type="submit" :disabled="modelSaving">
-          <Save :size="16" />
-          <span>{{ modelEditId ? '保存模型' : '新增模型' }}</span>
-        </button>
-        <button class="secondary-button" type="button" @click="resetModelForm">清空</button>
-      </div>
-    </form>
-
-    <div class="model-list" :aria-busy="modelLoading">
-      <div v-for="model in llmModels" :key="model.modelId" class="model-row">
-        <div>
-          <strong>{{ model.displayName }}</strong>
-          <span>{{ model.provider }} · {{ model.modelName }} · {{ statusLabel(model.status) }}</span>
-        </div>
-        <div class="row-actions">
-          <button class="secondary-button action-btn" title="编辑" @click="editModel(model)">
-            <Pencil :size="14" />
-            <span>编辑</span>
-          </button>
-          <button class="secondary-button action-btn" title="测试" :disabled="modelTesting === model.modelId" @click="testModel(model)">
-            <FlaskConical :size="14" />
-            <span>测试</span>
-          </button>
-          <button class="danger-button action-btn" title="删除" @click="removeModel(model)">
-            <Trash2 :size="14" />
-            <span>删除</span>
-          </button>
-        </div>
-      </div>
+    <div class="foundation-entry">
+      <strong>统一配置入口</strong>
+      <span>Agent 工作流只选择基座中的模型。</span>
     </div>
   </AdminPanel>
   </main>
 
-  <AdminConfirmDialog
-    v-model:visible="createVisible"
-    title="新建 AI 助手"
-    message=""
-    confirm-label="创建"
-    :danger="false"
-    @confirm="handleCreate"
-  >
-    <template #default>
-      <div class="create-dialog-form">
-        <label>
-          <span>助手编号</span>
-          <input v-model="createForm.agentCode" placeholder="如 LEAVE_HELPER" autofocus />
-        </label>
-        <label>
-          <span>助手名称</span>
-          <input v-model="createForm.agentName" placeholder="如 假期助手" />
-        </label>
-        <label>
-          <span>头像附件 ID</span>
-          <input v-model="createForm.avatarAttachmentRefId" placeholder="不填则使用默认图标" />
-        </label>
-      </div>
-    </template>
-  </AdminConfirmDialog>
-
-  <AdminConfirmDialog
-    v-model:visible="editVisible"
-    title="编辑 AI 助手"
-    message=""
-    confirm-label="保存"
-    :danger="false"
-    @confirm="handleEdit"
-  >
-    <template #default>
-      <div class="create-dialog-form">
-        <label>
-          <span>助手名称</span>
-          <input v-model="editForm.agentName" placeholder="如 假期助手" autofocus />
-        </label>
-        <label>
-          <span>头像附件 ID</span>
-          <input v-model="editForm.avatarAttachmentRefId" placeholder="不填则使用默认图标" />
-        </label>
-        <p class="form-tip">上传头像后填入附件 ID，员工端会优先显示头像，没有头像时显示默认 AI 图标。</p>
-      </div>
-    </template>
-  </AdminConfirmDialog>
-
-  <AdminConfirmDialog
-    v-model:visible="disableVisible"
-    title="停用 AI 助手"
-    :message="disableTarget ? `停用后员工端将不可检索和调用 ${humanizeText(disableTarget.agentName) || disableTarget.agentCode}` : ''"
-    confirm-label="停用"
-    :danger="true"
-    @confirm="handleDisable"
-  />
-
-  <AdminConfirmDialog
-    v-model:visible="enableVisible"
-    title="启用 AI 助手"
-    :message="enableTarget ? `启用后员工端可按权限检索和调用 ${humanizeText(enableTarget.agentName) || enableTarget.agentCode}` : ''"
-    confirm-label="启用"
-    :danger="false"
-    @confirm="handleEnable"
+  <AgentConfigDialogs
+    v-model:create-visible="createVisible"
+    v-model:disable-visible="disableVisible"
+    v-model:delete-visible="deleteVisible"
+    v-model:edit-visible="editVisible"
+    v-model:enable-visible="enableVisible"
+    :agent-options="agentOptions"
+    :create-form="createForm"
+    :disable-target="disableTarget"
+    :delete-target="deleteTarget"
+    :edit-form="editForm"
+    :enable-target="enableTarget"
+    @create="handleCreate"
+    @disable="handleDisable"
+    @delete="handleDelete"
+    @edit="handleEdit"
+    @enable="handleEnable"
   />
 </template>
 
@@ -509,6 +372,31 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.agent-risk-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  color: var(--red-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.agent-risk-text span {
+  color: var(--red-dark);
+}
+
+.agent-status-cell {
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: start;
+}
+
+.status-danger {
+  background: var(--error-bg);
+  color: var(--red-dark);
+}
+
 .form-tip {
   margin: 0;
   color: var(--muted);
@@ -523,81 +411,22 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.create-dialog-form {
-  display: grid;
-  gap: var(--space-lg);
-  margin-top: var(--space-md);
-}
-
-.create-dialog-form label {
-  display: grid;
-  gap: var(--space-xs);
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.model-form {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-md);
-}
-
-.model-form label {
-  display: grid;
-  gap: var(--space-xs);
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.model-form input,
-.model-form select {
-  min-height: var(--control-h);
-}
-
-.model-form-actions {
-  display: flex;
-  align-items: end;
-  gap: var(--space-sm);
-}
-
-.model-list {
+.foundation-entry {
   display: grid;
   gap: var(--space-sm);
-  margin-top: var(--space-base);
-}
-
-.model-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  padding: var(--space-md);
+  padding: var(--space-lg);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background: var(--panel-strong);
 }
 
-.model-row > div:first-child {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
+.foundation-entry strong {
+  color: var(--ink);
+  font-size: var(--text-md);
 }
 
-.model-row strong,
-.model-row span {
-  overflow-wrap: anywhere;
-}
-
-.model-row span {
+.foundation-entry span {
   color: var(--muted);
-  font-size: 12px;
-}
-
-@media (max-width: 900px) {
-  .model-form {
-    grid-template-columns: 1fr;
-  }
+  font-size: var(--text-sm);
 }
 </style>

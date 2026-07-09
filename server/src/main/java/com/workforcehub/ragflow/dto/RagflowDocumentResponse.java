@@ -15,10 +15,14 @@ public class RagflowDocumentResponse {
     private Long fileSize;
     private String contentHash;
     private String parserType;
+    private String parserTypeName;
     private String ingestStatus;
+    private String ingestStatusName;
     private Long latestIngestJobId;
     private String ingestJobStatus;
+    private String ingestJobStatusName;
     private String vectorStatus;
+    private String vectorStatusName;
     private Integer chunkCount;
     private String errorMessage;
     private LocalDateTime createdAt;

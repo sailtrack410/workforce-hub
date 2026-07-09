@@ -16,6 +16,8 @@ public class WorkflowTodoResponse {
     private String title;
     private String summary;
     private String status;
+    private String statusName;
     private String priority;
+    private String priorityName;
     private LocalDateTime createdAt;
 }

@@ -119,6 +119,29 @@ public class ImRepository {
                    m.pin_flag,
                    m.mute_flag,
                    m.member_role,
+                   EXISTS (
+                       SELECT 1
+                       FROM im_message mention_message
+                       WHERE mention_message.conversation_id = c.id
+                         AND mention_message.seq_no > m.last_read_seq
+                         AND mention_message.status IN ('NORMAL', 'EDITED')
+                         AND mention_message.sender_type = 'USER'
+                         AND mention_message.sender_id <> m.member_id
+                         AND JSON_CONTAINS(JSON_EXTRACT(mention_message.content_json, '$.mentionUserIds'), CAST(CAST(m.member_id AS CHAR) AS JSON))
+                   ) AS has_mention_me,
+                   EXISTS (
+                       SELECT 1
+                       FROM im_message reply_message
+                       JOIN im_message quoted_message ON quoted_message.id = reply_message.quoted_message_id
+                       WHERE reply_message.conversation_id = c.id
+                         AND reply_message.seq_no > m.last_read_seq
+                         AND reply_message.status IN ('NORMAL', 'EDITED')
+                         AND reply_message.sender_type = 'USER'
+                         AND reply_message.sender_id <> m.member_id
+                         AND quoted_message.sender_type = 'USER'
+                         AND quoted_message.sender_id = m.member_id
+                         AND quoted_message.conversation_id = c.id
+                   ) AS has_reply_me,
                    lm.id AS last_message_id,
                    lm.seq_no AS last_message_seq_no,
                    lm.sender_type AS last_message_sender_type,
@@ -638,6 +661,8 @@ public class ImRepository {
             rs.getInt("pin_flag") == 1,
             rs.getInt("mute_flag") == 1,
             rs.getString("member_role"),
+            rs.getInt("has_mention_me") == 1,
+            rs.getInt("has_reply_me") == 1,
             lastMessage
         );
     }

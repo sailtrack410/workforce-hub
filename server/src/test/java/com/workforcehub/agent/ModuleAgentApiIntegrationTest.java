@@ -24,11 +24,13 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -161,6 +163,64 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value(containsString("工作流配置无效")));
+    }
+
+    @Test
+    @DisplayName("知识检索节点必须指定可用知识库才可发布")
+    void knowledgeNodeShouldRequireActiveKnowledgeSpace() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String missingSpaceWorkflow = """
+            {
+              "nodes": [
+                { "id": "start", "type": "START" },
+                {
+                  "id": "search",
+                  "type": "KNOWLEDGE",
+                  "config": {
+                    "prompt": "请基于知识检索结果回答：{{knowledge}}",
+                    "toolCalls": [
+                      {
+                        "toolCode": "KNOWLEDGE_SEARCH_CHUNKS",
+                        "args": { "spaceId": "", "query": "{{start.query}}", "topK": 5 },
+                        "outputKey": "knowledge"
+                      }
+                    ]
+                  },
+                  "outputKey": "knowledge"
+                },
+                { "id": "end", "type": "END", "config": { "reply": "{{knowledge}}" } }
+              ],
+              "edges": [
+                { "from": "start", "to": "search" },
+                { "from": "search", "to": "end" }
+              ]
+            }
+            """;
+
+        mockMvc.perform(post("/api/admin/agents/workflows/validate")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "workflowConfigJson": "%s"
+                    }
+                    """.formatted(escapeJsonString(missingSpaceWorkflow))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.valid").value(false))
+            .andExpect(jsonPath("$.data.messages", hasItem("知识检索节点必须指定知识库")));
+
+        long inactiveSpaceId = 9401L;
+        seedKnowledgeSpace(inactiveSpaceId, "agent_inactive_kb", "停用知识库", "INACTIVE");
+        String inactiveSpaceWorkflow = missingSpaceWorkflow.replace("\"spaceId\": \"\"", "\"spaceId\": \"%d\"".formatted(inactiveSpaceId));
+        long agentId = createAgent(adminSession, "KB_DAG_AGENT", "知识检索助手", "QA");
+        long versionId = createVersionWithWorkflow(adminSession, agentId, 1, inactiveSpaceWorkflow);
+
+        mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", versionId)
+                .cookie(adminSession))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
+            .andExpect(jsonPath("$.message").value("知识检索节点关联的知识库不可用"));
     }
 
     @Test
@@ -892,6 +952,70 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data", hasSize(1)))
             .andExpect(jsonLong("$.data[0].agentId", agentId));
+    }
+
+    @Test
+    @DisplayName("后台删除Agent应标记弃用并保留后台可见历史")
+    void adminDeleteShouldDeprecateAgentAndHideFromEmployee() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedAgentWithoutTool(adminSession, "DEPRECATED_AGENT", "弃用助手");
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        long draftVersionId = createVersion(adminSession, agentId, 2);
+
+        mockMvc.perform(delete("/api/admin/agents/{agentId}", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(get("/api/admin/agents/{agentId}", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data.agentId", agentId))
+            .andExpect(jsonPath("$.data.status").value("DEPRECATED"))
+            .andExpect(jsonPath("$.data.statusName").value("已弃用"));
+
+        mockMvc.perform(get("/api/admin/agents")
+                .cookie(adminSession)
+                .param("keyword", "弃用"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].status").value("DEPRECATED"));
+
+        mockMvc.perform(get("/api/employee/agents")
+                .cookie(employeeSession)
+                .param("keyword", "弃用"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(0)));
+
+        mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "inputPayloadJson": "{\\"query\\":\\"弃用后不应执行\\"}"
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("当前 Agent 已弃用，无法继续对话"));
+
+        mockMvc.perform(post("/api/admin/agents/{agentId}/enable", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("已弃用的AI助手不能重新启用"));
+
+        mockMvc.perform(post("/api/admin/agents/versions/{versionId}/publish", draftVersionId)
+                .cookie(adminSession))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("已弃用的AI助手不能发布"));
     }
 
     @Test
@@ -1790,6 +1914,15 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(adminSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));
+    }
+
+    private void seedKnowledgeSpace(long spaceId, String spaceCode, String spaceName, String status) {
+        jdbcTemplate.update("""
+            INSERT INTO kb_space
+                (id, space_code, space_name, owner_type, owner_id, visibility, status, created_by, updated_by, is_deleted)
+            VALUES
+                (?, ?, ?, 'ADMIN', 1001, 'PRIVATE', ?, 1001, 1001, 0)
+            """, spaceId, spaceCode, spaceName, status);
     }
 
     private void seedCustomGroup() {

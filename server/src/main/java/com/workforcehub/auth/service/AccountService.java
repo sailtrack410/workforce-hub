@@ -5,9 +5,7 @@ import com.workforcehub.auth.dto.BindEmailRequest;
 import com.workforcehub.auth.dto.CurrentUserResponse;
 import com.workforcehub.auth.dto.ResetPasswordRequest;
 import com.workforcehub.auth.domain.OrgUser;
-import com.workforcehub.auth.domain.AdminUser;
 import com.workforcehub.auth.mapper.AuthUserAccountMapper;
-import com.workforcehub.auth.mapper.AdminUserMapper;
 import com.workforcehub.auth.mapper.OrgUserMapper;
 import com.workforcehub.auth.security.WfhUserDetails;
 import com.workforcehub.common.enums.UserType;
@@ -28,18 +26,18 @@ import java.time.LocalDateTime;
 public class AccountService {
 
     private final AuthUserAccountMapper accountMapper;
-    private final AdminUserMapper adminUserMapper;
+    private final AdminPermissionService adminPermissionService;
     private final OrgUserMapper orgUserMapper;
     private final EmailCodeService emailCodeService;
     private final PasswordEncoder passwordEncoder;
 
     public AccountService(AuthUserAccountMapper accountMapper,
-                          AdminUserMapper adminUserMapper,
+                          AdminPermissionService adminPermissionService,
                           OrgUserMapper orgUserMapper,
                           EmailCodeService emailCodeService,
                           PasswordEncoder passwordEncoder) {
         this.accountMapper = accountMapper;
-        this.adminUserMapper = adminUserMapper;
+        this.adminPermissionService = adminPermissionService;
         this.orgUserMapper = orgUserMapper;
         this.emailCodeService = emailCodeService;
         this.passwordEncoder = passwordEncoder;
@@ -60,8 +58,10 @@ public class AccountService {
         response.setDisplayName(user.getDisplayName());
         response.setLoginName(user.getUsername());
         if (user.getUserType() == UserType.ADMIN) {
-            response.setRoleCodes(adminUserMapper.selectRoleCodes(user.getUserId()));
-            response.setPermissionCodes(adminUserMapper.selectPermissionCodes(user.getUserId()));
+            AdminPermissionService.AdminPermissionProfile permissionProfile =
+                adminPermissionService.resolveProfile(user.getUserId());
+            response.setRoleCodes(permissionProfile.roleCodes());
+            response.setPermissionCodes(permissionProfile.permissionCodes());
         }
         if (user.getUserType() == UserType.USER) {
             AuthUserAccount account = accountMapper.selectByUserId(user.getUserId());

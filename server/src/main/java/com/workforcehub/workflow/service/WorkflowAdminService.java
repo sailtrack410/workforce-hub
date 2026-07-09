@@ -214,7 +214,9 @@ public class WorkflowAdminService {
         response.setProcessCode(row.processCode());
         response.setProcessName(row.processName());
         response.setBizType(row.bizType());
+        response.setBizTypeName(bizTypeName(row.bizType()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
@@ -229,6 +231,7 @@ public class WorkflowAdminService {
         response.setTemplateCode(row.templateCode());
         response.setTemplateName(row.templateName());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         if (row.currentVersionId() != null) {
@@ -239,6 +242,7 @@ public class WorkflowAdminService {
             currentVersion.setFlowableDefinitionKey(row.currentFlowableDefinitionKey());
             currentVersion.setFlowableDefinitionId(row.currentFlowableDefinitionId());
             currentVersion.setStatus(row.currentVersionStatus());
+            currentVersion.setStatusName(statusName(row.currentVersionStatus()));
             currentVersion.setEffectiveFrom(row.currentEffectiveFrom());
             currentVersion.setEffectiveTo(row.currentEffectiveTo());
             response.setCurrentVersion(currentVersion);
@@ -260,6 +264,7 @@ public class WorkflowAdminService {
         response.setEffectiveFrom(row.effectiveFrom());
         response.setEffectiveTo(row.effectiveTo());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
@@ -270,9 +275,11 @@ public class WorkflowAdminService {
         response.setRequestId(row.id());
         response.setRequestNo(row.requestNo());
         response.setBizType(row.bizType());
+        response.setBizTypeName(bizTypeName(row.bizType()));
         response.setBizId(row.bizId());
         response.setTitle(row.title());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCurrentStepKey(row.currentStepKey());
         response.setCurrentStepName(row.currentStepName());
         response.setSubmittedAt(row.submittedAt());
@@ -288,10 +295,14 @@ public class WorkflowAdminService {
         response.setRequestId(row.id());
         response.setRequestNo(row.requestNo());
         response.setBizType(row.bizType());
+        response.setBizTypeName(bizTypeName(row.bizType()));
         response.setBizId(row.bizId());
         response.setApplicantUserId(row.applicantUserId());
+        response.setApplicantName(row.applicantName());
+        response.setApplicantEmployeeNo(row.applicantEmployeeNo());
         response.setTitle(row.title());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCurrentStepKey(row.currentStepKey());
         response.setCurrentStepName(row.currentStepName());
         response.setFlowableProcessInstanceId(row.flowableProcessInstanceId());
@@ -300,6 +311,7 @@ public class WorkflowAdminService {
         if (leave != null) {
             WorkflowLeaveDetailResponse leaveResponse = new WorkflowLeaveDetailResponse();
             leaveResponse.setLeaveTypeId(leave.leaveTypeId());
+            leaveResponse.setLeaveName(leave.leaveName());
             leaveResponse.setStartAt(leave.startAt());
             leaveResponse.setEndAt(leave.endAt());
             leaveResponse.setDurationMinutes(leave.durationMinutes());
@@ -311,6 +323,7 @@ public class WorkflowAdminService {
                 new WorkflowClockCorrectionDetailResponse();
             clockCorrectionResponse.setTargetDate(clockCorrection.targetDate());
             clockCorrectionResponse.setMissingPunchType(clockCorrection.missingPunchType());
+            clockCorrectionResponse.setMissingPunchTypeName(punchTypeName(clockCorrection.missingPunchType()));
             clockCorrectionResponse.setExpectedPunchAt(clockCorrection.expectedPunchAt());
             clockCorrectionResponse.setReason(clockCorrection.reason());
             response.setClockCorrection(clockCorrectionResponse);
@@ -329,6 +342,7 @@ public class WorkflowAdminService {
         response.setFileSize(row.fileSize());
         response.setContentSha256(row.contentSha256());
         response.setScanStatus(row.scanStatus());
+        response.setScanStatusName(scanStatusName(row.scanStatus()));
         return response;
     }
 
@@ -340,14 +354,77 @@ public class WorkflowAdminService {
         response.setStepKey(row.stepKey());
         response.setStepName(row.stepName());
         response.setActorType(row.actorType());
+        response.setActorTypeName(actorTypeName(row.actorType()));
         response.setActorId(row.actorId());
+        response.setActorName(row.actorName());
+        response.setActorAccount(row.actorAccount());
         response.setActionType(row.actionType());
+        response.setActionTypeName(actionName(row.actionType()));
         response.setComment(row.comment());
         response.setBeforeStatus(row.beforeStatus());
+        response.setBeforeStatusName(statusName(row.beforeStatus()));
         response.setAfterStatus(row.afterStatus());
+        response.setAfterStatusName(statusName(row.afterStatus()));
         response.setAgentDecisionJson(compactJson(row.agentDecisionJson()));
         response.setActedAt(row.actedAt());
         return response;
+    }
+
+    private String bizTypeName(String value) {
+        if ("LEAVE".equals(value)) return "请假";
+        if ("CLOCK_CORRECTION".equals(value)) return "补卡";
+        if ("EXPENSE".equals(value)) return "费用报销";
+        if ("BUSINESS_TRIP".equals(value)) return "出差";
+        if ("OVERTIME".equals(value)) return "加班";
+        if ("SEAL".equals(value)) return "用章";
+        if ("PURCHASE".equals(value)) return "采购";
+        if ("CERTIFICATE".equals(value)) return "证明开具";
+        if ("BORROW".equals(value)) return "备用金借款";
+        if ("PROJECT".equals(value)) return "项目立项";
+        return "其他业务";
+    }
+
+    private String statusName(String value) {
+        if ("PENDING_REVIEW".equals(value)) return "待预审";
+        if ("IN_APPROVAL".equals(value)) return "审批中";
+        if ("APPROVED".equals(value)) return "已通过";
+        if ("REJECTED".equals(value)) return "已驳回";
+        if ("WITHDRAWN".equals(value)) return "已撤回";
+        if ("DRAFT".equals(value)) return "草稿";
+        if ("PUBLISHED".equals(value)) return "已发布";
+        if ("ARCHIVED".equals(value)) return "已归档";
+        if ("ACTIVE".equals(value)) return "启用";
+        if ("INACTIVE".equals(value)) return "停用";
+        return value == null ? null : "未知状态";
+    }
+
+    private String actionName(String value) {
+        if ("APPROVE".equals(value)) return "通过";
+        if ("REJECT".equals(value)) return "驳回";
+        if ("WITHDRAW".equals(value)) return "撤回";
+        if ("AGENT_PRE_REVIEW".equals(value)) return "AI 预审";
+        return value == null ? null : "其他动作";
+    }
+
+    private String scanStatusName(String value) {
+        if ("CLEAN".equals(value)) return "已通过";
+        if ("FAILED".equals(value)) return "未通过";
+        if ("PENDING".equals(value)) return "检测中";
+        return value == null ? null : "未知状态";
+    }
+
+    private String actorTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("ADMIN".equals(value) || "ADMIN_USER".equals(value)) return "管理员";
+        if ("AGENT".equals(value)) return "AI 助手";
+        if ("SYSTEM".equals(value)) return "系统";
+        return value == null ? null : "业务参与人";
+    }
+
+    private String punchTypeName(String value) {
+        if ("ON_DUTY".equals(value)) return "上班卡";
+        if ("OFF_DUTY".equals(value)) return "下班卡";
+        return value == null ? null : "其他补卡类型";
     }
 
     private String normalizeStatus(String status) {

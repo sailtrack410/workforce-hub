@@ -4,14 +4,10 @@ import type {
   AttendanceDailyResultResponse,
   AttendanceExceptionResponse,
   AgentResponse,
-  AgentTaskResponse,
   AttachmentRefResponse,
-  CancelAgentTaskRequest,
   ClockCorrectionRequestCreateRequest,
-  ConfirmAgentTaskRequest,
   ConfirmUploadRequest,
   CopyEmployeeFileRequest,
-  CreateAgentTaskRequest,
   CreateEmployeeFileFolderRequest,
   CreateGroupConversationRequest,
   CreateDownloadTicketRequest,
@@ -33,6 +29,7 @@ import type {
   FileTrashResponse,
   ForwardImMessageRequest,
   FriendRequest,
+  GenericWorkflowRequestCreateRequest,
   GroupMemberUserIdsRequest,
   ImConversationListQuery,
   ImConversationDetailResponse,
@@ -116,6 +113,7 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
     workflow: {
       submitLeaveRequest: (request: LeaveRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/leave-requests', request),
       submitClockCorrectionRequest: (request: ClockCorrectionRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/clock-correction-requests', request),
+      submitGenericRequest: (request: GenericWorkflowRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/generic-requests', request),
       todos: () => client.get<WorkflowTodoResponse[]>('/api/employee/workflow/todos'),
       requests: (query: WorkflowRequestListQuery = {}) => client.get<PageResult<WorkflowRequestSummaryResponse>>('/api/employee/workflow/requests', { query }),
       approveTask: (taskId: string, request: WorkflowTaskApproveRequest) => client.post<WorkflowRequestStatusResponse>(`/api/employee/workflow/tasks/${encodeURIComponent(taskId)}/approve`, request),
@@ -238,17 +236,6 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
     },
     agents: {
       list: (query: { keyword?: string } = {}) => client.get<AgentResponse[]>('/api/employee/agents', { query }),
-      createTask: (agentId: EntityId, request: CreateAgentTaskRequest) => (
-        client.post<AgentTaskResponse>(`/api/employee/agents/${pathId(agentId)}/tasks`, request)
-      ),
-    },
-    agentTasks: {
-      confirm: (taskId: EntityId, request: ConfirmAgentTaskRequest) => (
-        client.post<AgentTaskResponse>(`/api/employee/agent-tasks/${pathId(taskId)}/confirm`, request)
-      ),
-      cancel: (taskId: EntityId, request: CancelAgentTaskRequest) => (
-        client.post<AgentTaskResponse>(`/api/employee/agent-tasks/${pathId(taskId)}/cancel`, request)
-      ),
     },
     files: {
       list: (query: FileListQuery = {}) => client.get<PageResult<EmployeeFileResponse>>('/api/employee/files', { query }),

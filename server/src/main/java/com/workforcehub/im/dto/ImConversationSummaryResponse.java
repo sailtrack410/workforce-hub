@@ -12,6 +12,7 @@ public class ImConversationSummaryResponse {
 
     private Long conversationId;
     private String conversationType;
+    private String conversationTypeName;
     private String conversationKey;
     private String title;
     private Long avatarFileId;
@@ -22,7 +23,11 @@ public class ImConversationSummaryResponse {
     private ImMessageResponse lastMessage;
     private LocalDateTime lastMessageAt;
     private String status;
+    private String statusName;
     private Boolean pin;
     private Boolean mute;
     private String memberRole;
+    private String memberRoleName;
+    private Boolean hasMentionMe;
+    private Boolean hasReplyMe;
 }

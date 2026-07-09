@@ -342,15 +342,55 @@ public class FileQuotaPolicyService {
         response.setPolicyCode(row.policyCode());
         response.setPolicyName(row.policyName());
         response.setScopeType(row.scopeType());
+        response.setScopeTypeName(scopeTypeName(row.scopeType()));
         response.setScopeId(row.scopeId());
+        response.setScopeName(scopeName(row.scopeType(), row.scopeId()));
         response.setQuotaBytes(row.quotaBytes());
         response.setCacheQuotaBytes(row.cacheQuotaBytes());
         response.setWarningThreshold(row.warningThreshold());
         response.setBlockThreshold(row.blockThreshold());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
+    }
+
+    private String scopeName(String scopeType, Long scopeId) {
+        if ("GLOBAL".equals(scopeType)) {
+            return "全局";
+        }
+        if (scopeId == null) {
+            return null;
+        }
+        if ("DEPARTMENT".equals(scopeType)) {
+            return jdbcTemplate.query("""
+                SELECT dept_name
+                FROM org_department
+                WHERE id = ? AND is_deleted = 0
+                """, rs -> rs.next() ? rs.getString("dept_name") : "部门");
+        }
+        if ("USER".equals(scopeType)) {
+            return jdbcTemplate.query("""
+                SELECT real_name
+                FROM org_user
+                WHERE id = ? AND is_deleted = 0
+                """, rs -> rs.next() ? rs.getString("real_name") : "员工");
+        }
+        return "适用对象";
+    }
+
+    private String scopeTypeName(String value) {
+        if ("GLOBAL".equals(value)) return "全局";
+        if ("DEPARTMENT".equals(value)) return "部门";
+        if ("USER".equals(value)) return "员工";
+        return value == null ? null : "适用范围";
+    }
+
+    private String statusName(String value) {
+        if ("ACTIVE".equals(value)) return "启用";
+        if ("INACTIVE".equals(value)) return "停用";
+        return value == null ? null : "其他状态";
     }
 
     private BigDecimal ratio(long used, long quota) {

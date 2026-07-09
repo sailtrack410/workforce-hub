@@ -12,6 +12,7 @@ public record AgentRow(
     Long publishedVersionId,
     Integer publishedVersionNo,
     String publishedVersionLabel,
+    String publishedWorkflowConfigJson,
     String status,
     LocalDateTime createdAt,
     LocalDateTime updatedAt

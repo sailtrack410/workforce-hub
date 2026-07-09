@@ -4,7 +4,7 @@ import { Sparkles, MessageCircle, ChevronLeft, X } from 'lucide-vue-next';
 import type { AgentResponse } from '@/api';
 import { employeeApi } from '@/api';
 import { useAgentsSectionContext } from '../employee-shell-context';
-import { humanizeText } from '@/utils/employee-format';
+import { agentTypeLabel, humanizeText, identityModeLabel, statusText } from '@/utils/employee-format';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
@@ -104,6 +104,10 @@ function backToList() {
   shell.setMobileView('list');
 }
 
+function agentVisibleType(agent: AgentResponse) {
+  return agent.agentTypeName || agentTypeLabel(agent.agentType);
+}
+
 onMounted(() => {
   void loadAgents();
 });
@@ -163,7 +167,7 @@ watch(agents, (rows) => {
           />
           <div class="agent-card-copy">
             <strong>{{ humanizeText(agent.agentName) }}</strong>
-            <small>{{ agent.agentType }}</small>
+            <small>{{ agentVisibleType(agent) }}</small>
           </div>
           <AppTag tone="success">已添加</AppTag>
         </button>
@@ -192,7 +196,7 @@ watch(agents, (rows) => {
           />
           <div class="agent-card-copy">
             <strong>{{ humanizeText(agent.agentName) }}</strong>
-            <small>{{ agent.agentType }}</small>
+            <small>{{ agentVisibleType(agent) }}</small>
           </div>
           <AppTag tone="neutral">可添加</AppTag>
         </button>
@@ -216,13 +220,12 @@ watch(agents, (rows) => {
           status="online"
         />
         <h3>{{ humanizeText(profileAgent.agentName) }}</h3>
-        <p>{{ profileAgent.agentCode }}</p>
         <div class="agent-profile-badges">
           <AppTag tone="success">
             <Sparkles :size="11" />
             AI 助手
           </AppTag>
-          <AppTag tone="neutral">{{ profileAgent.agentType }}</AppTag>
+          <AppTag tone="neutral">{{ agentVisibleType(profileAgent) }}</AppTag>
           <AppTag v-if="profileAgent.publishedVersionLabel" tone="primary">
             v{{ profileAgent.publishedVersionLabel }}
           </AppTag>
@@ -230,20 +233,16 @@ watch(agents, (rows) => {
       </header>
       <dl class="agent-profile-detail">
         <div>
-          <dt>助手代码</dt>
-          <dd>{{ profileAgent.agentCode }}</dd>
-        </div>
-        <div>
           <dt>类型</dt>
-          <dd>{{ profileAgent.agentType }}</dd>
+          <dd>{{ agentVisibleType(profileAgent) }}</dd>
         </div>
         <div>
           <dt>身份模式</dt>
-          <dd>{{ profileAgent.identityMode }}</dd>
+          <dd>{{ profileAgent.identityModeName || identityModeLabel(profileAgent.identityMode) }}</dd>
         </div>
         <div>
           <dt>状态</dt>
-          <dd>{{ profileAgent.status }}</dd>
+          <dd>{{ profileAgent.statusName || statusText(profileAgent.status) }}</dd>
         </div>
       </dl>
       <div class="agent-profile-actions">

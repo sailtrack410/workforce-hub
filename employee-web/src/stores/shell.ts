@@ -35,9 +35,10 @@ import { createClientId } from '@/utils/request-id';
 export type SectionId = 'messages' | 'todos' | 'files' | 'workbench' | 'processes' | 'contacts' | 'agents' | 'reports' | 'settings';
 export type ContactsViewMode = 'list' | 'tree';
 export type ConversationTone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
-export type SectionFilter = '全部' | '未处理' | 'AI' | '群聊' | '私聊';
+export type SectionFilter = '全部' | '未处理' | 'AI' | '群聊' | '私聊' | '进行中' | '已完成' | '未开始';
 export type ThemeMode = 'light' | 'dark';
 export type MessageDensity = 'cozy' | 'compact';
+export type TodoTagColor = 'blue' | 'green' | 'amber' | 'rose' | 'teal' | 'gray';
 
 export interface StoredPreferences {
   theme: ThemeMode;
@@ -56,7 +57,7 @@ export interface StoredPreferences {
 
 export interface SectionAction {
   label: string;
-  action: 'switch-section' | 'switch-item' | 'open-workbench' | 'upload-personal-file' | 'approve-todo' | 'reject-todo';
+  action: 'switch-section' | 'switch-item' | 'open-workbench' | 'upload-personal-file';
   section?: SectionId;
   item?: string;
   app?: string;
@@ -91,10 +92,20 @@ export interface ConversationMessage {
   senderId?: EntityId | null;
   status?: string;
   quotedMessageId?: EntityId | null;
+  mentions?: MessageMention[];
   translatedText?: string;
   attachments?: ConversationAttachment[];
   processCard?: ConversationProcessCard;
   knowledgeCard?: KnowledgeAnswerCard;
+}
+
+export interface MessageMention {
+  userId: EntityId;
+  name: string;
+  originalName?: string;
+  role?: string;
+  department?: string;
+  avatarUrl?: string;
 }
 
 export interface ConversationCard {
@@ -174,6 +185,8 @@ export interface ConversationRecord {
   status: string;
   pinned?: boolean;
   muted?: boolean;
+  hasMentionMe?: boolean;
+  hasReplyMe?: boolean;
   unreadLabel: string;
   summaryTitle: string;
   summaryBody: string;
@@ -198,6 +211,14 @@ export interface TodoRecord {
   fields: Array<[string, string]>;
   timeline: string[];
   actions: SectionAction[];
+  startDate?: string;
+  endDate?: string;
+  startAt?: string;
+  endAt?: string;
+  tagName?: string;
+  tagColor?: TodoTagColor;
+  completed?: boolean;
+  createdAt?: string;
 }
 
 export interface FileSpaceRecord {
@@ -287,16 +308,11 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     kicker: '',
     title: '待办',
     subtitle: '',
-    search: '搜索待办、申请号、处理人',
+    search: '搜索待办、标签',
     primaryAction: {
-      label: '刷新列表',
+      label: '添加待办',
       action: 'switch-section',
       section: 'todos',
-    },
-    secondaryAction: {
-      label: '打开申请',
-      action: 'open-workbench',
-      app: 'requests',
     },
   },
   files: {
@@ -329,7 +345,7 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     kicker: '',
     title: '流程',
     subtitle: '',
-    search: '搜索流程、审批、编号',
+    search: '搜索流程、审批',
   },
   contacts: {
     kicker: '',
@@ -370,6 +386,7 @@ export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = 
 export const primaryNavItems: NavRailItem[] = navItems;
 
 export const sectionFilters: SectionFilter[] = ['全部', '未处理', 'AI', '群聊', '私聊'];
+export const todoSectionFilters: SectionFilter[] = ['全部', '进行中', '已完成', '未开始'];
 
 const currentUser = {
   name: '员工',
@@ -382,6 +399,7 @@ const currentUser = {
 const preferenceStorageKey = 'workforce-hub.employee.preferences.v1';
 const personalFilesStoragePrefix = 'workforce-hub.employee.personal-files.v1';
 const contactRemarksStoragePrefix = 'workforce-hub.employee.contact-remarks.v1';
+const todoStorageKey = 'workforce-hub.employee.todos.v1';
 
 const defaultPreferences: StoredPreferences = {
   theme: 'light',
@@ -512,6 +530,104 @@ function writeStoredContactRemarks(ownerId: string | number | null | undefined, 
   }
 }
 
+function todayDateString() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function isDateString(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isDateTimeMinuteString(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+}
+
+function datePart(value: string) {
+  return value.slice(0, 10);
+}
+
+function formatTodoRange(startAt: string, endAt: string) {
+  const start = startAt.replace('T', ' ');
+  const end = endAt.replace('T', ' ');
+  if (datePart(startAt) === datePart(endAt)) return `${start} - ${endAt.slice(11)}`;
+  return `${start} 至 ${end}`;
+}
+
+function normalizeTodoColor(value: unknown): TodoTagColor {
+  if (['blue', 'green', 'amber', 'rose', 'teal', 'gray'].includes(String(value))) {
+    return value as TodoTagColor;
+  }
+  return 'blue';
+}
+
+function createTodoRecord(input: Partial<TodoRecord> & { title: string }): TodoRecord {
+  const fallbackStartAt = `${isDateString(input.startDate) ? input.startDate : todayDateString()}T09:00`;
+  const startAt = isDateTimeMinuteString(input.startAt) ? input.startAt : fallbackStartAt;
+  const fallbackEndDate = isDateString(input.endDate) && input.endDate >= datePart(startAt) ? input.endDate : datePart(startAt);
+  const fallbackEndAt = `${fallbackEndDate}T${fallbackEndDate === datePart(startAt) ? '18:00' : '18:00'}`;
+  const endAt = isDateTimeMinuteString(input.endAt) && input.endAt >= startAt ? input.endAt : (fallbackEndAt >= startAt ? fallbackEndAt : startAt);
+  const startDate = datePart(startAt);
+  const endDate = datePart(endAt);
+  const tagName = typeof input.tagName === 'string' && input.tagName.trim()
+    ? input.tagName.trim().slice(0, 12)
+    : '工作';
+  const note = typeof input.note === 'string' ? input.note.trim().slice(0, 300) : '';
+  const completed = Boolean(input.completed);
+  return {
+    id: input.id || `todo-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    title: input.title.trim().slice(0, 60),
+    subtitle: formatTodoRange(startAt, endAt),
+    note,
+    time: startAt.replace('T', ' '),
+    status: completed ? 'DONE' : 'OPEN',
+    priority: tagName.slice(0, 1),
+    requestNo: '',
+    taskId: '',
+    currentStepName: completed ? '已完成' : '待处理',
+    summary: note || input.title.trim().slice(0, 60),
+    fields: [],
+    timeline: [],
+    actions: [],
+    startDate,
+    endDate,
+    startAt,
+    endAt,
+    tagName,
+    tagColor: normalizeTodoColor(input.tagColor),
+    completed,
+    createdAt: input.createdAt || new Date().toISOString(),
+  };
+}
+
+function readStoredTodos(): TodoRecord[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(todoStorageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is Partial<TodoRecord> & { title: string } => (
+        Boolean(item)
+        && typeof item === 'object'
+        && typeof (item as Partial<TodoRecord>).title === 'string'
+        && Boolean((item as Partial<TodoRecord>).title?.trim())
+      ))
+      .map(createTodoRecord)
+      .slice(0, 200);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredTodos(todos: TodoRecord[]) {
+  try {
+    globalThis.localStorage?.setItem(todoStorageKey, JSON.stringify(todos.slice(0, 200)));
+  } catch {
+    return;
+  }
+}
+
 function buildContactCategoryItems(deptTree: OrgDepartmentTreeNodeResponse[]): ContactCategoryItem[] {
   return deptTree.map((node) => ({
     id: `dept-${node.id}`,
@@ -590,7 +706,7 @@ const workbenchItems: WorkbenchRecord[] = [
     id: 'oa',
     title: 'OA 申请',
     label: 'oa',
-    subtitle: '请假申请 / 我的申请',
+    subtitle: '请假 / 补卡 / 报销 / 出差 / 加班',
     note: '',
     tone: 'blue',
     status: '可用',
@@ -622,73 +738,72 @@ const workbenchItems: WorkbenchRecord[] = [
     stats: [],
     steps: [],
   },
-  {
-    id: 'agent',
-    title: 'AI 任务',
-    label: 'AI',
-    subtitle: 'AI 助手任务',
-    note: '',
-    tone: 'green',
-    status: '',
-    fields: [],
-    stats: [],
-    steps: [],
-  },
 ];
 
 const contactItems: ContactRecord[] = [];
 
 const profileItems: ProfileRecord[] = [
   {
+    id: 'profile',
+    title: '个人中心',
+    subtitle: '身份 / 组织 / 账号 / 偏好',
+    note: '',
+    tone: 'blue',
+    stats: [],
+    fields: [
+      ['身份状态', '姓名 任职状态 岗位 入职日期'],
+      ['组织状态', '所属部门 直属上级 直属下级'],
+      ['账号状态', '手机号 绑定邮箱 修改密码'],
+      ['偏好状态', '在线状态 主题 消息密度'],
+    ],
+  },
+  {
     id: 'organization',
-    title: '组织关系',
-    subtitle: '同部门 / 上下级',
+    title: '组织归属',
+    subtitle: '部门 / 上级 / 下级',
     note: '',
     tone: 'green',
     stats: [],
-    fields: [],
+    fields: [
+      ['组织关系', '所属部门 岗位 直属上级 直属下级 组织链路'],
+    ],
   },
   {
     id: 'security',
-    title: '账号与安全',
+    title: '账号安全',
     subtitle: '手机号 / 邮箱 / 密码',
     note: '',
     tone: 'amber',
     stats: [],
-    fields: [],
+    fields: [
+      ['账号安全', '登录名 手机号 绑定邮箱 换绑邮箱 修改密码 退出登录'],
+    ],
   },
   {
     id: 'preferences',
-    title: '偏好设置',
-    subtitle: '外观 / 通知 / 状态',
+    title: '工作偏好',
+    subtitle: '状态 / 外观 / 通知',
     note: '',
     tone: 'gray',
     stats: [],
-    fields: [],
-  },
-  {
-    id: 'storage',
-    title: '文件空间',
-    subtitle: '配额与最近文件',
-    note: '',
-    tone: 'gray',
-    stats: [],
-    fields: [],
+    fields: [
+      ['偏好设置', '工作状态 通知设置 界面设置 消息样式 在线 忙碌 离开 免打扰'],
+    ],
   },
 ];
 
 const SETTINGS_ALIAS: Record<string, string> = {
-  center: 'security',
-  profile: 'security',
+  center: 'profile',
 };
 
 export function normalizeSettingsPanel(id?: string | null): string {
-  if (!id) return 'security';
+  if (!id) return 'profile';
   if (SETTINGS_ALIAS[id]) return SETTINGS_ALIAS[id];
-  return profileItems.some((item) => item.id === id) ? id : 'security';
+  return profileItems.some((item) => item.id === id) ? id : 'profile';
 }
 
 const WORKBENCH_ALIAS: Record<string, string> = {
+  agent: 'oa',
   files: 'oa',
   leave: 'oa',
   requests: 'oa',
@@ -763,6 +878,23 @@ function isPendingStatus(status: string) {
   return ['PENDING', 'OPEN', 'IN_APPROVAL', 'ABNORMAL'].includes(status);
 }
 
+export function todoLifecycle(todo: TodoRecord, now = new Date()) {
+  if (todo.completed || todo.status === 'DONE') return '已完成';
+  const nowKey = toDateTimeMinuteString(now);
+  if (todo.startAt && todo.startAt > nowKey) return '未开始';
+  return '进行中';
+}
+
+function toDateTimeMinuteString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function matchesTodoFilter(item: TodoRecord, filter: SectionFilter) {
+  if (filter === '全部') return true;
+  if (filter === '进行中' || filter === '已完成' || filter === '未开始') return todoLifecycle(item) === filter;
+  return true;
+}
+
 function matchesConversationFilter(item: ConversationRecord, filter: SectionFilter) {
   if (filter === '全部') return true;
   if (filter === '未处理') return item.unread > 0 || isPendingStatus(item.status);
@@ -804,7 +936,7 @@ export const useShellStore = defineStore('employee-shell', {
     },
     filters: {
       messages: '全部' as SectionFilter,
-      todos: '全部' as SectionFilter,
+      todos: '进行中' as SectionFilter,
       files: '全部' as SectionFilter,
       workbench: '全部' as SectionFilter,
       processes: '全部' as SectionFilter,
@@ -822,9 +954,9 @@ export const useShellStore = defineStore('employee-shell', {
       contacts: '',
       agents: '',
       reports: 'overview',
-      settings: 'security',
+      settings: 'profile',
     },
-    todos: [] as TodoRecord[],
+    todos: readStoredTodos(),
     files: createFileSpaces(),
     personalFileOwnerId: '',
     workbench: workbenchItems,
@@ -885,8 +1017,8 @@ export const useShellStore = defineStore('employee-shell', {
         .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
     },
     filteredTodos(state): TodoRecord[] {
-      return state.todos
-        .filter((item) => state.filters.todos !== '未处理' || isPendingStatus(item.status))
+      return [...state.todos]
+        .filter((item) => matchesTodoFilter(item, state.filters.todos))
         .filter((item) => includesKeyword([
           item.title,
           item.subtitle,
@@ -896,7 +1028,14 @@ export const useShellStore = defineStore('employee-shell', {
           item.requestNo,
           item.taskId,
           item.currentStepName,
-        ], state.search.todos));
+          item.startDate,
+          item.endDate,
+          item.startAt,
+          item.endAt,
+          item.tagName,
+        ], state.search.todos))
+        .sort((a, b) => String(a.startAt ?? a.startDate ?? '').localeCompare(String(b.startAt ?? b.startDate ?? ''))
+          || String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
     },
     filteredFiles(state): FileSpaceRecord[] {
       return state.files.filter((item) => includesKeyword([
@@ -1153,7 +1292,7 @@ export const useShellStore = defineStore('employee-shell', {
       }
       this.profile = profileItems;
       if (!this.profile.some((item) => item.id === this.active.settings)) {
-        this.active.settings = this.profile[0]?.id ?? 'security';
+        this.active.settings = this.profile[0]?.id ?? 'profile';
       }
       this.contacts = collectContacts({
         user,
@@ -1247,6 +1386,32 @@ export const useShellStore = defineStore('employee-shell', {
       ));
       writeStoredPersonalFiles(personal.files, this.personalFileOwnerId);
     },
+    addTodoTask(input: Pick<TodoRecord, 'title' | 'startAt' | 'endAt' | 'note' | 'tagName' | 'tagColor'>) {
+      const record = createTodoRecord({ ...input, title: input.title });
+      this.todos = [...this.todos, record];
+      this.active.todos = record.id;
+      writeStoredTodos(this.todos);
+      return record;
+    },
+    toggleTodoTask(id: string) {
+      this.todos = this.todos.map((item) => {
+        if (item.id !== id) return item;
+        const completed = !item.completed;
+        return {
+          ...item,
+          completed,
+          status: completed ? 'DONE' : 'OPEN',
+          currentStepName: completed ? '已完成' : '待处理',
+        };
+      });
+      writeStoredTodos(this.todos);
+    },
+    reloadStoredTodos() {
+      this.todos = readStoredTodos();
+      if (!this.todos.some((item) => item.id === this.active.todos)) {
+        this.active.todos = this.todos[0]?.id ?? '';
+      }
+    },
     // 后端待办同步到本地，如果当前选中的待办被删了就自动切到第一条
     mergeBackendTodos(backendTodos: TodoRecord[]) {
       const backendIds = new Set(backendTodos.map((item) => item.id));
@@ -1269,7 +1434,22 @@ export const useShellStore = defineStore('employee-shell', {
     mergeBackendMessages(conversationId: string, backendMessages: ConversationMessage[]) {
       const conversation = this.conversations.find((item) => item.id === conversationId);
       if (!conversation || !backendMessages.length) return;
-      conversation.messages = applyMessageRemarks(backendMessages, conversation, this.contactRemarks);
+      const localMessages = new Map(conversation.messages.map((message) => [message.id, message]));
+      const mentionMembers = conversation.panel.members
+        .filter((member) => member.userId !== undefined && member.userId !== null)
+        .map((member) => ({
+          userId: member.userId as EntityId,
+          name: member.originalName || member.name,
+          originalName: member.originalName || member.name,
+          role: member.role,
+        }));
+      const nextMessages = backendMessages.map((message) => ({
+        ...message,
+        mentions: message.mentions ?? localMessages.get(message.id)?.mentions ?? mentionMembers.filter((member) => (
+          hasMentionToken(message.body, member.originalName || member.name)
+        )),
+      }));
+      conversation.messages = applyMessageRemarks(nextMessages, conversation, this.contactRemarks);
       conversation.panel.attachments = collectConversationAttachments(backendMessages);
       const latestMessage = conversation.messages[conversation.messages.length - 1];
       conversation.subtitle = latestMessage.body;
@@ -1437,4 +1617,12 @@ function applyMessageRemarks(messages: ConversationMessage[], conversation: Conv
       author: remark ? (conversation.kind === 'team' ? `${remark} @ ${originalAuthor}` : remark) : originalAuthor,
     };
   });
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasMentionToken(text: string, name: string) {
+  return new RegExp(`(^|[\\s，。,.!?！？、:：；;])@${escapeRegExp(name)}(?=$|[\\s，。,.!?！？、:：；;])`).test(text);
 }

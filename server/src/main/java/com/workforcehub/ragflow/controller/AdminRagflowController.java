@@ -95,6 +95,12 @@ public class AdminRagflowController {
         return R.ok(ragflowAdminService.updateSpace(spaceId, request));
     }
 
+    @DeleteMapping("/spaces/{spaceId}")
+    public R<Void> deleteSpace(@PathVariable Long spaceId) {
+        ragflowAdminService.deleteSpace(spaceId);
+        return R.ok();
+    }
+
     @GetMapping("/spaces/{spaceId}/acl")
     public R<List<RagflowAclResponse>> listAcl(@PathVariable Long spaceId) {
         return R.ok(ragflowAdminService.listAcl(spaceId));

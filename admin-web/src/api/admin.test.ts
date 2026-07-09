@@ -61,6 +61,16 @@ describe('adminApi', () => {
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ systemPrompt: 'updated' });
   });
 
+  it('maps agent deprecate endpoint', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse(null));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.agentConfig.remove('8001');
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/agents/8001');
+    expect(fetcher.mock.calls[0][1]?.method).toBe('DELETE');
+  });
+
   it('maps leave type update and delete endpoints', async () => {
     const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ leaveTypeId: '7001' }));
     const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
@@ -104,6 +114,43 @@ describe('adminApi', () => {
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ ocrBaseUrl: 'http://ocr.local', ocrApiKey: 'test-key', ocrModel: 'ocr-v1', retrievalTopK: 8 });
   });
 
+  it('maps notification channel endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ channelCode: 'EMAIL_DEFAULT' }));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+    const request = {
+      enabled: true,
+      host: 'smtp.example.com',
+      port: 465,
+      username: 'notice@example.com',
+      secretValue: 'secret',
+      fromAddress: 'notice@example.com',
+      fromName: 'Workforce Hub',
+      sslEnabled: true,
+      starttlsEnabled: false,
+      timeoutMillis: 5000,
+    };
+
+    await api.notificationChannels.detail('EMAIL_DEFAULT');
+    await api.notificationChannels.update('EMAIL_DEFAULT', request);
+    await api.notificationChannels.test('EMAIL_DEFAULT', { ...request, recipient: 'admin.demo@example.com' });
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/notification-channels/EMAIL_DEFAULT');
+    expect(fetcher.mock.calls[1][0]).toBe('/api/admin/notification-channels/EMAIL_DEFAULT');
+    expect(fetcher.mock.calls[1][1]?.method).toBe('PUT');
+    expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body))).toEqual(request);
+    expect(fetcher.mock.calls[2][0]).toBe('/api/admin/notification-channels/EMAIL_DEFAULT/test');
+    expect(fetcher.mock.calls[2][1]?.method).toBe('POST');
+  });
+
+  it('maps provider model discovery endpoint', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.aiProviders.models('1001');
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/agents/ai-providers/1001/models');
+  });
+
   it('maps ragflow upload endpoints under ragflow permission path', async () => {
     const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ uploadTicketId: '1', deduplicated: false, headers: {} }));
     const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
@@ -128,6 +175,16 @@ describe('adminApi', () => {
 
     expect(fetcher.mock.calls[0][0]).toBe('/api/admin/ragflow/files/upload-tickets');
     expect(fetcher.mock.calls[1][0]).toBe('/api/admin/ragflow/files/confirm-upload');
+  });
+
+  it('maps ragflow space delete endpoint', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse(null));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.ragflow.deleteSpace('9001');
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/ragflow/spaces/9001');
+    expect(fetcher.mock.calls[0][1]?.method).toBe('DELETE');
   });
 
   it('maps rbac endpoints', async () => {

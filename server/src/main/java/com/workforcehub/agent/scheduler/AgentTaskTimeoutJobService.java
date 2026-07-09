@@ -218,8 +218,11 @@ public class AgentTaskTimeoutJobService {
                                                        LocalDateTime startedAt) {
         AgentTaskTimeoutScanResponse response = new AgentTaskTimeoutScanResponse();
         response.setJobRunId(jobRunId);
+        response.setJobRunNo(jobRunId);
         response.setTriggerType(triggerType);
+        response.setTriggerTypeName(triggerTypeName(triggerType));
         response.setJobStatus(jobStatus);
+        response.setJobStatusName(statusName(jobStatus));
         response.setBatchSize(batchSize);
         response.setScannedCount(scannedCount);
         response.setCancelledCount(cancelledCount);
@@ -228,6 +231,20 @@ public class AgentTaskTimeoutJobService {
         response.setStartedAt(startedAt);
         response.setFinishedAt(LocalDateTime.now());
         return response;
+    }
+
+    private String triggerTypeName(String value) {
+        if ("MANUAL".equals(value)) return "手动";
+        if ("SCHEDULED".equals(value)) return "定时任务";
+        if ("SERVICE".equals(value)) return "服务";
+        return value == null ? null : "其他触发";
+    }
+
+    private String statusName(String value) {
+        if ("RUNNING".equals(value)) return "运行中";
+        if ("SUCCEEDED".equals(value) || "SUCCESS".equals(value)) return "成功";
+        if ("FAILED".equals(value)) return "失败";
+        return value == null ? null : "未知状态";
     }
 
     private static class ScanStats {

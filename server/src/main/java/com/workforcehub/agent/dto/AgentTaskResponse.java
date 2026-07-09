@@ -12,11 +12,16 @@ public class AgentTaskResponse {
 
     private Long taskId;
     private Long agentId;
+    private String agentName;
     private Long agentVersionId;
     private String triggerType;
+    private String triggerTypeName;
     private String contextType;
+    private String contextTypeName;
     private Long contextId;
+    private String contextDisplayName;
     private String status;
+    private String statusName;
     private Integer toolCallCount;
     private LocalDateTime waitingDeadlineAt;
     private String workflowSnapshotJson;

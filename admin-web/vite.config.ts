@@ -18,7 +18,8 @@ function localUploadBridgePlugin(): Plugin {
         }
 
         const target = request.headers['x-upload-path'];
-        const uploadPath = Array.isArray(target) ? target[0] : target;
+        const rawUploadPath = Array.isArray(target) ? target[0] : target;
+        const uploadPath = decodeUploadPath(rawUploadPath);
         if (!uploadPath || uploadPath.includes('\0')) {
           response.statusCode = 400;
           response.end('Missing upload target');
@@ -50,6 +51,15 @@ function localUploadBridgePlugin(): Plugin {
       });
     },
   };
+}
+
+function decodeUploadPath(uploadPath?: string) {
+  if (!uploadPath) return '';
+  try {
+    return decodeURIComponent(uploadPath);
+  } catch {
+    return uploadPath;
+  }
 }
 
 export function resolveLocalUploadTargets(uploadPath: string) {
@@ -88,6 +98,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: '127.0.0.1',
+      port: 5173,
+      strictPort: true,
       proxy: {
         '/api': {
           target: apiProxyTarget,

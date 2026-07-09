@@ -32,6 +32,7 @@ export const useSessionStore = defineStore('admin-session', {
         if (!state.user) return false;
         // 后端已对 ADMIN 用户返回 permissionCodes（AccountService.java:65）。
         // 字段缺失或为空时默认拒绝，避免后端漏传导致越权。
+        if (state.user.roleCodes?.includes('SUPER_ADMIN')) return true;
         const codes = state.user.permissionCodes;
         return Array.isArray(codes) && codes.includes(permissionCode);
       };

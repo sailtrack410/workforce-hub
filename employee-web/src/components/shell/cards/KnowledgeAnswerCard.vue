@@ -158,6 +158,28 @@ const confidenceTone = computed(() => {
   return 'neutral';
 });
 
+function visibleBusinessText(value?: string) {
+  const text = value?.trim();
+  if (!text) return '';
+  if (/https?:\/\//i.test(text) || text.includes('/api/')) return '';
+  if (/\bWF-[A-Z0-9-]*\d[A-Z0-9-]*\b/i.test(text)) return '';
+  if (/\b\d{16,}\b/.test(text)) return '';
+  if (/^[A-Z][A-Z0-9_]{2,}$/.test(text)) return '';
+  return text;
+}
+
+function visibleFlowFields(flow: KnowledgeRelatedFlow) {
+  return (flow.fields ?? [])
+    .map(([key, value]) => [key, visibleBusinessText(value)] as [string, string])
+      .filter(([, value]) => value);
+}
+
+function visibleRelatedBusiness() {
+  return props.relatedBusiness
+    .map((item) => ({ ...item, value: visibleBusinessText(item.value) }))
+    .filter((item) => item.value);
+}
+
 function categoryLabel(category?: AgentResultCategory) {
   if (category === 'OA') return 'OA';
   if (category === 'QA') return 'QA';
@@ -259,9 +281,9 @@ function shouldShowEmptyCitation() {
       </div>
     </section>
 
-    <section v-if="props.relatedBusiness.length" class="business-strip" aria-label="关联字段">
+    <section v-if="visibleRelatedBusiness().length" class="business-strip" aria-label="关联字段">
       <span
-        v-for="item in props.relatedBusiness"
+        v-for="item in visibleRelatedBusiness()"
         :key="`${item.label}-${item.value}`"
         :class="item.tone ? `tone-${item.tone}` : ''"
       >
@@ -290,14 +312,14 @@ function shouldShowEmptyCitation() {
           <MindmapMap theme="multi-color" :fill="iconPalettes.workflow" :size="29" />
         </span>
         <span class="flow-copy">
-          <strong>{{ flow.title }}</strong>
-          <small v-if="flow.summary">{{ flow.summary }}</small>
-          <span v-if="flow.fields?.length" class="flow-fields">
-            <i v-for="field in flow.fields" :key="field[0]">{{ field[0] }}：{{ field[1] }}</i>
+          <strong>{{ visibleBusinessText(flow.title) || '相关流程' }}</strong>
+          <small v-if="visibleBusinessText(flow.summary)">{{ visibleBusinessText(flow.summary) }}</small>
+          <span v-if="visibleFlowFields(flow).length" class="flow-fields">
+            <i v-for="field in visibleFlowFields(flow)" :key="field[0]">{{ field[0] }}：{{ field[1] }}</i>
           </span>
         </span>
         <span class="flow-meta">
-          <AppBadge :tone="flow.statusTone ?? 'neutral'">{{ flow.status }}</AppBadge>
+          <AppBadge :tone="flow.statusTone ?? 'neutral'">{{ visibleBusinessText(flow.status) || '待处理' }}</AppBadge>
           <small v-if="apiRefLabel(flow.apiRef)">{{ apiRefLabel(flow.apiRef) }}</small>
         </span>
       </button>

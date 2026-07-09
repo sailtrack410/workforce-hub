@@ -11,6 +11,7 @@ public class WorkflowRequestCreateResponse {
     private Long requestId;
     private String requestNo;
     private String status;
+    private String statusName;
     private String flowableProcessInstanceId;
     private Long agentTaskId;
 }

@@ -10,4 +10,5 @@ public class WorkflowRequestStatusResponse {
 
     private Long requestId;
     private String status;
+    private String statusName;
 }

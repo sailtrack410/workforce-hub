@@ -23,11 +23,13 @@ public class AdminImOutboxSummaryResponse {
     @Data
     public static class StatusCount {
         private String status;
+        private String statusName;
         private Long count;
 
-        public static StatusCount of(String status, Long count) {
+        public static StatusCount of(String status, String statusName, Long count) {
             StatusCount item = new StatusCount();
             item.setStatus(status);
+            item.setStatusName(statusName);
             item.setCount(count);
             return item;
         }

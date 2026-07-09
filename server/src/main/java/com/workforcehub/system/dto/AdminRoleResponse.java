@@ -14,6 +14,7 @@ public class AdminRoleResponse {
     private String roleCode;
     private String roleName;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -16,7 +16,9 @@ describe('admin router', () => {
     expect(findRoute(routes, '/users')?.name).toBe('admin-users');
     expect(findRoute(routes, '/files')?.name).toBe('admin-files');
     expect(findRoute(routes, '/ragflow')?.name).toBe('admin-ragflow');
+    expect(findRoute(routes, '/ai-models')?.name).toBe('admin-ai-models');
     expect(findRoute(routes, '/system')?.name).toBe('admin-system');
+    expect(findRoute(routes, '/settings')?.name).toBe('admin-settings');
     expect(findRoute(routes, '/roles')?.name).toBe('admin-roles');
     expect(findRoute(routes, '/attendance')?.name).toBe('admin-attendance');
     expect(findRoute(routes, '/agent-config')?.name).toBe('admin-agent-config');
@@ -43,7 +45,7 @@ describe('admin router', () => {
 async function loadAdminRoutes(): Promise<RouteRecordRaw[]> {
   Object.defineProperty(globalThis, 'location', {
     value: {
-      host: '127.0.0.1:5174',
+      host: '127.0.0.1:5173',
       pathname: '/',
       search: '',
       hash: '#/',

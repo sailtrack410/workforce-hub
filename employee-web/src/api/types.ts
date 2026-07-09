@@ -65,6 +65,7 @@ export interface OrgUserDetailResponse {
   employeeNo: string;
   realName: string;
   gender?: string | null;
+  genderName?: string | null;
   mobile?: string | null;
   avatarAttachmentRefId?: EntityId | null;
   primaryDeptId?: EntityId | null;
@@ -84,7 +85,7 @@ export interface OrgUserDetailResponse {
 
 export interface UpdateEmployeeProfileRequest {
   mobile?: string | null;
-  avatarAttachmentRefId?: EntityId | null;
+  avatarAttachmentRefId: EntityId | null;
 }
 
 export type PresenceStatus = 'ONLINE' | 'BUSY' | 'AWAY' | 'DND';
@@ -183,7 +184,9 @@ export interface WorkflowTodoResponse {
   title: string;
   summary: string;
   status: string;
+  statusName?: string | null;
   priority?: string | null;
+  priorityName?: string | null;
   createdAt?: string | null;
 }
 
@@ -191,9 +194,11 @@ export interface WorkflowRequestSummaryResponse {
   requestId: EntityId;
   requestNo: string;
   bizType: string;
+  bizTypeName?: string | null;
   bizId: number;
   title: string;
   status: string;
+  statusName?: string | null;
   currentStepKey?: string | null;
   currentStepName?: string | null;
   submittedAt?: string | null;
@@ -204,6 +209,7 @@ export interface WorkflowRequestCreateResponse {
   requestId: EntityId;
   requestNo: string;
   status: string;
+  statusName?: string | null;
   flowableProcessInstanceId?: string | null;
   agentTaskId?: EntityId | null;
 }
@@ -211,6 +217,7 @@ export interface WorkflowRequestCreateResponse {
 export interface WorkflowRequestStatusResponse {
   requestId: EntityId;
   status: string;
+  statusName?: string | null;
 }
 
 export interface WorkflowLeaveDetailResponse {
@@ -224,6 +231,7 @@ export interface WorkflowLeaveDetailResponse {
 export interface WorkflowClockCorrectionDetailResponse {
   targetDate?: string | null;
   missingPunchType?: string | null;
+  missingPunchTypeName?: string | null;
   expectedPunchAt?: string | null;
   reason?: string | null;
 }
@@ -235,16 +243,19 @@ export interface WorkflowRequestAttachmentResponse {
   fileSize: number;
   contentSha256: string;
   scanStatus: string;
+  scanStatusName?: string | null;
 }
 
 export interface WorkflowRequestDetailResponse {
   requestId: EntityId;
   requestNo: string;
   bizType: string;
+  bizTypeName?: string | null;
   bizId: EntityId;
   applicantUserId: EntityId;
   title: string;
   status: string;
+  statusName?: string | null;
   currentStepKey?: string | null;
   currentStepName?: string | null;
   flowableProcessInstanceId?: string | null;
@@ -252,6 +263,7 @@ export interface WorkflowRequestDetailResponse {
   finishedAt?: string | null;
   leave?: WorkflowLeaveDetailResponse | null;
   clockCorrection?: WorkflowClockCorrectionDetailResponse | null;
+  generic?: WorkflowGenericDetailResponse | null;
   attachments: WorkflowRequestAttachmentResponse[];
 }
 
@@ -276,14 +288,23 @@ export interface ImMessageResponse {
   conversationId: string | number;
   seqNo: number;
   senderType: string;
+  senderTypeName?: string | null;
   senderId: string | number;
   messageType: string;
+  messageTypeName?: string | null;
   contentJson: string;
   contentText: string;
   attachments?: ImMessageAttachmentResponse[];
+  mentions?: ImMessageMentionResponse[];
   quotedMessageId?: string | number | null;
   status: string;
+  statusName?: string | null;
   sentAt?: string | null;
+}
+
+export interface ImMessageMentionResponse {
+  userId: EntityId;
+  name?: string | null;
 }
 
 export interface ImMessageAttachmentResponse {
@@ -293,12 +314,14 @@ export interface ImMessageAttachmentResponse {
   fileSize: number;
   contentSha256: string;
   scanStatus: string;
+  scanStatusName?: string | null;
 }
 
 export interface SendImMessageRequest {
   messageType?: 'TEXT' | 'FILE';
   text?: string;
   attachmentRefIds?: EntityId[];
+  mentionUserIds?: EntityId[];
   clientMessageId?: string;
   quotedMessageId?: EntityId;
 }
@@ -316,7 +339,9 @@ export interface ForwardImMessageRequest {
 export interface ImMessageActionResponse {
   messageId: EntityId;
   actionType: string;
+  actionTypeName?: string | null;
   status: string;
+  statusName?: string | null;
 }
 
 export interface RemindImMessageRequest {
@@ -338,6 +363,7 @@ export interface ImMessageListQuery extends QueryParams {
 export interface ImConversationSummaryResponse {
   conversationId: string | number;
   conversationType: string;
+  conversationTypeName?: string | null;
   conversationKey?: string | null;
   title?: string | null;
   avatarFileId?: string | number | null;
@@ -348,9 +374,13 @@ export interface ImConversationSummaryResponse {
   lastMessage?: ImMessageResponse | null;
   lastMessageAt?: string | null;
   status: string;
+  statusName?: string | null;
   pin: boolean;
   mute: boolean;
   memberRole: string;
+  memberRoleName?: string | null;
+  hasMentionMe?: boolean;
+  hasReplyMe?: boolean;
 }
 
 export interface ImConversationDetailResponse {
@@ -362,9 +392,12 @@ export interface ImConversationDetailResponse {
 export interface ImConversationMemberResponse {
   memberId: EntityId;
   memberType: string;
+  memberTypeName?: string | null;
   displayName: string;
   memberRole: string;
+  memberRoleName?: string | null;
   status: string;
+  statusName?: string | null;
   joinedAt?: string | null;
 }
 
@@ -373,10 +406,13 @@ export interface ImGroupProfileResponse {
   title: string;
   avatarFileId?: string | number | null;
   groupType: string;
+  groupTypeName?: string | null;
   ownerUserId: string | number;
   noticeText?: string | null;
   status: string;
+  statusName?: string | null;
   currentMemberRole?: string | null;
+  currentMemberRoleName?: string | null;
 }
 
 export interface ImGroupFileResponse {
@@ -387,6 +423,7 @@ export interface ImGroupFileResponse {
   fileSize: number;
   contentSha256: string;
   scanStatus: string;
+  scanStatusName?: string | null;
   uploaderId?: EntityId | null;
   uploaderName?: string | null;
   createdAt?: string | null;
@@ -445,6 +482,20 @@ export interface ClockCorrectionRequestCreateRequest {
   attachmentRefIds?: EntityId[];
 }
 
+export interface GenericWorkflowRequestCreateRequest {
+  processCode: string;
+  title?: string;
+  summary?: string;
+  formPayload: Record<string, unknown>;
+  attachmentRefIds?: EntityId[];
+}
+
+export interface WorkflowGenericDetailResponse {
+  processCode: string;
+  summary?: string | null;
+  formPayload?: Record<string, unknown> | null;
+}
+
 export interface AttendanceDateRangeQuery extends QueryParams {
   startDate?: string;
   endDate?: string;
@@ -464,8 +515,11 @@ export interface PunchRecordResponse {
   userId: EntityId;
   punchAt?: string | null;
   punchType: string;
+  punchTypeName?: string | null;
   sourceType: string;
+  sourceTypeName?: string | null;
   status: string;
+  statusName?: string | null;
   dailyResult?: AttendanceDailyResultResponse | null;
 }
 
@@ -491,8 +545,10 @@ export interface AttendanceExceptionResponse {
   userId: EntityId;
   workDate: string;
   exceptionType: string;
+  exceptionTypeName?: string | null;
   exceptionDesc?: string | null;
   status: string;
+  statusName?: string | null;
 }
 
 export interface LeaveAccountResponse {
@@ -627,6 +683,7 @@ export interface AttachmentRefResponse {
   contentSha256: string;
   deduplicated: boolean;
   scanStatus: string;
+  scanStatusName?: string | null;
   createdAt?: string | null;
 }
 
@@ -634,15 +691,18 @@ export interface EmployeeFileResponse {
   attachmentRefId: EntityId;
   fileObjectId: EntityId;
   ownerType: string;
+  ownerTypeName?: string | null;
   ownerId?: EntityId | null;
   folderId?: EntityId | null;
   originalFileName?: string | null;
   displayName: string;
   uploaderType: string;
+  uploaderTypeName?: string | null;
   uploaderId?: EntityId | null;
   mimeType?: string | null;
   fileSize: number;
   scanStatus: string;
+  scanStatusName?: string | null;
   deletedAt?: string | null;
   purgeAfter?: string | null;
   createdAt?: string | null;
@@ -676,47 +736,14 @@ export interface AgentResponse {
   agentName: string;
   avatarAttachmentRefId?: EntityId | null;
   agentType: string;
+  agentTypeName?: string | null;
   identityMode: string;
+  identityModeName?: string | null;
   publishedVersionId?: EntityId | null;
   publishedVersionNo?: number | null;
   publishedVersionLabel?: string | null;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
-
-export interface CreateAgentTaskRequest {
-  triggerType: string;
-  contextType?: string;
-  contextId?: EntityId;
-  inputPayloadJson?: string;
-  toolCalls?: UnknownRecord[];
-}
-
-export interface AgentTaskResponse {
-  taskId: EntityId;
-  agentId: EntityId;
-  agentVersionId?: EntityId | null;
-  triggerType: string;
-  contextType?: string | null;
-  contextId?: EntityId | null;
-  status: string;
-  toolCallCount: number;
-  waitingDeadlineAt?: string | null;
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  errorMessage?: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-}
-
-export interface ConfirmAgentTaskRequest {
-  approved: boolean;
-  comment?: string;
-}
-
-export interface CancelAgentTaskRequest {
-  reason: string;
-}
-
-export type UnknownRecord = Record<string, unknown>;

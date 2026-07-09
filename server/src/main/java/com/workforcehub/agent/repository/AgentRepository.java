@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -233,6 +234,25 @@ public class AgentRepository {
             """, this::mapAgent, params.toArray());
     }
 
+    public List<KnowledgeSpaceHealthRow> listKnowledgeSpacesByIds(List<Long> spaceIds) {
+        if (spaceIds == null || spaceIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(spaceIds.size(), "?"));
+        return jdbcTemplate.query("""
+            SELECT id, space_name, status
+            FROM kb_space
+            WHERE id IN (
+            """ + placeholders + """
+            )
+              AND is_deleted = 0
+            """, (rs, rowNum) -> new KnowledgeSpaceHealthRow(
+            rs.getLong("id"),
+            rs.getString("space_name"),
+            rs.getString("status")
+        ), spaceIds.toArray());
+    }
+
     public void disableAgent(Long agentId, Long operatorId) {
         jdbcTemplate.update("""
             UPDATE agt_agent
@@ -247,6 +267,16 @@ public class AgentRepository {
         jdbcTemplate.update("""
             UPDATE agt_agent
             SET status = 'ACTIVE',
+                updated_by = ?
+            WHERE id = ?
+              AND is_deleted = 0
+            """, operatorId, agentId);
+    }
+
+    public void deprecateAgent(Long agentId, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_agent
+            SET status = 'DEPRECATED',
                 updated_by = ?
             WHERE id = ?
               AND is_deleted = 0
@@ -426,10 +456,23 @@ public class AgentRepository {
 
     public List<AgentAclRow> listAclByAgent(Long agentId) {
         return jdbcTemplate.query("""
-            SELECT id, agent_id, subject_type, subject_id, perm_code, status, created_at, updated_at
-            FROM agt_agent_acl
-            WHERE agent_id = ?
-            ORDER BY updated_at DESC, id DESC
+            SELECT acl.id,
+                   acl.agent_id,
+                   acl.subject_type,
+                   acl.subject_id,
+                   COALESCE(role.role_name, dept.dept_name, pos.position_name, user.real_name) AS subject_name,
+                   COALESCE(role.role_code, dept.dept_code, pos.position_code, user.employee_no) AS subject_code,
+                   acl.perm_code,
+                   acl.status,
+                   acl.created_at,
+                   acl.updated_at
+            FROM agt_agent_acl acl
+            LEFT JOIN admin_role role ON acl.subject_type = 'ROLE' AND role.id = acl.subject_id
+            LEFT JOIN org_department dept ON acl.subject_type = 'DEPARTMENT' AND dept.id = acl.subject_id
+            LEFT JOIN org_position pos ON acl.subject_type = 'POSITION' AND pos.id = acl.subject_id
+            LEFT JOIN org_user user ON acl.subject_type = 'USER' AND user.id = acl.subject_id
+            WHERE acl.agent_id = ?
+            ORDER BY acl.updated_at DESC, acl.id DESC
             """, this::mapAcl, agentId);
     }
 
@@ -470,12 +513,25 @@ public class AgentRepository {
 
     public AgentAclRow getAclOrThrow(Long agentId, String subjectType, Long subjectId, String permCode) {
         List<AgentAclRow> rows = jdbcTemplate.query("""
-            SELECT id, agent_id, subject_type, subject_id, perm_code, status, created_at, updated_at
-            FROM agt_agent_acl
-            WHERE agent_id = ?
-              AND subject_type = ?
-              AND subject_id = ?
-              AND perm_code = ?
+            SELECT acl.id,
+                   acl.agent_id,
+                   acl.subject_type,
+                   acl.subject_id,
+                   COALESCE(role.role_name, dept.dept_name, pos.position_name, user.real_name) AS subject_name,
+                   COALESCE(role.role_code, dept.dept_code, pos.position_code, user.employee_no) AS subject_code,
+                   acl.perm_code,
+                   acl.status,
+                   acl.created_at,
+                   acl.updated_at
+            FROM agt_agent_acl acl
+            LEFT JOIN admin_role role ON acl.subject_type = 'ROLE' AND role.id = acl.subject_id
+            LEFT JOIN org_department dept ON acl.subject_type = 'DEPARTMENT' AND dept.id = acl.subject_id
+            LEFT JOIN org_position pos ON acl.subject_type = 'POSITION' AND pos.id = acl.subject_id
+            LEFT JOIN org_user user ON acl.subject_type = 'USER' AND user.id = acl.subject_id
+            WHERE acl.agent_id = ?
+              AND acl.subject_type = ?
+              AND acl.subject_id = ?
+              AND acl.perm_code = ?
             LIMIT 1
             """, this::mapAcl, agentId, subjectType, subjectId, permCode);
         if (rows.isEmpty()) {
@@ -789,6 +845,10 @@ public class AgentRepository {
                      task.trigger_type,
                      task.context_type,
                      task.context_id,
+                     wf_request.title,
+                     wf_request.request_no,
+                     triggered_user.real_name,
+                     triggered_admin.display_name,
                      task.triggered_by_type,
                      task.triggered_by_id,
                      task.waiting_deadline_at,
@@ -820,6 +880,10 @@ public class AgentRepository {
                      task.trigger_type,
                      task.context_type,
                      task.context_id,
+                     wf_request.title,
+                     wf_request.request_no,
+                     triggered_user.real_name,
+                     triggered_admin.display_name,
                      task.triggered_by_type,
                      task.triggered_by_id,
                      task.waiting_deadline_at,
@@ -922,17 +986,27 @@ public class AgentRepository {
 
     public List<AdminAgentTaskAuditRow> listAdminAgentTaskAudits(Long taskId) {
         return jdbcTemplate.query("""
-            SELECT id,
-                   task_id,
-                   action_type,
-                   target_type,
-                   target_id,
-                   decision_summary,
-                   risk_flag,
-                   occurred_at
-            FROM agt_audit_log
-            WHERE task_id = ?
-            ORDER BY occurred_at ASC, id ASC
+            SELECT audit.id,
+                   audit.task_id,
+                   audit.action_type,
+                   audit.target_type,
+                   audit.target_id,
+                   CASE
+                       WHEN audit.target_type = 'TASK' THEN 'AI 任务'
+                       WHEN audit.target_type = 'TOOL_CALL' THEN tool.tool_name
+                       WHEN audit.target_type = 'AGENT' THEN agent.agent_name
+                       ELSE NULL
+                   END AS target_display_name,
+                   audit.decision_summary,
+                   audit.risk_flag,
+                   audit.occurred_at
+            FROM agt_audit_log audit
+            LEFT JOIN agt_tool_call_log call_log ON audit.target_type = 'TOOL_CALL' AND call_log.id = audit.target_id
+            LEFT JOIN agt_tool tool ON tool.id = call_log.tool_id
+            LEFT JOIN agt_task task ON task.id = audit.task_id
+            LEFT JOIN agt_agent agent ON agent.id = task.agent_id
+            WHERE audit.task_id = ?
+            ORDER BY audit.occurred_at ASC, audit.id ASC
             """, this::mapAdminTaskAudit, taskId);
     }
 
@@ -947,6 +1021,7 @@ public class AgentRepository {
                    CASE WHEN agent_avatar_ref.id IS NULL OR agent_avatar_file.id IS NULL THEN NULL ELSE aa.avatar_attachment_ref_id END AS avatar_attachment_ref_id,
                    aa.agent_type, aa.identity_mode,
                    aa.published_version_id, pv.version_no AS published_version_no, pv.version_label AS published_version_label,
+                   pv.workflow_config_json AS published_workflow_config_json,
                    aa.status, aa.created_at, aa.updated_at
             FROM agt_agent aa
             LEFT JOIN agt_agent_version pv ON pv.id = aa.published_version_id
@@ -1037,8 +1112,17 @@ public class AgentRepository {
                    task.trigger_type,
                    task.context_type,
                    task.context_id,
+                   CASE
+                       WHEN task.context_type = 'WF_REQUEST' THEN wf_request.title
+                       ELSE NULL
+                   END AS context_display_name,
+                   CASE
+                       WHEN task.context_type = 'WF_REQUEST' THEN wf_request.request_no
+                       ELSE NULL
+                   END AS context_no,
                    task.triggered_by_type,
                    task.triggered_by_id,
+                   COALESCE(triggered_user.real_name, triggered_admin.display_name) AS triggered_by_name,
                    task.waiting_deadline_at,
                    task.workflow_snapshot_json,
                    task.execution_trace_json,
@@ -1051,6 +1135,9 @@ public class AgentRepository {
                    COUNT(log.id) AS tool_call_count
             FROM agt_task task
             JOIN agt_agent agent ON agent.id = task.agent_id
+            LEFT JOIN wf_request wf_request ON task.context_type = 'WF_REQUEST' AND wf_request.id = task.context_id
+            LEFT JOIN org_user triggered_user ON task.triggered_by_type = 'USER' AND triggered_user.id = task.triggered_by_id
+            LEFT JOIN admin_user triggered_admin ON task.triggered_by_type IN ('ADMIN', 'ADMIN_USER') AND triggered_admin.id = task.triggered_by_id
             LEFT JOIN agt_tool_call_log log ON log.task_id = task.id
             """;
     }
@@ -1101,6 +1188,7 @@ public class AgentRepository {
             rs.getObject("published_version_id", Long.class),
             rs.getObject("published_version_no", Integer.class),
             rs.getString("published_version_label"),
+            rs.getString("published_workflow_config_json"),
             rs.getString("status"),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
@@ -1163,6 +1251,8 @@ public class AgentRepository {
             rs.getLong("agent_id"),
             rs.getString("subject_type"),
             rs.getLong("subject_id"),
+            rs.getString("subject_name"),
+            rs.getString("subject_code"),
             rs.getString("perm_code"),
             rs.getString("status"),
             rs.getTimestamp("created_at").toLocalDateTime(),
@@ -1202,8 +1292,11 @@ public class AgentRepository {
             rs.getString("trigger_type"),
             rs.getString("context_type"),
             rs.getObject("context_id", Long.class),
+            rs.getString("context_display_name"),
+            rs.getString("context_no"),
             rs.getString("triggered_by_type"),
             rs.getObject("triggered_by_id", Long.class),
+            rs.getString("triggered_by_name"),
             rs.getString("status"),
             rs.getInt("tool_call_count"),
             rs.getTimestamp("waiting_deadline_at") == null ? null : rs.getTimestamp("waiting_deadline_at").toLocalDateTime(),
@@ -1269,6 +1362,7 @@ public class AgentRepository {
             rs.getString("action_type"),
             rs.getString("target_type"),
             rs.getObject("target_id", Long.class),
+            rs.getString("target_display_name"),
             rs.getString("decision_summary"),
             rs.getInt("risk_flag") == 1,
             rs.getTimestamp("occurred_at").toLocalDateTime()
@@ -1293,27 +1387,127 @@ public class AgentRepository {
     // ==================== LLM Model ====================
 
     public List<LlmModelRow> listLlmModels() {
-        return jdbcTemplate.query(llmModelSelectSql() + " WHERE is_deleted = 0 ORDER BY created_at DESC", this::mapLlmModel);
+        return jdbcTemplate.query(llmModelSelectSql() + " WHERE m.is_deleted = 0 ORDER BY m.default_flag DESC, m.created_at DESC", this::mapLlmModel);
     }
 
     public LlmModelRow getLlmModel(Long modelId) {
-        List<LlmModelRow> list = jdbcTemplate.query(llmModelSelectSql() + " WHERE id = ? AND is_deleted = 0", this::mapLlmModel, modelId);
+        List<LlmModelRow> list = jdbcTemplate.query(llmModelSelectSql() + " WHERE m.id = ? AND m.is_deleted = 0", this::mapLlmModel, modelId);
         return list.isEmpty() ? null : list.get(0);
     }
 
-    public void insertLlmModel(Long modelId, String provider, String modelName, String displayName, String endpoint, String apiKey, String status, Long operatorId) {
-        jdbcTemplate.update("""
-            INSERT INTO agt_llm_model (id, provider, model_name, display_name, endpoint, api_key, status, created_by, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, modelId, provider, modelName, displayName, endpoint, apiKey, status, operatorId, operatorId);
+    public LlmModelRow getRawLlmModel(Long modelId) {
+        List<LlmModelRow> list = jdbcTemplate.query(rawLlmModelSelectSql() + " WHERE m.id = ? AND m.is_deleted = 0", this::mapLlmModel, modelId);
+        return list.isEmpty() ? null : list.get(0);
     }
 
-    public void updateLlmModel(Long modelId, String provider, String modelName, String displayName, String endpoint, String apiKey, String status, Long operatorId) {
+    public LlmModelRow getFirstActiveTextModelByProvider(Long providerId) {
+        List<LlmModelRow> list = jdbcTemplate.query(llmModelSelectSql() + """
+             WHERE p.id = ? AND m.model_type = 'TEXT' AND m.status = 'ACTIVE' AND m.is_deleted = 0
+             ORDER BY m.default_flag DESC, m.created_at DESC
+             LIMIT 1
+            """, this::mapLlmModel, providerId);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    public List<AiProviderRow> listAiProviders() {
+        return jdbcTemplate.query("""
+            SELECT id, provider_type, display_name, base_url, api_key, enabled,
+                   last_test_success, last_test_message, last_tested_at, created_at, updated_at
+            FROM agt_llm_provider
+            WHERE is_deleted = 0
+            ORDER BY created_at DESC
+            """, this::mapAiProvider);
+    }
+
+    public AiProviderRow getAiProvider(Long providerId) {
+        List<AiProviderRow> list = jdbcTemplate.query("""
+            SELECT id, provider_type, display_name, base_url, api_key, enabled,
+                   last_test_success, last_test_message, last_tested_at, created_at, updated_at
+            FROM agt_llm_provider
+            WHERE id = ? AND is_deleted = 0
+            """, this::mapAiProvider, providerId);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    public AiProviderRow getAiProviderByType(String providerType) {
+        List<AiProviderRow> list = jdbcTemplate.query("""
+            SELECT id, provider_type, display_name, base_url, api_key, enabled,
+                   last_test_success, last_test_message, last_tested_at, created_at, updated_at
+            FROM agt_llm_provider
+            WHERE provider_type = ? AND is_deleted = 0
+            LIMIT 1
+            """, this::mapAiProvider, providerType);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    public void insertAiProvider(Long providerId, String providerType, String displayName, String baseUrl, String apiKey, Boolean enabled, Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO agt_llm_provider (id, provider_type, display_name, base_url, api_key, enabled, created_by, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, providerId, providerType, displayName, baseUrl, apiKey, Boolean.FALSE.equals(enabled) ? 0 : 1, operatorId, operatorId);
+    }
+
+    public void updateAiProvider(Long providerId, String providerType, String displayName, String baseUrl, String apiKey, Boolean enabled, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_llm_provider
+            SET provider_type = ?, display_name = ?, base_url = ?, api_key = ?, enabled = ?, updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """, providerType, displayName, baseUrl, apiKey, Boolean.FALSE.equals(enabled) ? 0 : 1, operatorId, providerId);
+    }
+
+    public void updateAiProviderTestResult(Long providerId, Boolean success, String message, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_llm_provider
+            SET last_test_success = ?, last_test_message = ?, last_tested_at = NOW(), updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """, success == null ? null : (success ? 1 : 0),
+            message == null || message.length() <= 512 ? message : message.substring(0, 512),
+            operatorId, providerId);
+    }
+
+    public void deleteAiProvider(Long providerId, Long operatorId) {
+        jdbcTemplate.update("UPDATE agt_llm_provider SET is_deleted = 1, updated_by = ? WHERE id = ?", operatorId, providerId);
+    }
+
+    public void clearDefaultLlmModel(String modelType, Long exceptModelId, Long operatorId) {
         jdbcTemplate.update("""
             UPDATE agt_llm_model
-            SET provider = ?, model_name = ?, display_name = ?, endpoint = ?, api_key = ?, status = ?, updated_by = ?
+            SET default_flag = 0, updated_by = ?
+            WHERE model_type = ? AND id <> ? AND is_deleted = 0
+            """, operatorId, modelType, exceptModelId == null ? -1L : exceptModelId);
+    }
+
+    public void insertLlmModel(Long modelId, String provider, String modelType, String modelName, String displayName, String endpoint, String apiKey, Boolean defaultFlag, Boolean streamOutputFlag, Boolean visionFlag, Boolean toolCallFlag, Boolean structuredOutputFlag, Boolean reasoningFlag, String status, Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO agt_llm_model (id, provider, model_type, model_name, display_name, endpoint, api_key, default_flag, stream_output_flag, vision_flag, tool_call_flag, structured_output_flag, reasoning_flag, status, created_by, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, modelId, provider, modelType, modelName, displayName, endpoint, apiKey, Boolean.TRUE.equals(defaultFlag) ? 1 : 0,
+            Boolean.TRUE.equals(streamOutputFlag) ? 1 : 0, Boolean.TRUE.equals(visionFlag) ? 1 : 0,
+            Boolean.TRUE.equals(toolCallFlag) ? 1 : 0, Boolean.TRUE.equals(structuredOutputFlag) ? 1 : 0,
+            Boolean.TRUE.equals(reasoningFlag) ? 1 : 0, status, operatorId, operatorId);
+    }
+
+    public void updateLlmModel(Long modelId, String provider, String modelType, String modelName, String displayName, String endpoint, String apiKey, Boolean defaultFlag, Boolean streamOutputFlag, Boolean visionFlag, Boolean toolCallFlag, Boolean structuredOutputFlag, Boolean reasoningFlag, String status, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_llm_model
+            SET provider = ?, model_type = ?, model_name = ?, display_name = ?, endpoint = ?, api_key = ?, default_flag = ?,
+                stream_output_flag = ?, vision_flag = ?, tool_call_flag = ?, structured_output_flag = ?, reasoning_flag = ?,
+                status = ?, updated_by = ?
             WHERE id = ? AND is_deleted = 0
-            """, provider, modelName, displayName, endpoint, apiKey, status, operatorId, modelId);
+            """, provider, modelType, modelName, displayName, endpoint, apiKey, Boolean.TRUE.equals(defaultFlag) ? 1 : 0,
+            Boolean.TRUE.equals(streamOutputFlag) ? 1 : 0, Boolean.TRUE.equals(visionFlag) ? 1 : 0,
+            Boolean.TRUE.equals(toolCallFlag) ? 1 : 0, Boolean.TRUE.equals(structuredOutputFlag) ? 1 : 0,
+            Boolean.TRUE.equals(reasoningFlag) ? 1 : 0, status, operatorId, modelId);
+    }
+
+    public void updateLlmModelTestResult(Long modelId, Boolean success, String message, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE agt_llm_model
+            SET last_test_success = ?, last_test_message = ?, last_tested_at = NOW(), updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """, success == null ? null : (success ? 1 : 0),
+            message == null || message.length() <= 512 ? message : message.substring(0, 512),
+            operatorId, modelId);
     }
 
     public void deleteLlmModel(Long modelId, Long operatorId) {
@@ -1322,20 +1516,66 @@ public class AgentRepository {
 
     private String llmModelSelectSql() {
         return """
-            SELECT id, provider, model_name, display_name, endpoint, api_key, status, created_at, updated_at
-            FROM agt_llm_model
+            SELECT m.id, m.provider, m.model_type, m.model_name, m.display_name,
+                   COALESCE(NULLIF(m.endpoint, ''), p.base_url) AS endpoint,
+                   COALESCE(NULLIF(m.api_key, ''), p.api_key) AS api_key,
+                   m.default_flag, m.stream_output_flag, m.vision_flag, m.tool_call_flag,
+                   m.structured_output_flag, m.reasoning_flag, m.status,
+                   m.last_test_success, m.last_test_message, m.last_tested_at,
+                   m.created_at, m.updated_at
+            FROM agt_llm_model m
+            LEFT JOIN agt_llm_provider p ON p.provider_type = m.provider AND p.is_deleted = 0
             """;
+    }
+
+    private String rawLlmModelSelectSql() {
+        return """
+            SELECT m.id, m.provider, m.model_type, m.model_name, m.display_name,
+                   m.endpoint,
+                   m.api_key,
+                   m.default_flag, m.stream_output_flag, m.vision_flag, m.tool_call_flag,
+                   m.structured_output_flag, m.reasoning_flag, m.status,
+                   m.last_test_success, m.last_test_message, m.last_tested_at,
+                   m.created_at, m.updated_at
+            FROM agt_llm_model m
+            """;
+    }
+
+    private AiProviderRow mapAiProvider(ResultSet rs, int rowNum) throws SQLException {
+        return new AiProviderRow(
+            rs.getLong("id"),
+            rs.getString("provider_type"),
+            rs.getString("display_name"),
+            rs.getString("base_url"),
+            rs.getString("api_key"),
+            rs.getInt("enabled") == 1,
+            rs.getObject("last_test_success") == null ? null : rs.getInt("last_test_success") == 1,
+            rs.getString("last_test_message"),
+            rs.getTimestamp("last_tested_at") == null ? null : rs.getTimestamp("last_tested_at").toLocalDateTime(),
+            rs.getTimestamp("created_at").toLocalDateTime(),
+            rs.getTimestamp("updated_at").toLocalDateTime()
+        );
     }
 
     private LlmModelRow mapLlmModel(ResultSet rs, int rowNum) throws SQLException {
         return new LlmModelRow(
             rs.getLong("id"),
             rs.getString("provider"),
+            rs.getString("model_type"),
             rs.getString("model_name"),
             rs.getString("display_name"),
             rs.getString("endpoint"),
             rs.getString("api_key"),
+            rs.getInt("default_flag") == 1,
+            rs.getInt("stream_output_flag") == 1,
+            rs.getInt("vision_flag") == 1,
+            rs.getInt("tool_call_flag") == 1,
+            rs.getInt("structured_output_flag") == 1,
+            rs.getInt("reasoning_flag") == 1,
             rs.getString("status"),
+            rs.getObject("last_test_success") == null ? null : rs.getInt("last_test_success") == 1,
+            rs.getString("last_test_message"),
+            rs.getTimestamp("last_tested_at") == null ? null : rs.getTimestamp("last_tested_at").toLocalDateTime(),
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
         );

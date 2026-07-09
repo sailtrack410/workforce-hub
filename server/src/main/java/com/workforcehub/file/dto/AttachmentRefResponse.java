@@ -15,5 +15,6 @@ public class AttachmentRefResponse {
     private String contentSha256;
     private Boolean deduplicated;
     private String scanStatus;
+    private String scanStatusName;
     private LocalDateTime createdAt;
 }

@@ -10,7 +10,7 @@ const router = useRouter();
 const session = useSessionStore();
 
 const form = reactive({
-  loginName: 'admin.demo',
+  loginName: '',
   password: '',
 });
 const submitting = ref(false);

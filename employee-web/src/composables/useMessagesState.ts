@@ -1,7 +1,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { employeeApi } from '@/api';
 import type { EntityId } from '@/api';
-import type { ConversationMessage, PersonalFileRecord, useShellStore } from '@/stores/shell';
+import type { ConversationMessage, MessageMention, PersonalFileRecord, useShellStore } from '@/stores/shell';
 import type { useImStore } from '@/stores/im';
 import type { useSessionStore } from '@/stores/session';
 import { useAgentDirectory } from './useAgentDirectory';
@@ -13,6 +13,12 @@ import { scrollElementToBottomAfterLayout } from '@/utils/scroll';
 
 type FieldRows = Array<[string, string]>;
 export type MessageMenuAction = 'copy' | 'translate' | 'forward' | 'favorite' | 'remind' | 'quote' | 'delete-or-recall';
+export interface MessageQuotePreview {
+  id: string;
+  author: string;
+  body: string;
+  visible: boolean;
+}
 
 // 只能撤回自己发的、2 分钟内的消息
 export function canRecallMessage(message: ConversationMessage, now = new Date()) {
@@ -46,6 +52,7 @@ export function useMessagesState({
   const { resolveDownloadUrl } = usePersonalFileTransfer();
 
   const draft = ref('');
+  const draftMentions = ref<MessageMention[]>([]);
   const messageStream = ref<HTMLElement | null>(null);
   const createConversationOpen = ref(false);
   const createConversationMode = ref<'private' | 'group' | 'agent'>('private');
@@ -95,6 +102,39 @@ export function useMessagesState({
   const activeConversationCurrentStep = computed(() => (
     activeConversation.value.workflowSteps.find((step) => step.status === 'current')
   ));
+  const mentionableMembers = computed<MessageMention[]>(() => {
+    const entries = new Map<string, MessageMention>();
+    activeConversation.value.panel.members.forEach((member) => {
+      if (member.userId === undefined || member.userId === null) return;
+      const contact = shell.contacts.find((item) => (
+        item.userId !== undefined && item.userId !== null && String(item.userId) === String(member.userId)
+      ));
+      const name = member.originalName || contact?.originalName || member.name;
+      entries.set(String(member.userId), {
+        userId: member.userId,
+        name,
+        originalName: name,
+        role: contact?.role || member.role,
+        department: contact?.department,
+        avatarUrl: contact?.avatarUrl,
+      });
+    });
+    shell.contacts.forEach((contact) => {
+      if (contact.userId === undefined || contact.userId === null || contact.relation === '本人') return;
+      const key = String(contact.userId);
+      if (entries.has(key)) return;
+      const name = contact.originalName || contact.name;
+      entries.set(key, {
+        userId: contact.userId,
+        name,
+        originalName: name,
+        role: contact.role,
+        department: contact.department,
+        avatarUrl: contact.avatarUrl,
+      });
+    });
+    return Array.from(entries.values());
+  });
   const activeConversationDetail = computed(() => im.detailsByConversation[shell.active.messages] ?? null);
   const activeGroupProfile = computed(() => activeConversationDetail.value?.groupProfile ?? null);
   const activeConversationPreferenceRows = computed<FieldRows>(() => {
@@ -105,6 +145,7 @@ export function useMessagesState({
     ];
   });
   const hasActiveConversation = computed(() => Boolean(activeConversation.value.id));
+  const quotedMessagePreview = computed(() => resolveQuotedMessage(quotedMessageId.value));
   const messageForwardConversations = computed(() => {
     const keyword = messageForwardSearch.value.trim().toLowerCase();
     return shell.conversations
@@ -125,6 +166,47 @@ export function useMessagesState({
 
   function isCurrentUserMessage(message: ConversationMessage) {
     return message.side === 'right' && message.status !== 'RECALLED';
+  }
+
+  function resolveQuotedMessage(messageId?: EntityId | string | null): MessageQuotePreview | null {
+    if (messageId === undefined || messageId === null) return null;
+    const id = String(messageId);
+    const message = activeConversation.value.messages.find((item) => item.id === id);
+    if (!message) {
+      return {
+        id,
+        author: '引用消息',
+        body: '原消息不可见',
+        visible: false,
+      };
+    }
+    return {
+      id,
+      author: message.author || '成员',
+      body: message.status === 'RECALLED' ? '消息已撤回' : (message.body || '非文本消息'),
+      visible: true,
+    };
+  }
+
+  function cancelQuote() {
+    quotedMessageId.value = null;
+  }
+
+  async function jumpToQuotedMessage(messageId?: EntityId | string | null) {
+    if (messageId === undefined || messageId === null) return;
+    await nextTick();
+    const id = String(messageId);
+    const target = Array.from(messageStream.value?.querySelectorAll<HTMLElement>('[data-message-id]') ?? [])
+      .find((item) => item.dataset.messageId === id);
+    if (!target) {
+      showToast('原消息不可见');
+      return;
+    }
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    target.classList.remove('quote-target');
+    void target.offsetWidth;
+    target.classList.add('quote-target');
+    window.setTimeout(() => target.classList.remove('quote-target'), 1400);
   }
 
   function openCreateConversation(mode: 'private' | 'group' | 'agent') {
@@ -358,9 +440,8 @@ export function useMessagesState({
     }
     if (action === 'quote') {
       quotedMessageId.value = message.id;
-      draft.value = `> ${message.body}\n\n${draft.value}`;
       closeMessageAction();
-      showToast('已引用到输入框');
+      showToast('已引用');
       return;
     }
     if (action === 'delete-or-recall') {
@@ -553,6 +634,40 @@ export function useMessagesState({
     }
   }
 
+  function insertMemberMention(member: MessageMention) {
+    const token = `@${member.originalName || member.name} `;
+    draft.value = draft.value ? `${draft.value.trimEnd()} ${token}` : token;
+    if (!draftMentions.value.some((item) => String(item.userId) === String(member.userId))) {
+      draftMentions.value = [...draftMentions.value, member];
+    }
+  }
+
+  function mentionForMessage(message: ConversationMessage): MessageMention | null {
+    if (message.senderType !== 'USER' || message.senderId === undefined || message.senderId === null || message.side === 'right') return null;
+    return mentionableMembers.value.find((member) => String(member.userId) === String(message.senderId)) ?? {
+      userId: message.senderId,
+      name: message.originalAuthor || message.author,
+      originalName: message.originalAuthor || message.author,
+      role: message.role,
+    };
+  }
+
+  function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function hasMentionToken(text: string, name: string) {
+    return new RegExp(`(^|[\\s，。,.!?！？、:：；;])@${escapeRegExp(name)}(?=$|[\\s，。,.!?！？、:：；;])`).test(text);
+  }
+
+  function mentionsFromText(text: string, members = mentionableMembers.value) {
+    const normalized = text.trim();
+    if (!normalized) return [];
+    return members.filter((member) => (
+      hasMentionToken(normalized, member.originalName || member.name)
+    ));
+  }
+
   async function scrollMessagesToLatest(behavior: ScrollBehavior = 'smooth') {
     await nextTick();
     await scrollElementToBottomAfterLayout(() => messageStream.value, { behavior });
@@ -594,7 +709,27 @@ export function useMessagesState({
       void scrollMessagesToLatest();
     }
     try {
-      const sent = await im.sendMessage(conversationId, text, session.user?.userId, employeeApi.im, quotedMessageId.value ?? undefined);
+      const parsedMentions = mentionsFromText(text);
+      const mentions = [
+        ...draftMentions.value.filter((member) => hasMentionToken(text, member.originalName || member.name)),
+        ...parsedMentions,
+      ].filter((member, index, rows) => (
+        rows.findIndex((item) => String(item.userId) === String(member.userId)) === index
+      ));
+      const sent = await im.sendMessage(
+        conversationId,
+        text,
+        session.user?.userId,
+        employeeApi.im,
+        quotedMessageId.value ?? undefined,
+        mentions.map((mention) => mention.userId),
+      );
+      if (sent && mentions.length) {
+        const currentMessages = im.messagesByConversation[conversationKey] ?? [];
+        im.messagesByConversation[conversationKey] = currentMessages.map((message) => (
+          message.id === sent.id ? { ...message, mentions } : message
+        ));
+      }
       const messages = im.messagesByConversation[conversationKey];
       if (messages?.length) {
         shell.mergeBackendMessages(conversationKey, messages);
@@ -610,13 +745,22 @@ export function useMessagesState({
         }
       }
       draft.value = '';
+      draftMentions.value = [];
       quotedMessageId.value = null;
       await scrollMessagesToLatest();
       if (isAgentConversation && sent?.seqNo !== undefined && !wsConnected.value) {
         void im.pollAgentReply(conversationId, sent.seqNo, session.user?.userId).then(() => {
           const refreshedMessages = im.messagesByConversation[conversationKey];
           if (refreshedMessages?.length) {
-            shell.mergeBackendMessages(conversationKey, refreshedMessages.filter((item) => !item.id.startsWith('agent-loading-')));
+            const refreshedMembers = mentionableMembers.value;
+            const parsedMessages = refreshedMessages
+              .filter((item) => !item.id.startsWith('agent-loading-'))
+              .map((message) => ({
+                ...message,
+                mentions: message.mentions ?? mentionsFromText(message.body, refreshedMembers),
+              }));
+            im.messagesByConversation[conversationKey] = parsedMessages;
+            shell.mergeBackendMessages(conversationKey, parsedMessages);
             void scrollMessagesToLatest();
           }
         }).catch(() => undefined);
@@ -649,8 +793,17 @@ export function useMessagesState({
     { flush: 'post' },
   );
 
+  watch(
+    () => shell.active.messages,
+    () => {
+      quotedMessageId.value = null;
+      draftMentions.value = [];
+    },
+  );
+
   return {
     draft,
+    draftMentions,
     messageStream,
     createConversationOpen,
     createConversationMode,
@@ -673,6 +826,8 @@ export function useMessagesState({
     messageForwardNote,
     messageForwardSelectedIds,
     messageForwardConversations,
+    quotedMessageId,
+    quotedMessagePreview,
     messageActionCanRecall,
     activeConversation,
     activeConversationTitle,
@@ -680,6 +835,7 @@ export function useMessagesState({
     activeGroupProfile,
     activeConversationPreferenceRows,
     hasActiveConversation,
+    mentionableMembers,
     backToList,
     openCreateConversation,
     closeCreateConversation,
@@ -694,6 +850,10 @@ export function useMessagesState({
     leaveActiveGroup,
     dismissActiveGroup,
     toggleActiveConversationPreference,
+    resolveQuotedMessage,
+    cancelQuote,
+    jumpToQuotedMessage,
+    mentionsFromText,
     openMessageAction,
     closeMessageAction,
     runMessageMenuAction,
@@ -704,6 +864,8 @@ export function useMessagesState({
     submitMessageRecall,
     openImAttachment,
     insertAgentMention,
+    insertMemberMention,
+    mentionForMessage,
     sendMessage,
     activeConversationId,
   };

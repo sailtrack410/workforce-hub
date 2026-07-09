@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import {
   navItems,
   normalizeWorkbenchApp,
   normalizeSettingsPanel,
   sectionMeta,
+  todoLifecycle,
+  todoSectionFilters,
   useShellStore,
   type ConversationMessage,
   type ConversationRecord,
@@ -207,6 +209,8 @@ const shellDemoTodos: TodoRecord[] = [
 
 describe('useShellStore', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-06T12:00:00'));
     localStorage.clear();
     setActivePinia(createPinia());
   });
@@ -227,6 +231,7 @@ describe('useShellStore', () => {
   it('maps legacy leave and requests workbench routes into oa', () => {
     expect(normalizeWorkbenchApp('leave')).toBe('oa');
     expect(normalizeWorkbenchApp('requests')).toBe('oa');
+    expect(normalizeWorkbenchApp('agent')).toBe('oa');
   });
 
   it('labels the workbench section as dashboard', () => {
@@ -317,14 +322,99 @@ describe('useShellStore', () => {
     expect(group?.memberCount).toBe(12);
   });
 
-  it('combines pending filter and keyword search for todos', () => {
+  it('uses personal todo status filters instead of workflow pending filters', () => {
+    expect(todoSectionFilters).toEqual(['全部', '进行中', '已完成', '未开始']);
+  });
+
+  it('combines personal todo status filter and keyword search', () => {
     const shell = useShellStore();
-    shell.mergeBackendTodos(shellDemoTodos);
+    const activeTodo = shell.addTodoTask({
+      title: '准备周会材料',
+      note: '整理本周风险项',
+      startAt: '2026-07-06T09:30',
+      endAt: '2026-07-06T13:30',
+      tagName: '工作',
+      tagColor: 'blue',
+    });
+    const upcomingTodo = shell.addTodoTask({
+      title: '明日客户回访',
+      note: '确认合同时间',
+      startAt: '2026-07-07T14:00',
+      endAt: '2026-07-07T14:30',
+      tagName: '协作',
+      tagColor: 'teal',
+    });
+    const completedTodo = shell.addTodoTask({
+      title: '归档会议纪要',
+      note: '同步到云空间',
+      startAt: '2026-07-06T10:00',
+      endAt: '2026-07-06T10:30',
+      tagName: '工作',
+      tagColor: 'green',
+    });
+    shell.toggleTodoTask(completedTodo.id);
 
-    shell.setSearch('todos', '考勤');
-    shell.setFilter('todos', '未处理');
+    expect(todoLifecycle(activeTodo)).toBe('进行中');
+    expect(todoLifecycle(upcomingTodo)).toBe('未开始');
+    expect(todoLifecycle(shell.todos.find((item) => item.id === completedTodo.id)!)).toBe('已完成');
 
-    expect(shell.filteredTodos.map((item) => item.id)).toEqual(['todo-attendance']);
+    shell.setSearch('todos', '客户');
+    shell.setFilter('todos', '未开始');
+
+    expect(shell.filteredTodos.map((item) => item.id)).toEqual([upcomingTodo.id]);
+  });
+
+  it('creates personal todos with minute time, note and colored tag', () => {
+    const shell = useShellStore();
+
+    const todo = shell.addTodoTask({
+      title: '准备周会材料',
+      note: '整理本周风险项',
+      startAt: '2026-07-06T09:30',
+      endAt: '2026-07-07T10:45',
+      tagName: '工作',
+      tagColor: 'blue',
+    });
+
+    expect(todo).toMatchObject({
+      title: '准备周会材料',
+      note: '整理本周风险项',
+      startDate: '2026-07-06',
+      endDate: '2026-07-07',
+      startAt: '2026-07-06T09:30',
+      endAt: '2026-07-07T10:45',
+      tagName: '工作',
+      tagColor: 'blue',
+      status: 'OPEN',
+    });
+    expect(todo.subtitle).toBe('2026-07-06 09:30 至 2026-07-07 10:45');
+    expect(shell.filteredTodos.map((item) => item.id)).toEqual([todo.id]);
+  });
+
+  it('persists personal todo completion state', () => {
+    const shell = useShellStore();
+    const todo = shell.addTodoTask({
+      title: '回访客户',
+      note: '确认合同时间',
+      startAt: '2026-07-06T14:00',
+      endAt: '2026-07-06T14:30',
+      tagName: '协作',
+      tagColor: 'teal',
+    });
+
+    shell.toggleTodoTask(todo.id);
+    setActivePinia(createPinia());
+    const restored = useShellStore();
+
+    expect(restored.todos[0]).toMatchObject({
+      id: todo.id,
+      completed: true,
+      status: 'DONE',
+      note: '确认合同时间',
+      startAt: '2026-07-06T14:00',
+      endAt: '2026-07-06T14:30',
+    });
+    expect(restored.pendingTodoCount).toBe(0);
   });
 
   it('uses loaded backend todos as the source of truth', () => {
@@ -568,13 +658,30 @@ describe('useShellStore', () => {
     expect(restored.messageDensity).toBe('compact');
   });
 
-  it('exposes account settings panels without a separate profile homepage', () => {
+  it('exposes profile center panels from the profile overview', () => {
     const shell = useShellStore();
 
-    expect(shell.profile.map((item) => item.id)).toEqual(['organization', 'security', 'preferences', 'storage']);
-    expect(normalizeSettingsPanel('center')).toBe('security');
-    expect(normalizeSettingsPanel('profile')).toBe('security');
-    expect(normalizeSettingsPanel('storage')).toBe('storage');
+    expect(shell.profile.map((item) => item.id)).toEqual(['profile', 'organization', 'security', 'preferences']);
+    expect(shell.activeProfile.title).toBe('个人中心');
+    expect(normalizeSettingsPanel('center')).toBe('profile');
+    expect(normalizeSettingsPanel('profile')).toBe('profile');
+    expect(normalizeSettingsPanel('storage')).toBe('profile');
+  });
+
+  it('finds profile center entries by real field and action keywords', () => {
+    const shell = useShellStore();
+
+    shell.setSearch('settings', '工号');
+    expect(shell.filteredProfile.map((item) => item.id)).toContain('profile');
+
+    shell.setSearch('settings', '修改密码');
+    expect(shell.filteredProfile.map((item) => item.id)).toContain('security');
+
+    shell.setSearch('settings', '直属上级');
+    expect(shell.filteredProfile.map((item) => item.id)).toContain('organization');
+
+    shell.setSearch('settings', '在线状态');
+    expect(shell.filteredProfile.map((item) => item.id)).toContain('profile');
   });
 
   it('persists personalization preferences across store instances', () => {

@@ -8,17 +8,20 @@ import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
 import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.repository.AgentRepository;
+import com.workforcehub.agent.repository.LlmModelRow;
 import com.workforcehub.agent.repository.AgentRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.ragflow.repository.RagflowGlobalSettingRow;
 import com.workforcehub.ragflow.repository.RagflowRepository;
 import com.workforcehub.workflow.repository.WorkflowLeaveDetailRow;
+import com.workforcehub.workflow.repository.WorkflowGenericDetailRow;
 import com.workforcehub.workflow.repository.WorkflowRepository;
 import com.workforcehub.workflow.repository.WorkflowRequestRow;
 import com.workforcehub.workflow.service.WorkflowAgentPreReviewTrigger;
 import com.workforcehub.workflow.service.WorkflowAgentResultCallback;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -28,6 +31,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 /**
  * 生产环境流程预审 Agent 触发器。
@@ -43,6 +47,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
     private final RagflowRepository ragflowRepository;
     private final OpenAiCompatibleAgentModelClient agentModelClient;
     private final ObjectProvider<WorkflowAgentResultCallback> workflowCallbackProvider;
+    private final Executor agentExecutor;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
 
@@ -51,6 +56,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
                                                 RagflowRepository ragflowRepository,
                                                 OpenAiCompatibleAgentModelClient agentModelClient,
                                                 ObjectProvider<WorkflowAgentResultCallback> workflowCallbackProvider,
+                                                @Qualifier("agentExecutor") Executor agentExecutor,
                                                 PlatformTransactionManager transactionManager,
                                                 ObjectMapper objectMapper) {
         this.agentRepository = agentRepository;
@@ -58,6 +64,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
         this.ragflowRepository = ragflowRepository;
         this.agentModelClient = agentModelClient;
         this.workflowCallbackProvider = workflowCallbackProvider;
+        this.agentExecutor = agentExecutor;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.objectMapper = objectMapper;
     }
@@ -96,7 +103,9 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
             "审批流程触发AI预审",
             false
         );
-        Runnable afterCommit = () -> completePreReview(taskId, requestId, processTypeCode, bizType, bizId, applicantUserId);
+        Runnable afterCommit = () -> agentExecutor.execute(() ->
+            completePreReview(taskId, requestId, processTypeCode, bizType, bizId, applicantUserId)
+        );
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -174,12 +183,13 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
         try {
             WorkflowRequestRow request = workflowRepository.getRequestByIdOrThrow(requestId);
             WorkflowLeaveDetailRow leave = workflowRepository.getLeaveDetailByRequestId(requestId);
+            WorkflowGenericDetailRow generic = workflowRepository.getGenericDetailByRequestId(requestId);
             AgentModelResponse response = agentModelClient.generateReply(new AgentModelRequest(
                 null,
                 taskId,
                 "OA预审",
                 preReviewSystemPrompt(),
-                preReviewInputJson(request, leave, processTypeCode, bizType, bizId, applicantUserId),
+                preReviewInputJson(request, leave, generic, processTypeCode, bizType, bizId, applicantUserId),
                 ragflowModelConfigJson()
             ));
             return normalizeDecisionJson(response.text(), requestId, processTypeCode, bizType, bizId, applicantUserId);
@@ -191,14 +201,31 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
     }
 
     private String ragflowModelConfigJson() throws Exception {
+        LlmModelRow model = agentRepository.listLlmModels().stream()
+            .filter(row -> "ACTIVE".equals(row.status()) && "TEXT".equals(row.modelType()) && StringUtils.hasText(row.apiKey()))
+            .filter(row -> Boolean.TRUE.equals(row.defaultFlag()))
+            .findFirst()
+            .orElseGet(() -> agentRepository.listLlmModels().stream()
+                .filter(row -> "ACTIVE".equals(row.status()) && "TEXT".equals(row.modelType()) && StringUtils.hasText(row.apiKey()))
+                .findFirst()
+                .orElse(null));
+        if (model != null) {
+            return objectMapper.writeValueAsString(Map.of(
+                "baseUrl", model.endpoint() == null ? "" : model.endpoint(),
+                "apiKey", model.apiKey(),
+                "model", model.modelName(),
+                "temperature", 0.1,
+                "maxTokens", 1024
+            ));
+        }
         RagflowGlobalSettingRow setting = ragflowRepository.getGlobalSetting();
         if (!StringUtils.hasText(setting.ocrBaseUrl()) || !StringUtils.hasText(setting.ocrModel())
             || !Boolean.TRUE.equals(setting.ocrApiKeyConfigured())) {
-            throw new BizException(422, "知识库OCR模型未配置");
+            throw new BizException(422, "AI模型未配置");
         }
         String apiKey = ragflowRepository.getRawOcrApiKey();
         if (!StringUtils.hasText(apiKey)) {
-            throw new BizException(422, "知识库OCR模型未配置");
+            throw new BizException(422, "AI模型未配置");
         }
         return objectMapper.writeValueAsString(Map.of(
             "baseUrl", setting.ocrBaseUrl(),
@@ -211,7 +238,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
 
     private String preReviewSystemPrompt() {
         return """
-            你是OA请假申请预审Agent。只输出一个JSON对象，不要输出Markdown。
+            你是OA申请预审Agent。只输出一个JSON对象，不要输出Markdown。
             JSON字段:
             decision: APPROVED、REJECTED、TO_HUMAN 三选一。
             conclusion: 一句话结论。
@@ -225,6 +252,7 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
 
     private String preReviewInputJson(WorkflowRequestRow request,
                                       WorkflowLeaveDetailRow leave,
+                                      WorkflowGenericDetailRow generic,
                                       String processTypeCode,
                                       String bizType,
                                       Long bizId,
@@ -244,6 +272,14 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
             leaveNode.put("endAt", String.valueOf(leave.endAt()));
             leaveNode.put("durationMinutes", leave.durationMinutes());
             leaveNode.put("reason", leave.reason());
+        }
+        if (generic != null) {
+            ObjectNode genericNode = input.putObject("generic");
+            genericNode.put("processCode", generic.processCode());
+            genericNode.put("summary", generic.summary());
+            if (StringUtils.hasText(generic.formPayloadJson())) {
+                genericNode.set("formPayload", objectMapper.readTree(generic.formPayloadJson()));
+            }
         }
         return objectMapper.writeValueAsString(input);
     }

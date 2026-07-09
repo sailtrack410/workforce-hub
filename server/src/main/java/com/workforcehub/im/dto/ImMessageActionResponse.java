@@ -1,6 +1,5 @@
 package com.workforcehub.im.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -9,10 +8,19 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class ImMessageActionResponse {
 
     private Long messageId;
     private String actionType;
+    private String actionTypeName;
     private String status;
+    private String statusName;
+
+    public ImMessageActionResponse(Long messageId, String actionType, String actionTypeName, String status, String statusName) {
+        this.messageId = messageId;
+        this.actionType = actionType;
+        this.actionTypeName = actionTypeName;
+        this.status = status;
+        this.statusName = statusName;
+    }
 }

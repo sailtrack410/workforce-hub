@@ -8,6 +8,7 @@ public record AdminAgentTaskAuditRow(
     String actionType,
     String targetType,
     Long targetId,
+    String targetDisplayName,
     String decisionSummary,
     Boolean riskFlag,
     LocalDateTime occurredAt

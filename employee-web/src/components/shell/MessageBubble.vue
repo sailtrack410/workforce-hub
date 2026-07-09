@@ -1,19 +1,32 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AppAvatar from '../ui/AppAvatar.vue';
-import type { ConversationMessage } from '../../stores/shell';
+import type { ConversationMessage, MessageMention } from '../../stores/shell';
 import type { EntityId } from '../../api';
 import { renderMarkdownText } from '../../utils/markdown';
+import { statusText } from '../../utils/employee-format';
+
+interface MessageQuotePreview {
+  id: string;
+  author: string;
+  body: string;
+  visible: boolean;
+}
 
 const props = defineProps<{
   message: ConversationMessage;
   agent?: boolean;
   avatarUrl?: string;
+  quote?: MessageQuotePreview | null;
+  senderMention?: MessageMention | null;
 }>();
 
 const emit = defineEmits<{
   action: [message: ConversationMessage, event: MouseEvent];
   attachment: [message: ConversationMessage, attachmentId: EntityId, action: 'preview' | 'download'];
+  quote: [messageId: EntityId | string];
+  mention: [mention: MessageMention];
+  insertMention: [mention: MessageMention];
 }>();
 
 const renderedMarkdown = computed(() => (
@@ -25,6 +38,33 @@ const renderedMarkdown = computed(() => (
 const bubbleTitle = computed(() => (
   props.message.time ? `${props.message.author} · ${props.message.time}` : props.message.author
 ));
+
+const bodyParts = computed(() => {
+  const mentions = props.message.mentions ?? [];
+  if (!mentions.length) return [{ type: 'text' as const, text: props.message.body }];
+  const ranges: Array<{ start: number; end: number; mention: MessageMention }> = [];
+  mentions.forEach((mention) => {
+    const token = `@${mention.originalName || mention.name}`;
+    let from = 0;
+    while (from < props.message.body.length) {
+      const start = props.message.body.indexOf(token, from);
+      if (start < 0) break;
+      ranges.push({ start, end: start + token.length, mention });
+      from = start + token.length;
+    }
+  });
+  ranges.sort((a, b) => a.start - b.start);
+  const parts: Array<{ type: 'text'; text: string } | { type: 'mention'; text: string; mention: MessageMention }> = [];
+  let cursor = 0;
+  ranges.forEach((range) => {
+    if (range.start < cursor) return;
+    if (range.start > cursor) parts.push({ type: 'text', text: props.message.body.slice(cursor, range.start) });
+    parts.push({ type: 'mention', text: props.message.body.slice(range.start, range.end), mention: range.mention });
+    cursor = range.end;
+  });
+  if (cursor < props.message.body.length) parts.push({ type: 'text', text: props.message.body.slice(cursor) });
+  return parts.length ? parts : [{ type: 'text' as const, text: props.message.body }];
+});
 
 function openMessageAction(event: MouseEvent) {
   if (props.message.status === 'RECALLED') return;
@@ -48,16 +88,49 @@ function openMessageAction(event: MouseEvent) {
     />
     <div class="bubble-stack">
       <div v-if="message.side !== 'right'" class="bubble-meta">
-        <strong>{{ message.author }}</strong>
+        <button
+          v-if="senderMention"
+          class="bubble-author-mention"
+          type="button"
+          @click.stop="emit('insertMention', senderMention)"
+        >
+          {{ message.author }}<span>@</span>
+        </button>
+        <strong v-else>{{ message.author }}</strong>
       </div>
       <div class="bubble-content">
+        <button
+          v-if="quote"
+          class="bubble-quote"
+          type="button"
+          :disabled="!quote.visible"
+          @click.stop="emit('quote', quote.id)"
+        >
+          <span class="bubble-quote-rail" aria-hidden="true" />
+          <span class="bubble-quote-copy">
+            <strong class="bubble-quote-author">{{ quote.author }}：</strong>
+            <span class="bubble-quote-body">{{ quote.body }}</span>
+          </span>
+        </button>
         <div v-if="renderedMarkdown" class="bubble-markdown" v-html="renderedMarkdown" />
-        <p v-else>{{ message.body }}</p>
+        <p v-else>
+          <template v-for="(part, index) in bodyParts" :key="`${part.type}-${index}`">
+            <button
+              v-if="part.type === 'mention'"
+              class="bubble-mention-token"
+              type="button"
+              @click.stop="emit('mention', part.mention)"
+            >
+              {{ part.text }}
+            </button>
+            <span v-else>{{ part.text }}</span>
+          </template>
+        </p>
         <p v-if="message.translatedText" class="bubble-translation">{{ message.translatedText }}</p>
         <div v-if="message.attachments?.length" class="bubble-attachments">
           <span v-for="file in message.attachments" :key="file.id" class="bubble-attachment">
             <strong>{{ file.name }}</strong>
-            <small>{{ file.type }} · {{ file.size }} · {{ file.status }}</small>
+            <small>{{ file.type }} · {{ file.size }} · {{ statusText(file.status) }}</small>
             <span class="attachment-actions">
               <button
                 v-if="file.attachmentRefId"
@@ -113,24 +186,31 @@ function openMessageAction(event: MouseEvent) {
 }
 
 .bubble-content {
+  display: grid;
+  gap: var(--space-10, 0.625rem);
   max-width: 100%;
   padding: var(--space-10, 0.625rem) var(--space-14, 0.875rem);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 1rem 1rem 1rem 0.375rem;
-  background: #fff;
+  background: var(--surface-panel);
   box-shadow: 0 1px 1px rgba(16, 24, 40, 0.04);
   overflow-wrap: anywhere;
 }
 
 .message-bubble.right .bubble-content {
-  border-color: #c8e6c9;
+  border-color: color-mix(in srgb, var(--success-300) 48%, var(--border-subtle));
   border-radius: 1rem 1rem 0.375rem 1rem;
-  background: #d9fdd3;
+  background: color-mix(in srgb, var(--success-100) 46%, var(--surface-panel));
+}
+
+:global([data-theme='dark']) .message-bubble.right .bubble-content {
+  border-color: color-mix(in srgb, var(--success-500) 42%, var(--border-subtle));
+  background: color-mix(in srgb, var(--success-900, #14532d) 38%, var(--surface-panel));
 }
 
 .message-bubble.agent .bubble-content {
-  border-color: #cfe3ff;
-  background: #f7fbff;
+  border-color: color-mix(in srgb, var(--primary-300) 46%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-accent) 58%, var(--surface-panel));
 }
 
 .bubble-meta {
@@ -147,6 +227,35 @@ function openMessageAction(event: MouseEvent) {
   color: var(--text-primary);
 }
 
+.bubble-author-mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bubble-author-mention span {
+  display: none;
+}
+
+.bubble-author-mention:hover,
+.bubble-author-mention:focus-visible {
+  color: var(--text-accent);
+  outline: none;
+}
+
+.bubble-author-mention:hover span,
+.bubble-author-mention:focus-visible span {
+  display: inline;
+}
+
 .bubble-meta strong,
 .bubble-meta span,
 .bubble-meta time {
@@ -156,8 +265,8 @@ function openMessageAction(event: MouseEvent) {
 }
 
 .bubble-content p {
-  margin: var(--space-6, 0.375rem) 0 0;
-  color: #1f2937;
+  margin: 0;
+  color: var(--text-secondary);
   font-size: var(--text-body-sm);
   line-height: 1.65;
   overflow-wrap: anywhere;
@@ -165,12 +274,102 @@ function openMessageAction(event: MouseEvent) {
   word-break: break-word;
 }
 
-.bubble-content > p:first-child {
-  margin-top: 0;
+.bubble-mention-token {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bubble-mention-token:hover,
+.bubble-mention-token:focus-visible {
+  outline: none;
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+}
+
+.bubble-quote {
+  display: grid;
+  grid-template-columns: 0.1875rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-10, 0.625rem);
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-tertiary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bubble-quote:disabled {
+  cursor: default;
+  opacity: 0.82;
+}
+
+.bubble-quote:hover:not(:disabled),
+.bubble-quote:focus-visible {
+  outline: none;
+  color: var(--text-secondary);
+}
+
+.bubble-quote-copy {
+  display: grid;
+  gap: var(--space-4, 0.25rem);
+  min-width: 0;
+}
+
+.bubble-quote-rail {
+  width: 0.1875rem;
+  min-height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-200) 92%, var(--surface-panel));
+}
+
+.message-bubble.right .bubble-quote-rail {
+  background: color-mix(in srgb, var(--success-200) 92%, var(--surface-panel));
+}
+
+.message-bubble.agent .bubble-quote-rail {
+  background: color-mix(in srgb, var(--primary-300) 88%, var(--surface-panel));
+}
+
+.bubble-quote-author {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--text-secondary) 78%, var(--surface-panel));
+  font-size: var(--text-body-sm);
+  line-height: 1.3;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bubble-quote-body {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--text-secondary) 72%, var(--surface-panel));
+  font-size: var(--text-body-sm);
+  line-height: 1.4;
+  text-align: left;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .bubble-translation {
-  padding-top: var(--space-6, 0.375rem);
+  padding-top: var(--space-2, 0.125rem);
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   color: var(--text-secondary) !important;
 }
@@ -178,8 +377,7 @@ function openMessageAction(event: MouseEvent) {
 .bubble-markdown {
   display: grid;
   gap: var(--space-8, 0.5rem);
-  margin-top: var(--space-8, 0.5rem);
-  color: #1f2937;
+  color: var(--text-secondary);
   font-size: var(--text-body-sm);
   line-height: 1.65;
   overflow-wrap: anywhere;
@@ -227,8 +425,8 @@ function openMessageAction(event: MouseEvent) {
 .bubble-markdown :deep(code) {
   padding: 0.08rem 0.25rem;
   border-radius: 0.25rem;
-  background: #e8f2ff;
-  color: #0f4f8f;
+  background: var(--surface-accent);
+  color: var(--text-accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.92em;
 }
@@ -256,7 +454,6 @@ function openMessageAction(event: MouseEvent) {
 .bubble-attachments {
   display: grid;
   gap: var(--space-8);
-  margin-top: var(--space-12);
 }
 
 .bubble-attachment {

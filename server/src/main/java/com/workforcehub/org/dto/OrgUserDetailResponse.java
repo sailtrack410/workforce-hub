@@ -14,6 +14,7 @@ public class OrgUserDetailResponse {
     private String employeeNo;
     private String realName;
     private String gender;
+    private String genderName;
     private String mobile;
     private String email;
     private Long avatarAttachmentRefId;
@@ -24,7 +25,9 @@ public class OrgUserDetailResponse {
     private Long managerUserId;
     private String managerName;
     private String employmentStatus;
+    private String employmentStatusName;
     private String status;
+    private String statusName;
     private LocalDate hireDate;
     private LocalDate regularizedAt;
     private LocalDate serviceStartDate;

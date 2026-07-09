@@ -30,6 +30,8 @@ public class CreateRagflowSpaceRequest {
     @Size(max = 128)
     private String embeddingModel;
 
+    private Long embeddingModelId;
+
     @Min(1)
     private Integer embeddingDimension;
 
@@ -40,6 +42,8 @@ public class CreateRagflowSpaceRequest {
 
     @Size(max = 128)
     private String rerankModel;
+
+    private Long rerankModelId;
 
     @Min(100)
     @Max(8000)

@@ -97,6 +97,82 @@ describe('useImSocket', () => {
     latestSocket()?.onclose?.();
     expect(latestTimeoutDelay(setTimeoutSpy)).toBe(60000);
   });
+
+  it('dispatches browser notification for incoming websocket messages', async () => {
+    const notifyUser = vi.fn();
+    let socket: ReturnType<typeof useImSocket> | undefined;
+    const Root = defineComponent({
+      setup() {
+        socket = useImSocket({
+          im: {
+            loadConversations: vi.fn().mockResolvedValue(undefined),
+            conversations: [{
+              id: '1001',
+              title: '运营一部群',
+              messages: [],
+              panel: { attachments: [] },
+            }],
+            messagesByConversation: {},
+            upsertMessage: vi.fn((conversationId, message) => {
+              socketIm.messagesByConversation[conversationId] = [message];
+            }),
+          } as never,
+          session: {
+            isAuthenticated: true,
+            user: { userId: '1', displayName: '李雷' },
+            displayName: '李雷',
+          } as never,
+          shell: {
+            active: { messages: '' },
+            notifDesktop: true,
+            notifSound: true,
+            notifMentionOnly: false,
+            presenceStatus: 'ONLINE',
+            conversations: [{ id: '1001', title: '运营一部群' }],
+            mergeBackendConversations: vi.fn(),
+            mergeBackendMessages: vi.fn(),
+          } as never,
+          syncConversationMessages: vi.fn(),
+          notifyUser,
+        });
+        return () => h('span');
+      },
+    });
+    const socketIm = {
+      messagesByConversation: {} as Record<string, unknown[]>,
+    };
+
+    createTestRenderer().createApp(Root).mount({});
+    await socket?.handleImSocketMessage(JSON.stringify({
+      eventType: 'IM_MESSAGE_CREATED',
+      conversationId: '1001',
+      payload: {
+        messageId: '9001',
+        conversationId: '1001',
+        seqNo: 3,
+        senderType: 'USER',
+        senderId: '2',
+        messageType: 'TEXT',
+        contentJson: '{"text":"收到新的消息"}',
+        contentText: '收到新的消息',
+        status: 'NORMAL',
+        sentAt: '2026-07-06 10:00:00',
+      },
+    }));
+
+    expect(notifyUser).toHaveBeenCalledWith(expect.objectContaining({
+      channel: 'browser',
+      topic: 'im.message.created',
+      title: '运营一部群',
+      body: '收到新的消息',
+      route: '/messages/1001',
+      senderId: '2',
+      conversationId: '1001',
+    }), expect.objectContaining({
+      enabled: true,
+      currentUserId: '1',
+    }));
+  });
 });
 
 function latestSocket() {

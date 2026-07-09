@@ -14,15 +14,12 @@ import type {
   PersonalFileRecord,
   SectionAction,
   SectionMeta,
-  TodoRecord,
   useShellStore,
 } from '../stores/shell';
-import type { useWorkflowStore } from '../stores/workflow';
 
 type StoreShell = ReturnType<typeof useShellStore>;
 type StoreIm = ReturnType<typeof useImStore>;
 type StoreSession = ReturnType<typeof useSessionStore>;
-type StoreWorkflow = ReturnType<typeof useWorkflowStore>;
 type ReadonlyRef<T> = ComputedRef<T> | Readonly<Ref<T>>;
 type RunSectionAction = (action?: SectionAction) => void;
 
@@ -43,16 +40,9 @@ export interface MessagesSectionContext {
 }
 
 export interface TodosSectionContext {
-  workflow: StoreWorkflow;
-  activeTodo: ReadonlyRef<TodoRecord>;
+  shell: StoreShell;
   pendingTodoCount: ReadonlyRef<number>;
-  mustHandleTodos: ReadonlyRef<TodoRecord[]>;
-  approvalTodos: ReadonlyRef<TodoRecord[]>;
-  deferredTodos: ReadonlyRef<TodoRecord[]>;
-  hasActiveTodo: ReadonlyRef<boolean>;
   backToList: () => void;
-  runAction: RunSectionAction;
-  retryTodos: () => Promise<void>;
 }
 
 export interface WorkbenchSectionContext {

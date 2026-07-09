@@ -3,19 +3,22 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const source = readFileSync(fileURLToPath(new URL('./RagflowView.vue', import.meta.url)), 'utf8');
+const uploadDialogSource = readFileSync(fileURLToPath(new URL('../components/ragflow/RagflowUploadDialog.vue', import.meta.url)), 'utf8');
+const settingsDialogSource = readFileSync(fileURLToPath(new URL('../components/ragflow/RagflowSettingsDialog.vue', import.meta.url)), 'utf8');
 
 describe('RagflowView', () => {
-  it('shows upload progress while a document is uploading', () => {
-    expect(source).toContain('const uploadProgress = ref(0)');
-    expect(source).toContain('const uploadStatus = ref');
-    expect(source).toContain('class="upload-progress"');
-    expect(source).toContain(':value="uploadProgress"');
+  it('supports a multi-file upload queue', () => {
+    expect(source).toContain('const uploadQueue = ref<UploadQueueItem[]>([])');
+    expect(source).toContain('function setUploadFiles(files: File[])');
+    expect(uploadDialogSource).toContain('type="file" multiple');
+    expect(uploadDialogSource).toContain('v-for="item in items"');
   });
 
-  it('keeps upload feedback visible after a fast result or an error', () => {
-    expect(source).toContain('v-if="uploading || uploadStatus"');
-    expect(source).toContain('uploadStatus.value = errorMessage(e)');
-    expect(source).toContain('window.setTimeout(resolve, 600)');
+  it('closes the upload dialog after files are registered for background ingest', () => {
+    expect(source).toContain('await adminApi.ragflow.addDocument(selected.value.spaceId, attachmentRefId)');
+    expect(source).toContain('uploadVisible.value = false');
+    expect(source).toContain('正在后台入库');
+    expect(source).not.toContain('window.setTimeout(resolve, 600)');
   });
 
   it('uses browser upload progress events for ticket target uploads', () => {
@@ -29,5 +32,17 @@ describe('RagflowView', () => {
     expect(source).toContain('adminApi.ragflow.confirmUpload');
     expect(source).not.toContain('adminApi.files.createUploadTicket({');
     expect(source).not.toContain('adminApi.files.confirmUpload({');
+  });
+
+  it('deletes knowledge spaces through a ragflow-scoped endpoint', () => {
+    expect(source).toContain('RagflowSpaceDeleteDialog');
+    expect(source).toContain('adminApi.ragflow.deleteSpace');
+    expect(source).toContain('spaceDeleteVisible');
+  });
+
+  it('keeps uneditable model settings out of the knowledge space settings form', () => {
+    expect(settingsDialogSource).not.toContain('const vectorSettingsLocked = computed');
+    expect(settingsDialogSource).not.toContain(':disabled="vectorSettingsLocked"');
+    expect(settingsDialogSource).not.toContain('模型设置');
   });
 });

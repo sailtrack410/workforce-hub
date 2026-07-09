@@ -20,7 +20,7 @@ import { useFilesSectionContext } from '../employee-shell-context';
 import { isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { buildStorageOverview, parseStorageSizeBytes } from '@/utils/cloud-storage-summary';
-import { formatDateTime } from '@/utils/employee-format';
+import { formatDateTime, statusText } from '@/utils/employee-format';
 import type { PersonalFileRecord } from '@/stores/shell';
 import cloudFolderImage from '@/assets/cloud-folder.png';
 import archiveFileIcon from '@/assets/file-icons/archive.png';
@@ -54,9 +54,11 @@ const {
 } = useFilesSectionContext();
 
 type FileTab = 'all' | 'trash';
+type FileQuickView = 'all' | 'recentAccess' | 'recentUpload' | 'favorites' | 'shared';
 type FilePlacementMode = 'move' | 'copy';
 
 const fileTab = ref<FileTab>('all');
+const quickView = ref<FileQuickView>('all');
 const currentFolderId = ref<EntityId | null>(null);
 const browserLoading = ref(false);
 const browserError = ref('');
@@ -81,18 +83,56 @@ let searchTimer: number | undefined;
 const activeFiles = computed(() => activeFile.value.files.filter((file: PersonalFileRecord) => !isFileTrashed(file)));
 const trashedFiles = computed(() => activeFile.value.files.filter((file: PersonalFileRecord) => isFileTrashed(file)));
 const visibleTrashFiles = computed(() => trashedFiles.value);
-const emptyTitle = computed(() => fileTab.value === 'trash' ? '回收站为空' : '暂无文件');
-const emptyDescription = computed(() => fileTab.value === 'trash' ? '删除的文件会暂存在这里' : '上传或新建文件夹后开始管理');
 const placementTitle = computed(() => placementTarget.value?.mode === 'copy' ? '复制到' : '移动到');
 const recentUploadCount = computed(() => activeFiles.value.filter((file) => isWithinLastWeek(file.rawCreatedAt ?? file.createdAt)).length);
 const recentAccessCount = computed(() => activeFiles.value.filter((file) => (recentAccessLog.value[fileIdentity(file)] ?? 0) >= weekAgoTime()).length);
 const favoriteFileCount = computed(() => activeFiles.value.filter((file) => favoriteFileIds.value.includes(fileIdentity(file))).length);
 const fileQuickCards = computed(() => [
-  { title: '最近访问', count: recentAccessCount.value },
-  { title: '最近上传', count: recentUploadCount.value },
-  { title: '收藏夹', count: favoriteFileCount.value },
-  { title: '共享文件', count: 0 },
+  { key: 'recentAccess' as const, title: '最近访问', count: recentAccessCount.value },
+  { key: 'recentUpload' as const, title: '最近上传', count: recentUploadCount.value },
+  { key: 'favorites' as const, title: '收藏夹', count: favoriteFileCount.value },
+  { key: 'shared' as const, title: '共享文件', count: 0 },
 ]);
+const quickViewTitles: Record<FileQuickView, string> = {
+  all: '全部文件',
+  recentAccess: '最近访问',
+  recentUpload: '最近上传',
+  favorites: '收藏夹',
+  shared: '共享文件',
+};
+const quickViewEmptyDescriptions: Record<FileQuickView, string> = {
+  all: '上传或新建文件夹后开始管理',
+  recentAccess: '预览或下载文件后会出现在这里',
+  recentUpload: '最近 7 天上传的文件会出现在这里',
+  favorites: '收藏文件后会出现在这里',
+  shared: '暂无共享文件',
+};
+const quickViewFiles = computed(() => {
+  const files = activeFiles.value
+    .filter((file) => fileMatchesQuickView(file))
+    .filter((file) => fileMatchesClientFilters(file));
+  if (quickView.value === 'recentAccess') {
+    return [...files].sort((a, b) => (recentAccessLog.value[fileIdentity(b)] ?? 0) - (recentAccessLog.value[fileIdentity(a)] ?? 0));
+  }
+  if (quickView.value === 'recentUpload') {
+    return [...files].sort((a, b) => fileCreatedTime(b) - fileCreatedTime(a));
+  }
+  return files;
+});
+const visibleBrowserFolders = computed(() => quickView.value === 'all' ? browserFolders.value : []);
+const visibleBrowserFiles = computed(() => quickView.value === 'all' ? browserFiles.value : quickViewFiles.value);
+const currentFileViewTitle = computed(() => fileTab.value === 'trash' ? '回收站' : quickViewTitles[quickView.value]);
+const currentFileViewCount = computed(() => {
+  if (fileTab.value === 'trash') return `${visibleTrashFiles.value.length} 个文件`;
+  const folderCount = visibleBrowserFolders.value.length;
+  const fileCount = visibleBrowserFiles.value.length;
+  return folderCount ? `${folderCount} 个文件夹 · ${fileCount} 个文件` : `${fileCount} 个文件`;
+});
+const emptyTitle = computed(() => {
+  if (fileTab.value === 'trash') return '回收站为空';
+  return quickView.value === 'all' ? '暂无文件' : `暂无${quickViewTitles[quickView.value]}`;
+});
+const emptyDescription = computed(() => fileTab.value === 'trash' ? '删除的文件会暂存在这里' : quickViewEmptyDescriptions[quickView.value]);
 const storageUsedLabel = computed(() => formatStorageLabel(activeFile.value.summary[0]?.[0] ?? '0B'));
 const storageTotalLabel = computed(() => formatStorageLabel(activeFile.value.summary[1]?.[0] ?? '0B'));
 const storageUsedBytes = computed(() => parseStorageSizeBytes(storageUsedLabel.value));
@@ -127,6 +167,14 @@ function isWithinLastWeek(value?: string | null) {
   if (value === '刚刚') return true;
   const time = new Date(value).getTime();
   return Number.isFinite(time) && time >= weekAgoTime();
+}
+
+function fileCreatedTime(file: PersonalFileRecord) {
+  const value = file.rawCreatedAt ?? file.createdAt;
+  if (!value) return 0;
+  if (value === '刚刚') return Date.now();
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
 
 function readRecentAccessLog() {
@@ -202,8 +250,38 @@ function fileIconAssetOf(file: PersonalFileRecord) {
   return fileIcon;
 }
 
+function fileMatchesQuickView(file: PersonalFileRecord) {
+  if (quickView.value === 'all') return true;
+  if (quickView.value === 'recentAccess') return (recentAccessLog.value[fileIdentity(file)] ?? 0) >= weekAgoTime();
+  if (quickView.value === 'recentUpload') return isWithinLastWeek(file.rawCreatedAt ?? file.createdAt);
+  if (quickView.value === 'favorites') return favoriteFileIds.value.includes(fileIdentity(file));
+  return false;
+}
+
+function fileMatchesClientFilters(file: PersonalFileRecord) {
+  const keyword = fileKeyword.value.trim().toLowerCase();
+  if (keyword) {
+    const haystack = [file.name, file.type, file.status, file.mimeType ?? ''].join(' ').toLowerCase();
+    if (!haystack.includes(keyword)) return false;
+  }
+  if (fileTypeFilter.value === 'all') return true;
+  const name = file.name.toLowerCase();
+  const type = file.type.toLowerCase();
+  const mime = file.mimeType?.toLowerCase() ?? '';
+  if (fileTypeFilter.value === 'document') return /(\.pdf|\.docx?|\.txt|\.rtf|\.md)$/i.test(name) || type.includes('文档') || mime.includes('pdf') || mime.includes('word');
+  if (fileTypeFilter.value === 'image') return /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name) || mime.startsWith('image/');
+  if (fileTypeFilter.value === 'sheet') return /\.(xls|xlsx|csv)$/i.test(name) || type.includes('表格') || mime.includes('spreadsheet');
+  if (fileTypeFilter.value === 'archive') return /\.(zip|rar|7z|tar|gz)$/i.test(name) || type.includes('压缩');
+  if (fileTypeFilter.value === 'media') return /\.(mp3|mp4|wav|mov|avi|m4a)$/i.test(name) || mime.startsWith('audio/') || mime.startsWith('video/');
+  if (fileTypeFilter.value === 'code') return /\.(js|ts|java|py|go|json|xml|yml|yaml|css|html)$/i.test(name) || type.includes('代码');
+  return true;
+}
+
 async function loadBrowser() {
-  if (fileTab.value !== 'all') return;
+  if (fileTab.value !== 'all' || quickView.value !== 'all') {
+    browserLoading.value = false;
+    return;
+  }
   browserLoading.value = true;
   browserError.value = '';
   try {
@@ -304,12 +382,30 @@ async function downloadBrowserFile(file: PersonalFileRecord) {
   await downloadPersonalFile(file);
 }
 
+function selectAllFiles() {
+  fileTab.value = 'all';
+  quickView.value = 'all';
+  selectedFileRows.value = [];
+}
+
+function selectTrashFiles() {
+  fileTab.value = 'trash';
+  quickView.value = 'all';
+  selectedFileRows.value = [];
+}
+
+function selectQuickView(view: FileQuickView) {
+  fileTab.value = 'all';
+  quickView.value = view;
+  selectedFileRows.value = [];
+}
+
 function uploadToCurrentFolder() {
-  setUploadFolderId(currentFolderId.value);
+  setUploadFolderId(quickView.value === 'all' ? currentFolderId.value : null);
   runAction(currentMeta.value.primaryAction);
 }
 
-watch([currentFolderId, fileTypeFilter, fileTab], () => {
+watch([currentFolderId, fileTypeFilter, fileTab, quickView], () => {
   void loadBrowser();
 });
 
@@ -318,6 +414,7 @@ watch(() => activeFile.value.files.length, () => {
 });
 
 watch(fileKeyword, () => {
+  if (quickView.value !== 'all') return;
   if (searchTimer) window.clearTimeout(searchTimer);
   searchTimer = window.setTimeout(() => {
     void loadBrowser();
@@ -351,16 +448,24 @@ onMounted(() => {
     </div>
   </header>
 
-  <section class="content-stack">
+  <section class="content-stack cloud-content-stack">
     <section class="cloud-summary-grid" aria-label="云空间概览">
       <div class="cloud-quick-grid">
-        <article v-for="card in fileQuickCards" :key="card.title" class="cloud-folder-card">
+        <button
+          v-for="card in fileQuickCards"
+          :key="card.key"
+          class="cloud-folder-card"
+          :class="{ active: fileTab === 'all' && quickView === card.key }"
+          type="button"
+          :aria-pressed="fileTab === 'all' && quickView === card.key"
+          @click="selectQuickView(card.key)"
+        >
           <img :src="cloudFolderImage" alt="" aria-hidden="true" />
           <div>
             <h3>{{ card.title }}</h3>
             <p>{{ card.count }} 个文件</p>
           </div>
-        </article>
+        </button>
       </div>
 
       <article class="storage-overview-card">
@@ -394,19 +499,23 @@ onMounted(() => {
     <section class="detail-card">
       <div class="title-line file-tabs">
         <div class="settings-density-row">
-          <button type="button" :class="{ active: fileTab === 'all' }" @click="fileTab = 'all'">
+          <button type="button" :class="{ active: fileTab === 'all' && quickView === 'all' }" @click="selectAllFiles">
             全部文件
             <span class="tab-count">{{ activeFiles.length }}</span>
           </button>
-          <button type="button" :class="{ active: fileTab === 'trash' }" @click="fileTab = 'trash'">
+          <button type="button" :class="{ active: fileTab === 'trash' }" @click="selectTrashFiles">
             回收站
             <span class="tab-count">{{ trashedFiles.length }}</span>
           </button>
         </div>
+        <div class="file-current-view">
+          <strong>{{ currentFileViewTitle }}</strong>
+          <span>{{ currentFileViewCount }}</span>
+        </div>
       </div>
 
       <template v-if="fileTab === 'all'">
-        <div class="file-browser-toolbar">
+        <div class="file-browser-toolbar" :class="{ compact: quickView !== 'all' }">
           <label class="file-search-field">
             <Search :size="16" />
             <input v-model="fileKeyword" type="search" placeholder="搜索文件或文件夹" />
@@ -420,7 +529,7 @@ onMounted(() => {
             <option value="media">音视频</option>
             <option value="code">代码</option>
           </select>
-          <label class="file-folder-create">
+          <label v-if="quickView === 'all'" class="file-folder-create">
             <input v-model="folderNameDraft" class="ui-inline-input" placeholder="新建文件夹" @keydown.enter.prevent="createFolder" />
             <AppButton variant="secondary" size="sm" @click="createFolder">
               <FolderPlus :size="15" />
@@ -430,7 +539,7 @@ onMounted(() => {
         </div>
         <p v-if="folderActionError" class="dialog-error">{{ folderActionError }}</p>
 
-        <div class="file-breadcrumb">
+        <div v-if="quickView === 'all'" class="file-breadcrumb">
           <button type="button" :class="{ active: currentFolderId === null }" @click="openRootFolder">
             <Home :size="15" />
             根目录
@@ -446,17 +555,17 @@ onMounted(() => {
           </button>
         </div>
 
-        <AppLoadingState v-if="browserLoading" />
-        <p v-else-if="browserError" class="dialog-error">{{ browserError }}</p>
+        <AppLoadingState v-if="quickView === 'all' && browserLoading" />
+        <p v-else-if="quickView === 'all' && browserError" class="dialog-error">{{ browserError }}</p>
         <AppEmptyState
-          v-else-if="!browserFolders.length && !browserFiles.length"
+          v-else-if="!visibleBrowserFolders.length && !visibleBrowserFiles.length"
           :title="emptyTitle"
           :description="emptyDescription"
         />
 
         <div v-else class="file-list cloud-file-list">
           <div
-            v-for="folder in browserFolders"
+            v-for="folder in visibleBrowserFolders"
             :key="folder.folderId"
             class="file-row folder-row"
             role="button"
@@ -477,7 +586,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-for="file in browserFiles" :key="file.id" class="file-row">
+          <div v-for="file in visibleBrowserFiles" :key="file.id" class="file-row">
             <input v-model="selectedFileRows" type="checkbox" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" />
             <span class="file-thumb" aria-hidden="true">
               <img class="file-thumb-img" :src="fileIconAssetOf(file)" alt="" />
@@ -490,7 +599,7 @@ onMounted(() => {
                 <span>{{ file.type }}</span>
                 <span>{{ file.size }}</span>
                 <span>{{ file.createdAt }}</span>
-                <span>{{ file.status }}</span>
+                <span>{{ statusText(file.status) }}</span>
               </small>
             </div>
             <div class="file-actions">
@@ -545,7 +654,7 @@ onMounted(() => {
                 <span>{{ file.type }}</span>
                 <span>{{ file.size }}</span>
                 <span>{{ file.createdAt }}</span>
-                <span>{{ file.status }}</span>
+                <span>{{ statusText(file.status) }}</span>
               </small>
             </div>
             <div class="file-actions">

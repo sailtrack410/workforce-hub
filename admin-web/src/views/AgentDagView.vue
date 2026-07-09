@@ -9,9 +9,10 @@ import type {
   AgentVersionResponse,
   AgentToolResponse,
   LlmModelResponse,
+  RagflowSpaceResponse,
   WorkflowValidationResponse,
 } from '@/api/types';
-import { errorMessage, humanizeText, statusLabel } from '@/utils/format';
+import { actorTypeLabel, errorMessage, humanizeText, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AgentDagEditor from '@/components/AgentDagEditor.vue';
 
@@ -29,6 +30,7 @@ const agent = ref<AgentResponse | null>(null);
 const versions = ref<AgentVersionResponse[]>([]);
 const tools = ref<AgentToolResponse[]>([]);
 const models = ref<LlmModelResponse[]>([]);
+const knowledgeSpaces = ref<RagflowSpaceResponse[]>([]);
 const aclList = ref<AgentAclResponse[]>([]);
 const selectedVersionId = ref('');
 const newVersionLabel = ref('');
@@ -54,7 +56,11 @@ const selectedVersion = computed(() =>
   versions.value.find((v) => String(v.versionId) === selectedVersionId.value) ?? null,
 );
 
+const isAgentDeprecated = computed(() => agent.value?.status === 'DEPRECATED');
+const canTestVersion = computed(() => Boolean(selectedVersion.value) && !isAgentDeprecated.value);
+
 const isReadonly = computed(() => {
+  if (isAgentDeprecated.value) return true;
   const s = selectedVersion.value?.publishStatus;
   return s === 'PUBLISHED' || s === 'ARCHIVED';
 });
@@ -83,18 +89,20 @@ const workflowSignature = computed(() =>
 
 onMounted(async () => {
   try {
-    const [agentData, versionList, toolList, modelList, aclData] = await Promise.all([
+    const [agentData, versionList, toolList, modelList, aclData, spaceData] = await Promise.all([
       adminApi.agentConfig.detail(agentId),
       adminApi.agentConfig.versions(agentId),
       adminApi.agentConfig.tools(),
       adminApi.llmModels.list(),
       adminApi.agentConfig.acl(agentId),
+      adminApi.ragflow.spaces(1, 200),
     ]);
     agent.value = agentData;
     versions.value = versionList;
     tools.value = toolList;
     models.value = modelList;
     aclList.value = aclData;
+    knowledgeSpaces.value = spaceData.list;
 
     let draft = versionList.find((v) => v.publishStatus === 'DRAFT')
       ?? (agentData.publishedVersionId
@@ -186,7 +194,22 @@ function defaultDag() {
       },
       {
         id: 'end', type: 'END', position: { x: 660, y: 320 },
-        config: { reply: '{{answer}}' },
+        config: {
+          replyJson: {
+            cardType: 'agent_result',
+            schemaVersion: 1,
+            category: '{{input.category}}',
+            status: 'SUCCESS',
+            title: '{{input.queryTitle}}',
+            answer: '{{answer}}',
+            reason: null,
+            confidence: null,
+            data: { fields: null, records: null, flow: null },
+            actions: [],
+            citations: null,
+            error: null,
+          },
+        },
         inputFields: [
           { key: 'reply', label: '回复', ref: '{{answer}}' },
         ],
@@ -207,6 +230,10 @@ function defaultModelId() {
 async function handleSave() {
   const v = selectedVersion.value;
   if (!v) return;
+  if (isReadonly.value) {
+    toast.error(agent.value?.status === 'DEPRECATED' ? '已弃用的 AI 助手只允许查看' : '当前版本只读');
+    return;
+  }
   if (v.publishStatus !== 'DRAFT') {
     toast.error('已发布版本不可直接修改，请先创建新草稿');
     return;
@@ -230,11 +257,11 @@ async function handleSave() {
 }
 
 async function handleCreateDraft() {
-  const versionLabel = newVersionLabel.value.trim();
-  if (!versionLabel) {
-    toast.error('请填写显示版本号');
+  if (isAgentDeprecated.value) {
+    toast.error('已弃用的 AI 助手不能创建新草稿');
     return;
   }
+  const versionLabel = newVersionLabel.value.trim() || String(Math.max(0, ...versions.value.map((ver) => ver.versionNo)) + 1);
   if (versions.value.some((ver) => versionDisplay(ver) === versionLabel)) {
     toast.error('显示版本号已存在');
     return;
@@ -261,6 +288,10 @@ async function handleCreateDraft() {
 }
 
 async function handleValidate() {
+  if (isReadonly.value) {
+    toast.error(agent.value?.status === 'DEPRECATED' ? '已弃用的 AI 助手只允许查看' : '当前版本只读');
+    return;
+  }
   validating.value = true;
   validationResult.value = null;
   try {
@@ -278,6 +309,10 @@ async function handleValidate() {
 async function handlePublish() {
   const v = selectedVersion.value;
   if (!v) return;
+  if (isReadonly.value) {
+    toast.error(agent.value?.status === 'DEPRECATED' ? '已弃用的 AI 助手不能发布' : '当前版本只读');
+    return;
+  }
   if (v.publishStatus !== 'DRAFT') {
     toast.error('只有草稿版本可以发布');
     return;
@@ -311,6 +346,10 @@ async function handlePublish() {
 }
 
 async function handleGrantAcl() {
+  if (isReadonly.value) {
+    toast.error(agent.value?.status === 'DEPRECATED' ? '已弃用的 AI 助手不能调整可用范围' : '当前版本只读');
+    return;
+  }
   if (!aclForm.value.subjectId.trim()) {
     toast.error('请选择可用身份');
     return;
@@ -349,12 +388,13 @@ function aclSubjectLabel(type: string) {
     DEPARTMENT: '部门',
     GROUP: '群会话',
     ADMIN_USER: '管理员',
-  }[type] ?? type;
+  }[type] ?? actorTypeLabel(type);
 }
 
 function aclSubjectName(acl: AgentAclResponse) {
-  if (acl.subjectType !== 'ROLE') return String(acl.subjectId);
-  return roleOptions.find((role) => role.id === String(acl.subjectId))?.label ?? String(acl.subjectId);
+  if (acl.subjectName) return acl.subjectName;
+  if (acl.subjectType !== 'ROLE') return '未命名范围';
+  return roleOptions.find((role) => role.id === String(acl.subjectId))?.label ?? '未命名身份';
 }
 
 function aclPermissionLabel(code: string) {
@@ -362,7 +402,7 @@ function aclPermissionLabel(code: string) {
     visible: '可见',
     use: '可用',
     manage: '管理',
-  }[code] ?? code;
+  }[code] ?? '可用';
 }
 
 function goBack() {
@@ -388,9 +428,9 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
           <ArrowLeft :size="16" />
         </button>
         <div class="dag-title-group">
-          <span class="bar-title">{{ humanizeText(agent.agentName) || agent.agentCode }}</span>
-          <span class="dag-agent-code">{{ agent.agentCode }}</span>
+          <span class="bar-title">{{ humanizeText(agent.agentName) || 'AI 助手' }}</span>
         </div>
+        <span v-if="agent.status === 'DEPRECATED'" class="version-state deprecated">已弃用</span>
         <span :class="['version-state', selectedVersion?.publishStatus?.toLowerCase()]">{{ versionStateText }}</span>
         <select class="bar-select" :value="selectedVersionId" @change="selectVersion(versions.find((v) => String(v.versionId) === ($event.target as HTMLSelectElement).value)!)">
           <option v-for="v in versions" :key="v.versionId" :value="String(v.versionId)">
@@ -398,15 +438,14 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
           </option>
         </select>
         <div class="version-create">
-          <input v-model="newVersionLabel" title="新草稿显示版本号" />
-          <button class="bar-btn" :disabled="saving" @click="handleCreateDraft">
-            <Plus :size="14" /> 草稿
+          <button class="bar-btn" :disabled="saving || isAgentDeprecated" @click="handleCreateDraft">
+            <Plus :size="14" /> 新建草稿
           </button>
         </div>
       </div>
       <div class="dag-commandbar-actions">
         <span v-if="isReadonly" class="bar-readonly">只读</span>
-        <span v-if="validationResult && !validationResult.valid" class="bar-error">{{ validationResult.messages.join('；') }}</span>
+        <span v-if="validationResult && !validationResult.valid" class="bar-error">流程配置未通过，请检查节点连接和必填项</span>
         <span :class="['acl-state', hasActiveAcl ? 'ok' : 'warn']">{{ hasActiveAcl ? '范围已配置' : '范围未配置' }}</span>
         <span :class="['acl-state', lastWorkflowTestPassed ? 'ok' : 'warn']">{{ lastWorkflowTestPassed ? '流程已测' : '流程待测' }}</span>
         <button class="bar-btn" :disabled="validating || isReadonly" @click="handleValidate">
@@ -415,7 +454,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
         <button class="bar-btn" :disabled="saving || isReadonly" @click="handleSave">
           <Save :size="14" /> 保存
         </button>
-        <button class="bar-btn primary" :disabled="publishing || selectedVersion?.publishStatus !== 'DRAFT'" @click="handlePublish">
+        <button class="bar-btn primary" :disabled="publishing || isReadonly || selectedVersion?.publishStatus !== 'DRAFT'" @click="handlePublish">
           <Send :size="14" /> 发布
         </button>
       </div>
@@ -428,10 +467,10 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
           <span>可用范围</span>
         </div>
         <div class="acl-form">
-          <select v-model="aclForm.subjectId" :disabled="aclSaving">
+          <select v-model="aclForm.subjectId" :disabled="aclSaving || isReadonly">
             <option v-for="role in roleOptions" :key="role.id" :value="role.id">{{ role.label }}</option>
           </select>
-          <select v-model="aclForm.permCode" :disabled="aclSaving">
+          <select v-model="aclForm.permCode" :disabled="aclSaving || isReadonly">
             <option value="use">可用</option>
             <option value="visible">可见</option>
             <option value="manage">管理</option>
@@ -440,7 +479,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
         </div>
         <div class="acl-list">
           <span v-for="acl in aclList" :key="acl.aclId">
-            {{ aclSubjectLabel(acl.subjectType) }} {{ aclSubjectName(acl) }} · {{ aclPermissionLabel(acl.permCode) }} · {{ statusLabel(acl.status) }}
+            {{ acl.subjectTypeName || aclSubjectLabel(acl.subjectType) }} {{ aclSubjectName(acl) }} · {{ acl.permCodeName || aclPermissionLabel(acl.permCode) }} · {{ acl.statusName || statusLabel(acl.status) }}
           </span>
         </div>
       </aside>
@@ -449,7 +488,9 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
         v-model="workflowConfigJson"
         :tools="tools"
         :models="models.map(m => ({ modelId: String(m.modelId), displayName: m.displayName, provider: m.provider }))"
+        :knowledge-spaces="knowledgeSpaces"
         :readonly="isReadonly"
+        :testable="canTestVersion"
         :version-id="selectedVersion?.versionId"
         :system-prompt="systemPrompt"
         :model-config-json="modelConfigJson"
@@ -552,6 +593,11 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
 .version-state.published {
   background: var(--success-bg);
   color: var(--success);
+}
+
+.version-state.deprecated {
+  background: var(--error-bg);
+  color: var(--red);
 }
 
 .bar-select {
@@ -774,7 +820,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   .dag-acl-panel {
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+    border-bottom: 1px solid var(--line-soft);
   }
 
   .acl-form {

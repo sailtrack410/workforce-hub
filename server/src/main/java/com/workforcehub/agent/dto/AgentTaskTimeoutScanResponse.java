@@ -11,8 +11,11 @@ import java.time.LocalDateTime;
 public class AgentTaskTimeoutScanResponse {
 
     private String jobRunId;
+    private String jobRunNo;
     private String triggerType;
+    private String triggerTypeName;
     private String jobStatus;
+    private String jobStatusName;
     private Integer batchSize;
     private Long scannedCount;
     private Long cancelledCount;

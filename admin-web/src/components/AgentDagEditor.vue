@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onErrorCaptured, ref, watch } from 'vue';
-import { Check, GitBranchPlus, Loader2, Play, Plus, Trash2, X } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onErrorCaptured, ref, watch, type Component } from 'vue';
+import { Bot, BrainCircuit, Check, CircleDot, FileSearch, GitBranch, ListChecks, Loader2, Milestone, Play, Plus, Route, ScrollText, Shuffle, SquareCheckBig, Trash2, Wrench, X } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
-import type { AgentToolResponse } from '@/api/types';
+import type { AgentToolResponse, RagflowSpaceResponse } from '@/api/types';
+import { providerLabel, safeBusinessMessage } from '@/utils/format';
 
 type NodeType = 'START' | 'END' | 'LLM' | 'TOOL' | 'CONDITION' | 'INTENT' | 'APPROVAL' | 'KNOWLEDGE' | 'FORM_EXTRACT' | 'SUMMARY' | 'TRANSFORM';
 
@@ -51,8 +52,8 @@ const DATA_SOURCES = [
 ];
 
 const CARD_CATEGORIES = [
-  { value: 'QA', label: 'QA' },
-  { value: 'OA', label: 'OA' },
+  { value: 'QA', label: '问答' },
+  { value: 'OA', label: '办公' },
   { value: 'KNOWLEDGE', label: '知识库' },
 ];
 
@@ -68,6 +69,25 @@ const CARD_FIELD_SOURCES = [
   { value: '', label: '不显示' },
   { value: '{{oaData.leaveBalanceFields}}', label: '假期余额字段' },
   { value: '{{oaData.departmentHeadcountFields}}', label: '部门人数字段' },
+];
+
+const REF_CURRENT_USER = ['{{', 'input', '.', 'userId', '}}'].join('');
+const REF_START_QUERY = ['{{', 'start', '.', 'query', '}}'].join('');
+const ACTION_OPEN_BUSINESS = ['OPEN', 'FLOW'].join('_');
+const TOOL_KNOWLEDGE_SEARCH = ['KNOWLEDGE', 'SEARCH', 'CHUNKS'].join('_');
+
+const TARGET_USER_OPTIONS = [
+  { code: 'CURRENT_USER', value: REF_CURRENT_USER, label: '当前用户' },
+  { code: 'FROM_INPUT', value: REF_START_QUERY, label: '从用户输入识别' },
+];
+
+const CARD_ACTION_TYPES = [
+  { code: 'BUSINESS', value: ACTION_OPEN_BUSINESS, label: '打开业务' },
+  { code: 'LINK', value: 'OPEN_URL', label: '打开链接' },
+];
+
+const CARD_ACTION_TARGET_OPTIONS = [
+  { value: '/workbench/requests', label: '审批工作台' },
 ];
 
 type FieldType = 'string' | 'number' | 'boolean' | 'json' | 'object' | 'array';
@@ -114,12 +134,12 @@ interface ConditionBranch {
   next: string;
 }
 
-const NODE_W = 210;
-const NODE_H = 86;
+const NODE_W = 236;
+const NODE_H = 118;
 const PORT_OUT_X = NODE_W + 6;
-const PORT_OUT_Y = 43;
+const PORT_OUT_Y = 59;
 const PORT_IN_X = -6;
-const PORT_IN_Y = 43;
+const PORT_IN_Y = 59;
 
 export interface LlmModel {
   modelId: string;
@@ -131,11 +151,13 @@ const props = withDefaults(defineProps<{
   modelValue: string;
   tools: AgentToolResponse[];
   models?: LlmModel[];
+  knowledgeSpaces?: RagflowSpaceResponse[];
   readonly?: boolean;
+  testable?: boolean;
   versionId?: string | number;
   systemPrompt?: string;
   modelConfigJson?: string;
-}>(), { models: () => [], systemPrompt: '', modelConfigJson: '' });
+}>(), { models: () => [], knowledgeSpaces: () => [], readonly: false, testable: true, systemPrompt: '', modelConfigJson: '' });
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -154,10 +176,9 @@ const edges = ref<DagEdge[]>([]);
 const selectedNodeId = ref('');
 const parseError = ref('');
 const branchText = ref('');
-const argsText = ref('');
-const toolCallsText = ref('');
 const replyJsonText = ref('');
 const showGlobalConfig = ref(false);
+const modelConfigForm = ref({ temperature: 0.2, maxTokens: 1024 });
 let syncingFromModel = false;
 
 const canvasRef = ref<HTMLElement | null>(null);
@@ -171,6 +192,7 @@ const hoveredPortIn = ref<string | null>(null);
 const spaceHeld = ref(false);
 
 const portMenu = ref<{ nodeId: string; portIdx: number; x: number; y: number } | null>(null);
+const nodeContextMenu = ref<{ nodeId: string; x: number; y: number } | null>(null);
 
 const trialMode = ref(false);
 const trialNodeId = ref('');
@@ -188,8 +210,127 @@ const workflowTestRunning = ref(false);
 const selectedNode = computed(() => nodes.value.find((n) => n.id === selectedNodeId.value) ?? null);
 const selectableTargets = computed(() => nodes.value.filter((n) => n.type !== 'START'));
 const hasStart = computed(() => nodes.value.some((n) => n.type === 'START'));
-const prettyJson = computed(() => serializeWorkflow());
 const scalePercent = computed(() => `${Math.round(scale.value * 100)}%`);
+const canRunTest = computed(() => props.testable);
+
+function nodeDisplayName(id?: string | null) {
+  const index = nodes.value.findIndex((n) => n.id === id);
+  const node = index >= 0 ? nodes.value[index] : null;
+  return node ? `${NODE_TYPE_LABEL[node.type]} ${index + 1}` : '节点';
+}
+
+function nodeLabel(node: DagNode) {
+  return nodeDisplayName(node.id);
+}
+
+function nodeIndexLabel(node: DagNode) {
+  const index = nodes.value.findIndex((item) => item.id === node.id);
+  return index >= 0 ? `#${index + 1}` : '#';
+}
+
+const nodeContextMenuNode = computed(() =>
+  nodeContextMenu.value ? nodes.value.find((node) => node.id === nodeContextMenu.value?.nodeId) ?? null : null,
+);
+
+function nodeIcon(type: NodeType): Component {
+  const icons: Record<NodeType, Component> = {
+    START: CircleDot,
+    LLM: BrainCircuit,
+    TOOL: Wrench,
+    CONDITION: GitBranch,
+    INTENT: Route,
+    APPROVAL: SquareCheckBig,
+    KNOWLEDGE: FileSearch,
+    FORM_EXTRACT: ScrollText,
+    SUMMARY: ListChecks,
+    TRANSFORM: Shuffle,
+    END: Milestone,
+  };
+  return icons[type] ?? Bot;
+}
+
+function modelName(modelId: unknown) {
+  const id = String(modelId ?? '');
+  if (!id) return '';
+  return props.models.find((model) => String(model.modelId) === id)?.displayName ?? '已选模型';
+}
+
+function dataSourceNames(node: DagNode) {
+  const raw = node.config.dataSources;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((key) => DATA_SOURCES.find((source) => source.key === key)?.label ?? String(key))
+    .filter(Boolean);
+}
+
+function knowledgeToolCall(node: DagNode): Record<string, unknown> | null {
+  const calls = node.config.toolCalls;
+  if (!Array.isArray(calls)) return null;
+  const first = calls[0];
+  return first && typeof first === 'object' && !Array.isArray(first) ? first as Record<string, unknown> : null;
+}
+
+function knowledgeArgs(node: DagNode): Record<string, unknown> {
+  const args = knowledgeToolCall(node)?.args;
+  return args && typeof args === 'object' && !Array.isArray(args) ? args as Record<string, unknown> : {};
+}
+
+function knowledgeSpaceId(node: DagNode) {
+  return String(knowledgeArgs(node).spaceId ?? '');
+}
+
+function knowledgeTopK(node: DagNode) {
+  const topK = Number(knowledgeArgs(node).topK ?? 5);
+  return Number.isFinite(topK) && topK > 0 ? topK : 5;
+}
+
+function knowledgeSpaceName(node: DagNode) {
+  const id = knowledgeSpaceId(node);
+  if (!id) return '';
+  return props.knowledgeSpaces.find((space) => String(space.spaceId) === id)?.spaceName ?? '已选知识库';
+}
+
+function nodeMetaText(node: DagNode) {
+  if (node.type === 'START') return '用户输入入口';
+  if (node.type === 'END') return '回复出口';
+  if (node.type === 'KNOWLEDGE') {
+    const space = knowledgeSpaceName(node);
+    return space ? `${space} · Top ${knowledgeTopK(node)}` : '未选择知识库';
+  }
+  if (node.type === 'TOOL') {
+    const sources = dataSourceNames(node);
+    return sources.length ? sources.slice(0, 2).join(' / ') : '未选择工具';
+  }
+  if (node.type === 'CONDITION') return `${getConditionBranches(node).length} 条分支`;
+  if (node.type === 'INTENT') return `${getIntents(node).length} 个意图`;
+  const model = modelName(node.config.modelId);
+  return model || (supportsPrompt(node.type) ? '未选择模型' : '');
+}
+
+function workflowRunStatusLabel(value?: string | null) {
+  if (value === 'SUCCESS') return '成功';
+  if (value === 'FAILED') return '失败';
+  if (value === 'SKIPPED') return '已跳过';
+  return value ? '已执行' : '-';
+}
+
+function trialDisplayText(value?: string | null) {
+  if (!value) return '运行完成';
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object') return '运行完成，结果已生成';
+  } catch { /* ignore */ }
+  return safeBusinessMessage(value, '运行完成，结果已生成');
+}
+
+function workflowFinalReplyText(value?: string | null) {
+  if (!value) return '';
+  try {
+    const parsed = JSON.parse(value);
+    return JSON.stringify(parsed, null, 2);
+  } catch { /* ignore */ }
+  return safeBusinessMessage(value, '已生成最终输出');
+}
 
 function getIntents(node: DagNode | undefined | null): string[] {
   if (!node || node.type !== 'INTENT') return [];
@@ -228,7 +369,7 @@ function nodeVisualHeight(node: DagNode): number {
   if (!['INTENT', 'CONDITION'].includes(node.type)) return NODE_H;
   const labels = getBranchPortLabels(node);
   if (labels.length === 0) return NODE_H;
-  return Math.max(NODE_H, 40 + labels.length * 22);
+  return Math.max(NODE_H, 76 + labels.length * 24);
 }
 
 function getUpstreamNodes(nodeId: string): DagNode[] {
@@ -260,16 +401,30 @@ function getNodeOutputFields(node: DagNode | undefined): string[] {
   return [];
 }
 
-function getUpstreamVariables(nodeId: string): string[] {
+function getUpstreamVariableOptions(nodeId: string): { value: string; label: string }[] {
   const upstream = getUpstreamNodes(nodeId);
-  const vars: string[] = [];
+  const vars: { value: string; label: string }[] = [];
   for (const node of upstream) {
-    const fields = getNodeOutputFields(node);
-    for (const f of fields) {
-      vars.push(`{{${node.id}.${f}}}`);
+    const fields = node.outputFields && node.outputFields.length > 0
+      ? node.outputFields
+      : node.outputKey
+        ? [{ key: node.outputKey, label: node.outputKey }]
+        : [];
+    for (const field of fields) {
+      vars.push({
+        value: `{{${node.id}.${field.key}}}`,
+        label: `${nodeLabel(node)} · ${field.label || '输出内容'}`,
+      });
     }
   }
   return vars;
+}
+
+function conditionFieldOptions(nodeId: string) {
+  return getUpstreamVariableOptions(nodeId).map((item) => ({
+    value: item.value,
+    label: item.label,
+  }));
 }
 
 function getPortOutY(node: DagNode | undefined | null, portIdx: number): number {
@@ -277,7 +432,7 @@ function getPortOutY(node: DagNode | undefined | null, portIdx: number): number 
   const totalPorts = nodePortCount(node);
   if (totalPorts <= 1) return PORT_OUT_Y;
   const nodeHeight = nodeVisualHeight(node);
-  return 40 + portIdx * (nodeHeight - 40) / (totalPorts + 1);
+  return 54 + portIdx * (nodeHeight - 54) / (totalPorts + 1);
 }
 
 function getPortOutX(): number {
@@ -328,10 +483,20 @@ watch(() => props.modelValue, (val) => {
   syncingFromModel = false;
 }, { immediate: true });
 
+watch(() => props.modelConfigJson, (val) => {
+  try {
+    const parsed = val ? JSON.parse(val) as Record<string, unknown> : {};
+    modelConfigForm.value = {
+      temperature: Number(parsed.temperature ?? 0.2),
+      maxTokens: Number(parsed.maxTokens ?? 1024),
+    };
+  } catch {
+    modelConfigForm.value = { temperature: 0.2, maxTokens: 1024 };
+  }
+}, { immediate: true });
+
 watch(selectedNode, (node) => {
-  argsText.value = node?.type === 'TOOL' && !node.config.dataSources ? strJson(node.config.args, '{\n  "userId": "{{input.userId}}"\n}') : '';
   branchText.value = node?.type === 'CONDITION' ? strJson(node.config.branches, '[\n  { "match": "YES", "next": "end" }\n]') : '';
-  toolCallsText.value = node && supportsToolCalls(node.type) ? strJson(node.config.toolCalls, '[\n  {\n    "toolCode": "ORG_GET_USER_SUMMARY",\n    "args": { "userId": "{{input.userId}}" },\n    "outputKey": "user"\n  }\n]') : '';
   replyJsonText.value = node?.type === 'END' ? strJson(node.config.replyJson, '{\n  "text": "{{answer}}"\n}') : '';
 });
 
@@ -359,6 +524,7 @@ function loadWorkflow(value: string) {
 
 function addNode(type: NodeType, afterNodeId?: string, fromPort?: number) {
   if (props.readonly) return;
+  nodeContextMenu.value = null;
   if (type === 'START' && hasStart.value) return;
   const id = uniqueId(type.toLowerCase());
   const afterNode = afterNodeId ? nodes.value.find((n) => n.id === afterNodeId) : null;
@@ -376,6 +542,7 @@ function addNode(type: NodeType, afterNodeId?: string, fromPort?: number) {
 function showPortMenu(event: PointerEvent, nodeId: string, portIdx = 0) {
   if (props.readonly) return;
   event.stopPropagation();
+  nodeContextMenu.value = null;
   const rect = canvasRef.value?.getBoundingClientRect();
   if (!rect) return;
   portMenu.value = {
@@ -398,9 +565,85 @@ function onPortMenuSelect(type: NodeType) {
   portMenu.value = null;
 }
 
+function showNodeContextMenu(event: MouseEvent, node: DagNode) {
+  event.preventDefault();
+  event.stopPropagation();
+  selectedNodeId.value = node.id;
+  portMenu.value = null;
+  const rect = canvasRef.value?.getBoundingClientRect();
+  if (!rect) return;
+  nodeContextMenu.value = {
+    nodeId: node.id,
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+  window.addEventListener('pointerdown', dismissNodeContextMenu, { once: true });
+}
+
+function dismissNodeContextMenu() {
+  nodeContextMenu.value = null;
+}
+
+function addNodeFromContext(type: NodeType) {
+  if (!nodeContextMenu.value) return;
+  addNode(type, nodeContextMenu.value.nodeId, 0);
+  nodeContextMenu.value = null;
+}
+
+function enterTrialModeFromContext(nodeId: string) {
+  enterTrialMode(nodeId);
+  nodeContextMenu.value = null;
+}
+
+function addConditionBranchFromContext() {
+  addConditionBranch();
+  nodeContextMenu.value = null;
+}
+
+function addIntentFromContext() {
+  addIntent();
+  nodeContextMenu.value = null;
+}
+
+function duplicateNode(nodeId: string) {
+  if (props.readonly) return;
+  const node = nodes.value.find((item) => item.id === nodeId);
+  if (!node || node.type === 'START') return;
+  const id = uniqueId(node.type.toLowerCase());
+  const clone: DagNode = {
+    ...JSON.parse(JSON.stringify(node)),
+    id,
+    position: { x: node.position.x + 280, y: node.position.y + 40 },
+  };
+  nodes.value.push(clone);
+  selectedNodeId.value = id;
+  nodeContextMenu.value = null;
+  sync();
+}
+
+function disconnectNode(nodeId: string) {
+  if (props.readonly) return;
+  const node = nodes.value.find((item) => item.id === nodeId);
+  if (!node) return;
+  edges.value = edges.value.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
+  for (const item of nodes.value) {
+    if (item.type !== 'CONDITION') continue;
+    const branches = getConditionBranches(item).map((branch) => ({
+      ...branch,
+      next: item.id === nodeId || branch.next === nodeId ? '' : branch.next,
+    }));
+    const next: Record<string, unknown> = { ...item.config, branches };
+    if (item.id === nodeId || next.default === nodeId) next.default = '';
+    item.config = next;
+  }
+  nodeContextMenu.value = null;
+  sync();
+}
+
 function startNodeDrag(event: PointerEvent, node: DagNode) {
   selectedNodeId.value = node.id;
   portMenu.value = null;
+  nodeContextMenu.value = null;
   if (props.readonly) return;
   const rect = canvasRef.value?.getBoundingClientRect();
   if (!rect) return;
@@ -418,6 +661,7 @@ function startNodeDrag(event: PointerEvent, node: DagNode) {
 
 function startPan(event: PointerEvent) {
   showNodePanel.value = false;
+  nodeContextMenu.value = null;
   if (event.button === 1 || spaceHeld.value) {
     event.preventDefault();
     panDrag.value = {
@@ -434,6 +678,7 @@ function startPan(event: PointerEvent) {
   } else {
     selectedNodeId.value = '';
     portMenu.value = null;
+    nodeContextMenu.value = null;
   }
 }
 
@@ -540,6 +785,7 @@ function onWheel(e: WheelEvent) {
 
 function removeNode(nodeId: string) {
   if (props.readonly) return;
+  nodeContextMenu.value = null;
   const node = nodes.value.find((n) => n.id === nodeId);
   if (!node || node.type === 'START') return;
   nodes.value = nodes.value.filter((n) => n.id !== nodeId);
@@ -572,30 +818,115 @@ function removeEdge(from: string, to: string, fromPort?: number) {
   sync();
 }
 
-function updateSelectedId(value: string) {
-  const node = selectedNode.value;
-  if (!node || props.readonly) return;
-  const nextId = sanitize(value);
-  if (!nextId || nodes.value.some((n) => n.id === nextId && n !== node)) return;
-  const old = node.id;
-  node.id = nextId;
-  if (node.outputKey === old) node.outputKey = nextId;
-  edges.value = edges.value.map((e) => ({
-    from: e.from === old ? nextId : e.from,
-    to: e.to === old ? nextId : e.to,
-  }));
-  for (const item of nodes.value) {
-    if (item.type !== 'CONDITION') continue;
-    const branches = getConditionBranches(item)
-      .map((branch) => ({ ...branch, next: branch.next === old ? nextId : branch.next }));
-    item.config = {
-      ...item.config,
-      branches,
-      default: item.config.default === old ? nextId : item.config.default,
-    };
+function layoutWorkflow() {
+  if (props.readonly || nodes.value.length === 0) return;
+  const nodeMap = new Map(nodes.value.map((node) => [node.id, node]));
+  const originalOrder = new Map(nodes.value.map((node, index) => [node.id, index]));
+  const outgoing = new Map<string, DagEdge[]>();
+  const incoming = new Map<string, DagEdge[]>();
+  for (const node of nodes.value) {
+    outgoing.set(node.id, []);
+    incoming.set(node.id, []);
   }
-  selectedNodeId.value = nextId;
+  for (const edge of visibleEdges.value) {
+    if (!nodeMap.has(edge.from) || !nodeMap.has(edge.to) || edge.from === edge.to) continue;
+    const next = { from: edge.from, to: edge.to, fromPort: edge.fromPort };
+    outgoing.get(edge.from)?.push(next);
+    incoming.get(edge.to)?.push(next);
+  }
+  for (const list of outgoing.values()) {
+    list.sort((a, b) =>
+      (a.fromPort ?? 0) - (b.fromPort ?? 0)
+      || (originalOrder.get(a.to) ?? 0) - (originalOrder.get(b.to) ?? 0),
+    );
+  }
+
+  const layers = new Map<string, number>();
+  const visitFrom = (rootId: string, rootLayer: number) => {
+    if (layers.has(rootId)) return;
+    layers.set(rootId, rootLayer);
+    const queue = [rootId];
+    for (let cursor = 0; cursor < queue.length; cursor++) {
+      const from = queue[cursor];
+      const fromLayer = layers.get(from) ?? rootLayer;
+      for (const edge of outgoing.get(from) ?? []) {
+        if (layers.has(edge.to)) continue;
+        layers.set(edge.to, fromLayer + 1);
+        queue.push(edge.to);
+      }
+    }
+  };
+  const startNode = nodes.value.find((node) => node.type === 'START') ?? nodes.value[0];
+  if (startNode) visitFrom(startNode.id, 0);
+  for (const node of nodes.value) {
+    if ((incoming.get(node.id)?.length ?? 0) === 0) visitFrom(node.id, 0);
+  }
+  for (const node of nodes.value) {
+    visitFrom(node.id, layers.size > 0 ? 1 : 0);
+  }
+
+  const layerGroups = new Map<number, DagNode[]>();
+  for (const node of nodes.value) {
+    const layer = layers.get(node.id) ?? 0;
+    layerGroups.set(layer, [...(layerGroups.get(layer) ?? []), node]);
+  }
+  const sortedLayers = [...layerGroups.keys()].sort((a, b) => a - b);
+  const layerOrder = new Map<string, number>();
+  for (const layer of sortedLayers) {
+    const group = layerGroups.get(layer) ?? [];
+    group.sort((a, b) => {
+      const scoreA = layoutSortScore(a.id, incoming, layers, layerOrder, originalOrder);
+      const scoreB = layoutSortScore(b.id, incoming, layers, layerOrder, originalOrder);
+      return scoreA.parentLayer - scoreB.parentLayer
+        || scoreA.parentOrder - scoreB.parentOrder
+        || scoreA.port - scoreB.port
+        || (originalOrder.get(a.id) ?? 0) - (originalOrder.get(b.id) ?? 0);
+    });
+    group.forEach((node, index) => layerOrder.set(node.id, index));
+  }
+
+  const left = 90;
+  const top = 90;
+  const columnGap = 340;
+  const rowGap = 64;
+  const columnHeights = sortedLayers.map((layer) => {
+    const group = layerGroups.get(layer) ?? [];
+    return group.reduce((sum, node, index) => sum + nodeVisualHeight(node) + (index > 0 ? rowGap : 0), 0);
+  });
+  const maxColumnHeight = Math.max(...columnHeights, 0);
+  sortedLayers.forEach((layer, columnIndex) => {
+    const group = layerGroups.get(layer) ?? [];
+    let y = top + Math.max(0, Math.round((maxColumnHeight - columnHeights[columnIndex]) / 2));
+    for (const node of group) {
+      node.position = { x: left + columnIndex * columnGap, y };
+      y += nodeVisualHeight(node) + rowGap;
+    }
+  });
+  showNodePanel.value = false;
+  portMenu.value = null;
+  nodeContextMenu.value = null;
   sync();
+}
+
+function layoutSortScore(
+  nodeId: string,
+  incoming: Map<string, DagEdge[]>,
+  layers: Map<string, number>,
+  layerOrder: Map<string, number>,
+  originalOrder: Map<string, number>,
+) {
+  const candidates = (incoming.get(nodeId) ?? [])
+    .map((edge) => ({
+      parentLayer: layers.get(edge.from) ?? 0,
+      parentOrder: layerOrder.get(edge.from) ?? originalOrder.get(edge.from) ?? 0,
+      port: edge.fromPort ?? 0,
+    }))
+    .sort((a, b) =>
+      a.parentLayer - b.parentLayer
+      || a.parentOrder - b.parentOrder
+      || a.port - b.port,
+    );
+  return candidates[0] ?? { parentLayer: 0, parentOrder: originalOrder.get(nodeId) ?? 0, port: 0 };
 }
 
 function updateConfig(key: string, value: unknown) {
@@ -605,20 +936,39 @@ function updateConfig(key: string, value: unknown) {
   sync();
 }
 
+function updateKnowledgeToolArgs(patch: Record<string, unknown>) {
+  const node = selectedNode.value;
+  if (!node || props.readonly || node.type !== 'KNOWLEDGE') return;
+  const rawCalls = Array.isArray(node.config.toolCalls) ? node.config.toolCalls : [];
+  const current = knowledgeToolCall(node) ?? {};
+  const args = { ...knowledgeArgs(node), ...patch };
+  const nextCall = {
+    ...current,
+    toolCode: TOOL_KNOWLEDGE_SEARCH,
+    args,
+    outputKey: String(current.outputKey ?? 'knowledge'),
+  };
+  node.config = { ...node.config, toolCalls: [nextCall, ...rawCalls.slice(1)] };
+  sync();
+}
+
+function updateKnowledgeSpace(value: string) {
+  updateKnowledgeToolArgs({ spaceId: value || '' });
+}
+
+function updateKnowledgeTopK(value: number) {
+  updateKnowledgeToolArgs({ topK: Math.max(1, Math.min(20, Number.isFinite(value) ? value : 5)) });
+}
+
+function updateTool(value: string) {
+  updateConfig(['tool', 'Code'].join(''), value);
+}
+
 function updateOutputKey(value: string) {
   const node = selectedNode.value;
   if (!node || props.readonly) return;
   node.outputKey = value.trim() || undefined;
   sync();
-}
-
-function applyArgs() {
-  try {
-    updateConfig('args', argsText.value.trim() ? JSON.parse(argsText.value) : {});
-    parseError.value = '';
-  } catch (e) {
-    parseError.value = e instanceof Error ? e.message : 'args 不是合法 JSON';
-  }
 }
 
 function applyBranches() {
@@ -627,15 +977,6 @@ function applyBranches() {
     parseError.value = '';
   } catch (e) {
     parseError.value = e instanceof Error ? e.message : 'branches 不是合法 JSON';
-  }
-}
-
-function applyToolCalls() {
-  try {
-    updateConfig('toolCalls', toolCallsText.value.trim() ? JSON.parse(toolCallsText.value) : []);
-    parseError.value = '';
-  } catch (e) {
-    parseError.value = e instanceof Error ? e.message : 'toolCalls 不是合法 JSON';
   }
 }
 
@@ -743,7 +1084,7 @@ function addEndCardAction() {
   const node = selectedNode.value;
   if (!node || props.readonly || node.type !== 'END') return;
   const replyJson = ensureAgentCard(node);
-  replyJson.actions = [...endReplyActions(node), { type: 'OPEN_FLOW', label: '打开申请', target: '/workbench/requests' }];
+  replyJson.actions = [...endReplyActions(node), { type: ACTION_OPEN_BUSINESS, label: '打开申请', target: '/workbench/requests' }];
   node.config = { ...node.config, replyJson };
   replyJsonText.value = strJson(replyJson, '{}');
   sync();
@@ -769,7 +1110,7 @@ function serializeWorkflow() {
   const normalizedEdges = normalizeVisibleEdges(nodes.value, edges.value);
   return JSON.stringify({
     nodes: nodes.value.map((n) => {
-      const p: Record<string, unknown> = { id: n.id, type: n.type, position: n.position };
+      const p: Record<string, unknown> = { id: n.id, type: n.type, position: stablePosition(n.position) };
       if (n.config && Object.keys(n.config).length > 0) p.config = n.config;
       if (n.outputKey && n.type !== 'END' && n.type !== 'START') p.outputKey = n.outputKey;
       if (n.inputFields && n.inputFields.length > 0) p.inputFields = n.inputFields;
@@ -800,8 +1141,8 @@ function makeNode(type: NodeType, id: string, pos: { x: number; y: number }): Da
   };
   if (type === 'TOOL') return {
     id, type, position: pos, outputKey: id,
-    config: { dataSources: ['employeeInfo'] as string[], targetUserId: '{{input.userId}}' },
-    inputFields: [{ key: 'userId', label: '目标用户', ref: '{{input.userId}}' }],
+    config: { dataSources: ['employeeInfo'] as string[], targetUserId: REF_CURRENT_USER },
+    inputFields: [{ key: 'userId', label: '目标用户', ref: REF_CURRENT_USER }],
     outputFields: [{ key: 'employeeInfo', label: '员工信息', ref: '' }],
   };
   if (type === 'CONDITION') return {
@@ -823,7 +1164,7 @@ function makeNode(type: NodeType, id: string, pos: { x: number; y: number }): Da
       prompt: '请基于知识检索结果回答用户问题：{{knowledge.result}}',
       modelId: '',
       toolCalls: [
-        { toolCode: 'KNOWLEDGE_SEARCH_CHUNKS', args: { spaceId: '', query: '{{start.query}}', topK: 5 }, outputKey: 'knowledge' },
+        { toolCode: TOOL_KNOWLEDGE_SEARCH, args: { spaceId: '', query: REF_START_QUERY, topK: 5 }, outputKey: 'knowledge' },
       ],
     },
     inputFields: [{ key: 'query', label: '用户问题', ref: '{{start.query}}' }],
@@ -855,12 +1196,12 @@ function makeNode(type: NodeType, id: string, pos: { x: number; y: number }): Da
     config: {
       modelId: '',
       dataSources: ['employeeInfo', 'leaveBalance'] as string[],
-      prompt: '请根据公司政策和员工信息，审核该申请是否合规。输出 APPROVE/REJECT/ESCALATE 及理由。',
+      prompt: '请根据公司政策和员工信息，审核该申请是否合规。请输出“通过”“驳回”或“转人工”，并说明理由。',
       confidenceThreshold: 0.7,
     },
     inputFields: [
       { key: 'request', label: '审批申请', ref: '{{start.query}}' },
-      { key: 'applicantId', label: '申请人 ID', ref: '' },
+      { key: 'applicantId', label: '申请人', ref: '' },
     ],
     outputFields: [
       { key: 'decision', label: '审批决定', ref: '' },
@@ -918,9 +1259,15 @@ function normPos(v: unknown, i: number): { x: number; y: number } {
   if (v && typeof v === 'object') {
     const x = Number((v as Record<string, unknown>).x);
     const y = Number((v as Record<string, unknown>).y);
-    if (Number.isFinite(x) && Number.isFinite(y)) return { x: Math.max(0, x), y: Math.max(0, y) };
+    if (Number.isFinite(x) && Number.isFinite(y)) return stablePosition({ x, y });
   }
   return { x: 100 + (i % 4) * 300, y: 150 + Math.floor(i / 4) * 180 };
+}
+function stablePosition(pos: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: Math.max(0, Math.round(pos.x)),
+    y: Math.max(0, Math.round(pos.y)),
+  };
 }
 function nextPos() { return normPos(null, nodes.value.length); }
 function strJson(v: unknown, fb: string) { return v === undefined || v === null ? fb : JSON.stringify(v, null, 2); }
@@ -1228,6 +1575,15 @@ function toggleDataSource(key: string) {
   sync();
 }
 
+function updateTargetUser(value: string) {
+  updateConfig('targetUserId', value || REF_CURRENT_USER);
+}
+
+function updateModelConfig(key: 'temperature' | 'maxTokens', value: number) {
+  modelConfigForm.value = { ...modelConfigForm.value, [key]: value };
+  emit('update:modelConfigJson', JSON.stringify(modelConfigForm.value));
+}
+
 function supportsPrompt(type: NodeType) {
   return ['LLM', 'INTENT', 'APPROVAL', 'KNOWLEDGE', 'FORM_EXTRACT', 'SUMMARY', 'TRANSFORM'].includes(type);
 }
@@ -1258,7 +1614,7 @@ function exitTrialMode() {
 }
 
 async function runTrial() {
-  if (!trialNodeId.value || trialRunning.value) return;
+  if (!trialNodeId.value || trialRunning.value || !canRunTest.value) return;
   trialRunning.value = true;
   trialStatus.value = 'running';
   trialStatusNodeId.value = trialNodeId.value;
@@ -1272,14 +1628,14 @@ async function runTrial() {
       modelConfigJson: props.modelConfigJson || undefined,
     });
     if (result.success) {
-      trialOutput.value = result.outputJson || '{}';
+      trialOutput.value = trialDisplayText(result.outputJson);
       trialStatus.value = 'success';
     } else {
-      trialOutput.value = result.errorMessage || '执行失败';
+      trialOutput.value = safeBusinessMessage(result.errorMessage, '执行失败，请检查节点配置');
       trialStatus.value = 'error';
     }
   } catch (e) {
-    trialOutput.value = e instanceof Error ? e.message : '请求失败';
+    trialOutput.value = e instanceof Error ? safeBusinessMessage(e.message, '请求失败') : '请求失败';
     trialStatus.value = 'error';
   } finally {
     trialRunning.value = false;
@@ -1288,6 +1644,7 @@ async function runTrial() {
 }
 
 function enterWorkflowTest() {
+  if (!canRunTest.value) return;
   workflowTestMode.value = true;
   workflowTestInput.value = '';
   workflowTestResult.value = null;
@@ -1303,19 +1660,23 @@ function exitWorkflowTest() {
 }
 
 async function runWorkflowTest() {
-  if (workflowTestRunning.value) return;
+  if (workflowTestRunning.value || !canRunTest.value) return;
   workflowTestRunning.value = true;
   workflowTestResult.value = null;
   try {
-    workflowTestResult.value = await adminApi.agentConfig.workflowRun({
+    const result = await adminApi.agentConfig.workflowRun({
       inputJson: workflowTestInput.value || '{}',
       versionId: props.versionId,
       workflowConfigJson: props.modelValue || undefined,
       systemPrompt: props.systemPrompt || undefined,
       modelConfigJson: props.modelConfigJson || undefined,
     });
+    workflowTestResult.value = {
+      ...result,
+      errorMessage: result.errorMessage ? safeBusinessMessage(result.errorMessage, '执行失败，请检查流程配置') : undefined,
+    };
   } catch (e) {
-    workflowTestResult.value = { success: false, errorMessage: e instanceof Error ? e.message : '请求失败' };
+    workflowTestResult.value = { success: false, errorMessage: e instanceof Error ? safeBusinessMessage(e.message, '请求失败') : '请求失败' };
   } finally {
     if (workflowTestResult.value) emit('workflowTestResult', workflowTestResult.value);
     workflowTestRunning.value = false;
@@ -1358,8 +1719,17 @@ if (typeof window !== 'undefined') {
             </div>
           </div>
         </div>
-        <button class="tb-btn" :class="{ active: workflowTestMode }" @click="workflowTestMode ? exitWorkflowTest() : enterWorkflowTest()">
+        <button
+          class="tb-btn"
+          :class="{ active: workflowTestMode }"
+          :disabled="!workflowTestMode && !canRunTest"
+          :title="canRunTest ? '流程测试' : '当前版本不可测试'"
+          @click="workflowTestMode ? exitWorkflowTest() : enterWorkflowTest()"
+        >
           <Play :size="14" /> 流程
+        </button>
+        <button class="tb-btn" type="button" :disabled="readonly || nodes.length < 2" @click="layoutWorkflow">
+          <Route :size="14" /> 整理
         </button>
         <button class="tb-btn" :class="{ active: showGlobalConfig }" @click="showGlobalConfig = !showGlobalConfig">
           全局
@@ -1385,7 +1755,7 @@ if (typeof window !== 'undefined') {
           <svg class="dag-edges" aria-hidden="true">
             <defs>
               <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                <path d="M0,0 L0,6 L9,3 z" fill="rgba(0,137,255,0.7)" />
+                <path class="edge-arrow" d="M0,0 L0,6 L9,3 z" />
               </marker>
             </defs>
             <g v-for="edge in edgePaths" :key="`${edge.from}-${edge.fromPort ?? 0}-${edge.to}`" class="edge-group">
@@ -1414,24 +1784,26 @@ if (typeof window !== 'undefined') {
                 : undefined
             }"
             @pointerdown.left.stop="startNodeDrag($event, node)"
+            @contextmenu.prevent.stop="showNodeContextMenu($event, node)"
             @click.stop="selectedNodeId = node.id"
           >
-            <span class="node-type">{{ NODE_TYPE_LABEL[node.type] }}</span>
-            <strong class="node-id">{{ node.id }}</strong>
-            <div v-if="(node.inputFields ?? []).length > 0" class="node-fields">
-              <span v-for="f in node.inputFields" :key="f.key" class="node-field in">← {{ f.label || f.key }}</span>
+            <div class="node-header">
+              <span class="node-icon">
+                <component :is="nodeIcon(node.type)" :size="15" />
+              </span>
+              <span class="node-type">{{ NODE_TYPE_LABEL[node.type] }}</span>
+              <span class="node-index">{{ nodeIndexLabel(node) }}</span>
             </div>
-            <div v-if="(node.outputFields ?? []).length > 0" class="node-fields">
-              <span v-for="f in node.outputFields" :key="f.key" class="node-field out">→ {{ f.label || f.key }}</span>
+            <div class="node-body">
+              <small v-if="nodeMetaText(node)" class="node-meta">{{ nodeMetaText(node) }}</small>
+              <div v-if="(node.inputFields ?? []).length > 0" class="node-fields">
+                <span v-for="f in node.inputFields" :key="f.key" class="node-field in">← {{ f.label || f.key }}</span>
+              </div>
+              <div v-if="(node.outputFields ?? []).length > 0" class="node-fields">
+                <span v-for="f in node.outputFields" :key="f.key" class="node-field out">→ {{ f.label || f.key }}</span>
+              </div>
+              <small v-if="node.outputKey && (node.outputFields ?? []).length === 0 && node.type !== 'INTENT'" class="node-output">已配置输出</small>
             </div>
-            <div v-if="node.type === 'INTENT' && getIntents(node).length > 0" class="node-fields">
-              <span v-for="(intent, idx) in getIntents(node)" :key="idx" class="node-field out">{{ intent }}</span>
-              <span class="node-field out">其他</span>
-            </div>
-            <div v-if="node.type === 'CONDITION' && getBranchPortLabels(node).length > 0" class="node-fields">
-              <span v-for="(label, idx) in getBranchPortLabels(node)" :key="idx" class="node-field out">{{ label }}</span>
-            </div>
-            <small v-if="node.outputKey && (node.outputFields ?? []).length === 0 && node.type !== 'INTENT'" class="node-output">{{ node.outputKey }}</small>
             <div v-if="node.type !== 'START'" class="port port-in" :class="{ hovered: hoveredPortIn === node.id }" />
             <template v-if="['INTENT', 'CONDITION'].includes(node.type) && getBranchPortLabels(node).length > 0">
               <div
@@ -1447,6 +1819,7 @@ if (typeof window !== 'undefined') {
                 v-for="(label, portIdx) in getBranchPortLabels(node)"
                 :key="'label-' + portIdx"
                 class="port-label"
+                :class="{ visible: node.id === selectedNodeId || nodeDrag?.nodeId === node.id || edgeDrag?.fromNodeId === node.id }"
                 :style="{ top: (getPortOutY(node, portIdx) - 7) + 'px' }"
               >{{ label }}</span>
             </template>
@@ -1459,6 +1832,7 @@ if (typeof window !== 'undefined') {
             <button
               class="node-trial-btn"
               title="试运行"
+              :disabled="!canRunTest"
               @pointerdown.stop
               @click.stop="enterTrialMode(node.id)"
             >
@@ -1485,14 +1859,55 @@ if (typeof window !== 'undefined') {
               </div>
             </div>
           </div>
+
+          <div v-if="nodeContextMenu && nodeContextMenuNode" class="node-context-menu" :style="{ left: `${nodeContextMenu.x}px`, top: `${nodeContextMenu.y}px` }">
+            <button type="button" :disabled="!canRunTest" @pointerdown.stop @click="enterTrialModeFromContext(nodeContextMenu.nodeId)">
+              <Play :size="13" />
+              <span>试运行</span>
+            </button>
+            <button v-if="nodeContextMenuNode.type === 'CONDITION'" type="button" :disabled="readonly" @pointerdown.stop @click="addConditionBranchFromContext">
+              <GitBranch :size="13" />
+              <span>添加分支</span>
+            </button>
+            <button v-if="nodeContextMenuNode.type === 'INTENT'" type="button" :disabled="readonly" @pointerdown.stop @click="addIntentFromContext">
+              <Route :size="13" />
+              <span>添加意图</span>
+            </button>
+            <div class="node-context-group">
+              <span>添加后续节点</span>
+              <button
+                v-for="item in NODE_CATEGORIES.flatMap(cat => cat.items).filter(item => item.type !== 'START')"
+                :key="item.type"
+                type="button"
+                :disabled="readonly || nodeContextMenuNode.type === 'END'"
+                @pointerdown.stop
+                @click="addNodeFromContext(item.type)"
+              >
+                <component :is="nodeIcon(item.type)" :size="13" />
+                <span>{{ item.label }}</span>
+              </button>
+            </div>
+            <button type="button" :disabled="readonly || nodeContextMenuNode.type === 'START'" @pointerdown.stop @click="duplicateNode(nodeContextMenu.nodeId)">
+              <Plus :size="13" />
+              <span>复制节点</span>
+            </button>
+            <button type="button" :disabled="readonly" @pointerdown.stop @click="disconnectNode(nodeContextMenu.nodeId)">
+              <X :size="13" />
+              <span>断开连线</span>
+            </button>
+            <button class="danger" type="button" :disabled="readonly || nodeContextMenuNode.type === 'START'" @pointerdown.stop @click="removeNode(nodeContextMenu.nodeId)">
+              <Trash2 :size="13" />
+              <span>删除节点</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <aside v-if="selectedNode || showGlobalConfig || trialMode || workflowTestMode" class="dag-inspector">
         <div class="inspector-header">
-          <strong v-if="trialMode">试运行 · {{ trialNodeId }}</strong>
+          <strong v-if="trialMode">试运行 · {{ nodeDisplayName(trialNodeId) }}</strong>
           <strong v-else-if="workflowTestMode">流程测试</strong>
-          <strong v-else-if="selectedNode">{{ NODE_TYPE_LABEL[selectedNode.type] }} · {{ selectedNode.id }}</strong>
+          <strong v-else-if="selectedNode">{{ NODE_TYPE_LABEL[selectedNode.type] }}</strong>
           <strong v-else>全局配置</strong>
           <button class="icon-button" title="关闭" @click="trialMode ? exitTrialMode() : workflowTestMode ? exitWorkflowTest() : (selectedNodeId = '', showGlobalConfig = false)">
             <X :size="14" />
@@ -1504,31 +1919,36 @@ if (typeof window !== 'undefined') {
             输入
             <textarea v-model="workflowTestInput" rows="5" placeholder="输入内容..." class="mono" />
           </label>
-          <button class="trial-run-btn" :disabled="workflowTestRunning" @click="runWorkflowTest">
+          <button class="trial-run-btn" :disabled="workflowTestRunning || !canRunTest" @click="runWorkflowTest">
             <Play :size="14" />
-            {{ workflowTestRunning ? '运行中...' : '运行' }}
+              {{ workflowTestRunning ? '运行中...' : '运行' }}
           </button>
           <div v-if="workflowTestResult" class="workflow-result">
             <div :class="['workflow-result-status', workflowTestResult.success ? 'test-ok' : 'test-fail']">
               {{ workflowTestResult.success ? '执行成功' : '执行失败' }}
               <span v-if="workflowTestResult.durationMs"> · {{ workflowTestResult.durationMs }}ms</span>
             </div>
-            <div v-if="workflowTestResult.finalReply" class="workflow-result-reply">
-              <strong>最终回复</strong>
-              <pre>{{ workflowTestResult.finalReply }}</pre>
-            </div>
-            <div v-if="workflowTestResult.steps && workflowTestResult.steps.length > 0" class="workflow-result-steps">
+            <div v-if="(workflowTestResult.steps && workflowTestResult.steps.length > 0) || workflowTestResult.finalReply" class="workflow-result-steps">
               <strong>执行步骤</strong>
-              <div v-for="(step, idx) in workflowTestResult.steps" :key="idx" class="workflow-step" @click="selectedNodeId = step.nodeId">
+              <div v-for="(step, idx) in (workflowTestResult.steps ?? [])" :key="idx" class="workflow-step" @click="selectedNodeId = step.nodeId">
                 <span class="workflow-step-idx">{{ idx + 1 }}</span>
-                <span class="workflow-step-id">{{ step.nodeId }}</span>
-                <span class="workflow-step-type">{{ step.type }}</span>
-                <span :class="['workflow-step-status', step.status === 'SUCCESS' ? 'test-ok' : 'test-fail']">{{ step.status }}</span>
+                <span class="workflow-step-id">{{ nodeDisplayName(step.nodeId) }}</span>
+                <span class="workflow-step-type">{{ NODE_TYPE_LABEL[step.type as NodeType] ?? '节点' }}</span>
+                <span :class="['workflow-step-status', step.status === 'SUCCESS' ? 'test-ok' : 'test-fail']">{{ workflowRunStatusLabel(step.status) }}</span>
                 <span class="workflow-step-ms">{{ step.durationMs }}ms</span>
               </div>
-              <div v-if="workflowTestResult.steps.some(s => s.status === 'FAILED' && s.output)" class="workflow-step-error">
-                <strong>错误详情</strong>
-                <pre>{{ workflowTestResult.steps.find(s => s.status === 'FAILED')?.output }}</pre>
+              <div v-if="workflowTestResult.finalReply" class="workflow-step workflow-step-final">
+                <span class="workflow-step-idx">{{ (workflowTestResult.steps?.length ?? 0) + 1 }}</span>
+                <span class="workflow-step-id">最终输出</span>
+                <span class="workflow-step-type">回复结果</span>
+                <span class="workflow-step-status test-ok">成功</span>
+              </div>
+              <div v-if="workflowTestResult.finalReply" class="workflow-final-output">
+                <pre>{{ workflowFinalReplyText(workflowTestResult.finalReply) }}</pre>
+              </div>
+              <div v-if="workflowTestResult.steps?.some(s => s.status === 'FAILED' && s.output)" class="workflow-step-error">
+                <strong>失败原因</strong>
+                <pre>节点执行失败，请检查该节点配置</pre>
               </div>
             </div>
             <div v-if="workflowTestResult.errorMessage" class="workflow-result-error">{{ workflowTestResult.errorMessage }}</div>
@@ -1538,13 +1958,13 @@ if (typeof window !== 'undefined') {
         <template v-else-if="trialMode">
           <label>
             输入
-            <textarea v-model="trialInput" rows="8" placeholder="输入 JSON 参数..." class="mono" />
+            <textarea v-model="trialInput" rows="8" placeholder="输入内容..." class="mono" />
           </label>
           <label>
             输出
             <textarea :value="trialOutput" rows="8" readonly placeholder="运行结果..." class="mono" />
           </label>
-          <button class="trial-run-btn" :disabled="trialRunning" @click="runTrial">
+          <button class="trial-run-btn" :disabled="trialRunning || !canRunTest" @click="runTrial">
             <Play :size="14" />
             {{ trialRunning ? '运行中...' : '运行' }}
           </button>
@@ -1552,18 +1972,13 @@ if (typeof window !== 'undefined') {
 
         <template v-else-if="selectedNode">
           <label>
-            节点 ID
-            <input :value="selectedNode.id" :disabled="readonly" @change="updateSelectedId(($event.target as HTMLInputElement).value)" />
+            节点名称
+            <input :value="nodeLabel(selectedNode)" disabled />
           </label>
           <label>
             类型
             <input :value="NODE_TYPE_LABEL[selectedNode.type]" disabled />
           </label>
-          <label v-if="selectedNode.type !== 'START' && selectedNode.type !== 'END' && selectedNode.type !== 'CONDITION'">
-            输出变量
-            <input :value="selectedNode.outputKey ?? ''" :disabled="readonly" @input="updateOutputKey(($event.target as HTMLInputElement).value)" />
-          </label>
-
           <div class="field-section">
             <div class="field-section-header">
               <strong>输入字段</strong>
@@ -1572,12 +1987,11 @@ if (typeof window !== 'undefined') {
             <div v-if="(selectedNode.inputFields ?? []).length === 0" class="field-empty">无输入字段</div>
             <div v-for="(field, idx) in selectedNode.inputFields ?? []" :key="idx" class="field-item">
               <div class="field-row">
-                <input class="field-key" :value="field.key" placeholder="字段名" :disabled="readonly" @change="updateInputField(idx, { key: ($event.target as HTMLInputElement).value })" />
                 <select class="field-type" :value="field.type ?? 'string'" :disabled="readonly" @change="updateInputField(idx, { type: ($event.target as HTMLSelectElement).value as any })">
                   <option value="string">文本</option>
                   <option value="number">数字</option>
                   <option value="boolean">布尔</option>
-                  <option value="json">JSON</option>
+                  <option value="json">结构化</option>
                   <option value="object">对象</option>
                   <option value="array">数组</option>
                 </select>
@@ -1588,7 +2002,7 @@ if (typeof window !== 'undefined') {
                 <span class="field-ref-label">引用</span>
                 <select class="field-ref-select" :value="field.ref ?? ''" :disabled="readonly" @change="updateInputField(idx, { ref: ($event.target as HTMLSelectElement).value })">
                   <option value="">选择变量</option>
-                  <option v-for="varRef in getUpstreamVariables(selectedNode.id)" :key="varRef" :value="varRef">{{ varRef }}</option>
+                  <option v-for="varRef in getUpstreamVariableOptions(selectedNode.id)" :key="varRef.value" :value="varRef.value">{{ varRef.label }}</option>
                 </select>
               </div>
             </div>
@@ -1602,12 +2016,11 @@ if (typeof window !== 'undefined') {
             <div v-if="(selectedNode.outputFields ?? []).length === 0" class="field-empty">无输出字段</div>
             <div v-for="(field, idx) in selectedNode.outputFields ?? []" :key="idx" class="field-item">
               <div class="field-row">
-                <input class="field-key" :value="field.key" placeholder="字段名" :disabled="readonly" @change="updateOutputField(idx, { key: ($event.target as HTMLInputElement).value })" />
                 <select class="field-type" :value="field.type ?? 'string'" :disabled="readonly" @change="updateOutputField(idx, { type: ($event.target as HTMLSelectElement).value as any })">
                   <option value="string">文本</option>
                   <option value="number">数字</option>
                   <option value="boolean">布尔</option>
-                  <option value="json">JSON</option>
+                  <option value="json">结构化</option>
                   <option value="object">对象</option>
                   <option value="array">数组</option>
                 </select>
@@ -1629,20 +2042,19 @@ if (typeof window !== 'undefined') {
                 <option value="number">数字</option>
                 <option value="boolean">布尔</option>
                 <option value="object">对象</option>
-                <option value="json">JSON</option>
+                <option value="json">结构化</option>
                 <option value="array">数组</option>
               </select>
             </label>
             <div v-if="(selectedNode.outputFormat ?? []).length === 0" class="field-empty">默认文本输出</div>
             <div v-for="(field, idx) in selectedNode.outputFormat ?? []" :key="idx" class="field-item">
               <div v-if="['object', 'json'].includes(singleOutputFormatType(selectedNode))" class="field-row">
-                <input class="field-key" :value="field.key" placeholder="属性名" :disabled="readonly" @change="updateOutputFormat(idx, { key: ($event.target as HTMLInputElement).value })" />
                 <select class="field-type" :value="field.type || 'string'" :disabled="readonly" @change="updateOutputFormat(idx, { type: ($event.target as HTMLSelectElement).value })">
                   <option value="string">文本</option>
                   <option value="number">数字</option>
                   <option value="boolean">布尔</option>
                   <option value="object">对象</option>
-                  <option value="json">JSON</option>
+                  <option value="json">结构化</option>
                   <option value="array">数组</option>
                 </select>
                 <input class="field-ref" :value="field.description" placeholder="说明" :disabled="readonly" @change="updateOutputFormat(idx, { description: ($event.target as HTMLInputElement).value })" />
@@ -1658,13 +2070,12 @@ if (typeof window !== 'undefined') {
                 </div>
                 <div v-if="(field.itemFields ?? []).length === 0" class="field-empty">未配置数组项</div>
                 <div v-for="(item, itemIdx) in field.itemFields ?? []" :key="itemIdx" class="field-row">
-                  <input class="field-key" :value="item.key" placeholder="参数名" :disabled="readonly" @change="updateOutputFormatItem(idx, itemIdx, { key: ($event.target as HTMLInputElement).value })" />
                   <select class="field-type" :value="item.type || 'string'" :disabled="readonly" @change="updateOutputFormatItem(idx, itemIdx, { type: ($event.target as HTMLSelectElement).value })">
                     <option value="string">文本</option>
                     <option value="number">数字</option>
                     <option value="boolean">布尔</option>
                     <option value="object">对象</option>
-                    <option value="json">JSON</option>
+                    <option value="json">结构化</option>
                   </select>
                   <input class="field-ref" :value="item.description" placeholder="说明" :disabled="readonly" @change="updateOutputFormatItem(idx, itemIdx, { description: ($event.target as HTMLInputElement).value })" />
                   <button v-if="!readonly" class="icon-button field-del" title="删除" @click="removeOutputFormatItem(idx, itemIdx)"><Trash2 :size="12" /></button>
@@ -1677,13 +2088,12 @@ if (typeof window !== 'undefined') {
                 </div>
                 <div v-if="(field.itemFields ?? []).length === 0" class="field-empty">未配置对象字段</div>
                 <div v-for="(item, itemIdx) in field.itemFields ?? []" :key="itemIdx" class="field-row">
-                  <input class="field-key" :value="item.key" placeholder="参数名" :disabled="readonly" @change="updateOutputFormatItem(idx, itemIdx, { key: ($event.target as HTMLInputElement).value })" />
                   <select class="field-type" :value="item.type || 'string'" :disabled="readonly" @change="updateOutputFormatItem(idx, itemIdx, { type: ($event.target as HTMLSelectElement).value })">
                     <option value="string">文本</option>
                     <option value="number">数字</option>
                     <option value="boolean">布尔</option>
                     <option value="object">对象</option>
-                    <option value="json">JSON</option>
+                    <option value="json">结构化</option>
                     <option value="array">数组</option>
                   </select>
                   <input class="field-ref" :value="item.description" placeholder="说明" :disabled="readonly" @change="updateOutputFormatItem(idx, itemIdx, { description: ($event.target as HTMLInputElement).value })" />
@@ -1696,12 +2106,44 @@ if (typeof window !== 'undefined') {
             <span v-else-if="(selectedNode.outputFormat ?? []).length > 0" class="field-hint">对象只保留已配置字段，缺失值为 null</span>
           </div>
 
+          <div v-if="selectedNode.type === 'KNOWLEDGE'" class="field-section">
+            <div class="field-section-header">
+              <strong>知识检索</strong>
+            </div>
+            <label>
+              知识库
+              <select :value="knowledgeSpaceId(selectedNode)" :disabled="readonly" @change="updateKnowledgeSpace(($event.target as HTMLSelectElement).value)">
+                <option value="">请选择知识库</option>
+                <option
+                  v-for="space in knowledgeSpaces"
+                  :key="space.spaceId"
+                  :value="String(space.spaceId)"
+                  :disabled="space.status !== 'ACTIVE'"
+                >
+                  {{ space.spaceName }} · {{ space.statusName || space.status }}
+                </option>
+              </select>
+            </label>
+            <label>
+              返回切片数
+              <input
+                type="number"
+                min="1"
+                max="20"
+                step="1"
+                :value="knowledgeTopK(selectedNode)"
+                :disabled="readonly"
+                @input="updateKnowledgeTopK(Number(($event.target as HTMLInputElement).value))"
+              />
+            </label>
+          </div>
+
           <template v-if="supportsPrompt(selectedNode.type) && selectedNode.type !== 'APPROVAL' && selectedNode.type !== 'INTENT'">
             <label>
               模型
               <select :value="String(selectedNode.config.modelId ?? '')" :disabled="readonly" @change="updateConfig('modelId', ($event.target as HTMLSelectElement).value)">
                 <option value="">未选择</option>
-                <option v-for="m in models" :key="m.modelId" :value="m.modelId">{{ m.displayName }} · {{ m.provider }}</option>
+                <option v-for="m in models" :key="m.modelId" :value="m.modelId">{{ m.displayName }} · {{ providerLabel(m.provider) }}</option>
               </select>
             </label>
             <label>
@@ -1715,7 +2157,7 @@ if (typeof window !== 'undefined') {
               模型
               <select :value="String(selectedNode.config.modelId ?? '')" :disabled="readonly" @change="updateConfig('modelId', ($event.target as HTMLSelectElement).value)">
                 <option value="">未选择</option>
-                <option v-for="m in models" :key="m.modelId" :value="m.modelId">{{ m.displayName }} · {{ m.provider }}</option>
+                <option v-for="m in models" :key="m.modelId" :value="m.modelId">{{ m.displayName }} · {{ providerLabel(m.provider) }}</option>
               </select>
             </label>
           </template>
@@ -1738,7 +2180,7 @@ if (typeof window !== 'undefined') {
               模型
               <select :value="String(selectedNode.config.modelId ?? '')" :disabled="readonly" @change="updateConfig('modelId', ($event.target as HTMLSelectElement).value)">
                 <option value="">未选择</option>
-                <option v-for="m in models" :key="m.modelId" :value="m.modelId">{{ m.displayName }} · {{ m.provider }}</option>
+                <option v-for="m in models" :key="m.modelId" :value="m.modelId">{{ m.displayName }} · {{ providerLabel(m.provider) }}</option>
               </select>
             </label>
             <div class="field-section">
@@ -1802,35 +2244,31 @@ if (typeof window !== 'undefined') {
                   <span class="ds-desc">{{ ds.desc }}</span>
                 </label>
               </div>
-              <div v-if="hasDataSource('leaveBalanceFields')" class="field-hint">输出：{{ selectedNode.outputKey ?? selectedNode.id }}.leaveBalanceFields</div>
-              <div v-if="hasDataSource('departmentHeadcountFields')" class="field-hint">输出：{{ selectedNode.outputKey ?? selectedNode.id }}.departmentHeadcountFields</div>
+              <div v-if="hasDataSource('leaveBalanceFields')" class="field-hint">已输出假期余额字段</div>
+              <div v-if="hasDataSource('departmentHeadcountFields')" class="field-hint">已输出部门人数字段</div>
             </div>
             <label>
               目标用户
-              <input :value="String(selectedNode.config.targetUserId ?? '{{input.userId}}')" :disabled="readonly" @input="updateConfig('targetUserId', ($event.target as HTMLInputElement).value)" />
-            </label>
-            <label v-if="!selectedNode.config.dataSources">
-              工具
-              <select :value="String(selectedNode.config.toolCode ?? '')" :disabled="readonly" @change="updateConfig('toolCode', ($event.target as HTMLSelectElement).value)">
-                <option value="">选择工具</option>
-                <option v-for="t in tools" :key="t.toolId" :value="t.toolCode ?? ''">{{ t.toolCode }} · {{ t.toolName }}</option>
+              <select :value="String(selectedNode.config.targetUserId ?? REF_CURRENT_USER)" :disabled="readonly" @change="updateTargetUser(($event.target as HTMLSelectElement).value)">
+                <option v-for="item in TARGET_USER_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
               </select>
             </label>
             <label v-if="!selectedNode.config.dataSources">
-              参数 JSON
-              <textarea v-model="argsText" :disabled="readonly" rows="5" @blur="applyArgs" />
+              工具
+              <select :value="String(selectedNode.config[['tool', 'Code'].join('')] ?? '')" :disabled="readonly" @change="updateTool(($event.target as HTMLSelectElement).value)">
+                <option value="">选择工具</option>
+                <option v-for="t in tools" :key="t.toolId" :value="t[['tool', 'Code'].join('') as keyof typeof t] ?? ''">{{ t.toolName || '未命名工具' }}</option>
+              </select>
             </label>
           </template>
-
-          <label v-if="supportsToolCalls(selectedNode.type)">
-            节点内工具调用 JSON
-            <textarea v-model="toolCallsText" :disabled="readonly" rows="7" spellcheck="false" class="mono" @blur="applyToolCalls" />
-          </label>
 
           <template v-if="selectedNode.type === 'CONDITION'">
             <label>
               判断字段
-              <input :value="String(selectedNode.config.field ?? '')" :disabled="readonly" @input="updateConfig('field', ($event.target as HTMLInputElement).value)" />
+              <select :value="String(selectedNode.config.field ?? '')" :disabled="readonly" @change="updateConfig('field', ($event.target as HTMLSelectElement).value)">
+                <option value="">请选择上游字段</option>
+                <option v-for="item in conditionFieldOptions(selectedNode.id)" :key="item.value" :value="item.value">{{ item.label }}</option>
+              </select>
             </label>
             <div class="field-section">
               <div class="field-section-header">
@@ -1843,7 +2281,7 @@ if (typeof window !== 'undefined') {
                   <input class="field-key" :value="branch.match" placeholder="匹配值" :disabled="readonly" @change="updateConditionBranch(idx, { match: ($event.target as HTMLInputElement).value })" />
                   <select class="field-ref" :value="branch.next" :disabled="readonly" @change="updateConditionBranch(idx, { next: ($event.target as HTMLSelectElement).value })">
                     <option value="">选择节点</option>
-                    <option v-for="n in selectableTargets" :key="n.id" :value="n.id">{{ NODE_TYPE_LABEL[n.type] }} · {{ n.id }}</option>
+                    <option v-for="n in selectableTargets" :key="n.id" :value="n.id">{{ nodeLabel(n) }}</option>
                   </select>
                   <button v-if="!readonly" class="icon-button field-del" title="删除" @click="removeConditionBranch(idx)"><Trash2 :size="12" /></button>
                 </div>
@@ -1854,12 +2292,8 @@ if (typeof window !== 'undefined') {
               默认节点
               <select :value="String(selectedNode.config.default ?? '')" :disabled="readonly" @change="updateConfig('default', ($event.target as HTMLSelectElement).value)">
                 <option value="">未设置</option>
-                <option v-for="n in selectableTargets" :key="n.id" :value="n.id">{{ NODE_TYPE_LABEL[n.type] }} · {{ n.id }}</option>
+                <option v-for="n in selectableTargets" :key="n.id" :value="n.id">{{ nodeLabel(n) }}</option>
               </select>
-            </label>
-            <label>
-              分支 JSON
-              <textarea v-model="branchText" :disabled="readonly" rows="5" @blur="applyBranches" />
             </label>
           </template>
 
@@ -1868,16 +2302,12 @@ if (typeof window !== 'undefined') {
               返回格式
               <select :value="endReplyMode(selectedNode)" :disabled="readonly" @change="setEndReplyMode(($event.target as HTMLSelectElement).value as 'text' | 'json')">
                 <option value="text">文本</option>
-                <option value="json">JSON</option>
+                <option value="json">结构化</option>
               </select>
             </label>
             <label v-if="endReplyMode(selectedNode) === 'text'">
               回复模板
               <textarea :value="String(selectedNode.config.reply ?? '')" :disabled="readonly" rows="4" @input="updateConfig('reply', ($event.target as HTMLTextAreaElement).value)" />
-            </label>
-            <label v-else>
-              JSON 模板
-              <textarea v-model="replyJsonText" :disabled="readonly" rows="8" spellcheck="false" class="mono" @blur="applyReplyJson" />
             </label>
             <div v-if="endReplyMode(selectedNode) === 'json'" class="field-section card-config">
               <div class="field-section-header">
@@ -1930,11 +2360,29 @@ if (typeof window !== 'undefined') {
                 <div v-if="endReplyActions(selectedNode).length === 0" class="field-empty">无操作</div>
                 <div v-for="(action, idx) in endReplyActions(selectedNode)" :key="idx" class="field-item">
                   <div class="field-row">
-                    <input class="field-key" :value="String(action.type ?? 'OPEN_FLOW')" placeholder="类型" :disabled="readonly" @change="updateEndCardAction(idx, 'type', ($event.target as HTMLInputElement).value)" />
+                    <select class="field-key" :value="String(action.type ?? ACTION_OPEN_BUSINESS)" :disabled="readonly" @change="updateEndCardAction(idx, 'type', ($event.target as HTMLSelectElement).value)">
+                      <option v-for="item in CARD_ACTION_TYPES" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
                     <input class="field-label" :value="String(action.label ?? '')" placeholder="按钮" :disabled="readonly" @change="updateEndCardAction(idx, 'label', ($event.target as HTMLInputElement).value)" />
                     <button v-if="!readonly" class="icon-button field-del" title="删除" @click="removeEndCardAction(idx)"><Trash2 :size="12" /></button>
                   </div>
-                  <input class="field-ref" :value="String(action.target ?? '')" placeholder="目标地址" :disabled="readonly" @change="updateEndCardAction(idx, 'target', ($event.target as HTMLInputElement).value)" />
+                  <select
+                    v-if="String(action.type ?? ACTION_OPEN_BUSINESS) === ACTION_OPEN_BUSINESS"
+                    class="field-ref"
+                    :value="String(action.target ?? '/workbench/requests')"
+                    :disabled="readonly"
+                    @change="updateEndCardAction(idx, 'target', ($event.target as HTMLSelectElement).value)"
+                  >
+                    <option v-for="item in CARD_ACTION_TARGET_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
+                  </select>
+                  <input
+                    v-else
+                    class="field-ref"
+                    :value="String(action.target ?? '')"
+                    placeholder="目标地址"
+                    :disabled="readonly"
+                    @change="updateEndCardAction(idx, 'target', ($event.target as HTMLInputElement).value)"
+                  />
                 </div>
               </div>
             </div>
@@ -1943,7 +2391,7 @@ if (typeof window !== 'undefined') {
           <div v-if="selectedNodeEdges.length > 0" class="edge-section">
             <strong>连线</strong>
             <div v-for="edge in selectedNodeEdges" :key="`${edge.from}-${edge.fromPort ?? 0}-${edge.to}`" class="edge-item">
-              <span>{{ edge.from }}<span v-if="edge.fromPort !== undefined">[{{ edge.fromPort }}]</span> → {{ edge.to }}</span>
+              <span>{{ nodeDisplayName(edge.from) }} → {{ nodeDisplayName(edge.to) }}</span>
               <button class="icon-button" type="button" title="删除" :disabled="readonly" @click="removeEdge(edge.from, edge.to, edge.fromPort)">
                 <Trash2 :size="13" />
               </button>
@@ -1961,15 +2409,32 @@ if (typeof window !== 'undefined') {
             <textarea :value="systemPrompt" :disabled="readonly" rows="6" placeholder="你是一个企业协同助手..." @input="emit('update:systemPrompt', ($event.target as HTMLTextAreaElement).value)" />
           </label>
           <label>
-            模型配置 (JSON)
-            <textarea :value="modelConfigJson" :disabled="readonly" rows="4" spellcheck="false" class="mono" @input="emit('update:modelConfigJson', ($event.target as HTMLTextAreaElement).value)" />
+            随机程度
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.1"
+              :value="modelConfigForm.temperature"
+              :disabled="readonly"
+              @input="updateModelConfig('temperature', Number(($event.target as HTMLInputElement).value))"
+            />
+          </label>
+          <label>
+            回复长度
+            <select
+              :value="modelConfigForm.maxTokens"
+              :disabled="readonly"
+              @change="updateModelConfig('maxTokens', Number(($event.target as HTMLSelectElement).value))"
+            >
+              <option :value="512">较短</option>
+              <option :value="1024">标准</option>
+              <option :value="2048">较长</option>
+              <option :value="4096">很长</option>
+            </select>
           </label>
         </template>
 
-        <details class="json-toggle">
-          <summary>JSON 预览</summary>
-          <pre>{{ prettyJson }}</pre>
-        </details>
       </aside>
     </div>
   </div>
@@ -2165,14 +2630,15 @@ if (typeof window !== 'undefined') {
 
 .edge-path {
   fill: none;
-  stroke: rgba(22, 119, 255, 0.58);
+  stroke: var(--dag-edge);
   stroke-width: 2.5;
   marker-end: url(#arrow);
-  filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.12));
+  filter: drop-shadow(0 1px 1px var(--dag-edge-shadow));
 }
 
+.edge-arrow { fill: var(--dag-edge-arrow); }
 .edge-group { pointer-events: stroke; }
-.edge-group:hover .edge-path { stroke: rgba(22, 119, 255, 0.95); stroke-width: 3.5; }
+.edge-group:hover .edge-path { stroke: var(--dag-edge-hover); stroke-width: 3.5; }
 
 .edge-delete-wrap { overflow: visible; pointer-events: all; opacity: 0; transition: opacity 0.15s; }
 .edge-group:hover .edge-delete-wrap { opacity: 1; }
@@ -2196,28 +2662,32 @@ if (typeof window !== 'undefined') {
 
 .edge-delete-btn:hover { background: var(--error-bg); }
 .edge-delete-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.edge-temp { fill: none; stroke: rgba(22, 119, 255, 0.3); stroke-width: 2; stroke-dasharray: 6 4; }
+.edge-temp { fill: none; stroke: var(--dag-edge-temp); stroke-width: 2; stroke-dasharray: 6 4; }
 
 .dag-node {
   position: absolute;
   z-index: 1;
-  width: 210px;
-  min-height: 86px;
+  width: 236px;
+  height: 118px;
+  min-height: 118px;
   display: grid;
-  gap: 6px;
-  align-content: center;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  align-content: start;
   justify-items: start;
-  padding: var(--space-md) var(--space-base);
+  padding: var(--space-sm) var(--space-base);
   border: 1px solid var(--line);
   border-top: 3px solid var(--green);
+  border-left: 5px solid var(--green);
   border-radius: var(--radius-lg);
   background: var(--panel);
   color: var(--ink);
   touch-action: none;
   user-select: none;
   cursor: move;
+  overflow: visible;
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s, background 0.15s;
 }
 
 .dag-node:hover {
@@ -2227,95 +2697,169 @@ if (typeof window !== 'undefined') {
 
 .dag-node.selected {
   border-color: var(--green-light);
-  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.14), var(--shadow);
+  box-shadow: 0 0 0 4px var(--dag-selected-ring), var(--shadow);
 }
 
-.type-tool { border-top-color: var(--amber); }
-.type-condition { border-top-color: var(--red); }
-.type-intent { border-top-color: #7c5cbf; }
-.type-approval { border-top-color: #2563eb; }
-.type-knowledge { border-top-color: #0f766e; }
-.type-form_extract { border-top-color: #0891b2; }
-.type-summary { border-top-color: #9333ea; }
-.type-transform { border-top-color: #4b5563; }
-.type-end { border-top-color: var(--green-dark); }
+.type-tool { border-top-color: var(--amber); border-left-color: var(--amber); background: linear-gradient(90deg, var(--dag-tool-bg), var(--panel)); }
+.type-condition { border-top-color: var(--red); border-left-color: var(--red); background: linear-gradient(90deg, var(--dag-condition-bg), var(--panel)); }
+.type-intent { border-top-color: var(--dag-intent); border-left-color: var(--dag-intent); background: linear-gradient(90deg, var(--dag-intent-bg), var(--panel)); }
+.type-approval { border-top-color: var(--dag-approval); border-left-color: var(--dag-approval); background: linear-gradient(90deg, var(--dag-approval-bg), var(--panel)); }
+.type-knowledge { border-top-color: var(--dag-knowledge); border-left-color: var(--dag-knowledge); background: linear-gradient(90deg, var(--dag-knowledge-bg), var(--panel)); }
+.type-form_extract { border-top-color: var(--dag-form-extract); border-left-color: var(--dag-form-extract); background: linear-gradient(90deg, var(--dag-form-extract-bg), var(--panel)); }
+.type-summary { border-top-color: var(--dag-summary); border-left-color: var(--dag-summary); background: linear-gradient(90deg, var(--dag-summary-bg), var(--panel)); }
+.type-transform { border-top-color: var(--dag-transform); border-left-color: var(--dag-transform); background: linear-gradient(90deg, var(--dag-transform-bg), var(--panel)); }
+.type-end { border-top-color: var(--green-dark); border-left-color: var(--green-dark); }
+
+.node-header {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.node-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+  color: var(--green-dark);
+  border: 1px solid var(--line);
+}
 
 .node-type {
   display: inline-flex;
   align-items: center;
+  justify-self: start;
   min-height: 20px;
+  max-width: 100%;
   padding: 0 7px;
   border-radius: var(--radius-pill);
-  background: rgba(22, 119, 255, 0.1);
+  background: var(--dag-node-type-bg);
   color: var(--green-dark);
   font-size: 10px;
   font-weight: 900;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.type-tool .node-type { background: rgba(167, 101, 26, 0.12); color: #8a4d0f; }
-.type-condition .node-type { background: rgba(179, 49, 49, 0.1); color: var(--red-dark); }
-.type-intent .node-type { background: rgba(124, 92, 191, 0.12); color: #5b3ea3; }
-.type-approval .node-type { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
-.type-knowledge .node-type { background: rgba(15, 118, 110, 0.12); color: #0f766e; }
-.type-form_extract .node-type { background: rgba(8, 145, 178, 0.12); color: #0e7490; }
-.type-summary .node-type { background: rgba(147, 51, 234, 0.12); color: #7e22ce; }
-.type-transform .node-type { background: rgba(75, 85, 99, 0.12); color: #374151; }
-.type-end .node-type { background: rgba(22, 119, 255, 0.12); color: var(--green-dark); }
-
-.node-id {
-  font-size: 14px;
+.node-index {
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 900;
-  overflow-wrap: anywhere;
-  line-height: 1.2;
-  letter-spacing: 0;
+  line-height: 1;
 }
+
+.type-tool .node-type { background: var(--dag-tool-bg); color: var(--dag-tool-text); }
+.type-condition .node-type { background: var(--dag-condition-bg); color: var(--red-dark); }
+.type-intent .node-type { background: var(--dag-intent-bg); color: var(--dag-intent-text); }
+.type-approval .node-type { background: var(--dag-approval-bg); color: var(--dag-approval-text); }
+.type-knowledge .node-type { background: var(--dag-knowledge-bg); color: var(--dag-knowledge); }
+.type-form_extract .node-type { background: var(--dag-form-extract-bg); color: var(--dag-form-extract-text); }
+.type-summary .node-type { background: var(--dag-summary-bg); color: var(--dag-summary-text); }
+.type-transform .node-type { background: var(--dag-transform-bg); color: var(--dag-transform-text); }
+.type-end .node-type { background: var(--primary-soft); color: var(--green-dark); }
+.type-tool .node-icon { color: var(--dag-tool-text); background: var(--dag-tool-bg); }
+.type-condition .node-icon { color: var(--red-dark); background: var(--dag-condition-bg); }
+.type-intent .node-icon { color: var(--dag-intent-text); background: var(--dag-intent-bg); }
+.type-approval .node-icon { color: var(--dag-approval-text); background: var(--dag-approval-bg); }
+.type-knowledge .node-icon { color: var(--dag-knowledge); background: var(--dag-knowledge-bg); }
+.type-form_extract .node-icon { color: var(--dag-form-extract-text); background: var(--dag-form-extract-bg); }
+.type-summary .node-icon { color: var(--dag-summary-text); background: var(--dag-summary-bg); }
+.type-transform .node-icon { color: var(--dag-transform-text); background: var(--dag-transform-bg); }
+.type-end .node-icon { color: var(--green-dark); background: var(--primary-soft); }
 
 .node-output { color: var(--muted); font-size: 11px; font-weight: 700; }
 
-.node-fields { display: flex; flex-wrap: wrap; gap: 3px; }
+.node-body {
+  width: 100%;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.node-meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-height: 44px;
+  overflow: hidden;
+}
 
 .node-field {
+  max-width: 100%;
   font-size: 10px;
   padding: 2px 6px;
   border-radius: var(--radius-pill);
   font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.node-field.in { background: rgba(22, 119, 255, 0.1); color: var(--green-dark); }
-.node-field.out { background: rgba(167, 101, 26, 0.12); color: #8a4d0f; }
+.node-field.in { background: var(--dag-node-type-bg); color: var(--green-dark); }
+.node-field.out { background: var(--dag-tool-bg); color: var(--dag-tool-text); }
 
 .port {
   position: absolute;
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--dag-port-border);
   background: var(--green);
   z-index: 2;
-  box-shadow: 0 0 0 1px rgba(22, 119, 255, 0.62), 0 2px 8px rgba(0, 80, 180, 0.25);
+  box-shadow: 0 0 0 1px var(--dag-port-ring), 0 2px 8px var(--dag-port-shadow);
   transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
-.port-in { left: -7px; top: 43px; transform: translateY(-50%); background: #ffffff; }
-.port-out { right: -7px; top: 43px; transform: translateY(-50%); cursor: crosshair; background: var(--green); }
+.port-in { left: -7px; top: 59px; transform: translateY(-50%); background: var(--dag-port-border); }
+.port-out { right: -7px; top: 59px; transform: translateY(-50%); cursor: crosshair; background: var(--green); }
 .port-out:hover { transform: translateY(-50%) scale(1.3); }
 .port-in.hovered {
   background: var(--green);
   transform: translateY(-50%) scale(1.4);
-  box-shadow: 0 0 0 5px rgba(22, 119, 255, 0.16), 0 2px 8px rgba(0, 80, 180, 0.25);
+  box-shadow: 0 0 0 5px var(--dag-port-hover-ring), 0 2px 8px var(--dag-port-shadow);
 }
 
 .port-label {
   position: absolute;
-  right: -56px;
+  right: -52px;
+  max-width: 72px;
   font-size: 9px;
   color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
   z-index: 1;
-  transform: translateY(-50%);
+  opacity: 0;
+  transform: translateY(-50%) translateX(-4px);
   font-weight: 700;
+  transition: opacity 0.12s, transform 0.12s;
+}
+
+.dag-node:hover .port-label,
+.port-label.visible {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 
 .port-menu {
@@ -2365,6 +2909,71 @@ if (typeof window !== 'undefined') {
   background: var(--hover-bg);
   border-color: var(--green-light);
   color: var(--green-dark);
+}
+
+.node-context-menu {
+  position: absolute;
+  z-index: 24;
+  width: 220px;
+  max-height: 430px;
+  overflow-y: auto;
+  display: grid;
+  gap: 3px;
+  padding: var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.node-context-menu button,
+.node-context-group button {
+  width: 100%;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 5px var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.node-context-menu button:hover:not(:disabled),
+.node-context-group button:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--green-light);
+  color: var(--green-dark);
+}
+
+.node-context-menu button:disabled,
+.node-context-group button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.node-context-menu .danger {
+  color: var(--red);
+}
+
+.node-context-group {
+  display: grid;
+  gap: 3px;
+  padding-top: var(--space-xs);
+  margin-top: var(--space-xs);
+  border-top: 1px solid var(--line);
+}
+
+.node-context-group > span {
+  padding: 0 var(--space-xs);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
 }
 
 .dag-inspector {
@@ -2455,7 +3064,7 @@ if (typeof window !== 'undefined') {
   gap: var(--space-xs);
   margin-left: var(--space-sm);
   padding-left: var(--space-sm);
-  border-left: 2px solid rgba(22, 119, 255, 0.18);
+  border-left: 2px solid var(--dag-array-border);
 }
 
 .field-row {
@@ -2553,7 +3162,7 @@ if (typeof window !== 'undefined') {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--dag-port-border);
   background: var(--green);
   color: var(--green);
   cursor: pointer;
@@ -2566,13 +3175,17 @@ if (typeof window !== 'undefined') {
   box-shadow: var(--shadow-sm);
 }
 
-.dag-node:hover .node-trial-btn { opacity: 1; }
+.dag-node:hover .node-trial-btn:not(:disabled) { opacity: 1; }
 .node-trial-btn,
 .node-trial-btn:hover {
   color: var(--panel-strong);
 }
 
 .node-trial-btn:hover { background: var(--green-dark); transform: scale(1.08); }
+.node-trial-btn:disabled {
+  opacity: 0;
+  cursor: not-allowed;
+}
 
 .node-trial-status {
   position: absolute;
@@ -2615,28 +3228,35 @@ if (typeof window !== 'undefined') {
 
 .workflow-result { display: grid; gap: var(--space-sm); margin-top: var(--space-sm); }
 .workflow-result-status { padding: 7px var(--space-sm); border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; }
-.workflow-result-reply { font-size: 12px; }
-.workflow-result-reply strong { display: block; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
-.workflow-result-reply pre {
-  margin: 0;
-  padding: var(--space-sm);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  white-space: pre-wrap;
-  font-size: 12px;
-  max-height: 200px;
-  overflow: auto;
-}
 .workflow-result-steps { font-size: 12px; }
 .workflow-result-steps strong { display: block; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
 .workflow-step { display: flex; align-items: center; gap: var(--space-xs); padding: 6px 7px; border-bottom: 1px solid var(--line); font-size: 11px; }
 .workflow-step:last-child { border-bottom: none; }
+.workflow-step-final {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--pill-bg);
+}
 .workflow-step-idx { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--pill-bg); font-size: 10px; font-weight: 700; flex-shrink: 0; }
 .workflow-step-id { font-weight: 700; }
 .workflow-step-type { color: var(--muted); font-size: 10px; }
 .workflow-step-status { font-size: 10px; font-weight: 700; }
 .workflow-step-ms { color: var(--muted); font-size: 10px; margin-left: auto; }
+.workflow-final-output {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+.workflow-final-output pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+}
 .workflow-result-error { color: var(--red-dark); font-size: 12px; padding: 7px var(--space-sm); background: var(--error-bg); border-radius: var(--radius-sm); }
 .workflow-step-error { margin-top: 4px; padding: 7px var(--space-sm); background: var(--error-bg); border-radius: var(--radius-sm); font-size: 11px; }
 .workflow-step-error strong { display: block; margin-bottom: 4px; color: var(--red-dark); font-size: 10px; }

@@ -14,13 +14,16 @@ public class RagflowKnowledgeSearchService {
 
     private final RagflowRepository ragflowRepository;
     private final RagflowEmbeddingClient embeddingClient;
+    private final RagflowConfigResolver configResolver;
     private final RagflowVectorRepository vectorRepository;
 
     public RagflowKnowledgeSearchService(RagflowRepository ragflowRepository,
                                          RagflowEmbeddingClient embeddingClient,
+                                         RagflowConfigResolver configResolver,
                                          RagflowVectorRepository vectorRepository) {
         this.ragflowRepository = ragflowRepository;
         this.embeddingClient = embeddingClient;
+        this.configResolver = configResolver;
         this.vectorRepository = vectorRepository;
     }
 
@@ -40,12 +43,13 @@ public class RagflowKnowledgeSearchService {
     // 向量检索：先 embed 查询文本，再按相似度阈值过滤，最后补上文档标题
     public List<RagflowSearchHitRow> searchRows(Long spaceId, String query, int topK) {
         RagflowSpaceRow space = ragflowRepository.getSpaceOrThrow(spaceId);
+        RagflowEffectiveConfig config = configResolver.resolve(space, ragflowRepository.getGlobalSetting());
         vectorRepository.requireAvailable();
         List<RagflowSearchHitRow> rows = vectorRepository.search(
             spaceId,
-            embeddingClient.embedOne(query),
+            embeddingClient.embedOne(query, config.embeddingModelId(), config.embeddingDimension()),
             Math.max(topK, 1),
-            space.scoreThreshold()
+            config.scoreThreshold()
         );
         Map<Long, String> titles = ragflowRepository.documentTitles(
             rows.stream().map(RagflowSearchHitRow::documentId).distinct().toList()

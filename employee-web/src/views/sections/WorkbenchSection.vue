@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type Component } from 'vue';
+import { useRouter } from 'vue-router';
 import {
+  BriefcaseBusiness,
+  CalendarDays,
   Check,
   ChevronLeft,
+  Clock3,
+  CreditCard,
   Download,
   Eye,
   ExternalLink,
+  FileCheck2,
   Folder,
   Home,
+  Plane,
+  ReceiptText,
   Search,
+  ShoppingCart,
+  Stamp,
+  Timer,
   Upload,
   X,
 } from 'lucide-vue-next';
-import { employeeApi, type AgentResponse, type EmployeeFileFolderResponse, type EmployeeFileResponse, type EntityId, type LeaveAccountResponse } from '@/api';
+import { employeeApi, type AttendanceExceptionResponse, type EmployeeFileFolderResponse, type EmployeeFileResponse, type EntityId, type LeaveAccountResponse } from '@/api';
 import { useWorkbenchSectionContext } from '../employee-shell-context';
 import { useWorkbenchState } from '@/composables/useWorkbenchState';
 import { usePersonalFileTransfer } from '@/composables/usePersonalFileTransfer';
@@ -25,13 +36,15 @@ import {
   minutesToDayLabel,
   parseAgentPreReviewDecision,
   punchTypeLabel,
+  reviewModeLabel,
+  riskLevelLabel,
   statusText,
   toneOfStatus,
 } from '@/utils/employee-format';
 import { fileIconOf, fileToneOf } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { trimFormValue } from '@/utils/form-values';
 import type { PersonalFileRecord } from '@/stores/shell';
-import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 import AppErrorState from '../../components/ui/AppErrorState.vue';
@@ -44,18 +57,12 @@ const {
   session,
   showToast,
 } = useWorkbenchSectionContext();
+const router = useRouter();
 
 const {
   leaveAccounts,
-  leaveTypes,
   selectableLeaveTypes,
   attendanceExceptions,
-  agentTaskForm,
-  agentTaskSubmitting,
-  agentTaskResult,
-  agentTaskError,
-  agents,
-  agentsLoading,
   leaveForm,
   leaveAttachmentIds,
   leaveSubmitting,
@@ -64,7 +71,6 @@ const {
   workbenchLoading,
   workbenchError,
   workflowRequests,
-  workflowRequestsTotal,
   workflowRequestsLoading,
   workflowRequestsError,
   selectedRequestId,
@@ -79,6 +85,10 @@ const {
   attendanceError,
   punchLoading,
   punchResult,
+  todayKey,
+  todayResult,
+  todayExceptions,
+  latestDailyResult,
   clockCorrectionForm,
   clockCorrectionAttachmentIds,
   clockCorrectionSubmitting,
@@ -86,14 +96,12 @@ const {
   clockCorrectionError,
   activeFile,
   activeWorkbench,
-  workbenchHighlights,
-  selectedLeaveAccount,
   selectedLeaveType,
   canSubmitLeave,
   activeWorkbenchTitle,
-  selectedRequest,
   workflowDetailRows,
   attendanceSummary,
+  attendanceRiskSummary,
   teamAttendanceRows,
   submitLeaveRequest,
   refreshActiveWorkbench,
@@ -104,11 +112,8 @@ const {
   withdrawWorkflowRequest,
   refreshAttendancePanel,
   punchAttendance,
+  openClockCorrectionFromException,
   submitClockCorrectionRequest,
-  loadAgents,
-  submitAgentTask,
-  confirmAgentTask,
-  cancelAgentTask,
   workflowFilePreview,
   workflowFilePreviewLoading,
   workflowFilePreviewTitle,
@@ -125,7 +130,39 @@ function backToList() {
   shell.setMobileView('list');
 }
 
-type AttachmentPickerTarget = 'leave' | 'clock';
+type AttachmentPickerTarget = 'leave' | 'clock' | 'generic';
+type WorkflowBucketKey = 'pending' | 'active' | 'finished';
+type OaProcessAvailability = 'enabled' | 'planned';
+type OaProcessTone = 'primary' | 'success' | 'warning' | 'neutral';
+type GenericOaFieldType = 'text' | 'date' | 'datetime' | 'time' | 'money' | 'number' | 'select' | 'textarea' | 'attachment';
+
+interface GenericOaFieldOption {
+  value: string;
+  label: string;
+}
+
+interface GenericOaField {
+  key: string;
+  label: string;
+  type: GenericOaFieldType;
+  required?: boolean;
+  options?: GenericOaFieldOption[];
+  placeholder?: string;
+}
+
+interface OaProcessDefinition {
+  key: string;
+  processCode?: string;
+  title: string;
+  description: string;
+  statusLabel: string;
+  statusTone: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
+  availability: OaProcessAvailability;
+  tone: OaProcessTone;
+  icon: Component;
+  tags: string[];
+  formFields?: GenericOaField[];
+}
 
 const attachmentPickerOpen = ref(false);
 const attachmentPickerTarget = ref<AttachmentPickerTarget>('leave');
@@ -140,17 +177,275 @@ const attachmentPickerBreadcrumbs = ref<EmployeeFileFolderResponse[]>([]);
 const attachmentUploadInput = ref<HTMLInputElement | null>(null);
 const attachmentUploading = ref(false);
 const attachmentUploadError = ref('');
+const leaveDialogOpen = ref(false);
+const clockCorrectionDialogOpen = ref(false);
+const genericOaDialogOpen = ref(false);
+const activeGenericProcess = ref<OaProcessDefinition | null>(null);
+const genericOaForm = ref<Record<string, string | number>>({});
+const genericOaAttachmentIds = ref<Array<number | string>>([]);
+const genericOaSubmitting = ref(false);
+const genericOaError = ref('');
+const genericOaResult = ref('');
+const processCatalogOpen = ref(false);
+const workflowBucket = ref<WorkflowBucketKey>('active');
+const workflowBucketInitialized = ref(false);
 let attachmentSearchTimer: number | undefined;
-const agentAvatarUrls = ref<Record<string, string>>({});
 const { resolveDownloadUrl, uploadPersonalAttachment } = usePersonalFileTransfer();
 
-const currentAttachmentIds = computed(() => (
-  attachmentPickerTarget.value === 'leave' ? leaveAttachmentIds.value : clockCorrectionAttachmentIds.value
-));
+const oaProcessCatalog: OaProcessDefinition[] = [
+  {
+    key: 'leave',
+    title: '请假申请',
+    description: '年假、病假、事假等假期申请，提交后进入直属上级审批。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'primary',
+    icon: CalendarDays,
+    tags: ['假期', '审批'],
+  },
+  {
+    key: 'clockCorrection',
+    title: '补卡申请',
+    description: '缺卡、漏打卡或异常考勤说明，支持上传证明附件。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'warning',
+    icon: Clock3,
+    tags: ['考勤', '异常闭环'],
+  },
+  {
+    key: 'expense',
+    processCode: 'EXPENSE',
+    title: '费用报销',
+    description: '差旅、交通、招待、办公费用等报销申请。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'success',
+    icon: ReceiptText,
+    tags: ['财务', '发票'],
+    formFields: [
+      {
+        key: 'expenseCategory',
+        label: '费用类型',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'TRAVEL', label: '差旅费' },
+          { value: 'TRANSPORT', label: '交通费' },
+          { value: 'ENTERTAINMENT', label: '招待费' },
+          { value: 'OFFICE', label: '办公费' },
+          { value: 'OTHER', label: '其他' },
+        ],
+      },
+      { key: 'amount', label: '报销金额', type: 'money', required: true },
+      { key: 'occurredAt', label: '发生日期', type: 'date', required: true },
+      { key: 'reason', label: '报销事由', type: 'textarea', required: true },
+      { key: 'invoiceAttachments', label: '发票/凭证', type: 'attachment', required: true },
+    ],
+  },
+  {
+    key: 'businessTrip',
+    processCode: 'BUSINESS_TRIP',
+    title: '出差申请',
+    description: '出差城市、周期、预算和同行人审批。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'primary',
+    icon: Plane,
+    tags: ['差旅', '预算'],
+    formFields: [
+      { key: 'destination', label: '出差地点', type: 'text', required: true },
+      { key: 'startAt', label: '开始时间', type: 'datetime', required: true },
+      { key: 'endAt', label: '结束时间', type: 'datetime', required: true },
+      { key: 'budgetAmount', label: '预计预算', type: 'money' },
+      { key: 'reason', label: '出差事由', type: 'textarea', required: true },
+    ],
+  },
+  {
+    key: 'overtime',
+    processCode: 'OVERTIME',
+    title: '加班申请',
+    description: '工作日、休息日、节假日加班登记与审批。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'warning',
+    icon: Timer,
+    tags: ['考勤', '补偿'],
+    formFields: [
+      { key: 'overtimeDate', label: '加班日期', type: 'date', required: true },
+      { key: 'startAt', label: '开始时间', type: 'time', required: true },
+      { key: 'endAt', label: '结束时间', type: 'time', required: true },
+      {
+        key: 'compensationMode',
+        label: '补偿方式',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'TIME_OFF', label: '调休' },
+          { value: 'PAY', label: '加班费' },
+          { value: 'ATTENDANCE_ONLY', label: '仅计入考勤' },
+        ],
+      },
+      { key: 'reason', label: '加班原因', type: 'textarea', required: true },
+    ],
+  },
+  {
+    key: 'seal',
+    processCode: 'SEAL',
+    title: '用章申请',
+    description: '合同章、公章、法人章等用章审批和留痕。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'neutral',
+    icon: Stamp,
+    tags: ['行政', '合同'],
+    formFields: [
+      {
+        key: 'sealType',
+        label: '印章类型',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'COMPANY', label: '公章' },
+          { value: 'CONTRACT', label: '合同章' },
+          { value: 'LEGAL_REPRESENTATIVE', label: '法人章' },
+          { value: 'FINANCE', label: '财务章' },
+          { value: 'DEPARTMENT', label: '部门章' },
+        ],
+      },
+      { key: 'documentName', label: '文件名称', type: 'text', required: true },
+      { key: 'counterparty', label: '相对方', type: 'text' },
+      { key: 'purpose', label: '用章用途', type: 'textarea', required: true },
+      { key: 'documentAttachments', label: '用章文件', type: 'attachment', required: true },
+    ],
+  },
+  {
+    key: 'purchase',
+    processCode: 'PURCHASE',
+    title: '采购申请',
+    description: '办公用品、设备、服务采购需求和预算审批。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'success',
+    icon: ShoppingCart,
+    tags: ['采购', '预算'],
+    formFields: [
+      { key: 'itemName', label: '采购内容', type: 'text', required: true },
+      { key: 'quantity', label: '数量', type: 'number', required: true },
+      { key: 'budgetAmount', label: '预算金额', type: 'money', required: true },
+      { key: 'supplier', label: '建议供应商', type: 'text' },
+      { key: 'reason', label: '采购原因', type: 'textarea', required: true },
+    ],
+  },
+  {
+    key: 'certificate',
+    processCode: 'CERTIFICATE',
+    title: '证明开具',
+    description: '在职证明、收入证明、实习证明等申请。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'neutral',
+    icon: FileCheck2,
+    tags: ['人事', '证明'],
+    formFields: [
+      {
+        key: 'certificateType',
+        label: '证明类型',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'EMPLOYMENT', label: '在职证明' },
+          { value: 'INCOME', label: '收入证明' },
+          { value: 'INTERNSHIP', label: '实习证明' },
+          { value: 'OTHER', label: '其他证明' },
+        ],
+      },
+      { key: 'recipient', label: '接收方', type: 'text' },
+      {
+        key: 'deliveryMode',
+        label: '交付方式',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'ELECTRONIC', label: '电子版' },
+          { value: 'PAPER', label: '纸质版' },
+        ],
+      },
+      { key: 'purpose', label: '申请用途', type: 'textarea', required: true },
+      { key: 'supportingAttachments', label: '补充材料', type: 'attachment' },
+    ],
+  },
+  {
+    key: 'borrow',
+    processCode: 'BORROW',
+    title: '备用金借款',
+    description: '项目备用金、活动预支和后续核销流程。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'success',
+    icon: CreditCard,
+    tags: ['财务', '核销'],
+    formFields: [
+      { key: 'amount', label: '借款金额', type: 'money', required: true },
+      { key: 'useDate', label: '使用日期', type: 'date', required: true },
+      { key: 'expectedRepayAt', label: '预计归还日期', type: 'date', required: true },
+      { key: 'purpose', label: '借款用途', type: 'textarea', required: true },
+      { key: 'supportingAttachments', label: '预算/说明附件', type: 'attachment' },
+    ],
+  },
+  {
+    key: 'project',
+    processCode: 'PROJECT',
+    title: '项目立项',
+    description: '项目目标、周期、人员和预算立项审批。',
+    statusLabel: '可提交',
+    statusTone: 'success',
+    availability: 'enabled',
+    tone: 'primary',
+    icon: BriefcaseBusiness,
+    tags: ['项目', '预算'],
+    formFields: [
+      { key: 'projectName', label: '项目名称', type: 'text', required: true },
+      { key: 'startAt', label: '开始日期', type: 'date', required: true },
+      { key: 'endAt', label: '结束日期', type: 'date', required: true },
+      { key: 'budgetAmount', label: '项目预算', type: 'money', required: true },
+      { key: 'goal', label: '立项目标', type: 'textarea', required: true },
+      { key: 'projectAttachments', label: '立项材料', type: 'attachment' },
+    ],
+  },
+];
+
+const currentAttachmentIds = computed(() => attachmentIdsFor(attachmentPickerTarget.value));
 const currentAttachmentIdSet = computed(() => new Set(currentAttachmentIds.value.map((item) => String(item))));
+const activeGenericFields = computed(() => activeGenericProcess.value?.formFields ?? []);
+const genericOaSubmitDisabled = computed(() => genericOaSubmitting.value || !activeGenericProcess.value);
 const leaveAvailableMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.availableMinutes ?? 0), 0));
 const leaveFrozenMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.frozenMinutes ?? 0), 0));
 const activeLeaveAccountCount = computed(() => leaveAccounts.value.filter((account) => account.status === 'ACTIVE').length);
+const frozenLeaveAccountCount = computed(() => leaveAccounts.value.filter((account) => (account.frozenMinutes ?? 0) > 0).length);
+const recentLeaveAccounts = computed(() => leaveAccounts.value.filter((account) => account.lastChangeMinutes !== undefined && account.lastChangeMinutes !== null));
+const workflowBuckets = computed(() => [
+  { key: 'pending' as const, label: '待处理', count: workflowRequests.value.filter((request) => workflowBucketOf(request.status) === 'pending').length },
+  { key: 'active' as const, label: '进行中', count: workflowRequests.value.filter((request) => workflowBucketOf(request.status) === 'active').length },
+  { key: 'finished' as const, label: '已结束', count: workflowRequests.value.filter((request) => workflowBucketOf(request.status) === 'finished').length },
+]);
+const activeWorkflowBucket = computed(() => workflowBuckets.value.find((item) => item.key === workflowBucket.value) ?? workflowBuckets.value[1]);
+const filteredWorkflowRequests = computed(() => workflowRequests.value.filter((request) => workflowBucketOf(request.status) === workflowBucket.value));
+const activeWorkflowDetail = computed(() => (
+  workflowDetail.value && workflowBucketOf(workflowDetail.value.status) === workflowBucket.value ? workflowDetail.value : null
+));
+const activeWorkflowAttachments = computed(() => activeWorkflowDetail.value?.attachments ?? []);
+const activeWorkflowCanWithdraw = computed(() => activeWorkflowDetail.value?.status === 'IN_APPROVAL');
+const oaQuickProcessCards = computed(() => oaProcessCatalog.slice(0, 6));
 
 function leaveAccountTone(account: LeaveAccountResponse) {
   if (account.status !== 'ACTIVE') return 'neutral';
@@ -168,6 +463,76 @@ function leaveAccountToneClass(index: number) {
   return ['blue', 'green', 'amber', 'gray'][index % 4];
 }
 
+function leaveAccountApplyText(account: LeaveAccountResponse) {
+  if (account.status !== 'ACTIVE') return statusText(account.status);
+  if (account.balanceMode === 'NO_DEDUCT') return '可申请';
+  return (account.availableMinutes ?? 0) > 0 ? '可申请' : '余额不足';
+}
+
+function leaveAccountChangeTone(account: LeaveAccountResponse) {
+  if ((account.lastChangeMinutes ?? 0) > 0) return 'positive';
+  if ((account.lastChangeMinutes ?? 0) < 0) return 'negative';
+  return 'neutral';
+}
+
+function leaveBalanceModeText(account: LeaveAccountResponse) {
+  return account.balanceMode === 'NO_DEDUCT' ? '不扣余额' : '按时长扣减';
+}
+
+function openLeaveInOa() {
+  shell.selectItem('workbench', 'oa');
+  void router.push({ name: 'employee-workbench-detail', params: { app: 'oa' } });
+}
+
+function openProcessCatalog() {
+  processCatalogOpen.value = true;
+}
+
+function closeProcessCatalog() {
+  processCatalogOpen.value = false;
+}
+
+function handleOaProcess(process: OaProcessDefinition) {
+  if (process.key === 'leave') {
+    processCatalogOpen.value = false;
+    void openLeaveDialog();
+    return;
+  }
+  if (process.key === 'clockCorrection') {
+    processCatalogOpen.value = false;
+    openClockCorrectionDialog();
+    return;
+  }
+  if (process.processCode && process.formFields?.length) {
+    openGenericOaDialog(process);
+    return;
+  }
+  showToast(`${process.title}流程模板待发布`);
+}
+
+function workflowBucketOf(status: string): WorkflowBucketKey {
+  if (status === 'DRAFT' || status === 'PENDING') return 'pending';
+  if (status === 'PENDING_REVIEW' || status === 'IN_APPROVAL') return 'active';
+  return 'finished';
+}
+
+function setWorkflowBucket(bucket: WorkflowBucketKey) {
+  workflowBucket.value = bucket;
+  const firstRequest = workflowRequests.value.find((request) => workflowBucketOf(request.status) === bucket);
+  if (firstRequest) void loadWorkflowRequestDetail(firstRequest.requestId);
+}
+
+function initializeWorkflowBucket() {
+  if (workflowBucketInitialized.value || !workflowRequests.value.length) return;
+  workflowBucketInitialized.value = true;
+  const bucket = workflowBuckets.value.find((item) => item.count > 0)?.key ?? 'active';
+  workflowBucket.value = bucket;
+  const firstRequest = workflowRequests.value.find((request) => workflowBucketOf(request.status) === bucket);
+  if (firstRequest && String(firstRequest.requestId) !== String(selectedRequestId.value ?? '')) {
+    void loadWorkflowRequestDetail(firstRequest.requestId);
+  }
+}
+
 function mapPickerFile(file: EmployeeFileResponse): PersonalFileRecord {
   const name = file.displayName || file.originalFileName || '未命名文件';
   return {
@@ -183,28 +548,19 @@ function mapPickerFile(file: EmployeeFileResponse): PersonalFileRecord {
   };
 }
 
-async function refreshAgentAvatarUrls(items: AgentResponse[]) {
-  const entries = await Promise.all(items.map(async (agent) => {
-    if (!agent.avatarAttachmentRefId) return [String(agent.agentId), ''] as const;
-    try {
-      const ticket = await employeeApi.files.createDownloadTicket(agent.avatarAttachmentRefId, { downloadType: 'INLINE' });
-      return [String(agent.agentId), resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo))] as const;
-    } catch {
-      return [String(agent.agentId), ''] as const;
-    }
-  }));
-  agentAvatarUrls.value = Object.fromEntries(entries);
-}
-
 function attachmentIdsFor(target: AttachmentPickerTarget) {
-  return target === 'leave' ? leaveAttachmentIds.value : clockCorrectionAttachmentIds.value;
+  if (target === 'leave') return leaveAttachmentIds.value;
+  if (target === 'clock') return clockCorrectionAttachmentIds.value;
+  return genericOaAttachmentIds.value;
 }
 
 function setAttachmentIdsFor(target: AttachmentPickerTarget, ids: Array<string | number>) {
   if (target === 'leave') {
     leaveAttachmentIds.value = ids;
-  } else {
+  } else if (target === 'clock') {
     clockCorrectionAttachmentIds.value = ids;
+  } else {
+    genericOaAttachmentIds.value = ids;
   }
 }
 
@@ -215,7 +571,7 @@ function selectedAttachmentFiles(target: AttachmentPickerTarget) {
     ?? attachmentPickerFiles.value.find((file) => String(file.attachmentRefId) === String(id))
     ?? {
       id: `selected-${id}`,
-      name: String(id),
+      name: '已选附件',
       type: '文件',
       size: '',
       createdAt: '',
@@ -304,6 +660,138 @@ function removeAttachment(target: AttachmentPickerTarget, attachmentRefId?: Enti
   setAttachmentIdsFor(target, attachmentIdsFor(target).filter((item) => String(item) !== String(attachmentRefId)));
 }
 
+async function openLeaveDialog() {
+  leaveError.value = '';
+  if (!canSubmitLeave.value && !workbenchLoading.value) {
+    await refreshActiveWorkbench();
+  }
+  leaveDialogOpen.value = true;
+}
+
+async function submitLeaveRequestFromDialog() {
+  await submitLeaveRequest();
+  if (!leaveError.value && leaveResult.value) {
+    leaveDialogOpen.value = false;
+  }
+}
+
+function openClockCorrectionDialog(exception?: AttendanceExceptionResponse) {
+  openClockCorrectionFromException(exception);
+  clockCorrectionDialogOpen.value = true;
+}
+
+async function submitClockCorrectionFromDialog() {
+  await submitClockCorrectionRequest();
+  if (!clockCorrectionError.value && clockCorrectionResult.value) {
+    clockCorrectionDialogOpen.value = false;
+  }
+}
+
+function openGenericOaDialog(process: OaProcessDefinition) {
+  activeGenericProcess.value = process;
+  genericOaForm.value = {};
+  genericOaAttachmentIds.value = [];
+  genericOaError.value = '';
+  genericOaResult.value = '';
+  for (const field of process.formFields ?? []) {
+    if (field.type !== 'attachment') {
+      genericOaForm.value[field.key] = field.options?.[0]?.value ?? '';
+    }
+  }
+  processCatalogOpen.value = false;
+  genericOaDialogOpen.value = true;
+}
+
+function closeGenericOaDialog() {
+  if (genericOaSubmitting.value) return;
+  genericOaDialogOpen.value = false;
+  activeGenericProcess.value = null;
+  genericOaError.value = '';
+  genericOaResult.value = '';
+}
+
+function genericFieldDisplayValue(field: GenericOaField, value: string) {
+  if (field.type === 'select') {
+    return field.options?.find((item) => item.value === value)?.label ?? value;
+  }
+  return value;
+}
+
+function genericFormValue(key: string) {
+  return trimFormValue(genericOaForm.value[key]);
+}
+
+function genericOaSummary(process: OaProcessDefinition) {
+  const fields = process.formFields ?? [];
+  const reasonField = fields.find((field) => ['reason', 'purpose'].includes(field.key));
+  const primaryField = reasonField ?? fields.find((field) => field.type !== 'attachment');
+  const value = primaryField ? genericFieldDisplayValue(primaryField, genericFormValue(primaryField.key)) : '';
+  return value || process.title;
+}
+
+async function submitGenericOaRequestFromDialog() {
+  const process = activeGenericProcess.value;
+  if (!process?.processCode || genericOaSubmitting.value) return;
+  genericOaError.value = '';
+  genericOaResult.value = '';
+  const fields = process.formFields ?? [];
+  for (const field of fields) {
+    if (!field.required) continue;
+    if (field.type === 'attachment') {
+      if (!genericOaAttachmentIds.value.length) {
+        genericOaError.value = `请上传或选择${field.label}`;
+        return;
+      }
+      continue;
+    }
+    if (!genericFormValue(field.key)) {
+      genericOaError.value = `请填写${field.label}`;
+      return;
+    }
+  }
+  const formFields = fields
+    .filter((field) => field.type !== 'attachment')
+    .map((field) => {
+      const value = genericFormValue(field.key);
+      return {
+        key: field.key,
+        label: field.label,
+        type: field.type,
+        value,
+        displayValue: genericFieldDisplayValue(field, value),
+      };
+    });
+  genericOaSubmitting.value = true;
+  try {
+    const result = await employeeApi.workflow.submitGenericRequest({
+      processCode: process.processCode,
+      title: process.title,
+      summary: genericOaSummary(process),
+      formPayload: {
+        processKey: process.key,
+        processTitle: process.title,
+        fields: formFields,
+      },
+      attachmentRefIds: genericOaAttachmentIds.value,
+    });
+    genericOaResult.value = result.statusName || statusText(result.status);
+    genericOaDialogOpen.value = false;
+    activeGenericProcess.value = null;
+    genericOaForm.value = {};
+    genericOaAttachmentIds.value = [];
+    await loadWorkflowRequests();
+    showToast(`${process.title}已提交`);
+  } catch (error) {
+    genericOaError.value = error instanceof Error ? error.message : '提交失败';
+  } finally {
+    genericOaSubmitting.value = false;
+  }
+}
+
+async function selectWorkflowRequest(requestId: EntityId) {
+  await loadWorkflowRequestDetail(requestId);
+}
+
 function openAttachmentUpload() {
   attachmentUploadInput.value?.click();
 }
@@ -360,9 +848,9 @@ watch(attachmentPickerKeyword, () => {
   }, 240);
 });
 
-watch(agents, (items) => {
-  void refreshAgentAvatarUrls(items);
-}, { immediate: true });
+watch(workflowRequests, () => {
+  initializeWorkflowBucket();
+});
 </script>
 
 <template>
@@ -400,74 +888,48 @@ watch(agents, (items) => {
       />
       <AppLoadingState v-else-if="workbenchLoading" />
       <template v-else>
-        <section class="highlight-grid attendance-highlight-grid">
-          <article v-for="item in workbenchHighlights" :key="item.label" class="highlight-card">
-            <small>{{ item.label }}</small>
-            <strong>{{ item.value }}</strong>
-            <span>{{ item.note }}</span>
-          </article>
-        </section>
+        <section class="oa-workbench">
+          <aside class="oa-status-rail" aria-label="申请状态">
+            <button
+              v-for="bucket in workflowBuckets"
+              :key="bucket.key"
+              type="button"
+              :class="{ active: bucket.key === workflowBucket }"
+              :aria-pressed="bucket.key === workflowBucket"
+              @click="setWorkflowBucket(bucket.key)"
+            >
+              <span>{{ bucket.label }}</span>
+              <strong>{{ bucket.count }}</strong>
+            </button>
+          </aside>
 
-        <section class="detail-grid workbench-split">
-          <article class="detail-card">
-            <h3>请假申请</h3>
-            <form class="workbench-form" @submit.prevent="submitLeaveRequest">
-              <label class="security-field">
-                <span>假期类型</span>
-                <select v-model="leaveForm.leaveTypeId" class="ui-inline-input">
-                  <option v-for="item in selectableLeaveTypes" :key="item.leaveTypeId" :value="String(item.leaveTypeId)">
-                    {{ item.leaveName }}
-                  </option>
-                </select>
-              </label>
-              <label class="security-field">
-                <span>开始时间</span>
-                <input v-model="leaveForm.startAt" class="ui-inline-input" type="datetime-local" />
-              </label>
-              <label class="security-field">
-                <span>结束时间</span>
-                <input v-model="leaveForm.endAt" class="ui-inline-input" type="datetime-local" />
-              </label>
-              <label class="security-field">
-                <span>请假时长</span>
-                <input :value="leaveForm.durationMinutes ? minutesToDayLabel(Number(leaveForm.durationMinutes)) : ''" class="ui-inline-input" type="text" readonly />
-              </label>
-              <label class="security-field form-full">
-                <span>请假原因</span>
-                <textarea v-model="leaveForm.reason" class="ui-textarea compact-textarea" rows="4" />
-              </label>
-              <div class="security-field form-full">
-                <span>申请附件</span>
-                <div class="attachment-picker-summary">
-                  <button type="button" @click="openAttachmentPicker('leave')">
-                    选择附件
-                    <small>{{ leaveAttachmentIds.length }} 个</small>
-                  </button>
-                  <div v-if="selectedAttachmentFiles('leave').length" class="attachment-chip-list">
-                    <span v-for="file in selectedAttachmentFiles('leave')" :key="file.id">
-                      {{ file.name }}
-                      <button type="button" aria-label="移除附件" @click="removeAttachment('leave', file.attachmentRefId)">
-                        <X :size="13" />
-                      </button>
-                    </span>
-                  </div>
-                </div>
+          <section class="oa-request-panel">
+            <header class="oa-panel-head">
+              <div>
+                <h3>我的申请</h3>
+                <span>{{ activeWorkflowBucket.label }} · {{ filteredWorkflowRequests.length }} 条</span>
               </div>
-              <p v-if="leaveError" class="dialog-error form-full">{{ leaveError }}</p>
-              <p v-if="leaveResult" class="form-result form-full">申请编号：{{ leaveResult.requestNo }} · {{ statusText(leaveResult.status) }}</p>
-              <div class="form-actions form-full">
-                <AppButton variant="primary" type="submit" :disabled="leaveSubmitting || !canSubmitLeave">
-                  {{ leaveSubmitting ? '提交中' : '提交申请' }}
-                </AppButton>
-              </div>
-            </form>
-          </article>
-
-          <article class="detail-card">
-            <div class="title-line">
-              <h3>我的申请</h3>
-              <span class="meta-time">{{ workflowRequestsTotal }} 条</span>
-            </div>
+              <AppButton variant="primary" size="sm" @click="openProcessCatalog">
+                发起申请
+              </AppButton>
+            </header>
+            <section class="oa-process-strip" aria-label="常用流程">
+              <button
+                v-for="process in oaQuickProcessCards"
+                :key="process.key"
+                type="button"
+                :class="[`tone-${process.tone}`, { planned: process.availability === 'planned' }]"
+                @click="handleOaProcess(process)"
+              >
+                <span class="oa-process-icon" aria-hidden="true">
+                  <component :is="process.icon" :size="17" />
+                </span>
+                <span>
+                  <strong>{{ process.title }}</strong>
+                  <small>{{ process.statusLabel }}</small>
+                </span>
+              </button>
+            </section>
             <AppErrorState
               v-if="workflowRequestsError"
               title="申请加载失败"
@@ -477,27 +939,44 @@ watch(agents, (items) => {
             />
             <AppLoadingState v-else-if="workflowRequestsLoading" />
             <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" description="暂无申请" />
-            <div v-else class="request-list">
+            <AppEmptyState v-else-if="!filteredWorkflowRequests.length" :title="`暂无${activeWorkflowBucket.label}申请`" :description="`暂无${activeWorkflowBucket.label}申请`" />
+            <div v-else class="oa-request-list">
               <button
-                v-for="request in workflowRequests"
+                v-for="request in filteredWorkflowRequests"
                 :key="request.requestId"
                 type="button"
                 :class="{ active: request.requestId === selectedRequestId }"
-                @click="loadWorkflowRequestDetail(request.requestId)"
+                :aria-current="request.requestId === selectedRequestId"
+                @click="selectWorkflowRequest(request.requestId)"
               >
-                <strong>{{ request.title }}</strong>
-                <span>{{ request.requestNo }}</span>
-                <small>{{ bizTypeLabel(request.bizType) }} · {{ statusText(request.status) }} · {{ formatDateTime(request.submittedAt) }}</small>
+                <div class="oa-request-row-main">
+                  <span>{{ request.bizTypeName || bizTypeLabel(request.bizType) }}</span>
+                  <strong>{{ request.title }}</strong>
+                  <AppTag :tone="toneOfStatus(request.status)">{{ request.statusName || statusText(request.status) }}</AppTag>
+                </div>
+                <div class="oa-request-row-meta">
+                  <span>{{ displayField(request.currentStepName) }}</span>
+                  <span>{{ formatDateTime(request.submittedAt) }}</span>
+                  <span v-if="request.finishedAt">{{ formatDateTime(request.finishedAt) }}</span>
+                </div>
               </button>
             </div>
 
-            <div class="title-line request-detail-heading">
-              <h3>申请详情</h3>
-              <AppTag v-if="selectedRequest" :tone="toneOfStatus(selectedRequest.status)">{{ statusText(selectedRequest.status) }}</AppTag>
-            </div>
+          </section>
+
+          <section class="oa-detail-panel">
+            <header class="oa-detail-head">
+              <div>
+                <h3>{{ activeWorkflowDetail?.title ?? '申请详情' }}</h3>
+                <span v-if="activeWorkflowDetail">{{ activeWorkflowDetail.bizTypeName || bizTypeLabel(activeWorkflowDetail.bizType) }} · {{ displayField(activeWorkflowDetail.currentStepName) }}</span>
+              </div>
+              <div class="request-panel-actions">
+                <AppTag v-if="activeWorkflowDetail" :tone="toneOfStatus(activeWorkflowDetail.status)">{{ activeWorkflowDetail.statusName || statusText(activeWorkflowDetail.status) }}</AppTag>
+              </div>
+            </header>
             <AppLoadingState v-if="workflowDetailLoading" />
-            <AppEmptyState v-else-if="!workflowDetail" title="暂无详情" description="暂无详情" />
-            <div v-else class="request-detail-stack">
+            <AppEmptyState v-else-if="!activeWorkflowDetail" title="暂无详情" description="暂无详情" />
+            <div v-else class="request-detail-stack oa-detail-body">
               <div class="workflow-node-map" aria-label="流程进度">
                 <span
                   v-for="step in workflowProgressSteps"
@@ -515,16 +994,16 @@ watch(agents, (items) => {
                   <dd>{{ row[1] }}</dd>
                 </div>
               </dl>
-              <div v-if="workflowDetail.attachments.length" class="file-list">
-                <div v-for="file in workflowDetail.attachments" :key="file.attachmentRefId" class="file-row">
+              <div v-if="activeWorkflowAttachments.length" class="oa-attachment-list">
+                <div v-for="file in activeWorkflowAttachments" :key="file.attachmentRefId" class="oa-attachment-row">
                   <span class="file-icon" :class="`file-tone-${fileToneOf(file)}`">
                     <component :is="fileIconOf(file)" :size="18" />
                   </span>
-                  <div>
+                  <div class="oa-attachment-copy">
                     <strong>{{ file.displayName }}</strong>
-                    <small>{{ fileTypeLabelFromName(file.displayName, file.mimeType) }} · {{ fileSizeLabel(file.fileSize) }} · {{ statusText(file.scanStatus) }}</small>
+                    <small>{{ fileTypeLabelFromName(file.displayName, file.mimeType) }} · {{ fileSizeLabel(file.fileSize) }} · {{ file.scanStatusName || statusText(file.scanStatus) }}</small>
                   </div>
-                  <div class="file-actions">
+                  <div class="oa-attachment-actions">
                     <button type="button" @click="previewWorkflowAttachment(file)">
                       <Eye :size="15" />
                       预览
@@ -539,26 +1018,26 @@ watch(agents, (items) => {
               <div class="timeline-list">
                 <span v-for="item in workflowActionItems" :key="item.action.actionId">
                   <strong>{{ actionTypeLabel(item.action.actionType) }}</strong>
-                  <small>{{ displayField(item.action.stepName) }} · {{ formatDateTime(item.action.actedAt) }}</small>
-                  <em v-if="item.action.comment">{{ item.action.comment }}</em>
+                  <small>{{ humanizeText(displayField(item.action.stepName)) }} · {{ formatDateTime(item.action.actedAt) }}</small>
+                  <em v-if="item.action.comment">{{ humanizeText(item.action.comment) }}</em>
                   <div v-if="item.agentDecision" class="agent-decision-panel">
                     <div class="agent-decision-head">
                       <strong>{{ item.agentDecision.conclusion || statusText(item.agentDecision.decision) }}</strong>
-                      <small v-if="item.agentDecision.riskLevel">风险：{{ item.agentDecision.riskLevel }}</small>
-                      <small v-if="item.agentDecision.reviewMode">{{ item.agentDecision.reviewMode }}</small>
+                      <small v-if="riskLevelLabel(item.agentDecision.riskLevel)">风险：{{ riskLevelLabel(item.agentDecision.riskLevel) }}</small>
+                      <small v-if="reviewModeLabel(item.agentDecision.reviewMode)">{{ reviewModeLabel(item.agentDecision.reviewMode) }}</small>
                     </div>
-                    <p v-if="item.agentDecision.reason">{{ item.agentDecision.reason }}</p>
-                    <p v-if="item.agentDecision.suggestion">建议：{{ item.agentDecision.suggestion }}</p>
+                    <p v-if="item.agentDecision.reason">{{ humanizeText(item.agentDecision.reason) }}</p>
+                    <p v-if="item.agentDecision.suggestion">建议：{{ humanizeText(item.agentDecision.suggestion) }}</p>
                     <ul v-if="item.agentDecision.checks.length">
                       <li v-for="check in item.agentDecision.checks" :key="`${check.name}-${check.result}`">
                         <span>{{ displayField(check.name) }}</span>
-                        <em>{{ displayField(check.result || check.status) }}</em>
+                        <em>{{ check.result ? displayField(check.result) : statusText(check.status) }}</em>
                       </li>
                     </ul>
                   </div>
                 </span>
               </div>
-              <div v-if="workflowDetail.status === 'IN_APPROVAL'" class="withdraw-box">
+              <div v-if="activeWorkflowCanWithdraw" class="withdraw-box">
                 <textarea v-model="withdrawComment" class="ui-textarea compact-textarea" placeholder="撤回原因" rows="3" />
                 <AppButton variant="secondary" size="sm" :disabled="withdrawSubmitting" @click="withdrawWorkflowRequest">
                   {{ withdrawSubmitting ? '撤回中' : '撤回申请' }}
@@ -566,43 +1045,26 @@ watch(agents, (items) => {
               </div>
               <p v-if="workflowDetailError" class="dialog-error">{{ workflowDetailError }}</p>
             </div>
-          </article>
-
-          <article class="detail-card">
-            <h3>假期账户</h3>
-            <dl class="field-grid">
-              <div>
-                <dt>假期类型</dt>
-                <dd>{{ selectedLeaveType?.leaveName ?? '暂无' }}</dd>
-              </div>
-              <div>
-                <dt>可用余额</dt>
-                <dd>{{ selectedLeaveAccount ? minutesToDayLabel(selectedLeaveAccount.availableMinutes) : (selectedLeaveType?.balanceMode === 'NO_DEDUCT' ? '无需扣减' : '暂无') }}</dd>
-              </div>
-              <div>
-                <dt>冻结余额</dt>
-                <dd>{{ selectedLeaveAccount ? minutesToDayLabel(selectedLeaveAccount.frozenMinutes) : (selectedLeaveType?.balanceMode === 'NO_DEDUCT' ? '无需冻结' : '暂无') }}</dd>
-              </div>
-              <div>
-                <dt>状态</dt>
-                <dd>{{ statusText(selectedLeaveAccount?.status ?? selectedLeaveType?.status ?? '') }}</dd>
-              </div>
-            </dl>
-          </article>
+          </section>
         </section>
       </template>
     </template>
 
     <template v-else-if="activeWorkbench.id === 'attendance'">
-      <section class="highlight-grid">
-        <article v-for="row in attendanceSummary" :key="row[0]" class="highlight-card">
-          <small>{{ row[0] }}</small>
-          <strong>{{ row[1] }}</strong>
-        </article>
-      </section>
-      <section class="detail-grid">
-        <article class="detail-card">
-          <h3>打卡</h3>
+      <section class="attendance-command-grid">
+        <article class="detail-card attendance-today-card">
+          <div class="attendance-card-head">
+            <div>
+              <h3>今日考勤</h3>
+              <span>{{ todayKey }}</span>
+            </div>
+            <AppTag :tone="todayExceptions.length ? 'warning' : 'success'">{{ todayResult ? statusText(todayResult.resultStatus) : '待打卡' }}</AppTag>
+          </div>
+          <div class="attendance-status-panel">
+            <strong>{{ todayExceptions.length ? '今日异常' : (todayResult ? '今日正常' : '等待打卡') }}</strong>
+            <span v-if="todayResult">迟到 {{ todayResult.lateMinutes ?? 0 }} · 早退 {{ todayResult.earlyLeaveMinutes ?? 0 }} · 缺勤 {{ todayResult.absenceMinutes ?? 0 }}</span>
+            <span v-else>最近记录：{{ latestDailyResult?.workDate ?? '暂无' }}</span>
+          </div>
           <div class="punch-actions">
             <AppButton variant="primary" :disabled="Boolean(punchLoading)" @click="punchAttendance('ON_DUTY')">
               {{ punchLoading === 'ON_DUTY' ? '打卡中' : '上班打卡' }}
@@ -611,64 +1073,68 @@ watch(agents, (items) => {
               {{ punchLoading === 'OFF_DUTY' ? '打卡中' : '下班打卡' }}
             </AppButton>
           </div>
-          <p v-if="punchResult" class="form-result">
-            {{ punchTypeLabel(punchResult.punchType) }} · {{ formatDateTime(punchResult.punchAt) }} · {{ statusText(punchResult.status) }}
-          </p>
+          <div v-if="punchResult" class="attendance-last-punch">
+            <span>最近打卡</span>
+            <strong>{{ punchTypeLabel(punchResult.punchType) }} · {{ formatDateTime(punchResult.punchAt) }}</strong>
+            <small>{{ statusText(punchResult.status) }}</small>
+          </div>
           <p v-if="attendanceError" class="dialog-error">{{ attendanceError }}</p>
         </article>
 
-        <article class="detail-card">
-          <h3>补卡申请</h3>
-          <form class="workbench-form single-column" @submit.prevent="submitClockCorrectionRequest">
-            <label class="security-field">
-              <span>考勤日期</span>
-              <input v-model="clockCorrectionForm.targetDate" class="ui-inline-input" type="date" />
-            </label>
-            <label class="security-field">
-              <span>缺卡类型</span>
-              <select v-model="clockCorrectionForm.missingPunchType" class="ui-inline-input">
-                <option value="ON_DUTY">上班</option>
-                <option value="OFF_DUTY">下班</option>
-              </select>
-            </label>
-            <label class="security-field">
-              <span>补卡时间</span>
-              <input v-model="clockCorrectionForm.expectedPunchAt" class="ui-inline-input" type="datetime-local" />
-            </label>
-            <label class="security-field">
-              <span>补卡原因</span>
-              <textarea v-model="clockCorrectionForm.reason" class="ui-textarea compact-textarea" rows="3" />
-            </label>
-            <div class="security-field">
-              <span>补卡附件</span>
-              <div class="attachment-picker-summary">
-                <button type="button" @click="openAttachmentPicker('clock')">
-                  选择附件
-                  <small>{{ clockCorrectionAttachmentIds.length }} 个</small>
-                </button>
-                <div v-if="selectedAttachmentFiles('clock').length" class="attachment-chip-list">
-                  <span v-for="file in selectedAttachmentFiles('clock')" :key="file.id">
-                    {{ file.name }}
-                    <button type="button" aria-label="移除附件" @click="removeAttachment('clock', file.attachmentRefId)">
-                      <X :size="13" />
-                    </button>
-                  </span>
-                </div>
+        <article class="detail-card exception-loop-card">
+          <div class="attendance-card-head">
+            <div>
+              <h3>异常闭环</h3>
+              <span>{{ todayExceptions.length }} 条今日异常</span>
+            </div>
+            <AppButton variant="secondary" size="sm" @click="openClockCorrectionDialog()">
+              补卡
+            </AppButton>
+          </div>
+          <AppEmptyState v-if="!attendanceExceptions.length" title="暂无异常" description="暂无异常" />
+          <div v-else class="attendance-action-list">
+            <div v-for="item in attendanceExceptions.slice(0, 5)" :key="item.exceptionId" class="attendance-action-row">
+              <div>
+                <strong>{{ item.workDate }}</strong>
+                <span>{{ item.exceptionDesc || item.exceptionType }}</span>
               </div>
+              <AppTag :tone="item.status === 'DONE' ? 'success' : 'warning'">{{ statusText(item.status) }}</AppTag>
+              <button type="button" @click="openClockCorrectionDialog(item)">发起补卡</button>
             </div>
-            <p v-if="clockCorrectionError" class="dialog-error">{{ clockCorrectionError }}</p>
-            <p v-if="clockCorrectionResult" class="form-result">申请编号：{{ clockCorrectionResult.requestNo }} · {{ statusText(clockCorrectionResult.status) }}</p>
-            <div class="form-actions">
-              <AppButton variant="primary" type="submit" :disabled="clockCorrectionSubmitting">
-                {{ clockCorrectionSubmitting ? '提交中' : '提交补卡' }}
-              </AppButton>
-            </div>
-          </form>
+          </div>
         </article>
       </section>
-      <section class="detail-grid">
-        <article class="detail-card">
-          <h3>日结果</h3>
+
+      <section class="highlight-grid attendance-metric-grid">
+        <article v-for="row in attendanceSummary" :key="row[0]" class="highlight-card">
+          <small>{{ row[0] }}</small>
+          <strong>{{ row[1] }}</strong>
+        </article>
+      </section>
+
+      <section class="detail-grid attendance-detail-grid">
+        <article class="detail-card team-risk-card" v-if="session.subordinates.length">
+          <div class="attendance-card-head">
+            <div>
+              <h3>团队风险</h3>
+              <span>{{ attendanceRiskSummary.map((row) => `${row[0]} ${row[1]}`).join(' · ') }}</span>
+            </div>
+          </div>
+          <AppLoadingState v-if="attendanceLoading" />
+          <AppEmptyState v-else-if="!teamAttendanceRows.length" title="暂无团队风险" description="暂无团队风险" />
+          <div v-else class="attendance-action-list">
+            <div v-for="item in teamAttendanceRows" :key="`team-${item.userId}-${item.workDate}`" class="attendance-action-row">
+              <div>
+                <strong>{{ item.userName }}</strong>
+                <span>{{ item.workDate }} · {{ statusText(item.resultStatus) }}</span>
+              </div>
+              <small>迟到 {{ item.lateMinutes ?? 0 }} · 早退 {{ item.earlyLeaveMinutes ?? 0 }} · 缺勤 {{ item.absenceMinutes ?? 0 }}</small>
+            </div>
+          </div>
+        </article>
+
+        <article class="detail-card attendance-history-card">
+          <h3>月度记录</h3>
           <AppLoadingState v-if="attendanceLoading" />
           <AppEmptyState v-else-if="!attendanceDailyResults.length" title="暂无日结果" description="暂无日结果" />
           <div v-else class="compact-table">
@@ -679,184 +1145,349 @@ watch(agents, (items) => {
             </div>
           </div>
         </article>
-        <article class="detail-card">
-          <h3>团队考勤</h3>
-          <AppLoadingState v-if="attendanceLoading" />
-          <AppEmptyState v-else-if="!teamAttendanceRows.length" title="暂无团队考勤" description="暂无团队考勤" />
-          <div v-else class="compact-table">
-            <div v-for="item in teamAttendanceRows" :key="`team-${item.userId}-${item.workDate}`">
-              <strong>{{ item.workDate }}</strong>
-              <span>{{ statusText(item.resultStatus) }}</span>
-              <small>员工 {{ item.userId }} · 迟到 {{ item.lateMinutes ?? 0 }} · 早退 {{ item.earlyLeaveMinutes ?? 0 }}</small>
-            </div>
-          </div>
-        </article>
-        <article class="detail-card">
-          <h3>异常</h3>
-          <AppEmptyState v-if="!attendanceExceptions.length" title="暂无异常" description="暂无异常" />
-          <div v-else class="compact-table">
-            <div v-for="item in attendanceExceptions" :key="item.exceptionId">
-              <strong>{{ item.workDate }}</strong>
-              <span>{{ statusText(item.status) }}</span>
-              <small>{{ item.exceptionDesc || item.exceptionType }}</small>
-            </div>
-          </div>
-        </article>
       </section>
     </template>
 
     <template v-else-if="activeWorkbench.id === 'balance'">
       <section class="leave-balance-board">
-        <article class="leave-balance-hero">
-          <div>
-            <small>我的假期</small>
-            <h3>{{ minutesToDayLabel(leaveAvailableMinutes) }}</h3>
-            <p>当前可用余额，提交请假时会自动冻结对应时长。</p>
-          </div>
-          <div class="leave-hero-metrics">
-            <span>
-              <strong>{{ leaveAccounts.length }}</strong>
-              <small>假种</small>
-            </span>
-            <span>
-              <strong>{{ activeLeaveAccountCount }}</strong>
-              <small>可用</small>
-            </span>
-            <span>
-              <strong>{{ minutesToDayLabel(leaveFrozenMinutes) }}</strong>
-              <small>冻结</small>
-            </span>
-          </div>
-        </article>
-
-        <section class="leave-account-grid refined">
-          <article
-            v-for="(account, index) in leaveAccounts"
-            :key="account.accountId"
-            class="leave-balance-card"
-            :class="`leave-tone-${leaveAccountToneClass(index)}`"
-          >
-            <div class="leave-card-head">
-              <span class="leave-card-icon">
-                <Check :size="18" />
-              </span>
-              <AppTag :tone="leaveAccountTone(account)">{{ statusText(account.status) }}</AppTag>
+        <AppErrorState
+          v-if="workbenchError"
+          title="假期账户加载失败"
+          :description="workbenchError"
+          action-label="重试"
+          @retry="refreshActiveWorkbench"
+        />
+        <AppLoadingState v-else-if="workbenchLoading" />
+        <template v-else>
+          <article class="leave-balance-hero">
+            <div class="leave-balance-primary">
+              <span>假期账户</span>
+              <strong>{{ minutesToDayLabel(leaveAvailableMinutes) }}</strong>
+              <small>可用余额</small>
             </div>
-            <div>
-              <small>{{ account.leaveCode }}</small>
-              <h3>{{ account.leaveName }}</h3>
+            <div class="leave-balance-side">
+              <div class="leave-hero-metrics">
+                <span>
+                  <strong>{{ minutesToDayLabel(leaveFrozenMinutes) }}</strong>
+                  <small>冻结余额</small>
+                </span>
+                <span>
+                  <strong>{{ activeLeaveAccountCount }}</strong>
+                  <small>可申请假种</small>
+                </span>
+                <span>
+                  <strong>{{ leaveAccounts.length }}</strong>
+                  <small>账户数</small>
+                </span>
+              </div>
+              <AppButton variant="primary" size="sm" type="button" @click="openLeaveInOa">
+                前往 OA 请假
+              </AppButton>
             </div>
-            <strong>{{ minutesToDayLabel(account.availableMinutes) }}</strong>
-            <dl>
-              <div>
-                <dt>冻结</dt>
-                <dd>{{ minutesToDayLabel(account.frozenMinutes) }}</dd>
-              </div>
-              <div>
-                <dt>近期</dt>
-                <dd>{{ leaveAccountMeta(account) }}</dd>
-              </div>
-            </dl>
           </article>
-          <AppEmptyState v-if="!leaveAccounts.length" title="暂无假期账户" description="暂无假期账户" />
-        </section>
-      </section>
-    </template>
 
-    <template v-else-if="activeWorkbench.id === 'agent'">
-      <section class="detail-grid">
-        <article class="detail-card">
-          <div class="title-line">
-            <h3>可用 AI 助手</h3>
-            <AppButton variant="secondary" size="sm" :disabled="agentsLoading" @click="loadAgents">
-              {{ agentsLoading ? '加载中' : '刷新' }}
-            </AppButton>
-          </div>
-          <AppLoadingState v-if="agentsLoading" />
-          <AppEmptyState v-else-if="!agents.length" title="暂无 AI 助手" description="暂无 AI 助手" />
-          <div v-else class="compact-table">
-            <div v-for="agent in agents" :key="agent.agentId" class="agent-compact-row">
-              <AppAvatar :label="humanizeText(agent.agentName)" :image="agentAvatarUrls[String(agent.agentId)]" kind="agent" tone="success" size="sm" />
-              <div>
-                <strong>{{ humanizeText(agent.agentName) }}</strong>
-                <span>{{ agent.agentType }}</span>
-                <small>{{ agent.agentCode }} · {{ statusText(agent.status) }}</small>
+          <div class="leave-balance-layout">
+            <section class="leave-account-panel">
+              <header class="leave-panel-head">
+                <div>
+                  <h3>假种账户</h3>
+                  <span>{{ activeLeaveAccountCount }} 个可申请 · {{ frozenLeaveAccountCount }} 个冻结中</span>
+                </div>
+              </header>
+              <section class="leave-account-grid refined">
+                <article
+                  v-for="(account, index) in leaveAccounts"
+                  :key="account.accountId"
+                  class="leave-balance-card"
+                  :class="`leave-tone-${leaveAccountToneClass(index)}`"
+                >
+                  <div class="leave-card-head">
+                    <div>
+                      <small>{{ leaveBalanceModeText(account) }}</small>
+                      <h3>{{ account.leaveName }}</h3>
+                    </div>
+                    <AppTag :tone="leaveAccountTone(account)">{{ leaveAccountApplyText(account) }}</AppTag>
+                  </div>
+                  <strong>{{ minutesToDayLabel(account.availableMinutes) }}</strong>
+                  <dl>
+                    <div>
+                      <dt>冻结</dt>
+                      <dd>{{ minutesToDayLabel(account.frozenMinutes) }}</dd>
+                    </div>
+                    <div>
+                      <dt>近期</dt>
+                      <dd>{{ leaveAccountMeta(account) }}</dd>
+                    </div>
+                    <div>
+                      <dt>状态</dt>
+                      <dd>{{ statusText(account.status) }}</dd>
+                    </div>
+                  </dl>
+                </article>
+                <AppEmptyState v-if="!leaveAccounts.length" class="leave-account-empty" title="暂无假期账户" description="暂无假期账户" />
+              </section>
+            </section>
+
+            <aside class="leave-change-panel">
+              <header class="leave-panel-head">
+                <div>
+                  <h3>近期变动</h3>
+                  <span>{{ recentLeaveAccounts.length }} 条</span>
+                </div>
+              </header>
+              <div v-if="recentLeaveAccounts.length" class="leave-change-list">
+                <div v-for="account in recentLeaveAccounts" :key="`change-${account.accountId}`">
+                  <span>
+                    <strong>{{ account.leaveName }}</strong>
+                    <small>{{ account.lastTxnType ?? '最近变动' }}</small>
+                  </span>
+                  <em :class="`change-${leaveAccountChangeTone(account)}`">
+                    {{ (account.lastChangeMinutes ?? 0) > 0 ? '+' : '' }}{{ minutesToDayLabel(Math.abs(account.lastChangeMinutes ?? 0)) }}
+                  </em>
+                </div>
               </div>
-            </div>
+              <AppEmptyState v-else title="暂无近期变动" description="暂无近期变动" />
+            </aside>
           </div>
-        </article>
-
-        <article class="detail-card">
-          <h3>AI 任务</h3>
-          <form class="workbench-form single-column" @submit.prevent="submitAgentTask">
-            <label class="security-field">
-              <span>AI 助手</span>
-              <select v-model="agentTaskForm.agentId" class="ui-inline-input">
-                <option v-for="agent in agents" :key="agent.agentId" :value="String(agent.agentId)">
-                  {{ humanizeText(agent.agentName) }}
-                </option>
-              </select>
-            </label>
-            <label class="security-field">
-              <span>输入</span>
-              <textarea v-model="agentTaskForm.inputText" class="ui-textarea compact-textarea" rows="3" />
-            </label>
-            <div class="form-actions">
-              <AppButton variant="primary" type="submit" :disabled="agentTaskSubmitting || !agentTaskForm.agentId">
-                {{ agentTaskSubmitting ? '提交中' : '创建任务' }}
-              </AppButton>
-            </div>
-          </form>
-          <p v-if="agentTaskError" class="dialog-error">{{ agentTaskError }}</p>
-          <p v-if="agentTaskResult" class="form-result">任务：{{ agentTaskResult.taskId }} · {{ statusText(agentTaskResult.status) }}</p>
-        </article>
-      </section>
-
-      <section class="detail-grid">
-        <article class="detail-card">
-          <h3>任务确认</h3>
-          <div class="security-form">
-            <label class="security-field">
-              <span>任务ID</span>
-              <input v-model="agentTaskForm.taskId" class="ui-inline-input" inputmode="numeric" />
-            </label>
-            <label class="security-field">
-              <span>意见</span>
-              <textarea v-model="agentTaskForm.comment" class="ui-textarea compact-textarea" rows="3" />
-            </label>
-            <div class="form-actions">
-              <AppButton variant="primary" size="sm" :disabled="agentTaskSubmitting || !agentTaskForm.taskId" @click="confirmAgentTask(true)">
-                确认继续
-              </AppButton>
-              <AppButton variant="secondary" size="sm" :disabled="agentTaskSubmitting || !agentTaskForm.taskId" @click="confirmAgentTask(false)">
-                拒绝继续
-              </AppButton>
-            </div>
-          </div>
-        </article>
-
-        <article class="detail-card">
-          <h3>取消任务</h3>
-          <div class="security-form">
-            <label class="security-field">
-              <span>任务ID</span>
-              <input v-model="agentTaskForm.taskId" class="ui-inline-input" inputmode="numeric" />
-            </label>
-            <label class="security-field">
-              <span>原因</span>
-              <textarea v-model="agentTaskForm.cancelReason" class="ui-textarea compact-textarea" rows="3" />
-            </label>
-            <div class="form-actions">
-              <AppButton variant="destructive" size="sm" :disabled="agentTaskSubmitting || !agentTaskForm.taskId || !agentTaskForm.cancelReason.trim()" @click="cancelAgentTask">
-                取消任务
-              </AppButton>
-            </div>
-          </div>
-        </article>
+        </template>
       </section>
     </template>
+
   </section>
 </div>
+
+<AppDialog v-if="processCatalogOpen" wide>
+  <section class="oa-process-dialog">
+    <header class="dialog-head dialog-head-row">
+      <div>
+        <h2>发起申请</h2>
+        <p>常用 OA 流程</p>
+      </div>
+      <button class="field-icon-button" type="button" aria-label="关闭" @click="closeProcessCatalog">
+        <X :size="15" />
+      </button>
+    </header>
+    <div class="oa-process-grid">
+      <button
+        v-for="process in oaProcessCatalog"
+        :key="process.key"
+        type="button"
+        class="oa-process-card"
+        :class="[`tone-${process.tone}`, { planned: process.availability === 'planned' }]"
+        @click="handleOaProcess(process)"
+      >
+        <span class="oa-process-icon" aria-hidden="true">
+          <component :is="process.icon" :size="20" />
+        </span>
+        <span class="oa-process-copy">
+          <span class="oa-process-title-row">
+            <strong>{{ process.title }}</strong>
+            <AppTag :tone="process.statusTone">{{ process.statusLabel }}</AppTag>
+          </span>
+          <small>{{ process.description }}</small>
+          <span class="oa-process-tags">
+            <em v-for="tag in process.tags" :key="`${process.key}-${tag}`">{{ tag }}</em>
+          </span>
+        </span>
+      </button>
+    </div>
+  </section>
+</AppDialog>
+
+<AppDialog v-if="leaveDialogOpen">
+  <section class="leave-request-dialog">
+    <header class="dialog-head dialog-head-row">
+      <div>
+        <h2>请假申请</h2>
+        <p>{{ selectedLeaveType?.leaveName ?? '暂无假种' }}</p>
+      </div>
+      <button class="field-icon-button" type="button" aria-label="关闭" @click="leaveDialogOpen = false">
+        <X :size="15" />
+      </button>
+    </header>
+    <form class="workbench-form" @submit.prevent="submitLeaveRequestFromDialog">
+      <label class="security-field">
+        <span>假期类型</span>
+        <select v-model="leaveForm.leaveTypeId" class="ui-inline-input">
+          <option v-for="item in selectableLeaveTypes" :key="item.leaveTypeId" :value="String(item.leaveTypeId)">
+            {{ item.leaveName }}
+          </option>
+        </select>
+      </label>
+      <label class="security-field">
+        <span>开始时间</span>
+        <input v-model="leaveForm.startAt" class="ui-inline-input" type="datetime-local" />
+      </label>
+      <label class="security-field">
+        <span>结束时间</span>
+        <input v-model="leaveForm.endAt" class="ui-inline-input" type="datetime-local" />
+      </label>
+      <label class="security-field">
+        <span>请假时长</span>
+        <input :value="leaveForm.durationMinutes ? minutesToDayLabel(Number(leaveForm.durationMinutes)) : ''" class="ui-inline-input" type="text" readonly />
+      </label>
+      <label class="security-field form-full">
+        <span>请假原因</span>
+        <textarea v-model="leaveForm.reason" class="ui-textarea compact-textarea" rows="4" />
+      </label>
+      <div class="security-field form-full">
+        <span>申请附件</span>
+        <div class="attachment-picker-summary">
+          <button type="button" @click="openAttachmentPicker('leave')">
+            选择附件
+            <small>{{ leaveAttachmentIds.length }} 个</small>
+          </button>
+          <div v-if="selectedAttachmentFiles('leave').length" class="attachment-chip-list">
+            <span v-for="file in selectedAttachmentFiles('leave')" :key="file.id">
+              <span class="attachment-chip-name">{{ file.name }}</span>
+              <button type="button" aria-label="移除附件" @click="removeAttachment('leave', file.attachmentRefId)">
+                <X :size="13" />
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+      <p v-if="leaveError" class="dialog-error form-full">{{ leaveError }}</p>
+      <div class="form-actions form-full">
+        <AppButton variant="secondary" type="button" :disabled="leaveSubmitting" @click="leaveDialogOpen = false">
+          取消
+        </AppButton>
+        <AppButton variant="primary" type="submit" :disabled="leaveSubmitting || !canSubmitLeave">
+          {{ leaveSubmitting ? '提交中' : '提交申请' }}
+        </AppButton>
+      </div>
+    </form>
+  </section>
+</AppDialog>
+
+<AppDialog v-if="clockCorrectionDialogOpen">
+  <section class="leave-request-dialog">
+    <header class="dialog-head dialog-head-row">
+      <div>
+        <h2>补卡申请</h2>
+        <p>{{ clockCorrectionForm.targetDate || '考勤日期' }}</p>
+      </div>
+      <button class="field-icon-button" type="button" aria-label="关闭" @click="clockCorrectionDialogOpen = false">
+        <X :size="15" />
+      </button>
+    </header>
+    <form class="workbench-form single-column" @submit.prevent="submitClockCorrectionFromDialog">
+      <label class="security-field">
+        <span>考勤日期</span>
+        <input v-model="clockCorrectionForm.targetDate" class="ui-inline-input" type="date" />
+      </label>
+      <label class="security-field">
+        <span>缺卡类型</span>
+        <select v-model="clockCorrectionForm.missingPunchType" class="ui-inline-input">
+          <option value="ON_DUTY">上班</option>
+          <option value="OFF_DUTY">下班</option>
+        </select>
+      </label>
+      <label class="security-field">
+        <span>补卡时间</span>
+        <input v-model="clockCorrectionForm.expectedPunchAt" class="ui-inline-input" type="datetime-local" />
+      </label>
+      <label class="security-field">
+        <span>补卡原因</span>
+        <textarea v-model="clockCorrectionForm.reason" class="ui-textarea compact-textarea" rows="3" />
+      </label>
+      <div class="security-field">
+        <span>补卡附件</span>
+        <div class="attachment-picker-summary">
+          <button type="button" @click="openAttachmentPicker('clock')">
+            选择附件
+            <small>{{ clockCorrectionAttachmentIds.length }} 个</small>
+          </button>
+          <div v-if="selectedAttachmentFiles('clock').length" class="attachment-chip-list">
+            <span v-for="file in selectedAttachmentFiles('clock')" :key="file.id">
+              <span class="attachment-chip-name">{{ file.name }}</span>
+              <button type="button" aria-label="移除附件" @click="removeAttachment('clock', file.attachmentRefId)">
+                <X :size="13" />
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+      <p v-if="clockCorrectionError" class="dialog-error">{{ clockCorrectionError }}</p>
+      <p v-if="clockCorrectionResult" class="form-result">{{ clockCorrectionResult.statusName || statusText(clockCorrectionResult.status) }}</p>
+      <div class="form-actions">
+        <AppButton variant="secondary" type="button" :disabled="clockCorrectionSubmitting" @click="clockCorrectionDialogOpen = false">
+          取消
+        </AppButton>
+        <AppButton variant="primary" type="submit" :disabled="clockCorrectionSubmitting">
+          {{ clockCorrectionSubmitting ? '提交中' : '提交补卡' }}
+        </AppButton>
+      </div>
+    </form>
+  </section>
+</AppDialog>
+
+<AppDialog v-if="genericOaDialogOpen && activeGenericProcess">
+  <section class="leave-request-dialog">
+    <header class="dialog-head dialog-head-row">
+      <div>
+        <h2>{{ activeGenericProcess.title }}</h2>
+        <p>{{ activeGenericProcess.statusLabel }}</p>
+      </div>
+      <button class="field-icon-button" type="button" aria-label="关闭" @click="closeGenericOaDialog">
+        <X :size="15" />
+      </button>
+    </header>
+    <form class="workbench-form" @submit.prevent="submitGenericOaRequestFromDialog">
+      <template v-for="field in activeGenericFields" :key="field.key">
+        <label v-if="field.type === 'select'" class="security-field">
+          <span>{{ field.label }}</span>
+          <select v-model="genericOaForm[field.key]" class="ui-inline-input">
+            <option v-for="option in field.options" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <label v-else-if="field.type === 'textarea'" class="security-field form-full">
+          <span>{{ field.label }}</span>
+          <textarea v-model="genericOaForm[field.key]" class="ui-textarea compact-textarea" rows="4" />
+        </label>
+        <div v-else-if="field.type === 'attachment'" class="security-field form-full">
+          <span>{{ field.label }}</span>
+          <div class="attachment-picker-summary">
+            <button type="button" @click="openAttachmentPicker('generic')">
+              选择附件
+              <small>{{ genericOaAttachmentIds.length }} 个</small>
+            </button>
+            <div v-if="selectedAttachmentFiles('generic').length" class="attachment-chip-list">
+              <span v-for="file in selectedAttachmentFiles('generic')" :key="file.id">
+                <span class="attachment-chip-name">{{ file.name }}</span>
+                <button type="button" aria-label="移除附件" @click="removeAttachment('generic', file.attachmentRefId)">
+                  <X :size="13" />
+                </button>
+              </span>
+            </div>
+          </div>
+        </div>
+        <label v-else class="security-field">
+          <span>{{ field.label }}</span>
+          <input
+            v-model="genericOaForm[field.key]"
+            class="ui-inline-input"
+            :type="field.type === 'datetime' ? 'datetime-local' : field.type === 'money' ? 'number' : field.type"
+            :step="field.type === 'money' ? '0.01' : field.type === 'number' ? '1' : undefined"
+            :placeholder="field.placeholder"
+          />
+        </label>
+      </template>
+      <p v-if="genericOaError" class="dialog-error form-full">{{ genericOaError }}</p>
+      <p v-if="genericOaResult" class="form-result form-full">{{ genericOaResult }}</p>
+      <div class="form-actions form-full">
+        <AppButton variant="secondary" type="button" :disabled="genericOaSubmitting" @click="closeGenericOaDialog">
+          取消
+        </AppButton>
+        <AppButton variant="primary" type="submit" :disabled="genericOaSubmitDisabled">
+          {{ genericOaSubmitting ? '提交中' : '提交申请' }}
+        </AppButton>
+      </div>
+    </form>
+  </section>
+</AppDialog>
 
 <AppDialog v-if="attachmentPickerOpen" wide>
   <section class="attachment-picker-dialog">

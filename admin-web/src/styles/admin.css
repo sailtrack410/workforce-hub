@@ -28,15 +28,61 @@
   --panel:        #FFFFFF;
   --panel-strong: #ffffff;
   --line:         #DDE3EC;
+  --line-soft:    rgba(15, 23, 42, 0.1);
+  --table-head-bg:#F8FAFC;
+  --dialog-overlay-bg: rgba(0, 20, 60, 0.4);
+  --dialog-z:      9999;
+  --control-border: #D0D5DD;
+  --focus-ring: rgba(22, 119, 255, 0.34);
 
   /* ---- 语义背景 ---- */
   --hover-bg:     #F0F6FF;
   --pill-bg:      #E8F3FF;
   --error-bg:     #FCE9E8;
   --success-bg:   #E8F8F0;
+  --error-border: #F0B8B4;
+  --success-border: #A8DFC1;
+  --toast-error-border: rgba(179, 49, 49, 0.2);
+  --toast-success-border: rgba(22, 163, 74, 0.2);
   --avatar-bg:    #E8F3FF;
   --ring-bg:      #B3D9FF;
   --brand-mark-bg:#E8F3FF;
+  --org-link-stroke: rgba(22, 119, 255, 0.42);
+  --org-link-port-ring: rgba(22, 119, 255, 0.1);
+
+  /* ---- DAG ---- */
+  --dag-edge-arrow: rgba(0, 137, 255, 0.7);
+  --dag-edge: rgba(22, 119, 255, 0.58);
+  --dag-edge-hover: rgba(22, 119, 255, 0.95);
+  --dag-edge-temp: rgba(22, 119, 255, 0.3);
+  --dag-edge-shadow: rgba(15, 23, 42, 0.12);
+  --dag-selected-ring: rgba(22, 119, 255, 0.14);
+  --dag-node-type-bg: rgba(22, 119, 255, 0.1);
+  --dag-tool-bg: rgba(167, 101, 26, 0.12);
+  --dag-tool-text: #8a4d0f;
+  --dag-condition-bg: rgba(179, 49, 49, 0.1);
+  --dag-intent: #7c5cbf;
+  --dag-intent-bg: rgba(124, 92, 191, 0.12);
+  --dag-intent-text: #5b3ea3;
+  --dag-approval: #2563eb;
+  --dag-approval-bg: rgba(37, 99, 235, 0.12);
+  --dag-approval-text: #1d4ed8;
+  --dag-knowledge: #0f766e;
+  --dag-knowledge-bg: rgba(15, 118, 110, 0.12);
+  --dag-form-extract: #0891b2;
+  --dag-form-extract-bg: rgba(8, 145, 178, 0.12);
+  --dag-form-extract-text: #0e7490;
+  --dag-summary: #9333ea;
+  --dag-summary-bg: rgba(147, 51, 234, 0.12);
+  --dag-summary-text: #7e22ce;
+  --dag-transform: #4b5563;
+  --dag-transform-bg: rgba(75, 85, 99, 0.12);
+  --dag-transform-text: #374151;
+  --dag-port-border: #ffffff;
+  --dag-port-ring: rgba(22, 119, 255, 0.62);
+  --dag-port-shadow: rgba(0, 80, 180, 0.25);
+  --dag-port-hover-ring: rgba(22, 119, 255, 0.16);
+  --dag-array-border: rgba(22, 119, 255, 0.18);
 
   /* ---- 侧边栏 ---- */
   --sidebar-bg:   #FFFFFF;
@@ -126,12 +172,12 @@ button:active:not(:disabled) {
 
 button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(22, 119, 255, 0.34);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
 }
 
 input, select, textarea {
   width: 100%;
-  border: 1px solid #D0D5DD;
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
   color: var(--ink);
@@ -150,7 +196,7 @@ textarea {
 
 input:focus, select:focus, textarea:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(22, 119, 255, 0.34);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
 }
 
 /* =========================================================
@@ -234,6 +280,7 @@ input:focus, select:focus, textarea:focus {
 .primary-button,
 .secondary-button,
 .danger-button,
+.ghost-button,
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -261,6 +308,16 @@ input:focus, select:focus, textarea:focus {
   background: var(--red);
   color: var(--panel-strong);
 }
+.ghost-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.ghost-button.danger {
+  color: var(--red);
+}
+
 .icon-button {
   width: var(--control-h);
   padding: 0;
@@ -271,12 +328,15 @@ input:focus, select:focus, textarea:focus {
 
 .primary-button:hover { background: var(--green-dark); border-color: var(--green-dark); }
 .secondary-button:hover,
+.ghost-button:hover,
 .icon-button:hover { border-color: var(--green-light); color: var(--green-dark); }
+.ghost-button.danger:hover { border-color: var(--red); color: var(--red-dark); }
 .danger-button:hover { background: var(--red-dark); border-color: var(--red-dark); }
 
 .primary-button:active,
 .secondary-button:active,
 .danger-button:active,
+.ghost-button:active,
 .icon-button:active {
   transform: scale(0.98);
 }
@@ -284,9 +344,10 @@ input:focus, select:focus, textarea:focus {
 .primary-button:focus-visible,
 .secondary-button:focus-visible,
 .danger-button:focus-visible,
+.ghost-button:focus-visible,
 .icon-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(22, 119, 255, 0.34);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
 }
 
 /* =========================================================

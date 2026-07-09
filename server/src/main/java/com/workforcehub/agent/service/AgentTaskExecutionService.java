@@ -79,6 +79,9 @@ public class AgentTaskExecutionService {
         Long agentId = command.agentId();
         Long senderId = command.triggerUserId();
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
+        if ("DEPRECATED".equals(agent.status())) {
+            throw new BizException(409, AgentService.DEPRECATED_AGENT_MESSAGE);
+        }
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
             throw new BizException(409, "AI助手未发布或未启用");
         }
@@ -337,11 +340,16 @@ public class AgentTaskExecutionService {
         AgentTaskResponse response = new AgentTaskResponse();
         response.setTaskId(row.id());
         response.setAgentId(row.agentId());
+        response.setAgentName(agentRepository.getAgentOrThrow(row.agentId()).agentName());
         response.setAgentVersionId(row.agentVersionId());
         response.setTriggerType(row.triggerType());
+        response.setTriggerTypeName(triggerTypeName(row.triggerType()));
         response.setContextType(row.contextType());
+        response.setContextTypeName(contextTypeName(row.contextType()));
         response.setContextId(row.contextId());
+        response.setContextDisplayName(contextDisplayName(row.contextType(), row.contextId()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setToolCallCount(agentRepository.countToolCalls(row.id()));
         response.setWaitingDeadlineAt(row.waitingDeadlineAt());
         response.setStartedAt(row.startedAt());
@@ -350,6 +358,43 @@ public class AgentTaskExecutionService {
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
+    }
+
+    private String statusName(String value) {
+        if ("PENDING".equals(value)) return "待处理";
+        if ("RUNNING".equals(value)) return "运行中";
+        if ("SUCCEEDED".equals(value) || "SUCCESS".equals(value)) return "成功";
+        if ("FAILED".equals(value)) return "失败";
+        if ("WAITING_HUMAN_CONFIRM".equals(value)) return "待确认";
+        if ("REJECTED".equals(value)) return "已拒绝";
+        if ("CANCELLED".equals(value)) return "已取消";
+        return value == null ? null : "未知状态";
+    }
+
+    private String triggerTypeName(String value) {
+        if ("MANUAL".equals(value)) return "手动";
+        if ("CONVERSATION".equals(value)) return "会话";
+        if ("WORKFLOW".equals(value)) return "审批";
+        if ("TIMER".equals(value) || "SCHEDULED".equals(value)) return "定时任务";
+        if ("EVENT".equals(value)) return "事件";
+        if ("SERVICE".equals(value)) return "服务";
+        return value == null ? null : "其他触发";
+    }
+
+    private String contextTypeName(String value) {
+        if ("USER_QUERY".equals(value)) return "员工咨询";
+        if ("WF_REQUEST".equals(value)) return "审批申请";
+        if ("IM_GROUP".equals(value)) return "群聊消息";
+        if ("IM_CONVERSATION".equals(value) || "CONVERSATION".equals(value)) return "消息会话";
+        return value == null ? null : "业务场景";
+    }
+
+    private String contextDisplayName(String contextType, Long contextId) {
+        if (contextId == null) return null;
+        if ("WF_REQUEST".equals(contextType)) return "审批申请";
+        if ("IM_CONVERSATION".equals(contextType) || "CONVERSATION".equals(contextType)) return "消息会话";
+        if ("USER_QUERY".equals(contextType)) return "员工咨询";
+        return "业务记录";
     }
 
     private record ConversationExecutionContext(

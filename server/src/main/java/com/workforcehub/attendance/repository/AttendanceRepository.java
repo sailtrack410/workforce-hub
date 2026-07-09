@@ -363,9 +363,20 @@ public class AttendanceRepository {
 
     public AttendanceGroupMemberRow getGroupMemberOrThrow(Long memberId) {
         List<AttendanceGroupMemberRow> rows = jdbcTemplate.query("""
-            SELECT id, group_id, user_id, effective_from, effective_to, source_type, status
-            FROM att_group_member
-            WHERE id = ?
+            SELECT gm.id,
+                   gm.group_id,
+                   g.group_name,
+                   gm.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   gm.effective_from,
+                   gm.effective_to,
+                   gm.source_type,
+                   gm.status
+            FROM att_group_member gm
+            LEFT JOIN att_group g ON g.id = gm.group_id
+            LEFT JOIN org_user u ON u.id = gm.user_id
+            WHERE gm.id = ?
             LIMIT 1
             """,
             this::mapGroupMember,
@@ -379,10 +390,21 @@ public class AttendanceRepository {
 
     public List<AttendanceGroupMemberRow> listGroupMembers(Long groupId) {
         return jdbcTemplate.query("""
-            SELECT id, group_id, user_id, effective_from, effective_to, source_type, status
-            FROM att_group_member
-            WHERE group_id = ?
-            ORDER BY effective_from DESC, id DESC
+            SELECT gm.id,
+                   gm.group_id,
+                   g.group_name,
+                   gm.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   gm.effective_from,
+                   gm.effective_to,
+                   gm.source_type,
+                   gm.status
+            FROM att_group_member gm
+            LEFT JOIN att_group g ON g.id = gm.group_id
+            LEFT JOIN org_user u ON u.id = gm.user_id
+            WHERE gm.group_id = ?
+            ORDER BY gm.effective_from DESC, gm.id DESC
             LIMIT 500
             """,
             this::mapGroupMember,
@@ -428,9 +450,22 @@ public class AttendanceRepository {
 
     public AttendanceScheduleRow getScheduleOrThrow(Long scheduleId) {
         List<AttendanceScheduleRow> rows = jdbcTemplate.query("""
-            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
-            FROM att_schedule
-            WHERE id = ?
+            SELECT s.id,
+                   s.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   s.work_date,
+                   s.shift_id,
+                   sh.shift_name,
+                   s.calendar_id,
+                   wc.calendar_name,
+                   s.schedule_source,
+                   s.status
+            FROM att_schedule s
+            LEFT JOIN org_user u ON u.id = s.user_id
+            LEFT JOIN att_shift sh ON sh.id = s.shift_id
+            LEFT JOIN att_work_calendar wc ON wc.id = s.calendar_id
+            WHERE s.id = ?
             LIMIT 1
             """,
             this::mapSchedule,
@@ -444,9 +479,22 @@ public class AttendanceRepository {
 
     public AttendanceScheduleRow getScheduleForUpdateOrThrow(Long scheduleId) {
         List<AttendanceScheduleRow> rows = jdbcTemplate.query("""
-            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
-            FROM att_schedule
-            WHERE id = ?
+            SELECT s.id,
+                   s.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   s.work_date,
+                   s.shift_id,
+                   sh.shift_name,
+                   s.calendar_id,
+                   wc.calendar_name,
+                   s.schedule_source,
+                   s.status
+            FROM att_schedule s
+            LEFT JOIN org_user u ON u.id = s.user_id
+            LEFT JOIN att_shift sh ON sh.id = s.shift_id
+            LEFT JOIN att_work_calendar wc ON wc.id = s.calendar_id
+            WHERE s.id = ?
             LIMIT 1
             FOR UPDATE
             """,
@@ -512,10 +560,23 @@ public class AttendanceRepository {
     public List<AttendanceScheduleRow> listSchedules(Long userId, LocalDate startDate, LocalDate endDate) {
         if (userId == null) {
             return jdbcTemplate.query("""
-                SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
-                FROM att_schedule
-                WHERE work_date BETWEEN ? AND ?
-                ORDER BY work_date DESC, id DESC
+                SELECT s.id,
+                       s.user_id,
+                       u.employee_no,
+                       u.real_name,
+                       s.work_date,
+                       s.shift_id,
+                       sh.shift_name,
+                       s.calendar_id,
+                       wc.calendar_name,
+                       s.schedule_source,
+                       s.status
+                FROM att_schedule s
+                LEFT JOIN org_user u ON u.id = s.user_id
+                LEFT JOIN att_shift sh ON sh.id = s.shift_id
+                LEFT JOIN att_work_calendar wc ON wc.id = s.calendar_id
+                WHERE s.work_date BETWEEN ? AND ?
+                ORDER BY s.work_date DESC, s.id DESC
                 LIMIT 500
                 """,
                 this::mapSchedule,
@@ -524,11 +585,24 @@ public class AttendanceRepository {
             );
         }
         return jdbcTemplate.query("""
-            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
-            FROM att_schedule
-            WHERE user_id = ?
-              AND work_date BETWEEN ? AND ?
-            ORDER BY work_date DESC, id DESC
+            SELECT s.id,
+                   s.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   s.work_date,
+                   s.shift_id,
+                   sh.shift_name,
+                   s.calendar_id,
+                   wc.calendar_name,
+                   s.schedule_source,
+                   s.status
+            FROM att_schedule s
+            LEFT JOIN org_user u ON u.id = s.user_id
+            LEFT JOIN att_shift sh ON sh.id = s.shift_id
+            LEFT JOIN att_work_calendar wc ON wc.id = s.calendar_id
+            WHERE s.user_id = ?
+              AND s.work_date BETWEEN ? AND ?
+            ORDER BY s.work_date DESC, s.id DESC
             LIMIT 500
             """,
             this::mapSchedule,
@@ -556,11 +630,24 @@ public class AttendanceRepository {
 
     public AttendanceScheduleRow getActiveSchedule(Long userId, LocalDate workDate) {
         List<AttendanceScheduleRow> rows = jdbcTemplate.query("""
-            SELECT id, user_id, work_date, shift_id, calendar_id, schedule_source, status
-            FROM att_schedule
-            WHERE user_id = ?
-              AND work_date = ?
-              AND status = 'ACTIVE'
+            SELECT s.id,
+                   s.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   s.work_date,
+                   s.shift_id,
+                   sh.shift_name,
+                   s.calendar_id,
+                   wc.calendar_name,
+                   s.schedule_source,
+                   s.status
+            FROM att_schedule s
+            LEFT JOIN org_user u ON u.id = s.user_id
+            LEFT JOIN att_shift sh ON sh.id = s.shift_id
+            LEFT JOIN att_work_calendar wc ON wc.id = s.calendar_id
+            WHERE s.user_id = ?
+              AND s.work_date = ?
+              AND s.status = 'ACTIVE'
             LIMIT 1
             """,
             this::mapSchedule,
@@ -677,8 +764,8 @@ public class AttendanceRepository {
 
     public AttendanceDailyResultRow getDailyResultForUpdate(Long userId, LocalDate workDate) {
         List<AttendanceDailyResultRow> rows = jdbcTemplate.query(dailyResultSelectSql() + """
-            WHERE user_id = ?
-              AND work_date = ?
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
             LIMIT 1
             FOR UPDATE
             """,
@@ -691,8 +778,8 @@ public class AttendanceRepository {
 
     public AttendanceDailyResultRow getDailyResult(Long userId, LocalDate workDate) {
         List<AttendanceDailyResultRow> rows = jdbcTemplate.query(dailyResultSelectSql() + """
-            WHERE user_id = ?
-              AND work_date = ?
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
             LIMIT 1
             """,
             this::mapDailyResult,
@@ -815,9 +902,9 @@ public class AttendanceRepository {
 
     public List<AttendanceDailyResultRow> listDailyResults(Long userId, LocalDate startDate, LocalDate endDate) {
         return jdbcTemplate.query(dailyResultSelectSql() + """
-            WHERE user_id = ?
-              AND work_date BETWEEN ? AND ?
-            ORDER BY work_date ASC
+            WHERE adr.user_id = ?
+              AND adr.work_date BETWEEN ? AND ?
+            ORDER BY adr.work_date ASC
             """,
             this::mapDailyResult,
             userId,
@@ -829,8 +916,8 @@ public class AttendanceRepository {
     public List<AttendanceDailyResultRow> listDailyResultsForAdmin(Long userId, LocalDate startDate, LocalDate endDate) {
         if (userId == null) {
             return jdbcTemplate.query(dailyResultSelectSql() + """
-                WHERE work_date BETWEEN ? AND ?
-                ORDER BY work_date DESC, id DESC
+                WHERE adr.work_date BETWEEN ? AND ?
+                ORDER BY adr.work_date DESC, adr.id DESC
                 LIMIT 500
                 """,
                 this::mapDailyResult,
@@ -839,9 +926,9 @@ public class AttendanceRepository {
             );
         }
         return jdbcTemplate.query(dailyResultSelectSql() + """
-            WHERE user_id = ?
-              AND work_date BETWEEN ? AND ?
-            ORDER BY work_date DESC, id DESC
+            WHERE adr.user_id = ?
+              AND adr.work_date BETWEEN ? AND ?
+            ORDER BY adr.work_date DESC, adr.id DESC
             LIMIT 500
             """,
             this::mapDailyResult,
@@ -886,10 +973,27 @@ public class AttendanceRepository {
 
     private String dailyResultSelectSql() {
         return """
-            SELECT id, user_id, work_date, schedule_id, group_id, shift_id,
-                   result_status, late_minutes, early_leave_minutes,
-                   absence_minutes, work_minutes, exception_flag, calculated_at
-            FROM att_daily_result
+            SELECT adr.id,
+                   adr.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   adr.work_date,
+                   adr.schedule_id,
+                   adr.group_id,
+                   ag.group_name,
+                   adr.shift_id,
+                   sh.shift_name,
+                   adr.result_status,
+                   adr.late_minutes,
+                   adr.early_leave_minutes,
+                   adr.absence_minutes,
+                   adr.work_minutes,
+                   adr.exception_flag,
+                   adr.calculated_at
+            FROM att_daily_result adr
+            LEFT JOIN org_user u ON u.id = adr.user_id
+            LEFT JOIN att_group ag ON ag.id = adr.group_id
+            LEFT JOIN att_shift sh ON sh.id = adr.shift_id
             """;
     }
 
@@ -935,7 +1039,10 @@ public class AttendanceRepository {
         return new AttendanceGroupMemberRow(
             rs.getLong("id"),
             rs.getLong("group_id"),
+            rs.getString("group_name"),
             rs.getLong("user_id"),
+            rs.getString("employee_no"),
+            rs.getString("real_name"),
             rs.getDate("effective_from").toLocalDate(),
             localDate(rs, "effective_to"),
             rs.getString("source_type"),
@@ -947,9 +1054,13 @@ public class AttendanceRepository {
         return new AttendanceScheduleRow(
             rs.getLong("id"),
             rs.getLong("user_id"),
+            rs.getString("employee_no"),
+            rs.getString("real_name"),
             rs.getDate("work_date").toLocalDate(),
             rs.getLong("shift_id"),
+            rs.getString("shift_name"),
             rs.getObject("calendar_id", Long.class),
+            rs.getString("calendar_name"),
             rs.getString("schedule_source"),
             rs.getString("status")
         );
@@ -959,10 +1070,14 @@ public class AttendanceRepository {
         return new AttendanceDailyResultRow(
             rs.getLong("id"),
             rs.getLong("user_id"),
+            rs.getString("employee_no"),
+            rs.getString("real_name"),
             rs.getDate("work_date").toLocalDate(),
             rs.getObject("schedule_id", Long.class),
             rs.getObject("group_id", Long.class),
+            rs.getString("group_name"),
             rs.getObject("shift_id", Long.class),
+            rs.getString("shift_name"),
             rs.getString("result_status"),
             rs.getInt("late_minutes"),
             rs.getInt("early_leave_minutes"),

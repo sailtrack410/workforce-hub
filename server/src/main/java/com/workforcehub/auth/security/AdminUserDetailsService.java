@@ -2,6 +2,7 @@ package com.workforcehub.auth.security;
 
 import com.workforcehub.auth.domain.AdminUser;
 import com.workforcehub.auth.mapper.AdminUserMapper;
+import com.workforcehub.auth.service.AdminPermissionService;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -15,9 +16,12 @@ import org.springframework.stereotype.Service;
 public class AdminUserDetailsService implements UserDetailsService {
 
     private final AdminUserMapper adminUserMapper;
+    private final AdminPermissionService adminPermissionService;
 
-    public AdminUserDetailsService(AdminUserMapper adminUserMapper) {
+    public AdminUserDetailsService(AdminUserMapper adminUserMapper,
+                                   AdminPermissionService adminPermissionService) {
         this.adminUserMapper = adminUserMapper;
+        this.adminPermissionService = adminPermissionService;
     }
 
     @Override
@@ -27,14 +31,16 @@ public class AdminUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("管理员账号不存在");
         }
 
+        AdminPermissionService.AdminPermissionProfile permissionProfile =
+            adminPermissionService.resolveProfile(admin.getId());
         return new AdminUserDetails(
             admin.getId(),
             admin.getUsername(),
             admin.getPasswordHash(),
             admin.getDisplayName(),
             admin.getStatus(),
-            adminUserMapper.selectRoleCodes(admin.getId()),
-            adminUserMapper.selectPermissionCodes(admin.getId())
+            permissionProfile.roleCodes(),
+            permissionProfile.permissionCodes()
         );
     }
 }

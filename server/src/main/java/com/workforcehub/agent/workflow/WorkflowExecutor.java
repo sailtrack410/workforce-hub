@@ -379,9 +379,9 @@ public class WorkflowExecutor {
         return basePrompt
             + "请根据以下输入内容判断属于哪个意图类别。\n\n"
             + "可选意图：" + intentList + " / 其他\n\n"
-            + "判断规则：只要问题询问制度、政策、知识库或文档，即使包含请假、年假、申请等词，也优先返回 KNOWLEDGE；"
-            + "如果可选意图包含发起请假流程，用户表达我要请假、我想请假、打算请假、准备请假、需要请假、发起请假、办理请假、提交请假或执行 OA 请假流程时返回发起请假流程；"
-            + "只有询问怎么请假、请假制度、请假规则、请假政策或请假流程是什么时才返回知识库；"
+            + "判断规则：先判断用户是不是在问制度、政策、规则、流程说明、知识库或文档；"
+            + "只要是在问这些说明类内容，即使同时包含请假、年假、申请、办理、我想请假等词，也优先返回知识库；"
+            + "只有用户明确要求发起、提交或办理请假，且没有询问制度、政策、规则、流程说明、知识库或文档时，才返回发起请假流程；"
             + "如果可选意图包含更细的 OA 意图，部门人数、成员数、同事数量返回查询部门人数，假期余额、年假剩余返回查询假期；"
             + "只有没有细分意图时，查询个人假期余额、审批、流程或申请办理才返回 OA。\n\n"
             + "输入内容：" + inputText + "\n\n"
@@ -777,11 +777,13 @@ public class WorkflowExecutor {
                 ? agentRepository.getLlmModel(Long.parseLong(modelIdText.trim()))
                 : firstActiveModel();
             if (model != null && StringUtils.hasText(model.apiKey())) {
-                return write(objectMapper, java.util.Map.of(
-                    "baseUrl", model.endpoint() == null ? "" : model.endpoint(),
-                    "apiKey", model.apiKey(),
-                    "model", model.modelName()
-                ));
+                ObjectNode modelConfig = objectMapper.createObjectNode();
+                modelConfig.put("baseUrl", model.endpoint() == null ? "" : model.endpoint());
+                modelConfig.put("apiKey", model.apiKey());
+                modelConfig.put("model", model.modelName());
+                copyModelTuningFields(modelConfig, readModelConfig(fallbackModelConfigJson));
+                copyModelTuningFields(modelConfig, node.config());
+                return write(objectMapper, modelConfig);
             }
         } catch (NumberFormatException ignored) {
             return StringUtils.hasText(fallbackModelConfigJson) ? fallbackModelConfigJson : "{}";
@@ -789,11 +791,38 @@ public class WorkflowExecutor {
         return StringUtils.hasText(fallbackModelConfigJson) ? fallbackModelConfigJson : "{}";
     }
 
+    private JsonNode readModelConfig(String modelConfigJson) {
+        if (!StringUtils.hasText(modelConfigJson)) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            return objectMapper.readTree(modelConfigJson);
+        } catch (Exception ignored) {
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private void copyModelTuningFields(ObjectNode target, JsonNode source) {
+        if (source == null || !source.isObject()) {
+            return;
+        }
+        for (String field : List.of("timeout", "maxTokens", "temperature")) {
+            JsonNode value = source.get(field);
+            if (value != null && !value.isNull()) {
+                target.set(field, value.deepCopy());
+            }
+        }
+    }
+
     private LlmModelRow firstActiveModel() {
         return agentRepository.listLlmModels().stream()
-            .filter(model -> "ACTIVE".equals(model.status()) && StringUtils.hasText(model.apiKey()))
+            .filter(model -> "ACTIVE".equals(model.status()) && "TEXT".equals(model.modelType()) && StringUtils.hasText(model.apiKey()))
+            .filter(model -> Boolean.TRUE.equals(model.defaultFlag()))
             .findFirst()
-            .orElse(null);
+            .orElseGet(() -> agentRepository.listLlmModels().stream()
+                .filter(model -> "ACTIVE".equals(model.status()) && "TEXT".equals(model.modelType()) && StringUtils.hasText(model.apiKey()))
+                .findFirst()
+                .orElse(null));
     }
 
     private long elapsedMillis(long startedNanos) {
@@ -881,6 +910,12 @@ public class WorkflowExecutor {
                     if (!dataSourceOutput.isEmpty()) {
                         result.set("dataSources", dataSourceOutput);
                     }
+                    if (version != null) {
+                        ArrayNode toolCalls = executeNodeToolCallsForPreview(version, node, context);
+                        if (!toolCalls.isEmpty()) {
+                            result.set("toolCalls", toolCalls);
+                        }
+                    }
                     String prompt;
                     if (node.type() == WorkflowNodeType.INTENT) {
                         prompt = intentPrompt(node, context);
@@ -921,6 +956,44 @@ public class WorkflowExecutor {
         }
 
         return objectMapper.convertValue(result, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+    }
+
+    private ArrayNode executeNodeToolCallsForPreview(AgentVersionRow version,
+                                                     WorkflowNode node,
+                                                     WorkflowContext context) {
+        ArrayNode outputs = objectMapper.createArrayNode();
+        JsonNode calls = node.config().path("toolCalls");
+        if (!calls.isArray() || calls.isEmpty()) {
+            return outputs;
+        }
+        for (JsonNode toolCall : calls) {
+            ObjectNode output = executeSingleToolCallForPreview(version, toolCall, context);
+            outputs.add(output);
+            String outputKey = toolCall.path("outputKey").asText("");
+            if (StringUtils.hasText(outputKey)) {
+                context.putJson(outputKey, output.path("response"));
+            }
+        }
+        return outputs;
+    }
+
+    private ObjectNode executeSingleToolCallForPreview(AgentVersionRow version,
+                                                       JsonNode toolCall,
+                                                       WorkflowContext context) {
+        String toolCode = toolCall.path("toolCode").asText("").trim().toUpperCase();
+        AgentToolBindingRow binding = agentRepository.getBindingByVersionAndToolCode(version.id(), toolCode);
+        if (binding == null) {
+            agentRepository.getActiveToolByCodeOrThrow(toolCode);
+            throw new BizException(403, "AI助手未授权调用该工具");
+        }
+        JsonNode args = templateResolver.resolveJson(toolCall.path("args"), context);
+        String requestPayloadJson = write(objectMapper, args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
+        String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson);
+        ObjectNode output = objectMapper.createObjectNode();
+        output.put("toolCode", toolCode);
+        output.set("request", readJson(requestPayloadJson));
+        output.set("response", readJson(responsePayloadJson));
+        return output;
     }
 
 }

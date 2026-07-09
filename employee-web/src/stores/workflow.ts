@@ -69,28 +69,28 @@ export const useWorkflowStore = defineStore('employee-workflow', {
 });
 
 export function mapWorkflowTodoToRecord(todo: WorkflowTodoResponse): TodoRecord {
+  const statusText = todo.statusName || statusLabel(todo.status);
+  const priorityText = todo.priorityName || normalizePriority(todo.priority);
   return {
     id: `workflow-todo-${todo.todoId}`,
     title: todo.title,
-    subtitle: statusLabel(todo.status),
+    subtitle: statusText,
     note: todo.summary,
     time: formatTodoTime(todo.createdAt),
     status: todo.status,
-    priority: normalizePriority(todo.priority),
-    requestNo: `REQ-${todo.requestId}`,
+    priority: priorityText,
+    requestNo: '',
     taskId: todo.taskId,
-    currentStepName: statusLabel(todo.status),
+    currentStepName: statusText,
     summary: todo.summary,
     fields: [
-      ['申请编号', `REQ-${todo.requestId}`],
-      ['任务状态', statusLabel(todo.status)],
-      ['优先级', normalizePriority(todo.priority)],
-      ['当前状态', statusLabel(todo.status)],
+      ['任务状态', statusText],
+      ['优先级', priorityText],
+      ['当前状态', statusText],
     ],
     timeline: [],
     actions: [
-      { label: '审批通过', action: 'approve-todo' },
-      { label: '驳回', action: 'reject-todo' },
+      { label: '查看流程', action: 'open-workbench', app: 'oa' },
     ],
   };
 }
@@ -107,7 +107,7 @@ function statusLabel(status: string) {
   if (status === 'IN_APPROVAL') return '审批中';
   if (status === 'APPROVED') return '已通过';
   if (status === 'REJECTED') return '已驳回';
-  return status;
+  return status ? '其他状态' : '-';
 }
 
 function formatTodoTime(value?: string | null) {

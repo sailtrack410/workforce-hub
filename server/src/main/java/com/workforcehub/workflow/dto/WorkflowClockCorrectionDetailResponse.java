@@ -13,6 +13,7 @@ public class WorkflowClockCorrectionDetailResponse {
 
     private LocalDate targetDate;
     private String missingPunchType;
+    private String missingPunchTypeName;
     private LocalDateTime expectedPunchAt;
     private String reason;
 }

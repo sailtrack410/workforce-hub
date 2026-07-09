@@ -166,9 +166,12 @@ public class FileCleanupJobService {
     private CleanupJobRunResponse buildResponse(String jobRunId, String jobType, boolean dryRun, CleanupStats stats) {
         CleanupJobRunResponse response = new CleanupJobRunResponse();
         response.setJobRunId(jobRunId);
+        response.setJobRunNo(cleanupJobNo(jobRunId));
         response.setJobType(jobType);
+        response.setJobTypeName(jobTypeName(jobType));
         response.setDryRun(dryRun);
         response.setJobStatus(stats.jobStatus);
+        response.setJobStatusName(jobStatusName(stats.jobStatus));
         response.setExpiredUploadTickets(stats.expiredUploadTickets);
         response.setExpiredDownloadTickets(stats.expiredDownloadTickets);
         response.setPurgedAttachmentRefs(stats.purgedAttachmentRefs);
@@ -177,6 +180,32 @@ public class FileCleanupJobService {
         response.setReleasedBytes(stats.releasedBytes);
         response.setErrorMessage(stats.errorMessage);
         return response;
+    }
+
+    private String jobTypeName(String value) {
+        if ("ALL_EXPIRED".equals(value)) return "全部到期清理";
+        if ("EXPIRED_UPLOAD_TICKET".equals(value)) return "过期上传票据";
+        if ("EXPIRED_DOWNLOAD_TICKET".equals(value)) return "过期下载票据";
+        if ("EXPIRED_RECYCLE_REF".equals(value)) return "到期回收站引用";
+        if ("UNREFERENCED_FILE_OBJECT".equals(value)) return "无引用物理对象";
+        if ("FAILED_PHYSICAL_OBJECT".equals(value)) return "失败物理对象重试";
+        return value == null ? null : "清理任务";
+    }
+
+    private String jobStatusName(String value) {
+        if ("SUCCESS".equals(value) || "SUCCEEDED".equals(value)) return "成功";
+        if ("FAILED".equals(value)) return "失败";
+        if ("RUNNING".equals(value)) return "运行中";
+        return value == null ? null : "其他状态";
+    }
+
+    private String cleanupJobNo(String jobRunId) {
+        if (jobRunId == null || jobRunId.isBlank()) {
+            return "清理任务";
+        }
+        int index = jobRunId.lastIndexOf('-');
+        String suffix = index >= 0 ? jobRunId.substring(index + 1) : jobRunId;
+        return "清理任务 " + suffix.substring(Math.max(0, suffix.length() - 6));
     }
 
     private static class CleanupStats {

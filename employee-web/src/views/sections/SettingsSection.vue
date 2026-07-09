@@ -5,7 +5,6 @@ import {
   LogOut,
   MoonStar,
   SunMedium,
-  PencilLine,
 } from 'lucide-vue-next';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -21,12 +20,13 @@ import type {
 import { createEmailCodeCooldown } from '@/composables/emailCodeCooldown';
 import { useCurrentUserAvatarUrl } from '@/composables/useCurrentUserAvatarUrl';
 import { usePersonalFileTransfer } from '@/composables/usePersonalFileTransfer';
+import { ensureBrowserNotificationPermission } from '@/services/notifications';
 import { useSettingsSectionContext } from '../employee-shell-context';
 import { displayField, employmentStatusLabel } from '@/utils/employee-format';
 import { normalizeSettingsPanel, shellUser } from '@/stores/shell';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
-import AppEmptyState from '../../components/ui/AppEmptyState.vue';
+import AppErrorState from '../../components/ui/AppErrorState.vue';
 import AppInput from '../../components/ui/AppInput.vue';
 
 type FieldRows = Array<[string, string]>;
@@ -59,6 +59,8 @@ const mobileSubmitting = ref(false);
 const mobileUpdateNotice = ref('');
 const mobileUpdateError = ref('');
 const mobileInput = ref<HTMLInputElement | null>(null);
+const emailCard = ref<HTMLElement | null>(null);
+const passwordCard = ref<HTMLElement | null>(null);
 const passwordChangeForm = ref({ code: '', newPassword: '' });
 const passwordChangeCodeSending = ref(false);
 const passwordChangeCodeCooldown = createEmailCodeCooldown();
@@ -69,17 +71,11 @@ const avatarUploading = ref(false);
 const avatarUpdateError = ref('');
 const avatarPickerInput = ref<HTMLInputElement | null>(null);
 const logoutSubmitting = ref(false);
-const colleagueAvatarUrls = ref<Record<string, string>>({});
-const signatureDraft = ref('');
-const signatureSaving = ref(false);
-const signatureSaveError = ref('');
-const signatureSaveNotice = ref('');
 const preferencesHydrated = ref(false);
 let preferencePushTimer: number | undefined;
 
 const {
   uploadAvatarAttachment,
-  resolveDownloadUrl,
 } = usePersonalFileTransfer();
 const { refreshCurrentUserAvatarUrl } = useCurrentUserAvatarUrl(shell, session);
 
@@ -111,24 +107,31 @@ const bubbleStyleOptions: Array<{ value: BubbleStyle; label: string }> = [
 ];
 
 const activeProfile = computed(() => shell.activeProfile);
-const activeFile = computed(() => shell.activeFile);
-const selectedProfileId = computed(() => activeProfile.value.id === 'profile' ? 'security' : activeProfile.value.id);
+const selectedProfileId = computed(() => activeProfile.value.id);
 const currentUserName = computed(() => session.displayName || shellUser.name);
 const currentUserShortName = computed(() => session.shortName || shellUser.shortName);
 const profileStatusLabel = computed(() => employmentStatusLabel(session.profile?.employmentStatus ?? session.user?.employmentStatus));
 const currentEmail = computed(() => session.user?.email?.trim() ?? '');
 const themeLabel = computed(() => (shell.theme === 'light' ? '浅色' : '深色'));
+const presenceStatusLabel = computed(() => (
+  presenceOptions.find((item) => item.value === shell.presenceStatus)?.label ?? '在线'
+));
+const messageDensityLabel = computed(() => (shell.messageDensity === 'compact' ? '紧凑' : '宽松'));
 const bindEmailCodeButtonText = computed(() => (
   bindEmailCodeSending.value ? '发送中' : bindEmailCodeCooldown.label.value
 ));
 const passwordChangeCodeButtonText = computed(() => (
   passwordChangeCodeSending.value ? '发送中' : passwordChangeCodeCooldown.label.value
 ));
-const accountSecurityRows = computed<FieldRows>(() => [
-  ['用户类型', displayField(session.user?.userType)],
-  ['会话状态', session.user ? '已登录' : '未登录'],
+const profileRows = computed<FieldRows>(() => [
+  ['岗位', displayField(session.profile?.positionName)],
+  ['入职日期', displayField(session.profile?.hireDate)],
+]);
+const accountRows = computed<FieldRows>(() => [
   ['登录名', displayField(session.user?.loginName)],
-  ['邮箱', displayField(session.user?.email)],
+  ['手机号', displayField(session.profile?.mobile)],
+  ['绑定邮箱', currentEmail.value || '未绑定'],
+  ['账号状态', session.user ? '正常' : '未登录'],
 ]);
 const relationTree = computed<RelationTree>(() => {
   const ownName = session.displayName || currentUserName.value;
@@ -140,36 +143,14 @@ const relationTree = computed<RelationTree>(() => {
   };
 });
 const organizationRows = computed<FieldRows>(() => [
-  ['部门', relationTree.value.department],
+  ['所属部门', relationTree.value.department],
   ['岗位', displayField(session.profile?.positionName)],
   ['直属上级', displayField(relationTree.value.managerName || session.profile?.managerName)],
   ['直属下级', `${relationTree.value.subordinates.length} 人`],
 ]);
-const preferenceRows = computed<FieldRows>(() => [
-  ['颜色模式', themeLabel.value],
-  ['消息密度', shell.messageDensity === 'cozy' ? '宽松' : '紧凑'],
-  ['列表宽度', `${shell.listWidth}px`],
-]);
-const storageRows = computed<FieldRows>(() => activeFile.value.summary.map(([value, label]) => [label, value]));
-const recentFileRows = computed(() => activeFile.value.files.slice(0, 5));
-const personalizationRows = computed<FieldRows>(() => [
-  ['在线状态', presenceOptions.find((item) => item.value === shell.presenceStatus)?.label ?? shell.presenceStatus],
-  ['强调色', accentColorOptions.find((item) => item.value === shell.accentColor)?.label ?? shell.accentColor],
-  ['字号', fontScaleOptions.find((item) => item.value === shell.fontScale)?.label ?? shell.fontScale],
-  ['气泡样式', bubbleStyleOptions.find((item) => item.value === shell.bubbleStyle)?.label ?? shell.bubbleStyle],
-]);
-const notificationRows = computed<FieldRows>(() => [
-  ['声音提醒', shell.notifSound ? '开启' : '关闭'],
-  ['桌面通知', shell.notifDesktop ? '开启' : '关闭'],
-  ['仅 @ 我提醒', shell.notifMentionOnly ? '开启' : '关闭'],
-  ['未读角标', shell.notifUnreadBadge ? '开启' : '关闭'],
-]);
-const colleagues = computed(() => session.colleagues);
 const colleaguesLoading = computed(() => session.profileLoading);
 const colleaguesError = computed(() => session.profileError);
-function colleagueAvatarUrl(user: OrgUserSummaryResponse) {
-  return colleagueAvatarUrls.value[String(user.avatarAttachmentRefId ?? '')] || '';
-}
+const preferenceDisabled = computed(() => !preferencesHydrated.value);
 
 void hydrateUserPreferences();
 void refreshCurrentUserAvatarUrl();
@@ -181,7 +162,6 @@ async function hydrateUserPreferences() {
   } catch {
     return;
   } finally {
-    signatureDraft.value = shell.signature;
     preferencesHydrated.value = true;
   }
 }
@@ -220,6 +200,12 @@ async function openMobileReset() {
   mobileInput.value?.focus();
 }
 
+async function retryOrgProfile() {
+  await session.loadOrgProfile();
+  shell.setColleagues(session.colleagues);
+  shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
+}
+
 function backToList() {
   shell.setMobileView('list');
 }
@@ -230,10 +216,19 @@ function selectSettingsItem(id: string) {
   void router.push({ name: 'employee-settings-detail', params: { panel: canonical } });
 }
 
-function goPersonalFiles() {
-  shell.selectItem('files', 'personal');
-  shell.setSection('files');
-  void router.push({ name: 'employee-files' });
+async function openEmailBinding() {
+  startBindEmailEditing();
+  selectSettingsItem('security');
+  await nextTick();
+  emailCard.value?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  (emailCard.value?.querySelector('input') as HTMLInputElement | null)?.focus();
+}
+
+async function openPasswordChange() {
+  selectSettingsItem('security');
+  await nextTick();
+  passwordCard.value?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  (passwordCard.value?.querySelector('input:not(:disabled)') as HTMLInputElement | null)?.focus();
 }
 
 async function submitMobileUpdate() {
@@ -243,7 +238,10 @@ async function submitMobileUpdate() {
   mobileUpdateError.value = '';
   mobileSubmitting.value = true;
   try {
-    await employeeApi.me.updateProfile({ mobile: mobile || null });
+    await employeeApi.me.updateProfile({
+      mobile: mobile || null,
+      avatarAttachmentRefId: session.profile?.avatarAttachmentRefId ?? null,
+    });
     await session.loadCurrentUser();
     await session.loadOrgProfile();
     shell.setColleagues(session.colleagues);
@@ -268,7 +266,7 @@ async function sendBindEmailCode() {
   try {
     await employeeApi.auth.sendEmailCode({ email, purpose: 'BIND' });
     bindEmailCodeCooldown.start();
-    bindEmailNotice.value = '验证码已发送，60 秒后可再次发送';
+    bindEmailNotice.value = '验证码已发送';
     showToast(bindEmailNotice.value);
   } catch (error) {
     bindEmailError.value = error instanceof Error ? error.message : '验证码发送失败';
@@ -333,7 +331,7 @@ async function sendPasswordChangeCode() {
   try {
     await session.sendPasswordResetCode(email);
     passwordChangeCodeCooldown.start();
-    passwordChangeNotice.value = '验证码已发送至当前邮箱，60 秒后可再次发送';
+    passwordChangeNotice.value = '验证码已发送';
     showToast(passwordChangeNotice.value);
   } catch (error) {
     passwordChangeError.value = error instanceof Error ? error.message : '验证码发送失败';
@@ -355,7 +353,7 @@ async function submitPasswordChange() {
     await session.resetPassword({ email, code, newPassword });
     passwordChangeForm.value.code = '';
     passwordChangeForm.value.newPassword = '';
-    passwordChangeNotice.value = '密码已更新，下次登录请使用新密码';
+    passwordChangeNotice.value = '密码已更新';
     showToast(passwordChangeNotice.value);
   } catch (error) {
     passwordChangeError.value = error instanceof Error ? error.message : '密码修改失败';
@@ -385,7 +383,10 @@ async function handleAvatarSelected(event: Event) {
   avatarUpdateError.value = '';
   try {
     const attachment = await uploadAvatarAttachment(file);
-    await employeeApi.me.updateProfile({ avatarAttachmentRefId: attachment.attachmentRefId });
+    await employeeApi.me.updateProfile({
+      mobile: session.profile?.mobile ?? null,
+      avatarAttachmentRefId: attachment.attachmentRefId,
+    });
     await session.loadOrgProfile();
     shell.setColleagues(session.colleagues);
     shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
@@ -401,6 +402,7 @@ async function handleAvatarSelected(event: Event) {
 
 async function handleLogout() {
   if (logoutSubmitting.value) return;
+  if (typeof globalThis.confirm === 'function' && !globalThis.confirm('确认退出登录？')) return;
   logoutSubmitting.value = true;
   try {
     await session.logout();
@@ -411,26 +413,6 @@ async function handleLogout() {
     showToast(error instanceof Error ? error.message : '退出登录失败');
   } finally {
     logoutSubmitting.value = false;
-  }
-}
-
-async function saveSignature() {
-  if (signatureSaving.value) return;
-  signatureSaving.value = true;
-  signatureSaveError.value = '';
-  signatureSaveNotice.value = '';
-  const signature = signatureDraft.value.trim().slice(0, 140);
-  try {
-    shell.setSignature(signature);
-    await pushPreferencesNow({ signature });
-    signatureDraft.value = shell.signature;
-    signatureSaveNotice.value = '签名已保存';
-    showToast(signatureSaveNotice.value);
-  } catch (error) {
-    signatureSaveError.value = error instanceof Error ? error.message : '签名保存失败';
-    showToast(signatureSaveError.value);
-  } finally {
-    signatureSaving.value = false;
   }
 }
 
@@ -476,6 +458,11 @@ async function updateBubbleStyle(style: BubbleStyle) {
 }
 
 async function updateNotificationPreference(field: NotificationPreferenceField, value: boolean) {
+  if (field === 'notifDesktop' && value && !await ensureBrowserNotificationPermission()) {
+    shell.setNotificationPreference(field, false);
+    showToast('桌面通知未授权');
+    return;
+  }
   shell.setNotificationPreference(field, value);
   try {
     await pushPreferencesNow({ [field]: value });
@@ -491,32 +478,9 @@ watch(
   },
 );
 
-watch(() => shell.signature, (signature) => {
-  if (!signatureSaving.value) signatureDraft.value = signature;
-}, { immediate: true });
-
 watch(() => session.profile?.avatarAttachmentRefId, () => {
   void refreshCurrentUserAvatarUrl();
 });
-
-watch(colleagues, async (rows) => {
-  const ids = rows
-    .map((item) => item.avatarAttachmentRefId)
-    .filter((id): id is NonNullable<typeof id> => id !== null && id !== undefined)
-    .map((id) => String(id));
-  const missing = ids.filter((id) => !colleagueAvatarUrls.value[id]);
-  if (!missing.length) return;
-  const next = { ...colleagueAvatarUrls.value };
-  await Promise.all(missing.map(async (id) => {
-    try {
-      const ticket = await employeeApi.files.createDownloadTicket(id, { downloadType: 'INLINE' });
-      next[id] = resolveDownloadUrl(ticket, employeeApi.files.downloadUrl(ticket.ticketNo));
-    } catch {
-      next[id] = '';
-    }
-  }));
-  colleagueAvatarUrls.value = next;
-}, { immediate: true });
 
 watch(() => session.profile?.mobile, (mobile) => {
   if (!mobileSubmitting.value) {
@@ -549,65 +513,24 @@ onBeforeUnmount(() => {
   </header>
 
   <section class="content-stack settings-dashboard">
-    <section v-if="selectedProfileId === 'organization'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>所在部门</h3>
-        </header>
-        <dl class="settings-list">
-          <div v-for="row in organizationRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
-      </article>
+    <AppErrorState
+      v-if="session.profileError"
+      title="档案加载失败"
+      :description="session.profileError"
+      action-label="重试"
+      @retry="retryOrgProfile"
+    />
 
-      <article v-if="relationTree.managerName || relationTree.subordinates.length" class="settings-card">
-        <header class="settings-card-head">
-          <h3>上下级</h3>
-        </header>
-        <dl class="settings-list compact">
-          <div>
-            <dt>直属上级</dt>
-            <dd>{{ relationTree.managerName || '暂无' }}</dd>
-          </div>
-          <div>
-            <dt>直属下级</dt>
-            <dd>{{ relationTree.subordinates.length ? `${relationTree.subordinates.length} 人` : '暂无' }}</dd>
-          </div>
-        </dl>
-        <div v-if="relationTree.subordinates.length" class="settings-member-list">
-          <span v-for="user in relationTree.subordinates" :key="user.userId">
-            {{ user.realName }}
-          </span>
-        </div>
-      </article>
-
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>同部门同事 <small v-if="colleagues.length">（{{ colleagues.length }} 人）</small></h3>
-        </header>
-        <p v-if="colleaguesError" class="dialog-error">{{ colleaguesError }}</p>
-        <AppEmptyState v-else-if="!colleaguesLoading && !colleagues.length" title="暂无同事" description="当前部门只有你一个人" />
-        <p v-else-if="colleaguesLoading" class="form-hint">加载中…</p>
-        <div v-else class="colleague-list">
-          <div v-for="user in colleagues" :key="user.userId" class="colleague-row">
-            <AppAvatar :label="user.realName || '同事'" :image="colleagueAvatarUrl(user)" tone="primary" size="sm" />
-            <div>
-              <strong>{{ user.realName }}</strong>
-              <small>{{ user.positionName || '未设置岗位' }}<span v-if="user.managerName"> · 直属上级 {{ user.managerName }}</span></small>
-            </div>
-          </div>
-        </div>
-      </article>
-    </section>
-
-    <section v-else-if="selectedProfileId === 'security'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card personal-compact-card">
+    <section v-if="selectedProfileId === 'profile'" class="personal-center">
+      <article class="personal-center-head">
         <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="xl" status="online" />
-        <div class="personal-compact-copy">
+        <div class="personal-center-title">
+          <span>个人中心</span>
           <h3>{{ currentUserName }}</h3>
-          <p>{{ session.positionName || '未设置岗位' }}<span v-if="session.departmentName"> · {{ session.departmentName }}</span></p>
+          <p>
+            <span v-if="session.departmentName">{{ session.departmentName }}</span>
+            <span v-if="session.positionName"> · {{ session.positionName }}</span>
+          </p>
           <span>{{ profileStatusLabel }}</span>
         </div>
         <input
@@ -617,25 +540,143 @@ onBeforeUnmount(() => {
           hidden
           @change="handleAvatarSelected"
         />
-        <div class="personal-compact-actions">
-          <button type="button" class="personal-action-button" :disabled="avatarUploading" @click="openAvatarPicker">
+        <div class="personal-center-actions">
+          <AppButton variant="secondary" size="sm" :disabled="avatarUploading" @click="openAvatarPicker">
             <Camera :size="15" />
             {{ avatarUploading ? '上传中' : '更换头像' }}
-          </button>
-          <button type="button" class="personal-action-button danger" :disabled="logoutSubmitting" @click="handleLogout">
-            <LogOut :size="15" />
-            {{ logoutSubmitting ? '退出中' : '退出登录' }}
-          </button>
+          </AppButton>
         </div>
-        <p v-if="avatarUpdateError" class="dialog-error personal-hero-error">{{ avatarUpdateError }}</p>
+        <p v-if="avatarUpdateError" class="dialog-error personal-center-error">{{ avatarUpdateError }}</p>
+      </article>
+
+      <section class="personal-status-grid" aria-label="个人状态">
+        <article class="personal-status-card">
+          <header>
+            <span>身份状态</span>
+            <strong>{{ profileStatusLabel }}</strong>
+          </header>
+          <dl class="personal-status-list">
+            <div v-for="row in profileRows" :key="row[0]">
+              <dt>{{ row[0] }}</dt>
+              <dd>{{ row[1] }}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="personal-status-card">
+          <header>
+            <span>组织状态</span>
+            <strong>{{ displayField(session.departmentName) }}</strong>
+          </header>
+          <dl class="personal-status-list">
+            <div>
+              <dt>直属上级</dt>
+              <dd>{{ displayField(relationTree.managerName || session.profile?.managerName) }}</dd>
+            </div>
+            <div>
+              <dt>直属下级</dt>
+              <dd>{{ relationTree.subordinates.length }} 人</dd>
+            </div>
+          </dl>
+          <footer>
+            <button type="button" @click="selectSettingsItem('organization')">查看组织关系</button>
+          </footer>
+        </article>
+
+        <article class="personal-status-card">
+          <header>
+            <span>账号状态</span>
+            <strong>{{ session.user ? '正常' : '未登录' }}</strong>
+          </header>
+          <dl class="personal-status-list">
+            <div>
+              <dt>手机号</dt>
+              <dd>{{ displayField(session.profile?.mobile) }}</dd>
+            </div>
+            <div>
+              <dt>邮箱</dt>
+              <dd>{{ currentEmail ? '已绑定' : '未绑定' }}</dd>
+            </div>
+          </dl>
+          <footer>
+            <button type="button" @click="openMobileReset">修改手机号</button>
+            <button type="button" @click="openEmailBinding">{{ currentEmail ? '换绑邮箱' : '绑定邮箱' }}</button>
+            <button type="button" @click="openPasswordChange">修改密码</button>
+          </footer>
+        </article>
+
+        <article class="personal-status-card">
+          <header>
+            <span>偏好状态</span>
+            <strong>{{ presenceStatusLabel }}</strong>
+          </header>
+          <dl class="personal-status-list">
+            <div>
+              <dt>主题</dt>
+              <dd>{{ themeLabel }}</dd>
+            </div>
+            <div>
+              <dt>消息密度</dt>
+              <dd>{{ messageDensityLabel }}</dd>
+            </div>
+          </dl>
+          <footer>
+            <button type="button" @click="selectSettingsItem('preferences')">设置偏好</button>
+          </footer>
+        </article>
+      </section>
+    </section>
+
+    <section v-else-if="selectedProfileId === 'organization'" class="settings-card-grid">
+      <article class="settings-card settings-wide-card">
+        <header class="settings-card-head">
+          <h3>组织关系</h3>
+        </header>
+        <dl class="settings-list">
+          <div v-for="row in organizationRows" :key="row[0]">
+            <dt>{{ row[0] }}</dt>
+            <dd>{{ row[1] }}</dd>
+          </div>
+        </dl>
       </article>
 
       <article class="settings-card">
         <header class="settings-card-head">
-          <h3>账号概览</h3>
+          <h3>组织链路</h3>
         </header>
-        <dl class="settings-list">
-          <div v-for="row in accountSecurityRows" :key="row[0]">
+        <div class="settings-org-chart compact-org-chart">
+          <div class="settings-org-level">
+            <span class="settings-org-node department-node">{{ relationTree.department }}</span>
+          </div>
+          <div class="settings-org-level">
+            <span class="settings-org-node">{{ relationTree.managerName || '暂无上级' }}</span>
+            <span class="settings-org-node current-user-node">{{ relationTree.ownName }}</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="settings-card">
+        <header class="settings-card-head">
+          <h3>直属下级</h3>
+        </header>
+        <p v-if="colleaguesError" class="dialog-error">{{ colleaguesError }}</p>
+        <p v-else-if="colleaguesLoading" class="form-hint">加载中</p>
+        <div v-else-if="relationTree.subordinates.length" class="settings-member-list compact-member-list">
+          <span v-for="user in relationTree.subordinates" :key="user.userId">
+            {{ user.realName }}
+          </span>
+        </div>
+        <p v-else class="empty-inline">暂无下属</p>
+      </article>
+    </section>
+
+    <section v-else-if="selectedProfileId === 'security'" class="settings-card-grid">
+      <article class="settings-card settings-wide-card">
+        <header class="settings-card-head">
+          <h3>账号安全</h3>
+        </header>
+        <dl class="settings-list two-column">
+          <div v-for="row in accountRows" :key="row[0]">
             <dt>{{ row[0] }}</dt>
             <dd>{{ row[1] }}</dd>
           </div>
@@ -668,7 +709,7 @@ onBeforeUnmount(() => {
         </div>
       </article>
 
-      <article class="settings-card">
+      <article ref="emailCard" class="settings-card">
         <header class="settings-card-head">
           <h3>邮箱绑定</h3>
         </header>
@@ -682,7 +723,7 @@ onBeforeUnmount(() => {
               换绑
             </AppButton>
           </div>
-          <label class="security-field">
+          <label v-if="!currentEmail || bindEmailEditing" class="security-field">
             <span>{{ currentEmail ? '新邮箱' : '邮箱地址' }}</span>
             <AppInput v-model="bindEmail" type="email" placeholder="邮箱地址" />
           </label>
@@ -711,12 +752,20 @@ onBeforeUnmount(() => {
         </div>
       </article>
 
-      <article class="settings-card">
+      <article ref="passwordCard" class="settings-card">
         <header class="settings-card-head">
           <h3>修改密码</h3>
         </header>
         <div class="security-form">
-          <p v-if="!currentEmail" class="form-hint">请先在上方绑定邮箱以接收验证码。</p>
+          <div v-if="!currentEmail" class="bound-email-row">
+            <div>
+              <span>邮箱</span>
+              <strong>未绑定</strong>
+            </div>
+            <AppButton variant="secondary" size="sm" @click="openEmailBinding">
+              绑定邮箱
+            </AppButton>
+          </div>
           <label class="security-field">
             <span>邮箱</span>
             <AppInput :model-value="currentEmail" disabled placeholder="未绑定邮箱" />
@@ -746,38 +795,30 @@ onBeforeUnmount(() => {
           <p v-if="passwordChangeError" class="dialog-error">{{ passwordChangeError }}</p>
         </div>
       </article>
+
+      <article class="settings-card settings-wide-card settings-danger-card">
+        <header class="settings-card-head">
+          <h3>退出登录</h3>
+          <AppButton variant="destructive" size="sm" :disabled="logoutSubmitting" @click="handleLogout">
+            <LogOut :size="15" />
+            {{ logoutSubmitting ? '退出中' : '退出登录' }}
+          </AppButton>
+        </header>
+      </article>
     </section>
 
     <section v-else-if="selectedProfileId === 'preferences'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
+      <article class="settings-card">
         <header class="settings-card-head">
-          <h3>个人状态</h3>
+          <h3>工作状态</h3>
         </header>
-        <div class="signature-editor">
-          <label class="security-field">
-            <span>个性签名</span>
-            <textarea
-              v-model="signatureDraft"
-              class="ui-textarea compact-textarea"
-              maxlength="140"
-              rows="3"
-            />
-          </label>
-          <div class="settings-control-row">
-            <AppButton variant="primary" size="sm" :disabled="signatureSaving" @click="saveSignature">
-              {{ signatureSaving ? '保存中' : '保存签名' }}
-            </AppButton>
-            <span class="settings-inline-count">{{ signatureDraft.length }}/140</span>
-          </div>
-          <p v-if="signatureSaveNotice" class="form-result">{{ signatureSaveNotice }}</p>
-          <p v-if="signatureSaveError" class="dialog-error">{{ signatureSaveError }}</p>
-        </div>
         <div class="settings-density-row">
           <button
             v-for="item in presenceOptions"
             :key="item.value"
             type="button"
             :class="{ active: shell.presenceStatus === item.value }"
+            :disabled="preferenceDisabled"
             @click="updatePresenceStatus(item.value)"
           >
             {{ item.label }}
@@ -787,36 +828,19 @@ onBeforeUnmount(() => {
 
       <article class="settings-card">
         <header class="settings-card-head">
-          <h3>显示设置</h3>
+          <h3>界面设置</h3>
         </header>
-        <dl class="settings-list">
-          <div v-for="row in preferenceRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
         <div class="settings-control-row">
-          <AppButton variant="secondary" size="sm" @click="shell.toggleTheme()">
+          <AppButton variant="secondary" size="sm" :disabled="preferenceDisabled" @click="shell.toggleTheme()">
             <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="14" />
-            切换到{{ shell.theme === 'light' ? '深色' : '浅色' }}
+            {{ themeLabel }}
           </AppButton>
         </div>
-      </article>
-
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>会话显示</h3>
-        </header>
-        <dl class="settings-list">
-          <div v-for="row in personalizationRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
         <div class="settings-density-row">
           <button
             type="button"
             :class="{ active: shell.messageDensity === 'cozy' }"
+            :disabled="preferenceDisabled"
             @click="shell.setMessageDensity('cozy')"
           >
             宽松
@@ -824,6 +848,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             :class="{ active: shell.messageDensity === 'compact' }"
+            :disabled="preferenceDisabled"
             @click="shell.setMessageDensity('compact')"
           >
             紧凑
@@ -835,18 +860,8 @@ onBeforeUnmount(() => {
             :key="item.value"
             type="button"
             :class="{ active: shell.fontScale === item.value }"
+            :disabled="preferenceDisabled"
             @click="updateFontScale(item.value)"
-          >
-            {{ item.label }}
-          </button>
-        </div>
-        <div class="settings-density-row">
-          <button
-            v-for="item in bubbleStyleOptions"
-            :key="item.value"
-            type="button"
-            :class="{ active: shell.bubbleStyle === item.value }"
-            @click="updateBubbleStyle(item.value)"
           >
             {{ item.label }}
           </button>
@@ -855,15 +870,28 @@ onBeforeUnmount(() => {
 
       <article class="settings-card">
         <header class="settings-card-head">
-          <h3>强调色</h3>
+          <h3>消息样式</h3>
         </header>
-        <div class="accent-swatch-grid">
+        <div class="settings-density-row">
+          <button
+            v-for="item in bubbleStyleOptions"
+            :key="item.value"
+            type="button"
+            :class="{ active: shell.bubbleStyle === item.value }"
+            :disabled="preferenceDisabled"
+            @click="updateBubbleStyle(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <div class="accent-swatch-grid compact-swatch-grid">
           <button
             v-for="item in accentColorOptions"
             :key="item.value"
             type="button"
             :class="['accent-swatch', `accent-${item.value}`, { active: shell.accentColor === item.value }]"
             :aria-label="item.label"
+            :disabled="preferenceDisabled"
             @click="updateAccentColor(item.value)"
           >
             <span />
@@ -872,21 +900,16 @@ onBeforeUnmount(() => {
         </div>
       </article>
 
-      <article class="settings-card">
+      <article class="settings-card settings-wide-card">
         <header class="settings-card-head">
-          <h3>通知提醒</h3>
+          <h3>通知设置</h3>
         </header>
-        <dl class="settings-list">
-          <div v-for="row in notificationRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
         <div class="settings-toggle-list">
           <label>
             <input
               type="checkbox"
               :checked="shell.notifSound"
+              :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifSound', ($event.target as HTMLInputElement).checked)"
             />
             <span>声音提醒</span>
@@ -895,6 +918,7 @@ onBeforeUnmount(() => {
             <input
               type="checkbox"
               :checked="shell.notifDesktop"
+              :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifDesktop', ($event.target as HTMLInputElement).checked)"
             />
             <span>桌面通知</span>
@@ -903,6 +927,7 @@ onBeforeUnmount(() => {
             <input
               type="checkbox"
               :checked="shell.notifMentionOnly"
+              :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifMentionOnly', ($event.target as HTMLInputElement).checked)"
             />
             <span>仅 @ 我提醒</span>
@@ -911,6 +936,7 @@ onBeforeUnmount(() => {
             <input
               type="checkbox"
               :checked="shell.notifUnreadBadge"
+              :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifUnreadBadge', ($event.target as HTMLInputElement).checked)"
             />
             <span>未读角标</span>
@@ -919,44 +945,6 @@ onBeforeUnmount(() => {
       </article>
     </section>
 
-    <section v-else-if="selectedProfileId === 'storage'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>文件空间</h3>
-          <AppButton variant="secondary" size="sm" @click="goPersonalFiles">
-            打开云空间
-          </AppButton>
-        </header>
-        <div class="settings-storage-layout">
-          <div class="settings-storage-chart" :style="{ '--storage-level': `${shell.activeFile.usage}%` }">
-            <strong>{{ shell.activeFile.usage }}%</strong>
-            <span>已用</span>
-          </div>
-          <dl class="settings-list">
-            <div v-for="row in storageRows" :key="row[0]">
-              <dt>{{ row[0] }}</dt>
-              <dd>{{ row[1] }}</dd>
-            </div>
-          </dl>
-        </div>
-      </article>
-
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>最近文件</h3>
-          <AppButton variant="primary" size="sm" @click="goPersonalFiles">
-            管理文件
-          </AppButton>
-        </header>
-        <AppEmptyState v-if="!recentFileRows.length" title="暂无文件" description="暂无文件" />
-        <div v-else class="settings-file-list">
-          <div v-for="file in recentFileRows" :key="file.id">
-            <strong>{{ file.name }}</strong>
-            <span>{{ file.size }} · {{ file.status }} · {{ file.createdAt }}</span>
-          </div>
-        </div>
-      </article>
-    </section>
   </section>
 </div>
 </template>

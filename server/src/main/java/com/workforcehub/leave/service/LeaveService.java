@@ -367,7 +367,9 @@ public class LeaveService {
         response.setLeaveCode(row.leaveCode());
         response.setLeaveName(row.leaveName());
         response.setBalanceMode(row.balanceMode());
+        response.setBalanceModeName(balanceModeName(row.balanceMode()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
@@ -379,16 +381,42 @@ public class LeaveService {
         LeaveAccountResponse response = new LeaveAccountResponse();
         response.setAccountId(row.accountId());
         response.setUserId(row.userId());
+        response.setEmployeeNo(row.employeeNo());
+        response.setRealName(row.realName());
         response.setLeaveTypeId(row.leaveTypeId());
         response.setLeaveCode(row.leaveCode());
         response.setLeaveName(row.leaveName());
         response.setBalanceMode(row.balanceMode());
+        response.setBalanceModeName(balanceModeName(row.balanceMode()));
         response.setAvailableMinutes(row.availableMinutes());
         response.setFrozenMinutes(row.frozenMinutes());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setLastTxnType(lastTxnType);
+        response.setLastTxnTypeName(txnTypeName(lastTxnType));
         response.setLastChangeMinutes(lastChangeMinutes);
         return response;
+    }
+
+    private String balanceModeName(String balanceMode) {
+        if (BALANCE_MODE_DEDUCT.equals(balanceMode)) return "扣减余额";
+        if (BALANCE_MODE_NO_DEDUCT.equals(balanceMode)) return "不扣减余额";
+        return "未知模式";
+    }
+
+    private String statusName(String status) {
+        if (STATUS_ACTIVE.equals(status)) return "启用";
+        if (STATUS_INACTIVE.equals(status)) return "停用";
+        return "未知状态";
+    }
+
+    private String txnTypeName(String txnType) {
+        if (txnType == null) return null;
+        if (TXN_TYPE_ADJUST.equals(txnType)) return "管理员调整";
+        if (TXN_TYPE_DEDUCT.equals(txnType)) return "审批扣减";
+        if (TXN_TYPE_FREEZE.equals(txnType)) return "审批冻结";
+        if (TXN_TYPE_UNFREEZE.equals(txnType)) return "审批释放";
+        return "业务变更";
     }
 
     private String normalizeBalanceMode(String balanceMode) {

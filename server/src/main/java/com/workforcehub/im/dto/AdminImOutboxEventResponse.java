@@ -12,13 +12,16 @@ public class AdminImOutboxEventResponse {
 
     private Long eventId;
     private String eventType;
+    private String eventTypeName;
     private Long conversationId;
     private Long messageId;
     private Long seqNo;
     private Long actorUserId;
+    private String actorName;
     private String recipientUserIdsJson;
     private String payloadJson;
     private String status;
+    private String statusName;
     private Integer retryCount;
     private LocalDateTime nextRetryAt;
     private String lastError;

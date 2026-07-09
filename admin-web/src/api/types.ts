@@ -80,11 +80,18 @@ export interface AdminAgentTaskResponse {
   agentName?: string | null;
   agentVersionId?: EntityId | null;
   triggerType?: string | null;
+  triggerTypeName?: string | null;
   contextType?: string | null;
+  contextTypeName?: string | null;
   contextId?: EntityId | null;
+  contextDisplayName?: string | null;
+  contextNo?: string | null;
   triggeredByType?: string | null;
+  triggeredByTypeName?: string | null;
   triggeredById?: EntityId | null;
+  triggeredByName?: string | null;
   status: string;
+  statusName?: string | null;
   toolCallCount?: number | null;
   waitingDeadlineAt?: string | null;
   workflowSnapshotJson?: string | null;
@@ -138,12 +145,16 @@ export interface AdminAgentTaskToolCallResponse {
   toolCode?: string | null;
   toolName?: string | null;
   toolType?: string | null;
+  toolTypeName?: string | null;
   riskLevel?: string | null;
+  riskLevelName?: string | null;
   readOnlyFlag?: boolean | null;
   requestPayloadJson?: string | null;
   responsePayloadJson?: string | null;
   approvalStatus?: string | null;
+  approvalStatusName?: string | null;
   resultStatus?: string | null;
+  resultStatusName?: string | null;
   calledAt?: string | null;
 }
 
@@ -151,8 +162,11 @@ export interface AdminAgentTaskAuditResponse {
   auditId: EntityId;
   taskId: EntityId;
   actionType: string;
+  actionTypeName?: string | null;
   targetType?: string | null;
+  targetTypeName?: string | null;
   targetId?: EntityId | null;
+  targetDisplayName?: string | null;
   decisionSummary?: string | null;
   riskFlag?: boolean | null;
   occurredAt?: string | null;
@@ -169,8 +183,11 @@ export interface AgentTaskTimeoutRunQuery extends QueryParams {
 
 export interface AgentTaskTimeoutScanResponse {
   jobRunId: string;
+  jobRunNo?: string | null;
   triggerType: string;
-  status: string;
+  triggerTypeName?: string | null;
+  jobStatus: string;
+  jobStatusName?: string | null;
   scannedCount: number;
   cancelledCount: number;
   skippedCount: number;
@@ -178,8 +195,11 @@ export interface AgentTaskTimeoutScanResponse {
 
 export interface AdminAgentTaskTimeoutRunResponse {
   jobRunId: string;
+  jobRunNo?: string | null;
   triggerType: string;
+  triggerTypeName?: string | null;
   status: string;
+  statusName?: string | null;
   batchSize?: number | null;
   scannedCount?: number | null;
   cancelledCount?: number | null;
@@ -205,9 +225,11 @@ export interface WorkflowRequestSummaryResponse {
   requestId: EntityId;
   requestNo: string;
   bizType: string;
+  bizTypeName?: string | null;
   bizId: EntityId;
   title: string;
   status: string;
+  statusName?: string | null;
   currentStepKey?: string | null;
   currentStepName?: string | null;
   submittedAt?: string | null;
@@ -216,6 +238,7 @@ export interface WorkflowRequestSummaryResponse {
 
 export interface WorkflowLeaveDetailResponse {
   leaveTypeId: EntityId;
+  leaveName?: string | null;
   startAt?: string | null;
   endAt?: string | null;
   durationMinutes?: number | null;
@@ -225,6 +248,7 @@ export interface WorkflowLeaveDetailResponse {
 export interface WorkflowClockCorrectionDetailResponse {
   targetDate?: string | null;
   missingPunchType?: string | null;
+  missingPunchTypeName?: string | null;
   expectedPunchAt?: string | null;
   reason?: string | null;
 }
@@ -236,10 +260,13 @@ export interface WorkflowRequestAttachmentResponse {
   fileSize: number;
   contentSha256: string;
   scanStatus: string;
+  scanStatusName?: string | null;
 }
 
 export interface WorkflowRequestDetailResponse extends WorkflowRequestSummaryResponse {
   applicantUserId: EntityId;
+  applicantName?: string | null;
+  applicantEmployeeNo?: string | null;
   flowableProcessInstanceId?: string | null;
   leave?: WorkflowLeaveDetailResponse | null;
   clockCorrection?: WorkflowClockCorrectionDetailResponse | null;
@@ -253,12 +280,18 @@ export interface WorkflowTaskActionResponse {
   stepKey?: string | null;
   stepName?: string | null;
   actorType?: string | null;
+  actorTypeName?: string | null;
   actorId?: EntityId | null;
+  actorName?: string | null;
+  actorAccount?: string | null;
   actionType: string;
+  actionTypeName?: string | null;
   comment?: string | null;
   agentDecisionJson?: string | null;
   beforeStatus?: string | null;
+  beforeStatusName?: string | null;
   afterStatus?: string | null;
+  afterStatusName?: string | null;
   actedAt?: string | null;
 }
 
@@ -270,6 +303,7 @@ export interface WorkflowTemplateResponse {
   templateCode: string;
   templateName: string;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   currentVersion?: WorkflowTemplateVersionResponse | null;
@@ -288,6 +322,7 @@ export interface WorkflowTemplateVersionResponse {
   effectiveFrom?: string | null;
   effectiveTo?: string | null;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -297,7 +332,9 @@ export interface LeaveTypeResponse {
   leaveCode: string;
   leaveName: string;
   balanceMode: string;
+  balanceModeName?: string | null;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -305,13 +342,17 @@ export interface LeaveTypeResponse {
 export interface LeaveAccountResponse {
   accountId: EntityId;
   userId: EntityId;
+  employeeNo?: string | null;
+  realName?: string | null;
   leaveTypeId: EntityId;
   leaveCode: string;
   leaveName: string;
   balanceMode: string;
+  balanceModeName?: string | null;
   availableMinutes: number;
   frozenMinutes: number;
   status: string;
+  statusName?: string | null;
   lastTxnType?: string | null;
   lastChangeMinutes?: number | null;
 }
@@ -329,6 +370,7 @@ export interface AdminRoleResponse {
   roleCode: string;
   roleName: string;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -338,8 +380,11 @@ export interface AdminPermissionResponse {
   permCode: string;
   permName: string;
   moduleCode?: string | null;
+  moduleName?: string | null;
   actionCode?: string | null;
+  actionName?: string | null;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -355,11 +400,19 @@ export interface AdminAuditLogQuery extends QueryParams {
 export interface AdminAuditLogResponse {
   auditLogId: EntityId;
   operatorType: string;
+  operatorTypeName?: string | null;
   operatorId?: EntityId | null;
+  operatorName?: string | null;
+  operatorAccount?: string | null;
   actionType: string;
+  actionTypeName?: string | null;
   targetType?: string | null;
+  targetTypeName?: string | null;
   targetId?: EntityId | null;
+  targetDisplayName?: string | null;
+  targetNo?: string | null;
   result?: string | null;
+  resultName?: string | null;
   detailJson?: string | null;
   occurredAt?: string | null;
 }
@@ -369,7 +422,9 @@ export interface AttendanceCalendarResponse {
   calendarCode: string;
   calendarName: string;
   calendarType: string;
+  calendarTypeName?: string | null;
   status: string;
+  statusName?: string | null;
 }
 
 export interface CreateAttendanceCalendarRequest {
@@ -390,6 +445,7 @@ export interface AttendanceShiftResponse {
   offDutyPunchStart?: string | null;
   offDutyPunchEnd?: string | null;
   status: string;
+  statusName?: string | null;
 }
 
 export interface CreateAttendanceShiftRequest {
@@ -409,10 +465,13 @@ export interface AttendanceGroupResponse {
   groupCode: string;
   groupName: string;
   calendarId: EntityId;
+  calendarName?: string | null;
   defaultShiftId: EntityId;
+  defaultShiftName?: string | null;
   lateGraceMinutes: number;
   earlyLeaveGraceMinutes: number;
   status: string;
+  statusName?: string | null;
 }
 
 export interface CreateAttendanceGroupRequest {
@@ -428,11 +487,16 @@ export interface CreateAttendanceGroupRequest {
 export interface AttendanceGroupMemberResponse {
   memberId: EntityId;
   groupId: EntityId;
+  groupName?: string | null;
   userId: EntityId;
+  employeeNo?: string | null;
+  realName?: string | null;
   effectiveFrom: string;
   effectiveTo?: string | null;
   sourceType: string;
+  sourceTypeName?: string | null;
   status: string;
+  statusName?: string | null;
 }
 
 export interface AddAttendanceGroupMemberRequest {
@@ -445,11 +509,17 @@ export interface AddAttendanceGroupMemberRequest {
 export interface AttendanceScheduleResponse {
   scheduleId: EntityId;
   userId: EntityId;
+  employeeNo?: string | null;
+  realName?: string | null;
   workDate: string;
   shiftId: EntityId;
+  shiftName?: string | null;
   calendarId?: EntityId | null;
+  calendarName?: string | null;
   scheduleSource: string;
+  scheduleSourceName?: string | null;
   status: string;
+  statusName?: string | null;
 }
 
 export interface CreateAttendanceScheduleRequest {
@@ -470,11 +540,16 @@ export interface UpdateAttendanceScheduleRequest {
 export interface AttendanceDailyResultResponse {
   dailyResultId: EntityId;
   userId: EntityId;
+  employeeNo?: string | null;
+  realName?: string | null;
   workDate: string;
   scheduleId?: EntityId | null;
   groupId?: EntityId | null;
+  groupName?: string | null;
   shiftId?: EntityId | null;
+  shiftName?: string | null;
   resultStatus: string;
+  resultStatusName?: string | null;
   lateMinutes: number;
   earlyLeaveMinutes: number;
   absenceMinutes: number;
@@ -507,9 +582,12 @@ export interface StorageSummaryResponse {
 
 export interface CleanupJobRunResponse {
   jobRunId: string;
+  jobRunNo?: string | null;
   jobType: string;
+  jobTypeName?: string | null;
   dryRun: boolean;
   jobStatus: string;
+  jobStatusName?: string | null;
   expiredUploadTickets?: number | null;
   expiredDownloadTickets?: number | null;
   purgedAttachmentRefs?: number | null;
@@ -534,15 +612,19 @@ export interface RagflowSpaceResponse {
   chunkCount: number;
   embeddingProvider?: string | null;
   embeddingModel?: string | null;
+  embeddingModelId?: EntityId | null;
   embeddingDimension?: number | null;
   rerankEnabled?: boolean | null;
   rerankProvider?: string | null;
   rerankModel?: string | null;
+  rerankModelId?: EntityId | null;
   chunkSize?: number | null;
   chunkOverlap?: number | null;
   retrievalTopK?: number | null;
   scoreThreshold?: number | string | null;
   status: string;
+  visibilityName?: string | null;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -552,14 +634,17 @@ export interface RagflowGlobalSettingResponse {
   ocrBaseUrl?: string | null;
   ocrApiKeyConfigured?: boolean | null;
   ocrModel?: string | null;
+  ocrModelId?: EntityId | null;
   embeddingBaseUrl?: string | null;
   embeddingApiKeyConfigured?: boolean | null;
   embeddingModel?: string | null;
+  embeddingModelId?: EntityId | null;
   embeddingDimension?: number | null;
   rerankEnabled?: boolean | null;
   rerankBaseUrl?: string | null;
   rerankApiKeyConfigured?: boolean | null;
   rerankModel?: string | null;
+  rerankModelId?: EntityId | null;
   chunkSize?: number | null;
   chunkOverlap?: number | null;
   retrievalTopK?: number | null;
@@ -573,8 +658,13 @@ export interface RagflowAclResponse {
   spaceId: EntityId;
   subjectType: string;
   subjectId: EntityId;
+  subjectName?: string | null;
+  subjectCode?: string | null;
   permCode: string;
+  subjectTypeName?: string | null;
+  permCodeName?: string | null;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
 }
 
@@ -586,10 +676,12 @@ export interface CreateRagflowSpaceRequest {
   status?: string | null;
   embeddingProvider?: string | null;
   embeddingModel?: string | null;
+  embeddingModelId?: EntityId | null;
   embeddingDimension?: number | null;
   rerankEnabled?: boolean | null;
   rerankProvider?: string | null;
   rerankModel?: string | null;
+  rerankModelId?: EntityId | null;
   chunkSize?: number | null;
   chunkOverlap?: number | null;
   retrievalTopK?: number | null;
@@ -603,10 +695,12 @@ export interface UpdateRagflowSpaceRequest {
   status?: string | null;
   embeddingProvider?: string | null;
   embeddingModel?: string | null;
+  embeddingModelId?: EntityId | null;
   embeddingDimension?: number | null;
   rerankEnabled?: boolean | null;
   rerankProvider?: string | null;
   rerankModel?: string | null;
+  rerankModelId?: EntityId | null;
   chunkSize?: number | null;
   chunkOverlap?: number | null;
   retrievalTopK?: number | null;
@@ -617,14 +711,17 @@ export interface UpdateRagflowGlobalSettingRequest {
   ocrBaseUrl?: string | null;
   ocrApiKey?: string | null;
   ocrModel?: string | null;
+  ocrModelId?: EntityId | null;
   embeddingBaseUrl?: string | null;
   embeddingApiKey?: string | null;
   embeddingModel?: string | null;
+  embeddingModelId?: EntityId | null;
   embeddingDimension?: number | null;
   rerankEnabled?: boolean | null;
   rerankBaseUrl?: string | null;
   rerankApiKey?: string | null;
   rerankModel?: string | null;
+  rerankModelId?: EntityId | null;
   chunkSize?: number | null;
   chunkOverlap?: number | null;
   retrievalTopK?: number | null;
@@ -649,10 +746,14 @@ export interface RagflowDocumentResponse {
   fileSize?: number | null;
   contentHash?: string | null;
   parserType?: string | null;
+  parserTypeName?: string | null;
   ingestStatus: string;
+  ingestStatusName?: string | null;
   latestIngestJobId?: EntityId | null;
   ingestJobStatus?: string | null;
+  ingestJobStatusName?: string | null;
   vectorStatus?: string | null;
+  vectorStatusName?: string | null;
   chunkCount?: number | null;
   errorMessage?: string | null;
   createdAt?: string | null;
@@ -702,6 +803,7 @@ export interface AttachmentRefResponse {
   contentSha256: string;
   deduplicated: boolean;
   scanStatus: string;
+  scanStatusName?: string | null;
   createdAt?: string | null;
 }
 
@@ -802,6 +904,7 @@ export interface OrgUserDetailResponse {
   employeeNo?: string | null;
   realName: string;
   gender?: string | null;
+  genderName?: string | null;
   mobile?: string | null;
   email?: string | null;
   avatarAttachmentRefId?: EntityId | null;
@@ -821,7 +924,7 @@ export interface OrgUserDetailResponse {
 }
 
 export interface OrgUserCreateRequest {
-  employeeNo: string;
+  employeeNo?: string | null;
   realName: string;
   gender?: string | null;
   mobile?: string | null;
@@ -847,11 +950,16 @@ export interface AgentResponse {
   agentName?: string | null;
   avatarAttachmentRefId?: EntityId | null;
   agentType?: string | null;
+  agentTypeName?: string | null;
   identityMode?: string | null;
+  identityModeName?: string | null;
   publishedVersionId?: EntityId | null;
   publishedVersionNo?: number | null;
   publishedVersionLabel?: string | null;
+  knowledgeIssueCount?: number | null;
+  knowledgeIssueMessage?: string | null;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -889,9 +997,14 @@ export interface AgentAclResponse {
   aclId: EntityId;
   agentId: EntityId;
   subjectType: string;
+  subjectTypeName?: string | null;
   subjectId: EntityId;
+  subjectName?: string | null;
+  subjectCode?: string | null;
   permCode: string;
+  permCodeName?: string | null;
   status: string;
+  statusName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -957,19 +1070,124 @@ export interface CreateLeaveTypeRequest {
 export interface LlmModelResponse {
   modelId: EntityId;
   provider: string;
+  providerName?: string | null;
+  modelType?: string | null;
+  modelTypeName?: string | null;
   modelName: string;
   displayName: string;
   endpoint?: string | null;
-  apiKey?: string | null;
+  apiKeyConfigured?: boolean | null;
+  defaultFlag?: boolean | null;
+  streamOutputFlag?: boolean | null;
+  visionFlag?: boolean | null;
+  toolCallFlag?: boolean | null;
+  structuredOutputFlag?: boolean | null;
+  reasoningFlag?: boolean | null;
   status: string;
+  lastTestSuccess?: boolean | null;
+  lastTestMessage?: string | null;
+  lastTestedAt?: string | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface CreateLlmModelRequest {
   provider: string;
+  modelType?: string | null;
   modelName: string;
   displayName: string;
   endpoint?: string | null;
   apiKey?: string | null;
+  defaultFlag?: boolean | null;
+  streamOutputFlag?: boolean | null;
+  visionFlag?: boolean | null;
+  toolCallFlag?: boolean | null;
+  structuredOutputFlag?: boolean | null;
+  reasoningFlag?: boolean | null;
   status?: string | null;
+}
+
+export interface TestLlmModelRequest {
+  provider: string;
+  modelType?: string | null;
+  modelName: string;
+  endpoint?: string | null;
+  apiKey?: string | null;
+  visionFlag?: boolean | null;
+}
+
+export interface AiProviderResponse {
+  providerId: EntityId;
+  providerType: string;
+  providerTypeName?: string | null;
+  displayName: string;
+  baseUrl?: string | null;
+  apiKeyConfigured?: boolean | null;
+  enabled?: boolean | null;
+  lastTestSuccess?: boolean | null;
+  lastTestMessage?: string | null;
+  lastTestedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface ProviderModelOptionResponse {
+  modelName: string;
+  displayName?: string | null;
+  modelType?: string | null;
+}
+
+export interface SaveAiProviderRequest {
+  providerType: string;
+  displayName: string;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+  enabled?: boolean | null;
+}
+
+/* =========================================================
+   Notification Channel Settings
+   ========================================================= */
+
+export interface NotificationChannelResponse {
+  channelCode: string;
+  channelType: string;
+  channelName: string;
+  enabled: boolean;
+  host?: string | null;
+  port?: number | null;
+  username?: string | null;
+  hasSecret: boolean;
+  fromAddress?: string | null;
+  fromName?: string | null;
+  sslEnabled: boolean;
+  starttlsEnabled: boolean;
+  timeoutMillis?: number | null;
+  lastTestSuccess?: boolean | null;
+  lastTestMessage?: string | null;
+  lastTestedAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface NotificationChannelSaveRequest {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username?: string | null;
+  secretValue?: string | null;
+  fromAddress: string;
+  fromName?: string | null;
+  sslEnabled: boolean;
+  starttlsEnabled: boolean;
+  timeoutMillis: number;
+}
+
+export interface NotificationChannelTestRequest extends NotificationChannelSaveRequest {
+  recipient: string;
+}
+
+export interface NotificationChannelTestResponse {
+  success: boolean;
+  message: string;
+  testedAt?: string | null;
 }

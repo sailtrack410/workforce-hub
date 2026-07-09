@@ -15,11 +15,16 @@ public class AgentResponse {
     private String agentName;
     private Long avatarAttachmentRefId;
     private String agentType;
+    private String agentTypeName;
     private String identityMode;
+    private String identityModeName;
     private Long publishedVersionId;
     private Integer publishedVersionNo;
     private String publishedVersionLabel;
+    private Integer knowledgeIssueCount;
+    private String knowledgeIssueMessage;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

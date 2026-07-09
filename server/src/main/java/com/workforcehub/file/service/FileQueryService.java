@@ -299,14 +299,17 @@ public class FileQueryService {
         response.setAttachmentRefId(rs.getLong("attachment_ref_id"));
         response.setFileObjectId(rs.getLong("file_object_id"));
         response.setOwnerType(rs.getString("owner_type"));
+        response.setOwnerTypeName(ownerTypeName(rs.getString("owner_type")));
         response.setOwnerId(rs.getObject("owner_id", Long.class));
         response.setOriginalFileName(rs.getString("original_file_name"));
         response.setDisplayName(rs.getString("display_name"));
         response.setUploaderType(rs.getString("uploader_type"));
+        response.setUploaderTypeName(uploaderTypeName(rs.getString("uploader_type")));
         response.setUploaderId(rs.getObject("uploader_id", Long.class));
         response.setMimeType(rs.getString("mime_type"));
         response.setFileSize(rs.getLong("file_size"));
         response.setScanStatus(rs.getString("scan_status"));
+        response.setScanStatusName(scanStatusName(rs.getString("scan_status")));
         response.setDeletedAt(rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime());
         response.setPurgeAfter(rs.getTimestamp("purge_after") == null ? null : rs.getTimestamp("purge_after").toLocalDateTime());
         response.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
@@ -319,20 +322,45 @@ public class FileQueryService {
         response.setAttachmentRefId(rs.getLong("attachment_ref_id"));
         response.setFileObjectId(rs.getLong("file_object_id"));
         response.setOwnerType(rs.getString("owner_type"));
+        response.setOwnerTypeName(ownerTypeName(rs.getString("owner_type")));
         response.setOwnerId(rs.getObject("owner_id", Long.class));
         response.setFolderId(rs.getObject("folder_id", Long.class));
         response.setOriginalFileName(rs.getString("original_file_name"));
         response.setDisplayName(rs.getString("display_name"));
         response.setUploaderType(rs.getString("uploader_type"));
+        response.setUploaderTypeName(uploaderTypeName(rs.getString("uploader_type")));
         response.setUploaderId(rs.getObject("uploader_id", Long.class));
         response.setMimeType(rs.getString("mime_type"));
         response.setFileSize(rs.getLong("file_size"));
         response.setScanStatus(rs.getString("scan_status"));
+        response.setScanStatusName(scanStatusName(rs.getString("scan_status")));
         response.setDeletedAt(rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime());
         response.setPurgeAfter(rs.getTimestamp("purge_after") == null ? null : rs.getTimestamp("purge_after").toLocalDateTime());
         response.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
         response.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
         return response;
+    }
+
+    private String ownerTypeName(String value) {
+        if ("USER_FILE".equals(value)) return "个人文件";
+        if ("ADMIN_FILE".equals(value)) return "管理文件";
+        if ("IM_GROUP_FILE".equals(value)) return "群文件";
+        if ("WORKFLOW_ATTACHMENT".equals(value)) return "审批附件";
+        return value == null ? null : "业务文件";
+    }
+
+    private String uploaderTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("ADMIN".equals(value) || "ADMIN_USER".equals(value)) return "管理员";
+        if ("SYSTEM".equals(value)) return "系统";
+        return value == null ? null : "上传人";
+    }
+
+    private String scanStatusName(String value) {
+        if ("CLEAN".equals(value) || "READY".equals(value)) return "已通过";
+        if ("PENDING".equals(value)) return "检测中";
+        if ("FAILED".equals(value) || "INFECTED".equals(value)) return "未通过";
+        return value == null ? null : "未知状态";
     }
 
     private EmployeeFileFolderResponse mapEmployeeFileFolder(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {

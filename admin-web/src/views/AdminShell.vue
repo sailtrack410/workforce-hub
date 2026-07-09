@@ -6,6 +6,7 @@ import {
   Bot,
   CalendarCheck,
   FileArchive,
+  Cpu,
   LibraryBig,
   GitPullRequestArrow,
   LayoutGrid,
@@ -28,8 +29,8 @@ const session = useSessionStore();
 
 const navItems = [
   { path: '/dashboard', label: '概览', icon: BarChart3 },
-  { path: '/agent-tasks', label: 'Agent 任务', icon: Bot, permission: 'ADMIN_AGENT_TASK_MANAGE' },
-  { path: '/agent-config', label: 'Agent 配置', icon: LayoutGrid, permission: 'ADMIN_AGENT_MANAGE' },
+  { path: '/agent-tasks', label: 'AI 任务', icon: Bot, permission: 'ADMIN_AGENT_TASK_MANAGE' },
+  { path: '/agent-config', label: 'AI 助手', icon: LayoutGrid, permission: 'ADMIN_AGENT_MANAGE' },
   { path: '/workflow', label: '审批治理', icon: GitPullRequestArrow, permission: 'ADMIN_WORKFLOW_MANAGE' },
   { path: '/leave', label: '假期余额', icon: PlaneTakeoff, permission: 'ADMIN_LEAVE_MANAGE' },
   { path: '/leave-types', label: '假种管理', icon: Tag, permission: 'ADMIN_LEAVE_MANAGE' },
@@ -39,9 +40,10 @@ const navItems = [
   { path: '/positions', label: '岗位管理', icon: MapPin, permission: 'ADMIN_ORG_MANAGE' },
   { path: '/users', label: '人员管理', icon: Users, permission: 'ADMIN_ORG_MANAGE' },
   { path: '/files', label: '文件清理', icon: FileArchive, permission: 'ADMIN_FILE_MANAGE' },
-  { path: '/ragflow', label: 'RAGFlow', icon: LibraryBig, permission: 'ADMIN_RAGFLOW_MANAGE' },
+  { path: '/ragflow', label: '知识库', icon: LibraryBig, permission: 'ADMIN_RAGFLOW_MANAGE' },
+  { path: '/ai-models', label: 'AI 基座', icon: Cpu, permission: 'ADMIN_AGENT_MANAGE' },
   { path: '/system', label: '系统记录', icon: ShieldCheck },
-  { path: '/settings', label: '设置', icon: Settings },
+  { path: '/settings', label: '设置', icon: Settings, permission: 'ADMIN_NOTIFICATION_CHANNEL_MANAGE' },
 ];
 
 const visibleNavItems = computed(() => navItems.filter((item) => session.hasPermission(item.permission)));

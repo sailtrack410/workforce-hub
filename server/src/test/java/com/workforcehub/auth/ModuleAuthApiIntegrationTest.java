@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
@@ -25,6 +26,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
@@ -65,6 +67,9 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
     @Autowired
     private OrgUserMapper orgUserMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @MockBean
     private JavaMailSender javaMailSender;
 
@@ -84,6 +89,25 @@ class ModuleAuthApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.userType").value("ADMIN"))
             .andExpect(jsonPath("$.data.displayName").value("演示管理员"))
             .andExpect(jsonPath("$.data.loginName").value(ADMIN_LOGIN_NAME));
+    }
+
+    @Test
+    @DisplayName("超级管理员 me 应返回所有有效权限而不依赖角色权限关联")
+    void superAdminMeShouldExposeAllActivePermissionsWithoutRolePermissionBinding() throws Exception {
+        jdbcTemplate.update("""
+            INSERT INTO admin_permission (
+                id, perm_code, perm_name, module_code, action_code, status, created_by, updated_by, is_deleted
+            ) VALUES (7999, 'ADMIN_FUTURE_MANAGE', '未来权限', 'FUTURE', 'MANAGE', 'ACTIVE', NULL, NULL, 0)
+            """);
+        Cookie session = login("/api/admin/auth/login", ADMIN_LOGIN_NAME, ADMIN_PASSWORD, "auth-admin-login-future-perm");
+
+        mockMvc.perform(get("/api/admin/auth/me")
+                .cookie(session)
+                .header("X-Request-Id", "auth-admin-me-future-perm"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.roleCodes", hasItem("SUPER_ADMIN")))
+            .andExpect(jsonPath("$.data.permissionCodes", hasItem("ADMIN_FUTURE_MANAGE")));
     }
 
     @Test

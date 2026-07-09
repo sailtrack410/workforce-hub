@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   BarChart3,
   CalendarDays,
+  Check,
   ChevronLeft,
   CheckCircle2,
   CircleAlert,
@@ -10,7 +11,6 @@ import {
   ClipboardList,
   CloudUpload,
   FileText,
-  FolderOpen,
   GitBranch,
   LayoutGrid,
   MessageCircle,
@@ -38,10 +38,12 @@ import type {
   AgentResponse,
   EntityId,
 } from '../api';
-import type { ContactRecord, ConversationRecord, PersonalFileRecord, SectionAction, SectionFilter, SectionId } from '../stores/shell';
+import type { ContactRecord, ConversationRecord, PersonalFileRecord, SectionAction, SectionFilter, SectionId, TodoRecord } from '../stores/shell';
 import {
   primaryNavItems,
   sectionFilters,
+  todoLifecycle,
+  todoSectionFilters,
   shellUser,
   useShellStore,
   normalizeSettingsPanel,
@@ -49,7 +51,6 @@ import {
 } from '../stores/shell';
 import { useImStore } from '../stores/im';
 import { useSessionStore } from '../stores/session';
-import { useWorkflowStore } from '../stores/workflow';
 import { useCurrentUserAvatarUrl } from '../composables/useCurrentUserAvatarUrl';
 import { useEmployeeAuthFlow } from '../composables/useEmployeeAuthFlow';
 import { useFileUpload } from '../composables/useFileUpload';
@@ -58,6 +59,7 @@ import { usePersonalFileTransfer } from '../composables/usePersonalFileTransfer'
 import { fileSizeLabel, fileTypeLabel } from '@/utils/file-format';
 import {
   statusText,
+  agentTypeLabel,
   humanizeText,
   toneOfConversation,
   toneOfStatus,
@@ -86,7 +88,6 @@ import type { EmployeeShellContexts } from './employee-shell-context';
 const shell = useShellStore();
 const im = useImStore();
 const session = useSessionStore();
-const workflow = useWorkflowStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -95,12 +96,11 @@ const resizing = ref(false);
 const toastMessage = ref('');
 const filterScroller = ref<HTMLElement | null>(null);
 const filtersOverflow = ref(false);
+const completingTodoIds = ref<Set<string>>(new Set());
+const dismissedTodoIds = ref<Set<string>>(new Set());
 const fileSendTarget = ref<{ file: PersonalFileRecord; caption: string; submitting: boolean } | null>(null);
 const fileSendTargetQuery = ref('');
 const fileSendTargetError = ref('');
-const todoActionMode = ref<'approve' | 'reject' | null>(null);
-const todoActionComment = ref('');
-const todoActionError = ref('');
 let toastTimer: number | undefined;
 
 const sectionIcons: Record<SectionId, typeof MessageCircle> = {
@@ -123,10 +123,10 @@ const workbenchIcons: Record<string, typeof MessageCircle> = {
 };
 
 const profileIcons: Record<string, typeof MessageCircle> = {
+  profile: UserRound,
   organization: UsersRound,
   security: ShieldCheck,
   preferences: SlidersHorizontal,
-  storage: FolderOpen,
 };
 
 const activeSection = computed(() => shell.section);
@@ -153,7 +153,7 @@ const searchModel = computed({
 });
 const filterOptions = computed(() => {
   if (activeSection.value === 'messages') return sectionFilters;
-  if (activeSection.value === 'todos') return sectionFilters.filter((item) => ['全部', '未处理'].includes(item));
+  if (activeSection.value === 'todos') return todoSectionFilters;
   return [];
 });
 const activeFilter = computed(() => shell.filters[activeSection.value]);
@@ -189,6 +189,59 @@ const filteredSearchAgentResults = computed(() => {
   return searchAgentResults.value.filter((agent) => !existingAgentCodes.value.has(agent.agentCode));
 });
 const filteredTodos = computed(() => shell.filteredTodos);
+const visibleTodoList = computed(() => filteredTodos.value.filter((item) => (
+  shell.filters.todos !== '进行中' || !dismissedTodoIds.value.has(item.id)
+)));
+const compactTodoRange = (item: TodoRecord) => {
+  if (!item.startAt || !item.endAt) return item.subtitle || item.time;
+  const start = `${Number(item.startAt.slice(5, 7))}月${Number(item.startAt.slice(8, 10))}日 ${item.startAt.slice(11)}`;
+  if (item.startAt.slice(0, 10) === item.endAt.slice(0, 10)) return `${start} - ${item.endAt.slice(11)}`;
+  const end = `${Number(item.endAt.slice(5, 7))}月${Number(item.endAt.slice(8, 10))}日 ${item.endAt.slice(11)}`;
+  return `${start} - ${end}`;
+};
+const todoStatusTone = (item: TodoRecord): 'success' | 'warning' | 'neutral' => {
+  const lifecycle = todoLifecycle(item);
+  if (lifecycle === '已完成') return 'success';
+  if (lifecycle === '未开始') return 'neutral';
+  return 'warning';
+};
+function completeTodoFromList(item: TodoRecord) {
+  if (item.completed || completingTodoIds.value.has(item.id)) return;
+  completingTodoIds.value = new Set([...completingTodoIds.value, item.id]);
+  if (shell.filters.todos === '进行中') {
+    dismissedTodoIds.value = new Set([...dismissedTodoIds.value, item.id]);
+  }
+  window.setTimeout(() => {
+    shell.toggleTodoTask(item.id);
+    const next = new Set(completingTodoIds.value);
+    next.delete(item.id);
+    completingTodoIds.value = next;
+  }, 240);
+}
+
+function conversationNoticeLabel(conversation: ConversationRecord) {
+  if (conversation.hasMentionMe) return '[有人@我]';
+  if (conversation.hasReplyMe) return '[有人回复我]';
+  const userId = session.user?.userId;
+  if (userId === undefined || userId === null) return '';
+  const unreadMessages = conversation.unread > 0
+    ? conversation.messages.slice(-conversation.unread)
+    : conversation.messages.slice(-1);
+  if (unreadMessages.some((message) => (
+    message.side !== 'right'
+    && message.mentions?.some((mention) => String(mention.userId) === String(userId))
+  ))) return '[有人@我]';
+  const ownMessageIds = new Set(conversation.messages
+    .filter((message) => message.side === 'right' || (message.senderId !== undefined && message.senderId !== null && String(message.senderId) === String(userId)))
+    .map((message) => String(message.id)));
+  if (unreadMessages.some((message) => (
+    message.side !== 'right'
+    && message.quotedMessageId !== undefined
+    && message.quotedMessageId !== null
+    && ownMessageIds.has(String(message.quotedMessageId))
+  ))) return '[有人回复我]';
+  return '';
+}
 const filteredFiles = computed(() => shell.filteredFiles);
 const filteredWorkbench = computed(() => shell.filteredWorkbench);
 const filteredContacts = computed(() => shell.filteredContacts);
@@ -202,10 +255,6 @@ const listEmptyText = computed(() => {
 });
 const showFilterBar = computed(() => filterOptions.value.length > 1);
 const showFilterArrows = computed(() => filtersOverflow.value);
-const todoActionTitle = computed(() => (todoActionMode.value === 'reject' ? '驳回待办' : '审批通过'));
-const mustHandleTodos = computed(() => filteredTodos.value.filter((item) => item.priority === '高').slice(0, 5));
-const approvalTodos = computed(() => filteredTodos.value.filter((item) => item.priority !== '低'));
-const deferredTodos = computed(() => filteredTodos.value.filter((item) => item.priority === '低'));
 const workbenchLaunchers = computed(() => filteredWorkbench.value);
 const hasActiveConversation = computed(() => Boolean(activeConversation.value.id));
 const uploadFolderId = ref<EntityId | null>(null);
@@ -248,7 +297,6 @@ const {
   sendSelectedFileToConversation,
 });
 const { refreshCurrentUserAvatarUrl } = useCurrentUserAvatarUrl(shell, session);
-const hasActiveTodo = computed(() => Boolean(activeTodo.value.id));
 const businessEmptyTitle = computed(() => {
   if (activeSection.value === 'processes') return '暂无流程';
   if (activeSection.value === 'contacts') return '暂无联系人';
@@ -257,12 +305,10 @@ const businessEmptyTitle = computed(() => {
 });
 const currentListLoading = computed(() => {
   if (activeSection.value === 'messages') return im.loading;
-  if (activeSection.value === 'todos') return workflow.loading;
   return false;
 });
 const currentListError = computed(() => {
   if (activeSection.value === 'messages') return im.error;
-  if (activeSection.value === 'todos') return workflow.error;
   return '';
 });
 
@@ -391,14 +437,6 @@ function runAction(action?: SectionAction) {
   if (action.action === 'open-workbench' && action.app) {
     navigateSection('workbench', action.app);
     shell.selectItem('workbench', action.app);
-    return;
-  }
-  if (action.action === 'approve-todo') {
-    openTodoAction('approve');
-    return;
-  }
-  if (action.action === 'reject-todo') {
-    openTodoAction('reject');
   }
 }
 
@@ -450,50 +488,17 @@ async function confirmSendFileTarget(conversationId: EntityId) {
 }
 function selectNav(section: SectionId) {
   closeConversationContextMenu();
+  if (section === 'settings') {
+    selectSettingsItem('profile');
+    shell.setMobileView('list');
+    return;
+  }
   navigateSection(section);
   shell.setMobileView('list');
 }
 
 function openProfileSettings() {
-  selectSettingsItem('security');
-}
-
-function openTodoAction(mode: 'approve' | 'reject') {
-  if (!hasActiveTodo.value || workflow.actionLoading) return;
-  todoActionMode.value = mode;
-  todoActionComment.value = '';
-  todoActionError.value = '';
-}
-
-function closeTodoAction() {
-  if (workflow.actionLoading) return;
-  todoActionMode.value = null;
-  todoActionComment.value = '';
-  todoActionError.value = '';
-}
-
-async function submitTodoAction() {
-  const todo = activeTodo.value;
-  if (!todo.id || !todo.taskId || !todoActionMode.value) return;
-  const comment = todoActionComment.value.trim();
-  if (todoActionMode.value === 'reject' && !comment) {
-    todoActionError.value = '驳回原因不能为空';
-    return;
-  }
-  todoActionError.value = '';
-  try {
-    if (todoActionMode.value === 'approve') {
-      await workflow.approveTask(todo.taskId, comment);
-      showToast('已通过');
-    } else {
-      await workflow.rejectTask(todo.taskId, comment);
-      showToast('已驳回');
-    }
-    shell.mergeBackendTodos(workflow.todos);
-    closeTodoAction();
-  } catch (error) {
-    todoActionError.value = error instanceof Error ? error.message : '提交失败';
-  }
+  selectSettingsItem('profile');
 }
 
 async function loadAuthenticatedWorkspace() {
@@ -502,9 +507,6 @@ async function loadAuthenticatedWorkspace() {
     session.loadOrgProfile().then(() => {
       shell.setColleagues(session.colleagues);
       shell.syncSessionProfile(session.user, session.profile, session.manager, session.subordinates);
-    }),
-    workflow.loadTodos().then(() => {
-      shell.mergeBackendTodos(workflow.todos);
     }),
     im.loadConversations().then(() => {
       shell.mergeBackendConversations(im.conversations);
@@ -716,7 +718,8 @@ function openDetail(payload?: unknown) {
     : null;
   if (action?.action === 'OPEN_FLOW') {
     const target = action.payload?.targetApp;
-    if (target === 'requests') {
+    const path = action.apiRef?.path;
+    if (target === 'requests' || path === '/workbench/requests') {
       navigateSection('workbench', 'requests');
       shell.selectItem('workbench', 'requests');
       return;
@@ -822,12 +825,8 @@ async function retryMessages() {
   await im.loadConversations();
 }
 
-async function retryTodos() {
-  if (!session.isAuthenticated) return;
-  await workflow.loadTodos();
-}
-
 onMounted(async () => {
+  document.body.dataset.theme = shell.theme;
   window.addEventListener('keydown', handleKeydown);
   window.addEventListener('click', closeConversationContextMenu);
   window.addEventListener('resize', updateFilterOverflow);
@@ -844,6 +843,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  delete document.body.dataset.theme;
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('click', closeConversationContextMenu);
   window.removeEventListener('resize', updateFilterOverflow);
@@ -855,6 +855,10 @@ onBeforeUnmount(() => {
 
 watch(() => session.profile?.avatarAttachmentRefId, () => {
   void refreshCurrentUserAvatarUrl().then(refreshContactAvatarUrls);
+});
+
+watch(() => shell.theme, (theme) => {
+  document.body.dataset.theme = theme;
 });
 
 watch([filterOptions, activeSection, searchOpen], () => {
@@ -933,6 +937,8 @@ watch(
           void router.replace({ name: 'employee-settings-detail', params: { panel: canonical } });
         }
       } else {
+        shell.selectItem('settings', 'profile');
+        void router.replace({ name: 'employee-settings-detail', params: { panel: 'profile' } });
         shell.setMobileView('list');
       }
     } else {
@@ -966,16 +972,9 @@ const employeeShellContexts = {
     openFilePreviewFromUrl,
   },
   todos: {
-    workflow,
-    activeTodo,
+    shell,
     pendingTodoCount,
-    mustHandleTodos,
-    approvalTodos,
-    deferredTodos,
-    hasActiveTodo,
     backToList,
-    runAction,
-    retryTodos,
   },
   workbench: {
     shell,
@@ -1243,14 +1242,6 @@ provideEmployeeShellContexts(employeeShellContexts);
           @retry="retryMessages"
         />
 
-        <AppErrorState
-          v-else-if="currentListError && activeSection === 'todos' && !filteredTodos.length"
-          title="待办同步失败"
-          :description="currentListError"
-          action-label="重试"
-          @retry="retryTodos"
-        />
-
         <div v-else-if="activeSection === 'messages'" class="list-items">
           <AppEmptyState
             v-if="!filteredConversations.length && !filteredSearchAgentResults.length && !searchAgentsLoading && !searchAgentsError"
@@ -1284,7 +1275,7 @@ provideEmployeeShellContexts(employeeShellContexts);
                       <strong>{{ humanizeText(agent.agentName) }}</strong>
                       <span class="conversation-kind-pill pill-agent">可添加</span>
                     </div>
-                    <p>{{ agent.agentCode }} · {{ agent.agentType }}</p>
+                    <p>{{ agent.agentTypeName || agentTypeLabel(agent.agentType) }}</p>
                   </div>
                 </div>
                 <div class="message-row-side">
@@ -1329,7 +1320,10 @@ provideEmployeeShellContexts(employeeShellContexts);
                         置顶
                       </span>
                     </div>
-                    <p>{{ item.subtitle }}</p>
+                    <p>
+                      <span v-if="conversationNoticeLabel(item)" class="conversation-notice-label">{{ conversationNoticeLabel(item) }}</span>
+                      {{ item.subtitle }}
+                    </p>
                   </div>
                 </div>
                 <div class="message-row-side">
@@ -1342,26 +1336,48 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
 
         <div v-else-if="activeSection === 'todos'" class="list-items">
-          <AppEmptyState v-if="!filteredTodos.length" title="待办已清空" :description="listEmptyText" icon="todos" />
-          <AppListItem
-            v-for="item in filteredTodos"
-            v-else
-            :key="item.id"
-            :active="item.id === activeTodo.id"
-            @click="navigateSection('todos', item.id); shell.selectItem('todos', item.id)"
-          >
-            <div class="generic-row">
-              <AppAvatar :label="item.priority" tone="warning" />
-              <div class="generic-copy">
-                <div class="title-line">
-                  <strong>{{ item.title }}</strong>
-                  <span class="meta-time">{{ item.time }}</span>
-                </div>
-                <p>{{ item.subtitle }}</p>
+          <AppEmptyState v-if="!visibleTodoList.length" title="待办已清空" :description="listEmptyText" icon="todos" />
+          <TransitionGroup v-else name="todo-list" tag="div" class="todo-list-stack">
+            <article
+              v-for="item in visibleTodoList"
+              :key="item.id"
+              class="todo-list-item"
+              :class="{ active: item.id === activeTodo.id, 'todo-item-completing': completingTodoIds.has(item.id) }"
+            >
+              <div class="generic-row todo-list-row">
+                <button
+                  class="todo-list-check"
+                  type="button"
+                  :class="{ checked: item.completed }"
+                  :aria-label="item.completed ? '已完成' : '完成待办'"
+                  @click.stop="completeTodoFromList(item)"
+                >
+                  <Check :size="14" />
+                </button>
+                <button
+                  class="todo-list-main"
+                  type="button"
+                  @click="navigateSection('todos', item.id); shell.selectItem('todos', item.id)"
+                >
+                  <div class="generic-copy todo-list-copy">
+                    <div class="title-line">
+                      <strong class="todo-title-with-dot" :class="`todo-color-${item.tagColor ?? 'blue'}`">
+                        <i aria-hidden="true" />
+                        <span>{{ item.title }}</span>
+                      </strong>
+                      <span class="meta-time">{{ item.startAt?.slice(11) ?? item.startDate }}</span>
+                    </div>
+                    <p class="todo-list-meta">
+                      <span>{{ item.tagName }}</span>
+                      <span>· {{ compactTodoRange(item) }}</span>
+                    </p>
+                    <p v-if="item.note" class="todo-list-note">{{ item.note }}</p>
+                  </div>
+                </button>
+                <AppTag :tone="todoStatusTone(item)">{{ todoLifecycle(item) }}</AppTag>
               </div>
-              <AppTag :tone="toneOfStatus(item.status)">{{ statusText(item.status) }}</AppTag>
-            </div>
-          </AppListItem>
+            </article>
+          </TransitionGroup>
         </div>
 
         <div v-else-if="activeSection === 'workbench'" class="list-items">
@@ -1379,7 +1395,7 @@ provideEmployeeShellContexts(employeeShellContexts);
               <div class="generic-copy">
                 <div class="title-line">
                   <strong>{{ item.title }}</strong>
-                  <span class="meta-time">{{ item.status }}</span>
+                  <span class="meta-time">{{ statusText(item.status) }}</span>
                 </div>
                 <p>{{ item.note }}</p>
               </div>
@@ -1398,25 +1414,32 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
 
         <div v-else-if="activeSection === 'settings'" class="list-items">
-          <AppListItem
-            v-for="item in filteredProfile"
-            :key="item.id"
-            :active="item.id === activeProfile.id"
-            @click="selectSettingsItem(item.id)"
-          >
-            <div class="generic-row">
-              <span class="list-icon tone-gray">
-                <component :is="profileIcons[item.id] ?? Settings" :size="18" />
-              </span>
-              <div class="generic-copy">
-                <div class="title-line">
-                  <strong>{{ item.title }}</strong>
-                  <span class="meta-time">{{ item.subtitle }}</span>
+          <AppEmptyState v-if="!filteredProfile.length" title="无匹配结果" description="个人中心入口">
+            <AppButton variant="secondary" size="sm" @click="shell.setSearch('settings', '')">
+              清空搜索
+            </AppButton>
+          </AppEmptyState>
+          <template v-else>
+            <AppListItem
+              v-for="item in filteredProfile"
+              :key="item.id"
+              :active="item.id === activeProfile.id"
+              @click="selectSettingsItem(item.id)"
+            >
+              <div class="generic-row">
+                <span class="list-icon tone-gray">
+                  <component :is="profileIcons[item.id] ?? Settings" :size="18" />
+                </span>
+                <div class="generic-copy">
+                  <div class="title-line">
+                    <strong>{{ item.title }}</strong>
+                    <span class="meta-time">{{ item.subtitle }}</span>
+                  </div>
+                  <p v-if="item.note">{{ item.note }}</p>
                 </div>
-                <p v-if="item.note">{{ item.note }}</p>
               </div>
-            </div>
-          </AppListItem>
+            </AppListItem>
+          </template>
         </div>
 
         <div v-else-if="activeSection === 'agents'" class="list-items">
@@ -1464,7 +1487,7 @@ provideEmployeeShellContexts(employeeShellContexts);
                   <em>{{ record.actor }} · {{ record.time }}</em>
                   <small>{{ record.detail }}</small>
                 </span>
-                <b>{{ record.status }}</b>
+                <b>{{ statusText(record.status) }}</b>
               </span>
             </div>
           </section>
@@ -1493,7 +1516,7 @@ provideEmployeeShellContexts(employeeShellContexts);
                 <span class="attachment-type">{{ file.type }}</span>
                 <span>
                   <strong>{{ file.name }}</strong>
-                  <small>{{ file.size }} · {{ file.status }}</small>
+                  <small>{{ file.size }} · {{ statusText(file.status) }}</small>
                 </span>
                 <ArrowUpRight :size="14" />
               </button>
@@ -1555,7 +1578,7 @@ provideEmployeeShellContexts(employeeShellContexts);
             <div v-if="activeConversation.panel.attachments.length" class="stack-list">
               <span v-for="file in activeConversation.panel.attachments" :key="file.id">
                 <strong>{{ file.name }}</strong>
-                <small>{{ file.size }} · {{ file.status }}</small>
+                <small>{{ file.size }} · {{ statusText(file.status) }}</small>
               </span>
             </div>
             <p v-else class="empty-inline">无文件</p>
@@ -1604,34 +1627,6 @@ provideEmployeeShellContexts(employeeShellContexts);
         <div class="dialog-actions">
           <AppButton variant="ghost" type="button" @click="closeContactRemarkEditor">取消</AppButton>
           <AppButton variant="primary" type="submit" @click="submitContactRemark">保存</AppButton>
-        </div>
-      </form>
-    </AppDialog>
-
-    <AppDialog v-if="todoActionMode">
-      <form class="todo-action-dialog" @submit.prevent="submitTodoAction">
-        <header class="dialog-head">
-          <h2>{{ todoActionTitle }}</h2>
-          <p>{{ activeTodo.title }}</p>
-        </header>
-        <label class="dialog-field">
-          <span>{{ todoActionMode === 'reject' ? '驳回原因' : '审批意见' }}</span>
-          <textarea
-            v-model="todoActionComment"
-            class="ui-textarea"
-            :required="todoActionMode === 'reject'"
-            :placeholder="todoActionMode === 'reject' ? '驳回原因' : '审批意见'"
-            rows="5"
-          />
-        </label>
-        <p v-if="todoActionError" class="dialog-error">{{ todoActionError }}</p>
-        <div class="dialog-actions">
-          <AppButton variant="ghost" type="button" :disabled="workflow.actionLoading" @click="closeTodoAction">
-            取消
-          </AppButton>
-          <AppButton variant="primary" type="submit" :disabled="workflow.actionLoading">
-            {{ workflow.actionLoading ? '提交中' : '提交' }}
-          </AppButton>
         </div>
       </form>
     </AppDialog>

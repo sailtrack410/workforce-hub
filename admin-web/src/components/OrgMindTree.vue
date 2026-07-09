@@ -85,7 +85,6 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
             </span>
             <span class="org-node-main">
               <strong>{{ node.deptName }}</strong>
-              <span>{{ node.deptCode }}</span>
             </span>
             <span class="org-node-count"><Users :size="14" />{{ nodeUserCount(node) }}</span>
           </button>
@@ -198,7 +197,7 @@ function employeeNodeId(deptId: EntityId, userId: EntityId) {
   border: 2px solid var(--green);
   border-radius: var(--radius-circle);
   background: var(--panel-strong);
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--org-link-port-ring);
 }
 
 .org-link-port.left { left: -5px; }

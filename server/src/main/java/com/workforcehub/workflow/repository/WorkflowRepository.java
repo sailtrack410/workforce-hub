@@ -4,6 +4,7 @@ import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.file.repository.DownloadAttachmentRow;
 import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
+import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -131,6 +132,25 @@ public class WorkflowRepository {
             Timestamp.valueOf(request.getEndAt()),
             request.getDurationMinutes(),
             request.getReason()
+        );
+    }
+
+    public void insertGenericDetail(Long detailId,
+                                    Long requestId,
+                                    String processCode,
+                                    String payloadJson,
+                                    GenericWorkflowRequestCreateRequest request) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_req_generic
+                (id, request_id, process_code, summary, form_payload_json)
+            VALUES
+                (?, ?, ?, ?, CAST(? AS JSON))
+            """,
+            detailId,
+            requestId,
+            processCode,
+            request.getSummary(),
+            payloadJson
         );
     }
 
@@ -472,12 +492,24 @@ public class WorkflowRepository {
 
     public WorkflowRequestDetailRow getRequestDetailOrThrow(Long requestId) {
         List<WorkflowRequestDetailRow> rows = jdbcTemplate.query("""
-            SELECT id, request_no, biz_type, biz_id, applicant_user_id, title, status,
-                   current_step_key, current_step_name, flowable_process_instance_id,
-                   submitted_at, finished_at
-            FROM wf_request
-            WHERE id = ?
-              AND is_deleted = 0
+            SELECT wr.id,
+                   wr.request_no,
+                   wr.biz_type,
+                   wr.biz_id,
+                   wr.applicant_user_id,
+                   ou.real_name AS applicant_name,
+                   ou.employee_no AS applicant_employee_no,
+                   wr.title,
+                   wr.status,
+                   wr.current_step_key,
+                   wr.current_step_name,
+                   wr.flowable_process_instance_id,
+                   wr.submitted_at,
+                   wr.finished_at
+            FROM wf_request wr
+            LEFT JOIN org_user ou ON ou.id = wr.applicant_user_id
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
             LIMIT 1
             """,
             (rs, rowNum) -> new WorkflowRequestDetailRow(
@@ -486,6 +518,8 @@ public class WorkflowRepository {
                 rs.getString("biz_type"),
                 rs.getLong("biz_id"),
                 rs.getLong("applicant_user_id"),
+                rs.getString("applicant_name"),
+                rs.getString("applicant_employee_no"),
                 rs.getString("title"),
                 rs.getString("status"),
                 rs.getString("current_step_key"),
@@ -504,13 +538,15 @@ public class WorkflowRepository {
 
     public WorkflowLeaveDetailRow getLeaveDetailByRequestId(Long requestId) {
         List<WorkflowLeaveDetailRow> rows = jdbcTemplate.query("""
-            SELECT leave_type_id, start_at, end_at, duration_minutes, reason
-            FROM wf_req_leave
-            WHERE request_id = ?
+            SELECT l.leave_type_id, lt.leave_name, l.start_at, l.end_at, l.duration_minutes, l.reason
+            FROM wf_req_leave l
+            LEFT JOIN lv_type lt ON lt.id = l.leave_type_id
+            WHERE l.request_id = ?
             LIMIT 1
             """,
             (rs, rowNum) -> new WorkflowLeaveDetailRow(
                 rs.getLong("leave_type_id"),
+                rs.getString("leave_name"),
                 rs.getTimestamp("start_at").toLocalDateTime(),
                 rs.getTimestamp("end_at").toLocalDateTime(),
                 rs.getInt("duration_minutes"),
@@ -533,6 +569,23 @@ public class WorkflowRepository {
                 rs.getString("missing_punch_type"),
                 rs.getTimestamp("expected_punch_at").toLocalDateTime(),
                 rs.getString("reason")
+            ),
+            requestId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public WorkflowGenericDetailRow getGenericDetailByRequestId(Long requestId) {
+        List<WorkflowGenericDetailRow> rows = jdbcTemplate.query("""
+            SELECT process_code, summary, form_payload_json
+            FROM wf_req_generic
+            WHERE request_id = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowGenericDetailRow(
+                rs.getString("process_code"),
+                rs.getString("summary"),
+                rs.getString("form_payload_json")
             ),
             requestId
         );
@@ -636,12 +689,28 @@ public class WorkflowRepository {
 
     public List<WorkflowTaskActionRow> listTaskActions(Long requestId) {
         return jdbcTemplate.query("""
-            SELECT id, request_id, flowable_task_id, step_key, step_name, actor_type,
-                   actor_id, action_type, action_comment, agent_decision_json,
-                   before_status, after_status, acted_at
-            FROM wf_task_action
-            WHERE request_id = ?
-            ORDER BY acted_at ASC, id ASC
+            SELECT wta.id,
+                   wta.request_id,
+                   wta.flowable_task_id,
+                   wta.step_key,
+                   wta.step_name,
+                   wta.actor_type,
+                   wta.actor_id,
+                   COALESCE(ou.real_name, agent.agent_name) AS actor_name,
+                   aua.login_name AS actor_account,
+                   wta.action_type,
+                   wta.action_comment,
+                   wta.agent_decision_json,
+                   wta.before_status,
+                   wta.after_status,
+                   wta.acted_at
+            FROM wf_task_action wta
+            LEFT JOIN org_user ou ON wta.actor_type = 'USER' AND ou.id = wta.actor_id
+            LEFT JOIN auth_user_account aua ON wta.actor_type = 'USER' AND aua.user_id = wta.actor_id
+            LEFT JOIN agt_task at ON wta.actor_type = 'AGENT' AND at.id = wta.actor_id
+            LEFT JOIN agt_agent agent ON agent.id = at.agent_id
+            WHERE wta.request_id = ?
+            ORDER BY wta.acted_at ASC, wta.id ASC
             """,
             (rs, rowNum) -> new WorkflowTaskActionRow(
                 rs.getLong("id"),
@@ -651,6 +720,8 @@ public class WorkflowRepository {
                 rs.getString("step_name"),
                 rs.getString("actor_type"),
                 rs.getLong("actor_id"),
+                rs.getString("actor_name"),
+                rs.getString("actor_account"),
                 rs.getString("action_type"),
                 rs.getString("action_comment"),
                 rs.getString("agent_decision_json"),

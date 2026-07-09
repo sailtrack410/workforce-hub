@@ -11,14 +11,17 @@ public class RagflowGlobalSettingResponse {
     private String ocrBaseUrl;
     private Boolean ocrApiKeyConfigured;
     private String ocrModel;
+    private Long ocrModelId;
     private String embeddingBaseUrl;
     private Boolean embeddingApiKeyConfigured;
     private String embeddingModel;
+    private Long embeddingModelId;
     private Integer embeddingDimension;
     private Boolean rerankEnabled;
     private String rerankBaseUrl;
     private Boolean rerankApiKeyConfigured;
     private String rerankModel;
+    private Long rerankModelId;
     private Integer chunkSize;
     private Integer chunkOverlap;
     private Integer retrievalTopK;

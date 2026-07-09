@@ -17,6 +17,8 @@ public record ImConversationSummaryRow(
     Boolean pin,
     Boolean mute,
     String memberRole,
+    Boolean hasMentionMe,
+    Boolean hasReplyMe,
     ImMessageRow lastMessage
 ) {
 }

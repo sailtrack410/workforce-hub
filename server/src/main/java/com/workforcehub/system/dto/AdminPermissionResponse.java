@@ -14,8 +14,11 @@ public class AdminPermissionResponse {
     private String permCode;
     private String permName;
     private String moduleCode;
+    private String moduleName;
     private String actionCode;
+    private String actionName;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

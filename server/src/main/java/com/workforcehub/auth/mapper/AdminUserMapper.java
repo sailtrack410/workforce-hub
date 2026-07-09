@@ -21,4 +21,6 @@ public interface AdminUserMapper {
     List<String> selectRoleCodes(@Param("adminUserId") Long adminUserId);
 
     List<String> selectPermissionCodes(@Param("adminUserId") Long adminUserId);
+
+    List<String> selectAllActivePermissionCodes();
 }

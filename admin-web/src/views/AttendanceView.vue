@@ -10,12 +10,14 @@ import type {
   AttendanceScheduleResponse,
   AttendanceShiftResponse,
   EntityId,
+  OrgUserSummaryResponse,
 } from '@/api/types';
-import { errorMessage, formatDateTime, formatId, formatMinutes, statusLabel } from '@/utils/format';
+import { attendanceResultLabel, attendanceSourceLabel, errorMessage, formatDateTime, formatId, formatMinutes, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
+import AdminUserPicker from '@/components/AdminUserPicker.vue';
 
 const toast = useToast();
 
@@ -36,7 +38,6 @@ const today = localDate(new Date());
 const firstDay = `${today.slice(0, 8)}01`;
 
 const shiftForm = reactive({
-  shiftCode: '',
   shiftName: '',
   startTime: '09:00:00',
   endTime: '18:00:00',
@@ -46,9 +47,8 @@ const shiftForm = reactive({
   offDutyPunchEnd: '19:00:00',
   status: 'ACTIVE',
 });
-const calendarForm = reactive({ calendarCode: '', calendarName: '', status: 'ACTIVE' });
+const calendarForm = reactive({ calendarName: '', status: 'ACTIVE' });
 const groupForm = reactive({
-  groupCode: '',
   groupName: '',
   calendarId: '',
   defaultShiftId: '',
@@ -67,21 +67,22 @@ const scheduleForm = reactive({
 });
 const scheduleFilters = reactive({ userId: '', startDate: firstDay, endDate: today });
 const resultFilters = reactive({ userId: '', startDate: firstDay, endDate: today });
+const memberUserId = ref<EntityId | null>(null);
+const scheduleUserId = ref<EntityId | null>(null);
+const scheduleFilterUserId = ref<EntityId | null>(null);
+const resultFilterUserId = ref<EntityId | null>(null);
 
 const shiftColumns: TableColumn[] = [
-  { key: 'shiftCode', label: '编码' },
   { key: 'shiftName', label: '名称' },
   { key: 'workTime', label: '班段' },
   { key: 'punchTime', label: '打卡窗口' },
   { key: 'status', label: '状态' },
 ];
 const calendarColumns: TableColumn[] = [
-  { key: 'calendarCode', label: '编码' },
   { key: 'calendarName', label: '名称' },
   { key: 'status', label: '状态' },
 ];
 const groupColumns: TableColumn[] = [
-  { key: 'groupCode', label: '编码' },
   { key: 'groupName', label: '名称' },
   { key: 'calendarId', label: '日历' },
   { key: 'defaultShiftId', label: '默认班次' },
@@ -118,22 +119,22 @@ function localDate(date: Date) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-function sourceLabel(value?: string | null) {
-  const labels: Record<string, string> = { MANUAL: '手动', AUTO: '自动', TEMPLATE: '模板' };
-  return value ? labels[value] ?? value : '-';
-}
-
-function resultLabel(value?: string | null) {
-  const labels: Record<string, string> = { NORMAL: '正常', ABNORMAL: '异常', NO_RULE: '未排班', LEAVE: '请假' };
-  return value ? labels[value] ?? value : '-';
-}
-
 function shiftName(shiftId?: EntityId | null) {
-  return shifts.value.find((item) => String(item.shiftId) === String(shiftId))?.shiftName ?? formatId(shiftId);
+  return shifts.value.find((item) => String(item.shiftId) === String(shiftId))?.shiftName ?? '未命名班次';
 }
 
 function calendarName(calendarId?: EntityId | null) {
-  return calendars.value.find((item) => String(item.calendarId) === String(calendarId))?.calendarName ?? formatId(calendarId);
+  return calendars.value.find((item) => String(item.calendarId) === String(calendarId))?.calendarName ?? '未命名日历';
+}
+
+function employeeLabel(row: { realName?: string | null; employeeNo?: string | null }) {
+  return row.realName || '未命名员工';
+}
+
+function generatedCode(prefix: string, name: string) {
+  const stamp = Date.now().toString(36).toUpperCase();
+  const seed = encodeURIComponent(name.trim()).replace(/%/g, '').slice(0, 8).toUpperCase();
+  return `${prefix}_${seed || stamp}_${stamp}`.slice(0, 64);
 }
 
 async function loadBase() {
@@ -182,12 +183,11 @@ async function createCalendar() {
   submitting.value = true;
   try {
     await adminApi.attendance.createCalendar({
-      calendarCode: calendarForm.calendarCode,
+      calendarCode: generatedCode('CAL', calendarForm.calendarName),
       calendarName: calendarForm.calendarName,
       calendarType: 'STANDARD',
       status: calendarForm.status,
     });
-    calendarForm.calendarCode = '';
     calendarForm.calendarName = '';
     await loadBase();
   } catch (e) {
@@ -200,8 +200,10 @@ async function createCalendar() {
 async function createShift() {
   submitting.value = true;
   try {
-    await adminApi.attendance.createShift({ ...shiftForm });
-    shiftForm.shiftCode = '';
+    await adminApi.attendance.createShift({
+      ...shiftForm,
+      shiftCode: generatedCode('SHIFT', shiftForm.shiftName),
+    });
     shiftForm.shiftName = '';
     await loadBase();
   } catch (e) {
@@ -215,7 +217,7 @@ async function createGroup() {
   submitting.value = true;
   try {
     await adminApi.attendance.createGroup({
-      groupCode: groupForm.groupCode,
+      groupCode: generatedCode('GROUP', groupForm.groupName),
       groupName: groupForm.groupName,
       calendarId: groupForm.calendarId,
       defaultShiftId: groupForm.defaultShiftId,
@@ -223,7 +225,6 @@ async function createGroup() {
       earlyLeaveGraceMinutes: Number(groupForm.earlyLeaveGraceMinutes),
       status: groupForm.status,
     });
-    groupForm.groupCode = '';
     groupForm.groupName = '';
     await loadBase();
   } catch (e) {
@@ -253,6 +254,7 @@ async function addGroupMember() {
       sourceType: memberForm.sourceType,
     });
     memberForm.userId = '';
+    memberUserId.value = null;
     groupMembers.value = await adminApi.attendance.groupMembers(selectedGroupId.value);
   } catch (e) {
     toast.error(errorMessage(e));
@@ -291,6 +293,7 @@ async function submitSchedule() {
 function selectSchedule(row: AttendanceScheduleResponse) {
   selectedScheduleId.value = row.scheduleId;
   scheduleForm.userId = String(row.userId);
+  scheduleUserId.value = row.userId;
   scheduleForm.workDate = row.workDate;
   scheduleForm.shiftId = String(row.shiftId);
   scheduleForm.calendarId = row.calendarId == null ? '' : String(row.calendarId);
@@ -301,11 +304,32 @@ function selectSchedule(row: AttendanceScheduleResponse) {
 function clearScheduleSelection() {
   selectedScheduleId.value = null;
   scheduleForm.userId = '';
+  scheduleUserId.value = null;
   scheduleForm.workDate = today;
   scheduleForm.shiftId = '';
   scheduleForm.calendarId = '';
   scheduleForm.scheduleSource = 'MANUAL';
   scheduleForm.status = 'ACTIVE';
+}
+
+function onMemberUser(user: OrgUserSummaryResponse | null) {
+  void user;
+  memberForm.userId = memberUserId.value ? String(memberUserId.value) : '';
+}
+
+function onScheduleUser(user: OrgUserSummaryResponse | null) {
+  void user;
+  scheduleForm.userId = scheduleUserId.value ? String(scheduleUserId.value) : '';
+}
+
+function onScheduleFilterUser(user: OrgUserSummaryResponse | null) {
+  void user;
+  scheduleFilters.userId = scheduleFilterUserId.value ? String(scheduleFilterUserId.value) : '';
+}
+
+function onResultFilterUser(user: OrgUserSummaryResponse | null) {
+  void user;
+  resultFilters.userId = resultFilterUserId.value ? String(resultFilterUserId.value) : '';
 }
 
 onMounted(loadPage);
@@ -331,7 +355,6 @@ onMounted(loadPage);
     <template v-if="activeTab === 'shifts'">
       <AdminPanel :span="5" title="新建班次">
         <form class="attendance-form" @submit.prevent="createShift">
-          <label><span>编码</span><input v-model="shiftForm.shiftCode" required maxlength="64" /></label>
           <label><span>名称</span><input v-model="shiftForm.shiftName" required maxlength="128" /></label>
           <label><span>上班</span><input v-model="shiftForm.startTime" required type="time" step="1" /></label>
           <label><span>下班</span><input v-model="shiftForm.endTime" required type="time" step="1" /></label>
@@ -368,7 +391,6 @@ onMounted(loadPage);
     <template v-else-if="activeTab === 'groups'">
       <AdminPanel :span="5" title="工作日历">
         <form class="attendance-form" @submit.prevent="createCalendar">
-          <label><span>编码</span><input v-model="calendarForm.calendarCode" required maxlength="64" /></label>
           <label><span>名称</span><input v-model="calendarForm.calendarName" required maxlength="128" /></label>
           <label>
             <span>状态</span>
@@ -389,7 +411,6 @@ onMounted(loadPage);
 
       <AdminPanel :span="7" title="考勤组">
         <form class="attendance-form group-form" @submit.prevent="createGroup">
-          <label><span>编码</span><input v-model="groupForm.groupCode" required maxlength="64" /></label>
           <label><span>名称</span><input v-model="groupForm.groupName" required maxlength="128" /></label>
           <label>
             <span>日历</span>
@@ -431,8 +452,8 @@ onMounted(loadPage);
           row-key="groupId"
           @row-click="selectGroup"
         >
-          <template #cell-calendarId="{ row }">{{ calendarName(row.calendarId) }}</template>
-          <template #cell-defaultShiftId="{ row }">{{ shiftName(row.defaultShiftId) }}</template>
+          <template #cell-calendarId="{ row }">{{ row.calendarName || calendarName(row.calendarId) }}</template>
+          <template #cell-defaultShiftId="{ row }">{{ row.defaultShiftName || shiftName(row.defaultShiftId) }}</template>
           <template #cell-grace="{ row }">{{ row.lateGraceMinutes }} / {{ row.earlyLeaveGraceMinutes }}</template>
           <template #cell-status="{ row }"><span class="status-pill">{{ statusLabel(row.status) }}</span></template>
         </AdminTable>
@@ -440,7 +461,7 @@ onMounted(loadPage);
 
       <AdminPanel :span="12" title="考勤组成员">
         <form class="attendance-form member-form" @submit.prevent="addGroupMember">
-          <label><span>员工 ID</span><input v-model="memberForm.userId" required /></label>
+          <AdminUserPicker v-model="memberUserId" label="员工" @select="onMemberUser" />
           <label><span>开始日</span><input v-model="memberForm.effectiveFrom" required type="date" /></label>
           <label><span>结束日</span><input v-model="memberForm.effectiveTo" type="date" /></label>
           <label>
@@ -455,9 +476,9 @@ onMounted(loadPage);
           </button>
         </form>
         <AdminTable :columns="memberColumns" :rows="groupMembers" :loading="loading" row-key="memberId">
-          <template #cell-userId="{ row }">{{ formatId(row.userId) }}</template>
+          <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
           <template #cell-effectiveTo="{ row }">{{ row.effectiveTo || '-' }}</template>
-          <template #cell-sourceType="{ row }">{{ sourceLabel(row.sourceType) }}</template>
+          <template #cell-sourceType="{ row }">{{ attendanceSourceLabel(row.sourceType) }}</template>
           <template #cell-status="{ row }"><span class="status-pill">{{ statusLabel(row.status) }}</span></template>
         </AdminTable>
       </AdminPanel>
@@ -466,7 +487,7 @@ onMounted(loadPage);
     <template v-else-if="activeTab === 'schedules'">
       <AdminPanel :span="12" title="排班筛选">
         <AdminFilterBar @search="loadSchedules">
-          <input v-model="scheduleFilters.userId" placeholder="员工 ID" />
+          <AdminUserPicker v-model="scheduleFilterUserId" label="员工" @select="onScheduleFilterUser" />
           <input v-model="scheduleFilters.startDate" required type="date" />
           <input v-model="scheduleFilters.endDate" required type="date" />
         </AdminFilterBar>
@@ -474,7 +495,7 @@ onMounted(loadPage);
 
       <AdminPanel :span="5" :title="selectedScheduleId ? '修改排班' : '新建排班'">
         <form class="attendance-form" @submit.prevent="submitSchedule">
-          <label><span>员工 ID</span><input v-model="scheduleForm.userId" :disabled="!!selectedScheduleId" required /></label>
+          <AdminUserPicker v-model="scheduleUserId" label="员工" :disabled="!!selectedScheduleId" @select="onScheduleUser" />
           <label><span>日期</span><input v-model="scheduleForm.workDate" :disabled="!!selectedScheduleId" required type="date" /></label>
           <label>
             <span>班次</span>
@@ -528,9 +549,9 @@ onMounted(loadPage);
           row-key="scheduleId"
           @row-click="selectSchedule"
         >
-          <template #cell-userId="{ row }">{{ formatId(row.userId) }}</template>
+          <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
           <template #cell-shiftId="{ row }">{{ shiftName(row.shiftId) }}</template>
-          <template #cell-scheduleSource="{ row }">{{ sourceLabel(row.scheduleSource) }}</template>
+          <template #cell-scheduleSource="{ row }">{{ attendanceSourceLabel(row.scheduleSource) }}</template>
           <template #cell-status="{ row }"><span class="status-pill">{{ statusLabel(row.status) }}</span></template>
         </AdminTable>
       </AdminPanel>
@@ -539,7 +560,7 @@ onMounted(loadPage);
     <template v-else>
       <AdminPanel :span="12" title="日结果筛选">
         <AdminFilterBar @search="loadResults">
-          <input v-model="resultFilters.userId" placeholder="员工 ID" />
+          <AdminUserPicker v-model="resultFilterUserId" label="员工" @select="onResultFilterUser" />
           <input v-model="resultFilters.startDate" required type="date" />
           <input v-model="resultFilters.endDate" required type="date" />
         </AdminFilterBar>
@@ -547,8 +568,8 @@ onMounted(loadPage);
 
       <AdminPanel :span="12" :title="`日结果 (${dailyResults.length})`">
         <AdminTable :columns="resultColumns" :rows="dailyResults" :loading="loading" row-key="dailyResultId">
-          <template #cell-userId="{ row }">{{ formatId(row.userId) }}</template>
-          <template #cell-resultStatus="{ row }"><span class="status-pill">{{ resultLabel(row.resultStatus) }}</span></template>
+          <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
+          <template #cell-resultStatus="{ row }"><span class="status-pill">{{ attendanceResultLabel(row.resultStatus) }}</span></template>
           <template #cell-minutes="{ row }">
             <strong>工作 {{ formatMinutes(row.workMinutes) }}</strong>
             <span>迟到 {{ row.lateMinutes }} / 早退 {{ row.earlyLeaveMinutes }} / 缺勤 {{ row.absenceMinutes }}</span>

@@ -13,7 +13,6 @@ import type {
 import type { PersonalFileRecord, useShellStore } from '@/stores/shell';
 import type { useSessionStore } from '@/stores/session';
 import { useWorkflowStore } from '@/stores/workflow';
-import { useAgentTasks } from './useAgentTasks';
 import { thisMonthRange, useAttendance } from './useAttendance';
 import { usePersonalFileTransfer } from './usePersonalFileTransfer';
 import {
@@ -30,6 +29,12 @@ import { ref } from 'vue';
 import { useFilePreview } from './useFilePreview';
 
 type FieldRows = Array<[string, string]>;
+type GenericPayloadField = {
+  label?: unknown;
+  value?: unknown;
+  displayValue?: unknown;
+  type?: unknown;
+};
 
 interface UseWorkbenchStateOptions {
   shell: ReturnType<typeof useShellStore>;
@@ -190,9 +195,8 @@ export function useWorkbenchState({
     const detail = workflowDetail.value;
     if (!detail) return [];
     const rows: FieldRows = [
-      ['申请编号', detail.requestNo],
       ['业务类型', bizTypeLabel(detail.bizType)],
-      ['状态', statusText(detail.status)],
+      ['状态', detail.statusName || statusText(detail.status)],
       ['当前节点', displayField(detail.currentStepName)],
       ['提交时间', formatDateTime(detail.submittedAt)],
     ];
@@ -207,29 +211,16 @@ export function useWorkbenchState({
     if (detail.clockCorrection) {
       rows.push(
         ['考勤日期', displayField(detail.clockCorrection.targetDate)],
-        ['缺卡类型', punchTypeLabel(detail.clockCorrection.missingPunchType)],
+        ['缺卡类型', displayField(detail.clockCorrection.missingPunchTypeName || punchTypeLabel(detail.clockCorrection.missingPunchType))],
         ['补卡时间', formatDateTime(detail.clockCorrection.expectedPunchAt)],
         ['补卡原因', displayField(detail.clockCorrection.reason)],
       );
     }
+    if (detail.generic) {
+      rows.push(...genericWorkflowRows(detail.generic.formPayload));
+    }
     return rows;
   });
-  const {
-    agentTaskForm,
-    agentTaskSubmitting,
-    agentTaskResult,
-    agentTaskError,
-    agents,
-    agentsLoading,
-    loadAgents,
-    submitAgentTask,
-    confirmAgentTask,
-    cancelAgentTask,
-  } = useAgentTasks({
-    session,
-    showToast,
-  });
-
   const {
     attendanceDailyResults,
     teamAttendanceDailyResults,
@@ -238,15 +229,21 @@ export function useWorkbenchState({
     attendanceError,
     punchLoading,
     punchResult,
+    todayKey,
+    todayResult,
+    todayExceptions,
+    latestDailyResult,
     clockCorrectionForm,
     clockCorrectionAttachmentIds,
     clockCorrectionSubmitting,
     clockCorrectionResult,
     clockCorrectionError,
     attendanceSummary,
+    attendanceRiskSummary,
     teamAttendanceRows,
     refreshAttendancePanel,
     punchAttendance,
+    openClockCorrectionFromException,
     submitClockCorrectionRequest,
   } = useAttendance({
     session,
@@ -319,6 +316,8 @@ export function useWorkbenchState({
         reason,
         attachmentRefIds: leaveAttachmentIds.value,
       });
+      leaveForm.value.startAt = '';
+      leaveForm.value.endAt = '';
       leaveForm.value.reason = '';
       leaveAttachmentIds.value = [];
       await Promise.all([refreshWorkbenchData(), loadWorkflowRequests()]);
@@ -369,6 +368,8 @@ export function useWorkbenchState({
     selectedRequestId.value = requestId;
     workflowDetailLoading.value = true;
     workflowDetailError.value = '';
+    workflowDetail.value = null;
+    workflowActions.value = [];
     try {
       const [detail, actions] = await Promise.all([
         employeeApi.workflow.requestDetail(requestId),
@@ -452,10 +453,6 @@ export function useWorkbenchState({
       await refreshAttendancePanel();
       return;
     }
-    if (id === 'agent') {
-      await loadAgents();
-      return;
-    }
     if (id === 'balance') {
       await refreshWorkbenchData();
     }
@@ -513,19 +510,18 @@ export function useWorkbenchState({
     attendanceError,
     punchLoading,
     punchResult,
+    todayKey,
+    todayResult,
+    todayExceptions,
+    latestDailyResult,
     clockCorrectionForm,
     clockCorrectionAttachmentIds,
     clockCorrectionSubmitting,
     clockCorrectionResult,
     clockCorrectionError,
     attendanceSummary,
+    attendanceRiskSummary,
     workbenchHighlights,
-    agentTaskForm,
-    agentTaskSubmitting,
-    agentTaskResult,
-    agentTaskError,
-    agents,
-    agentsLoading,
     workflowFilePreview,
     workflowFilePreviewLoading,
     workflowFilePreviewTitle,
@@ -541,12 +537,32 @@ export function useWorkbenchState({
     withdrawWorkflowRequest,
     refreshAttendancePanel,
     punchAttendance,
+    openClockCorrectionFromException,
     submitClockCorrectionRequest,
-    loadAgents,
-    submitAgentTask,
-    confirmAgentTask,
-    cancelAgentTask,
     closeWorkflowFilePreview,
     openWorkflowPreviewExternal,
   };
+}
+
+function genericWorkflowRows(payload?: Record<string, unknown> | null): FieldRows {
+  const fields = Array.isArray(payload?.fields) ? payload.fields : [];
+  return fields
+    .map((item) => {
+      const field = item as GenericPayloadField;
+      const label = typeof field.label === 'string' ? field.label : '';
+      const rawValue = field.displayValue ?? field.value;
+      if (!label) return null;
+      return [label, displayGenericValue(rawValue, field.type)] as [string, string];
+    })
+    .filter((row): row is [string, string] => Boolean(row));
+}
+
+function displayGenericValue(value: unknown, type: unknown) {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return displayField(value == null ? '' : String(value));
+  }
+  if (type === 'datetime') {
+    return formatDateTime(String(value));
+  }
+  return displayField(String(value));
 }

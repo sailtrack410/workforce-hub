@@ -166,6 +166,7 @@ public class AgentTaskTimeoutRepository {
         List<Object> params = new ArrayList<>();
         String sql = """
             SELECT job_run_id,
+                   RIGHT(job_run_id, 8) AS job_run_no,
                    trigger_type,
                    status,
                    batch_size,
@@ -214,6 +215,7 @@ public class AgentTaskTimeoutRepository {
     private AdminAgentTaskTimeoutRunRow mapAdminTaskTimeoutRun(ResultSet rs, int rowNum) throws SQLException {
         return new AdminAgentTaskTimeoutRunRow(
             rs.getString("job_run_id"),
+            rs.getString("job_run_no"),
             rs.getString("trigger_type"),
             rs.getString("status"),
             rs.getInt("batch_size"),

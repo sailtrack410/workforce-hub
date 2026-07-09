@@ -11,7 +11,6 @@ import java.time.LocalTime;
 @Data
 public class CreateAttendanceShiftRequest {
 
-    @NotBlank(message = "班次编码不能为空")
     @Size(max = 64, message = "班次编码不能超过64个字符")
     @Pattern(regexp = "^[A-Za-z0-9_-]+$", message = "班次编码只能包含字母、数字、下划线和短横线")
     private String shiftCode;

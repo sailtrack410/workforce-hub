@@ -23,6 +23,7 @@ import com.workforcehub.im.dto.ImConversationDetailResponse;
 import com.workforcehub.im.dto.ImMessageActionResponse;
 import com.workforcehub.im.dto.ImMessageAttachmentResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
+import com.workforcehub.im.dto.ImMessageMentionResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
 import com.workforcehub.im.dto.RemindImMessageRequest;
 import com.workforcehub.im.dto.SendImMessageRequest;
@@ -47,6 +48,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -196,6 +198,7 @@ public class ImService {
         ensureCanAccessConversation(conversationId, userId);
         String text = normalizeText(request.getText());
         List<Long> attachmentRefIds = normalizeAttachmentRefIds(request.getAttachmentRefIds());
+        List<Long> mentionUserIds = normalizeMentionUserIds(conversationId, request.getMentionUserIds());
         if (!StringUtils.hasText(text) && attachmentRefIds.isEmpty()) {
             throw new BizException(400, "消息内容不能为空");
         }
@@ -229,7 +232,7 @@ public class ImService {
         Long seqNo = lastSeq + 1;
         Long messageId = IdGenerator.nextId();
         LocalDateTime sentAt = LocalDateTime.now();
-        String contentJson = buildContentJson(text, sourceAttachments);
+        String contentJson = buildContentJson(text, sourceAttachments, mentionUserIds);
         try {
             imMessageRepository.insertMessage(
                 messageId,
@@ -296,7 +299,7 @@ public class ImService {
         if (!StringUtils.hasText(text)) {
             throw new BizException(400, "消息内容不能为空");
         }
-        String contentJson = buildContentJson(text, imRepository.listMessageAttachments(messageId));
+        String contentJson = buildContentJson(text, imRepository.listMessageAttachments(messageId), extractMentionUserIds(message.contentJson()));
         int updated = imMessageRepository.updateMessageContent(messageId, contentJson, LocalDateTime.now());
         if (updated == 0) {
             throw new BizException(409, "当前消息状态不允许编辑");
@@ -391,7 +394,7 @@ public class ImService {
         Long forwardedMessageId = IdGenerator.nextId();
         LocalDateTime sentAt = LocalDateTime.now();
         String messageType = sourceAttachments.isEmpty() || StringUtils.hasText(text) ? "TEXT" : "FILE";
-        String contentJson = buildContentJson(text, sourceAttachments);
+        String contentJson = buildContentJson(text, sourceAttachments, extractMentionUserIds(message.contentJson()));
         imMessageRepository.insertMessage(
             forwardedMessageId,
             request.getTargetConversationId(),
@@ -433,7 +436,7 @@ public class ImService {
         Long userId = requireActiveEmployeeUserId();
         requireReadableMessage(conversationId, messageId, userId);
         imMessageRepository.upsertUserAction(IdGenerator.nextId(), conversationId, messageId, userId, "FAVORITE", "{}", null);
-        return new ImMessageActionResponse(messageId, "FAVORITE", "ACTIVE");
+        return new ImMessageActionResponse(messageId, "FAVORITE", "收藏", "ACTIVE", "启用");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -445,7 +448,7 @@ public class ImService {
         String note = blankToNull(request.getNote());
         String payloadJson = write(objectMapper, Map.of("note", note == null ? "" : note));
         imMessageRepository.upsertUserAction(IdGenerator.nextId(), conversationId, messageId, userId, "REMINDER", payloadJson, request.getRemindAt());
-        return new ImMessageActionResponse(messageId, "REMINDER", "ACTIVE");
+        return new ImMessageActionResponse(messageId, "REMINDER", "提醒", "ACTIVE", "启用");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -453,7 +456,7 @@ public class ImService {
         Long userId = requireActiveEmployeeUserId();
         requireReadableMessage(conversationId, messageId, userId);
         imMessageRepository.upsertUserAction(IdGenerator.nextId(), conversationId, messageId, userId, "DELETE", "{}", null);
-        return new ImMessageActionResponse(messageId, "DELETE", "ACTIVE");
+        return new ImMessageActionResponse(messageId, "DELETE", "删除", "ACTIVE", "启用");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -635,6 +638,7 @@ public class ImService {
         ImConversationSummaryResponse response = new ImConversationSummaryResponse();
         response.setConversationId(row.conversationId());
         response.setConversationType(row.conversationType());
+        response.setConversationTypeName(conversationTypeName(row.conversationType()));
         response.setConversationKey(row.conversationKey());
         response.setTitle(row.title());
         response.setAvatarFileId(row.avatarFileId());
@@ -644,9 +648,13 @@ public class ImService {
         response.setUnreadCount(row.unreadCount());
         response.setLastMessageAt(row.lastMessageAt());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setPin(row.pin());
         response.setMute(row.mute());
         response.setMemberRole(row.memberRole());
+        response.setMemberRoleName(memberRoleName(row.memberRole()));
+        response.setHasMentionMe(Boolean.TRUE.equals(row.hasMentionMe()));
+        response.setHasReplyMe(Boolean.TRUE.equals(row.hasReplyMe()));
         response.setLastMessage(row.lastMessage() == null ? null : toMessageResponse(row.lastMessage()));
         return response;
     }
@@ -718,9 +726,13 @@ public class ImService {
 
     private LlmModelRow firstActiveLlmModel() {
         return agentRepository.listLlmModels().stream()
-            .filter(model -> "ACTIVE".equals(model.status()) && StringUtils.hasText(model.apiKey()))
+            .filter(model -> "ACTIVE".equals(model.status()) && "TEXT".equals(model.modelType()) && StringUtils.hasText(model.apiKey()))
+            .filter(model -> Boolean.TRUE.equals(model.defaultFlag()))
             .findFirst()
-            .orElse(null);
+            .orElseGet(() -> agentRepository.listLlmModels().stream()
+                .filter(model -> "ACTIVE".equals(model.status()) && "TEXT".equals(model.modelType()) && StringUtils.hasText(model.apiKey()))
+                .findFirst()
+                .orElse(null));
     }
 
     private void pushConversationEventAfterCommit(Long conversationId, ImWebSocketEvent event) {
@@ -762,10 +774,13 @@ public class ImService {
         response.setConversationId(row.conversationId());
         response.setSeqNo(row.seqNo());
         response.setSenderType(row.senderType());
+        response.setSenderTypeName(senderTypeName(row.senderType()));
         response.setSenderId(row.senderId());
         response.setMessageType(row.messageType());
+        response.setMessageTypeName(messageTypeName(row.messageType()));
         response.setContentJson(row.contentJson());
         response.setContentText(extractText(row.contentJson()));
+        response.setMentions(extractMentionResponses(row.contentJson()));
         if ("RECALLED".equals(row.status())) {
             response.setAttachments(List.of());
         } else {
@@ -776,6 +791,7 @@ public class ImService {
         }
         response.setQuotedMessageId(row.quotedMessageId());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setSentAt(row.sentAt());
         return response;
     }
@@ -788,7 +804,51 @@ public class ImService {
         response.setFileSize(row.fileSize());
         response.setContentSha256(row.contentSha256());
         response.setScanStatus(row.scanStatus());
+        response.setScanStatusName(scanStatusName(row.scanStatus()));
         return response;
+    }
+
+    private String conversationTypeName(String value) {
+        if ("PRIVATE".equals(value)) return "私聊";
+        if ("GROUP".equals(value)) return "群聊";
+        if ("AGENT".equals(value)) return "AI 会话";
+        return value == null ? null : "会话";
+    }
+
+    private String memberRoleName(String value) {
+        if ("OWNER".equals(value)) return "群主";
+        if ("MEMBER".equals(value)) return "成员";
+        return value == null ? null : "成员";
+    }
+
+    private String senderTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("AGENT".equals(value)) return "AI 助手";
+        if ("SYSTEM".equals(value)) return "系统";
+        return value == null ? null : "发送人";
+    }
+
+    private String messageTypeName(String value) {
+        if ("TEXT".equals(value)) return "文本";
+        if ("FILE".equals(value)) return "文件";
+        if ("IMAGE".equals(value)) return "图片";
+        if ("KNOWLEDGE_CARD".equals(value)) return "知识卡片";
+        return value == null ? null : "消息";
+    }
+
+    private String statusName(String value) {
+        if ("ACTIVE".equals(value) || "NORMAL".equals(value)) return "正常";
+        if ("RECALLED".equals(value)) return "已撤回";
+        if ("EDITED".equals(value)) return "已编辑";
+        if ("CLOSED".equals(value)) return "已关闭";
+        return value == null ? null : "其他状态";
+    }
+
+    private String scanStatusName(String value) {
+        if ("CLEAN".equals(value) || "READY".equals(value)) return "已通过";
+        if ("PENDING".equals(value)) return "检测中";
+        if ("FAILED".equals(value) || "INFECTED".equals(value)) return "未通过";
+        return value == null ? null : "未知状态";
     }
 
     private int normalizeMessagePageSize(Integer size) {
@@ -849,13 +909,15 @@ public class ImService {
         return normalized;
     }
 
-    private String buildContentJson(String text, List<ImAttachmentRow> attachments) {
+    private String buildContentJson(String text, List<ImAttachmentRow> attachments, List<Long> mentionUserIds) {
         try {
             return objectMapper.writeValueAsString(Map.of(
                 "text",
                 text,
                 "attachmentCount",
-                attachments.size()
+                attachments.size(),
+                "mentionUserIds",
+                mentionUserIds == null ? List.of() : mentionUserIds
             ));
         } catch (Exception e) {
             throw new BizException(500, "消息内容序列化失败");
@@ -902,6 +964,52 @@ public class ImService {
         return new LinkedHashSet<>(attachmentRefIds == null ? List.<Long>of() : attachmentRefIds)
             .stream()
             .filter(attachmentRefId -> attachmentRefId != null)
+            .toList();
+    }
+
+    private List<Long> normalizeMentionUserIds(Long conversationId, List<Long> mentionUserIds) {
+        List<Long> ids = new LinkedHashSet<>(mentionUserIds == null ? List.<Long>of() : mentionUserIds)
+            .stream()
+            .filter(userId -> userId != null)
+            .toList();
+        ids.forEach(userId -> {
+            if (!imRepository.existsActiveUserMembership(conversationId, userId)) {
+                throw new BizException(400, "@成员不在当前会话中");
+            }
+        });
+        return ids;
+    }
+
+    private List<Long> extractMentionUserIds(String contentJson) {
+        if (!StringUtils.hasText(contentJson)) {
+            return List.of();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(contentJson);
+            JsonNode mentionUserIdsNode = node.get("mentionUserIds");
+            if (mentionUserIdsNode == null || !mentionUserIdsNode.isArray()) {
+                return List.of();
+            }
+            List<Long> values = new ArrayList<>();
+            mentionUserIdsNode.forEach(item -> {
+                if (item.canConvertToLong()) {
+                    values.add(item.asLong());
+                }
+            });
+            return values;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private List<ImMessageMentionResponse> extractMentionResponses(String contentJson) {
+        return extractMentionUserIds(contentJson).stream()
+            .map(userId -> {
+                ImMessageMentionResponse response = new ImMessageMentionResponse();
+                response.setUserId(userId);
+                imRepository.findActiveOrgUser(userId).ifPresent(user -> response.setName(user.realName()));
+                return response;
+            })
             .toList();
     }
 

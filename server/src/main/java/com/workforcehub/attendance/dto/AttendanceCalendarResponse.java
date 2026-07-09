@@ -9,5 +9,7 @@ public class AttendanceCalendarResponse {
     private String calendarCode;
     private String calendarName;
     private String calendarType;
+    private String calendarTypeName;
     private String status;
+    private String statusName;
 }

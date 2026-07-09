@@ -40,7 +40,7 @@ export function employmentStatusLabel(status?: string | null) {
   if (status === 'ACTIVE' || status === 'IN_SERVICE') return '在职';
   if (status === 'DISABLED') return '停用';
   if (status === 'RESIGNED') return '离职';
-  return displayField(status);
+  return status ? '其他状态' : '-';
 }
 
 export function percentage(value: number, max: number) {
@@ -52,6 +52,7 @@ export function statusText(status: string) {
   if (status === 'PENDING') return '待处理';
   if (status === 'PENDING_REVIEW') return '待预审';
   if (status === 'OPEN') return '待处理';
+  if (status === 'DONE') return '已完成';
   if (status === 'IN_APPROVAL') return '审批中';
   if (status === 'ABNORMAL') return '异常';
   if (status === 'NORMAL') return '正常';
@@ -65,7 +66,33 @@ export function statusText(status: string) {
   if (status === 'NO_RULE') return '未排班';
   if (status === 'LEAVE') return '请假';
   if (status === 'EXPIRED') return '已过期';
-  return status;
+  return status ? '其他状态' : '-';
+}
+
+export function agentTypeLabel(type?: string | null) {
+  if (type === 'QA') return '问答助手';
+  if (type === 'WORKFLOW') return '流程助手';
+  return type ? 'AI 助手' : '-';
+}
+
+export function identityModeLabel(mode?: string | null) {
+  if (mode === 'SYSTEM_IDENTITY') return '系统身份';
+  if (mode === 'USER_IDENTITY') return '员工身份';
+  return mode ? '通用身份' : '-';
+}
+
+export function riskLevelLabel(level?: string | null) {
+  if (level === 'HIGH' || level === '高') return '高风险';
+  if (level === 'MEDIUM' || level === '中') return '中风险';
+  if (level === 'LOW' || level === '低') return '低风险';
+  if (level === 'READONLY') return '低风险';
+  return level ? '风险待确认' : '';
+}
+
+export function reviewModeLabel(mode?: string | null) {
+  if (mode === 'AUTO') return '自动审核';
+  if (mode === 'MANUAL' || mode === 'HUMAN') return '人工复核';
+  return mode ? '审核方式待确认' : '';
 }
 
 // 后端存分钟数，前端按 8h/天 展示
@@ -87,13 +114,21 @@ export function toApiDateTime(value: string) {
 export function bizTypeLabel(type?: string | null) {
   if (type === 'LEAVE') return '请假';
   if (type === 'CLOCK_CORRECTION') return '补卡';
-  return displayField(type);
+  if (type === 'EXPENSE') return '费用报销';
+  if (type === 'BUSINESS_TRIP') return '出差';
+  if (type === 'OVERTIME') return '加班';
+  if (type === 'SEAL') return '用章';
+  if (type === 'PURCHASE') return '采购';
+  if (type === 'CERTIFICATE') return '证明开具';
+  if (type === 'BORROW') return '备用金借款';
+  if (type === 'PROJECT') return '项目立项';
+  return type ? '其他业务' : '-';
 }
 
 export function punchTypeLabel(type?: string | null) {
   if (type === 'ON_DUTY') return '上班';
   if (type === 'OFF_DUTY') return '下班';
-  return displayField(type);
+  return type ? '打卡类型' : '-';
 }
 
 export function actionTypeLabel(type?: string | null) {
@@ -101,7 +136,7 @@ export function actionTypeLabel(type?: string | null) {
   if (type === 'REJECT') return '驳回';
   if (type === 'WITHDRAW') return '撤回';
   if (type === 'AGENT_PRE_REVIEW') return 'AI 预审';
-  return displayField(type);
+  return type ? '审批操作' : '-';
 }
 
 // 解析 AI 预审的 JSON 结果，兼容后端字段名变化（suggestion/recommendation）
@@ -165,7 +200,7 @@ export function toneOfConversation(tone: string) {
 
 export function toneOfStatus(status: string) {
   if (['PENDING', 'OPEN', 'IN_APPROVAL', 'ABNORMAL'].includes(status)) return 'warning';
-  if (['ACTIVE', 'READY', 'APPROVED'].includes(status)) return 'success';
+  if (['ACTIVE', 'READY', 'APPROVED', 'DONE'].includes(status)) return 'success';
   if (['REJECTED', 'EXPIRED'].includes(status)) return 'danger';
   return 'neutral';
 }

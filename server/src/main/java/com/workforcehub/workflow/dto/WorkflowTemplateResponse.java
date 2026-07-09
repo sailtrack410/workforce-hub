@@ -14,6 +14,7 @@ public class WorkflowTemplateResponse {
     private String templateCode;
     private String templateName;
     private String status;
+    private String statusName;
     private WorkflowTemplateVersionResponse currentVersion;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

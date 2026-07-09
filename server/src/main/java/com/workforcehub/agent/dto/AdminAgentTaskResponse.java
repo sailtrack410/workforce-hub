@@ -16,11 +16,18 @@ public class AdminAgentTaskResponse {
     private String agentName;
     private Long agentVersionId;
     private String triggerType;
+    private String triggerTypeName;
     private String contextType;
+    private String contextTypeName;
     private Long contextId;
+    private String contextDisplayName;
+    private String contextNo;
     private String triggeredByType;
+    private String triggeredByTypeName;
     private Long triggeredById;
+    private String triggeredByName;
     private String status;
+    private String statusName;
     private Integer toolCallCount;
     private LocalDateTime waitingDeadlineAt;
     private String workflowSnapshotJson;

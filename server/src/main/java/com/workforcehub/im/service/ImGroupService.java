@@ -436,6 +436,7 @@ public class ImGroupService {
         ImConversationSummaryResponse response = new ImConversationSummaryResponse();
         response.setConversationId(row.conversationId());
         response.setConversationType(row.conversationType());
+        response.setConversationTypeName(conversationTypeName(row.conversationType()));
         response.setConversationKey(row.conversationKey());
         response.setTitle(row.title());
         response.setAvatarFileId(row.avatarFileId());
@@ -445,9 +446,11 @@ public class ImGroupService {
         response.setUnreadCount(row.unreadCount());
         response.setLastMessageAt(row.lastMessageAt());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setPin(row.pin());
         response.setMute(row.mute());
         response.setMemberRole(row.memberRole());
+        response.setMemberRoleName(memberRoleName(row.memberRole()));
         return response;
     }
 
@@ -455,9 +458,12 @@ public class ImGroupService {
         ImConversationMemberResponse response = new ImConversationMemberResponse();
         response.setMemberId(row.memberId());
         response.setMemberType(row.memberType());
+        response.setMemberTypeName(memberTypeName(row.memberType()));
         response.setDisplayName(row.displayName());
         response.setMemberRole(row.memberRole());
+        response.setMemberRoleName(memberRoleName(row.memberRole()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setJoinedAt(row.joinedAt());
         return response;
     }
@@ -468,10 +474,13 @@ public class ImGroupService {
         response.setTitle(row.title());
         response.setAvatarFileId(row.avatarFileId());
         response.setGroupType(row.groupType());
+        response.setGroupTypeName(groupTypeName(row.groupType()));
         response.setOwnerUserId(row.ownerUserId());
         response.setNoticeText(row.noticeText());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCurrentMemberRole(currentMemberRole);
+        response.setCurrentMemberRoleName(memberRoleName(currentMemberRole));
         return response;
     }
 
@@ -484,6 +493,7 @@ public class ImGroupService {
         response.setFileSize(row.fileSize());
         response.setContentSha256(row.contentSha256());
         response.setScanStatus(row.scanStatus());
+        response.setScanStatusName(scanStatusName(row.scanStatus()));
         response.setUploaderId(row.uploaderId());
         response.setUploaderName(row.uploaderName());
         response.setCreatedAt(row.createdAt());
@@ -523,6 +533,44 @@ public class ImGroupService {
 
     private boolean canDeleteGroupFile(String memberRole) {
         return "OWNER".equals(memberRole) || "ADMIN".equals(memberRole);
+    }
+
+    private String conversationTypeName(String value) {
+        if ("PRIVATE".equals(value)) return "私聊";
+        if ("GROUP".equals(value)) return "群聊";
+        if ("AGENT".equals(value)) return "AI 会话";
+        return value == null ? null : "会话";
+    }
+
+    private String memberTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("AGENT".equals(value)) return "AI 助手";
+        return value == null ? null : "成员";
+    }
+
+    private String memberRoleName(String value) {
+        if ("OWNER".equals(value)) return "群主";
+        if ("ADMIN".equals(value)) return "管理员";
+        if ("MEMBER".equals(value)) return "成员";
+        return value == null ? null : "成员";
+    }
+
+    private String groupTypeName(String value) {
+        if ("NORMAL".equals(value)) return "普通群";
+        return value == null ? null : "群聊";
+    }
+
+    private String statusName(String value) {
+        if ("ACTIVE".equals(value) || "NORMAL".equals(value)) return "正常";
+        if ("CLOSED".equals(value)) return "已关闭";
+        return value == null ? null : "其他状态";
+    }
+
+    private String scanStatusName(String value) {
+        if ("CLEAN".equals(value) || "READY".equals(value)) return "已通过";
+        if ("PENDING".equals(value)) return "检测中";
+        if ("FAILED".equals(value) || "INFECTED".equals(value)) return "未通过";
+        return value == null ? null : "未知状态";
     }
 
     private String normalizeOptionalText(String text) {

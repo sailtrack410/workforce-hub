@@ -133,7 +133,8 @@ INSERT INTO admin_permission (
     (7006, 'ADMIN_AGENT_MANAGE', 'Agent配置管理', 'AGENT', 'MANAGE', 'ACTIVE', NULL, NULL, 0),
     (7007, 'ADMIN_AGENT_TASK_MANAGE', 'Agent任务管理', 'AGENT_TASK', 'MANAGE', 'ACTIVE', NULL, NULL, 0),
     (7008, 'ADMIN_FILE_MANAGE', '文件管理', 'FILE', 'MANAGE', 'ACTIVE', NULL, NULL, 0),
-    (7009, 'ADMIN_RAGFLOW_MANAGE', 'RAGFlow管理', 'RAGFLOW', 'MANAGE', 'ACTIVE', NULL, NULL, 0)
+    (7009, 'ADMIN_RAGFLOW_MANAGE', 'RAGFlow管理', 'RAGFLOW', 'MANAGE', 'ACTIVE', NULL, NULL, 0),
+    (7010, 'ADMIN_NOTIFICATION_CHANNEL_MANAGE', '通知渠道配置', 'NOTIFICATION', 'MANAGE', 'ACTIVE', NULL, NULL, 0)
 ON DUPLICATE KEY UPDATE
     perm_name = VALUES(perm_name),
     module_code = VALUES(module_code),
@@ -163,7 +164,8 @@ INSERT INTO admin_role_permission (
     (6106, 6001, 7006, NULL),
     (6107, 6001, 7007, NULL),
     (6108, 6001, 7008, NULL),
-    (6109, 6001, 7009, NULL)
+    (6109, 6001, 7009, NULL),
+    (6110, 6001, 7010, NULL)
 ON DUPLICATE KEY UPDATE
     created_by = VALUES(created_by);
 

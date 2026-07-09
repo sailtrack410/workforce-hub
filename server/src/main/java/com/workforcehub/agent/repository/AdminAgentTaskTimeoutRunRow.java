@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public record AdminAgentTaskTimeoutRunRow(
     String jobRunId,
+    String jobRunNo,
     String triggerType,
     String status,
     Integer batchSize,

@@ -11,6 +11,12 @@ npm test
 npm run build
 ```
 
+开发端口约束：
+
+- `employee-web` 固定使用 `http://127.0.0.1:5174`
+- `admin-web` 当前占用 `http://127.0.0.1:5173` 时，不要随意改动它的端口
+- 前后端联调依赖既有端口约定，变更端口前先核对 Vite 代理、WebSocket Origin 和相关测试
+
 ## 本地联调
 
 员工端 API 基础层位于 `src/api/`，默认使用服务端 Session Cookie，所有请求都会带 `credentials: "include"`。

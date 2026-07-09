@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { Plus, RefreshCcw } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type { OrgPositionResponse, OrgPositionSaveRequest } from '@/api/types';
-import { errorMessage, statusLabel } from '@/utils/format';
+import { errorMessage, positionCategoryLabel, statusLabel } from '@/utils/format';
 import { usePositionStore } from '@/stores/position';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
@@ -25,7 +25,6 @@ const selected = computed(() =>
 );
 
 const columns: TableColumn[] = [
-  { key: 'positionCode', label: '编码' },
   { key: 'positionName', label: '名称' },
   { key: 'positionCategory', label: '分类' },
   { key: 'status', label: '状态' },
@@ -35,10 +34,8 @@ const detailRows = computed<DetailRow[]>(() => {
   const r = selected.value;
   if (!r) return [];
   return [
-    { label: 'ID', value: String(r.id) },
-    { label: '编码', value: r.positionCode },
     { label: '名称', value: r.positionName },
-    { label: '分类', value: r.positionCategory ?? '-' },
+    { label: '分类', value: positionCategoryLabel(r.positionCategory) },
     { label: '状态', value: statusLabel(r.status) },
   ];
 });
@@ -95,12 +92,11 @@ onMounted(loadList);
   <div class="page-grid">
     <AdminPanel :span="7" title="岗位列表">
       <template #actions>
-        <button class="icon-button" title="刷新" @click="loadList"><RefreshCcw :size="16" /></button>
+        <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
       <AdminFilterBar>
-        <input v-model="createForm.positionCode" placeholder="岗位编码" />
         <input v-model="createForm.positionName" placeholder="岗位名称" />
-        <button class="primary-button" :disabled="creating || !createForm.positionCode || !createForm.positionName" @click="handleCreate">
+        <button class="primary-button" :disabled="creating || !createForm.positionName" @click="handleCreate">
           <Plus :size="16" /> 新建
         </button>
       </AdminFilterBar>
@@ -111,7 +107,10 @@ onMounted(loadList);
         :selected-id="store.selectedPositionId"
         row-key="id"
         @row-click="onRowClick"
-      />
+      >
+        <template #cell-positionCategory="{ row }">{{ positionCategoryLabel(row.positionCategory) }}</template>
+        <template #cell-status="{ row }">{{ statusLabel(row.status) }}</template>
+      </AdminTable>
     </AdminPanel>
 
     <AdminPanel :span="5" title="岗位详情">

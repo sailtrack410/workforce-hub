@@ -191,10 +191,14 @@ public class ImAgentConversationService {
                     userMessage.getMessageId(),
                     e
                 );
+                String message = AgentService.DEPRECATED_AGENT_MESSAGE.equals(e.getMessage())
+                    ? AgentService.DEPRECATED_AGENT_MESSAGE
+                    : "AI助手暂时无法回复，请稍后再试";
                 writeAgentFailureSystemMessage(
                     userMessage.getConversationId(),
                     agentId,
-                    agentFailureMessageClientId(userMessage.getMessageId())
+                    agentFailureMessageClientId(userMessage.getMessageId()),
+                    message
                 );
             }
         };
@@ -259,6 +263,7 @@ public class ImAgentConversationService {
         ImConversationSummaryResponse response = new ImConversationSummaryResponse();
         response.setConversationId(row.conversationId());
         response.setConversationType(row.conversationType());
+        response.setConversationTypeName(conversationTypeName(row.conversationType()));
         response.setConversationKey(row.conversationKey());
         response.setTitle(row.title());
         response.setAvatarFileId(row.avatarFileId());
@@ -269,9 +274,13 @@ public class ImAgentConversationService {
         response.setLastMessage(row.lastMessage() == null ? null : toMessageResponse(row.lastMessage()));
         response.setLastMessageAt(row.lastMessageAt());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setPin(row.pin());
         response.setMute(row.mute());
         response.setMemberRole(row.memberRole());
+        response.setMemberRoleName(memberRoleName(row.memberRole()));
+        response.setHasMentionMe(Boolean.TRUE.equals(row.hasMentionMe()));
+        response.setHasReplyMe(Boolean.TRUE.equals(row.hasReplyMe()));
         return response;
     }
 
@@ -281,8 +290,10 @@ public class ImAgentConversationService {
         response.setConversationId(row.conversationId());
         response.setSeqNo(row.seqNo());
         response.setSenderType(row.senderType());
+        response.setSenderTypeName(senderTypeName(row.senderType()));
         response.setSenderId(row.senderId());
         response.setMessageType(row.messageType());
+        response.setMessageTypeName(messageTypeName(row.messageType()));
         response.setContentJson(row.contentJson());
         response.setContentText(extractText(row.contentJson()));
         if ("RECALLED".equals(row.status())) {
@@ -295,6 +306,7 @@ public class ImAgentConversationService {
         }
         response.setQuotedMessageId(row.quotedMessageId());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setSentAt(row.sentAt());
         return response;
     }
@@ -307,7 +319,54 @@ public class ImAgentConversationService {
         response.setFileSize(row.fileSize());
         response.setContentSha256(row.contentSha256());
         response.setScanStatus(row.scanStatus());
+        response.setScanStatusName(scanStatusName(row.scanStatus()));
         return response;
+    }
+
+    private String conversationTypeName(String value) {
+        if ("PRIVATE".equals(value)) return "私聊";
+        if ("GROUP".equals(value)) return "群聊";
+        if ("AGENT".equals(value)) return "AI 会话";
+        return value == null ? null : "会话";
+    }
+
+    private String memberRoleName(String value) {
+        if ("OWNER".equals(value)) return "群主";
+        if ("ADMIN".equals(value)) return "管理员";
+        if ("MEMBER".equals(value)) return "成员";
+        return value == null ? null : "成员";
+    }
+
+    private String senderTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("AGENT".equals(value)) return "AI 助手";
+        if ("SYSTEM".equals(value)) return "系统";
+        return value == null ? null : "发送人";
+    }
+
+    private String messageTypeName(String value) {
+        if ("TEXT".equals(value)) return "文本";
+        if ("FILE".equals(value)) return "文件";
+        if ("IMAGE".equals(value)) return "图片";
+        if ("KNOWLEDGE_CARD".equals(value)) return "知识卡片";
+        if ("CARD".equals(value)) return "卡片";
+        if ("SYSTEM".equals(value)) return "系统消息";
+        return value == null ? null : "消息";
+    }
+
+    private String statusName(String value) {
+        if ("ACTIVE".equals(value) || "NORMAL".equals(value)) return "正常";
+        if ("RECALLED".equals(value)) return "已撤回";
+        if ("EDITED".equals(value)) return "已编辑";
+        if ("CLOSED".equals(value)) return "已关闭";
+        return value == null ? null : "其他状态";
+    }
+
+    private String scanStatusName(String value) {
+        if ("CLEAN".equals(value) || "READY".equals(value)) return "已通过";
+        if ("PENDING".equals(value)) return "检测中";
+        if ("FAILED".equals(value) || "INFECTED".equals(value)) return "未通过";
+        return value == null ? null : "未知状态";
     }
 
     private String normalizeAgentMessageType(String messageType) {
@@ -384,6 +443,10 @@ public class ImAgentConversationService {
     }
 
     private void writeAgentFailureSystemMessage(Long conversationId, Long agentId, String clientMessageId) {
+        writeAgentFailureSystemMessage(conversationId, agentId, clientMessageId, "AI助手暂时无法回复，请稍后再试");
+    }
+
+    private void writeAgentFailureSystemMessage(Long conversationId, Long agentId, String clientMessageId, String message) {
         try {
             transactionTemplate.executeWithoutResult(status -> {
                 Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(conversationId);
@@ -402,7 +465,7 @@ public class ImAgentConversationService {
                 Long seqNo = lastSeq + 1;
                 Long messageId = IdGenerator.nextId();
                 LocalDateTime sentAt = LocalDateTime.now();
-                String contentJson = buildSystemContentJson("AI助手暂时无法回复，请稍后再试");
+                String contentJson = buildSystemContentJson(StringUtils.hasText(message) ? message : "AI助手暂时无法回复，请稍后再试");
                 try {
                     imMessageRepository.insertMessage(
                         messageId,

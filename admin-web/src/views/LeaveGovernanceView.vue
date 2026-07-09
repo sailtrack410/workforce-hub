@@ -2,25 +2,27 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RefreshCcw, Save } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
-import type { LeaveAccountResponse, LeaveTypeResponse } from '@/api/types';
-import { errorMessage, formatId, formatMinutes, statusLabel } from '@/utils/format';
+import type { EntityId, LeaveAccountResponse, LeaveTypeResponse, OrgUserSummaryResponse } from '@/api/types';
+import { errorMessage, formatId, formatMinutes, leaveBalanceModeLabel, statusLabel } from '@/utils/format';
 import { useLeaveGovernanceStore } from '@/stores/leaveGovernance';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
-import AdminCompactList from '@/components/AdminCompactList.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
+import AdminUserPicker from '@/components/AdminUserPicker.vue';
 
 const store = useLeaveGovernanceStore();
 const toast = useToast();
-const adjustment = reactive({ userId: '', leaveTypeId: '', changeMinutes: 480, reason: '', sourceTxnKey: '' });
+const adjustment = reactive({ userId: '', leaveTypeId: '', changeMinutes: 480, reason: '' });
 
 const leaveTypes = ref<LeaveTypeResponse[]>([]);
 const accounts = ref<LeaveAccountResponse[]>([]);
 const loading = ref(false);
 const submitting = ref(false);
 const confirmVisible = ref(false);
+const filterUserId = ref<EntityId | null>(store.filters.userId || null);
+const adjustmentUserId = ref<EntityId | null>(null);
 
 const activeLeaveTypes = computed(() => leaveTypes.value.filter((t) => t.status === 'ACTIVE'));
 
@@ -39,7 +41,7 @@ async function loadPage() {
   try {
     const [typeRows, accountRows] = await Promise.all([
       adminApi.leave.types(),
-      adminApi.leave.accounts({ userId: store.filters.userId, leaveTypeId: store.filters.leaveTypeId }),
+      adminApi.leave.accounts({ userId: filterUserId.value || undefined, leaveTypeId: store.filters.leaveTypeId }),
     ]);
     leaveTypes.value = typeRows;
     accounts.value = accountRows;
@@ -52,7 +54,22 @@ async function loadPage() {
 
 function fillAdjustment(account: LeaveAccountResponse) {
   adjustment.userId = String(account.userId);
+  adjustmentUserId.value = account.userId;
   adjustment.leaveTypeId = String(account.leaveTypeId);
+}
+
+function employeeLabel(row: { realName?: string | null; employeeNo?: string | null }) {
+  return row.realName || '未命名员工';
+}
+
+function onFilterUser(user: OrgUserSummaryResponse | null) {
+  void user;
+  store.filters.userId = filterUserId.value ? String(filterUserId.value) : '';
+}
+
+function onAdjustmentUser(user: OrgUserSummaryResponse | null) {
+  void user;
+  adjustment.userId = adjustmentUserId.value ? String(adjustmentUserId.value) : '';
 }
 
 async function submitAdjustment() {
@@ -67,7 +84,7 @@ async function submitAdjustment() {
       leaveTypeId: adjustment.leaveTypeId,
       changeMinutes: Number(adjustment.changeMinutes),
       reason: adjustment.reason || null,
-      sourceTxnKey: adjustment.sourceTxnKey || null,
+      sourceTxnKey: `ADMIN_ADJUST:${Date.now()}`,
     });
     toast.success(`调整完成，当前可用 ${formatMinutes(result.availableMinutes)}`);
     await loadPage();
@@ -89,7 +106,7 @@ async function submitAdjustment() {
         </button>
       </template>
       <AdminFilterBar @search="loadPage">
-        <input v-model="store.filters.userId" placeholder="员工 ID" />
+        <AdminUserPicker v-model="filterUserId" label="员工" @select="onFilterUser" />
         <select v-model="store.filters.leaveTypeId">
           <option value="">全部假种</option>
           <option v-for="type in leaveTypes" :key="formatId(type.leaveTypeId)" :value="String(type.leaveTypeId)">
@@ -101,10 +118,9 @@ async function submitAdjustment() {
 
     <AdminPanel :span="7" :title="`员工假期账户 (${accounts.length})`">
       <AdminTable :columns="accountColumns" :rows="accounts" :loading="loading" row-key="accountId" @select="fillAdjustment">
-        <template #cell-userId="{ row }">{{ formatId(row.userId) }}</template>
+        <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
         <template #cell-leaveName="{ row }">
           <strong>{{ row.leaveName }}</strong>
-          <span>{{ row.leaveCode }}</span>
         </template>
         <template #cell-availableMinutes="{ row }">{{ formatMinutes(row.availableMinutes) }}</template>
         <template #cell-frozenMinutes="{ row }">{{ formatMinutes(row.frozenMinutes) }}</template>
@@ -116,10 +132,7 @@ async function submitAdjustment() {
 
     <AdminPanel :span="5" title="余额调整">
       <form class="stack-form" @submit.prevent="confirmVisible = true">
-        <label>
-          <span>员工 ID</span>
-          <input v-model="adjustment.userId" />
-        </label>
+        <AdminUserPicker v-model="adjustmentUserId" label="员工" @select="onAdjustmentUser" />
         <label>
           <span>假种</span>
           <select v-model="adjustment.leaveTypeId">
@@ -132,10 +145,6 @@ async function submitAdjustment() {
         <label>
           <span>调整分钟数</span>
           <input v-model.number="adjustment.changeMinutes" type="number" />
-        </label>
-        <label>
-          <span>防重复编号</span>
-          <input v-model="adjustment.sourceTxnKey" maxlength="128" />
         </label>
         <label>
           <span>原因</span>
@@ -152,7 +161,7 @@ async function submitAdjustment() {
       <div class="card-grid">
         <article v-for="type in leaveTypes" :key="formatId(type.leaveTypeId)" class="mini-card">
           <strong>{{ type.leaveName }}</strong>
-          <span>{{ type.leaveCode }} · {{ type.balanceMode }} · {{ statusLabel(type.status) }}</span>
+          <span>{{ leaveBalanceModeLabel(type.balanceMode) }} · {{ statusLabel(type.status) }}</span>
         </article>
         <div v-if="leaveTypes.length === 0" class="empty-state">无数据</div>
       </div>

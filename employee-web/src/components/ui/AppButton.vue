@@ -92,8 +92,8 @@ const props = withDefaults(defineProps<{
 }
 
 .ui-button.variant-secondary {
-  background: #fff;
-  border-color: #dfe5ee;
+  background: var(--surface-panel);
+  border-color: var(--border-default);
   color: var(--text-primary);
 }
 

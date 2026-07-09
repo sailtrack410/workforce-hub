@@ -12,5 +12,7 @@ public class OrgPositionResponse {
     private String positionCode;
     private String positionName;
     private String positionCategory;
+    private String positionCategoryName;
     private String status;
+    private String statusName;
 }

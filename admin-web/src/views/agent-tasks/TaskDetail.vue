@@ -5,7 +5,7 @@ import type {
   AdminAgentTaskAuditResponse,
   AdminAgentTaskToolCallResponse,
 } from '@/api/types';
-import { formatDateTime, formatFullDateTime, formatId, humanizeText, shortId, statusLabel } from '@/utils/format';
+import { actorTypeLabel, agentContextLabel, auditActionLabel, formatDateTime, formatFullDateTime, formatId, humanizeText, safeBusinessMessage, statusLabel, taskTriggerLabel } from '@/utils/format';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
 import AdminCompactList from '@/components/AdminCompactList.vue';
@@ -20,36 +20,35 @@ const props = defineProps<{
 const detailRows = computed<DetailRow[]>(() => {
   const t = props.selected;
   if (!t) return [];
-  return [
-    { label: '任务 ID', value: formatId(t.taskId) },
-    { label: '状态', value: statusLabel(t.status) },
-    { label: '触发来源', value: t.triggerType || '-' },
-    { label: '上下文', value: `${t.contextType || '-'} / ${formatId(t.contextId)}` },
+	  return [
+	    { label: '状态', value: t.statusName || statusLabel(t.status) },
+	    { label: '触发方式', value: t.triggerTypeName || taskTriggerLabel(t.triggerType) },
+	    { label: '触发来源', value: t.triggeredByName || t.triggeredByTypeName || actorTypeLabel(t.triggeredByType) },
+	    { label: '业务场景', value: t.contextDisplayName || t.contextTypeName || agentContextLabel(t.contextType) },
     { label: '开始时间', value: formatFullDateTime(t.startedAt) },
     { label: '结束时间', value: formatFullDateTime(t.finishedAt) },
   ];
 });
 
-const executionTrace = computed(() => {
-  const value = props.selected?.executionTraceJson;
-  if (!value) return '';
-  try {
-    return humanizeText(JSON.stringify(JSON.parse(value), null, 2));
-  } catch {
-    return humanizeText(value);
-  }
-});
+const executionTrace = computed(() => props.selected?.executionTraceJson ? '执行轨迹已生成' : '');
+
+function toolDisplayName(value?: string | null) {
+  const text = humanizeText(value).trim();
+  if (!text) return '未命名工具';
+  if (/^[A-Z][A-Z0-9_]{2,}$/.test(text)) return '业务工具';
+  return text;
+}
 </script>
 
 <template>
   <AdminPanel :span="5" title="任务详情">
-    <AdminDetailList :rows="detailRows" :error="humanizeText(selected?.errorMessage)" />
+    <AdminDetailList :rows="detailRows" :error="selected?.errorMessage ? safeBusinessMessage(selected.errorMessage) : ''" />
 
     <h3>工具调用</h3>
     <AdminCompactList :loading="detailLoading" :empty="toolCalls.length === 0">
       <article v-for="call in toolCalls" :key="formatId(call.logId)">
-        <strong>{{ call.toolName || call.toolCode || shortId(call.toolId) }}</strong>
-        <span>{{ statusLabel(call.resultStatus) }} · {{ statusLabel(call.approvalStatus) }}</span>
+        <strong>{{ toolDisplayName(call.toolName) }}</strong>
+        <span>{{ call.resultStatusName || statusLabel(call.resultStatus) }} · {{ call.approvalStatusName || statusLabel(call.approvalStatus) }}</span>
       </article>
     </AdminCompactList>
 
@@ -60,8 +59,9 @@ const executionTrace = computed(() => {
     <h3>审计轨迹</h3>
     <AdminCompactList :loading="detailLoading" :empty="audits.length === 0">
       <article v-for="audit in audits" :key="formatId(audit.auditId)">
-        <strong>{{ audit.actionType }}</strong>
-        <span>{{ formatDateTime(audit.occurredAt) }} · {{ humanizeText(audit.decisionSummary) || '-' }}</span>
+        <strong>{{ audit.actionTypeName || auditActionLabel(audit.actionType) }}</strong>
+        <span>{{ audit.targetTypeName || '任务对象' }} · {{ formatDateTime(audit.occurredAt) }}</span>
+        <span>{{ audit.decisionSummary ? safeBusinessMessage(audit.decisionSummary, '已记录') : '-' }}</span>
       </article>
     </AdminCompactList>
   </AdminPanel>

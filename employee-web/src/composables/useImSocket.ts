@@ -5,15 +5,17 @@ import type { useImStore } from '@/stores/im';
 import { mapImMessageToConversationMessage } from '@/stores/im';
 import type { useSessionStore } from '@/stores/session';
 import type { useShellStore } from '@/stores/shell';
+import { dispatchNotification, type AppNotificationContext, type AppNotificationPayload } from '@/services/notifications';
 
 interface UseImSocketOptions {
   im: ReturnType<typeof useImStore>;
   session: ReturnType<typeof useSessionStore>;
   shell: ReturnType<typeof useShellStore>;
   syncConversationMessages: (conversationId: string) => Promise<void>;
+  notifyUser?: (payload: AppNotificationPayload, context: AppNotificationContext) => Promise<boolean>;
 }
 
-export function useImSocket({ im, session, shell, syncConversationMessages }: UseImSocketOptions) {
+export function useImSocket({ im, session, shell, syncConversationMessages, notifyUser = dispatchNotification }: UseImSocketOptions) {
   const wsConnected = ref(false);
   let socket: WebSocket | null = null;
   let reconnectTimer: number | undefined;
@@ -130,8 +132,27 @@ export function useImSocket({ im, session, shell, syncConversationMessages }: Us
     }
     if (['IM_MESSAGE_CREATED', 'IM_AGENT_MESSAGE_CREATED', 'IM_MESSAGE_EDITED', 'IM_MESSAGE_RECALLED', 'IM_AGENT_REPLY_FAILED'].includes(event.eventType)) {
       if (isImMessageResponse(event.payload)) {
-        im.upsertMessage(conversationId, mapImMessageToConversationMessage(event.payload, session.user?.userId));
+        const message = mapImMessageToConversationMessage(event.payload, session.user?.userId);
+        im.upsertMessage(conversationId, message);
         shell.mergeBackendMessages(conversationId, im.messagesByConversation[conversationId] ?? []);
+        if (event.eventType === 'IM_MESSAGE_CREATED' || event.eventType === 'IM_AGENT_MESSAGE_CREATED') {
+          await notifyUser({
+            channel: 'browser',
+            topic: 'im.message.created',
+            title: shell.conversations.find((item) => item.id === conversationId)?.title || message.author,
+            body: message.body,
+            route: `/messages/${conversationId}`,
+            senderId: event.payload.senderId,
+            conversationId,
+          }, {
+            enabled: shell.notifDesktop,
+            focused: typeof document !== 'undefined' && document.hasFocus(),
+            visible: typeof document !== 'undefined' && document.visibilityState === 'visible',
+            mentionOnly: shell.notifMentionOnly,
+            currentUserId: session.user?.userId,
+            currentUserName: session.displayName || session.user?.displayName,
+          });
+        }
       }
       if (shell.active.messages === conversationId) {
         const loadingMessages = (im.messagesByConversation[conversationId] ?? [])

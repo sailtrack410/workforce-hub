@@ -1,5 +1,7 @@
 package com.workforcehub.ragflow.service;
 
+import com.workforcehub.agent.repository.AgentRepository;
+import com.workforcehub.agent.repository.LlmModelRow;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.file.repository.FileObjectRepository;
 import com.workforcehub.file.repository.FileObjectRow;
@@ -29,22 +31,28 @@ import java.util.Map;
 public class RagflowIngestService {
 
     private final RagflowRepository ragflowRepository;
+    private final AgentRepository agentRepository;
     private final FileObjectRepository fileObjectRepository;
     private final StorageProviderRegistry storageProviderRegistry;
     private final RagflowEmbeddingClient embeddingClient;
+    private final RagflowConfigResolver configResolver;
     private final RagflowVectorRepository vectorRepository;
     private final RestClient restClient;
 
     public RagflowIngestService(RagflowRepository ragflowRepository,
+                                AgentRepository agentRepository,
                                 FileObjectRepository fileObjectRepository,
                                 StorageProviderRegistry storageProviderRegistry,
                                 RagflowEmbeddingClient embeddingClient,
+                                RagflowConfigResolver configResolver,
                                 RagflowVectorRepository vectorRepository,
                                 RestClient.Builder restClientBuilder) {
         this.ragflowRepository = ragflowRepository;
+        this.agentRepository = agentRepository;
         this.fileObjectRepository = fileObjectRepository;
         this.storageProviderRegistry = storageProviderRegistry;
         this.embeddingClient = embeddingClient;
+        this.configResolver = configResolver;
         this.vectorRepository = vectorRepository;
         this.restClient = restClientBuilder.build();
     }
@@ -54,17 +62,18 @@ public class RagflowIngestService {
         ragflowRepository.markIngestRunning(documentId, jobId);
         try {
             RagflowGlobalSettingRow setting = ragflowRepository.getGlobalSetting();
+            RagflowEffectiveConfig config = configResolver.resolve(ragflowRepository.getSpaceOrThrow(spaceId), setting);
             FileObjectRow fileObject = fileObjectRepository.getFileObjectOrThrow(fileObjectId);
             StorageObjectResource object = storageProviderRegistry.require(fileObject.storageProvider())
                 .loadObject(fileObject.bucketName(), fileObject.objectKey());
             byte[] bytes = object.resource().getContentAsByteArray();
             String text = parseText(bytes, title, mimeType, parserType);
-            List<String> chunks = splitChunks(text, setting);
+            List<String> chunks = splitChunks(text, config);
             if (chunks.isEmpty()) {
                 throw new BizException(422, "未解析出可入库内容");
             }
             vectorRepository.requireAvailable();
-            List<List<Double>> embeddings = embeddingClient.embed(chunks);
+            List<List<Double>> embeddings = embeddingClient.embed(chunks, config.embeddingModelId(), config.embeddingDimension());
             List<Long> vectorIds = vectorRepository.replaceDocumentVectors(spaceId, documentId, jobId, chunks, embeddings);
             ragflowRepository.replaceChunks(spaceId, documentId, jobId, chunks, vectorIds);
             ragflowRepository.markIngestSuccess(documentId, jobId, text, chunks.size());
@@ -100,16 +109,26 @@ public class RagflowIngestService {
 
     private String ocr(byte[] bytes, String mimeType) {
         RagflowGlobalSettingRow setting = ragflowRepository.getGlobalSetting();
-        if (!StringUtils.hasText(setting.ocrBaseUrl()) || !StringUtils.hasText(setting.ocrModel())) {
+        LlmModelRow model = setting.ocrModelId() == null ? null : agentRepository.getLlmModel(setting.ocrModelId());
+        String baseUrl = model == null ? setting.ocrBaseUrl() : model.endpoint();
+        String modelName = model == null ? setting.ocrModel() : model.modelName();
+        String apiKey = model == null ? ocrApiKey() : model.apiKey();
+        if (model != null && (!"ACTIVE".equals(model.status()) || !"OCR".equals(model.modelType()))) {
             throw new BizException(422, "OCR模型未配置");
+        }
+        if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(modelName)) {
+            throw new BizException(422, "OCR模型未配置");
+        }
+        if (!StringUtils.hasText(apiKey)) {
+            throw new BizException(422, "OCR Key未配置");
         }
         String dataUrl = "data:" + (StringUtils.hasText(mimeType) ? mimeType : "image/png") + ";base64," + Base64.getEncoder().encodeToString(bytes);
         Map<?, ?> response = restClient.post()
-            .uri(setting.ocrBaseUrl())
+            .uri(chatUrl(baseUrl))
             .contentType(MediaType.APPLICATION_JSON)
-            .header("Authorization", "Bearer " + ocrApiKey())
+            .header("Authorization", "Bearer " + apiKey)
             .body(Map.of(
-                "model", setting.ocrModel(),
+                "model", modelName,
                 "messages", List.of(Map.of(
                     "role", "user",
                     "content", List.of(
@@ -138,14 +157,28 @@ public class RagflowIngestService {
         return ragflowRepository.getRawOcrApiKey();
     }
 
+    private String chatUrl(String baseUrl) {
+        String trimmed = baseUrl.trim();
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        if (trimmed.endsWith("/chat/completions")) {
+            return trimmed;
+        }
+        if (trimmed.endsWith("/v1")) {
+            return trimmed + "/chat/completions";
+        }
+        return trimmed + "/v1/chat/completions";
+    }
+
     // 文本分块：按 chunkSize 切分，overlap 保证上下文连续性，避免语义截断
-    private List<String> splitChunks(String text, RagflowGlobalSettingRow setting) {
+    private List<String> splitChunks(String text, RagflowEffectiveConfig config) {
         String normalized = text == null ? "" : text.trim();
         if (!StringUtils.hasText(normalized)) {
             return List.of();
         }
-        int chunkSize = setting.chunkSize() == null ? 800 : Math.max(100, setting.chunkSize());
-        int overlap = setting.chunkOverlap() == null ? 100 : Math.max(0, Math.min(setting.chunkOverlap(), chunkSize - 1));
+        int chunkSize = config.chunkSize() == null ? 800 : Math.max(100, config.chunkSize());
+        int overlap = config.chunkOverlap() == null ? 100 : Math.max(0, Math.min(config.chunkOverlap(), chunkSize - 1));
         List<String> chunks = new ArrayList<>();
         int start = 0;
         while (start < normalized.length()) {

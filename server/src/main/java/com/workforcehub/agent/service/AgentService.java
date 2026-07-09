@@ -13,8 +13,6 @@ import com.workforcehub.agent.dto.AdminAgentTaskTimeoutRunResponse;
 import com.workforcehub.agent.dto.AdminAgentTaskToolCallResponse;
 import com.workforcehub.agent.dto.CancelAgentTaskRequest;
 import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
-import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
-import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.dto.AgentAclResponse;
 import com.workforcehub.agent.dto.AgentResponse;
 import com.workforcehub.agent.dto.AgentTaskListQuery;
@@ -24,6 +22,7 @@ import com.workforcehub.agent.dto.AgentToolBindingResponse;
 import com.workforcehub.agent.dto.AgentToolCallRequest;
 import com.workforcehub.agent.dto.AgentToolResponse;
 import com.workforcehub.agent.dto.AgentVersionResponse;
+import com.workforcehub.agent.dto.AiProviderResponse;
 import com.workforcehub.agent.dto.BindAgentToolRequest;
 import com.workforcehub.agent.dto.CreateAgentRequest;
 import com.workforcehub.agent.dto.CreateAgentTaskRequest;
@@ -33,6 +32,9 @@ import com.workforcehub.agent.dto.CreateLlmModelRequest;
 import com.workforcehub.agent.dto.GrantAgentAclRequest;
 import com.workforcehub.agent.dto.LlmModelResponse;
 import com.workforcehub.agent.dto.ModelTestResponse;
+import com.workforcehub.agent.dto.ProviderModelOptionResponse;
+import com.workforcehub.agent.dto.SaveAiProviderRequest;
+import com.workforcehub.agent.dto.TestLlmModelRequest;
 import com.workforcehub.agent.dto.TrialRunRequest;
 import com.workforcehub.agent.dto.TrialRunResponse;
 import com.workforcehub.agent.dto.UpdateAgentVersionRequest;
@@ -44,6 +46,8 @@ import com.workforcehub.agent.dto.WorkflowValidationResponse;
 import com.workforcehub.agent.repository.AgentAclRow;
 import com.workforcehub.agent.repository.AgentRepository;
 import com.workforcehub.agent.repository.AgentRow;
+import com.workforcehub.agent.repository.AiProviderRow;
+import com.workforcehub.agent.repository.KnowledgeSpaceHealthRow;
 import com.workforcehub.agent.repository.LlmModelRow;
 import com.workforcehub.agent.repository.AgentTaskQueryCriteria;
 import com.workforcehub.agent.repository.AgentTaskTimeoutRepository;
@@ -75,7 +79,9 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -108,6 +114,8 @@ public class AgentService {
     private static final Set<String> APPROVAL_MODES = Set.of("AUTO", "REQUIRE_CONFIRM");
     private static final Set<String> TIMEOUT_RUN_TRIGGER_TYPES = Set.of("SERVICE", "MANUAL", "SCHEDULED");
     private static final Set<String> TIMEOUT_RUN_STATUSES = Set.of("RUNNING", "SUCCESS", "SKIPPED", "FAILED");
+    private static final Set<String> MODEL_TYPES = Set.of("TEXT", "EMBEDDING", "RERANK", "TTS", "VISION", "OCR");
+    public static final String DEPRECATED_AGENT_MESSAGE = "当前 Agent 已弃用，无法继续对话";
 
     private final AgentRepository agentRepository;
     private final AgentTaskTimeoutRepository timeoutRepository;
@@ -117,7 +125,7 @@ public class AgentService {
     private final WorkflowParser workflowParser;
     private final WorkflowValidator workflowValidator;
     private final WorkflowExecutor workflowExecutor;
-    private final OpenAiCompatibleAgentModelClient agentModelClient;
+    private final AiModelHealthCheckService aiModelHealthCheckService;
 
     public AgentService(AgentRepository agentRepository,
                         AgentTaskTimeoutRepository timeoutRepository,
@@ -127,7 +135,7 @@ public class AgentService {
                         WorkflowParser workflowParser,
                         WorkflowValidator workflowValidator,
                         WorkflowExecutor workflowExecutor,
-                        OpenAiCompatibleAgentModelClient agentModelClient) {
+                        AiModelHealthCheckService aiModelHealthCheckService) {
         this.agentRepository = agentRepository;
         this.timeoutRepository = timeoutRepository;
         this.objectMapper = objectMapper;
@@ -136,7 +144,7 @@ public class AgentService {
         this.workflowParser = workflowParser;
         this.workflowValidator = workflowValidator;
         this.workflowExecutor = workflowExecutor;
-        this.agentModelClient = agentModelClient;
+        this.aiModelHealthCheckService = aiModelHealthCheckService;
     }
 
     public PageResult<AgentResponse> pageAdminAgents(long pageNo, long pageSize) {
@@ -148,8 +156,10 @@ public class AgentService {
         long safePageSize = Math.min(Math.max(pageSize, 1L), 100L);
         String normalizedKeyword = trimToNull(keyword);
         long total = agentRepository.countAgents(normalizedKeyword);
-        List<AgentResponse> rows = agentRepository.pageAgents(normalizedKeyword, (safePageNo - 1) * safePageSize, safePageSize).stream()
-            .map(this::toAgentResponse)
+        List<AgentRow> agentRows = agentRepository.pageAgents(normalizedKeyword, (safePageNo - 1) * safePageSize, safePageSize);
+        Map<Long, KnowledgeSpaceHealthRow> knowledgeSpaces = knowledgeSpaces(agentRows);
+        List<AgentResponse> rows = agentRows.stream()
+            .map(row -> toAgentResponse(row, knowledgeSpaces))
             .toList();
         return PageResult.of(safePageNo, safePageSize, total, rows);
     }
@@ -200,9 +210,11 @@ public class AgentService {
 
     public WorkflowValidationResponse validateWorkflow(String workflowConfigJson) {
         WorkflowValidationResult result = workflowValidator.validate(workflowConfigJson);
+        List<String> messages = new java.util.ArrayList<>(result.messages());
+        messages.addAll(knowledgeValidationMessages(workflowConfigJson));
         WorkflowValidationResponse response = new WorkflowValidationResponse();
-        response.setValid(result.valid());
-        response.setMessages(result.messages());
+        response.setValid(result.valid() && messages.isEmpty());
+        response.setMessages(messages);
         return response;
     }
 
@@ -421,8 +433,11 @@ public class AgentService {
         if (!"DRAFT".equals(version.publishStatus())) {
             throw new BizException(409, "只有草稿版本可以发布");
         }
+        AgentRow agent = agentRepository.getAgentOrThrow(version.agentId());
+        if ("DEPRECATED".equals(agent.status())) {
+            throw new BizException(409, "已弃用的AI助手不能发布");
+        }
         assertValidWorkflow(version.workflowConfigJson());
-        agentRepository.getAgentOrThrow(version.agentId());
         if (!agentRepository.hasActiveUsableAcl(version.agentId())) {
             throw new BizException(400, "请先配置AI助手可用范围");
         }
@@ -449,9 +464,19 @@ public class AgentService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public void deleteAgent(Long agentId) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        agentRepository.getAgentOrThrow(agentId);
+        agentRepository.deprecateAgent(agentId, operatorId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public AgentResponse enableAgent(Long agentId) {
         Long operatorId = CurrentUserHolder.requireUserId();
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
+        if ("DEPRECATED".equals(agent.status())) {
+            throw new BizException(409, "已弃用的AI助手不能重新启用");
+        }
         if (agent.publishedVersionId() == null) {
             throw new BizException(400, "未发布AI助手不能启用");
         }
@@ -468,6 +493,7 @@ public class AgentService {
 
     public ImAgentDescriptor requireUsableAgent(Long agentId, Long userId) {
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
+        ensureAgentNotDeprecated(agent);
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
             throw new BizException(409, "AI助手未发布或未启用");
         }
@@ -492,6 +518,7 @@ public class AgentService {
     public AgentTaskResponse createCurrentEmployeeTask(Long agentId, CreateAgentTaskRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         AgentRow agent = agentRepository.getAgentOrThrow(agentId);
+        ensureAgentNotDeprecated(agent);
         if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
             throw new BizException(409, "AI助手未发布或未启用");
         }
@@ -792,20 +819,130 @@ public class AgentService {
     }
 
     private AgentResponse toAgentResponse(AgentRow row) {
+        return toAgentResponse(row, knowledgeSpaces(List.of(row)));
+    }
+
+    private AgentResponse toAgentResponse(AgentRow row, Map<Long, KnowledgeSpaceHealthRow> knowledgeSpaces) {
         AgentResponse response = new AgentResponse();
         response.setAgentId(row.id());
         response.setAgentCode(row.agentCode());
         response.setAgentName(row.agentName());
         response.setAvatarAttachmentRefId(row.avatarAttachmentRefId());
         response.setAgentType(row.agentType());
+        response.setAgentTypeName(agentTypeName(row.agentType()));
         response.setIdentityMode(row.identityMode());
+        response.setIdentityModeName(identityModeName(row.identityMode()));
         response.setPublishedVersionId(row.publishedVersionId());
         response.setPublishedVersionNo(row.publishedVersionNo());
         response.setPublishedVersionLabel(row.publishedVersionLabel());
+        KnowledgeIssue knowledgeIssue = knowledgeIssue(row.publishedWorkflowConfigJson(), knowledgeSpaces);
+        response.setKnowledgeIssueCount(knowledgeIssue.count());
+        response.setKnowledgeIssueMessage(knowledgeIssue.message());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
+    }
+
+    private Map<Long, KnowledgeSpaceHealthRow> knowledgeSpaces(List<AgentRow> rows) {
+        Set<Long> spaceIds = new LinkedHashSet<>();
+        for (AgentRow row : rows) {
+            spaceIds.addAll(knowledgeReferences(row.publishedWorkflowConfigJson()).spaceIds());
+        }
+        if (spaceIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, KnowledgeSpaceHealthRow> result = new HashMap<>();
+        for (KnowledgeSpaceHealthRow row : agentRepository.listKnowledgeSpacesByIds(List.copyOf(spaceIds))) {
+            result.put(row.id(), row);
+        }
+        return result;
+    }
+
+    private KnowledgeIssue knowledgeIssue(String workflowConfigJson, Map<Long, KnowledgeSpaceHealthRow> knowledgeSpaces) {
+        KnowledgeReferences references = knowledgeReferences(workflowConfigJson);
+        int count = references.unconfiguredCount();
+        for (Long spaceId : references.spaceIds()) {
+            KnowledgeSpaceHealthRow space = knowledgeSpaces.get(spaceId);
+            if (space == null || !"ACTIVE".equals(space.status())) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            return new KnowledgeIssue(0, null);
+        }
+        return new KnowledgeIssue(count, "已发布版本关联的知识库不可用（" + count + "处），请重新配置后再使用");
+    }
+
+    private KnowledgeReferences knowledgeReferences(String workflowConfigJson) {
+        if (!StringUtils.hasText(workflowConfigJson)) {
+            return new KnowledgeReferences(Set.of(), 0);
+        }
+        try {
+            JsonNode root = objectMapper.readTree(workflowConfigJson);
+            Set<Long> spaceIds = new LinkedHashSet<>();
+            int unconfiguredCount = collectKnowledgeReferences(root, spaceIds);
+            return new KnowledgeReferences(spaceIds, unconfiguredCount);
+        } catch (Exception e) {
+            return new KnowledgeReferences(Set.of(), 0);
+        }
+    }
+
+    private int collectKnowledgeReferences(JsonNode node, Set<Long> spaceIds) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return 0;
+        }
+        int unconfiguredCount = 0;
+        if (node.isObject()) {
+            String toolCode = node.path("toolCode").asText("").trim().toUpperCase(Locale.ROOT);
+            if ("KNOWLEDGE_SEARCH_CHUNKS".equals(toolCode)) {
+                JsonNode spaceNode = node.path("args").path("spaceId");
+                if (spaceNode.isMissingNode()) {
+                    spaceNode = node.path("spaceId");
+                }
+                Long spaceId = positiveLong(spaceNode);
+                if (spaceId != null) {
+                    spaceIds.add(spaceId);
+                } else if (blankValue(spaceNode)) {
+                    unconfiguredCount++;
+                }
+            }
+            if ("KNOWLEDGE".equals(node.path("type").asText("").trim().toUpperCase(Locale.ROOT))) {
+                JsonNode toolCalls = node.path("config").path("toolCalls");
+                if (!toolCalls.isArray() || toolCalls.isEmpty()) {
+                    unconfiguredCount++;
+                }
+            }
+        }
+        for (JsonNode child : node) {
+            unconfiguredCount += collectKnowledgeReferences(child, spaceIds);
+        }
+        return unconfiguredCount;
+    }
+
+    private Long positiveLong(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.canConvertToLong()) {
+            long value = node.asLong();
+            return value > 0 ? value : null;
+        }
+        String text = node.asText("").trim();
+        if (!text.matches("\\d+")) {
+            return null;
+        }
+        try {
+            long value = Long.parseLong(text);
+            return value > 0 ? value : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private boolean blankValue(JsonNode node) {
+        return node == null || node.isMissingNode() || node.isNull() || !StringUtils.hasText(node.asText(""));
     }
 
     private AgentVersionResponse toVersionResponse(AgentVersionRow row) {
@@ -832,10 +969,13 @@ public class AgentService {
         response.setToolCode(row.toolCode());
         response.setToolName(row.toolName());
         response.setToolType(row.toolType());
+        response.setToolTypeName(toolTypeName(row.toolType()));
         response.setConnectorId(row.connectorId());
         response.setRiskLevel(row.riskLevel());
+        response.setRiskLevelName(riskLevelName(row.riskLevel()));
         response.setReadOnlyFlag(row.readOnlyFlag());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
@@ -849,8 +989,11 @@ public class AgentService {
         response.setToolCode(row.toolCode());
         response.setToolName(row.toolName());
         response.setRiskLevel(row.riskLevel());
+        response.setRiskLevelName(riskLevelName(row.riskLevel()));
         response.setApprovalMode(row.approvalMode());
+        response.setApprovalModeName(approvalModeName(row.approvalMode()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
@@ -861,9 +1004,14 @@ public class AgentService {
         response.setAclId(row.id());
         response.setAgentId(row.agentId());
         response.setSubjectType(row.subjectType());
+        response.setSubjectTypeName(subjectTypeName(row.subjectType()));
         response.setSubjectId(row.subjectId());
+        response.setSubjectName(row.subjectName());
+        response.setSubjectCode(row.subjectCode());
         response.setPermCode(row.permCode());
+        response.setPermCodeName(permCodeName(row.permCode()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
@@ -873,11 +1021,16 @@ public class AgentService {
         AgentTaskResponse response = new AgentTaskResponse();
         response.setTaskId(row.id());
         response.setAgentId(row.agentId());
+        response.setAgentName(agentRepository.getAgentOrThrow(row.agentId()).agentName());
         response.setAgentVersionId(row.agentVersionId());
         response.setTriggerType(row.triggerType());
+        response.setTriggerTypeName(triggerTypeName(row.triggerType()));
         response.setContextType(row.contextType());
+        response.setContextTypeName(contextTypeName(row.contextType()));
         response.setContextId(row.contextId());
+        response.setContextDisplayName(contextDisplayName(row.contextType(), row.contextId()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setToolCallCount(agentRepository.countToolCalls(row.id()));
         response.setWaitingDeadlineAt(row.waitingDeadlineAt());
         response.setWorkflowSnapshotJson(row.workflowSnapshotJson());
@@ -898,11 +1051,18 @@ public class AgentService {
         response.setAgentName(row.agentName());
         response.setAgentVersionId(row.agentVersionId());
         response.setTriggerType(row.triggerType());
+        response.setTriggerTypeName(triggerTypeName(row.triggerType()));
         response.setContextType(row.contextType());
+        response.setContextTypeName(contextTypeName(row.contextType()));
         response.setContextId(row.contextId());
+        response.setContextDisplayName(row.contextDisplayName());
+        response.setContextNo(row.contextNo());
         response.setTriggeredByType(row.triggeredByType());
+        response.setTriggeredByTypeName(actorTypeName(row.triggeredByType()));
         response.setTriggeredById(row.triggeredById());
+        response.setTriggeredByName(row.triggeredByName());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setToolCallCount(row.toolCallCount());
         response.setWaitingDeadlineAt(row.waitingDeadlineAt());
         response.setWorkflowSnapshotJson(row.workflowSnapshotJson());
@@ -923,12 +1083,16 @@ public class AgentService {
         response.setToolCode(row.toolCode());
         response.setToolName(row.toolName());
         response.setToolType(row.toolType());
+        response.setToolTypeName(toolTypeName(row.toolType()));
         response.setRiskLevel(row.riskLevel());
+        response.setRiskLevelName(riskLevelName(row.riskLevel()));
         response.setReadOnlyFlag(row.readOnlyFlag());
         response.setRequestPayloadJson(row.requestPayloadJson());
         response.setResponsePayloadJson(row.responsePayloadJson());
         response.setApprovalStatus(row.approvalStatus());
+        response.setApprovalStatusName(statusName(row.approvalStatus()));
         response.setResultStatus(row.resultStatus());
+        response.setResultStatusName(statusName(row.resultStatus()));
         response.setCalledAt(row.calledAt());
         return response;
     }
@@ -963,8 +1127,11 @@ public class AgentService {
     private AdminAgentTaskTimeoutRunResponse toAdminTaskTimeoutRunResponse(AdminAgentTaskTimeoutRunRow row) {
         AdminAgentTaskTimeoutRunResponse response = new AdminAgentTaskTimeoutRunResponse();
         response.setJobRunId(row.jobRunId());
+        response.setJobRunNo(row.jobRunNo());
         response.setTriggerType(row.triggerType());
+        response.setTriggerTypeName(triggerTypeName(row.triggerType()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setBatchSize(row.batchSize());
         response.setScannedCount(row.scannedCount());
         response.setCancelledCount(row.cancelledCount());
@@ -978,17 +1145,150 @@ public class AgentService {
         return response;
     }
 
+    private String contextDisplayName(String contextType, Long contextId) {
+        if (contextId == null) {
+            return null;
+        }
+        if ("WF_REQUEST".equals(contextType)) {
+            return "审批申请";
+        }
+        if ("IM_CONVERSATION".equals(contextType) || "CONVERSATION".equals(contextType)) {
+            return "消息会话";
+        }
+        if ("USER_QUERY".equals(contextType)) {
+            return "员工咨询";
+        }
+        return "业务记录";
+    }
+
     private AdminAgentTaskAuditResponse toAdminTaskAuditResponse(AdminAgentTaskAuditRow row) {
         AdminAgentTaskAuditResponse response = new AdminAgentTaskAuditResponse();
         response.setAuditId(row.id());
         response.setTaskId(row.taskId());
         response.setActionType(row.actionType());
+        response.setActionTypeName(actionTypeName(row.actionType()));
         response.setTargetType(row.targetType());
+        response.setTargetTypeName(targetTypeName(row.targetType()));
         response.setTargetId(row.targetId());
+        response.setTargetDisplayName(row.targetDisplayName());
         response.setDecisionSummary(row.decisionSummary());
         response.setRiskFlag(row.riskFlag());
         response.setOccurredAt(row.occurredAt());
         return response;
+    }
+
+    private String statusName(String value) {
+        if ("ACTIVE".equals(value)) return "启用";
+        if ("INACTIVE".equals(value)) return "停用";
+        if ("DEPRECATED".equals(value)) return "已弃用";
+        if ("PENDING".equals(value)) return "待处理";
+        if ("RUNNING".equals(value)) return "运行中";
+        if ("SUCCEEDED".equals(value) || "SUCCESS".equals(value)) return "成功";
+        if ("FAILED".equals(value)) return "失败";
+        if ("WAITING_HUMAN_CONFIRM".equals(value)) return "待确认";
+        if ("REJECTED".equals(value)) return "已拒绝";
+        if ("CANCELLED".equals(value)) return "已取消";
+        if ("APPROVED".equals(value)) return "已通过";
+        return value == null ? null : "未知状态";
+    }
+
+    private void ensureAgentNotDeprecated(AgentRow agent) {
+        if (agent != null && "DEPRECATED".equals(agent.status())) {
+            throw new BizException(409, DEPRECATED_AGENT_MESSAGE);
+        }
+    }
+
+    private String agentTypeName(String value) {
+        if ("QA".equals(value)) return "问答助手";
+        return value == null ? null : "其他助手";
+    }
+
+    private String identityModeName(String value) {
+        if ("SYSTEM_IDENTITY".equals(value)) return "系统身份";
+        if ("USER_IDENTITY".equals(value)) return "员工身份";
+        return value == null ? null : "其他身份";
+    }
+
+    private String triggerTypeName(String value) {
+        if ("MANUAL".equals(value)) return "手动";
+        if ("CONVERSATION".equals(value)) return "会话";
+        if ("WORKFLOW".equals(value)) return "审批";
+        if ("TIMER".equals(value) || "SCHEDULED".equals(value)) return "定时任务";
+        if ("EVENT".equals(value)) return "事件";
+        if ("SERVICE".equals(value)) return "服务";
+        return value == null ? null : "其他触发";
+    }
+
+    private String contextTypeName(String value) {
+        if ("USER_QUERY".equals(value)) return "员工咨询";
+        if ("WF_REQUEST".equals(value)) return "审批申请";
+        if ("IM_GROUP".equals(value)) return "群聊消息";
+        if ("IM_CONVERSATION".equals(value) || "CONVERSATION".equals(value)) return "消息会话";
+        return value == null ? null : "业务场景";
+    }
+
+    private String actorTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("ADMIN".equals(value) || "ADMIN_USER".equals(value)) return "管理员";
+        if ("SYSTEM".equals(value)) return "系统";
+        if ("AGENT".equals(value)) return "AI 助手";
+        return value == null ? null : "系统来源";
+    }
+
+    private String toolTypeName(String value) {
+        if ("HTTP".equals(value)) return "接口工具";
+        if ("DATABASE".equals(value)) return "数据工具";
+        if ("BUILTIN".equals(value)) return "内置工具";
+        return value == null ? null : "业务工具";
+    }
+
+    private String riskLevelName(String value) {
+        if ("LOW".equals(value)) return "低风险";
+        if ("MEDIUM".equals(value)) return "中风险";
+        if ("HIGH".equals(value)) return "高风险";
+        return value == null ? null : "未分级";
+    }
+
+    private String approvalModeName(String value) {
+        if ("NONE".equals(value)) return "无需确认";
+        if ("REQUIRE_CONFIRM".equals(value)) return "需要确认";
+        return value == null ? null : "确认策略";
+    }
+
+    private String subjectTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("ROLE".equals(value)) return "身份";
+        if ("DEPARTMENT".equals(value)) return "部门";
+        if ("GROUP".equals(value)) return "群会话";
+        if ("ADMIN_USER".equals(value)) return "管理员";
+        return value == null ? null : "范围";
+    }
+
+    private String permCodeName(String value) {
+        if ("visible".equals(value)) return "可见";
+        if ("use".equals(value)) return "可用";
+        if ("manage".equals(value)) return "管理";
+        return value == null ? null : "可用";
+    }
+
+    private String actionTypeName(String value) {
+        if ("TASK_CREATED".equals(value)) return "创建 AI 任务";
+        if ("TASK_WAITING_HUMAN_CONFIRM".equals(value)) return "等待人工确认";
+        if ("TASK_HUMAN_CONFIRMED".equals(value)) return "人工确认";
+        if ("TASK_HUMAN_REJECTED".equals(value)) return "人工拒绝";
+        if ("TASK_RUNNING".equals(value)) return "开始执行 AI 任务";
+        if ("TASK_SUCCEEDED".equals(value)) return "AI 任务完成";
+        if ("TASK_FAILED".equals(value)) return "AI 任务失败";
+        if ("TASK_CANCELLED".equals(value)) return "取消 AI 任务";
+        if ("TASK_TIMEOUT_CANCELLED".equals(value)) return "超时取消 AI 任务";
+        return value == null ? null : "任务操作";
+    }
+
+    private String targetTypeName(String value) {
+        if ("AGENT_TASK".equals(value)) return "AI 任务";
+        if ("AGENT".equals(value)) return "AI 助手";
+        if ("TOOL_CALL".equals(value)) return "工具调用";
+        return value == null ? null : "业务对象";
     }
 
     private record PreparedToolCall(AgentToolBindingRow binding, String requestPayloadJson) {
@@ -1002,6 +1302,32 @@ public class AgentService {
         if (!validation.valid()) {
             throw new BizException(400, "工作流配置无效: " + String.join("; ", validation.messages()));
         }
+        List<String> knowledgeMessages = knowledgeValidationMessages(workflowConfigJson);
+        if (!knowledgeMessages.isEmpty()) {
+            throw new BizException(400, String.join("; ", knowledgeMessages));
+        }
+    }
+
+    private List<String> knowledgeValidationMessages(String workflowConfigJson) {
+        KnowledgeReferences references = knowledgeReferences(workflowConfigJson);
+        List<String> messages = new java.util.ArrayList<>();
+        if (references.unconfiguredCount() > 0) {
+            messages.add("知识检索节点必须指定知识库");
+        }
+        if (!references.spaceIds().isEmpty()) {
+            Map<Long, KnowledgeSpaceHealthRow> spaces = new HashMap<>();
+            for (KnowledgeSpaceHealthRow row : agentRepository.listKnowledgeSpacesByIds(List.copyOf(references.spaceIds()))) {
+                spaces.put(row.id(), row);
+            }
+            for (Long spaceId : references.spaceIds()) {
+                KnowledgeSpaceHealthRow space = spaces.get(spaceId);
+                if (space == null || !"ACTIVE".equals(space.status())) {
+                    messages.add("知识检索节点关联的知识库不可用");
+                    break;
+                }
+            }
+        }
+        return messages;
     }
 
     // ==================== LLM Model ====================
@@ -1010,10 +1336,99 @@ public class AgentService {
         return agentRepository.listLlmModels().stream().map(this::toLlmModelResponse).toList();
     }
 
+    public List<AiProviderResponse> listAiProviders() {
+        return agentRepository.listAiProviders().stream().map(this::toAiProviderResponse).toList();
+    }
+
+    public AiProviderResponse createAiProvider(SaveAiProviderRequest request) {
+        Long providerId = IdGenerator.nextId();
+        String providerType = normalizeProvider(request.providerType());
+        agentRepository.insertAiProvider(providerId, providerType, request.displayName(),
+            officialEndpoint(providerType, request.baseUrl()), request.apiKey(), request.enabled(), 0L);
+        return toAiProviderResponse(agentRepository.getAiProvider(providerId));
+    }
+
+    public AiProviderResponse updateAiProvider(Long providerId, SaveAiProviderRequest request) {
+        AiProviderRow existing = agentRepository.getAiProvider(providerId);
+        if (existing == null) {
+            throw new BizException(404, "供应商不存在");
+        }
+        String apiKey = request.apiKey() != null ? request.apiKey() : existing.apiKey();
+        String providerType = normalizeProvider(request.providerType());
+        agentRepository.updateAiProvider(providerId, providerType, request.displayName(),
+            officialEndpoint(providerType, request.baseUrl()), apiKey,
+            request.enabled() == null ? existing.enabled() : request.enabled(), 0L);
+        return toAiProviderResponse(agentRepository.getAiProvider(providerId));
+    }
+
+    public void deleteAiProvider(Long providerId) {
+        agentRepository.deleteAiProvider(providerId, 0L);
+    }
+
+    public ModelTestResponse testAiProvider(Long providerId) {
+        AiProviderRow provider = agentRepository.getAiProvider(providerId);
+        if (provider == null) {
+            return new ModelTestResponse(false, "供应商不存在", null, 0);
+        }
+        return testAiProvider(provider);
+    }
+
+    public List<ProviderModelOptionResponse> listProviderModels(Long providerId) {
+        AiProviderRow provider = agentRepository.getAiProvider(providerId);
+        if (provider == null) {
+            throw new BizException(404, "供应商不存在");
+        }
+        try {
+            return aiModelHealthCheckService.listProviderModels(provider);
+        } catch (IllegalStateException e) {
+            throw new BizException(400, e.getMessage());
+        }
+    }
+
+    public void testAiProviders() {
+        for (AiProviderRow provider : agentRepository.listAiProviders()) {
+            if (Boolean.FALSE.equals(provider.enabled())) {
+                continue;
+            }
+            testAiProvider(provider);
+        }
+    }
+
+    private ModelTestResponse testAiProvider(AiProviderRow provider) {
+        ModelTestResponse response = aiModelHealthCheckService.testProvider(provider);
+        agentRepository.updateAiProviderTestResult(provider.id(), response.success(), response.message(), 0L);
+        return response;
+    }
+
+    public void testLlmModels() {
+        for (LlmModelRow model : agentRepository.listLlmModels()) {
+            if (!"ACTIVE".equals(model.status())) {
+                continue;
+            }
+            ModelTestResponse response = aiModelHealthCheckService.testModel(
+                model.provider(),
+                model.modelType(),
+                model.modelName(),
+                model.endpoint(),
+                model.apiKey(),
+                model.visionFlag()
+            );
+            agentRepository.updateLlmModelTestResult(model.id(), response.success(), response.message(), 0L);
+        }
+    }
+
     public LlmModelResponse createLlmModel(CreateLlmModelRequest request) {
         Long modelId = IdGenerator.nextId();
-        agentRepository.insertLlmModel(modelId, request.provider(), request.modelName(),
-            request.displayName(), request.endpoint(), request.apiKey(),
+        String provider = normalizeProvider(request.provider());
+        String modelType = normalizeDefault(request.modelType(), "TEXT", MODEL_TYPES, "模型类型不支持");
+        Boolean defaultFlag = Boolean.TRUE.equals(request.defaultFlag());
+        if (Boolean.TRUE.equals(defaultFlag)) {
+            agentRepository.clearDefaultLlmModel(modelType, modelId, 0L);
+        }
+        agentRepository.insertLlmModel(modelId, provider, modelType, request.modelName(),
+            request.displayName(), trimToNull(request.endpoint()), trimToNull(request.apiKey()),
+            defaultFlag, request.streamOutputFlag(), request.visionFlag(), request.toolCallFlag(),
+            request.structuredOutputFlag(), request.reasoningFlag(),
             request.status() != null ? request.status() : "ACTIVE", 0L);
         return toLlmModelResponse(agentRepository.getLlmModel(modelId));
     }
@@ -1023,9 +1438,19 @@ public class AgentService {
         if (existing == null) {
             throw new BizException(404, "模型不存在");
         }
-        String apiKey = request.apiKey() != null ? request.apiKey() : existing.apiKey();
-        agentRepository.updateLlmModel(modelId, request.provider(), request.modelName(),
-            request.displayName(), request.endpoint(), apiKey,
+        LlmModelRow rawExisting = agentRepository.getRawLlmModel(modelId);
+        String provider = normalizeProvider(request.provider());
+        String modelType = normalizeDefault(request.modelType(), StringUtils.hasText(existing.modelType()) ? existing.modelType() : "TEXT", MODEL_TYPES, "模型类型不支持");
+        Boolean defaultFlag = request.defaultFlag() == null ? existing.defaultFlag() : Boolean.TRUE.equals(request.defaultFlag());
+        if (Boolean.TRUE.equals(defaultFlag)) {
+            agentRepository.clearDefaultLlmModel(modelType, modelId, 0L);
+        }
+        String endpoint = request.endpoint() != null ? trimToNull(request.endpoint()) : rawExisting == null ? null : rawExisting.endpoint();
+        String apiKey = request.apiKey() != null ? trimToNull(request.apiKey()) : rawExisting == null ? null : rawExisting.apiKey();
+        agentRepository.updateLlmModel(modelId, provider, modelType, request.modelName(),
+            request.displayName(), endpoint, apiKey, defaultFlag,
+            request.streamOutputFlag(), request.visionFlag(), request.toolCallFlag(),
+            request.structuredOutputFlag(), request.reasoningFlag(),
             request.status() != null ? request.status() : existing.status(), 0L);
         return toLlmModelResponse(agentRepository.getLlmModel(modelId));
     }
@@ -1039,12 +1464,56 @@ public class AgentService {
         return new LlmModelResponse(
             String.valueOf(row.id()),
             row.provider(),
+            providerName(row.provider()),
+            row.modelType(),
+            modelTypeName(row.modelType()),
             row.modelName(),
             row.displayName(),
             row.endpoint(),
+            StringUtils.hasText(row.apiKey()),
+            row.defaultFlag(),
+            row.streamOutputFlag(),
+            row.visionFlag(),
+            row.toolCallFlag(),
+            row.structuredOutputFlag(),
+            row.reasoningFlag(),
             row.status(),
+            row.lastTestSuccess(),
+            row.lastTestMessage(),
+            row.lastTestedAt(),
             row.createdAt(),
             row.updatedAt()
+        );
+    }
+
+    private AiProviderResponse toAiProviderResponse(AiProviderRow row) {
+        if (row == null) return null;
+        return new AiProviderResponse(
+            String.valueOf(row.id()),
+            row.providerType(),
+            providerName(row.providerType()),
+            row.displayName(),
+            row.baseUrl(),
+            StringUtils.hasText(row.apiKey()),
+            row.enabled(),
+            row.lastTestSuccess(),
+            row.lastTestMessage(),
+            row.lastTestedAt(),
+            row.createdAt(),
+            row.updatedAt()
+        );
+    }
+
+    public ModelTestResponse testModelConnection(TestLlmModelRequest request) {
+        String provider = normalizeProvider(request.provider());
+        ModelConnectionConfig config = resolveModelConnection(provider, request.endpoint(), request.apiKey());
+        return aiModelHealthCheckService.testModel(
+            provider,
+            normalizeDefault(request.modelType(), "TEXT", MODEL_TYPES, "模型类型不支持"),
+            request.modelName(),
+            config.endpoint(),
+            config.apiKey(),
+            request.visionFlag()
         );
     }
 
@@ -1096,31 +1565,83 @@ public class AgentService {
     // ==================== Model Test ====================
 
     public ModelTestResponse testModelConnection(Long modelId) {
-        long start = System.currentTimeMillis();
-        try {
-            var modelRow = agentRepository.getLlmModel(modelId);
-            if (modelRow == null) {
-                return new ModelTestResponse(false, "模型不存在", null, System.currentTimeMillis() - start);
-            }
-            if (!StringUtils.hasText(modelRow.apiKey())) {
-                return new ModelTestResponse(false, "未配置 API Key", null, System.currentTimeMillis() - start);
-            }
-
-            String modelConfigJson = new com.fasterxml.jackson.databind.ObjectMapper()
-                .writeValueAsString(java.util.Map.of(
-                    "baseUrl", modelRow.endpoint() != null ? modelRow.endpoint() : "",
-                    "apiKey", modelRow.apiKey(),
-                    "model", modelRow.modelName()
-                ));
-
-            var response = agentModelClient.generateReply(new AgentModelRequest(
-                0L, 0L, "test", "你是一个测试助手。", "请回复：连接成功", modelConfigJson
-            ));
-
-            return new ModelTestResponse(true, "连接成功", response.text(), System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            return new ModelTestResponse(false, e.getMessage(), null, System.currentTimeMillis() - start);
+        var modelRow = agentRepository.getLlmModel(modelId);
+        if (modelRow == null) {
+            return new ModelTestResponse(false, "模型不存在", null, 0);
         }
+        ModelTestResponse response = aiModelHealthCheckService.testModel(
+            modelRow.provider(),
+            modelRow.modelType(),
+            modelRow.modelName(),
+            modelRow.endpoint(),
+            modelRow.apiKey(),
+            modelRow.visionFlag()
+        );
+        agentRepository.updateLlmModelTestResult(modelId, response.success(), response.message(), 0L);
+        return response;
+    }
+
+    private ModelConnectionConfig resolveModelConnection(String provider, String endpoint, String apiKey) {
+        AiProviderRow providerRow = agentRepository.getAiProviderByType(provider);
+        String resolvedEndpoint = trimToNull(endpoint);
+        if (resolvedEndpoint == null && providerRow != null) {
+            resolvedEndpoint = trimToNull(providerRow.baseUrl());
+        }
+        if (resolvedEndpoint == null) {
+            resolvedEndpoint = officialEndpoint(provider, null);
+        }
+        String resolvedApiKey = trimToNull(apiKey);
+        if (resolvedApiKey == null && providerRow != null) {
+            resolvedApiKey = trimToNull(providerRow.apiKey());
+        }
+        return new ModelConnectionConfig(resolvedEndpoint, resolvedApiKey);
+    }
+
+    private record ModelConnectionConfig(String endpoint, String apiKey) {
+    }
+
+    private String officialEndpoint(String provider, String endpoint) {
+        if (StringUtils.hasText(endpoint)) return endpoint.trim();
+        return switch (provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT)) {
+            case "openai" -> "https://api.openai.com/v1";
+            case "deepseek" -> "https://api.deepseek.com/v1";
+            case "qwen" -> "https://dashscope.aliyuncs.com/compatible-mode/v1";
+            case "doubao" -> "https://ark.cn-beijing.volces.com/api/v3";
+            case "anthropic" -> "https://api.anthropic.com/v1";
+            case "siliconflow" -> "https://api.siliconflow.cn/v1";
+            case "mimo" -> "https://api.xiaomimimo.com/v1";
+            default -> null;
+        };
+    }
+
+    private String providerName(String provider) {
+        return switch (provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT)) {
+            case "openai" -> "OpenAI";
+            case "deepseek" -> "DeepSeek";
+            case "anthropic" -> "Anthropic";
+            case "qwen" -> "通义千问";
+            case "doubao" -> "豆包";
+            case "siliconflow" -> "硅基流动";
+            case "mimo" -> "MiMo";
+            case "openai-compatible" -> "兼容接入";
+            default -> "其他供应商";
+        };
+    }
+
+    private String normalizeProvider(String provider) {
+        return trimToRequired(provider, "供应商不能为空").toLowerCase(Locale.ROOT);
+    }
+
+    private String modelTypeName(String modelType) {
+        return switch (modelType == null ? "" : modelType) {
+            case "TEXT" -> "文本";
+            case "EMBEDDING" -> "嵌入";
+            case "RERANK" -> "重排";
+            case "TTS" -> "语音合成";
+            case "VISION" -> "视觉";
+            case "OCR" -> "文字识别";
+            default -> "其他类型";
+        };
     }
 
     // ==================== Workflow Run ====================
@@ -1134,12 +1655,10 @@ public class AgentService {
             String modelConfigJson = request.modelConfigJson();
             if (request.versionId() != null) {
                 version = agentRepository.getVersionOrThrow(request.versionId());
-                if (!"DRAFT".equals(version.publishStatus())) {
-                    return new WorkflowRunResponse(false, null, List.of(), "只有草稿版本可以测试", System.currentTimeMillis() - start);
-                }
-                if (!StringUtils.hasText(workflowConfigJson)) workflowConfigJson = version.workflowConfigJson();
-                if (!StringUtils.hasText(systemPrompt)) systemPrompt = version.systemPrompt();
-                if (!StringUtils.hasText(modelConfigJson)) modelConfigJson = version.modelConfigJson();
+                boolean draftVersion = "DRAFT".equals(version.publishStatus());
+                if (!draftVersion || !StringUtils.hasText(workflowConfigJson)) workflowConfigJson = version.workflowConfigJson();
+                if (!draftVersion || !StringUtils.hasText(systemPrompt)) systemPrompt = version.systemPrompt();
+                if (!draftVersion || !StringUtils.hasText(modelConfigJson)) modelConfigJson = version.modelConfigJson();
             }
             if (!workflowParser.isWorkflowConfig(workflowConfigJson)) {
                 return new WorkflowRunResponse(false, null, List.of(), "无效的工作流配置", System.currentTimeMillis() - start);
@@ -1238,7 +1757,7 @@ public class AgentService {
             if (replyText == null) {
                 return new WorkflowRunResponse(false, null, steps, "工作流未到达 END 节点", System.currentTimeMillis() - start);
             }
-            if (version != null) {
+            if (version != null && "DRAFT".equals(version.publishStatus())) {
                 String normalizedWorkflow = normalize(objectMapper, workflowConfigJson, "工作流配置不是合法JSON");
                 String normalizedModel = normalize(objectMapper, modelConfigJson, "模型配置不是合法JSON");
                 String normalizedPrompt = trimToNull(systemPrompt);
@@ -1322,5 +1841,11 @@ public class AgentService {
         }
         fields.forEach((key, value) -> object.set(key, sortJson(value)));
         return object;
+    }
+
+    private record KnowledgeReferences(Set<Long> spaceIds, int unconfiguredCount) {
+    }
+
+    private record KnowledgeIssue(int count, String message) {
     }
 }

@@ -12,8 +12,11 @@ public class ImGroupProfileResponse {
     private String title;
     private Long avatarFileId;
     private String groupType;
+    private String groupTypeName;
     private Long ownerUserId;
     private String noticeText;
     private String status;
+    private String statusName;
     private String currentMemberRole;
+    private String currentMemberRoleName;
 }

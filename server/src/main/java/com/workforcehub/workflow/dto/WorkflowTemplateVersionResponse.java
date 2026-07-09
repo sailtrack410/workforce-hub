@@ -19,6 +19,7 @@ public class WorkflowTemplateVersionResponse {
     private LocalDateTime effectiveFrom;
     private LocalDateTime effectiveTo;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -24,14 +24,20 @@ import com.workforcehub.ragflow.repository.RagflowRepository;
 import com.workforcehub.ragflow.repository.RagflowSearchHitRow;
 import com.workforcehub.ragflow.repository.RagflowSpaceRow;
 import com.workforcehub.ragflow.repository.RagflowVectorRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import static com.workforcehub.common.util.TextValues.trimToNull;
 
@@ -48,18 +54,30 @@ public class RagflowAdminService {
     private final AttachmentRefRepository attachmentRefRepository;
     private final RagflowIngestService ragflowIngestService;
     private final RagflowKnowledgeSearchService knowledgeSearchService;
+    private final RagflowConfigResolver configResolver;
+    private final RagflowEmbeddingClient embeddingClient;
     private final RagflowVectorRepository vectorRepository;
+    private final Executor kbIngestExecutor;
+
+    @Value("${workforce.ragflow.embedding.validate-on-create:true}")
+    private boolean validateEmbeddingOnCreate = true;
 
     public RagflowAdminService(RagflowRepository ragflowRepository,
                                AttachmentRefRepository attachmentRefRepository,
                                RagflowIngestService ragflowIngestService,
                                RagflowKnowledgeSearchService knowledgeSearchService,
-                               RagflowVectorRepository vectorRepository) {
+                               RagflowConfigResolver configResolver,
+                               RagflowEmbeddingClient embeddingClient,
+                               RagflowVectorRepository vectorRepository,
+                               @Qualifier("kbIngestExecutor") Executor kbIngestExecutor) {
         this.ragflowRepository = ragflowRepository;
         this.attachmentRefRepository = attachmentRefRepository;
         this.ragflowIngestService = ragflowIngestService;
         this.knowledgeSearchService = knowledgeSearchService;
+        this.configResolver = configResolver;
+        this.embeddingClient = embeddingClient;
         this.vectorRepository = vectorRepository;
+        this.kbIngestExecutor = kbIngestExecutor;
     }
 
     public PageResult<RagflowSpaceResponse> pageSpaces(long pageNo, long pageSize, String keyword) {
@@ -83,21 +101,26 @@ public class RagflowAdminService {
     @Transactional(rollbackFor = Exception.class)
     public RagflowGlobalSettingResponse updateGlobalSetting(UpdateRagflowGlobalSettingRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
+        RagflowGlobalSettingRow existing = ragflowRepository.getGlobalSetting();
+        Integer embeddingDimension = detectGlobalEmbeddingDimension(request, existing);
         ragflowRepository.updateGlobalSetting(
             trimToNull(request.getOcrBaseUrl()),
             trimToNull(request.getOcrApiKey()),
             trimToNull(request.getOcrModel()),
+            request.getOcrModelId(),
             trimToNull(request.getEmbeddingBaseUrl()),
             trimToNull(request.getEmbeddingApiKey()),
             trimToNull(request.getEmbeddingModel()),
-            request.getEmbeddingDimension(),
+            request.getEmbeddingModelId(),
+            embeddingDimension,
             request.getRerankEnabled(),
             trimToNull(request.getRerankBaseUrl()),
             trimToNull(request.getRerankApiKey()),
             trimToNull(request.getRerankModel()),
-            defaultInt(request.getChunkSize(), 800),
-            defaultInt(request.getChunkOverlap(), 100),
-            defaultInt(request.getRetrievalTopK(), 5),
+            request.getRerankModelId(),
+            request.getChunkSize(),
+            request.getChunkOverlap(),
+            request.getRetrievalTopK(),
             normalizeScoreThreshold(request.getScoreThreshold()),
             operatorId
         );
@@ -111,6 +134,16 @@ public class RagflowAdminService {
         if (ragflowRepository.existsSpaceCode(spaceCode)) {
             throw new BizException(409, "知识库编码已存在");
         }
+        RagflowGlobalSettingRow setting = ragflowRepository.getGlobalSetting();
+        Long embeddingModelId = request.getEmbeddingModelId() == null ? setting.embeddingModelId() : request.getEmbeddingModelId();
+        Integer embeddingDimension = request.getEmbeddingDimension() == null ? setting.embeddingDimension() : request.getEmbeddingDimension();
+        if (validateEmbeddingOnCreate) {
+            int detectedDimension = embeddingClient.detectDimension(embeddingModelId);
+            if (request.getEmbeddingDimension() != null && request.getEmbeddingDimension() != detectedDimension) {
+                throw new BizException(422, "该Embedding模型实际返回" + detectedDimension + "维，不能配置为" + request.getEmbeddingDimension() + "维");
+            }
+            embeddingDimension = detectedDimension;
+        }
         Long spaceId = IdGenerator.nextId();
         ragflowRepository.insertSpace(
             spaceId,
@@ -121,13 +154,15 @@ public class RagflowAdminService {
             normalizeDefault(request.getStatus(), "ACTIVE", STATUSES, "状态不支持"),
             trimToNull(request.getEmbeddingProvider()),
             trimToNull(request.getEmbeddingModel()),
-            request.getEmbeddingDimension(),
+            embeddingModelId,
+            embeddingDimension,
             request.getRerankEnabled(),
             trimToNull(request.getRerankProvider()),
             trimToNull(request.getRerankModel()),
-            defaultInt(request.getChunkSize(), 800),
-            defaultInt(request.getChunkOverlap(), 100),
-            defaultInt(request.getRetrievalTopK(), 5),
+            request.getRerankModelId(),
+            request.getChunkSize() == null ? defaultInt(setting.chunkSize(), 800) : request.getChunkSize(),
+            request.getChunkOverlap() == null ? defaultInt(setting.chunkOverlap(), 100) : request.getChunkOverlap(),
+            request.getRetrievalTopK() == null ? defaultInt(setting.retrievalTopK(), 5) : request.getRetrievalTopK(),
             normalizeScoreThreshold(request.getScoreThreshold()),
             operatorId
         );
@@ -137,22 +172,27 @@ public class RagflowAdminService {
     @Transactional(rollbackFor = Exception.class)
     public RagflowSpaceResponse updateSpace(Long spaceId, UpdateRagflowSpaceRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        ragflowRepository.getSpaceOrThrow(spaceId);
+        RagflowSpaceRow existing = ragflowRepository.getSpaceOrThrow(spaceId);
+        String embeddingProvider = trimToNull(request.getEmbeddingProvider());
+        String embeddingModel = trimToNull(request.getEmbeddingModel());
+        ensureVectorSettingsUnchanged(existing, embeddingProvider, embeddingModel, request);
         ragflowRepository.updateSpace(
             spaceId,
             trimRequired(request.getSpaceName(), "知识库名称不能为空"),
             trimToNull(request.getDescription()),
             normalizeDefault(request.getVisibility(), "PRIVATE", VISIBILITIES, "可见范围不支持"),
             normalizeDefault(request.getStatus(), "ACTIVE", STATUSES, "状态不支持"),
-            trimToNull(request.getEmbeddingProvider()),
-            trimToNull(request.getEmbeddingModel()),
-            request.getEmbeddingDimension(),
+            existing.embeddingProvider(),
+            existing.embeddingModel(),
+            existing.embeddingModelId(),
+            existing.embeddingDimension(),
             request.getRerankEnabled(),
             trimToNull(request.getRerankProvider()),
             trimToNull(request.getRerankModel()),
-            defaultInt(request.getChunkSize(), 800),
-            defaultInt(request.getChunkOverlap(), 100),
-            defaultInt(request.getRetrievalTopK(), 5),
+            request.getRerankModelId(),
+            existing.chunkSize(),
+            existing.chunkOverlap(),
+            request.getRetrievalTopK(),
             normalizeScoreThreshold(request.getScoreThreshold()),
             operatorId
         );
@@ -200,7 +240,7 @@ public class RagflowAdminService {
         );
         ragflowRepository.insertIngestJob(jobId, documentId, spaceId, attachment.fileObjectId(), operatorId);
         ragflowRepository.bindLatestIngestJob(documentId, jobId, operatorId);
-        ragflowIngestService.ingest(
+        scheduleIngest(
             spaceId,
             documentId,
             jobId,
@@ -224,7 +264,7 @@ public class RagflowAdminService {
         Long jobId = IdGenerator.nextId();
         ragflowRepository.insertIngestJob(jobId, documentId, spaceId, document.sourceFileObjectId(), operatorId);
         ragflowRepository.bindLatestIngestJob(documentId, jobId, operatorId);
-        ragflowIngestService.ingest(
+        scheduleIngest(
             spaceId,
             documentId,
             jobId,
@@ -238,6 +278,43 @@ public class RagflowAdminService {
             .filter(item -> documentId.equals(item.getDocumentId()))
             .findFirst()
             .orElseThrow(() -> new BizException(500, "文档重新入库失败"));
+    }
+
+    private void scheduleIngest(Long spaceId, Long documentId, Long jobId, Long fileObjectId, String title, String mimeType, String parserType) {
+        Runnable execution = () -> kbIngestExecutor.execute(() -> ragflowIngestService.ingest(
+            spaceId,
+            documentId,
+            jobId,
+            fileObjectId,
+            title,
+            mimeType,
+            parserType
+        ));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    execution.run();
+                }
+            });
+            return;
+        }
+        execution.run();
+    }
+
+    // 删除知识库：软删除空间和文档，同时停用切片与向量，保留历史审计链路
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteSpace(Long spaceId) {
+        Long operatorId = CurrentUserHolder.requireUserId();
+        ragflowRepository.getSpaceOrThrow(spaceId);
+        ragflowRepository.softDeleteDocumentsBySpace(spaceId, operatorId);
+        ragflowRepository.deactivateSpaceChunks(spaceId);
+        ragflowRepository.deleteAcl(spaceId);
+        ragflowRepository.softDeleteSpace(spaceId, operatorId);
+        try {
+            vectorRepository.deactivateSpaceVectors(spaceId);
+        } catch (Exception | LinkageError ignored) {
+        }
     }
 
     // 删除文档：软删除数据库记录 + 停用向量，向量清理失败不影响主流程
@@ -258,7 +335,8 @@ public class RagflowAdminService {
     public RagflowSearchTestResponse searchTest(Long spaceId, RagflowSearchTestRequest request) {
         RagflowSpaceRow space = ragflowRepository.getSpaceOrThrow(spaceId);
         String query = trimRequired(request.getQuery(), "搜索内容不能为空");
-        int topK = defaultInt(space.retrievalTopK(), 5);
+        RagflowEffectiveConfig config = configResolver.resolve(space, ragflowRepository.getGlobalSetting());
+        int topK = defaultInt(config.retrievalTopK(), 5);
         List<RagflowSearchHitRow> rows = knowledgeSearchService.searchRows(spaceId, query, topK);
         RagflowSearchTestResponse response = new RagflowSearchTestResponse();
         response.setQuery(query);
@@ -296,19 +374,23 @@ public class RagflowAdminService {
         response.setSpaceCode(row.spaceCode());
         response.setDescription(row.description());
         response.setVisibility(row.visibility());
+        response.setVisibilityName(visibilityName(row.visibility()));
         response.setDocumentCount(row.documentCount());
         response.setChunkCount(row.chunkCount());
         response.setEmbeddingProvider(row.embeddingProvider());
         response.setEmbeddingModel(row.embeddingModel());
+        response.setEmbeddingModelId(row.embeddingModelId());
         response.setEmbeddingDimension(row.embeddingDimension());
         response.setRerankEnabled(row.rerankEnabled());
         response.setRerankProvider(row.rerankProvider());
         response.setRerankModel(row.rerankModel());
+        response.setRerankModelId(row.rerankModelId());
         response.setChunkSize(row.chunkSize());
         response.setChunkOverlap(row.chunkOverlap());
         response.setRetrievalTopK(row.retrievalTopK());
         response.setScoreThreshold(row.scoreThreshold());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
@@ -320,14 +402,17 @@ public class RagflowAdminService {
         response.setOcrBaseUrl(row.ocrBaseUrl());
         response.setOcrApiKeyConfigured(row.ocrApiKeyConfigured());
         response.setOcrModel(row.ocrModel());
+        response.setOcrModelId(row.ocrModelId());
         response.setEmbeddingBaseUrl(row.embeddingBaseUrl());
         response.setEmbeddingApiKeyConfigured(row.embeddingApiKeyConfigured());
         response.setEmbeddingModel(row.embeddingModel());
+        response.setEmbeddingModelId(row.embeddingModelId());
         response.setEmbeddingDimension(row.embeddingDimension());
         response.setRerankEnabled(row.rerankEnabled());
         response.setRerankBaseUrl(row.rerankBaseUrl());
         response.setRerankApiKeyConfigured(row.rerankApiKeyConfigured());
         response.setRerankModel(row.rerankModel());
+        response.setRerankModelId(row.rerankModelId());
         response.setChunkSize(row.chunkSize());
         response.setChunkOverlap(row.chunkOverlap());
         response.setRetrievalTopK(row.retrievalTopK());
@@ -335,6 +420,47 @@ public class RagflowAdminService {
         response.setCreatedAt(row.createdAt());
         response.setUpdatedAt(row.updatedAt());
         return response;
+    }
+
+    private void ensureVectorSettingsUnchanged(RagflowSpaceRow existing,
+                                               String embeddingProvider,
+                                               String embeddingModel,
+                                               UpdateRagflowSpaceRequest request) {
+        boolean changed = (embeddingProvider != null && !Objects.equals(trimToNull(existing.embeddingProvider()), embeddingProvider))
+            || (embeddingModel != null && !Objects.equals(trimToNull(existing.embeddingModel()), embeddingModel))
+            || (request.getEmbeddingModelId() != null && !Objects.equals(existing.embeddingModelId(), request.getEmbeddingModelId()))
+            || (request.getEmbeddingDimension() != null && !Objects.equals(existing.embeddingDimension(), request.getEmbeddingDimension()))
+            || (request.getChunkSize() != null && !Objects.equals(existing.chunkSize(), request.getChunkSize()))
+            || (request.getChunkOverlap() != null && !Objects.equals(existing.chunkOverlap(), request.getChunkOverlap()));
+        if (changed) {
+            throw new BizException(409, "嵌入模型、向量维度和切片参数只能在创建知识库时确定；请新建知识库后重新入库");
+        }
+    }
+
+    private Integer detectGlobalEmbeddingDimension(UpdateRagflowGlobalSettingRequest request, RagflowGlobalSettingRow existing) {
+        Long modelId = request.getEmbeddingModelId();
+        Integer configuredDimension = request.getEmbeddingDimension();
+        Integer detectedDimension = null;
+        if (modelId != null) {
+            detectedDimension = embeddingClient.detectDimension(modelId);
+        } else {
+            String baseUrl = trimToNull(request.getEmbeddingBaseUrl());
+            String modelName = trimToNull(request.getEmbeddingModel());
+            String apiKey = trimToNull(request.getEmbeddingApiKey());
+            if (apiKey == null && Boolean.TRUE.equals(existing.embeddingApiKeyConfigured())) {
+                apiKey = ragflowRepository.getRawEmbeddingApiKey();
+            }
+            if (StringUtils.hasText(baseUrl) || StringUtils.hasText(modelName) || StringUtils.hasText(apiKey)) {
+                detectedDimension = embeddingClient.detectDimension(baseUrl, apiKey, modelName);
+            }
+        }
+        if (detectedDimension == null) {
+            return configuredDimension;
+        }
+        if (configuredDimension != null && !Objects.equals(configuredDimension, detectedDimension)) {
+            throw new BizException(422, "该Embedding模型实际返回" + detectedDimension + "维，不能配置为" + configuredDimension + "维");
+        }
+        return detectedDimension;
     }
 
     private RagflowDocumentResponse toDocumentResponse(RagflowDocumentRow row) {
@@ -348,10 +474,14 @@ public class RagflowAdminService {
         response.setFileSize(row.fileSize());
         response.setContentHash(row.contentHash());
         response.setParserType(row.parserType());
+        response.setParserTypeName(parserTypeName(row.parserType()));
         response.setIngestStatus(row.ingestStatus());
+        response.setIngestStatusName(statusName(row.ingestStatus()));
         response.setLatestIngestJobId(row.latestIngestJobId());
         response.setIngestJobStatus(row.ingestJobStatus());
+        response.setIngestJobStatusName(statusName(row.ingestJobStatus()));
         response.setVectorStatus(row.vectorStatus());
+        response.setVectorStatusName(statusName(row.vectorStatus()));
         response.setChunkCount(row.chunkCount());
         response.setErrorMessage(row.errorMessage());
         response.setCreatedAt(row.createdAt());
@@ -376,11 +506,55 @@ public class RagflowAdminService {
         response.setAclId(row.id());
         response.setSpaceId(row.spaceId());
         response.setSubjectType(row.subjectType());
+        response.setSubjectTypeName(subjectTypeName(row.subjectType()));
         response.setSubjectId(row.subjectId());
+        response.setSubjectName(row.subjectName());
+        response.setSubjectCode(row.subjectCode());
         response.setPermCode(row.permCode());
+        response.setPermCodeName(permCodeName(row.permCode()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCreatedAt(row.createdAt());
         return response;
+    }
+
+    private String visibilityName(String value) {
+        if ("PRIVATE".equals(value)) return "私有";
+        if ("DEPARTMENT".equals(value)) return "部门可见";
+        if ("PUBLIC".equals(value)) return "全员可见";
+        return value == null ? null : "其他范围";
+    }
+
+    private String parserTypeName(String value) {
+        if ("AUTO".equals(value)) return "自动解析";
+        if ("OCR".equals(value)) return "文字识别";
+        if ("TEXT".equals(value)) return "文本解析";
+        return value == null ? null : "其他解析";
+    }
+
+    private String subjectTypeName(String value) {
+        if ("ROLE".equals(value)) return "角色";
+        if ("DEPARTMENT".equals(value)) return "部门";
+        if ("POSITION".equals(value)) return "岗位";
+        if ("USER".equals(value)) return "人员";
+        return value == null ? null : "授权对象";
+    }
+
+    private String permCodeName(String value) {
+        if ("read".equalsIgnoreCase(value)) return "可查阅";
+        if ("manage".equalsIgnoreCase(value)) return "可管理";
+        if ("use".equalsIgnoreCase(value)) return "可使用";
+        return value == null ? null : "业务权限";
+    }
+
+    private String statusName(String value) {
+        if ("ACTIVE".equals(value)) return "启用";
+        if ("INACTIVE".equals(value)) return "停用";
+        if ("PENDING".equals(value)) return "待处理";
+        if ("RUNNING".equals(value)) return "处理中";
+        if ("SUCCESS".equals(value) || "SUCCEEDED".equals(value) || "DONE".equals(value)) return "已完成";
+        if ("FAILED".equals(value)) return "失败";
+        return value == null ? null : "其他状态";
     }
 
     private String trimRequired(String value, String message) {

@@ -94,7 +94,7 @@ public class AttendanceService {
     @Transactional(rollbackFor = Exception.class)
     public AttendanceCalendarResponse createCalendar(CreateAttendanceCalendarRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        String calendarCode = normalizeCode(request.getCalendarCode());
+        String calendarCode = normalizeCode(request.getCalendarCode(), "CAL");
         String calendarName = request.getCalendarName().trim();
         String calendarType = normalizeCalendarType(request.getCalendarType());
         String status = normalizeStatus(request.getStatus());
@@ -116,7 +116,7 @@ public class AttendanceService {
     @Transactional(rollbackFor = Exception.class)
     public AttendanceShiftResponse createShift(CreateAttendanceShiftRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        String shiftCode = normalizeCode(request.getShiftCode());
+        String shiftCode = normalizeCode(request.getShiftCode(), "SHIFT");
         String shiftName = request.getShiftName().trim();
         String status = normalizeStatus(request.getStatus());
         if (attendanceRepository.existsShiftCode(shiftCode)) {
@@ -150,7 +150,7 @@ public class AttendanceService {
     @Transactional(rollbackFor = Exception.class)
     public AttendanceGroupResponse createGroup(CreateAttendanceGroupRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        String groupCode = normalizeCode(request.getGroupCode());
+        String groupCode = normalizeCode(request.getGroupCode(), "GROUP");
         String groupName = request.getGroupName().trim();
         String status = normalizeStatus(request.getStatus());
         AttendanceCalendarRow calendar = attendanceRepository.getCalendarOrThrow(request.getCalendarId());
@@ -752,7 +752,9 @@ public class AttendanceService {
         response.setCalendarCode(row.calendarCode());
         response.setCalendarName(row.calendarName());
         response.setCalendarType(row.calendarType());
+        response.setCalendarTypeName(calendarTypeName(row.calendarType()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         return response;
     }
 
@@ -768,6 +770,7 @@ public class AttendanceService {
         response.setOffDutyPunchStart(row.offDutyPunchStart());
         response.setOffDutyPunchEnd(row.offDutyPunchEnd());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         return response;
     }
 
@@ -777,10 +780,13 @@ public class AttendanceService {
         response.setGroupCode(row.groupCode());
         response.setGroupName(row.groupName());
         response.setCalendarId(row.calendarId());
+        response.setCalendarName(attendanceRepository.getCalendarOrThrow(row.calendarId()).calendarName());
         response.setDefaultShiftId(row.defaultShiftId());
+        response.setDefaultShiftName(attendanceRepository.getShiftOrThrow(row.defaultShiftId()).shiftName());
         response.setLateGraceMinutes(row.lateGraceMinutes());
         response.setEarlyLeaveGraceMinutes(row.earlyLeaveGraceMinutes());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         return response;
     }
 
@@ -788,11 +794,16 @@ public class AttendanceService {
         AttendanceGroupMemberResponse response = new AttendanceGroupMemberResponse();
         response.setMemberId(row.memberId());
         response.setGroupId(row.groupId());
+        response.setGroupName(row.groupName());
         response.setUserId(row.userId());
+        response.setEmployeeNo(row.employeeNo());
+        response.setRealName(row.realName());
         response.setEffectiveFrom(row.effectiveFrom());
         response.setEffectiveTo(row.effectiveTo());
         response.setSourceType(row.sourceType());
+        response.setSourceTypeName(sourceTypeName(row.sourceType()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         return response;
     }
 
@@ -800,11 +811,17 @@ public class AttendanceService {
         AttendanceScheduleResponse response = new AttendanceScheduleResponse();
         response.setScheduleId(row.scheduleId());
         response.setUserId(row.userId());
+        response.setEmployeeNo(row.employeeNo());
+        response.setRealName(row.realName());
         response.setWorkDate(row.workDate());
         response.setShiftId(row.shiftId());
+        response.setShiftName(row.shiftName());
         response.setCalendarId(row.calendarId());
+        response.setCalendarName(row.calendarName());
         response.setScheduleSource(row.scheduleSource());
+        response.setScheduleSourceName(sourceTypeName(row.scheduleSource()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         return response;
     }
 
@@ -814,8 +831,11 @@ public class AttendanceService {
         response.setUserId(row.userId());
         response.setPunchAt(row.punchAt());
         response.setPunchType(row.punchType());
+        response.setPunchTypeName(punchTypeName(row.punchType()));
         response.setSourceType(row.sourceType());
+        response.setSourceTypeName(sourceTypeName(row.sourceType()));
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setDailyResult(toDailyResultResponse(dailyResult));
         return response;
     }
@@ -824,11 +844,16 @@ public class AttendanceService {
         AttendanceDailyResultResponse response = new AttendanceDailyResultResponse();
         response.setDailyResultId(row.dailyResultId());
         response.setUserId(row.userId());
+        response.setEmployeeNo(row.employeeNo());
+        response.setRealName(row.realName());
         response.setWorkDate(row.workDate());
         response.setScheduleId(row.scheduleId());
         response.setGroupId(row.groupId());
+        response.setGroupName(row.groupName());
         response.setShiftId(row.shiftId());
+        response.setShiftName(row.shiftName());
         response.setResultStatus(row.resultStatus());
+        response.setResultStatusName(resultStatusName(row.resultStatus()));
         response.setLateMinutes(row.lateMinutes());
         response.setEarlyLeaveMinutes(row.earlyLeaveMinutes());
         response.setAbsenceMinutes(row.absenceMinutes());
@@ -845,13 +870,57 @@ public class AttendanceService {
         response.setUserId(row.userId());
         response.setWorkDate(row.workDate());
         response.setExceptionType(row.exceptionType());
+        response.setExceptionTypeName(exceptionTypeName(row.exceptionType(), row.exceptionDesc()));
         response.setExceptionDesc(row.exceptionDesc());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         return response;
     }
 
-    private String normalizeCode(String value) {
-        return value.trim().toUpperCase(Locale.ROOT);
+    private String normalizeCode(String value, String prefix) {
+        String trimmed = trimToNull(value);
+        return trimmed == null ? prefix + "_" + IdGenerator.nextIdString() : trimmed.toUpperCase(Locale.ROOT);
+    }
+
+    private String statusName(String value) {
+        if (STATUS_ACTIVE.equals(value)) return "启用";
+        if (STATUS_INACTIVE.equals(value)) return "停用";
+        return "未知状态";
+    }
+
+    private String sourceTypeName(String value) {
+        if (SOURCE_MANUAL.equals(value)) return "手动";
+        if (SOURCE_AUTO.equals(value)) return "自动";
+        if (SOURCE_TEMPLATE.equals(value)) return "模板";
+        if (SOURCE_APP.equals(value)) return "手机打卡";
+        if (SOURCE_PC.equals(value)) return "网页打卡";
+        return "未知来源";
+    }
+
+    private String punchTypeName(String value) {
+        if (PUNCH_TYPE_ON_DUTY.equals(value)) return "上班";
+        if (PUNCH_TYPE_OFF_DUTY.equals(value)) return "下班";
+        return value == null ? null : "其他打卡";
+    }
+
+    private String calendarTypeName(String value) {
+        if ("STANDARD".equals(value)) return "标准日历";
+        return value == null ? null : "其他日历";
+    }
+
+    private String exceptionTypeName(String value, String exceptionDesc) {
+        if (EXCEPTION_LATE.equals(value)) return "迟到";
+        if (EXCEPTION_EARLY_LEAVE.equals(value)) return "早退";
+        if (EXCEPTION_MISS_PUNCH.equals(value)) return "缺卡";
+        return trimToNull(exceptionDesc) != null ? exceptionDesc : (value == null ? null : "异常");
+    }
+
+    private String resultStatusName(String value) {
+        if (RESULT_NORMAL.equals(value)) return "正常";
+        if (RESULT_ABNORMAL.equals(value)) return "异常";
+        if (RESULT_NO_RULE.equals(value)) return "未设置规则";
+        if (RESULT_LEAVE.equals(value)) return "请假";
+        return "未知结果";
     }
 
     private String normalizeCalendarType(String value) {

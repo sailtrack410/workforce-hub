@@ -1,6 +1,7 @@
 package com.workforcehub.auth.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.auth.service.AdminPermissionService;
 import com.workforcehub.common.enums.UserType;
 import com.workforcehub.common.exception.BusinessErrorCode;
 import com.workforcehub.common.response.R;
@@ -17,6 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 后台接口权限校验。
@@ -37,7 +39,8 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
         new PathPermission("/api/admin/agent-tasks", "ADMIN_AGENT_TASK_MANAGE"),
         new PathPermission("/api/admin/agents/", "ADMIN_AGENT_MANAGE"),
         new PathPermission("/api/admin/files/", "ADMIN_FILE_MANAGE"),
-        new PathPermission("/api/admin/ragflow/", "ADMIN_RAGFLOW_MANAGE")
+        new PathPermission("/api/admin/ragflow/", "ADMIN_RAGFLOW_MANAGE"),
+        new PathPermission("/api/admin/notification-channels", "ADMIN_NOTIFICATION_CHANNEL_MANAGE")
     );
 
     private final ObjectMapper objectMapper;
@@ -67,9 +70,14 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        Set<String> authorities = auth.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .collect(java.util.stream.Collectors.toSet());
+        boolean superAdmin = user instanceof AdminUserDetails admin
+            && AdminPermissionService.hasSuperAdminRole(admin.getRoleCodes());
         if (auth.isAuthenticated()
             && user.getUserType() == UserType.ADMIN
-            && auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).anyMatch(requiredPermission::equals)) {
+            && (authorities.contains(requiredPermission) || superAdmin)) {
             filterChain.doFilter(request, response);
             return;
         }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="https://workforce-hub.local/processes">
+    <process id="business_trip_manager_approval" name="出差申请直属上级审批" isExecutable="true">
+        <startEvent id="start" name="提交出差申请"/>
+        <sequenceFlow id="flow_start_to_manager" sourceRef="start" targetRef="manager_approval"/>
+        <userTask id="manager_approval" name="直属上级审批" flowable:assignee="${managerUserId}"/>
+        <sequenceFlow id="flow_manager_to_end" sourceRef="manager_approval" targetRef="end"/>
+        <endEvent id="end" name="审批结束"/>
+    </process>
+</definitions>

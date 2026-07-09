@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
  */
 public record WorkflowLeaveDetailRow(
     Long leaveTypeId,
+    String leaveName,
     LocalDateTime startAt,
     LocalDateTime endAt,
     Integer durationMinutes,

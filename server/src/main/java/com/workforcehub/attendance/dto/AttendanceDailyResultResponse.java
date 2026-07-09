@@ -10,11 +10,16 @@ public class AttendanceDailyResultResponse {
 
     private Long dailyResultId;
     private Long userId;
+    private String employeeNo;
+    private String realName;
     private LocalDate workDate;
     private Long scheduleId;
     private Long groupId;
+    private String groupName;
     private Long shiftId;
+    private String shiftName;
     private String resultStatus;
+    private String resultStatusName;
     private Integer lateMinutes;
     private Integer earlyLeaveMinutes;
     private Integer absenceMinutes;

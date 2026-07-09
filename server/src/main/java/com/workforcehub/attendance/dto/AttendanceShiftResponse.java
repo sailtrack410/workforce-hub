@@ -17,4 +17,5 @@ public class AttendanceShiftResponse {
     private LocalTime offDutyPunchStart;
     private LocalTime offDutyPunchEnd;
     private String status;
+    private String statusName;
 }

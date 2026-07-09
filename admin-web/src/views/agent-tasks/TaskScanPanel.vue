@@ -6,7 +6,7 @@ import type {
   AdminAgentTaskTimeoutRunResponse,
   PageResult,
 } from '@/api/types';
-import { formatDateTime, humanizeText, statusLabel } from '@/utils/format';
+import { formatDateTime, safeBusinessMessage, statusLabel } from '@/utils/format';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminCompactList from '@/components/AdminCompactList.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
@@ -37,7 +37,7 @@ defineExpose({ setScanResult: (msg: string) => { scanResult.value = msg; } });
   <AdminPanel :span="6" title="失败聚合">
     <AdminCompactList :empty="failures.length === 0">
       <article v-for="failure in failures" :key="failure.errorMessage || 'empty'">
-        <strong>{{ humanizeText(failure.errorMessage) || '-' }}</strong>
+        <strong>{{ failure.errorMessage ? safeBusinessMessage(failure.errorMessage) : '-' }}</strong>
         <span>任务 {{ failure.taskCount }} · 工具调用 {{ failure.toolCallCount }} · {{ formatDateTime(failure.lastOccurredAt) }}</span>
       </article>
     </AdminCompactList>
@@ -45,7 +45,12 @@ defineExpose({ setScanResult: (msg: string) => { scanResult.value = msg; } });
 
   <AdminPanel :span="6" title="超时扫描">
     <form class="inline-form" @submit.prevent="confirmVisible = true">
-      <input v-model.number="scanForm.batchSize" type="number" min="1" max="500" />
+      <select v-model.number="scanForm.batchSize">
+        <option :value="50">50</option>
+        <option :value="100">100</option>
+        <option :value="200">200</option>
+        <option :value="500">500</option>
+      </select>
       <button class="danger-button" :disabled="loading" type="submit">
         <Play :size="16" />
         <span>执行扫描</span>
@@ -53,9 +58,9 @@ defineExpose({ setScanResult: (msg: string) => { scanResult.value = msg; } });
     </form>
     <p v-if="scanResult" class="inline-success">{{ scanResult }}</p>
     <AdminCompactList :empty="timeoutRuns.list.length === 0">
-      <article v-for="run in timeoutRuns.list" :key="run.jobRunId">
-        <strong>{{ run.jobRunId }}</strong>
-        <span>{{ statusLabel(run.status) }} · 扫描 {{ run.scannedCount ?? 0 }} · {{ formatDateTime(run.startedAt) }}</span>
+      <article v-for="(run, idx) in timeoutRuns.list" :key="run.jobRunNo || idx">
+        <strong>扫描批次</strong>
+        <span>{{ run.statusName || statusLabel(run.status) }} · 扫描 {{ run.scannedCount ?? 0 }} · {{ formatDateTime(run.startedAt) }}</span>
       </article>
     </AdminCompactList>
   </AdminPanel>

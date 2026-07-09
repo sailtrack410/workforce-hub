@@ -134,6 +134,7 @@ public abstract class LocalIntegrationTestSupport {
             deleteIfExists(jdbcTemplate, "ops_alert_resolution");
             deleteIfExists(jdbcTemplate, "ops_alert_rule");
             deleteIfExists(jdbcTemplate, "ops_alert_channel");
+            deleteIfExists(jdbcTemplate, "notify_channel_config");
             jdbcTemplate.execute("DELETE FROM sys_audit_log");
             jdbcTemplate.execute("DELETE FROM sys_storage_usage");
             jdbcTemplate.execute("DELETE FROM sys_storage_quota_policy");

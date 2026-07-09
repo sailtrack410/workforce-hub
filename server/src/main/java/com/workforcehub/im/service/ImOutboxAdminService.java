@@ -87,7 +87,7 @@ public class ImOutboxAdminService {
                 (safePageNo - 1) * safePageSize,
                 safePageSize
             ).stream()
-            .map(ImOutboxAdminService::toEventResponse)
+            .map(this::toEventResponse)
             .toList();
         return PageResult.of(safePageNo, safePageSize, total, rows);
     }
@@ -108,7 +108,7 @@ public class ImOutboxAdminService {
         response.setGeneratedAt(now);
         response.setSendingStaleBefore(staleSendingBefore);
         response.setStatusCounts(OUTBOX_STATUS_ORDER.stream()
-            .map(status -> AdminImOutboxSummaryResponse.StatusCount.of(status, countStatus(rows, status)))
+            .map(status -> AdminImOutboxSummaryResponse.StatusCount.of(status, statusName(status), countStatus(rows, status)))
             .toList());
         return response;
     }
@@ -255,17 +255,20 @@ public class ImOutboxAdminService {
         return normalized;
     }
 
-    static AdminImOutboxEventResponse toEventResponse(AdminImOutboxEventRow row) {
+    AdminImOutboxEventResponse toEventResponse(AdminImOutboxEventRow row) {
         AdminImOutboxEventResponse response = new AdminImOutboxEventResponse();
         response.setEventId(row.eventId());
         response.setEventType(row.eventType());
+        response.setEventTypeName(eventTypeName(row.eventType()));
         response.setConversationId(row.conversationId());
         response.setMessageId(row.messageId());
         response.setSeqNo(row.seqNo());
         response.setActorUserId(row.actorUserId());
+        response.setActorName(row.actorUserId() == null ? null : "成员");
         response.setRecipientUserIdsJson(row.recipientUserIdsJson());
         response.setPayloadJson(row.payloadJson());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setRetryCount(row.retryCount());
         response.setNextRetryAt(row.nextRetryAt());
         response.setLastError(row.lastError());
@@ -287,6 +290,7 @@ public class ImOutboxAdminService {
     private AdminImOutboxFailureSummaryResponse toFailureSummaryResponse(AdminImOutboxFailureSummaryRow row) {
         AdminImOutboxFailureSummaryResponse response = new AdminImOutboxFailureSummaryResponse();
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setLastError(row.lastError());
         response.setEventCount(row.eventCount());
         response.setMaxRetryCount(row.maxRetryCount());
@@ -299,11 +303,17 @@ public class ImOutboxAdminService {
         AdminImOutboxAuditResponse response = new AdminImOutboxAuditResponse();
         response.setAuditId(row.auditId());
         response.setOperatorType(row.operatorType());
+        response.setOperatorTypeName(actorTypeName(row.operatorType()));
         response.setOperatorId(row.operatorId());
+        response.setOperatorName(row.operatorId() == null ? null : actorTypeName(row.operatorType()));
         response.setActionType(row.actionType());
+        response.setActionTypeName(actionTypeName(row.actionType()));
         response.setTargetType(row.targetType());
+        response.setTargetTypeName(targetTypeName(row.targetType()));
         response.setTargetId(row.targetId());
+        response.setTargetDisplayName(row.targetId() == null ? null : targetTypeName(row.targetType()));
         response.setResult(row.result());
+        response.setResultName(statusName(row.result()));
         response.setDetailJson(row.detailJson());
         response.setOccurredAt(row.occurredAt());
         return response;
@@ -416,5 +426,46 @@ public class ImOutboxAdminService {
             .map(objectMapper.getNodeFactory()::numberNode)
             .toList());
         return node.toString();
+    }
+
+    private String statusName(String value) {
+        if ("PENDING".equals(value)) return "待发送";
+        if ("SENDING".equals(value)) return "发送中";
+        if ("SENT".equals(value)) return "已发送";
+        if ("FAILED".equals(value)) return "失败";
+        if ("DEAD".equals(value)) return "终止";
+        if ("SUCCESS".equals(value)) return "成功";
+        return value == null ? null : "其他状态";
+    }
+
+    private String eventTypeName(String value) {
+        if ("MESSAGE_CREATED".equals(value)) return "消息发送";
+        if ("MESSAGE_RECALLED".equals(value)) return "消息撤回";
+        if ("MESSAGE_EDITED".equals(value)) return "消息编辑";
+        if ("GROUP_PROFILE_UPDATED".equals(value)) return "群资料更新";
+        if ("AGENT_MESSAGE_CREATED".equals(value)) return "AI 回复";
+        if ("AGENT_REPLY_FAILED".equals(value)) return "AI 回复失败";
+        return value == null ? null : "消息事件";
+    }
+
+    private String actorTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("ADMIN".equals(value) || "ADMIN_USER".equals(value)) return "管理员";
+        if ("SYSTEM".equals(value)) return "系统";
+        if ("AGENT".equals(value)) return "AI 助手";
+        return value == null ? null : "操作人";
+    }
+
+    private String actionTypeName(String value) {
+        if ("RETRY".equals(value)) return "重试";
+        if ("BATCH_RETRY".equals(value)) return "批量重试";
+        if ("DISPATCH".equals(value)) return "发送";
+        return value == null ? null : "操作";
+    }
+
+    private String targetTypeName(String value) {
+        if ("IM_OUTBOX_EVENT".equals(value)) return "消息事件";
+        if ("IM_OUTBOX".equals(value)) return "消息队列";
+        return value == null ? null : "业务对象";
     }
 }

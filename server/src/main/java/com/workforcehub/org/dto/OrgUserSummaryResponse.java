@@ -19,7 +19,10 @@ public class OrgUserSummaryResponse {
     private Long managerUserId;
     private String managerName;
     private String employmentStatus;
+    private String employmentStatusName;
     private String status;
+    private String statusName;
     private String signature;
     private String presenceStatus;
+    private String presenceStatusName;
 }

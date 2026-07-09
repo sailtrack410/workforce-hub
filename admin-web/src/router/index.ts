@@ -51,8 +51,9 @@ export const adminRoutes = [
       { path: 'users', name: 'admin-users', component: UserView, meta: { permission: 'ADMIN_ORG_MANAGE' } },
       { path: 'files', name: 'admin-files', component: FileCleanupView, meta: { permission: 'ADMIN_FILE_MANAGE' } },
       { path: 'ragflow', name: 'admin-ragflow', component: RagflowView, meta: { permission: 'ADMIN_RAGFLOW_MANAGE' } },
+      { path: 'ai-models', name: 'admin-ai-models', component: SettingsView, meta: { permission: 'ADMIN_AGENT_MANAGE' } },
       { path: 'system', name: 'admin-system', component: SystemGovernanceView },
-      { path: 'settings', name: 'admin-settings', component: SettingsView },
+      { path: 'settings', name: 'admin-settings', component: SettingsView, meta: { permission: 'ADMIN_NOTIFICATION_CHANNEL_MANAGE' } },
     ],
   },
   {

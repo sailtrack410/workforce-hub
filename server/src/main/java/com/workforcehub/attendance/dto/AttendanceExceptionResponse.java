@@ -12,6 +12,8 @@ public class AttendanceExceptionResponse {
     private Long userId;
     private LocalDate workDate;
     private String exceptionType;
+    private String exceptionTypeName;
     private String exceptionDesc;
     private String status;
+    private String statusName;
 }

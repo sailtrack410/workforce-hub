@@ -28,7 +28,7 @@ describe('UserView', () => {
     expect(source).toContain('async function openUserDetail(row: OrgUserSummaryResponse)');
     expect(source).toContain('await loadDetail(row)');
     expect(source).toContain('@select-user="openUserDetail"');
-    expect(source).toContain('class="user-detail-overlay"');
+    expect(source).toContain('<AdminDialog v-model:visible="detailDialogOpen"');
     expect(source).not.toContain('scrollIntoView');
   });
 

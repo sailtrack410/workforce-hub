@@ -2,6 +2,7 @@ package com.workforcehub.org.service;
 
 import com.workforcehub.auth.domain.OrgUser;
 import com.workforcehub.auth.mapper.OrgUserMapper;
+import com.workforcehub.common.enums.EmploymentStatus;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
@@ -74,6 +75,7 @@ public class OrgDirectoryService {
             parent.getChildren().add(node);
         }
 
+        roots.forEach(this::fillDepartmentLabels);
         return roots;
     }
 
@@ -88,6 +90,7 @@ public class OrgDirectoryService {
             item.setPositionName(position.getPositionName());
             item.setPositionCategory(position.getPositionCategory());
             item.setStatus(position.getStatus());
+            fillPositionLabels(item);
             result.add(item);
         }
         return result;
@@ -102,11 +105,14 @@ public class OrgDirectoryService {
             (safePageNo - 1) * safePageSize,
             safePageSize
         );
+        rows.forEach(this::fillUserLabels);
         return PageResult.of(safePageNo, safePageSize, total, rows);
     }
 
     public List<OrgUserSummaryResponse> listUsersForOrgChart() {
-        return orgDirectoryMapper.selectUsersForOrgChart();
+        List<OrgUserSummaryResponse> rows = orgDirectoryMapper.selectUsersForOrgChart();
+        rows.forEach(this::fillUserLabels);
+        return rows;
     }
 
     public OrgUserSummaryResponse getUserSummary(Long userId) {
@@ -114,6 +120,7 @@ public class OrgDirectoryService {
         if (user == null) {
             throw new BizException(404, "员工不存在");
         }
+        fillUserLabels(user);
         return user;
     }
 
@@ -122,6 +129,7 @@ public class OrgDirectoryService {
         if (user == null) {
             throw new BizException(404, "员工不存在");
         }
+        fillUserDetailLabels(user);
         return user;
     }
 
@@ -130,6 +138,8 @@ public class OrgDirectoryService {
         if (dept == null) {
             throw new BizException(404, "部门不存在");
         }
+        dept.setDeptTypeName(departmentTypeName(dept.getDeptType()));
+        dept.setStatusName(statusName(dept.getStatus()));
         return dept;
     }
 
@@ -142,7 +152,9 @@ public class OrgDirectoryService {
     }
 
     public List<OrgUserSummaryResponse> listDirectSubordinates(Long userId) {
-        return orgDirectoryMapper.selectDirectSubordinates(userId);
+        List<OrgUserSummaryResponse> rows = orgDirectoryMapper.selectDirectSubordinates(userId);
+        rows.forEach(this::fillUserLabels);
+        return rows;
     }
 
     public OrgUserDetailResponse getCurrentEmployeeProfile() {
@@ -226,5 +238,116 @@ public class OrgDirectoryService {
         if (!CurrentUserHolder.isEmployee()) {
             throw new BizException(403, "仅员工端支持查看个人组织信息");
         }
+    }
+
+    private void fillUserLabels(OrgUserSummaryResponse user) {
+        if (user == null) {
+            return;
+        }
+        user.setEmploymentStatusName(employmentStatusName(user.getEmploymentStatus()));
+        user.setStatusName(statusName(user.getStatus()));
+        user.setPresenceStatusName(presenceStatusName(user.getPresenceStatus()));
+    }
+
+    private void fillUserDetailLabels(OrgUserDetailResponse user) {
+        if (user == null) {
+            return;
+        }
+        user.setGenderName(genderName(user.getGender()));
+        user.setEmploymentStatusName(employmentStatusName(user.getEmploymentStatus()));
+        user.setStatusName(statusName(user.getStatus()));
+    }
+
+    private void fillDepartmentLabels(OrgDepartmentTreeNodeResponse node) {
+        if (node == null) {
+            return;
+        }
+        node.setDeptTypeName(departmentTypeName(node.getDeptType()));
+        node.setStatusName(statusName(node.getStatus()));
+        if (node.getChildren() != null) {
+            node.getChildren().forEach(this::fillDepartmentLabels);
+        }
+    }
+
+    private void fillPositionLabels(OrgPositionResponse item) {
+        if (item == null) {
+            return;
+        }
+        item.setPositionCategoryName(positionCategoryName(item.getPositionCategory()));
+        item.setStatusName(statusName(item.getStatus()));
+    }
+
+    private String employmentStatusName(String value) {
+        if (value == null) {
+            return null;
+        }
+        for (EmploymentStatus item : EmploymentStatus.values()) {
+            if (item.getCode().equals(value)) {
+                return item.getDesc();
+            }
+        }
+        return "其他状态";
+    }
+
+    private String statusName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return switch (value) {
+            case "ACTIVE" -> "启用";
+            case "INACTIVE" -> "停用";
+            case "LOCKED" -> "锁定";
+            case "DISABLED" -> "禁用";
+            default -> "其他状态";
+        };
+    }
+
+    private String genderName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return switch (value) {
+            case "MALE" -> "男";
+            case "FEMALE" -> "女";
+            default -> "未填写";
+        };
+    }
+
+    private String presenceStatusName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return switch (value) {
+            case "ONLINE" -> "在线";
+            case "BUSY" -> "忙碌";
+            case "AWAY" -> "离开";
+            case "DND" -> "勿扰";
+            default -> "其他状态";
+        };
+    }
+
+    private String departmentTypeName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return switch (value) {
+            case "ROOT" -> "组织";
+            case "COMPANY" -> "公司";
+            case "BRANCH" -> "分支机构";
+            case "DEPARTMENT" -> "部门";
+            case "TEAM" -> "团队";
+            default -> "其他组织";
+        };
+    }
+
+    private String positionCategoryName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return switch (value) {
+            case "ENGINEER" -> "专业岗";
+            case "MANAGER" -> "管理岗";
+            default -> "其他分类";
+        };
     }
 }

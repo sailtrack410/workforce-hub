@@ -43,7 +43,7 @@ describe('employee router', () => {
 async function loadEmployeeRoutes(): Promise<RouteRecordRaw[]> {
   Object.defineProperty(globalThis, 'location', {
     value: {
-      host: '127.0.0.1:5173',
+      host: '127.0.0.1:5174',
       pathname: '/',
       search: '',
       hash: '#/',

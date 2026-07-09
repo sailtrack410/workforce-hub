@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { Plus, RefreshCcw } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type { OrgDepartmentTreeNodeResponse, OrgDepartmentSaveRequest } from '@/api/types';
-import { errorMessage, statusLabel } from '@/utils/format';
+import { departmentTypeLabel, errorMessage, statusLabel } from '@/utils/format';
 import { useDepartmentStore } from '@/stores/department';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
@@ -90,10 +90,8 @@ const detailRows = computed<DetailRow[]>(() => {
   const s = selected.value;
   if (!s) return [];
   return [
-    { label: 'ID', value: String(s.id) },
-    { label: '编码', value: s.deptCode },
     { label: '名称', value: s.deptName },
-    { label: '类型', value: s.deptType ?? '-' },
+    { label: '类型', value: departmentTypeLabel(s.deptType) },
     { label: '层级', value: String(s.deptLevel ?? '-') },
     { label: '负责人', value: s.leaderName ?? '-' },
     { label: '状态', value: statusLabel(s.status) },
@@ -107,17 +105,16 @@ onMounted(loadTree);
   <div class="page-grid">
     <AdminPanel :span="7" title="部门树">
       <template #actions>
-        <button class="icon-button" title="刷新" @click="loadTree"><RefreshCcw :size="16" /></button>
+        <button class="secondary-button" title="刷新" @click="loadTree"><RefreshCcw :size="16" />刷新</button>
       </template>
 
       <AdminFilterBar>
-        <input v-model="createForm.deptCode" placeholder="部门编码" />
         <input v-model="createForm.deptName" placeholder="部门名称" />
         <select v-model="createForm.parentId">
           <option :value="null">根节点</option>
           <option v-for="f in flatList" :key="f.node.id" :value="f.node.id">{{ '&nbsp;'.repeat(f.depth * 4) }}{{ f.node.deptName }}</option>
         </select>
-        <button class="primary-button" :disabled="creating || !createForm.deptCode || !createForm.deptName" @click="handleCreate">
+        <button class="primary-button" :disabled="creating || !createForm.deptName" @click="handleCreate">
           <Plus :size="16" /> 新建
         </button>
       </AdminFilterBar>
@@ -133,7 +130,7 @@ onMounted(loadTree);
           @click="selectNode(f.node)"
         >
           <strong>{{ f.node.deptName }}</strong>
-          <span>{{ f.node.deptCode }} · {{ statusLabel(f.node.status) }}</span>
+          <span>{{ statusLabel(f.node.status) }}</span>
         </article>
       </AdminCompactList>
     </AdminPanel>

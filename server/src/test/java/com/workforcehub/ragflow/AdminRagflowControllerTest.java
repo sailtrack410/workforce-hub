@@ -65,4 +65,11 @@ class AdminRagflowControllerTest {
 
         assertThrows(BizException.class, () -> controller.confirmDocumentUpload(request));
     }
+
+    @Test
+    void shouldDeleteSpaceThroughRagflowScope() {
+        controller.deleteSpace(9001L);
+
+        verify(ragflowAdminService).deleteSpace(9001L);
+    }
 }

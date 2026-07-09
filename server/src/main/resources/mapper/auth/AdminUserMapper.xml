@@ -73,4 +73,12 @@
         ORDER BY p.perm_code
     </select>
 
+    <select id="selectAllActivePermissionCodes" resultType="java.lang.String">
+        SELECT perm_code
+        FROM admin_permission
+        WHERE status = 'ACTIVE'
+          AND is_deleted = 0
+        ORDER BY perm_code
+    </select>
+
 </mapper>

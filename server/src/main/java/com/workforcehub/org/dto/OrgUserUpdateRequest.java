@@ -13,7 +13,6 @@ import java.time.LocalDate;
 @Data
 public class OrgUserUpdateRequest {
 
-    @NotBlank(message = "employeeNo 不能为空")
     @Size(max = 64, message = "employeeNo 长度不能超过 64")
     private String employeeNo;
 

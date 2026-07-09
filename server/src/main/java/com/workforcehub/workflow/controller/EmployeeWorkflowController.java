@@ -7,6 +7,7 @@ import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
 import com.workforcehub.file.dto.CreateDownloadTicketRequest;
 import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
+import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowRequestCreateResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
@@ -60,6 +61,12 @@ public class EmployeeWorkflowController {
     public R<WorkflowRequestCreateResponse> submitClockCorrectionRequest(
             @Valid @RequestBody ClockCorrectionRequestCreateRequest request) {
         return R.ok(workflowService.submitClockCorrectionRequest(request));
+    }
+
+    @PostMapping("/generic-requests")
+    public R<WorkflowRequestCreateResponse> submitGenericRequest(
+            @Valid @RequestBody GenericWorkflowRequestCreateRequest request) {
+        return R.ok(workflowService.submitGenericRequest(request));
     }
 
     @GetMapping("/todos")

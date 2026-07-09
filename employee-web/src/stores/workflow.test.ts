@@ -39,7 +39,7 @@ describe('workflow store', () => {
       taskId: 'TASK-10',
       currentStepName: '待处理',
     });
-    expect(record.actions.map((action) => action.label)).toEqual(['审批通过', '驳回']);
+    expect(record.actions).toEqual([{ label: '查看流程', action: 'open-workbench', app: 'oa' }]);
   });
 
   it('loads workflow todos from employee API', async () => {

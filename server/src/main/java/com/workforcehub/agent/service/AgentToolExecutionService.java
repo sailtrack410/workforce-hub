@@ -144,10 +144,23 @@ public class AgentToolExecutionService {
 
     private Long requiredLong(JsonNode payload, String fieldName) {
         JsonNode node = payload.get(fieldName);
-        if (node == null || !node.canConvertToLong()) {
+        if (node == null || node.isNull()) {
             throw new BizException(400, fieldName + "不能为空");
         }
-        return node.asLong();
+        if (node.canConvertToLong()) {
+            return node.asLong();
+        }
+        if (node.isTextual()) {
+            String text = node.asText().trim();
+            if (StringUtils.hasText(text)) {
+                try {
+                    return Long.parseLong(text);
+                } catch (NumberFormatException ignored) {
+                    // fall through to the unified validation message below
+                }
+            }
+        }
+        throw new BizException(400, fieldName + "不能为空");
     }
 
     private String requiredText(JsonNode payload, String fieldName) {

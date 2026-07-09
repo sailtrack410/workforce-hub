@@ -14,7 +14,9 @@ public class LeaveTypeResponse {
     private String leaveCode;
     private String leaveName;
     private String balanceMode;
+    private String balanceModeName;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

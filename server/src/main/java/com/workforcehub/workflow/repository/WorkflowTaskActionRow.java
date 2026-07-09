@@ -13,6 +13,8 @@ public record WorkflowTaskActionRow(
     String stepName,
     String actorType,
     Long actorId,
+    String actorName,
+    String actorAccount,
     String actionType,
     String comment,
     String agentDecisionJson,

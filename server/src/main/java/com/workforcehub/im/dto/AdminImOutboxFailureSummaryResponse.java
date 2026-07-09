@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class AdminImOutboxFailureSummaryResponse {
 
     private String status;
+    private String statusName;
     private String lastError;
     private Long eventCount;
     private Integer maxRetryCount;

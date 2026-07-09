@@ -95,6 +95,15 @@ public class RagflowVectorRepository {
         jdbcTemplate.update("UPDATE kb_vector_chunk SET is_active = FALSE WHERE kb_document_id = ? AND is_active = TRUE", documentId);
     }
 
+    public void deactivateSpaceVectors(Long spaceId) {
+        if (!properties.isEnabled() || !StringUtils.hasText(properties.getUrl())) {
+            return;
+        }
+        JdbcTemplate jdbcTemplate = jdbcTemplate();
+        ensureSchema(jdbcTemplate);
+        jdbcTemplate.update("UPDATE kb_vector_chunk SET is_active = FALSE WHERE space_id = ? AND is_active = TRUE", spaceId);
+    }
+
     public void requireAvailable() {
         if (!properties.isEnabled() || !StringUtils.hasText(properties.getUrl())) {
             throw new BizException(422, "向量库未配置");

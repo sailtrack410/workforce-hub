@@ -27,9 +27,9 @@ const props = withDefaults(defineProps<{
   width: 100%;
   min-height: 2.5rem;
   padding: var(--space-8) var(--space-12);
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-8);
-  background: #fff;
+  background: var(--surface-panel);
   color: var(--text-primary);
   font-family: var(--font-family-body);
   font-size: var(--text-body-md);

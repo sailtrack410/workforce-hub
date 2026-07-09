@@ -44,6 +44,7 @@ import type {
   KnowledgeAnswerRelatedRef,
 } from '@/types/knowledge';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
+import { statusText } from '@/utils/employee-format';
 import { createClientId } from '@/utils/request-id';
 
 export const DEFAULT_USER_AVATAR_URL = '/default-user-avatar.svg';
@@ -314,6 +315,7 @@ export const useImStore = defineStore('employee-im', {
       currentUserId?: EntityId,
       imApi: EmployeeImApi = employeeApi.im,
       quotedMessageId?: EntityId,
+      mentionUserIds: EntityId[] = [],
     ) {
       const normalizedText = text.trim();
       if (!normalizedText) return null;
@@ -327,6 +329,7 @@ export const useImStore = defineStore('employee-im', {
           clientMessageId: createClientId(`web-${conversationId}`),
         };
         if (quotedMessageId !== undefined) request.quotedMessageId = quotedMessageId;
+        if (mentionUserIds.length) request.mentionUserIds = mentionUserIds;
         const message = await imApi.sendMessage(conversationId, request);
         const record = mapImMessageToConversationMessage(message, currentUserId);
         this.upsertMessage(key, record);
@@ -662,6 +665,8 @@ export function mapImConversationToRecord(conversation: ImConversationSummaryRes
     status: conversation.status,
     pinned: conversation.pin,
     muted: conversation.mute,
+    hasMentionMe: conversation.hasMentionMe,
+    hasReplyMe: conversation.hasReplyMe,
     unreadLabel: conversation.unreadCount > 0 ? '未读消息' : '已读',
     summaryTitle: title,
     summaryBody,
@@ -714,6 +719,11 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     senderId: message.senderId,
     status: message.status,
     quotedMessageId: message.quotedMessageId,
+    mentions: message.mentions?.map((mention) => ({
+      userId: mention.userId,
+      name: mention.name || String(mention.userId),
+      originalName: mention.name || String(mention.userId),
+    })) ?? [],
     attachments,
     knowledgeCard,
   };
@@ -759,7 +769,7 @@ function fallbackConversationTitle(conversationType: string) {
 function authorOfMessage(message: ImMessageResponse) {
   if (message.senderType === 'SYSTEM') return '系统';
   if (message.senderType === 'AGENT') return 'AI 助手';
-  return `用户 ${message.senderId}`;
+  return '成员';
 }
 
 function messageRole(message: ImMessageResponse, knowledgeCard?: KnowledgeAnswerCard) {
@@ -779,7 +789,7 @@ function statusLabel(status: string) {
   if (status === 'RECALLED') return '已撤回';
   if (status === 'CLEAN') return '已通过';
   if (status === 'QUARANTINED') return '已隔离';
-  return status;
+  return '其他状态';
 }
 
 function formatConversationDate(value?: string | null) {
@@ -913,22 +923,16 @@ function parseAgentResultRecord(value: unknown): AgentResultRecord | undefined {
 
 function toKnowledgeRelatedFlow(flow: AgentResultFlow): KnowledgeRelatedFlow {
   const fields: Array<[string, string]> = [];
-  if (flow.status) fields.push(['状态', flow.status]);
-  if (flow.currentNode) fields.push(['当前节点', flow.currentNode]);
-  if (flow.detailUrl) fields.push(['详情', flow.detailUrl]);
+  const status = flow.status ? statusText(flow.status) : '待处理';
+  const currentNode = visibleBusinessText(flow.currentNode);
+  if (currentNode) fields.push(['当前节点', currentNode]);
   return {
     id: flow.requestId ?? flow.requestNo ?? flow.title ?? 'agent-flow',
-    title: flow.requestNo ? `${flow.title ?? '流程'} ${flow.requestNo}` : flow.title ?? '相关流程',
-    status: flow.status ?? '待处理',
+    title: visibleBusinessText(flow.title) || '相关流程',
+    status,
     statusTone: normalizeBadgeTone(undefined),
-    summary: flow.currentNode ? `当前节点：${flow.currentNode}` : undefined,
+    summary: currentNode ? `当前节点：${currentNode}` : undefined,
     fields,
-    apiRef: flow.detailUrl ? {
-      status: 'available',
-      method: 'GET',
-      path: flow.detailUrl,
-      description: '流程详情',
-    } : undefined,
   };
 }
 
@@ -1010,14 +1014,18 @@ function parseKnowledgeRelatedFlow(value: unknown): KnowledgeRelatedFlow | undef
   const id = optionalString(item.id);
   const title = optionalString(item.title);
   if (!id || !title) return undefined;
+  const safeTitle = visibleBusinessText(title);
+  if (!safeTitle) return undefined;
   return {
     id,
-    title,
-    status: stringValue(item.status, '待处理'),
+    title: safeTitle,
+    status: statusText(stringValue(item.status, '待处理')),
     statusTone: normalizeBadgeTone(item.statusTone),
-    summary: optionalString(item.summary),
-    fields: arrayValue(item.fields).map(parseFieldTuple).filter(Boolean) as Array<[string, string]>,
-    apiRef: parseKnowledgeApiRef(item.apiRef),
+    summary: visibleBusinessText(optionalString(item.summary)),
+    fields: (arrayValue(item.fields).map(parseFieldTuple).filter(Boolean) as Array<[string, string]>)
+      .map(([key, text]) => [key, visibleBusinessText(text)] as [string, string])
+      .filter(([, text]) => text),
+    apiRef: undefined,
   };
 }
 
@@ -1109,6 +1117,16 @@ function optionalString(value: unknown) {
 
 function stringValue(value: unknown, fallback: string) {
   return optionalString(value) ?? fallback;
+}
+
+function visibleBusinessText(value?: string) {
+  const text = value?.trim();
+  if (!text) return '';
+  if (/https?:\/\//i.test(text) || text.includes('/api/')) return '';
+  if (/\bWF-[A-Z0-9-]*\d[A-Z0-9-]*\b/i.test(text)) return '';
+  if (/\b\d{16,}\b/.test(text)) return '';
+  if (/^[A-Z][A-Z0-9_]{2,}$/.test(text)) return '';
+  return text;
 }
 
 function numberValue(value: unknown) {

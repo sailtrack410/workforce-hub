@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import type { ConversationMessage, ConversationProcessCard as ProcessCard } from '../../stores/shell';
 import AppBadge from '../ui/AppBadge.vue';
 import AppButton from '../ui/AppButton.vue';
+import { statusText } from '../../utils/employee-format';
 
 const emit = defineEmits<{
   open: [];
@@ -35,7 +36,7 @@ function toneOf(statusTone: ProcessCard['statusTone']) {
         <div class="header">
           <strong>{{ processCard.title }}</strong>
           <AppBadge :tone="toneOf(processCard.statusTone)">
-            {{ processCard.status }}
+            {{ statusText(processCard.status) }}
           </AppBadge>
         </div>
 
@@ -62,7 +63,7 @@ function toneOf(statusTone: ProcessCard['statusTone']) {
           <span class="file-type">{{ processCard.file.type }}</span>
           <span class="file-copy">
             <strong>{{ processCard.file.name }}</strong>
-            <small>{{ processCard.file.size }} · {{ processCard.file.status }}</small>
+            <small>{{ processCard.file.size }} · {{ statusText(processCard.file.status) }}</small>
           </span>
         </div>
       </div>

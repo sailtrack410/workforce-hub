@@ -14,4 +14,5 @@ public class WorkflowRequestAttachmentResponse {
     private Long fileSize;
     private String contentSha256;
     private String scanStatus;
+    private String scanStatusName;
 }

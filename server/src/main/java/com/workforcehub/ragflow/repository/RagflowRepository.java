@@ -48,8 +48,8 @@ public class RagflowRepository {
         params.add(offset);
         return jdbcTemplate.query("""
             SELECT id, space_name, space_code, description, visibility, document_count, chunk_count,
-                   embedding_provider, embedding_model, embedding_dimension, rerank_enabled,
-                   rerank_provider, rerank_model, chunk_size, chunk_overlap, retrieval_top_k,
+                   embedding_provider, embedding_model, embedding_model_id, embedding_dimension, rerank_enabled,
+                   rerank_provider, rerank_model, rerank_model_id, chunk_size, chunk_overlap, retrieval_top_k,
                    score_threshold, status, created_at, updated_at
             FROM kb_space
             """ + whereSql + """
@@ -61,8 +61,8 @@ public class RagflowRepository {
     public RagflowSpaceRow getSpaceOrThrow(Long spaceId) {
         List<RagflowSpaceRow> rows = jdbcTemplate.query("""
             SELECT id, space_name, space_code, description, visibility, document_count, chunk_count,
-                   embedding_provider, embedding_model, embedding_dimension, rerank_enabled,
-                   rerank_provider, rerank_model, chunk_size, chunk_overlap, retrieval_top_k,
+                   embedding_provider, embedding_model, embedding_model_id, embedding_dimension, rerank_enabled,
+                   rerank_provider, rerank_model, rerank_model_id, chunk_size, chunk_overlap, retrieval_top_k,
                    score_threshold, status, created_at, updated_at
             FROM kb_space
             WHERE id = ?
@@ -76,10 +76,10 @@ public class RagflowRepository {
 
     public RagflowGlobalSettingRow getGlobalSetting() {
         List<RagflowGlobalSettingRow> rows = jdbcTemplate.query("""
-            SELECT id, ocr_base_url, ocr_api_key, ocr_model,
-                   embedding_base_url, embedding_api_key, embedding_model,
+            SELECT id, ocr_base_url, ocr_api_key, ocr_model, ocr_model_id,
+                   embedding_base_url, embedding_api_key, embedding_model, embedding_model_id,
                    embedding_dimension, rerank_enabled,
-                   rerank_base_url, rerank_api_key, rerank_model,
+                   rerank_base_url, rerank_api_key, rerank_model, rerank_model_id,
                    chunk_size, chunk_overlap, retrieval_top_k, score_threshold,
                    created_at, updated_at
             FROM kb_ragflow_setting
@@ -94,14 +94,17 @@ public class RagflowRepository {
     public void updateGlobalSetting(String ocrBaseUrl,
                                     String ocrApiKey,
                                     String ocrModel,
+                                    Long ocrModelId,
                                     String embeddingBaseUrl,
                                     String embeddingApiKey,
                                     String embeddingModel,
+                                    Long embeddingModelId,
                                     Integer embeddingDimension,
                                     Boolean rerankEnabled,
                                     String rerankBaseUrl,
                                     String rerankApiKey,
                                     String rerankModel,
+                                    Long rerankModelId,
                                     Integer chunkSize,
                                     Integer chunkOverlap,
                                     Integer retrievalTopK,
@@ -112,23 +115,26 @@ public class RagflowRepository {
             SET ocr_base_url = ?,
                 ocr_api_key = COALESCE(?, ocr_api_key),
                 ocr_model = ?,
+                ocr_model_id = ?,
                 embedding_base_url = ?,
                 embedding_api_key = COALESCE(?, embedding_api_key),
                 embedding_model = ?,
+                embedding_model_id = ?,
                 embedding_dimension = ?,
                 rerank_enabled = ?,
                 rerank_base_url = ?,
                 rerank_api_key = COALESCE(?, rerank_api_key),
                 rerank_model = ?,
+                rerank_model_id = ?,
                 chunk_size = ?,
                 chunk_overlap = ?,
                 retrieval_top_k = ?,
                 score_threshold = ?,
                 updated_by = ?
             WHERE id = 1
-            """, ocrBaseUrl, ocrApiKey, ocrModel, embeddingBaseUrl, embeddingApiKey,
-            embeddingModel, embeddingDimension, Boolean.TRUE.equals(rerankEnabled) ? 1 : 0,
-            rerankBaseUrl, rerankApiKey, rerankModel,
+            """, ocrBaseUrl, ocrApiKey, ocrModel, ocrModelId, embeddingBaseUrl, embeddingApiKey,
+            embeddingModel, embeddingModelId, embeddingDimension, Boolean.TRUE.equals(rerankEnabled) ? 1 : 0,
+            rerankBaseUrl, rerankApiKey, rerankModel, rerankModelId,
             chunkSize, chunkOverlap, retrievalTopK, scoreThreshold, operatorId);
     }
 
@@ -156,10 +162,12 @@ public class RagflowRepository {
                             String status,
                             String embeddingProvider,
                             String embeddingModel,
+                            Long embeddingModelId,
                             Integer embeddingDimension,
                             Boolean rerankEnabled,
                             String rerankProvider,
                             String rerankModel,
+                            Long rerankModelId,
                             Integer chunkSize,
                             Integer chunkOverlap,
                             Integer retrievalTopK,
@@ -168,14 +176,14 @@ public class RagflowRepository {
         jdbcTemplate.update("""
             INSERT INTO kb_space
                 (id, space_name, space_code, description, visibility, status,
-                 embedding_provider, embedding_model, embedding_dimension, rerank_enabled,
-                 rerank_provider, rerank_model, chunk_size, chunk_overlap, retrieval_top_k,
+                 embedding_provider, embedding_model, embedding_model_id, embedding_dimension, rerank_enabled,
+                 rerank_provider, rerank_model, rerank_model_id, chunk_size, chunk_overlap, retrieval_top_k,
                  score_threshold, created_by, updated_by)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, spaceId, spaceName, spaceCode, description, visibility, status,
-            embeddingProvider, embeddingModel, embeddingDimension, Boolean.TRUE.equals(rerankEnabled) ? 1 : 0,
-            rerankProvider, rerankModel, chunkSize, chunkOverlap, retrievalTopK, scoreThreshold,
+            embeddingProvider, embeddingModel, embeddingModelId, embeddingDimension, boolFlag(rerankEnabled),
+            rerankProvider, rerankModel, rerankModelId, chunkSize, chunkOverlap, retrievalTopK, scoreThreshold,
             operatorId, operatorId);
     }
 
@@ -186,10 +194,12 @@ public class RagflowRepository {
                             String status,
                             String embeddingProvider,
                             String embeddingModel,
+                            Long embeddingModelId,
                             Integer embeddingDimension,
                             Boolean rerankEnabled,
                             String rerankProvider,
                             String rerankModel,
+                            Long rerankModelId,
                             Integer chunkSize,
                             Integer chunkOverlap,
                             Integer retrievalTopK,
@@ -203,10 +213,12 @@ public class RagflowRepository {
                 status = ?,
                 embedding_provider = ?,
                 embedding_model = ?,
+                embedding_model_id = ?,
                 embedding_dimension = ?,
                 rerank_enabled = ?,
                 rerank_provider = ?,
                 rerank_model = ?,
+                rerank_model_id = ?,
                 chunk_size = ?,
                 chunk_overlap = ?,
                 retrieval_top_k = ?,
@@ -215,8 +227,8 @@ public class RagflowRepository {
             WHERE id = ?
               AND is_deleted = 0
             """, spaceName, description, visibility, status,
-            embeddingProvider, embeddingModel, embeddingDimension, Boolean.TRUE.equals(rerankEnabled) ? 1 : 0,
-            rerankProvider, rerankModel, chunkSize, chunkOverlap, retrievalTopK, scoreThreshold,
+            embeddingProvider, embeddingModel, embeddingModelId, embeddingDimension, boolFlag(rerankEnabled),
+            rerankProvider, rerankModel, rerankModelId, chunkSize, chunkOverlap, retrievalTopK, scoreThreshold,
             operatorId, spaceId);
     }
 
@@ -382,6 +394,26 @@ public class RagflowRepository {
             """, operatorId, spaceId, documentId);
     }
 
+    public void softDeleteSpace(Long spaceId, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE kb_space
+            SET is_deleted = 1,
+                updated_by = ?
+            WHERE id = ?
+              AND is_deleted = 0
+            """, operatorId, spaceId);
+    }
+
+    public void softDeleteDocumentsBySpace(Long spaceId, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE kb_document
+            SET is_deleted = 1,
+                updated_by = ?
+            WHERE space_id = ?
+              AND is_deleted = 0
+            """, operatorId, spaceId);
+    }
+
     public void deactivateDocumentChunks(Long documentId) {
         jdbcTemplate.update("""
             UPDATE kb_chunk_manifest
@@ -389,6 +421,22 @@ public class RagflowRepository {
             WHERE kb_document_id = ?
               AND status = 'ACTIVE'
             """, documentId);
+    }
+
+    public void deactivateSpaceChunks(Long spaceId) {
+        jdbcTemplate.update("""
+            UPDATE kb_chunk_manifest
+            SET status = 'INACTIVE'
+            WHERE status = 'ACTIVE'
+              AND (
+                  space_id = ?
+                  OR kb_document_id IN (
+                      SELECT id
+                      FROM kb_document
+                      WHERE space_id = ?
+                  )
+              )
+            """, spaceId, spaceId);
     }
 
     public void refreshSpaceCounts(Long spaceId) {
@@ -450,11 +498,22 @@ public class RagflowRepository {
 
     public List<RagflowAclRow> listAcl(Long spaceId) {
         return jdbcTemplate.query("""
-            SELECT id, space_id, subject_type, subject_id, perm_code, status, created_at
-            FROM kb_space_acl
-            WHERE space_id = ?
-              AND status = 'ACTIVE'
-            ORDER BY created_at DESC, id DESC
+            SELECT acl.id,
+                   acl.space_id,
+                   acl.subject_type,
+                   acl.subject_id,
+                   COALESCE(role.role_name, dept.dept_name, pos.position_name) AS subject_name,
+                   COALESCE(role.role_code, dept.dept_code, pos.position_code) AS subject_code,
+                   acl.perm_code,
+                   acl.status,
+                   acl.created_at
+            FROM kb_space_acl acl
+            LEFT JOIN admin_role role ON acl.subject_type = 'ROLE' AND role.id = acl.subject_id
+            LEFT JOIN org_department dept ON acl.subject_type = 'DEPARTMENT' AND dept.id = acl.subject_id
+            LEFT JOIN org_position pos ON acl.subject_type = 'POSITION' AND pos.id = acl.subject_id
+            WHERE acl.space_id = ?
+              AND acl.status = 'ACTIVE'
+            ORDER BY acl.created_at DESC, acl.id DESC
             """, this::mapAcl, spaceId);
     }
 
@@ -498,10 +557,12 @@ public class RagflowRepository {
             rs.getInt("chunk_count"),
             rs.getString("embedding_provider"),
             rs.getString("embedding_model"),
+            rs.getObject("embedding_model_id", Long.class),
             rs.getObject("embedding_dimension", Integer.class),
-            rs.getInt("rerank_enabled") == 1,
+            rs.getObject("rerank_enabled", Integer.class) == null ? null : rs.getInt("rerank_enabled") == 1,
             rs.getString("rerank_provider"),
             rs.getString("rerank_model"),
+            rs.getObject("rerank_model_id", Long.class),
             rs.getObject("chunk_size", Integer.class),
             rs.getObject("chunk_overlap", Integer.class),
             rs.getObject("retrieval_top_k", Integer.class),
@@ -540,14 +601,17 @@ public class RagflowRepository {
             rs.getString("ocr_base_url"),
             rs.getString("ocr_api_key") != null && !rs.getString("ocr_api_key").isBlank(),
             rs.getString("ocr_model"),
+            rs.getObject("ocr_model_id", Long.class),
             rs.getString("embedding_base_url"),
             rs.getString("embedding_api_key") != null && !rs.getString("embedding_api_key").isBlank(),
             rs.getString("embedding_model"),
+            rs.getObject("embedding_model_id", Long.class),
             rs.getObject("embedding_dimension", Integer.class),
             rs.getInt("rerank_enabled") == 1,
             rs.getString("rerank_base_url"),
             rs.getString("rerank_api_key") != null && !rs.getString("rerank_api_key").isBlank(),
             rs.getString("rerank_model"),
+            rs.getObject("rerank_model_id", Long.class),
             rs.getObject("chunk_size", Integer.class),
             rs.getObject("chunk_overlap", Integer.class),
             rs.getObject("retrieval_top_k", Integer.class),
@@ -563,9 +627,15 @@ public class RagflowRepository {
             rs.getLong("space_id"),
             rs.getString("subject_type"),
             rs.getLong("subject_id"),
+            rs.getString("subject_name"),
+            rs.getString("subject_code"),
             rs.getString("perm_code"),
             rs.getString("status"),
             rs.getTimestamp("created_at").toLocalDateTime()
         );
+    }
+
+    private Integer boolFlag(Boolean value) {
+        return value == null ? null : Boolean.TRUE.equals(value) ? 1 : 0;
     }
 }

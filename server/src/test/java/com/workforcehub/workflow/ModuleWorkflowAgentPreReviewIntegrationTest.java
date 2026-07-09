@@ -116,6 +116,48 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
     }
 
     @Test
+    @DisplayName("通用OA申请应先触发Agent预审再进入直属上级审批")
+    void genericRequestShouldWaitForAgentPreReviewBeforeHumanApproval() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedWorkflowDefinitions();
+
+        MvcResult result = mockMvc.perform(post("/api/employee/workflow/generic-requests")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "processCode": "BUSINESS_TRIP",
+                      "title": "出差申请",
+                      "summary": "客户拜访",
+                      "formPayload": {
+                        "processKey": "businessTrip",
+                        "processTitle": "出差申请",
+                        "fields": [
+                          {"key":"destination","label":"出差地点","type":"text","value":"上海","displayValue":"上海"},
+                          {"key":"reason","label":"出差事由","type":"textarea","value":"客户拜访","displayValue":"客户拜访"}
+                        ]
+                      }
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"))
+            .andExpect(jsonLong("$.data.agentTaskId", AGENT_TASK_ID))
+            .andExpect(jsonPath("$.data.flowableProcessInstanceId").doesNotExist())
+            .andReturn();
+
+        long requestId = data(result).get("requestId").asLong();
+        assertEquals(requestId, agentTrigger.getLastRequestId());
+        assertEquals("BUSINESS_TRIP", agentTrigger.getLastProcessTypeCode());
+        assertEquals("BUSINESS_TRIP", agentTrigger.getLastBizType());
+        assertEquals(EMPLOYEE_USER_ID, agentTrigger.getLastApplicantUserId());
+        assertEquals("PENDING_REVIEW", requestStatus(requestId));
+        assertEquals("agent_pre_review", currentStepKey(requestId));
+        assertNull(processInstanceId(requestId), "Agent 预审完成前不应启动 Flowable 流程实例");
+        assertEquals(0L, pendingTodoCount(requestId, MANAGER_USER_ID));
+    }
+
+    @Test
     @DisplayName("Agent预审通过回调后应启动Flowable并进入直属上级审批")
     void agentApprovedCallbackShouldStartHumanApproval() throws Exception {
         Cookie employeeSession = loginEmployee();
@@ -369,13 +411,15 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
             INSERT INTO wf_process_type
                 (id, process_code, process_name, biz_type, status)
             VALUES
-                (9101, 'LEAVE', '请假流程', 'LEAVE', 'ACTIVE')
+                (9101, 'LEAVE', '请假流程', 'LEAVE', 'ACTIVE'),
+                (9102, 'BUSINESS_TRIP', '出差申请流程', 'BUSINESS_TRIP', 'ACTIVE')
             """);
         jdbcTemplate.update("""
             INSERT INTO wf_template
                 (id, process_type_id, template_code, template_name, status)
             VALUES
-                (9201, 9101, 'LEAVE_MANAGER_APPROVAL', '请假直属上级审批', 'ACTIVE')
+                (9201, 9101, 'LEAVE_MANAGER_APPROVAL', '请假直属上级审批', 'ACTIVE'),
+                (9202, 9102, 'BUSINESS_TRIP_MANAGER_APPROVAL', '出差申请直属上级审批', 'ACTIVE')
             """);
         jdbcTemplate.update("""
             INSERT INTO wf_template_version
@@ -383,7 +427,9 @@ class ModuleWorkflowAgentPreReviewIntegrationTest extends WorkflowFlowableIntegr
                  rule_snapshot_json)
             VALUES
                 (9301, 9201, 1, 'leave_manager_approval', 'PUBLISHED', 8001, NOW(), DATE_SUB(NOW(), INTERVAL 1 DAY),
-                 CAST('{"preReviewEnabled":true,"maxDurationMinutes":480}' AS JSON))
+                 CAST('{"preReviewEnabled":true,"maxDurationMinutes":480}' AS JSON)),
+                (9302, 9202, 1, 'business_trip_manager_approval', 'PUBLISHED', 8001, NOW(), DATE_SUB(NOW(), INTERVAL 1 DAY),
+                 CAST('{"preReview":{"mode":"KNOWLEDGE_BASE","required":true}}' AS JSON))
             """);
     }
 

@@ -197,7 +197,9 @@ public class AdminAlertService {
         row.put("alertCode", rs.getString("alert_code"));
         row.put("alertName", rs.getString("alert_name"));
         row.put("severity", rs.getString("severity"));
+        row.put("severityName", severityName(rs.getString("severity")));
         row.put("sourceModule", rs.getString("source_module"));
+        row.put("sourceModuleName", sourceModuleName(rs.getString("source_module")));
         row.put("ruleEnabled", rs.getInt("enabled") == 1);
         row.put("notifyEnabled", rs.getInt("notify_enabled") == 1);
         row.put("channelId", rs.getObject("channel_id", Long.class));
@@ -212,6 +214,7 @@ public class AdminAlertService {
         row.put("channelCode", rs.getString("channel_code"));
         row.put("channelName", rs.getString("channel_name"));
         row.put("channelType", rs.getString("channel_type"));
+        row.put("channelTypeName", channelTypeName(rs.getString("channel_type")));
         row.put("targetRef", rs.getString("target_ref"));
         row.put("enabled", rs.getInt("enabled") == 1);
         return row;
@@ -222,10 +225,41 @@ public class AdminAlertService {
         row.put("resolutionId", rs.getLong("id"));
         row.put("alertCode", rs.getString("alert_code"));
         row.put("actionType", rs.getString("action_type"));
+        row.put("actionTypeName", actionTypeName(rs.getString("action_type")));
         row.put("comment", rs.getString("comment"));
         row.put("operatorId", rs.getObject("operator_id", Long.class));
+        row.put("operatorName", "管理员");
         row.put("createdAt", rs.getTimestamp("created_at").toLocalDateTime());
         return row;
+    }
+
+    private String severityName(String value) {
+        if ("CRITICAL".equals(value)) return "严重";
+        if ("WARNING".equals(value)) return "警告";
+        if ("INFO".equals(value)) return "提示";
+        return value == null ? null : "告警";
+    }
+
+    private String sourceModuleName(String value) {
+        if ("AGENT".equals(value)) return "AI 任务";
+        if ("IM".equals(value)) return "消息";
+        if ("RAGFLOW".equals(value)) return "知识库";
+        if ("SYSTEM".equals(value)) return "系统";
+        return value == null ? null : "业务模块";
+    }
+
+    private String channelTypeName(String value) {
+        if ("WEBHOOK".equals(value)) return "Webhook";
+        if ("EMAIL".equals(value)) return "邮件";
+        if ("IM".equals(value)) return "站内消息";
+        return value == null ? null : "通知渠道";
+    }
+
+    private String actionTypeName(String value) {
+        if ("IGNORE".equals(value)) return "忽略";
+        if ("RESOLVE".equals(value)) return "已处理";
+        if ("RETRY".equals(value)) return "重试";
+        return value == null ? null : "处理";
     }
 
     private String requiredText(Map<String, Object> request, String key) {

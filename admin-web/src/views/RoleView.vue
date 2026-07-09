@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { Plus, RefreshCcw, Save, Trash2 } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type { RbacAdminUserRoleResponse, RbacPermissionResponse, RbacRoleResponse } from '@/api/types';
-import { errorMessage, statusLabel } from '@/utils/format';
+import { errorMessage, permissionDisplayName, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
@@ -22,8 +22,15 @@ const selectedPermissionIds = ref<Set<string>>(new Set());
 const selectedRoleIdsForAdmin = ref<Set<string>>(new Set());
 const roleForm = reactive({ roleCode: '', roleName: '', status: 'ACTIVE' });
 
+const roleCodeOptions = [
+  { value: 'ADMIN', label: '系统管理员' },
+  { value: 'HR_MANAGER', label: '人事管理员' },
+  { value: 'DEPT_MANAGER', label: '部门主管' },
+  { value: 'EMPLOYEE', label: '普通员工' },
+  { value: 'SUPER_ADMIN', label: '超级管理员' },
+];
+
 const roleColumns: TableColumn[] = [
-  { key: 'roleCode', label: '编码' },
   { key: 'roleName', label: '名称' },
   { key: 'status', label: '状态' },
 ];
@@ -72,8 +79,8 @@ function selectAdminUser(user: RbacAdminUserRoleResponse) {
 
 function newRole() {
   selectedRoleId.value = null;
-  roleForm.roleCode = '';
-  roleForm.roleName = '';
+  roleForm.roleCode = 'EMPLOYEE';
+  roleForm.roleName = '普通员工';
   roleForm.status = 'ACTIVE';
   selectedPermissionIds.value = new Set();
 }
@@ -154,7 +161,7 @@ onMounted(loadPage);
   <div class="page-grid">
     <AdminPanel :span="7" title="角色">
       <template #actions>
-        <button class="icon-button" title="刷新" @click="loadPage"><RefreshCcw :size="16" /></button>
+        <button class="secondary-button" title="刷新" @click="loadPage"><RefreshCcw :size="16" />刷新</button>
       </template>
 
       <AdminTable
@@ -175,7 +182,11 @@ onMounted(loadPage);
       </template>
       <template v-if="loading"><AdminSkeleton :lines="5" /></template>
       <div v-else class="stack-form">
-        <label>编码 <input v-model="roleForm.roleCode" /></label>
+        <label>角色类型
+          <select v-model="roleForm.roleCode" @change="roleForm.roleName = roleCodeOptions.find((item) => item.value === roleForm.roleCode)?.label ?? roleForm.roleName">
+            <option v-for="item in roleCodeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+          </select>
+        </label>
         <label>名称 <input v-model="roleForm.roleName" /></label>
         <label>状态
           <select v-model="roleForm.status">
@@ -190,7 +201,7 @@ onMounted(loadPage);
               :checked="selectedPermissionIds.has(String(permission.permissionId))"
               @change="togglePermission(permission.permissionId, ($event.target as HTMLInputElement).checked)"
             />
-            <span>{{ permission.permName }}</span>
+            <span>{{ permissionDisplayName(permission.permName) }}</span>
           </label>
         </div>
         <div class="button-row">

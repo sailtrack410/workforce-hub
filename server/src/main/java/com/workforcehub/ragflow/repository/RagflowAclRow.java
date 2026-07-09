@@ -7,6 +7,8 @@ public record RagflowAclRow(
     Long spaceId,
     String subjectType,
     Long subjectId,
+    String subjectName,
+    String subjectCode,
     String permCode,
     String status,
     LocalDateTime createdAt

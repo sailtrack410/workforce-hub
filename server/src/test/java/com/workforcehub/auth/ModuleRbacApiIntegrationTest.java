@@ -151,6 +151,70 @@ class ModuleRbacApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(100403));
     }
 
+    @Test
+    @DisplayName("内置超级管理员角色不允许被 RBAC 操作破坏")
+    void builtInSuperAdminRoleShouldBeProtected() throws Exception {
+        Cookie session = login(ADMIN_LOGIN_NAME, ADMIN_PASSWORD);
+
+        mockMvc.perform(delete("/api/admin/rbac/roles/6001").cookie(session))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409));
+
+        mockMvc.perform(put("/api/admin/rbac/roles/6001")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roleCode": "RENAMED_SUPER_ADMIN",
+                      "roleName": "被改名的超级管理员",
+                      "status": "ACTIVE"
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409));
+
+        mockMvc.perform(put("/api/admin/rbac/roles/6001")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roleCode": "SUPER_ADMIN",
+                      "roleName": "超级管理员",
+                      "status": "INACTIVE"
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409));
+
+        mockMvc.perform(put("/api/admin/rbac/roles/6001/permissions")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "permissionIds": []
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409));
+    }
+
+    @Test
+    @DisplayName("系统至少保留一个活跃超级管理员")
+    void shouldKeepAtLeastOneActiveSuperAdminUser() throws Exception {
+        Cookie session = login(ADMIN_LOGIN_NAME, ADMIN_PASSWORD);
+
+        mockMvc.perform(put("/api/admin/rbac/admin-users/8001/roles")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roleIds": []
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409));
+    }
+
     private Cookie login(String loginName, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/admin/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)

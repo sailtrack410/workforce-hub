@@ -72,13 +72,13 @@ provide(toastKey, api);
 .toast-error {
   background: var(--error-bg);
   color: var(--red-dark);
-  border: 1px solid rgba(179, 49, 49, 0.2);
+  border: 1px solid var(--toast-error-border);
 }
 
 .toast-success {
   background: var(--success-bg);
   color: var(--success);
-  border: 1px solid rgba(22, 163, 74, 0.2);
+  border: 1px solid var(--toast-success-border);
 }
 
 @keyframes toast-in {

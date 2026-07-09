@@ -100,7 +100,8 @@ public class OrgManagementService {
     public Long createDepartment(OrgDepartmentSaveRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
         OrgDepartment parent = resolveParentDepartment(request.getParentId(), null);
-        ensureDepartmentCodeUnique(request.getDeptCode(), null);
+        String deptCode = resolveDepartmentCode(request.getDeptCode(), null);
+        ensureDepartmentCodeUnique(deptCode, null);
         validateDepartmentType(request.getDeptType());
         validateRecordStatus(request.getStatus());
         validateLeaderUser(request.getLeaderUserId());
@@ -108,7 +109,7 @@ public class OrgManagementService {
         OrgDepartment department = new OrgDepartment();
         department.setId(IdGenerator.nextId());
         department.setParentId(parent == null ? null : parent.getId());
-        department.setDeptCode(request.getDeptCode().trim());
+        department.setDeptCode(deptCode);
         department.setDeptName(request.getDeptName().trim());
         department.setDeptType(normalizeUpper(request.getDeptType()));
         department.setDeptLevel(parent == null ? 0 : parent.getDeptLevel() + 1);
@@ -138,7 +139,8 @@ public class OrgManagementService {
         Long operatorId = CurrentUserHolder.requireUserId();
         OrgDepartment department = getDepartmentOrThrow(deptId);
         OrgDepartment parent = resolveParentDepartment(request.getParentId(), deptId);
-        ensureDepartmentCodeUnique(request.getDeptCode(), deptId);
+        String deptCode = resolveDepartmentCode(request.getDeptCode(), department.getDeptCode());
+        ensureDepartmentCodeUnique(deptCode, deptId);
         validateDepartmentType(request.getDeptType());
         validateRecordStatus(request.getStatus());
         validateLeaderUser(request.getLeaderUserId());
@@ -152,7 +154,7 @@ public class OrgManagementService {
         String beforeStatus = department.getStatus();
 
         department.setParentId(parent == null ? null : parent.getId());
-        department.setDeptCode(request.getDeptCode().trim());
+        department.setDeptCode(deptCode);
         department.setDeptName(request.getDeptName().trim());
         department.setDeptType(normalizeUpper(request.getDeptType()));
         department.setDeptLevel(newLevel);
@@ -220,12 +222,13 @@ public class OrgManagementService {
     @Transactional(rollbackFor = Exception.class)
     public Long createPosition(OrgPositionSaveRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        ensurePositionCodeUnique(request.getPositionCode(), null);
+        String positionCode = resolvePositionCode(request.getPositionCode(), null);
+        ensurePositionCodeUnique(positionCode, null);
         validateRecordStatus(request.getStatus());
 
         OrgPosition position = new OrgPosition();
         position.setId(IdGenerator.nextId());
-        position.setPositionCode(request.getPositionCode().trim());
+        position.setPositionCode(positionCode);
         position.setPositionName(request.getPositionName().trim());
         position.setPositionCategory(trimToNull(request.getPositionCategory()));
         position.setStatus(defaultRecordStatus(request.getStatus()));
@@ -239,10 +242,11 @@ public class OrgManagementService {
     public void updatePosition(Long positionId, OrgPositionSaveRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
         OrgPosition position = getPositionOrThrow(positionId);
-        ensurePositionCodeUnique(request.getPositionCode(), positionId);
+        String positionCode = resolvePositionCode(request.getPositionCode(), position.getPositionCode());
+        ensurePositionCodeUnique(positionCode, positionId);
         validateRecordStatus(request.getStatus());
 
-        position.setPositionCode(request.getPositionCode().trim());
+        position.setPositionCode(positionCode);
         position.setPositionName(request.getPositionName().trim());
         position.setPositionCategory(trimToNull(request.getPositionCategory()));
         position.setStatus(defaultRecordStatus(request.getStatus()));
@@ -253,7 +257,8 @@ public class OrgManagementService {
     @Transactional(rollbackFor = Exception.class)
     public Long createUser(OrgUserCreateRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        ensureEmployeeNoUnique(request.getEmployeeNo(), null);
+        String employeeNo = resolveEmployeeNo(request.getEmployeeNo(), null);
+        ensureEmployeeNoUnique(employeeNo, null);
         getDepartmentOrThrow(request.getPrimaryDeptId());
         validatePositionExists(request.getPositionId());
         validateManagerAssignment(request.getManagerUserId(), null);
@@ -261,7 +266,7 @@ public class OrgManagementService {
 
         OrgUser user = new OrgUser();
         user.setId(IdGenerator.nextId());
-        user.setEmployeeNo(request.getEmployeeNo().trim());
+        user.setEmployeeNo(employeeNo);
         user.setRealName(request.getRealName().trim());
         user.setGender(trimToNull(request.getGender()));
         user.setMobile(trimToNull(request.getMobile()));
@@ -292,7 +297,8 @@ public class OrgManagementService {
         OrgUser user = getUserOrThrow(userId);
         Map<String, Object> beforeSnapshot = userSnapshot(user);
 
-        ensureEmployeeNoUnique(request.getEmployeeNo(), userId);
+        String employeeNo = resolveEmployeeNo(request.getEmployeeNo(), user.getEmployeeNo());
+        ensureEmployeeNoUnique(employeeNo, userId);
         getDepartmentOrThrow(request.getPrimaryDeptId());
         validatePositionExists(request.getPositionId());
         validateManagerAssignment(request.getManagerUserId(), userId);
@@ -303,7 +309,7 @@ public class OrgManagementService {
         Long beforeManagerUserId = user.getManagerUserId();
         String beforeStatus = user.getStatus();
 
-        user.setEmployeeNo(request.getEmployeeNo().trim());
+        user.setEmployeeNo(employeeNo);
         user.setRealName(request.getRealName().trim());
         user.setGender(trimToNull(request.getGender()));
         user.setMobile(trimToNull(request.getMobile()));
@@ -643,6 +649,29 @@ public class OrgManagementService {
         if (positionMapper.countByPositionCode(positionCode.trim(), selfPositionId) > 0) {
             throw new BizException(400, "岗位编码已存在");
         }
+    }
+
+    private String resolveDepartmentCode(String deptCode, String currentCode) {
+        return resolveOrgCode(deptCode, currentCode, "DEPT");
+    }
+
+    private String resolvePositionCode(String positionCode, String currentCode) {
+        return resolveOrgCode(positionCode, currentCode, "POST");
+    }
+
+    private String resolveEmployeeNo(String employeeNo, String currentEmployeeNo) {
+        return resolveOrgCode(employeeNo, currentEmployeeNo, "EMP");
+    }
+
+    private String resolveOrgCode(String value, String currentCode, String prefix) {
+        String normalized = trimToNull(value);
+        if (normalized != null) {
+            return normalized.trim();
+        }
+        if (StringUtils.hasText(currentCode)) {
+            return currentCode.trim();
+        }
+        return prefix + "_" + IdGenerator.nextIdString();
     }
 
     private void ensureEmployeeNoUnique(String employeeNo, Long selfUserId) {

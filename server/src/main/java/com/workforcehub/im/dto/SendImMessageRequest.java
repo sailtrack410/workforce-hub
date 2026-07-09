@@ -19,6 +19,9 @@ public class SendImMessageRequest {
     @Size(max = 10, message = "单条消息最多支持10个附件")
     private List<Long> attachmentRefIds = List.of();
 
+    @Size(max = 50, message = "单条消息最多@50个成员")
+    private List<Long> mentionUserIds = List.of();
+
     @Size(max = 128, message = "客户端消息ID不能超过128个字符")
     private String clientMessageId;
 

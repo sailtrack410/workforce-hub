@@ -11,7 +11,9 @@ public class WorkflowProcessTypeResponse {
     private String processCode;
     private String processName;
     private String bizType;
+    private String bizTypeName;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

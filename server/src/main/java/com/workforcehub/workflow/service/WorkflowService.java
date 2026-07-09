@@ -20,8 +20,10 @@ import com.workforcehub.leave.service.LeaveService;
 import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
 import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
+import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
 import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
+import com.workforcehub.workflow.dto.WorkflowGenericDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowLeaveDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestCreateResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestAttachmentResponse;
@@ -36,6 +38,7 @@ import com.workforcehub.workflow.dto.WorkflowTaskRejectRequest;
 import com.workforcehub.workflow.dto.WorkflowTodoResponse;
 import com.workforcehub.workflow.repository.WorkflowAttachmentRow;
 import com.workforcehub.workflow.repository.WorkflowClockCorrectionDetailRow;
+import com.workforcehub.workflow.repository.WorkflowGenericDetailRow;
 import com.workforcehub.workflow.repository.WorkflowLeaveDetailRow;
 import com.workforcehub.workflow.repository.WorkflowRepository;
 import com.workforcehub.workflow.repository.WorkflowRequestDetailRow;
@@ -82,6 +85,16 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private static final String STATUS_REJECTED = "REJECTED";
     private static final String PUNCH_TYPE_ON_DUTY = "ON_DUTY";
     private static final String PUNCH_TYPE_OFF_DUTY = "OFF_DUTY";
+    private static final List<String> GENERIC_PROCESS_CODES = List.of(
+        "EXPENSE",
+        "BUSINESS_TRIP",
+        "OVERTIME",
+        "SEAL",
+        "PURCHASE",
+        "CERTIFICATE",
+        "BORROW",
+        "PROJECT"
+    );
     private static final long HALF_DAY_MINUTES = 240L;
     private static final LocalTime WORK_START = LocalTime.of(9, 0);
     private static final LocalTime LUNCH_BREAK_START = LocalTime.of(12, 0);
@@ -161,13 +174,14 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         );
 
         // 有 AI 预审配置时先进入 AI 审核，审核通过后再流转到人工审批
-        Long agentTaskId = triggerAgentPreReview(requestId, leaveDetailId, applicantUserId);
+        Long agentTaskId = triggerAgentPreReview(requestId, LEAVE_PROCESS_CODE, LEAVE_BIZ_TYPE, leaveDetailId, applicantUserId);
         if (agentTaskId != null) {
             workflowRepository.markPendingAgentPreReview(requestId, agentTaskId, applicantUserId);
             WorkflowRequestCreateResponse response = new WorkflowRequestCreateResponse();
             response.setRequestId(requestId);
             response.setRequestNo(requestNo);
             response.setStatus(STATUS_PENDING_REVIEW);
+            response.setStatusName(statusName(STATUS_PENDING_REVIEW));
             response.setAgentTaskId(agentTaskId);
             return response;
         }
@@ -185,6 +199,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         response.setRequestId(requestId);
         response.setRequestNo(requestNo);
         response.setStatus(STATUS_IN_APPROVAL);
+        response.setStatusName(statusName(STATUS_IN_APPROVAL));
         response.setFlowableProcessInstanceId(processInstanceId);
         return response;
     }
@@ -233,6 +248,73 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         response.setRequestId(requestId);
         response.setRequestNo(requestNo);
         response.setStatus(STATUS_IN_APPROVAL);
+        response.setStatusName(statusName(STATUS_IN_APPROVAL));
+        response.setFlowableProcessInstanceId(processInstanceId);
+        return response;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public WorkflowRequestCreateResponse submitGenericRequest(GenericWorkflowRequestCreateRequest request) {
+        Long applicantUserId = CurrentUserHolder.requireUserId();
+        String processCode = normalizeGenericProcessCode(request.getProcessCode());
+        validateGenericRequest(request);
+        OrgUserDetailResponse applicant = orgDirectoryService.getUserDetail(applicantUserId);
+        if (applicant.getManagerUserId() == null) {
+            throw new BizException(400, "当前员工没有直属上级，无法发起审批");
+        }
+
+        WorkflowTemplateVersionRow templateVersion =
+            workflowRepository.getPublishedTemplateVersion(processCode);
+        String title = buildGenericTitle(applicant, processCode, request.getTitle());
+        String requestNo = buildRequestNo(processCode);
+        Long requestId = IdGenerator.nextId();
+        Long detailId = IdGenerator.nextId();
+        workflowRepository.insertWorkflowRequest(
+            requestId,
+            requestNo,
+            processCode,
+            detailId,
+            applicantUserId,
+            applicant.getPrimaryDeptId(),
+            applicant.getPositionId(),
+            title,
+            templateVersion.id()
+        );
+        workflowRepository.insertGenericDetail(
+            detailId,
+            requestId,
+            processCode,
+            compactJsonPayload(request.getFormPayload()),
+            request
+        );
+        bindAttachments(requestId, applicantUserId, request.getAttachmentRefIds());
+
+        Long agentTaskId = triggerAgentPreReview(requestId, processCode, processCode, detailId, applicantUserId);
+        if (agentTaskId != null) {
+            workflowRepository.markPendingAgentPreReview(requestId, agentTaskId, applicantUserId);
+            WorkflowRequestCreateResponse response = new WorkflowRequestCreateResponse();
+            response.setRequestId(requestId);
+            response.setRequestNo(requestNo);
+            response.setStatus(STATUS_PENDING_REVIEW);
+            response.setStatusName(statusName(STATUS_PENDING_REVIEW));
+            response.setAgentTaskId(agentTaskId);
+            return response;
+        }
+
+        String processInstanceId = startHumanApproval(
+            requestId,
+            title,
+            blankToNull(request.getSummary()),
+            applicant,
+            templateVersion,
+            applicantUserId
+        );
+
+        WorkflowRequestCreateResponse response = new WorkflowRequestCreateResponse();
+        response.setRequestId(requestId);
+        response.setRequestNo(requestNo);
+        response.setStatus(STATUS_IN_APPROVAL);
+        response.setStatusName(statusName(STATUS_IN_APPROVAL));
         response.setFlowableProcessInstanceId(processInstanceId);
         return response;
     }
@@ -297,26 +379,31 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         WorkflowLeaveDetailRow leaveDetail = workflowRepository.getLeaveDetailByRequestId(requestId);
         WorkflowClockCorrectionDetailRow clockCorrection =
             workflowRepository.getClockCorrectionDetailByRequestId(requestId);
+        WorkflowGenericDetailRow generic = workflowRepository.getGenericDetailByRequestId(requestId);
         startHumanApproval(
             requestId,
             workflowRequest.title(),
-            requestSummary(leaveDetail, clockCorrection),
+            requestSummary(leaveDetail, clockCorrection, generic),
             applicant,
             templateVersion,
             agentTaskId
         );
     }
 
-    private Long triggerAgentPreReview(Long requestId, Long leaveDetailId, Long applicantUserId) {
+    private Long triggerAgentPreReview(Long requestId,
+                                       String processTypeCode,
+                                       String bizType,
+                                       Long bizId,
+                                       Long applicantUserId) {
         WorkflowAgentPreReviewTrigger trigger = agentPreReviewTriggerProvider.getIfAvailable();
         if (trigger == null) {
             return null;
         }
         return trigger.triggerPreReview(
             requestId,
-            LEAVE_PROCESS_CODE,
-            LEAVE_BIZ_TYPE,
-            leaveDetailId,
+            processTypeCode,
+            bizType,
+            bizId,
             applicantUserId
         );
     }
@@ -439,8 +526,9 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         WorkflowRequestDetailRow row = workflowRepository.getRequestDetailOrThrow(requestId);
         WorkflowLeaveDetailRow leave = workflowRepository.getLeaveDetailByRequestId(requestId);
         WorkflowClockCorrectionDetailRow clockCorrection = workflowRepository.getClockCorrectionDetailByRequestId(requestId);
+        WorkflowGenericDetailRow generic = workflowRepository.getGenericDetailByRequestId(requestId);
         List<WorkflowAttachmentRow> attachments = workflowRepository.listAttachmentsByRequestId(requestId);
-        return toRequestDetailResponse(row, leave, clockCorrection, attachments);
+        return toRequestDetailResponse(row, leave, clockCorrection, generic, attachments);
     }
 
     public List<WorkflowTaskActionResponse> listRequestActions(Long requestId) {
@@ -724,6 +812,12 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         }
     }
 
+    private void validateGenericRequest(GenericWorkflowRequestCreateRequest request) {
+        if (request.getFormPayload() == null || !request.getFormPayload().isObject()) {
+            throw new BizException(400, "通用OA表单数据格式错误");
+        }
+    }
+
     private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
         long durationMinutes = 0;
         LocalDate currentDate = startAt.toLocalDate();
@@ -763,7 +857,9 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         response.setTitle(row.title());
         response.setSummary(row.summary());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setPriority(row.priority());
+        response.setPriorityName(priorityName(row.priority()));
         response.setCreatedAt(row.createdAt());
         return response;
     }
@@ -773,9 +869,11 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         response.setRequestId(row.id());
         response.setRequestNo(row.requestNo());
         response.setBizType(row.bizType());
+        response.setBizTypeName(bizTypeName(row.bizType()));
         response.setBizId(row.bizId());
         response.setTitle(row.title());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCurrentStepKey(row.currentStepKey());
         response.setCurrentStepName(row.currentStepName());
         response.setSubmittedAt(row.submittedAt());
@@ -786,15 +884,20 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private WorkflowRequestDetailResponse toRequestDetailResponse(WorkflowRequestDetailRow row,
                                                                   WorkflowLeaveDetailRow leave,
                                                                   WorkflowClockCorrectionDetailRow clockCorrection,
+                                                                  WorkflowGenericDetailRow generic,
                                                                   List<WorkflowAttachmentRow> attachments) {
         WorkflowRequestDetailResponse response = new WorkflowRequestDetailResponse();
         response.setRequestId(row.id());
         response.setRequestNo(row.requestNo());
         response.setBizType(row.bizType());
+        response.setBizTypeName(bizTypeName(row.bizType()));
         response.setBizId(row.bizId());
         response.setApplicantUserId(row.applicantUserId());
+        response.setApplicantName(row.applicantName());
+        response.setApplicantEmployeeNo(row.applicantEmployeeNo());
         response.setTitle(row.title());
         response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
         response.setCurrentStepKey(row.currentStepKey());
         response.setCurrentStepName(row.currentStepName());
         response.setFlowableProcessInstanceId(row.flowableProcessInstanceId());
@@ -803,6 +906,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         if (leave != null) {
             WorkflowLeaveDetailResponse leaveResponse = new WorkflowLeaveDetailResponse();
             leaveResponse.setLeaveTypeId(leave.leaveTypeId());
+            leaveResponse.setLeaveName(leave.leaveName());
             leaveResponse.setStartAt(leave.startAt());
             leaveResponse.setEndAt(leave.endAt());
             leaveResponse.setDurationMinutes(leave.durationMinutes());
@@ -814,9 +918,17 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                 new WorkflowClockCorrectionDetailResponse();
             clockCorrectionResponse.setTargetDate(clockCorrection.targetDate());
             clockCorrectionResponse.setMissingPunchType(clockCorrection.missingPunchType());
+            clockCorrectionResponse.setMissingPunchTypeName(punchTypeName(clockCorrection.missingPunchType()));
             clockCorrectionResponse.setExpectedPunchAt(clockCorrection.expectedPunchAt());
             clockCorrectionResponse.setReason(clockCorrection.reason());
             response.setClockCorrection(clockCorrectionResponse);
+        }
+        if (generic != null) {
+            WorkflowGenericDetailResponse genericResponse = new WorkflowGenericDetailResponse();
+            genericResponse.setProcessCode(generic.processCode());
+            genericResponse.setSummary(generic.summary());
+            genericResponse.setFormPayload(parseJsonPayload(generic.formPayloadJson()));
+            response.setGeneric(genericResponse);
         }
         response.setAttachments(attachments.stream()
             .map(this::toAttachmentResponse)
@@ -832,6 +944,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         response.setFileSize(row.fileSize());
         response.setContentSha256(row.contentSha256());
         response.setScanStatus(row.scanStatus());
+        response.setScanStatusName(scanStatusName(row.scanStatus()));
         return response;
     }
 
@@ -843,20 +956,86 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         response.setStepKey(row.stepKey());
         response.setStepName(row.stepName());
         response.setActorType(row.actorType());
+        response.setActorTypeName(actorTypeName(row.actorType()));
         response.setActorId(row.actorId());
+        response.setActorName(row.actorName());
+        response.setActorAccount(row.actorAccount());
         response.setActionType(row.actionType());
+        response.setActionTypeName(actionName(row.actionType()));
         response.setComment(row.comment());
         response.setBeforeStatus(row.beforeStatus());
+        response.setBeforeStatusName(statusName(row.beforeStatus()));
         response.setAfterStatus(row.afterStatus());
+        response.setAfterStatusName(statusName(row.afterStatus()));
         response.setAgentDecisionJson(compactJson(row.agentDecisionJson()));
         response.setActedAt(row.actedAt());
         return response;
+    }
+
+    private String bizTypeName(String value) {
+        if (LEAVE_BIZ_TYPE.equals(value)) return "请假";
+        if (CLOCK_CORRECTION_BIZ_TYPE.equals(value)) return "补卡";
+        if ("EXPENSE".equals(value)) return "费用报销";
+        if ("BUSINESS_TRIP".equals(value)) return "出差";
+        if ("OVERTIME".equals(value)) return "加班";
+        if ("SEAL".equals(value)) return "用章";
+        if ("PURCHASE".equals(value)) return "采购";
+        if ("CERTIFICATE".equals(value)) return "证明开具";
+        if ("BORROW".equals(value)) return "备用金借款";
+        if ("PROJECT".equals(value)) return "项目立项";
+        return "其他业务";
+    }
+
+    private String statusName(String value) {
+        if (STATUS_PENDING_REVIEW.equals(value)) return "待预审";
+        if (STATUS_IN_APPROVAL.equals(value)) return "审批中";
+        if ("APPROVED".equals(value)) return "已通过";
+        if (STATUS_REJECTED.equals(value)) return "已驳回";
+        if ("WITHDRAWN".equals(value)) return "已撤回";
+        return value == null ? null : "未知状态";
+    }
+
+    private String actionName(String value) {
+        if ("APPROVE".equals(value)) return "通过";
+        if ("REJECT".equals(value)) return "驳回";
+        if ("WITHDRAW".equals(value)) return "撤回";
+        if ("AGENT_PRE_REVIEW".equals(value)) return "AI 预审";
+        return value == null ? null : "其他动作";
+    }
+
+    private String scanStatusName(String value) {
+        if ("CLEAN".equals(value)) return "已通过";
+        if ("FAILED".equals(value)) return "未通过";
+        if ("PENDING".equals(value)) return "检测中";
+        return value == null ? null : "未知状态";
+    }
+
+    private String actorTypeName(String value) {
+        if ("USER".equals(value)) return "员工";
+        if ("ADMIN".equals(value) || "ADMIN_USER".equals(value)) return "管理员";
+        if ("AGENT".equals(value)) return "AI 助手";
+        if ("SYSTEM".equals(value)) return "系统";
+        return value == null ? null : "业务参与人";
+    }
+
+    private String priorityName(String value) {
+        if ("HIGH".equals(value)) return "高";
+        if ("LOW".equals(value)) return "低";
+        if ("NORMAL".equals(value) || "MEDIUM".equals(value)) return "中";
+        return value == null ? null : "普通";
+    }
+
+    private String punchTypeName(String value) {
+        if (PUNCH_TYPE_ON_DUTY.equals(value)) return "上班卡";
+        if (PUNCH_TYPE_OFF_DUTY.equals(value)) return "下班卡";
+        return value == null ? null : "其他补卡类型";
     }
 
     private WorkflowRequestStatusResponse statusResponse(Long requestId, String status) {
         WorkflowRequestStatusResponse response = new WorkflowRequestStatusResponse();
         response.setRequestId(requestId);
         response.setStatus(status);
+        response.setStatusName(statusName(status));
         return response;
     }
 
@@ -870,14 +1049,53 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     }
 
     private String requestSummary(WorkflowLeaveDetailRow leaveDetail,
-                                  WorkflowClockCorrectionDetailRow clockCorrection) {
+                                  WorkflowClockCorrectionDetailRow clockCorrection,
+                                  WorkflowGenericDetailRow generic) {
         if (leaveDetail != null) {
             return leaveDetail.reason();
         }
         if (clockCorrection != null) {
             return clockCorrection.reason();
         }
+        if (generic != null) {
+            return generic.summary();
+        }
         return null;
+    }
+
+    private String normalizeGenericProcessCode(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase();
+        if (!GENERIC_PROCESS_CODES.contains(normalized)) {
+            throw new BizException(400, "暂不支持该OA流程");
+        }
+        return normalized;
+    }
+
+    private String buildGenericTitle(OrgUserDetailResponse applicant, String processCode, String fallbackTitle) {
+        String processName = bizTypeName(processCode);
+        if (StringUtils.hasText(fallbackTitle)) {
+            processName = fallbackTitle.trim().replace("申请", "");
+        }
+        return applicant.getRealName() + "的" + processName + "申请";
+    }
+
+    private String compactJsonPayload(JsonNode payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            throw new BizException(400, "通用OA表单数据格式错误");
+        }
+    }
+
+    private JsonNode parseJsonPayload(String json) {
+        if (!StringUtils.hasText(json)) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(json);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
     }
 
     private String normalizePunchType(String value) {

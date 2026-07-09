@@ -55,13 +55,13 @@ public class RbacService {
         }
         sql.append(" ORDER BY created_at DESC, id DESC");
         List<RoleResponse> roles = jdbcTemplate.query(sql.toString(), (rs, rowNum) -> toRoleResponse(rs), args.toArray());
-        roles.forEach(role -> role.setPermissions(listRolePermissions(role.getRoleId())));
+        roles.forEach(role -> role.setPermissions(listRolePermissions(role)));
         return roles;
     }
 
     public RoleResponse getRole(Long roleId) {
         RoleResponse role = findRole(roleId);
-        role.setPermissions(listRolePermissions(roleId));
+        role.setPermissions(listRolePermissions(role));
         return role;
     }
 
@@ -83,7 +83,8 @@ public class RbacService {
     @Transactional
     public RoleResponse updateRole(Long roleId, RoleSaveRequest request) {
         validateStatus(request.getStatus());
-        findRole(roleId);
+        RoleResponse role = findRole(roleId);
+        rejectBuiltInSuperAdminRole(role);
         if (existsRoleCode(request.getRoleCode().trim(), roleId)) {
             throw new BizException(409, "角色编码已存在");
         }
@@ -97,7 +98,8 @@ public class RbacService {
 
     @Transactional
     public void deleteRole(Long roleId) {
-        findRole(roleId);
+        RoleResponse role = findRole(roleId);
+        rejectBuiltInSuperAdminRole(role);
         jdbcTemplate.update("DELETE FROM admin_role_permission WHERE role_id = ?", roleId);
         jdbcTemplate.update("DELETE FROM admin_user_role WHERE role_id = ?", roleId);
         jdbcTemplate.update("UPDATE admin_role SET is_deleted = 1, updated_by = ? WHERE id = ? AND is_deleted = 0",
@@ -106,7 +108,8 @@ public class RbacService {
 
     @Transactional
     public RoleResponse assignRolePermissions(Long roleId, AssignRolePermissionsRequest request) {
-        findRole(roleId);
+        RoleResponse role = findRole(roleId);
+        rejectBuiltInSuperAdminRole(role);
         List<Long> permissionIds = distinctIds(request.getPermissionIds());
         ensurePermissionsExist(permissionIds);
         jdbcTemplate.update("DELETE FROM admin_role_permission WHERE role_id = ?", roleId);
@@ -148,6 +151,7 @@ public class RbacService {
         findAdminUser(adminUserId);
         List<Long> roleIds = distinctIds(request.getRoleIds());
         ensureRolesExist(roleIds);
+        ensureAtLeastOneActiveSuperAdminRemains(adminUserId, roleIds);
         jdbcTemplate.update("DELETE FROM admin_user_role WHERE admin_user_id = ?", adminUserId);
         Long operatorId = CurrentUserHolder.requireUserId();
         for (Long roleId : roleIds) {
@@ -197,18 +201,30 @@ public class RbacService {
             WHERE ur.admin_user_id = ? AND r.is_deleted = 0
             ORDER BY r.role_code
             """, (rs, rowNum) -> toRoleResponse(rs), adminUserId);
-        roles.forEach(role -> role.setPermissions(listRolePermissions(role.getRoleId())));
+        roles.forEach(role -> role.setPermissions(listRolePermissions(role)));
         return roles;
     }
 
-    private List<PermissionResponse> listRolePermissions(Long roleId) {
+    private List<PermissionResponse> listRolePermissions(RoleResponse role) {
+        if (isSuperAdminRole(role)) {
+            return listActivePermissions();
+        }
         return jdbcTemplate.query("""
             SELECT p.id, p.perm_code, p.perm_name, p.module_code, p.action_code, p.status
             FROM admin_permission p
             JOIN admin_role_permission rp ON rp.permission_id = p.id
             WHERE rp.role_id = ? AND p.is_deleted = 0
             ORDER BY p.module_code, p.action_code, p.id
-            """, (rs, rowNum) -> toPermissionResponse(rs), roleId);
+            """, (rs, rowNum) -> toPermissionResponse(rs), role.getRoleId());
+    }
+
+    private List<PermissionResponse> listActivePermissions() {
+        return jdbcTemplate.query("""
+            SELECT id, perm_code, perm_name, module_code, action_code, status
+            FROM admin_permission
+            WHERE status = 'ACTIVE' AND is_deleted = 0
+            ORDER BY module_code, action_code, id
+            """, (rs, rowNum) -> toPermissionResponse(rs));
     }
 
     private boolean existsRoleCode(String roleCode, Long excludeRoleId) {
@@ -248,6 +264,52 @@ public class RbacService {
         if (count == null || count != roleIds.size()) {
             throw new BizException(404, "角色不存在");
         }
+    }
+
+    private void ensureAtLeastOneActiveSuperAdminRemains(Long targetAdminUserId, List<Long> requestedRoleIds) {
+        if (containsActiveSuperAdminRole(requestedRoleIds)) return;
+        Long remaining = jdbcTemplate.queryForObject("""
+            SELECT COUNT(DISTINCT au.id)
+            FROM admin_user au
+            JOIN admin_user_role ur ON ur.admin_user_id = au.id
+            JOIN admin_role r ON r.id = ur.role_id
+            WHERE au.id <> ?
+              AND au.status = 'ACTIVE'
+              AND au.is_deleted = 0
+              AND r.role_code = ?
+              AND r.status = 'ACTIVE'
+              AND r.is_deleted = 0
+            """, Long.class, targetAdminUserId, AdminPermissionService.SUPER_ADMIN_ROLE_CODE);
+        if (remaining == null || remaining == 0) {
+            throw new BizException(409, "系统至少需要保留一个活跃超级管理员");
+        }
+    }
+
+    private boolean containsActiveSuperAdminRole(List<Long> roleIds) {
+        if (roleIds.isEmpty()) return false;
+        String marks = "?,".repeat(roleIds.size());
+        marks = marks.substring(0, marks.length() - 1);
+        List<Object> args = new ArrayList<>(roleIds);
+        args.add(AdminPermissionService.SUPER_ADMIN_ROLE_CODE);
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM admin_role
+            WHERE id IN (%s)
+              AND role_code = ?
+              AND status = 'ACTIVE'
+              AND is_deleted = 0
+            """.formatted(marks), Long.class, args.toArray());
+        return count != null && count > 0;
+    }
+
+    private void rejectBuiltInSuperAdminRole(RoleResponse role) {
+        if (isSuperAdminRole(role)) {
+            throw new BizException(409, "内置超级管理员角色不允许修改");
+        }
+    }
+
+    private boolean isSuperAdminRole(RoleResponse role) {
+        return AdminPermissionService.SUPER_ADMIN_ROLE_CODE.equals(role.getRoleCode());
     }
 
     private List<Long> distinctIds(List<Long> ids) {

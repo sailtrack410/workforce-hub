@@ -10,7 +10,6 @@ import lombok.Data;
 @Data
 public class OrgPositionSaveRequest {
 
-    @NotBlank(message = "positionCode 不能为空")
     @Size(max = 64, message = "positionCode 长度不能超过 64")
     private String positionCode;
 

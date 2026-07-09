@@ -4,6 +4,8 @@ import { nextTick, reactive, type Ref } from 'vue';
 import { employeeApi } from '@/api';
 import { useWorkbenchState } from './useWorkbenchState';
 import type {
+  AttendanceDailyResultResponse,
+  AttendanceExceptionResponse,
   LeaveAccountResponse,
   WorkflowRequestDetailResponse,
   WorkflowTaskActionResponse,
@@ -225,5 +227,124 @@ describe('useWorkbenchState', () => {
     expect(state.selectableLeaveTypes.value.map((item) => item.leaveName)).toEqual(['病假', '年假']);
     expect(state.leaveForm.value.leaveTypeId).toBe('L-2');
     expect(state.canSubmitLeave.value).toBe(true);
+  });
+
+  it('builds attendance risk data without loading team results for regular employees', async () => {
+    const teamDailyResults = vi.spyOn(employeeApi.attendance, 'teamDailyResults').mockResolvedValue([]);
+    vi.spyOn(employeeApi.attendance, 'dailyResults').mockResolvedValue([
+      {
+        dailyResultId: 'D-1',
+        userId: '1001',
+        workDate: '2026-05-06',
+        resultStatus: 'NORMAL',
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        absenceMinutes: 0,
+        exceptionFlag: false,
+      },
+      {
+        dailyResultId: 'D-2',
+        userId: '1001',
+        workDate: '2026-05-07',
+        resultStatus: 'ABNORMAL',
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        absenceMinutes: 480,
+        exceptionFlag: true,
+      },
+    ] as AttendanceDailyResultResponse[]);
+    vi.spyOn(employeeApi.attendance, 'exceptions').mockResolvedValue([
+      {
+        exceptionId: 'E-1',
+        dailyResultId: 'D-2',
+        userId: '1001',
+        workDate: '2026-05-07',
+        exceptionType: 'MISS_PUNCH',
+        exceptionDesc: '缺卡',
+        status: 'OPEN',
+      },
+    ] as AttendanceExceptionResponse[]);
+    const shell = createShell();
+    shell.active.workbench = 'attendance';
+    const state = useWorkbenchState({
+      shell,
+      session: { ...createSession(), isAuthenticated: true },
+      showToast: vi.fn(),
+    });
+
+    await state.refreshActiveWorkbench();
+
+    expect(teamDailyResults).not.toHaveBeenCalled();
+    expect(state.attendanceSummary.value).toEqual([
+      ['出勤天数', '1 天'],
+      ['异常次数', '1 次'],
+      ['缺卡次数', '1 次'],
+      ['异常天数', '1 天'],
+    ]);
+    expect(state.teamAttendanceRows.value).toEqual([]);
+  });
+
+  it('maps team attendance rows to subordinate names', async () => {
+    vi.spyOn(employeeApi.attendance, 'dailyResults').mockResolvedValue([]);
+    vi.spyOn(employeeApi.attendance, 'exceptions').mockResolvedValue([]);
+    vi.spyOn(employeeApi.attendance, 'teamDailyResults')
+      .mockResolvedValueOnce([
+        {
+          dailyResultId: 'TD-1',
+          userId: '2001',
+          workDate: '2026-05-07',
+          resultStatus: 'ABNORMAL',
+          lateMinutes: 12,
+          earlyLeaveMinutes: 0,
+          absenceMinutes: 0,
+          exceptionFlag: true,
+        },
+      ] as AttendanceDailyResultResponse[])
+      .mockResolvedValueOnce([]);
+    const shell = createShell();
+    shell.active.workbench = 'attendance';
+    const session = reactive({
+      isAuthenticated: false,
+      user: { userId: '1001' },
+      subordinates: [
+        { userId: '2001', employeeNo: 'E2001', realName: '李四' },
+        { userId: '2002', employeeNo: 'E2002', realName: '王五' },
+      ],
+    }) as unknown as ReturnType<typeof useSessionStore>;
+    const state = useWorkbenchState({
+      shell,
+      session,
+      showToast: vi.fn(),
+    });
+
+    await state.refreshAttendancePanel();
+    await nextTick();
+
+    expect(employeeApi.attendance.teamDailyResults).toHaveBeenCalledTimes(2);
+    expect(state.teamAttendanceRows.value[0]?.userName).toBe('李四');
+  });
+
+  it('validates clock correction date against expected punch time', async () => {
+    const submitClock = vi.spyOn(employeeApi.workflow, 'submitClockCorrectionRequest').mockResolvedValue({
+      requestId: 'REQ-CLOCK',
+      requestNo: 'REQ-CLOCK',
+      status: 'IN_APPROVAL',
+    });
+    const state = useWorkbenchState({
+      shell: createShell(),
+      session: createSession(),
+      showToast: vi.fn(),
+    });
+
+    state.clockCorrectionForm.value = {
+      targetDate: '2026-05-07',
+      missingPunchType: 'OFF_DUTY',
+      expectedPunchAt: '2026-05-08T18:00',
+      reason: '忘记打卡',
+    };
+    await state.submitClockCorrectionRequest();
+
+    expect(submitClock).not.toHaveBeenCalled();
+    expect(state.clockCorrectionError.value).toBe('补卡时间需与考勤日期一致');
   });
 });

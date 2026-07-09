@@ -29,7 +29,9 @@ public class AdminImOutboxBatchRetryResponse {
         private Long eventId;
         private boolean succeeded;
         private String beforeStatus;
+        private String beforeStatusName;
         private String afterStatus;
+        private String afterStatusName;
         private String skipReason;
 
         public static Item succeeded(Long eventId, String beforeStatus, String afterStatus) {
@@ -37,7 +39,9 @@ public class AdminImOutboxBatchRetryResponse {
             item.setEventId(eventId);
             item.setSucceeded(true);
             item.setBeforeStatus(beforeStatus);
+            item.setBeforeStatusName(statusName(beforeStatus));
             item.setAfterStatus(afterStatus);
+            item.setAfterStatusName(statusName(afterStatus));
             return item;
         }
 
@@ -46,8 +50,18 @@ public class AdminImOutboxBatchRetryResponse {
             item.setEventId(eventId);
             item.setSucceeded(false);
             item.setBeforeStatus(beforeStatus);
+            item.setBeforeStatusName(statusName(beforeStatus));
             item.setSkipReason(skipReason);
             return item;
+        }
+
+        private static String statusName(String value) {
+            if ("PENDING".equals(value)) return "待发送";
+            if ("SENDING".equals(value)) return "发送中";
+            if ("SENT".equals(value)) return "已发送";
+            if ("FAILED".equals(value)) return "失败";
+            if ("DEAD".equals(value)) return "终止";
+            return value == null ? null : "其他状态";
         }
     }
 }

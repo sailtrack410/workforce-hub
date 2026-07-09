@@ -17,7 +17,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = "workforce.ragflow.vector.enabled=false")
+@SpringBootTest(properties = {
+    "workforce.ragflow.vector.enabled=false",
+    "workforce.ragflow.embedding.validate-on-create=false"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("api")
 class RagflowVectorDisabledIntegrationTest extends LocalIntegrationTestSupport {

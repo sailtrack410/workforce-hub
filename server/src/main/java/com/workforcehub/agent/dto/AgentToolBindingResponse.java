@@ -16,8 +16,11 @@ public class AgentToolBindingResponse {
     private String toolCode;
     private String toolName;
     private String riskLevel;
+    private String riskLevelName;
     private String approvalMode;
+    private String approvalModeName;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

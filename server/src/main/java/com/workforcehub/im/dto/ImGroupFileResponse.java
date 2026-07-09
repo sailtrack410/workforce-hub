@@ -17,6 +17,7 @@ public class ImGroupFileResponse {
     private Long fileSize;
     private String contentSha256;
     private String scanStatus;
+    private String scanStatusName;
     private Long uploaderId;
     private String uploaderName;
     private LocalDateTime createdAt;

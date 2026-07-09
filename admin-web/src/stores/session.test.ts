@@ -51,6 +51,16 @@ describe('admin session store', () => {
     expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(false);
   });
 
+  it('grants permissions for super admin role', async () => {
+    const session = useSessionStore();
+
+    await session.loadCurrentUser(authApi({
+      me: async () => ({ ...user, roleCodes: ['SUPER_ADMIN'], permissionCodes: [] }),
+    }));
+
+    expect(session.hasPermission('ADMIN_ATTENDANCE_MANAGE')).toBe(true);
+  });
+
   it('clears local session when logout request is already expired', async () => {
     const session = useSessionStore();
     await session.loadCurrentUser(authApi());

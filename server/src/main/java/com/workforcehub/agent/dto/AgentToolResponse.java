@@ -14,10 +14,13 @@ public class AgentToolResponse {
     private String toolCode;
     private String toolName;
     private String toolType;
+    private String toolTypeName;
     private Long connectorId;
     private String riskLevel;
+    private String riskLevelName;
     private Boolean readOnlyFlag;
     private String status;
+    private String statusName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

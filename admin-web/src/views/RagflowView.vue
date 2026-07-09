@@ -1,13 +1,29 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { ArrowLeft, Download, Plus, RefreshCcw, Save, Search, Settings, Trash2, Upload, X } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
-import type { EntityId, RagflowAclResponse, RagflowDocumentResponse, RagflowGlobalSettingResponse, RagflowSearchTestResponse, RagflowSpaceResponse } from '@/api/types';
-import { errorMessage, formatBytes, formatDateTime, statusLabel } from '@/utils/format';
+import type { EntityId, LlmModelResponse, OrgDepartmentTreeNodeResponse, OrgPositionResponse, RagflowAclResponse, RagflowDocumentResponse, RagflowGlobalSettingResponse, RagflowSearchTestResponse, RagflowSpaceResponse, RbacRoleResponse } from '@/api/types';
+import { errorMessage, roleCodeLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
-import AdminPanel from '@/components/AdminPanel.vue';
-import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
-import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
+import type { TableColumn } from '@/components/AdminTable.vue';
+import RagflowCreateDialog from '@/components/ragflow/RagflowCreateDialog.vue';
+import RagflowDetailPanel from '@/components/ragflow/RagflowDetailPanel.vue';
+import RagflowDocumentDeleteDialog from '@/components/ragflow/RagflowDocumentDeleteDialog.vue';
+import RagflowGlobalSettingsDialog from '@/components/ragflow/RagflowGlobalSettingsDialog.vue';
+import RagflowListPanel from '@/components/ragflow/RagflowListPanel.vue';
+import RagflowSettingsDialog from '@/components/ragflow/RagflowSettingsDialog.vue';
+import RagflowSpaceDeleteDialog from '@/components/ragflow/RagflowSpaceDeleteDialog.vue';
+import RagflowUploadDialog from '@/components/ragflow/RagflowUploadDialog.vue';
+import '@/styles/ragflow.css';
+
+type UploadQueueStatus = 'READY' | 'HASHING' | 'TICKET' | 'UPLOADING' | 'CONFIRMING' | 'REGISTERING' | 'DONE' | 'FAILED';
+
+interface UploadQueueItem {
+  id: string;
+  file: File;
+  progress: number;
+  status: UploadQueueStatus;
+  message: string;
+}
 
 const toast = useToast();
 
@@ -19,24 +35,30 @@ const uploading = ref(false);
 const searchLoading = ref(false);
 const reingestingId = ref<EntityId | null>(null);
 const deletingId = ref<EntityId | null>(null);
+const deletingSpace = ref(false);
 const items = ref<RagflowSpaceResponse[]>([]);
 const globalSetting = ref<RagflowGlobalSettingResponse | null>(null);
 const selected = ref<RagflowSpaceResponse | null>(null);
 const settingsSpace = ref<RagflowSpaceResponse | null>(null);
 const documents = ref<RagflowDocumentResponse[]>([]);
 const aclItems = ref<RagflowAclResponse[]>([]);
+const roles = ref<RbacRoleResponse[]>([]);
+const departments = ref<OrgDepartmentTreeNodeResponse[]>([]);
+const positions = ref<OrgPositionResponse[]>([]);
+const llmModels = ref<LlmModelResponse[]>([]);
 const keyword = ref('');
 const createVisible = ref(false);
 const settingsVisible = ref(false);
 const globalSettingsVisible = ref(false);
 const uploadVisible = ref(false);
 const uploadDragActive = ref(false);
-const uploadProgress = ref(0);
-const uploadStatus = ref('');
-const selectedFile = ref<File | null>(null);
-const fileInputRef = ref<HTMLInputElement | null>(null);
+const uploadQueue = ref<UploadQueueItem[]>([]);
 const searchQuery = ref('');
 const searchResult = ref<RagflowSearchTestResponse | null>(null);
+const documentDeleteVisible = ref(false);
+const documentDeleteTarget = ref<RagflowDocumentResponse | null>(null);
+const spaceDeleteVisible = ref(false);
+const spaceDeleteTarget = ref<RagflowSpaceResponse | null>(null);
 
 const form = reactive({
   spaceName: '',
@@ -44,15 +66,13 @@ const form = reactive({
   description: '',
   visibility: 'PRIVATE',
   status: 'ACTIVE',
-  embeddingProvider: '',
-  embeddingModel: '',
+  embeddingModelId: '',
   embeddingDimension: '',
   rerankEnabled: false,
-  rerankProvider: '',
-  rerankModel: '',
-  chunkSize: '800',
-  chunkOverlap: '100',
-  retrievalTopK: '5',
+  rerankModelId: '',
+  chunkSize: '',
+  chunkOverlap: '',
+  retrievalTopK: '',
   scoreThreshold: '',
 });
 
@@ -61,6 +81,13 @@ const createForm = reactive({
   spaceCode: '',
   description: '',
   visibility: 'PRIVATE',
+  embeddingModelId: '',
+  rerankEnabled: false,
+  rerankModelId: '',
+  chunkSize: '800',
+  chunkOverlap: '100',
+  retrievalTopK: '5',
+  scoreThreshold: '',
 });
 
 const aclForm = reactive({
@@ -73,19 +100,33 @@ const globalForm = reactive({
   ocrBaseUrl: '',
   ocrApiKey: '',
   ocrModel: '',
+  ocrModelId: '',
   embeddingBaseUrl: '',
   embeddingApiKey: '',
   embeddingModel: '',
+  embeddingModelId: '',
   embeddingDimension: '',
   rerankEnabled: false,
   rerankBaseUrl: '',
   rerankApiKey: '',
   rerankModel: '',
+  rerankModelId: '',
   chunkSize: '800',
   chunkOverlap: '100',
   retrievalTopK: '5',
   scoreThreshold: '',
 });
+
+const scoreThresholdOptions = [
+  { value: '', label: '默认阈值' },
+  { value: '0.2', label: '宽松匹配' },
+  { value: '0.5', label: '标准匹配' },
+  { value: '0.8', label: '严格匹配' },
+];
+
+const ocrModelOptions = computed(() => activeModels('OCR'));
+const embeddingModelOptions = computed(() => activeModels('EMBEDDING'));
+const rerankModelOptions = computed(() => activeModels('RERANK'));
 
 const columns: TableColumn[] = [
   { key: 'spaceName', label: '知识库' },
@@ -94,7 +135,7 @@ const columns: TableColumn[] = [
   { key: 'chunkCount', label: '切片数' },
   { key: 'status', label: '状态' },
   { key: 'updatedAt', label: '更新时间' },
-  { key: '_actions', label: '操作', width: '170px' },
+  { key: '_actions', label: '操作', width: '230px' },
 ];
 
 const documentColumns: TableColumn[] = [
@@ -109,42 +150,48 @@ const documentColumns: TableColumn[] = [
 
 const aclColumns: TableColumn[] = [
   { key: 'subjectType', label: '类型' },
-  { key: 'subjectId', label: '对象 ID' },
+  { key: 'subjectId', label: '对象' },
   { key: 'permCode', label: '权限' },
   { key: '_actions', label: '操作', width: '90px' },
 ];
 
 const inDetail = computed(() => Boolean(selected.value));
 const currentTitle = computed(() => selected.value?.spaceName ?? '知识库');
-
-const visibilityLabel = (value?: string | null) => {
-  const labels: Record<string, string> = {
-    PRIVATE: '私有',
-    ROLE: '按角色',
-    DEPARTMENT: '按部门',
-    POSITION: '按岗位',
-    PUBLIC: '全员可查阅',
-  };
-  return value ? labels[value] ?? value : '-';
-};
-
-const parserTypeLabel = (value?: string | null) => {
-  const labels: Record<string, string> = {
-    TEXT: '文本',
-    WORD: '文档',
-    DOCUMENT: '文档',
-    PDF: 'PDF',
-    PPT: '演示文稿',
-    TABLE: '表格',
-    OCR: '图片 OCR',
-  };
-  return value ? labels[value.toUpperCase()] ?? value : '-';
-};
+const aclSubjectOptions = computed(() => {
+  if (aclForm.subjectType === 'ROLE') {
+    return roles.value.map((item) => ({ id: item.roleId, name: item.roleName || roleCodeLabel(item.roleCode) }));
+  }
+  if (aclForm.subjectType === 'POSITION') {
+    return positions.value.map((item) => ({ id: item.id, name: item.positionName }));
+  }
+  return flattenDepartments(departments.value).map((item) => ({ id: item.id, name: item.deptName }));
+});
 
 onMounted(() => {
   void loadList();
   void loadGlobalSetting();
+  void loadAclOptions();
+  void loadLlmModels();
 });
+
+async function loadAclOptions() {
+  try {
+    const [roleRows, departmentRows, positionRows] = await Promise.all([
+      adminApi.rbac.roles(),
+      adminApi.org.departmentTree(),
+      adminApi.org.positions(),
+    ]);
+    roles.value = roleRows;
+    departments.value = departmentRows;
+    positions.value = positionRows;
+  } catch (e) {
+    toast.error(errorMessage(e));
+  }
+}
+
+function flattenDepartments(nodes: OrgDepartmentTreeNodeResponse[]): OrgDepartmentTreeNodeResponse[] {
+  return nodes.flatMap((node) => [node, ...flattenDepartments(node.children ?? [])]);
+}
 
 async function loadList() {
   loading.value = true;
@@ -155,6 +202,8 @@ async function loadList() {
       const latest = res.list.find((item) => String(item.spaceId) === String(selected.value?.spaceId));
       if (latest) {
         selected.value = latest;
+      } else {
+        backToList();
       }
     }
   } catch (e) {
@@ -172,19 +221,34 @@ async function loadGlobalSetting() {
   }
 }
 
+async function loadLlmModels() {
+  try {
+    llmModels.value = await adminApi.llmModels.list();
+  } catch (e) {
+    toast.error(errorMessage(e));
+  }
+}
+
+function activeModels(type: string) {
+  return llmModels.value.filter((item) => item.status === 'ACTIVE' && item.modelType === type);
+}
+
 function openGlobalSettings() {
   const row = globalSetting.value;
   globalForm.ocrBaseUrl = row?.ocrBaseUrl ?? '';
   globalForm.ocrApiKey = '';
   globalForm.ocrModel = row?.ocrModel ?? '';
+  globalForm.ocrModelId = row?.ocrModelId == null ? '' : String(row.ocrModelId);
   globalForm.embeddingBaseUrl = row?.embeddingBaseUrl ?? '';
   globalForm.embeddingApiKey = '';
   globalForm.embeddingModel = row?.embeddingModel ?? '';
+  globalForm.embeddingModelId = row?.embeddingModelId == null ? '' : String(row.embeddingModelId);
   globalForm.embeddingDimension = row?.embeddingDimension == null ? '' : String(row.embeddingDimension);
   globalForm.rerankEnabled = Boolean(row?.rerankEnabled);
   globalForm.rerankBaseUrl = row?.rerankBaseUrl ?? '';
   globalForm.rerankApiKey = '';
   globalForm.rerankModel = row?.rerankModel ?? '';
+  globalForm.rerankModelId = row?.rerankModelId == null ? '' : String(row.rerankModelId);
   globalForm.chunkSize = row?.chunkSize == null ? '800' : String(row.chunkSize);
   globalForm.chunkOverlap = row?.chunkOverlap == null ? '100' : String(row.chunkOverlap);
   globalForm.retrievalTopK = row?.retrievalTopK == null ? '5' : String(row.retrievalTopK);
@@ -199,18 +263,20 @@ async function saveGlobalSettings() {
       ocrBaseUrl: globalForm.ocrBaseUrl.trim() || null,
       ocrApiKey: globalForm.ocrApiKey.trim() || null,
       ocrModel: globalForm.ocrModel.trim() || null,
+      ocrModelId: globalForm.ocrModelId || null,
       embeddingBaseUrl: globalForm.embeddingBaseUrl.trim() || null,
       embeddingApiKey: globalForm.embeddingApiKey.trim() || null,
       embeddingModel: globalForm.embeddingModel.trim() || null,
-      embeddingDimension: numberOrNull(globalForm.embeddingDimension),
+      embeddingModelId: globalForm.embeddingModelId || null,
       rerankEnabled: globalForm.rerankEnabled,
       rerankBaseUrl: globalForm.rerankBaseUrl.trim() || null,
       rerankApiKey: globalForm.rerankApiKey.trim() || null,
       rerankModel: globalForm.rerankModel.trim() || null,
+      rerankModelId: globalForm.rerankModelId || null,
       chunkSize: numberOrNull(globalForm.chunkSize) ?? 800,
       chunkOverlap: numberOrNull(globalForm.chunkOverlap) ?? 100,
       retrievalTopK: numberOrNull(globalForm.retrievalTopK) ?? 5,
-      scoreThreshold: globalForm.scoreThreshold.trim() || null,
+      scoreThreshold: textOrNull(globalForm.scoreThreshold),
     });
     globalSettingsVisible.value = false;
     toast.success('知识库模型设置已保存');
@@ -246,15 +312,13 @@ function fillForm(row: RagflowSpaceResponse) {
   form.description = row.description ?? '';
   form.visibility = row.visibility;
   form.status = row.status;
-  form.embeddingProvider = row.embeddingProvider ?? '';
-  form.embeddingModel = row.embeddingModel ?? '';
+  form.embeddingModelId = row.embeddingModelId == null ? '' : String(row.embeddingModelId);
   form.embeddingDimension = row.embeddingDimension == null ? '' : String(row.embeddingDimension);
   form.rerankEnabled = Boolean(row.rerankEnabled);
-  form.rerankProvider = row.rerankProvider ?? '';
-  form.rerankModel = row.rerankModel ?? '';
-  form.chunkSize = row.chunkSize == null ? '800' : String(row.chunkSize);
-  form.chunkOverlap = row.chunkOverlap == null ? '100' : String(row.chunkOverlap);
-  form.retrievalTopK = row.retrievalTopK == null ? '5' : String(row.retrievalTopK);
+  form.rerankModelId = row.rerankModelId == null ? '' : String(row.rerankModelId);
+  form.chunkSize = row.chunkSize == null ? '' : String(row.chunkSize);
+  form.chunkOverlap = row.chunkOverlap == null ? '' : String(row.chunkOverlap);
+  form.retrievalTopK = row.retrievalTopK == null ? '' : String(row.retrievalTopK);
   form.scoreThreshold = row.scoreThreshold == null ? '' : String(row.scoreThreshold);
 }
 
@@ -283,10 +347,18 @@ async function loadDocuments() {
 }
 
 function openCreate() {
+  const setting = globalSetting.value;
   createForm.spaceName = '';
-  createForm.spaceCode = '';
+  createForm.spaceCode = `KB_${Date.now()}`;
   createForm.description = '';
   createForm.visibility = 'PRIVATE';
+  createForm.embeddingModelId = '';
+  createForm.rerankEnabled = false;
+  createForm.rerankModelId = '';
+  createForm.chunkSize = String(setting?.chunkSize ?? 800);
+  createForm.chunkOverlap = String(setting?.chunkOverlap ?? 100);
+  createForm.retrievalTopK = String(setting?.retrievalTopK ?? 5);
+  createForm.scoreThreshold = setting?.scoreThreshold == null ? '' : String(setting.scoreThreshold);
   createVisible.value = true;
 }
 
@@ -300,9 +372,13 @@ async function handleCreate() {
       description: createForm.description.trim() || null,
       visibility: createForm.visibility,
       status: 'ACTIVE',
-      chunkSize: 800,
-      chunkOverlap: 100,
-      retrievalTopK: 5,
+      embeddingModelId: createForm.embeddingModelId || null,
+      rerankEnabled: createForm.rerankModelId ? createForm.rerankEnabled : null,
+      rerankModelId: createForm.rerankModelId || null,
+      chunkSize: numberOrNull(createForm.chunkSize),
+      chunkOverlap: numberOrNull(createForm.chunkOverlap),
+      retrievalTopK: numberOrNull(createForm.retrievalTopK),
+      scoreThreshold: textOrNull(createForm.scoreThreshold),
     });
     createVisible.value = false;
     toast.success('知识库已创建');
@@ -324,16 +400,10 @@ async function handleUpdate() {
       description: form.description.trim() || null,
       visibility: form.visibility,
       status: form.status,
-      embeddingProvider: form.embeddingProvider.trim() || null,
-      embeddingModel: form.embeddingModel.trim() || null,
-      embeddingDimension: numberOrNull(form.embeddingDimension),
       rerankEnabled: form.rerankEnabled,
-      rerankProvider: form.rerankProvider.trim() || null,
-      rerankModel: form.rerankModel.trim() || null,
-      chunkSize: numberOrNull(form.chunkSize) ?? 800,
-      chunkOverlap: numberOrNull(form.chunkOverlap) ?? 100,
-      retrievalTopK: numberOrNull(form.retrievalTopK) ?? 5,
-      scoreThreshold: form.scoreThreshold.trim() || null,
+      rerankModelId: form.rerankModelId || null,
+      retrievalTopK: numberOrNull(form.retrievalTopK),
+      scoreThreshold: textOrNull(form.scoreThreshold),
     });
     settingsSpace.value = updated;
     if (selected.value && String(selected.value.spaceId) === String(updated.spaceId)) {
@@ -371,12 +441,14 @@ async function saveAcl() {
 function addAcl() {
   const subjectId = aclForm.subjectId.trim();
   if (!settingsSpace.value || !subjectId) return;
+  const subject = aclSubjectOptions.value.find((item) => String(item.id) === subjectId);
   aclItems.value = [
     {
       aclId: createClientId('tmp'),
       spaceId: settingsSpace.value.spaceId,
       subjectType: aclForm.subjectType,
       subjectId,
+      subjectName: subject?.name,
       permCode: aclForm.permCode,
       status: 'ACTIVE',
     },
@@ -385,26 +457,23 @@ function addAcl() {
   aclForm.subjectId = '';
 }
 
+function aclSubjectName(row: RagflowAclResponse) {
+  if (row.subjectName) return row.subjectName;
+  const options = row.subjectType === 'ROLE'
+    ? roles.value.map((item) => ({ id: item.roleId, name: item.roleName || roleCodeLabel(item.roleCode) }))
+    : row.subjectType === 'POSITION'
+      ? positions.value.map((item) => ({ id: item.id, name: item.positionName }))
+      : flattenDepartments(departments.value).map((item) => ({ id: item.id, name: item.deptName }));
+  return options.find((item) => String(item.id) === String(row.subjectId))?.name || '未命名对象';
+}
+
 function removeAcl(row: RagflowAclResponse) {
   aclItems.value = aclItems.value.filter((item) => item !== row);
 }
 
-function handleFileChange(event: Event) {
-  selectedFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
-  uploadProgress.value = 0;
-  uploadStatus.value = '';
-}
-
-function openFilePicker() {
-  fileInputRef.value?.click();
-}
-
 function openUploadDialog() {
-  selectedFile.value = null;
+  uploadQueue.value = [];
   uploadDragActive.value = false;
-  uploadProgress.value = 0;
-  uploadStatus.value = '';
-  if (fileInputRef.value) fileInputRef.value.value = '';
   uploadVisible.value = true;
 }
 
@@ -412,26 +481,78 @@ function closeUploadDialog() {
   if (uploading.value) return;
   uploadVisible.value = false;
   uploadDragActive.value = false;
+  uploadQueue.value = [];
 }
 
-function handleFileDrop(event: DragEvent) {
-  uploadDragActive.value = false;
-  selectedFile.value = event.dataTransfer?.files?.[0] ?? null;
-  uploadProgress.value = 0;
-  uploadStatus.value = '';
-  if (fileInputRef.value) fileInputRef.value.value = '';
+function setUploadFiles(files: File[]) {
+  if (!files.length || uploading.value) return;
+  const keys = new Set(uploadQueue.value.map((item) => uploadFileKey(item.file)));
+  const nextItems = files
+    .filter((file) => {
+      const key = uploadFileKey(file);
+      if (keys.has(key)) return false;
+      keys.add(key);
+      return true;
+    })
+    .map((file) => ({
+      id: createClientId(`upload-${file.name}`),
+      file,
+      progress: 0,
+      status: 'READY' as UploadQueueStatus,
+      message: '待上传',
+    }));
+  uploadQueue.value = [...uploadQueue.value, ...nextItems];
 }
 
-async function uploadDocument() {
-  if (!selected.value || !selectedFile.value) return;
+function removeUploadFile(id: string) {
+  if (uploading.value) return;
+  uploadQueue.value = uploadQueue.value.filter((item) => item.id !== id);
+}
+
+function clearUploadQueue() {
+  if (uploading.value) return;
+  uploadQueue.value = [];
+}
+
+async function uploadDocuments() {
+  if (!selected.value || !uploadQueue.value.length) return;
   uploading.value = true;
-  uploadProgress.value = 0;
-  uploadStatus.value = '校验文件';
+  let successCount = 0;
+  let failedCount = 0;
   try {
-    const file = selectedFile.value;
+    for (const item of uploadQueue.value) {
+      if (item.status === 'DONE') continue;
+      const uploaded = await uploadSingleDocument(item);
+      if (uploaded) {
+        successCount += 1;
+      } else {
+        failedCount += 1;
+      }
+    }
+    await loadDocuments();
+    await loadList();
+    if (failedCount === 0) {
+      uploadVisible.value = false;
+      uploadDragActive.value = false;
+      uploadQueue.value = [];
+      toast.success(`${successCount} 个文件已上传，正在后台入库`);
+    } else {
+      toast.error(`上传完成：成功 ${successCount} 个，失败 ${failedCount} 个`);
+    }
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    uploading.value = false;
+  }
+}
+
+async function uploadSingleDocument(item: UploadQueueItem) {
+  if (!selected.value) return false;
+  const file = item.file;
+  try {
+    updateUploadItem(item.id, { progress: 5, status: 'HASHING', message: '校验文件' });
     const contentSha256 = await sha256Hex(file);
-    uploadProgress.value = 10;
-    uploadStatus.value = '创建上传票据';
+    updateUploadItem(item.id, { progress: 12, status: 'TICKET', message: '创建上传票据' });
     const ticket = await adminApi.ragflow.createUploadTicket({
       ownerType: 'RAGFLOW_DOCUMENT',
       ownerId: selected.value.spaceId,
@@ -441,21 +562,19 @@ async function uploadDocument() {
       contentSha256,
       clientRequestId: createClientId(`ragflow-${selected.value.spaceId}-${file.name}`),
     });
-    uploadProgress.value = 20;
+    updateUploadItem(item.id, { progress: 20, status: 'UPLOADING', message: ticket.deduplicated ? '复用文件' : '上传文件' });
     let attachmentRefId = ticket.attachmentRefId;
     if (!ticket.deduplicated) {
       if (!ticket.uploadTicketId || !ticket.objectKey || !ticket.uploadUrl) {
         throw new Error('上传地址不可用');
       }
-      uploadStatus.value = '上传文件';
       const uploadResponse = await uploadToTicketTarget(ticket.uploadUrl, file, normalizeUploadHeaders(ticket.headers, file), (percent) => {
-        uploadProgress.value = Math.max(uploadProgress.value, Math.min(80, 20 + Math.round(percent * 0.6)));
+        updateUploadItem(item.id, { progress: Math.max(20, Math.min(76, 20 + Math.round(percent * 0.56))) });
       });
       if (!uploadResponse.ok) {
         throw new Error(await uploadResponse.text().catch(() => '') || '文件上传失败');
       }
-      uploadProgress.value = 85;
-      uploadStatus.value = '确认文件';
+      updateUploadItem(item.id, { progress: 82, status: 'CONFIRMING', message: '确认文件' });
       const attachment = await adminApi.ragflow.confirmUpload({
         uploadTicketId: ticket.uploadTicketId,
         objectKey: ticket.objectKey,
@@ -466,32 +585,24 @@ async function uploadDocument() {
         displayName: file.name,
       });
       attachmentRefId = attachment.attachmentRefId;
-    } else {
-      uploadProgress.value = 85;
-      uploadStatus.value = '复用文件';
     }
     if (!attachmentRefId) throw new Error('附件引用不可用');
-    uploadProgress.value = 90;
-    uploadStatus.value = '加入知识库';
+    updateUploadItem(item.id, { progress: 92, status: 'REGISTERING', message: '登记入库任务' });
     await adminApi.ragflow.addDocument(selected.value.spaceId, attachmentRefId);
-    uploadProgress.value = 95;
-    uploadStatus.value = '刷新列表';
-    selectedFile.value = null;
-    if (fileInputRef.value) fileInputRef.value.value = '';
-    await loadDocuments();
-    await loadList();
-    uploadProgress.value = 100;
-    uploadStatus.value = '上传完成';
-    await new Promise((resolve) => window.setTimeout(resolve, 600));
-    uploadVisible.value = false;
-    toast.success('文件已上传');
+    updateUploadItem(item.id, { progress: 100, status: 'DONE', message: '后台入库中' });
+    return true;
   } catch (e) {
-    uploadProgress.value = 0;
-    uploadStatus.value = errorMessage(e);
-    toast.error(uploadStatus.value);
-  } finally {
-    uploading.value = false;
+    updateUploadItem(item.id, { progress: 0, status: 'FAILED', message: errorMessage(e) });
+    return false;
   }
+}
+
+function updateUploadItem(id: string, patch: Partial<UploadQueueItem>) {
+  uploadQueue.value = uploadQueue.value.map((item) => (item.id === id ? { ...item, ...patch } : item));
+}
+
+function uploadFileKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
 }
 
 async function downloadDocument(row: RagflowDocumentResponse) {
@@ -519,8 +630,39 @@ async function reingestDocument(row: RagflowDocumentResponse) {
   }
 }
 
-async function deleteDocument(row: RagflowDocumentResponse) {
-  if (!selected.value || !window.confirm(`删除文件「${row.title}」？`)) return;
+function deleteDocument(row: RagflowDocumentResponse) {
+  if (!selected.value) return;
+  documentDeleteTarget.value = row;
+  documentDeleteVisible.value = true;
+}
+
+function deleteSpace(row: RagflowSpaceResponse) {
+  spaceDeleteTarget.value = row;
+  spaceDeleteVisible.value = true;
+}
+
+async function confirmDeleteSpace() {
+  const row = spaceDeleteTarget.value;
+  if (!row) return;
+  deletingSpace.value = true;
+  try {
+    await adminApi.ragflow.deleteSpace(row.spaceId);
+    if (selected.value && String(selected.value.spaceId) === String(row.spaceId)) {
+      backToList();
+    }
+    await loadList();
+    toast.success('知识库已删除');
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    deletingSpace.value = false;
+    spaceDeleteTarget.value = null;
+  }
+}
+
+async function confirmDeleteDocument() {
+  const row = documentDeleteTarget.value;
+  if (!selected.value || !row) return;
   deletingId.value = row.documentId;
   try {
     await adminApi.ragflow.deleteDocument(selected.value.spaceId, row.documentId);
@@ -531,6 +673,7 @@ async function deleteDocument(row: RagflowDocumentResponse) {
     toast.error(errorMessage(e));
   } finally {
     deletingId.value = null;
+    documentDeleteTarget.value = null;
   }
 }
 
@@ -546,10 +689,18 @@ async function runSearchTest() {
   }
 }
 
-function numberOrNull(value: string) {
-  if (!value.trim()) return null;
-  const parsed = Number(value);
+function numberOrNull(value: unknown) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const text = String(value).trim();
+  if (!text) return null;
+  const parsed = Number(text);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function textOrNull(value: unknown) {
+  const text = value == null ? '' : String(value).trim();
+  return text || null;
 }
 
 async function sha256Hex(file: File) {
@@ -570,7 +721,7 @@ function uploadToTicketTarget(uploadUrl: string, file: File, uploadHeaders: Reco
     ? uploadHeaders
     : {
       'Content-Type': uploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
-      'X-Upload-Path': uploadUrl,
+      'X-Upload-Path': encodeURIComponent(uploadUrl),
     };
   return new Promise<Response>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -605,818 +756,109 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 
 <template>
   <main class="page-grid ragflow-page">
-    <template v-if="!inDetail">
-      <AdminPanel :span="12" title="知识库模型设置">
-        <template #actions>
-          <button class="secondary-button" @click="openGlobalSettings">
-            <Settings :size="16" />
-            <span>设置</span>
-          </button>
-        </template>
-        <div class="model-setting-grid">
-          <div>
-            <span>OCR</span>
-            <strong>{{ globalSetting?.ocrModel || '-' }}</strong>
-            <small>{{ globalSetting?.ocrApiKeyConfigured ? 'Key 已配置' : 'Key 未配置' }}</small>
-          </div>
-          <div>
-            <span>嵌入</span>
-            <strong>{{ globalSetting?.embeddingModel || '-' }}</strong>
-            <small>{{ globalSetting?.embeddingApiKeyConfigured ? 'Key 已配置' : 'Key 未配置' }}{{ globalSetting?.embeddingDimension ? ` · ${globalSetting.embeddingDimension}` : '' }}</small>
-          </div>
-          <div>
-            <span>重排</span>
-            <strong>{{ globalSetting?.rerankEnabled ? (globalSetting?.rerankModel || '-') : '未启用' }}</strong>
-            <small>{{ globalSetting?.rerankApiKeyConfigured ? 'Key 已配置' : 'Key 未配置' }}</small>
-          </div>
-          <div>
-            <span>检索</span>
-            <strong>Top {{ globalSetting?.retrievalTopK ?? 5 }}</strong>
-            <small>{{ globalSetting?.chunkSize ?? 800 }} / {{ globalSetting?.chunkOverlap ?? 100 }}</small>
-          </div>
-        </div>
-      </AdminPanel>
+    <RagflowListPanel
+      v-if="!inDetail"
+      v-model:keyword="keyword"
+      :columns="columns"
+      :global-setting="globalSetting"
+      :items="items"
+      :llm-models="llmModels"
+      :loading="loading"
+      @create="openCreate"
+      @load="loadList"
+      @delete-space="deleteSpace"
+      @open-global-settings="openGlobalSettings"
+      @open-settings="openSettings"
+      @open-space="openSpace"
+    />
 
-      <AdminPanel :span="12" title="知识库">
-        <template #actions>
-          <form class="ragflow-search" @submit.prevent="loadList">
-            <input v-model="keyword" placeholder="搜索名称 / 编码" />
-            <button class="secondary-button" title="搜索" type="submit">
-              <Search :size="16" />
-            </button>
-          </form>
-          <button class="secondary-button" title="刷新" :disabled="loading" @click="loadList">
-            <RefreshCcw :size="16" />
-          </button>
-          <button class="primary-button" @click="openCreate">
-            <Plus :size="16" />
-            <span>新建知识库</span>
-          </button>
-        </template>
+    <RagflowDetailPanel
+      v-else
+      v-model:search-query="searchQuery"
+      :current-title="currentTitle"
+      :deleting-id="deletingId"
+      :deleting-space="deletingSpace"
+      :doc-loading="docLoading"
+      :document-columns="documentColumns"
+      :documents="documents"
+      :reingesting-id="reingestingId"
+      :search-loading="searchLoading"
+      :search-result="searchResult"
+      :selected="selected"
+      @back="backToList"
+      @delete="deleteDocument"
+      @delete-space="deleteSpace"
+      @download="downloadDocument"
+      @load-documents="loadDocuments"
+      @open-settings="openSettings"
+      @open-upload="openUploadDialog"
+      @reingest="reingestDocument"
+      @search="runSearchTest"
+    />
 
-        <AdminTable :columns="columns" :rows="items" :loading="loading" row-key="spaceId" @row-click="openSpace">
-          <template #cell-spaceName="{ row }">
-            <strong>{{ row.spaceName }}</strong>
-            <span>{{ row.spaceCode }}</span>
-          </template>
-          <template #cell-visibility="{ row }">
-            {{ visibilityLabel(row.visibility) }}
-          </template>
-          <template #cell-status="{ row }">
-            <span class="status-pill">{{ statusLabel(row.status) }}</span>
-          </template>
-          <template #cell-updatedAt="{ row }">
-            {{ formatDateTime(row.updatedAt) }}
-          </template>
-          <template #cell-_actions="{ row }">
-            <div class="row-actions">
-              <button class="secondary-button action-btn" @click.stop="openSpace(row)">进入</button>
-              <button class="secondary-button action-btn" @click.stop="openSettings(row)">
-                <Settings :size="14" />
-                <span>设置</span>
-              </button>
-            </div>
-          </template>
-        </AdminTable>
-      </AdminPanel>
-    </template>
+    <RagflowCreateDialog
+      v-model:visible="createVisible"
+      :embedding-model-options="embeddingModelOptions"
+      :form="createForm"
+      :rerank-model-options="rerankModelOptions"
+      :score-threshold-options="scoreThresholdOptions"
+      @confirm="handleCreate"
+    />
 
-    <template v-else>
-      <AdminPanel :span="12">
-        <div class="kb-detail-head">
-          <button class="icon-button" title="返回知识库列表" @click="backToList">
-            <ArrowLeft :size="16" />
-          </button>
-          <div class="kb-detail-title">
-            <h2>{{ currentTitle }}</h2>
-            <span>文件、向量化进度、知识检索</span>
-          </div>
-          <div class="kb-detail-actions">
-            <button v-if="selected" class="secondary-button" @click="openSettings(selected)">
-              <Settings :size="16" />
-              <span>设置</span>
-            </button>
-            <button class="icon-button" title="刷新文件列表" :disabled="docLoading" @click="loadDocuments">
-              <RefreshCcw :size="16" />
-            </button>
-          </div>
-        </div>
+    <RagflowGlobalSettingsDialog
+      v-model:visible="globalSettingsVisible"
+      :embedding-model-options="embeddingModelOptions"
+      :form="globalForm"
+      :ocr-model-options="ocrModelOptions"
+      :rerank-model-options="rerankModelOptions"
+      :score-threshold-options="scoreThresholdOptions"
+      @confirm="saveGlobalSettings"
+    />
 
-        <div class="detail-summary">
-          <span>文件 {{ selected?.documentCount ?? 0 }}</span>
-          <span>切片 {{ selected?.chunkCount ?? 0 }}</span>
-          <span>{{ visibilityLabel(selected?.visibility) }}</span>
-        </div>
-      </AdminPanel>
+    <RagflowSettingsDialog
+      v-model:visible="settingsVisible"
+      :acl-columns="aclColumns"
+      :acl-form="aclForm"
+      :acl-items="aclItems"
+      :acl-loading="aclLoading"
+      :acl-subject-name="aclSubjectName"
+      :acl-subject-options="aclSubjectOptions"
+      :embedding-model-options="embeddingModelOptions"
+      :form="form"
+      :rerank-model-options="rerankModelOptions"
+      :saving="saving"
+      :score-threshold-options="scoreThresholdOptions"
+      :settings-space="settingsSpace"
+      @add-acl="addAcl"
+      @confirm="handleUpdate"
+      @remove-acl="removeAcl"
+      @save-acl="saveAcl"
+    />
 
-      <section class="ragflow-detail-layout">
-      <AdminPanel title="文件列表">
-        <template #actions>
-          <button class="primary-button" type="button" @click="openUploadDialog">
-            <Upload :size="16" />
-            <span>上传文件</span>
-          </button>
-        </template>
+    <RagflowUploadDialog
+      v-model:upload-drag-active="uploadDragActive"
+      v-model:visible="uploadVisible"
+      :items="uploadQueue"
+      :uploading="uploading"
+      @clear="clearUploadQueue"
+      @close="closeUploadDialog"
+      @file-change="setUploadFiles"
+      @remove-file="removeUploadFile"
+      @submit="uploadDocuments"
+    />
 
-        <AdminTable :columns="documentColumns" :rows="documents" :loading="docLoading" row-key="documentId">
-          <template #cell-title="{ row }">
-            <strong>{{ row.title }}</strong>
-            <span>{{ formatBytes(row.fileSize) }}</span>
-          </template>
-          <template #cell-parserType="{ row }">
-            {{ parserTypeLabel(row.parserType) }}
-          </template>
-          <template #cell-ingestStatus="{ row }">
-            <span class="status-pill">{{ statusLabel(row.ingestStatus) }}</span>
-            <small v-if="row.errorMessage" class="cell-note error-text">{{ row.errorMessage }}</small>
-          </template>
-          <template #cell-vectorStatus="{ row }">
-            <span class="status-pill">{{ statusLabel(row.vectorStatus || 'PENDING') }}</span>
-          </template>
-          <template #cell-createdAt="{ row }">
-            {{ formatDateTime(row.createdAt) }}
-          </template>
-          <template #cell-_actions="{ row }">
-            <button class="secondary-button action-btn" title="重新入库" aria-label="重新入库" :disabled="reingestingId === row.documentId" @click.stop="reingestDocument(row)">
-              <RefreshCcw :size="14" />
-            </button>
-            <button class="secondary-button action-btn" title="下载文件" aria-label="下载文件" :disabled="!row.attachmentRefId" @click.stop="downloadDocument(row)">
-              <Download :size="14" />
-            </button>
-            <button class="danger-button action-btn" title="删除文件" aria-label="删除文件" :disabled="deletingId === row.documentId" @click.stop="deleteDocument(row)">
-              <Trash2 :size="14" />
-            </button>
-          </template>
-        </AdminTable>
-      </AdminPanel>
+    <RagflowDocumentDeleteDialog
+      v-model:visible="documentDeleteVisible"
+      :target="documentDeleteTarget"
+      @confirm="confirmDeleteDocument"
+      @cancel="documentDeleteTarget = null"
+    />
 
-      <AdminPanel title="检索测试">
-        <form class="search-test" @submit.prevent="runSearchTest">
-          <input v-model="searchQuery" placeholder="输入问题或关键词" />
-          <button class="secondary-button" :disabled="searchLoading" type="submit">
-            <Search :size="16" />
-            <span>{{ searchLoading ? '检索中' : '测试检索' }}</span>
-          </button>
-        </form>
-
-        <div v-if="searchLoading" class="empty-state">检索中…</div>
-        <div v-else-if="searchResult?.hits.length" class="hit-list">
-          <article v-for="hit in searchResult.hits" :key="String(hit.chunkId)" class="hit-item">
-            <strong>{{ hit.documentTitle || '-' }}</strong>
-            <span>切片 {{ hit.chunkNo ?? '-' }}{{ hit.pageNo ? ` · 第 ${hit.pageNo} 页` : '' }}{{ hit.score == null ? '' : ` · ${(hit.score * 100).toFixed(1)}%` }}</span>
-            <p>{{ hit.contentText }}</p>
-          </article>
-        </div>
-        <div v-else class="empty-state">暂无结果</div>
-      </AdminPanel>
-      </section>
-    </template>
-
-    <AdminConfirmDialog v-model:visible="createVisible" title="新建知识库" message="" confirm-label="创建" @confirm="handleCreate">
-      <template #default>
-        <div class="dialog-form">
-          <label>
-            <span>名称</span>
-            <input v-model="createForm.spaceName" placeholder="如 公司制度知识库" autofocus />
-          </label>
-          <label>
-            <span>编码</span>
-            <input v-model="createForm.spaceCode" placeholder="如 COMPANY_POLICY" />
-          </label>
-          <label>
-            <span>描述</span>
-            <textarea v-model="createForm.description" rows="3" />
-          </label>
-          <label>
-            <span>查阅范围</span>
-            <select v-model="createForm.visibility">
-              <option value="PRIVATE">私有</option>
-              <option value="ROLE">按角色</option>
-              <option value="DEPARTMENT">按部门</option>
-              <option value="POSITION">按岗位</option>
-              <option value="PUBLIC">全员可查阅</option>
-            </select>
-          </label>
-        </div>
-      </template>
-    </AdminConfirmDialog>
-
-    <AdminConfirmDialog v-model:visible="globalSettingsVisible" title="知识库模型设置" message="" confirm-label="保存" @confirm="saveGlobalSettings">
-      <template #default>
-        <div class="dialog-form">
-          <h3 class="full-field form-subtitle">OCR</h3>
-          <label>
-            <span>服务 URL</span>
-            <input v-model="globalForm.ocrBaseUrl" />
-          </label>
-          <label>
-            <span>API Key</span>
-            <input v-model="globalForm.ocrApiKey" type="password" :placeholder="globalSetting?.ocrApiKeyConfigured ? '已配置' : ''" />
-          </label>
-          <label>
-            <span>OCR 模型</span>
-            <input v-model="globalForm.ocrModel" />
-          </label>
-
-          <h3 class="full-field form-subtitle">嵌入</h3>
-          <label>
-            <span>服务 URL</span>
-            <input v-model="globalForm.embeddingBaseUrl" />
-          </label>
-          <label>
-            <span>API Key</span>
-            <input v-model="globalForm.embeddingApiKey" type="password" :placeholder="globalSetting?.embeddingApiKeyConfigured ? '已配置' : ''" />
-          </label>
-          <label>
-            <span>嵌入模型</span>
-            <input v-model="globalForm.embeddingModel" />
-          </label>
-          <label>
-            <span>向量维度</span>
-            <input v-model="globalForm.embeddingDimension" type="number" min="1" />
-          </label>
-          <label>
-            <span>切片大小</span>
-            <input v-model="globalForm.chunkSize" type="number" min="100" />
-          </label>
-          <label>
-            <span>切片重叠</span>
-            <input v-model="globalForm.chunkOverlap" type="number" min="0" />
-          </label>
-          <label>
-            <span>召回数量</span>
-            <input v-model="globalForm.retrievalTopK" type="number" min="1" />
-          </label>
-          <label>
-            <span>分数阈值</span>
-            <input v-model="globalForm.scoreThreshold" placeholder="0-1，可空" />
-          </label>
-          <label class="check-row">
-            <input v-model="globalForm.rerankEnabled" type="checkbox" />
-            <span>启用重排序</span>
-          </label>
-
-          <h3 class="full-field form-subtitle">重排序</h3>
-          <label>
-            <span>服务 URL</span>
-            <input v-model="globalForm.rerankBaseUrl" />
-          </label>
-          <label>
-            <span>API Key</span>
-            <input v-model="globalForm.rerankApiKey" type="password" :placeholder="globalSetting?.rerankApiKeyConfigured ? '已配置' : ''" />
-          </label>
-          <label>
-            <span>重排序模型</span>
-            <input v-model="globalForm.rerankModel" />
-          </label>
-        </div>
-      </template>
-    </AdminConfirmDialog>
-
-    <AdminConfirmDialog v-model:visible="settingsVisible" title="知识库设置" message="" confirm-label="保存" @confirm="handleUpdate">
-      <template #default>
-        <div class="settings-dialog">
-          <section class="dialog-form">
-            <label>
-              <span>名称</span>
-              <input v-model="form.spaceName" />
-            </label>
-            <label>
-              <span>编码</span>
-              <input v-model="form.spaceCode" disabled />
-            </label>
-            <label class="full-field">
-              <span>描述</span>
-              <textarea v-model="form.description" rows="3" />
-            </label>
-            <label>
-              <span>查阅范围</span>
-              <select v-model="form.visibility">
-                <option value="PRIVATE">私有</option>
-                <option value="ROLE">按角色</option>
-                <option value="DEPARTMENT">按部门</option>
-                <option value="POSITION">按岗位</option>
-                <option value="PUBLIC">全员可查阅</option>
-              </select>
-            </label>
-            <label>
-              <span>状态</span>
-              <select v-model="form.status">
-                <option value="ACTIVE">启用</option>
-                <option value="INACTIVE">停用</option>
-              </select>
-            </label>
-          </section>
-
-          <section class="dialog-section">
-            <h3>模型设置</h3>
-            <div class="dialog-form">
-              <label>
-                <span>嵌入供应商</span>
-                <input v-model="form.embeddingProvider" placeholder="如 openai" />
-              </label>
-              <label>
-                <span>嵌入模型</span>
-                <input v-model="form.embeddingModel" placeholder="如 text-embedding-3-small" />
-              </label>
-              <label>
-                <span>向量维度</span>
-                <input v-model="form.embeddingDimension" type="number" min="1" />
-              </label>
-              <label>
-                <span>切片大小</span>
-                <input v-model="form.chunkSize" type="number" min="100" />
-              </label>
-              <label>
-                <span>切片重叠</span>
-                <input v-model="form.chunkOverlap" type="number" min="0" />
-              </label>
-              <label>
-                <span>召回数量</span>
-                <input v-model="form.retrievalTopK" type="number" min="1" />
-              </label>
-              <label>
-                <span>分数阈值</span>
-                <input v-model="form.scoreThreshold" placeholder="0-1，可空" />
-              </label>
-              <label class="check-row">
-                <input v-model="form.rerankEnabled" type="checkbox" />
-                <span>启用重排序</span>
-              </label>
-              <label>
-                <span>重排序供应商</span>
-                <input v-model="form.rerankProvider" />
-              </label>
-              <label>
-                <span>重排序模型</span>
-                <input v-model="form.rerankModel" />
-              </label>
-            </div>
-          </section>
-
-          <section class="dialog-section">
-            <div class="section-head">
-              <h3>查阅权限</h3>
-              <button class="secondary-button" :disabled="!settingsSpace || saving" @click.stop="saveAcl">
-                <Save :size="16" />
-                <span>保存权限</span>
-              </button>
-            </div>
-            <form class="acl-form" @submit.prevent="addAcl">
-              <select v-model="aclForm.subjectType">
-                <option value="ROLE">角色</option>
-                <option value="DEPARTMENT">部门</option>
-                <option value="POSITION">岗位</option>
-              </select>
-              <input v-model="aclForm.subjectId" placeholder="角色/部门/岗位 ID" />
-              <select v-model="aclForm.permCode">
-                <option value="read">可查阅</option>
-                <option value="manage">可管理</option>
-              </select>
-              <button class="secondary-button" type="submit">添加</button>
-            </form>
-            <AdminTable :columns="aclColumns" :rows="aclItems" :loading="aclLoading" row-key="aclId">
-              <template #cell-subjectType="{ row }">
-                {{ row.subjectType === 'ROLE' ? '角色' : row.subjectType === 'DEPARTMENT' ? '部门' : '岗位' }}
-              </template>
-              <template #cell-permCode="{ row }">
-                {{ row.permCode === 'manage' ? '可管理' : '可查阅' }}
-              </template>
-              <template #cell-_actions="{ row }">
-                <button class="danger-button action-btn" @click.stop="removeAcl(row)">移除</button>
-              </template>
-            </AdminTable>
-          </section>
-        </div>
-      </template>
-    </AdminConfirmDialog>
-
-    <Teleport to="body">
-      <div v-if="uploadVisible" class="upload-overlay" @click.self="closeUploadDialog">
-        <section class="upload-dialog" role="dialog" aria-modal="true" aria-labelledby="upload-dialog-title">
-          <header class="upload-dialog-head">
-            <h3 id="upload-dialog-title">上传文件</h3>
-            <button class="icon-button" type="button" title="关闭" :disabled="uploading" @click="closeUploadDialog">
-              <X :size="16" />
-            </button>
-          </header>
-
-          <form class="upload-dialog-form" @submit.prevent="uploadDocument">
-            <input ref="fileInputRef" class="file-picker-input" type="file" accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.png,.jpg,.jpeg,.webp" @change="handleFileChange" />
-            <button
-              :class="['upload-dropzone', { active: uploadDragActive }]"
-              type="button"
-              @click="openFilePicker"
-              @dragenter.prevent="uploadDragActive = true"
-              @dragover.prevent="uploadDragActive = true"
-              @dragleave.prevent="uploadDragActive = false"
-              @drop.prevent="handleFileDrop"
-            >
-              <Upload :size="22" />
-              <strong>{{ selectedFile?.name || '拖拽上传' }}</strong>
-              <span>{{ selectedFile ? formatBytes(selectedFile.size) : '选择本地文件' }}</span>
-            </button>
-
-            <div v-if="uploading || uploadStatus" class="upload-progress" role="status" aria-live="polite">
-              <div>
-                <span>{{ uploadStatus || '上传中' }}</span>
-                <strong>{{ uploadProgress }}%</strong>
-              </div>
-              <progress :value="uploadProgress" max="100">{{ uploadProgress }}%</progress>
-            </div>
-
-            <div class="upload-actions">
-              <button class="secondary-button" type="button" :disabled="uploading" @click="openFilePicker">选择本地文件</button>
-              <button class="primary-button" type="submit" :disabled="uploading || !selectedFile">
-                <Upload :size="16" />
-                <span>{{ uploading ? '上传中' : '上传文件' }}</span>
-              </button>
-            </div>
-          </form>
-        </section>
-      </div>
-    </Teleport>
+    <RagflowSpaceDeleteDialog
+      v-model:visible="spaceDeleteVisible"
+      :target="spaceDeleteTarget"
+      @confirm="confirmDeleteSpace"
+      @cancel="spaceDeleteTarget = null"
+    />
   </main>
 </template>
-
-<style scoped>
-.ragflow-search,
-.acl-form,
-.row-actions,
-.search-test,
-.section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.ragflow-search input {
-  width: 220px;
-}
-
-.model-setting-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-md);
-}
-
-.model-setting-grid div {
-  display: grid;
-  gap: var(--space-xs);
-  min-height: 72px;
-  padding: var(--space-md);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.model-setting-grid span,
-.model-setting-grid small {
-  color: var(--muted);
-  font-size: var(--text-xs);
-  font-weight: 700;
-}
-
-.model-setting-grid strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: var(--text-base);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row-actions {
-  flex-wrap: nowrap;
-}
-
-.action-btn {
-  min-height: 30px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-.cell-note {
-  display: block;
-  margin-top: 4px;
-  font-size: var(--text-xs);
-}
-
-.error-text {
-  color: var(--red);
-}
-
-.kb-detail-head {
-  display: grid;
-  grid-template-columns: var(--control-h) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-base);
-  margin-bottom: var(--space-md);
-}
-
-.kb-detail-title h2 {
-  margin: 0;
-  font-size: var(--text-md);
-}
-
-.kb-detail-title span {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
-
-.kb-detail-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.ragflow-detail-layout {
-  grid-column: span 12;
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
-  gap: var(--space-base);
-}
-
-.detail-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-base);
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.file-picker-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.search-test {
-  flex-direction: column;
-  align-items: stretch;
-  margin-bottom: var(--space-lg);
-}
-
-.hit-list,
-.settings-dialog {
-  display: grid;
-  gap: var(--space-lg);
-}
-
-.hit-item {
-  padding: var(--space-md);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.hit-item strong,
-.hit-item span {
-  display: block;
-}
-
-.hit-item span {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: var(--text-xs);
-}
-
-.hit-item p {
-  margin: var(--space-sm) 0 0;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  line-height: 1.6;
-}
-
-.dialog-form {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-lg);
-  margin-top: var(--space-md);
-}
-
-.dialog-form label,
-.dialog-form .check-row {
-  display: grid;
-  gap: var(--space-xs);
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.dialog-form .check-row {
-  display: flex;
-  align-items: center;
-  color: var(--ink);
-}
-
-.dialog-form .check-row input {
-  width: 18px;
-  min-height: 18px;
-}
-
-.form-subtitle {
-  margin: 0;
-  padding-top: var(--space-xs);
-  color: var(--ink);
-  font-size: var(--text-base);
-}
-
-.full-field {
-  grid-column: 1 / -1;
-}
-
-.settings-dialog {
-  max-height: 70vh;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.dialog-section {
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--line);
-}
-
-.dialog-section h3,
-.section-head h3 {
-  margin: 0;
-  font-size: var(--text-base);
-}
-
-.section-head {
-  justify-content: space-between;
-  margin-bottom: var(--space-md);
-}
-
-.acl-form {
-  margin-bottom: var(--space-md);
-}
-
-.upload-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: grid;
-  place-items: center;
-  padding: var(--space-xl);
-  background: rgba(0, 20, 60, 0.4);
-}
-
-.upload-dialog {
-  width: min(520px, 92vw);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-xl);
-}
-
-.upload-dialog-head,
-.upload-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-}
-
-.upload-dialog-head {
-  margin-bottom: var(--space-base);
-}
-
-.upload-dialog-head h3 {
-  margin: 0;
-  font-size: var(--text-md);
-}
-
-.upload-dialog-form {
-  display: grid;
-  gap: var(--space-base);
-}
-
-.upload-dropzone {
-  min-height: 180px;
-  display: grid;
-  place-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-xl);
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  color: var(--muted);
-  text-align: center;
-  transition: all 200ms ease;
-}
-
-.upload-dropzone:hover,
-.upload-dropzone.active {
-  border-color: var(--green);
-  background: var(--hover-bg);
-  color: var(--green-dark);
-}
-
-.upload-dropzone strong {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: var(--text-base);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.upload-dropzone span {
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
-
-.upload-progress {
-  display: grid;
-  gap: var(--space-xs);
-}
-
-.upload-progress div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.upload-progress strong {
-  color: var(--green-dark);
-}
-
-.upload-progress progress {
-  width: 100%;
-  height: 8px;
-  overflow: hidden;
-  border: 0;
-  border-radius: 999px;
-  background: var(--surface);
-}
-
-.upload-progress progress::-webkit-progress-bar {
-  background: var(--surface);
-}
-
-.upload-progress progress::-webkit-progress-value {
-  border-radius: 999px;
-  background: var(--green);
-}
-
-.upload-progress progress::-moz-progress-bar {
-  border-radius: 999px;
-  background: var(--green);
-}
-
-@media (max-width: 980px) {
-  .ragflow-search,
-  .acl-form {
-    flex-wrap: wrap;
-  }
-
-  .model-setting-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ragflow-detail-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .kb-detail-head {
-    grid-template-columns: var(--control-h) minmax(0, 1fr);
-  }
-
-  .kb-detail-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-  }
-
-  .dialog-form {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 560px) {
-  .model-setting-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .upload-dialog {
-    padding: var(--space-base);
-  }
-
-  .upload-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-</style>

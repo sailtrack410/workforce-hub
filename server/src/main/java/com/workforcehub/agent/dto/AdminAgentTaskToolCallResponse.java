@@ -16,11 +16,15 @@ public class AdminAgentTaskToolCallResponse {
     private String toolCode;
     private String toolName;
     private String toolType;
+    private String toolTypeName;
     private String riskLevel;
+    private String riskLevelName;
     private Boolean readOnlyFlag;
     private String requestPayloadJson;
     private String responsePayloadJson;
     private String approvalStatus;
+    private String approvalStatusName;
     private String resultStatus;
+    private String resultStatusName;
     private LocalDateTime calledAt;
 }

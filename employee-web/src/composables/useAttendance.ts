@@ -3,6 +3,7 @@ import { employeeApi } from '@/api';
 import type {
   AttendanceDailyResultResponse,
   AttendanceExceptionResponse,
+  EntityId,
   PunchRecordResponse,
   WorkflowRequestCreateResponse,
 } from '@/api';
@@ -25,9 +26,13 @@ export function thisMonthRange() {
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
+    startDate: toDateKey(start),
+    endDate: toDateKey(end),
   };
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 export function useAttendance({
@@ -55,13 +60,43 @@ export function useAttendance({
   const clockCorrectionResult = ref<WorkflowRequestCreateResponse | null>(null);
   const clockCorrectionError = ref('');
 
-  const attendanceSummary = computed<Array<[string, string]>>(() => [
-    ['日结果', `${attendanceDailyResults.value.length} 条`],
-    ['异常', `${attendanceExceptions.value.length} 条`],
-    ['团队考勤', `${teamAttendanceDailyResults.value.length} 条`],
-    ['本月范围', `${thisMonthRange().startDate} 至 ${thisMonthRange().endDate}`],
+  const todayKey = computed(() => toDateKey(new Date()));
+  const todayResult = computed(() => attendanceDailyResults.value.find((item) => item.workDate === todayKey.value) ?? null);
+  const todayExceptions = computed(() => attendanceExceptions.value.filter((item) => item.workDate === todayKey.value));
+  const latestDailyResult = computed(() => attendanceDailyResults.value[0] ?? null);
+  const attendanceSummary = computed<Array<[string, string]>>(() => {
+    const normalDays = attendanceDailyResults.value.filter((item) => item.resultStatus === 'NORMAL').length;
+    const abnormalDays = attendanceDailyResults.value.filter((item) => item.resultStatus === 'ABNORMAL' || item.exceptionFlag).length;
+    const missPunchCount = attendanceExceptions.value.filter((item) => item.exceptionType === 'MISS_PUNCH').length;
+    return [
+      ['出勤天数', `${normalDays} 天`],
+      ['异常次数', `${attendanceExceptions.value.length} 次`],
+      ['缺卡次数', `${missPunchCount} 次`],
+      ['异常天数', `${abnormalDays} 天`],
+    ];
+  });
+  const attendanceRiskSummary = computed<Array<[string, string]>>(() => [
+    ['今日异常', `${todayExceptions.value.length} 条`],
+    ['待处理异常', `${attendanceExceptions.value.filter((item) => item.status !== 'DONE').length} 条`],
+    ['团队异常', `${teamAttendanceDailyResults.value.filter((item) => item.resultStatus === 'ABNORMAL' || item.exceptionFlag).length} 条`],
   ]);
-  const teamAttendanceRows = computed(() => teamAttendanceDailyResults.value.slice(0, 12));
+  const teamUserNameMap = computed(() => new Map(session.subordinates.map((user) => [String(user.userId), user.realName || '未命名员工'])));
+  const teamAttendanceRows = computed(() => teamAttendanceDailyResults.value
+    .filter((item) => item.resultStatus === 'ABNORMAL' || item.exceptionFlag)
+    .slice(0, 12)
+    .map((item) => ({
+      ...item,
+      userName: teamUserNameMap.value.get(String(item.userId)) ?? '未命名员工',
+    })));
+
+  function openClockCorrectionFromException(exception?: AttendanceExceptionResponse) {
+    if (exception) {
+      clockCorrectionForm.value.targetDate = exception.workDate;
+      clockCorrectionForm.value.missingPunchType = exception.exceptionType === 'LATE' ? 'ON_DUTY' : 'OFF_DUTY';
+    }
+    clockCorrectionError.value = '';
+    clockCorrectionResult.value = null;
+  }
 
   // 并行加载本月考勤日结果、异常、团队考勤
   async function refreshAttendancePanel() {
@@ -76,11 +111,15 @@ export function useAttendance({
       ]);
       attendanceDailyResults.value = dailyResults;
       attendanceExceptions.value = exceptions;
-      // 团队考勤：逐个下属查询，任一失败不影响其他
-      const subordinateResults = await Promise.all(
-        session.subordinates.map((user) => employeeApi.attendance.teamDailyResults({ ...range, userId: user.userId }).catch(() => [])),
-      );
-      teamAttendanceDailyResults.value = subordinateResults.flat();
+      if (session.subordinates.length) {
+        // 团队考勤：逐个下属查询，任一失败不影响其他
+        const subordinateResults = await Promise.all(
+          session.subordinates.map((user) => employeeApi.attendance.teamDailyResults({ ...range, userId: user.userId }).catch(() => [])),
+        );
+        teamAttendanceDailyResults.value = subordinateResults.flat();
+      } else {
+        teamAttendanceDailyResults.value = [];
+      }
     } catch (error) {
       attendanceError.value = error instanceof Error ? error.message : '考勤加载失败';
     } finally {
@@ -117,6 +156,10 @@ export function useAttendance({
       clockCorrectionError.value = '请完整填写补卡申请';
       return;
     }
+    if (clockCorrectionForm.value.expectedPunchAt.slice(0, 10) !== targetDate) {
+      clockCorrectionError.value = '补卡时间需与考勤日期一致';
+      return;
+    }
     clockCorrectionSubmitting.value = true;
     try {
       clockCorrectionResult.value = await employeeApi.workflow.submitClockCorrectionRequest({
@@ -145,15 +188,21 @@ export function useAttendance({
     attendanceError,
     punchLoading,
     punchResult,
+    todayKey,
+    todayResult,
+    todayExceptions,
+    latestDailyResult,
     clockCorrectionForm,
     clockCorrectionAttachmentIds,
     clockCorrectionSubmitting,
     clockCorrectionResult,
     clockCorrectionError,
     attendanceSummary,
+    attendanceRiskSummary,
     teamAttendanceRows,
     refreshAttendancePanel,
     punchAttendance,
+    openClockCorrectionFromException,
     submitClockCorrectionRequest,
   };
 }

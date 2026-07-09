@@ -45,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -1153,6 +1154,80 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[0].senderType").value("USER"))
             .andExpect(jsonPath("$.data[1].senderType").value("SYSTEM"))
             .andExpect(jsonPath("$.data[1].contentText").value("AI助手暂时无法回复，请稍后再试"));
+
+        assertEquals(0L, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM agt_task
+            WHERE agent_id = ?
+              AND context_id = ?
+            """, Long.class, agentId, conversationId));
+        assertSocketEvent(employeeSocket, "IM_MESSAGE_CREATED", conversationId);
+        assertSocketEvent(employeeSocket, "IM_AGENT_REPLY_FAILED", conversationId);
+        unregisterSocket(EMPLOYEE_USER_ID, employeeSocket);
+    }
+
+    @Test
+    @DisplayName("已弃用Agent的既有IM会话再次提问应写入弃用提示")
+    void deprecatedAgentConversationShouldWriteDeprecatedSystemMessage() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long agentId = createPublishedAgentWithoutTool(adminSession, "IM_DEPRECATED_AGENT", "弃用IM助手");
+        grantAgentAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        CapturingWebSocketSession employeeSocket = registerSocket(EMPLOYEE_USER_ID);
+
+        MvcResult conversationResult = mockMvc.perform(post("/api/employee/im/agent-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentId": %d
+                    }
+                    """.formatted(agentId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long conversationId = data(conversationResult).get("conversationId").asLong();
+
+        mockMvc.perform(delete("/api/admin/agents/{agentId}", agentId)
+                .cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/employee/im/agent-conversations")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentId": %d
+                    }
+                    """.formatted(agentId)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("当前 Agent 已弃用，无法继续对话"));
+
+        mockMvc.perform(post("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "messageType": "TEXT",
+                      "text": "弃用后继续提问",
+                      "clientMessageId": "client-msg-agent-deprecated"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.seqNo").value(1));
+
+        awaitMessageCount(conversationId, 2L);
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}/messages", conversationId)
+                .cookie(employeeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(2)))
+            .andExpect(jsonPath("$.data[0].senderType").value("USER"))
+            .andExpect(jsonPath("$.data[1].senderType").value("SYSTEM"))
+            .andExpect(jsonPath("$.data[1].contentText").value("当前 Agent 已弃用，无法继续对话"));
 
         assertEquals(0L, jdbcTemplate.queryForObject("""
             SELECT COUNT(*)

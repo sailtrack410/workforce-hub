@@ -12,7 +12,6 @@ public class OrgDepartmentSaveRequest {
 
     private Long parentId;
 
-    @NotBlank(message = "deptCode 不能为空")
     @Size(max = 64, message = "deptCode 长度不能超过 64")
     private String deptCode;
 

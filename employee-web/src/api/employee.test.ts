@@ -62,6 +62,13 @@ describe('createEmployeeApi', () => {
       expectedPunchAt: '2026-05-01T09:00:00',
       reason: '补卡',
     });
+    await api.workflow.submitGenericRequest({
+      processCode: 'EXPENSE',
+      title: '费用报销',
+      summary: '客户拜访交通费',
+      formPayload: { fields: [{ key: 'reason', label: '报销事由', value: '客户拜访交通费' }] },
+      attachmentRefIds: [101],
+    });
     await api.workflow.todos();
     await api.workflow.requests({ pageNo: 2, pageSize: 20, status: 'PENDING' });
     await api.workflow.approveTask('TASK-1', { comment: '同意' });
@@ -84,6 +91,13 @@ describe('createEmployeeApi', () => {
         missingPunchType: 'CLOCK_IN',
         expectedPunchAt: '2026-05-01T09:00:00',
         reason: '补卡',
+      }],
+      ['post', '/api/employee/workflow/generic-requests', {
+        processCode: 'EXPENSE',
+        title: '费用报销',
+        summary: '客户拜访交通费',
+        formPayload: { fields: [{ key: 'reason', label: '报销事由', value: '客户拜访交通费' }] },
+        attachmentRefIds: [101],
       }],
       ['get', '/api/employee/workflow/todos', undefined],
       ['get', '/api/employee/workflow/requests', { query: { pageNo: 2, pageSize: 20, status: 'PENDING' } }],
@@ -217,7 +231,7 @@ describe('createEmployeeApi', () => {
     const api = createEmployeeApi(client);
 
     await api.me.profile();
-    await api.me.updateProfile({ mobile: '13900002202' });
+    await api.me.updateProfile({ mobile: '13900002202', avatarAttachmentRefId: '2053928981082898444' });
     await api.me.manager();
     await api.me.subordinates();
     await api.im.groupMembers(7001);
@@ -241,13 +255,10 @@ describe('createEmployeeApi', () => {
     await api.im.deleteMessage(7001, 7101);
     await api.im.createMessageAttachmentDownloadTicket('2053928814116044802', '2053928814116044811', '2053928981082898444', { downloadType: 'SINGLE' });
     await api.agents.list({ keyword: 'HR' });
-    await api.agents.createTask(9001, { triggerType: 'MANUAL', inputPayloadJson: '{}' });
-    await api.agentTasks.confirm('2053928981082898433', { approved: true, comment: '确认' });
-    await api.agentTasks.cancel('2053928981082898433', { reason: '取消' });
 
     expect(calls).toEqual([
       ['get', '/api/employee/me/profile', undefined],
-      ['put', '/api/employee/me/profile', { mobile: '13900002202' }],
+      ['put', '/api/employee/me/profile', { mobile: '13900002202', avatarAttachmentRefId: '2053928981082898444' }],
       ['get', '/api/employee/me/manager', undefined],
       ['get', '/api/employee/me/subordinates', undefined],
       ['get', '/api/employee/im/group-conversations/7001/members', undefined],
@@ -271,10 +282,18 @@ describe('createEmployeeApi', () => {
       ['post', '/api/employee/im/conversations/7001/messages/7101/delete', undefined],
       ['post', '/api/employee/im/conversations/2053928814116044802/messages/2053928814116044811/attachments/2053928981082898444/download-tickets', { downloadType: 'SINGLE' }],
       ['get', '/api/employee/agents', { query: { keyword: 'HR' } }],
-      ['post', '/api/employee/agents/9001/tasks', { triggerType: 'MANUAL', inputPayloadJson: '{}' }],
-      ['post', '/api/employee/agent-tasks/2053928981082898433/confirm', { approved: true, comment: '确认' }],
-      ['post', '/api/employee/agent-tasks/2053928981082898433/cancel', { reason: '取消' }],
     ]);
     expect(api.im.downloadAttachmentUrl('IM-1')).toBe('/api/employee/im/attachments/download/IM-1');
+  });
+
+  it('allows profile updates to preserve the current avatar ref', async () => {
+    const { client, calls } = createSpyClient();
+    const api = createEmployeeApi(client);
+
+    await api.me.updateProfile({ mobile: '13900002202', avatarAttachmentRefId: '2053928981082898444' });
+
+    expect(calls).toEqual([
+      ['put', '/api/employee/me/profile', { mobile: '13900002202', avatarAttachmentRefId: '2053928981082898444' }],
+    ]);
   });
 });

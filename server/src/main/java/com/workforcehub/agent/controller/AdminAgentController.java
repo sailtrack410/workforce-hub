@@ -5,6 +5,7 @@ import com.workforcehub.agent.dto.AgentResponse;
 import com.workforcehub.agent.dto.AgentToolBindingResponse;
 import com.workforcehub.agent.dto.AgentToolResponse;
 import com.workforcehub.agent.dto.AgentVersionResponse;
+import com.workforcehub.agent.dto.AiProviderResponse;
 import com.workforcehub.agent.dto.BindAgentToolRequest;
 import com.workforcehub.agent.dto.CreateAgentRequest;
 import com.workforcehub.agent.dto.CreateAgentToolRequest;
@@ -13,6 +14,9 @@ import com.workforcehub.agent.dto.CreateLlmModelRequest;
 import com.workforcehub.agent.dto.GrantAgentAclRequest;
 import com.workforcehub.agent.dto.LlmModelResponse;
 import com.workforcehub.agent.dto.ModelTestResponse;
+import com.workforcehub.agent.dto.ProviderModelOptionResponse;
+import com.workforcehub.agent.dto.SaveAiProviderRequest;
+import com.workforcehub.agent.dto.TestLlmModelRequest;
 import com.workforcehub.agent.dto.TrialRunRequest;
 import com.workforcehub.agent.dto.TrialRunResponse;
 import com.workforcehub.agent.dto.UpdateAgentVersionRequest;
@@ -73,6 +77,12 @@ public class AdminAgentController {
     public R<AgentResponse> updateAgent(@PathVariable Long agentId,
                                         @Valid @RequestBody UpdateAgentRequest request) {
         return R.ok(agentService.updateAgent(agentId, request));
+    }
+
+    @DeleteMapping("/{agentId}")
+    public R<Void> deleteAgent(@PathVariable Long agentId) {
+        agentService.deleteAgent(agentId);
+        return R.ok();
     }
 
     @GetMapping("/{agentId}/versions")
@@ -141,6 +151,38 @@ public class AdminAgentController {
 
     // ==================== LLM Models ====================
 
+    @GetMapping("/ai-providers")
+    public R<List<AiProviderResponse>> listAiProviders() {
+        return R.ok(agentService.listAiProviders());
+    }
+
+    @PostMapping("/ai-providers")
+    public R<AiProviderResponse> createAiProvider(@Valid @RequestBody SaveAiProviderRequest request) {
+        return R.ok(agentService.createAiProvider(request));
+    }
+
+    @PutMapping("/ai-providers/{providerId}")
+    public R<AiProviderResponse> updateAiProvider(@PathVariable Long providerId,
+                                                  @Valid @RequestBody SaveAiProviderRequest request) {
+        return R.ok(agentService.updateAiProvider(providerId, request));
+    }
+
+    @DeleteMapping("/ai-providers/{providerId}")
+    public R<Void> deleteAiProvider(@PathVariable Long providerId) {
+        agentService.deleteAiProvider(providerId);
+        return R.ok();
+    }
+
+    @PostMapping("/ai-providers/{providerId}/test")
+    public R<ModelTestResponse> testAiProvider(@PathVariable Long providerId) {
+        return R.ok(agentService.testAiProvider(providerId));
+    }
+
+    @GetMapping("/ai-providers/{providerId}/models")
+    public R<List<ProviderModelOptionResponse>> listProviderModels(@PathVariable Long providerId) {
+        return R.ok(agentService.listProviderModels(providerId));
+    }
+
     @GetMapping("/llm-models")
     public R<List<LlmModelResponse>> listLlmModels() {
         return R.ok(agentService.listLlmModels());
@@ -149,6 +191,11 @@ public class AdminAgentController {
     @PostMapping("/llm-models")
     public R<LlmModelResponse> createLlmModel(@Valid @RequestBody CreateLlmModelRequest request) {
         return R.ok(agentService.createLlmModel(request));
+    }
+
+    @PostMapping("/llm-models/test")
+    public R<ModelTestResponse> testModelDraft(@Valid @RequestBody TestLlmModelRequest request) {
+        return R.ok(agentService.testModelConnection(request));
     }
 
     @PutMapping("/llm-models/{modelId}")

@@ -152,6 +152,7 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
             jdbcTemplate.execute("DELETE FROM wf_req_overtime");
             jdbcTemplate.execute("DELETE FROM wf_req_clock_correction");
             jdbcTemplate.execute("DELETE FROM wf_req_hr_change");
+            deleteIfExists(jdbcTemplate, "wf_req_generic");
             jdbcTemplate.execute("DELETE FROM wf_request");
             jdbcTemplate.execute("DELETE FROM wf_template_version");
             jdbcTemplate.execute("DELETE FROM wf_template");

@@ -21,7 +21,7 @@ import type { ContactRecord, EntityId, OrgDepartmentTreeNodeResponse } from '@/s
 import { employeeApi } from '@/api';
 import type { AgentResponse, OrgUserSummaryResponse } from '@/api';
 import { useContactsSectionContext } from '../employee-shell-context';
-import { displayField, employmentStatusLabel } from '@/utils/employee-format';
+import { agentTypeLabel, displayField, employmentStatusLabel } from '@/utils/employee-format';
 import { humanizeText } from '@/utils/employee-format';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
@@ -463,7 +463,7 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
               />
               <span>
                 <strong>{{ humanizeText(agent.agentName) }}</strong>
-                <small>{{ agent.agentType }}</small>
+                <small>{{ agent.agentTypeName || agentTypeLabel(agent.agentType) }}</small>
               </span>
               <AppTag tone="success">AI 助手</AppTag>
             </button>
@@ -607,10 +607,6 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
         <div>
           <dt>职位</dt>
           <dd>{{ displayField(profileContact.role) }}</dd>
-        </div>
-        <div>
-          <dt>工号</dt>
-          <dd>{{ displayField(profileContact.employeeNo) }}</dd>
         </div>
         <div>
           <dt>直属上级</dt>

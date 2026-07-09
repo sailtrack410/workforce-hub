@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AdminAgentTaskResponse } from '@/api/types';
 import type { EntityId } from '@/api/types';
-import { formatDateTime, humanizeText, shortId, statusLabel } from '@/utils/format';
+import { formatDateTime, humanizeText, statusLabel } from '@/utils/format';
 import { useAgentTasksStore } from '@/stores/agentTasks';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
@@ -40,8 +40,18 @@ const columns: TableColumn[] = [
         <option value="FAILED">失败</option>
         <option value="CANCELLED">已取消</option>
       </select>
-      <input v-model="store.filters.contextType" placeholder="contextType" />
-      <input v-model="store.filters.triggeredByType" placeholder="triggeredByType" />
+      <select v-model="store.filters.contextType">
+        <option value="">全部场景</option>
+        <option value="USER_QUERY">员工咨询</option>
+        <option value="WF_REQUEST">审批申请</option>
+        <option value="IM_GROUP">群聊消息</option>
+      </select>
+      <select v-model="store.filters.triggeredByType">
+        <option value="">全部来源</option>
+        <option value="USER">员工</option>
+        <option value="ADMIN">管理员</option>
+        <option value="SYSTEM">系统</option>
+      </select>
     </AdminFilterBar>
     <AdminTable
       :columns="columns"
@@ -52,13 +62,13 @@ const columns: TableColumn[] = [
       @select="(row) => $emit('select', row)"
     >
       <template #cell-taskId="{ row }">
-        #{{ shortId(row.taskId) }}
+        {{ row.contextDisplayName || row.contextTypeName || 'AI 任务' }}
       </template>
       <template #cell-agentName="{ row }">
-        {{ humanizeText(row.agentName) || row.agentCode || shortId(row.agentId) }}
+        {{ humanizeText(row.agentName) || 'AI 助手' }}
       </template>
       <template #cell-status="{ row }">
-        <span class="status-pill">{{ statusLabel(row.status) }}</span>
+        <span class="status-pill">{{ row.statusName || statusLabel(row.status) }}</span>
       </template>
       <template #cell-createdAt="{ row }">
         {{ formatDateTime(row.createdAt) }}

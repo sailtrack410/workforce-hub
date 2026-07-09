@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class WorkflowLeaveDetailResponse {
 
     private Long leaveTypeId;
+    private String leaveName;
     private LocalDateTime startAt;
     private LocalDateTime endAt;
     private Integer durationMinutes;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { Crosshair, Plus, RefreshCcw, X } from 'lucide-vue-next';
+import { Crosshair, Plus, RefreshCcw } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type { EntityId, OrgUserSummaryResponse, OrgUserDetailResponse, OrgDepartmentTreeNodeResponse, OrgPositionResponse, OrgUserListQuery } from '@/api/types';
-import { errorMessage, formatDateTime, statusLabel } from '@/utils/format';
+import { errorMessage, formatDateTime, genderLabel, statusLabel } from '@/utils/format';
 import { useUserViewStore } from '@/stores/userView';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
@@ -13,6 +13,8 @@ import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vu
 import AdminSkeleton from '@/components/AdminSkeleton.vue';
 import AdminPagination from '@/components/AdminPagination.vue';
 import OrgMindTree from '@/components/OrgMindTree.vue';
+import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
+import AdminDialog from '@/components/AdminDialog.vue';
 
 const store = useUserViewStore();
 const toast = useToast();
@@ -26,7 +28,7 @@ const selectedDetail = ref<OrgUserDetailResponse | null>(null);
 const depts = ref<OrgDepartmentTreeNodeResponse[]>([]);
 const positions = ref<OrgPositionResponse[]>([]);
 const creating = ref(false);
-const createForm = reactive({ employeeNo: '', realName: '', gender: 'MALE', mobile: '', primaryDeptId: undefined as number | undefined, positionId: undefined as number | undefined, employmentStatus: 'ACTIVE', status: 'ACTIVE' });
+const createForm = reactive({ realName: '', gender: 'MALE', mobile: '', primaryDeptId: undefined as number | undefined, positionId: undefined as number | undefined, employmentStatus: 'ACTIVE', status: 'ACTIVE' });
 const departmentCreating = ref(false);
 const departmentFormOpen = ref(false);
 const departmentForm = reactive({ parentId: undefined as EntityId | undefined, deptCode: '', deptName: '' });
@@ -34,6 +36,8 @@ const ORG_ROOT_ID = '__org_root__';
 const orgViewportRef = ref<HTMLElement | null>(null);
 const orgCanvasRef = ref<HTMLElement | null>(null);
 const detailDialogOpen = ref(false);
+const departmentDeleteVisible = ref(false);
+const departmentDeleteTarget = ref<OrgDepartmentTreeNodeResponse | null>(null);
 const orgLinks = ref<OrgLink[]>([]);
 const orgCanvasSize = reactive({ width: 0, height: 0 });
 const orgPanState = { active: false, moved: false, pointerId: 0, x: 0, y: 0, left: 0, top: 0 };
@@ -47,7 +51,6 @@ interface OrgLink {
 }
 
 const columns: TableColumn[] = [
-  { key: 'employeeNo', label: '工号' },
   { key: 'realName', label: '姓名' },
   { key: 'primaryDeptName', label: '部门' },
   { key: 'positionName', label: '岗位' },
@@ -58,9 +61,8 @@ const detailRows = computed<DetailRow[]>(() => {
   const r = selectedDetail.value;
   if (!r) return [];
   return [
-    { label: '工号', value: r.employeeNo ?? '-' },
     { label: '姓名', value: r.realName },
-    { label: '性别', value: r.gender ?? '-' },
+    { label: '性别', value: genderLabel(r.gender) },
     { label: '手机', value: r.mobile ?? '-' },
     { label: '邮箱', value: r.email ?? '-' },
     { label: '部门', value: r.primaryDeptName ?? '-' },
@@ -179,7 +181,6 @@ async function handleCreate() {
   creating.value = true;
   try {
     await adminApi.org.createUser(createForm);
-    createForm.employeeNo = '';
     createForm.realName = '';
     createForm.mobile = '';
     await Promise.all([loadList(), loadMeta()]);
@@ -203,7 +204,7 @@ async function handleCreateDepartment() {
     const parentId = departmentForm.parentId;
     const deptId = await adminApi.org.createDepartment({
       parentId: parentId ?? null,
-      deptCode: departmentForm.deptCode.trim(),
+      deptCode: '',
       deptName: departmentForm.deptName.trim(),
       deptType: 'TEAM',
       status: 'ACTIVE',
@@ -226,9 +227,15 @@ async function handleCreateDepartment() {
   }
 }
 
-async function handleDeleteDepartment(dept: OrgDepartmentTreeNodeResponse) {
+function handleDeleteDepartment(dept: OrgDepartmentTreeNodeResponse) {
   if (String(dept.id) === ORG_ROOT_ID) return;
-  if (!window.confirm('删除部门')) return;
+  departmentDeleteTarget.value = dept;
+  departmentDeleteVisible.value = true;
+}
+
+async function confirmDeleteDepartment() {
+  const dept = departmentDeleteTarget.value;
+  if (!dept || String(dept.id) === ORG_ROOT_ID) return;
   try {
     await adminApi.org.deleteDepartment(dept.id);
     expandedDeptIds.value = expandedDeptIds.value.filter((item) => item !== String(dept.id));
@@ -238,6 +245,8 @@ async function handleDeleteDepartment(dept: OrgDepartmentTreeNodeResponse) {
     await Promise.all([loadList(), loadMeta()]);
   } catch (e) {
     toast.error(errorMessage(e));
+  } finally {
+    departmentDeleteTarget.value = null;
   }
 }
 
@@ -378,7 +387,7 @@ onBeforeUnmount(() => {
       <template #actions>
         <button class="icon-button" title="新建部门" @click="startCreateDepartment(null)"><Plus :size="16" /></button>
         <button class="icon-button" title="重置视图" @click="resetOrgPan"><Crosshair :size="16" /></button>
-        <button class="icon-button" title="刷新" @click="loadMeta"><RefreshCcw :size="16" /></button>
+        <button class="secondary-button" title="刷新" @click="loadMeta"><RefreshCcw :size="16" />刷新</button>
       </template>
 
       <div v-if="departmentFormOpen" class="department-form stack-form">
@@ -388,11 +397,10 @@ onBeforeUnmount(() => {
             <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ f.node.deptName }}</option>
           </select>
         </label>
-        <label>部门编码 <input v-model="departmentForm.deptCode" /></label>
         <label>部门名称 <input v-model="departmentForm.deptName" /></label>
         <div class="department-actions">
           <button class="secondary-button" @click="departmentFormOpen = false">取消</button>
-          <button class="primary-button" :disabled="departmentCreating || !departmentForm.deptCode.trim() || !departmentForm.deptName.trim()" @click="handleCreateDepartment">
+          <button class="primary-button" :disabled="departmentCreating || !departmentForm.deptName.trim()" @click="handleCreateDepartment">
             <Plus :size="16" /> 创建
           </button>
         </div>
@@ -462,10 +470,10 @@ onBeforeUnmount(() => {
 
     <AdminPanel :span="7" title="人员列表">
       <template #actions>
-        <button class="icon-button" title="刷新" @click="loadList"><RefreshCcw :size="16" /></button>
+        <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
       <AdminFilterBar>
-        <input v-model="store.filters.keyword" placeholder="搜索工号/姓名" @keyup.enter="loadList" />
+        <input v-model="store.filters.keyword" placeholder="搜索姓名" @keyup.enter="loadList" />
         <select v-model="store.filters.deptId" @change="loadList">
           <option :value="undefined">全部部门</option>
           <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ '&nbsp;'.repeat(f.depth * 4) }}{{ f.node.deptName }}</option>
@@ -482,7 +490,6 @@ onBeforeUnmount(() => {
       <details class="create-section">
         <summary class="create-summary">新建员工</summary>
         <div class="stack-form create-form">
-          <label>工号 <input v-model="createForm.employeeNo" /></label>
           <label>姓名 <input v-model="createForm.realName" /></label>
           <label>手机 <input v-model="createForm.mobile" /></label>
           <label>部门
@@ -497,7 +504,7 @@ onBeforeUnmount(() => {
               <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.positionName }}</option>
             </select>
           </label>
-          <button class="primary-button" :disabled="creating || !createForm.employeeNo || !createForm.realName" @click="handleCreate">
+          <button class="primary-button" :disabled="creating || !createForm.realName || !createForm.primaryDeptId" @click="handleCreate">
             <Plus :size="16" /> 创建
           </button>
         </div>
@@ -510,7 +517,9 @@ onBeforeUnmount(() => {
         :selected-id="store.selectedUserId"
         row-key="userId"
         @row-click="onRowClick"
-      />
+      >
+        <template #cell-employmentStatus="{ row }">{{ statusLabel(row.employmentStatus ?? '') }}</template>
+      </AdminTable>
       <AdminPagination
         :page-no="store.pagination.pageNo"
         :page-size="store.pagination.pageSize"
@@ -520,19 +529,21 @@ onBeforeUnmount(() => {
       />
     </AdminPanel>
 
-    <Teleport to="body">
-      <div v-if="detailDialogOpen" class="user-detail-overlay" @click.self="closeUserDetail">
-        <section class="user-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="user-detail-title">
-          <header class="user-detail-header">
-            <h3 id="user-detail-title">员工详情</h3>
-            <button type="button" class="icon-button" title="关闭" @click="closeUserDetail"><X :size="16" /></button>
-          </header>
-          <AdminSkeleton v-if="detailLoading" :lines="5" />
-          <AdminDetailList v-else-if="selectedDetail" :rows="detailRows" />
-          <div v-else class="empty-state">无数据</div>
-        </section>
-      </div>
-    </Teleport>
+    <AdminDialog v-model:visible="detailDialogOpen" title="员工详情" labelled-by="user-detail-title" width="min(560px, 92vw)" @close="closeUserDetail">
+      <AdminSkeleton v-if="detailLoading" :lines="5" />
+      <AdminDetailList v-else-if="selectedDetail" :rows="detailRows" />
+      <div v-else class="empty-state">无数据</div>
+    </AdminDialog>
+
+    <AdminConfirmDialog
+      v-model:visible="departmentDeleteVisible"
+      title="删除部门"
+      message="删除部门"
+      confirm-label="删除"
+      :danger="true"
+      @confirm="confirmDeleteDepartment"
+      @cancel="departmentDeleteTarget = null"
+    />
   </div>
 </template>
 
@@ -610,7 +621,7 @@ onBeforeUnmount(() => {
 
 .org-link-path {
   fill: none;
-  stroke: rgba(22, 119, 255, 0.42);
+  stroke: var(--org-link-stroke);
   stroke-width: 2;
   stroke-linecap: round;
 }
@@ -660,37 +671,4 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.user-detail-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: grid;
-  place-items: center;
-  padding: var(--space-xl);
-  background: rgba(0, 20, 60, 0.4);
-}
-
-.user-detail-dialog {
-  width: min(560px, 92vw);
-  max-height: min(720px, 86vh);
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel-strong);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-xl);
-}
-
-.user-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  margin-bottom: var(--space-base);
-}
-
-.user-detail-header h3 {
-  margin: 0;
-  font-size: 17px;
-}
 </style>

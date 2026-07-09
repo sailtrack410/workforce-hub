@@ -382,6 +382,8 @@ public class LeaveRepository {
         return """
             SELECT la.id AS account_id,
                    la.user_id,
+                   u.employee_no,
+                   u.real_name,
                    la.leave_type_id,
                    lt.leave_code,
                    lt.leave_name,
@@ -392,6 +394,7 @@ public class LeaveRepository {
                    la.status
             FROM lv_account la
             JOIN lv_type lt ON lt.id = la.leave_type_id
+            LEFT JOIN org_user u ON u.id = la.user_id
             """;
     }
 
@@ -399,6 +402,8 @@ public class LeaveRepository {
         return new LeaveAccountRow(
             rs.getLong("account_id"),
             rs.getLong("user_id"),
+            rs.getString("employee_no"),
+            rs.getString("real_name"),
             rs.getLong("leave_type_id"),
             rs.getString("leave_code"),
             rs.getString("leave_name"),

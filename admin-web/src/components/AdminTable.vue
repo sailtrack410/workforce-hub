@@ -81,6 +81,7 @@ function toggleSort(col: TableColumn) {
           <th
             v-for="col in columns"
             :key="col.key"
+            scope="col"
             :class="{ sortable: col.sortable, sorted: sortKey === col.key }"
             :style="col.width ? { width: col.width } : undefined"
             @click="toggleSort(col)"
@@ -138,7 +139,7 @@ th, td {
 }
 
 th {
-  background: #F8FAFC;
+  background: var(--table-head-bg);
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: 700;

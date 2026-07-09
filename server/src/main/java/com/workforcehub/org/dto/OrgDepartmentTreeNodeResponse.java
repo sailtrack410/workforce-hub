@@ -17,9 +17,11 @@ public class OrgDepartmentTreeNodeResponse {
     private String deptCode;
     private String deptName;
     private String deptType;
+    private String deptTypeName;
     private Integer deptLevel;
     private Long leaderUserId;
     private String leaderName;
     private String status;
+    private String statusName;
     private List<OrgDepartmentTreeNodeResponse> children = new ArrayList<>();
 }

@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { Play, RefreshCcw } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type { CleanupJobRunResponse, StorageSummaryResponse } from '@/api/types';
-import { errorMessage, formatBytes, statusLabel } from '@/utils/format';
+import { cleanupJobTypeLabel, errorMessage, formatBytes, safeBusinessMessage, statusLabel } from '@/utils/format';
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
@@ -42,8 +42,8 @@ const resultRows = computed<DetailRow[]>(() => {
   const r = result.value;
   if (!r) return [];
   return [
-    { label: '任务', value: r.jobRunId },
-    { label: '类型', value: r.jobType },
+    { label: '任务', value: '本次执行' },
+    { label: '类型', value: cleanupJobTypeLabel(r.jobType) },
     { label: '模式', value: r.dryRun ? '模拟清理' : '正式清理' },
     { label: '状态', value: statusLabel(r.jobStatus) },
     { label: '过期上传票据', value: String(r.expiredUploadTickets ?? 0) },
@@ -152,7 +152,7 @@ async function runCleanupJob() {
     </AdminPanel>
 
     <AdminPanel :span="12" title="执行结果">
-      <AdminDetailList v-if="result" :rows="resultRows" :error="result.errorMessage ?? ''" />
+      <AdminDetailList v-if="result" :rows="resultRows" :error="result.errorMessage ? safeBusinessMessage(result.errorMessage) : ''" />
       <div v-else class="empty-state">无数据</div>
     </AdminPanel>
 

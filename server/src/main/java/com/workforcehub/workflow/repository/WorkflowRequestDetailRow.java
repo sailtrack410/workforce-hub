@@ -11,6 +11,8 @@ public record WorkflowRequestDetailRow(
     String bizType,
     Long bizId,
     Long applicantUserId,
+    String applicantName,
+    String applicantEmployeeNo,
     String title,
     String status,
     String currentStepKey,
