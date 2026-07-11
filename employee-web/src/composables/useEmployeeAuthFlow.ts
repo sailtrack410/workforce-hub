@@ -31,10 +31,10 @@ export function useEmployeeAuthFlow({ session, loadAuthenticatedWorkspace }: Use
     if (authMode.value === 'reset') return '找回密码';
     if (loginRequiresEmailBinding.value) return '绑定邮箱';
     if (loginRequiresEmailCode.value) return '邮箱验证';
-    return '员工登录';
+    return '登录';
   });
   const authModeSubtitle = computed(() => {
-    if (authMode.value === 'reset') return '邮箱验证';
+    if (authMode.value === 'reset') return '';
     if (loginRequiresEmailBinding.value) return '首次登录需要绑定邮箱';
     if (loginRequiresEmailCode.value) return loginEmailCodeSubtitle({
       requiresEmailCode: loginRequiresEmailCode.value,

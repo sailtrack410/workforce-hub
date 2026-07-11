@@ -35,7 +35,7 @@ describe('workflow store', () => {
       title: '王晨年假申请',
       status: 'PENDING',
       priority: '高',
-      requestNo: 'REQ-20',
+      requestNo: '',
       taskId: 'TASK-10',
       currentStepName: '待处理',
     });

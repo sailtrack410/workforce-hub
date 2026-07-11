@@ -179,7 +179,7 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
 
 <template>
   <main class="page-grid">
-    <AdminPanel :span="12" :title="`申请列表 (${store.pagination.total})`">
+    <AdminPanel :span="7" :title="`申请列表 (${store.pagination.total})`">
       <template #actions>
         <button class="secondary-button" :disabled="loading" @click="loadPage">
           <RefreshCcw :size="16" />
@@ -207,9 +207,6 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
         </select>
         <input v-model="store.filters.keyword" placeholder="申请标题" />
       </AdminFilterBar>
-    </AdminPanel>
-
-    <AdminPanel :span="7" title="申请列表">
       <AdminTable
         :columns="requestColumns"
         :rows="items"

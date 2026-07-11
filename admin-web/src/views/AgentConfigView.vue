@@ -205,7 +205,7 @@ onMounted(() => {
 
 <template>
   <main class="page-grid">
-    <AdminPanel :span="12" title="AI 助手">
+    <AdminPanel :span="12" title="助手列表">
     <template #actions>
       <form class="agent-search" @submit.prevent="handleSearch">
         <input v-model="keyword" placeholder="搜索名称" />
@@ -216,6 +216,10 @@ onMounted(() => {
       <button class="secondary-button" title="刷新" @click="loadList">
         <RefreshCcw :size="16" />
         <span>刷新</span>
+      </button>
+      <button class="secondary-button" title="模型基座" @click="router.push('/ai-models')">
+        <Settings :size="16" />
+        <span>模型基座</span>
       </button>
       <button class="primary-button" @click="openCreate">
         <Plus :size="16" />
@@ -299,18 +303,6 @@ onMounted(() => {
     </AdminTable>
   </AdminPanel>
 
-  <AdminPanel :span="12" title="AI 模型基座">
-    <template #actions>
-      <button class="primary-button" title="进入基座" @click="router.push('/ai-models')">
-        <Settings :size="16" />
-        <span>进入基座</span>
-      </button>
-    </template>
-    <div class="foundation-entry">
-      <strong>统一配置入口</strong>
-      <span>Agent 工作流只选择基座中的模型。</span>
-    </div>
-  </AdminPanel>
   </main>
 
   <AgentConfigDialogs
@@ -411,22 +403,4 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.foundation-entry {
-  display: grid;
-  gap: var(--space-sm);
-  padding: var(--space-lg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--panel-strong);
-}
-
-.foundation-entry strong {
-  color: var(--ink);
-  font-size: var(--text-md);
-}
-
-.foundation-entry span {
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
 </style>

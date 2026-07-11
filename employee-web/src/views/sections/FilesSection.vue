@@ -20,7 +20,7 @@ import { useFilesSectionContext } from '../employee-shell-context';
 import { isFileTrashed } from '@/utils/file-record';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { buildStorageOverview, parseStorageSizeBytes } from '@/utils/cloud-storage-summary';
-import { formatDateTime, statusText } from '@/utils/employee-format';
+import { formatDateTime } from '@/utils/employee-format';
 import type { PersonalFileRecord } from '@/stores/shell';
 import cloudFolderImage from '@/assets/cloud-folder.png';
 import archiveFileIcon from '@/assets/file-icons/archive.png';
@@ -105,7 +105,7 @@ const quickViewEmptyDescriptions: Record<FileQuickView, string> = {
   recentAccess: '预览或下载文件后会出现在这里',
   recentUpload: '最近 7 天上传的文件会出现在这里',
   favorites: '收藏文件后会出现在这里',
-  shared: '暂无共享文件',
+  shared: '',
 };
 const quickViewFiles = computed(() => {
   const files = activeFiles.value
@@ -121,13 +121,6 @@ const quickViewFiles = computed(() => {
 });
 const visibleBrowserFolders = computed(() => quickView.value === 'all' ? browserFolders.value : []);
 const visibleBrowserFiles = computed(() => quickView.value === 'all' ? browserFiles.value : quickViewFiles.value);
-const currentFileViewTitle = computed(() => fileTab.value === 'trash' ? '回收站' : quickViewTitles[quickView.value]);
-const currentFileViewCount = computed(() => {
-  if (fileTab.value === 'trash') return `${visibleTrashFiles.value.length} 个文件`;
-  const folderCount = visibleBrowserFolders.value.length;
-  const fileCount = visibleBrowserFiles.value.length;
-  return folderCount ? `${folderCount} 个文件夹 · ${fileCount} 个文件` : `${fileCount} 个文件`;
-});
 const emptyTitle = computed(() => {
   if (fileTab.value === 'trash') return '回收站为空';
   return quickView.value === 'all' ? '暂无文件' : `暂无${quickViewTitles[quickView.value]}`;
@@ -435,10 +428,6 @@ onMounted(() => {
       </button>
       <div class="workspace-head-text">
         <h2 class="workspace-title">{{ activeFile.title }}</h2>
-        <div class="workspace-meta-line">
-          <span>{{ activeFile.subtitle }}</span>
-          <span>{{ activeFile.note }}</span>
-        </div>
       </div>
     </div>
     <div class="head-actions">
@@ -469,11 +458,11 @@ onMounted(() => {
       </div>
 
       <article class="storage-overview-card">
-        <header>储存概览</header>
+        <header>存储概览</header>
         <div class="storage-overview-body">
           <div class="storage-usage-line">
             <strong>{{ storageUsedLabel }}</strong>
-            <span>of {{ storageTotalLabel }}</span>
+            <span>/ {{ storageTotalLabel }}</span>
           </div>
           <div class="storage-ratio-bar" aria-hidden="true">
             <div class="storage-used-fill" :style="{ width: `${storageOverview.usedPercent}%` }">
@@ -508,10 +497,6 @@ onMounted(() => {
             <span class="tab-count">{{ trashedFiles.length }}</span>
           </button>
         </div>
-        <div class="file-current-view">
-          <strong>{{ currentFileViewTitle }}</strong>
-          <span>{{ currentFileViewCount }}</span>
-        </div>
       </div>
 
       <template v-if="fileTab === 'all'">
@@ -530,8 +515,8 @@ onMounted(() => {
             <option value="code">代码</option>
           </select>
           <label v-if="quickView === 'all'" class="file-folder-create">
-            <input v-model="folderNameDraft" class="ui-inline-input" placeholder="新建文件夹" @keydown.enter.prevent="createFolder" />
-            <AppButton variant="secondary" size="sm" @click="createFolder">
+            <input v-model="folderNameDraft" class="ui-inline-input" placeholder="新建文件夹" @input="folderActionError = ''" @keydown.enter.prevent="createFolder" />
+            <AppButton variant="secondary" size="sm" :disabled="!folderNameDraft.trim()" @click="createFolder">
               <FolderPlus :size="15" />
               新建
             </AppButton>
@@ -599,7 +584,7 @@ onMounted(() => {
                 <span>{{ file.type }}</span>
                 <span>{{ file.size }}</span>
                 <span>{{ file.createdAt }}</span>
-                <span>{{ statusText(file.status) }}</span>
+                <span>{{ file.status }}</span>
               </small>
             </div>
             <div class="file-actions">
@@ -654,7 +639,7 @@ onMounted(() => {
                 <span>{{ file.type }}</span>
                 <span>{{ file.size }}</span>
                 <span>{{ file.createdAt }}</span>
-                <span>{{ statusText(file.status) }}</span>
+                <span>{{ file.status }}</span>
               </small>
             </div>
             <div class="file-actions">

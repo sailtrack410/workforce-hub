@@ -26,6 +26,7 @@ import { displayField, employmentStatusLabel } from '@/utils/employee-format';
 import { normalizeSettingsPanel, shellUser } from '@/stores/shell';
 import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
+import AppDialog from '../../components/ui/AppDialog.vue';
 import AppErrorState from '../../components/ui/AppErrorState.vue';
 import AppInput from '../../components/ui/AppInput.vue';
 
@@ -71,6 +72,7 @@ const avatarUploading = ref(false);
 const avatarUpdateError = ref('');
 const avatarPickerInput = ref<HTMLInputElement | null>(null);
 const logoutSubmitting = ref(false);
+const logoutConfirmOpen = ref(false);
 const preferencesHydrated = ref(false);
 let preferencePushTimer: number | undefined;
 
@@ -400,12 +402,17 @@ async function handleAvatarSelected(event: Event) {
   }
 }
 
-async function handleLogout() {
+function handleLogout() {
   if (logoutSubmitting.value) return;
-  if (typeof globalThis.confirm === 'function' && !globalThis.confirm('确认退出登录？')) return;
+  logoutConfirmOpen.value = true;
+}
+
+async function confirmLogout() {
+  if (logoutSubmitting.value) return;
   logoutSubmitting.value = true;
   try {
     await session.logout();
+    logoutConfirmOpen.value = false;
     shell.setAvatarUrl('');
     showToast('已退出登录');
     void router.replace({ name: 'employee-messages' });
@@ -504,10 +511,6 @@ onBeforeUnmount(() => {
       </button>
       <div class="workspace-head-text">
         <h2 class="workspace-title">{{ activeProfile.title }}</h2>
-        <div class="workspace-meta-line">
-          <span>{{ currentUserName }}</span>
-          <span v-if="session.departmentName">{{ session.departmentName }}</span>
-        </div>
       </div>
     </div>
   </header>
@@ -525,13 +528,11 @@ onBeforeUnmount(() => {
       <article class="personal-center-head">
         <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="xl" status="online" />
         <div class="personal-center-title">
-          <span>个人中心</span>
           <h3>{{ currentUserName }}</h3>
           <p>
             <span v-if="session.departmentName">{{ session.departmentName }}</span>
             <span v-if="session.positionName"> · {{ session.positionName }}</span>
           </p>
-          <span>{{ profileStatusLabel }}</span>
         </div>
         <input
           ref="avatarPickerInput"
@@ -629,9 +630,6 @@ onBeforeUnmount(() => {
 
     <section v-else-if="selectedProfileId === 'organization'" class="settings-card-grid">
       <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>组织关系</h3>
-        </header>
         <dl class="settings-list">
           <div v-for="row in organizationRows" :key="row[0]">
             <dt>{{ row[0] }}</dt>
@@ -672,9 +670,6 @@ onBeforeUnmount(() => {
 
     <section v-else-if="selectedProfileId === 'security'" class="settings-card-grid">
       <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>账号安全</h3>
-        </header>
         <dl class="settings-list two-column">
           <div v-for="row in accountRows" :key="row[0]">
             <dt>{{ row[0] }}</dt>
@@ -725,11 +720,11 @@ onBeforeUnmount(() => {
           </div>
           <label v-if="!currentEmail || bindEmailEditing" class="security-field">
             <span>{{ currentEmail ? '新邮箱' : '邮箱地址' }}</span>
-            <AppInput v-model="bindEmail" type="email" placeholder="邮箱地址" />
+            <AppInput v-model="bindEmail" type="email" autocomplete="email" placeholder="邮箱地址" />
           </label>
           <label v-if="!currentEmail || bindEmailEditing" class="security-field">
             <span>验证码</span>
-            <AppInput v-model="bindEmailCode" placeholder="验证码" />
+            <AppInput v-model="bindEmailCode" autocomplete="one-time-code" placeholder="验证码" />
           </label>
           <div v-if="!currentEmail || bindEmailEditing" class="form-actions">
             <AppButton v-if="currentEmail" variant="ghost" size="sm" @click="cancelBindEmailEditing">
@@ -768,15 +763,15 @@ onBeforeUnmount(() => {
           </div>
           <label class="security-field">
             <span>邮箱</span>
-            <AppInput :model-value="currentEmail" disabled placeholder="未绑定邮箱" />
+            <AppInput :model-value="currentEmail" autocomplete="email" disabled placeholder="未绑定邮箱" />
           </label>
           <label class="security-field">
             <span>验证码</span>
-            <AppInput v-model="passwordChangeForm.code" placeholder="邮箱验证码" />
+            <AppInput v-model="passwordChangeForm.code" autocomplete="one-time-code" placeholder="邮箱验证码" />
           </label>
           <label class="security-field">
             <span>新密码</span>
-            <AppInput v-model="passwordChangeForm.newPassword" type="password" placeholder="8-64 位新密码" />
+            <AppInput v-model="passwordChangeForm.newPassword" type="password" autocomplete="new-password" placeholder="8-64 位新密码" />
           </label>
           <div class="form-actions">
             <AppButton
@@ -947,4 +942,18 @@ onBeforeUnmount(() => {
 
   </section>
 </div>
+
+<AppDialog v-if="logoutConfirmOpen">
+  <section class="dialog-head">
+    <h2>退出登录？</h2>
+  </section>
+  <div class="dialog-actions settings-logout-actions">
+    <AppButton variant="secondary" :disabled="logoutSubmitting" @click="logoutConfirmOpen = false">
+      继续使用
+    </AppButton>
+    <AppButton variant="destructive" :disabled="logoutSubmitting" @click="confirmLogout">
+      {{ logoutSubmitting ? '退出中' : '退出登录' }}
+    </AppButton>
+  </div>
+</AppDialog>
 </template>

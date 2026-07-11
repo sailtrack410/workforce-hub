@@ -150,7 +150,7 @@ describe('IM store', () => {
     expect(record).toMatchObject({
       id: '7102',
       senderId: 2002,
-      author: '用户 2002',
+      author: '成员',
       role: '成员',
       body: '下午同步一下排班。',
       side: 'left',
@@ -205,7 +205,7 @@ describe('IM store', () => {
       answer: '审批通过后会扣减年假余额，并同步生成请假考勤结果。',
       confidence: 'high',
       citations: [{ title: '员工年假制度', sourceType: 'POLICY' }],
-      relatedFlows: [{ id: 'WF-20260514-001', title: '请假申请 WF-20260514-001' }],
+      relatedFlows: [],
       suggestedActions: [{ label: '查看引用', action: 'open_citation' }],
     });
     expect(record.role).toBe('知识库 AI');

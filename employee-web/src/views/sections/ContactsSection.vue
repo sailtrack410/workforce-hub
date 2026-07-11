@@ -146,7 +146,7 @@ const breadcrumbItems = computed(() => {
     return buildBreadcrumb(currentDeptNode.value);
   }
   if (current.type === 'category') return ['通讯录', current.label];
-  if (current.type === 'ai') return ['通讯录', 'AI 助理'];
+  if (current.type === 'ai') return ['通讯录', 'AI 助手'];
   if (current.type === 'service') return ['通讯录', '企业服务', current.label];
   return ['通讯录'];
 });
@@ -209,6 +209,7 @@ const currentMembers = computed<ContactRecord[]>(() => {
 });
 
 const isAiCategory = computed(() => currentCategory.value?.type === 'ai');
+const canToggleTreeView = computed(() => currentCategory.value?.type === 'dept');
 
 // 当前部门子部门（用于树状视图以某个部门为根显示）
 const currentDeptChildren = computed<ContactTreeNode[]>(() => {
@@ -414,7 +415,7 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
       <nav class="contacts-breadcrumb" aria-label="通讯录路径">
         <span v-for="(item, index) in breadcrumbItems" :key="`${item}-${index}`">{{ item }}</span>
       </nav>
-      <div class="contacts-view-toggle">
+      <div v-if="canToggleTreeView" class="contacts-view-toggle">
         <button
           type="button"
           :class="{ active: shell.contactsViewMode === 'list' }"
@@ -443,7 +444,6 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
           <AppEmptyState
             v-else-if="!agents.length"
             title="暂无 AI 助手"
-            description="暂无可用 AI 助手"
             icon="workbench"
           />
           <div v-else class="contacts-member-list">
@@ -463,9 +463,10 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
               />
               <span>
                 <strong>{{ humanizeText(agent.agentName) }}</strong>
-                <small>{{ agent.agentTypeName || agentTypeLabel(agent.agentType) }}</small>
+                <small v-if="(agent.agentTypeName || agentTypeLabel(agent.agentType)) !== humanizeText(agent.agentName)">
+                  {{ agent.agentTypeName || agentTypeLabel(agent.agentType) }}
+                </small>
               </span>
-              <AppTag tone="success">AI 助手</AppTag>
             </button>
           </div>
         </template>
@@ -476,7 +477,6 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
           <AppEmptyState
             v-else-if="!currentMembers.length"
             title="暂无好友申请"
-            description="暂无好友申请"
             icon="contacts"
           />
           <div v-else class="contacts-member-list">
@@ -502,7 +502,6 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
           <AppEmptyState
             v-if="!currentMembers.length"
             title="暂无成员"
-            :description="currentCategory?.label ? `${currentCategory.label} 暂无成员` : '暂无成员'"
             icon="contacts"
           />
           <div v-else class="contacts-member-list">
@@ -585,7 +584,7 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
             <component :is="isCurrentFriend ? UserMinus : UserPlus" :size="15" />
             {{ friendActionLoading ? '处理中' : (isCurrentFriend ? '移除好友' : '加为好友') }}
           </AppButton>
-          <AppButton v-if="profileContact.userId" variant="secondary" size="sm" @click="editProfileRemark">
+          <AppButton v-if="profileContact.userId && profileContact.relation !== '本人'" variant="secondary" size="sm" @click="editProfileRemark">
             <Pencil :size="15" />
             备注
           </AppButton>
@@ -593,16 +592,8 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
       </div>
       <dl class="contact-profile-detail">
         <div>
-          <dt>企业/组织</dt>
-          <dd>{{ displayField(profileContact.source) }}</dd>
-        </div>
-        <div>
-          <dt>姓名</dt>
-          <dd>{{ profileContact.name }}</dd>
-        </div>
-        <div>
-          <dt>部门</dt>
-          <dd>{{ displayField(profileContact.department) }}</dd>
+          <dt>关系</dt>
+          <dd>{{ displayField(profileContact.relation) }}</dd>
         </div>
         <div>
           <dt>职位</dt>

@@ -23,7 +23,7 @@ const {
     </div>
   </header>
   <section class="content-stack">
-    <AppEmptyState :title="businessEmptyTitle" :description="businessEmptyTitle" />
+    <AppEmptyState :title="businessEmptyTitle" />
   </section>
 </div>
 </template>

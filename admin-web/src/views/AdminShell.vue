@@ -47,7 +47,9 @@ const navItems = [
 ];
 
 const visibleNavItems = computed(() => navItems.filter((item) => session.hasPermission(item.permission)));
-const activeTitle = computed(() => navItems.find((item) => route.path.startsWith(item.path))?.label ?? '后台运营');
+const activeTitle = computed(() => navItems.find((item) => (
+  route.path === item.path || route.path.startsWith(`${item.path}/`)
+))?.label ?? '后台运营');
 
 async function logout() {
   await session.logout();
@@ -183,20 +185,25 @@ async function logout() {
 }
 
 @media (max-width: 980px) {
-  .admin-shell { grid-template-columns: 1fr; }
+  .admin-shell { grid-template-columns: minmax(0, 1fr); }
   .admin-sidebar {
     position: sticky;
     top: 0;
+    min-width: 0;
+    max-width: 100vw;
     height: auto;
     z-index: 100;
     padding: var(--space-sm) var(--space-base);
     border-right: none;
     border-bottom: 1px solid var(--line);
+    overflow: hidden;
   }
   .brand-block { padding-bottom: var(--space-sm); }
   .brand-block div { display: none; }
   .admin-nav {
     display: flex;
+    width: 100%;
+    min-width: 0;
     overflow-x: auto;
     gap: var(--space-xs);
     -webkit-overflow-scrolling: touch;
@@ -215,6 +222,5 @@ async function logout() {
   .admin-main { padding: var(--space-base); }
   .admin-topbar { align-items: stretch; flex-direction: column; }
   .admin-nav-item span { display: inline; }
-  .admin-nav { flex-wrap: wrap; }
 }
 </style>

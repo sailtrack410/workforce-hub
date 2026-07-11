@@ -297,7 +297,7 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     kicker: '',
     title: '消息',
     subtitle: '',
-    search: '搜索会话、人员、文件',
+    search: '搜索会话',
     secondaryAction: {
       label: '查看待办',
       action: 'switch-section',
@@ -308,7 +308,7 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     kicker: '',
     title: '待办',
     subtitle: '',
-    search: '搜索待办、标签',
+    search: '搜索待办',
     primaryAction: {
       label: '添加待办',
       action: 'switch-section',
@@ -319,7 +319,7 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     kicker: '',
     title: '云空间',
     subtitle: '',
-    search: '搜索文件、材料、状态',
+    search: '搜索文件',
     primaryAction: {
       label: '上传文件',
       action: 'upload-personal-file',
@@ -327,9 +327,9 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
   },
   workbench: {
     kicker: '',
-    title: '仪表盘',
+    title: '工作台',
     subtitle: '',
-    search: '搜索申请、请假、考勤、假期',
+    search: '搜索应用',
     primaryAction: {
       label: 'OA 申请',
       action: 'switch-item',
@@ -345,31 +345,31 @@ export const sectionMeta: Record<SectionId, SectionMeta> = {
     kicker: '',
     title: '流程',
     subtitle: '',
-    search: '搜索流程、审批',
+    search: '搜索流程',
   },
   contacts: {
     kicker: '',
     title: '通讯录',
     subtitle: '',
-    search: '搜索姓名、部门、岗位',
+    search: '搜索联系人',
   },
   agents: {
     kicker: '',
     title: 'AI 助手',
     subtitle: '',
-    search: '搜索 AI 助手名称、代码',
+    search: '搜索 AI 助手',
   },
   reports: {
     kicker: '',
     title: '报表',
     subtitle: '',
-    search: '搜索报表、指标、时间',
+    search: '搜索报表',
   },
   settings: {
     kicker: '',
     title: '个人中心',
     subtitle: '',
-    search: '搜索资料、账号、偏好',
+    search: '搜索设置',
   },
 };
 
@@ -377,7 +377,7 @@ export const navItems: Array<{ id: SectionId; label: string; glyph: string }> = 
   { id: 'messages', label: '消息', glyph: '息' },
   { id: 'todos', label: '待办', glyph: '办' },
   { id: 'files', label: '云空间', glyph: '云' },
-  { id: 'workbench', label: '仪表盘', glyph: '表' },
+  { id: 'workbench', label: '工作台', glyph: '台' },
   { id: 'contacts', label: '通讯录', glyph: '录' },
   { id: 'agents', label: 'AI 助手', glyph: '助' },
   { id: 'settings', label: '个人中心', glyph: '心' },
@@ -745,7 +745,7 @@ const contactItems: ContactRecord[] = [];
 const profileItems: ProfileRecord[] = [
   {
     id: 'profile',
-    title: '个人中心',
+    title: '个人资料',
     subtitle: '身份 / 组织 / 账号 / 偏好',
     note: '',
     tone: 'blue',
@@ -1096,7 +1096,7 @@ export const useShellStore = defineStore('employee-shell', {
             ...deptCategories,
           ],
         },
-        { id: 'ai', type: 'ai', label: 'AI 助理', icon: 'sparkles' },
+        { id: 'ai', type: 'ai', label: 'AI 助手', icon: 'sparkles' },
         {
           id: 'enterprise-service',
           type: 'category',

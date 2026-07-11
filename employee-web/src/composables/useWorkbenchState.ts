@@ -111,7 +111,7 @@ export function useWorkbenchState({
 
   const activeWorkbench = computed(() => shell.activeWorkbench);
   const activeFile = computed(() => shell.activeFile);
-  const activeWorkbenchTitle = computed(() => activeWorkbench.value.title || '仪表盘');
+  const activeWorkbenchTitle = computed(() => activeWorkbench.value.title || '工作台');
   const leaveAccounts = ref<LeaveAccountResponse[]>([]);
   const leaveTypes = ref<LeaveTypeResponse[]>([]);
   const workbenchLoading = ref(false);
@@ -270,7 +270,7 @@ export function useWorkbenchState({
         .filter((result) => result.status === 'rejected')
         .length;
       if (failedCount === 4) {
-        workbenchError.value = '仪表盘数据加载失败';
+        workbenchError.value = '工作台数据加载失败';
       }
       const types = typesResult.status === 'fulfilled' ? typesResult.value : [];
       const accounts = accountsResult.status === 'fulfilled' ? accountsResult.value : [];
@@ -561,7 +561,8 @@ function displayGenericValue(value: unknown, type: unknown) {
   if (typeof value !== 'string' && typeof value !== 'number') {
     return displayField(value == null ? '' : String(value));
   }
-  if (type === 'datetime') {
+  const fieldType = String(type ?? '').replace(/[_-]/g, '').toLowerCase();
+  if (fieldType === 'datetime' || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value))) {
     return formatDateTime(String(value));
   }
   return displayField(String(value));

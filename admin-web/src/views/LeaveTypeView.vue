@@ -160,7 +160,7 @@ onMounted(loadList);
 
 <template>
   <div class="page-grid">
-    <AdminPanel :span="7" title="假种列表">
+    <AdminPanel :span="selected ? 7 : 12" title="假种列表">
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
@@ -195,35 +195,32 @@ onMounted(loadList);
       </AdminTable>
     </AdminPanel>
 
-    <AdminPanel :span="5" title="假种详情">
-      <template v-if="selected">
-        <AdminDetailList :rows="detailRows" />
-        <div class="detail-edit-form">
-          <select v-model="editForm.leaveCode">
-            <option value="">请选择假种</option>
-            <option v-for="type in leaveTypeOptions" :key="type.leaveCode" :value="type.leaveCode">
-              {{ type.leaveName }}
-            </option>
-          </select>
-          <select v-model="editForm.balanceMode">
-            <option value="DEDUCT">扣减余额</option>
-            <option value="NO_DEDUCT">不扣减余额</option>
-          </select>
-          <select v-model="editForm.status">
-            <option value="ACTIVE">启用</option>
-            <option value="INACTIVE">停用</option>
-          </select>
-          <div class="detail-actions">
-            <button class="primary-button" :disabled="saving || !editForm.leaveCode" @click="handleUpdate">
-              <Save :size="16" /> 保存
-            </button>
-            <button class="ghost-button danger" :disabled="deleting" @click="handleDelete">
-              <Trash2 :size="16" /> 删除
-            </button>
-          </div>
+    <AdminPanel v-if="selected" :span="5" title="假种详情">
+      <AdminDetailList :rows="detailRows" />
+      <div class="detail-edit-form">
+        <select v-model="editForm.leaveCode">
+          <option value="">请选择假种</option>
+          <option v-for="type in leaveTypeOptions" :key="type.leaveCode" :value="type.leaveCode">
+            {{ type.leaveName }}
+          </option>
+        </select>
+        <select v-model="editForm.balanceMode">
+          <option value="DEDUCT">扣减余额</option>
+          <option value="NO_DEDUCT">不扣减余额</option>
+        </select>
+        <select v-model="editForm.status">
+          <option value="ACTIVE">启用</option>
+          <option value="INACTIVE">停用</option>
+        </select>
+        <div class="detail-actions">
+          <button class="primary-button" :disabled="saving || !editForm.leaveCode" @click="handleUpdate">
+            <Save :size="16" /> 保存
+          </button>
+          <button class="ghost-button danger" :disabled="deleting" @click="handleDelete">
+            <Trash2 :size="16" /> 删除
+          </button>
         </div>
-      </template>
-      <template v-else><div class="empty-state">选择左侧假种查看详情</div></template>
+      </div>
     </AdminPanel>
 
     <AdminConfirmDialog

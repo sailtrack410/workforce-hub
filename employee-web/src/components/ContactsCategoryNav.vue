@@ -63,12 +63,18 @@ function hasChildren(item: ContactCategoryItem) {
       <div
         class="contacts-category-item"
         :class="{ active: activeId === item.id, expandable: hasChildren(item) }"
+        role="button"
+        tabindex="0"
+        :aria-current="activeId === item.id ? 'page' : undefined"
         @click="handleSelect(item)"
+        @keydown.enter.prevent="handleSelect(item)"
+        @keydown.space.prevent="handleSelect(item)"
       >
         <button
           v-if="hasChildren(item)"
           type="button"
           class="contacts-category-toggle"
+          :aria-label="`${isExpanded(item.id) ? '收起' : '展开'}${item.label}`"
           @click="handleToggle(item, $event)"
         >
           <component :is="isExpanded(item.id) ? ChevronDown : ChevronRight" :size="14" />

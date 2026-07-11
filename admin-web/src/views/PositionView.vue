@@ -90,7 +90,7 @@ onMounted(loadList);
 
 <template>
   <div class="page-grid">
-    <AdminPanel :span="7" title="岗位列表">
+    <AdminPanel :span="selected ? 7 : 12" title="岗位列表">
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
@@ -113,14 +113,11 @@ onMounted(loadList);
       </AdminTable>
     </AdminPanel>
 
-    <AdminPanel :span="5" title="岗位详情">
-      <template v-if="selected">
-        <AdminDetailList :rows="detailRows" />
-        <div class="detail-actions">
-          <button class="secondary-button" @click="handleUpdate">保存修改</button>
-        </div>
-      </template>
-      <template v-else><div class="empty-state">选择左侧岗位查看详情</div></template>
+    <AdminPanel v-if="selected" :span="5" title="岗位详情">
+      <AdminDetailList :rows="detailRows" />
+      <div class="detail-actions">
+        <button class="secondary-button" @click="handleUpdate">保存修改</button>
+      </div>
     </AdminPanel>
   </div>
 </template>

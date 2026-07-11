@@ -931,7 +931,6 @@ function toKnowledgeRelatedFlow(flow: AgentResultFlow): KnowledgeRelatedFlow {
     title: visibleBusinessText(flow.title) || '相关流程',
     status,
     statusTone: normalizeBadgeTone(undefined),
-    summary: currentNode ? `当前节点：${currentNode}` : undefined,
     fields,
   };
 }

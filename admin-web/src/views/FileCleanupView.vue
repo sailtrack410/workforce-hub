@@ -192,7 +192,7 @@ async function runCleanupJob() {
 
 .metric-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
   gap: var(--space-md);
   width: 100%;
 }

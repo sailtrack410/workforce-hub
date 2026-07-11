@@ -11,9 +11,9 @@ withDefaults(
 
 <template>
   <section :class="['panel', span ? `span-${span}` : '']">
-    <div v-if="title || $slots.actions" class="panel-title">
-      <div>
-        <h2>{{ title }}</h2>
+    <div v-if="title || subtitle || $slots.actions" :class="['panel-title', { 'actions-only': !title && !subtitle }]">
+      <div v-if="title || subtitle">
+        <h2 v-if="title">{{ title }}</h2>
         <span v-if="subtitle" class="panel-subtitle">{{ subtitle }}</span>
       </div>
       <slot name="actions" />
@@ -23,6 +23,10 @@ withDefaults(
 </template>
 
 <style scoped>
+.panel-title.actions-only {
+  justify-content: flex-end;
+}
+
 .panel-subtitle {
   color: var(--muted);
   display: inline-block;

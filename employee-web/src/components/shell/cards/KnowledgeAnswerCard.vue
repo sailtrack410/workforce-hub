@@ -319,7 +319,12 @@ function shouldShowEmptyCitation() {
           </span>
         </span>
         <span class="flow-meta">
-          <AppBadge :tone="flow.statusTone ?? 'neutral'">{{ visibleBusinessText(flow.status) || '待处理' }}</AppBadge>
+          <AppBadge
+            v-if="visibleBusinessText(flow.status) && visibleBusinessText(flow.status) !== '其他状态'"
+            :tone="flow.statusTone ?? 'neutral'"
+          >
+            {{ visibleBusinessText(flow.status) }}
+          </AppBadge>
           <small v-if="apiRefLabel(flow.apiRef)">{{ apiRefLabel(flow.apiRef) }}</small>
         </span>
       </button>

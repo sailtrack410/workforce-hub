@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{
   title: string;
-  description: string;
+  description?: string;
   icon?: 'messages' | 'todos' | 'files' | 'contacts' | 'workbench' | 'default';
 }>();
 </script>
@@ -14,7 +14,7 @@ const props = defineProps<{
       <i></i>
     </div>
     <h3>{{ title }}</h3>
-    <p>{{ description }}</p>
+    <p v-if="description">{{ description }}</p>
     <slot />
   </div>
 </template>
@@ -41,7 +41,7 @@ const props = defineProps<{
   place-items: center;
   border-radius: var(--radius-16);
   background: var(--primary-50);
-  box-shadow: inset 0 0 0 1px #dbeafe;
+  box-shadow: inset 0 0 0 1px var(--primary-100);
 }
 
 .empty-mark span {
@@ -50,7 +50,7 @@ const props = defineProps<{
   right: 0.9rem;
   height: 0.35rem;
   border-radius: 999px;
-  background: #93c5fd;
+  background: var(--primary-300);
 }
 
 .empty-mark span:first-child {
@@ -70,37 +70,37 @@ const props = defineProps<{
   height: 1.15rem;
   border: 2px solid var(--surface-panel);
   border-radius: 999px;
-  background: #1677ff;
+  background: var(--primary-500);
 }
 
 .empty-mark.todos {
   background: var(--warning-50);
-  box-shadow: inset 0 0 0 1px #f8e6b8;
+  box-shadow: inset 0 0 0 1px var(--warning-100);
 }
 
 .empty-mark.todos span,
 .empty-mark.todos i {
-  background: #d9a63a;
+  background: var(--warning-500);
 }
 
 .empty-mark.files {
   background: var(--success-50);
-  box-shadow: inset 0 0 0 1px #cdebd8;
+  box-shadow: inset 0 0 0 1px var(--success-100);
 }
 
 .empty-mark.files span,
 .empty-mark.files i {
-  background: #38a169;
+  background: var(--success-500);
 }
 
 .empty-mark.contacts {
   background: var(--surface-panel-muted);
-  box-shadow: inset 0 0 0 1px #ddd6fe;
+  box-shadow: inset 0 0 0 1px var(--primary-100);
 }
 
 .empty-mark.contacts span,
 .empty-mark.contacts i {
-  background: #8b5cf6;
+  background: var(--primary-400);
 }
 
 .ui-empty-state h3 {

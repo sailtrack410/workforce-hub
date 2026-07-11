@@ -247,12 +247,6 @@ const filteredWorkbench = computed(() => shell.filteredWorkbench);
 const filteredContacts = computed(() => shell.filteredContacts);
 const filteredProfile = computed(() => shell.filteredProfile);
 const mobileNavItems = computed(() => primaryNavItems);
-const listEmptyText = computed(() => {
-  if (activeSection.value === 'messages') return '暂无消息';
-  if (activeSection.value === 'todos') return '暂无待办';
-  if (activeSection.value === 'files') return '暂无文件';
-  return '暂无数据';
-});
 const showFilterBar = computed(() => filterOptions.value.length > 1);
 const showFilterArrows = computed(() => filtersOverflow.value);
 const workbenchLaunchers = computed(() => filteredWorkbench.value);
@@ -415,6 +409,7 @@ const {
   session,
   loadAuthenticatedWorkspace,
 });
+const showAuthModeHead = computed(() => loginRequiresEmailBinding.value || loginRequiresEmailCode.value || Boolean(authModeSubtitle.value));
 
 function runAction(action?: SectionAction) {
   if (!action) return;
@@ -1050,7 +1045,6 @@ provideEmployeeShellContexts(employeeShellContexts);
         </button>
       </div>
       <div class="auth-hero-copy">
-        <p>员工端</p>
         <h1>企业协同</h1>
       </div>
     </section>
@@ -1061,7 +1055,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         <button type="button" :class="{ active: authMode === 'reset' }" @click="setAuthMode('reset')">找回</button>
       </div>
 
-      <div class="auth-card-head">
+      <div v-if="showAuthModeHead" class="auth-card-head">
         <h2>{{ authModeTitle }}</h2>
         <p v-if="authModeSubtitle">{{ authModeSubtitle }}</p>
       </div>
@@ -1069,20 +1063,20 @@ provideEmployeeShellContexts(employeeShellContexts);
       <form v-if="authMode === 'login'" class="auth-form" @submit.prevent="submitLogin">
         <label class="auth-field">
           <span>登录名</span>
-          <AppInput v-model="loginName" placeholder="员工登录名" />
+          <AppInput v-model="loginName" autocomplete="username" placeholder="员工登录名" />
         </label>
         <label class="auth-field">
           <span>密码</span>
-          <AppInput v-model="password" type="password" placeholder="密码" />
+          <AppInput v-model="password" type="password" autocomplete="current-password" placeholder="密码" />
         </label>
         <label v-if="loginRequiresEmailBinding" class="auth-field">
           <span>绑定邮箱</span>
-          <AppInput v-model="loginBindEmail" type="email" placeholder="邮箱地址" />
+          <AppInput v-model="loginBindEmail" type="email" autocomplete="email" placeholder="邮箱地址" />
         </label>
         <div v-if="loginRequiresEmailCode || loginRequiresEmailBinding" class="auth-code-row">
           <label class="auth-field">
             <span>邮箱验证码</span>
-            <AppInput v-model="loginEmailCode" placeholder="邮箱验证码" />
+            <AppInput v-model="loginEmailCode" autocomplete="one-time-code" placeholder="邮箱验证码" />
           </label>
           <AppButton
             variant="secondary"
@@ -1103,12 +1097,12 @@ provideEmployeeShellContexts(employeeShellContexts);
       <form v-else class="auth-form" @submit.prevent="submitPasswordReset">
         <label class="auth-field">
           <span>绑定邮箱</span>
-          <AppInput v-model="resetEmail" type="email" placeholder="已绑定邮箱" />
+          <AppInput v-model="resetEmail" type="email" autocomplete="email" placeholder="已绑定邮箱" />
         </label>
         <div class="auth-code-row">
           <label class="auth-field">
             <span>验证码</span>
-            <AppInput v-model="resetCode" placeholder="验证码" />
+            <AppInput v-model="resetCode" autocomplete="one-time-code" placeholder="验证码" />
           </label>
           <AppButton
             variant="secondary"
@@ -1121,7 +1115,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
         <label class="auth-field">
           <span>新密码</span>
-          <AppInput v-model="resetPasswordValue" type="password" placeholder="8-64 位新密码" />
+          <AppInput v-model="resetPasswordValue" type="password" autocomplete="new-password" placeholder="8-64 位新密码" />
         </label>
         <p v-if="session.error" class="auth-error">{{ session.error }}</p>
         <p v-if="authNotice" class="auth-notice">{{ authNotice }}</p>
@@ -1191,7 +1185,7 @@ provideEmployeeShellContexts(employeeShellContexts);
       </div>
     </aside>
 
-    <section v-if="activeSection !== 'files'" class="list-pane" :class="{ 'mobile-visible': mobileStage === 'list' }">
+    <section v-if="activeSection !== 'files' && activeSection !== 'agents'" class="list-pane" :class="{ 'mobile-visible': mobileStage === 'list' }">
       <header class="pane-head">
         <div class="pane-title-row">
           <div class="pane-head-copy">
@@ -1245,8 +1239,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         <div v-else-if="activeSection === 'messages'" class="list-items">
           <AppEmptyState
             v-if="!filteredConversations.length && !filteredSearchAgentResults.length && !searchAgentsLoading && !searchAgentsError"
-            title="会话暂时为空"
-            :description="listEmptyText"
+            title="暂无会话"
             icon="messages"
           />
           <template v-else>
@@ -1336,7 +1329,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
 
         <div v-else-if="activeSection === 'todos'" class="list-items">
-          <AppEmptyState v-if="!visibleTodoList.length" title="待办已清空" :description="listEmptyText" icon="todos" />
+          <AppEmptyState v-if="!visibleTodoList.length" title="待办已清空" icon="todos" />
           <TransitionGroup v-else name="todo-list" tag="div" class="todo-list-stack">
             <article
               v-for="item in visibleTodoList"
@@ -1395,7 +1388,7 @@ provideEmployeeShellContexts(employeeShellContexts);
               <div class="generic-copy">
                 <div class="title-line">
                   <strong>{{ item.title }}</strong>
-                  <span class="meta-time">{{ statusText(item.status) }}</span>
+                  <span v-if="item.disabled" class="meta-time">{{ statusText(item.status) }}</span>
                 </div>
                 <p>{{ item.note }}</p>
               </div>
@@ -1414,7 +1407,7 @@ provideEmployeeShellContexts(employeeShellContexts);
         </div>
 
         <div v-else-if="activeSection === 'settings'" class="list-items">
-          <AppEmptyState v-if="!filteredProfile.length" title="无匹配结果" description="个人中心入口">
+          <AppEmptyState v-if="!filteredProfile.length" title="无匹配结果">
             <AppButton variant="secondary" size="sm" @click="shell.setSearch('settings', '')">
               清空搜索
             </AppButton>
@@ -1433,7 +1426,6 @@ provideEmployeeShellContexts(employeeShellContexts);
                 <div class="generic-copy">
                   <div class="title-line">
                     <strong>{{ item.title }}</strong>
-                    <span class="meta-time">{{ item.subtitle }}</span>
                   </div>
                   <p v-if="item.note">{{ item.note }}</p>
                 </div>
@@ -1442,19 +1434,15 @@ provideEmployeeShellContexts(employeeShellContexts);
           </template>
         </div>
 
-        <div v-else-if="activeSection === 'agents'" class="list-items">
-          <AppEmptyState title="AI 助手" description="请在右侧查看全部 AI 助手" icon="workbench" />
-        </div>
-
         <div v-else class="list-items">
-          <AppEmptyState :title="businessEmptyTitle" :description="listEmptyText" />
+          <AppEmptyState :title="businessEmptyTitle" />
         </div>
       </div>
     </section>
 
-    <div v-if="activeSection !== 'files'" class="resize-handle" role="separator" aria-orientation="vertical" aria-label="调整列表宽度" @pointerdown.prevent="startResize" />
+    <div v-if="activeSection !== 'files' && activeSection !== 'agents'" class="resize-handle" role="separator" aria-orientation="vertical" aria-label="调整列表宽度" @pointerdown.prevent="startResize" />
 
-    <section class="main-pane" :class="{ 'mobile-visible': mobileStage === 'detail' || activeSection === 'files' }">
+    <section class="main-pane" :class="{ 'mobile-visible': mobileStage === 'detail' || activeSection === 'files' || activeSection === 'agents' }">
       <RouterView v-slot="{ Component }">
         <component :is="Component" />
       </RouterView>
@@ -1466,13 +1454,13 @@ provideEmployeeShellContexts(employeeShellContexts);
           <div>
             <h2>{{ activeSection === 'messages' ? activeConversation.title : currentMeta.title }}</h2>
           </div>
-          <AppButton variant="ghost" size="sm" @click="shell.toggleDetail()">
+          <AppButton variant="ghost" size="sm" :aria-label="detailVisible ? '关闭详情' : '打开详情'" @click="shell.toggleDetail()">
             <component :is="detailVisible ? PanelLeftClose : PanelLeftOpen" :size="18" />
           </AppButton>
         </header>
 
         <template v-if="activeSection === 'messages' && hasActiveConversation">
-          <section class="context-block">
+          <section v-if="activeConversation.panel.auditTrail?.length" class="context-block">
             <h3>审核链路</h3>
             <div class="audit-chain">
               <span
@@ -1492,20 +1480,19 @@ provideEmployeeShellContexts(employeeShellContexts);
             </div>
           </section>
 
-          <section class="context-block">
+          <section v-if="activeConversation.panel.agentEvidence?.length" class="context-block">
             <h3>AI 预审依据</h3>
-            <div v-if="activeConversation.panel.agentEvidence?.length" class="stack-list">
+            <div class="stack-list">
               <span v-for="item in activeConversation.panel.agentEvidence" :key="item.label">
                 <small>{{ item.label }}</small>
                 <strong>{{ item.value }}</strong>
               </span>
             </div>
-            <p v-else class="empty-inline">暂无审核依据</p>
           </section>
 
-          <section class="context-block">
+          <section v-if="activeConversation.panel.attachments.length" class="context-block">
             <h3>相关材料</h3>
-            <div v-if="activeConversation.panel.attachments.length" class="stack-list">
+            <div class="stack-list">
               <button
                 v-for="file in activeConversation.panel.attachments"
                 :key="file.id"
@@ -1521,8 +1508,11 @@ provideEmployeeShellContexts(employeeShellContexts);
                 <ArrowUpRight :size="14" />
               </button>
             </div>
-            <p v-else class="empty-inline">无文件</p>
           </section>
+          <p
+            v-if="!activeConversation.panel.auditTrail?.length && !activeConversation.panel.agentEvidence?.length && !activeConversation.panel.attachments.length"
+            class="empty-inline"
+          >暂无详情</p>
         </template>
 
         <template v-else>
@@ -1558,13 +1548,12 @@ provideEmployeeShellContexts(employeeShellContexts);
 
     <div v-if="activeSection === 'messages' && hasActiveConversation && mobileStage === 'detail' && detailVisible" class="mobile-detail-shell">
       <div class="mobile-detail-card">
-        <button class="mobile-back" type="button" aria-label="返回列表" @click="backToList">
+        <button class="mobile-back" type="button" aria-label="关闭详情" @click="closeDetail">
           <ChevronLeft :size="22" />
         </button>
         <div class="mobile-detail-body">
-          <p class="pane-kicker">会话详情</p>
           <h3>{{ activeConversation.title }}</h3>
-          <section class="mobile-detail-section">
+          <section v-if="activeConversation.workflowSteps.length" class="mobile-detail-section">
             <h4>流程进度</h4>
             <div class="context-steps">
               <span v-for="step in activeConversation.workflowSteps" :key="step.label" :class="step.status">
@@ -1573,17 +1562,16 @@ provideEmployeeShellContexts(employeeShellContexts);
               </span>
             </div>
           </section>
-          <section class="mobile-detail-section">
+          <section v-if="activeConversation.panel.attachments.length" class="mobile-detail-section">
             <h4>相关材料</h4>
-            <div v-if="activeConversation.panel.attachments.length" class="stack-list">
+            <div class="stack-list">
               <span v-for="file in activeConversation.panel.attachments" :key="file.id">
                 <strong>{{ file.name }}</strong>
                 <small>{{ file.size }} · {{ statusText(file.status) }}</small>
               </span>
             </div>
-            <p v-else class="empty-inline">无文件</p>
           </section>
-          <AppButton variant="secondary" block @click="closeDetail">关闭</AppButton>
+          <p v-if="!activeConversation.workflowSteps.length && !activeConversation.panel.attachments.length" class="empty-inline">暂无详情</p>
         </div>
       </div>
     </div>

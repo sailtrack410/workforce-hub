@@ -289,15 +289,15 @@ async function sendMentionPrivateMessage() {
       </div>
     </div>
     <div class="head-actions">
-      <AppButton variant="secondary" size="sm" @click="todoCreateOpen = true">
+      <AppButton variant="secondary" size="sm" aria-label="添加待办" @click="todoCreateOpen = true">
         <Clock3 :size="16" />
         添加待办
       </AppButton>
-      <AppButton variant="secondary" size="sm" @click="openDetail">
+      <AppButton variant="secondary" size="sm" aria-label="详情" @click="openDetail">
         <Info :size="16" />
         详情
       </AppButton>
-      <AppButton v-if="activeConversation.kind === 'team'" variant="secondary" size="sm" @click="openGroupManagement">
+      <AppButton v-if="activeConversation.kind === 'team'" variant="secondary" size="sm" aria-label="群管理" @click="openGroupManagement">
         <UsersRound :size="16" />
         群管理
       </AppButton>
@@ -353,7 +353,7 @@ async function sendMentionPrivateMessage() {
   </section>
 
   <section v-else class="content-stack">
-    <AppEmptyState title="暂无会话" description="暂无消息">
+    <AppEmptyState title="暂无会话">
       <div class="head-actions">
         <AppButton variant="secondary" size="sm" @click="openCreateConversation('private')">
           私聊
@@ -647,10 +647,6 @@ async function sendMentionPrivateMessage() {
                 <UserMinus :size="13" />
               </button>
             </div>
-            <button class="group-member-card group-add-card" type="button" @click="toggleGroupMemberAdding">
-              <span class="group-add-icon"><Plus :size="18" /></span>
-              <span class="group-member-name">添加</span>
-            </button>
           </div>
         </section>
 

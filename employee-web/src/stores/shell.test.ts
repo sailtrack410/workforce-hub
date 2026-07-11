@@ -234,11 +234,11 @@ describe('useShellStore', () => {
     expect(normalizeWorkbenchApp('agent')).toBe('oa');
   });
 
-  it('labels the workbench section as dashboard', () => {
+  it('labels the workbench section consistently', () => {
     const workbenchNav = navItems.find((item) => item.id === 'workbench');
 
-    expect(workbenchNav?.label).toBe('仪表盘');
-    expect(sectionMeta.workbench.title).toBe('仪表盘');
+    expect(workbenchNav?.label).toBe('工作台');
+    expect(sectionMeta.workbench.title).toBe('工作台');
   });
 
   it('labels the files section as cloud space', () => {
@@ -632,7 +632,7 @@ describe('useShellStore', () => {
     shell.mergeBackendConversations([backendConversation]);
     shell.mergeBackendMessages('7001', backendMessages);
 
-    expect(shell.activeConversation.messages).toEqual(backendMessages);
+    expect(shell.activeConversation.messages).toEqual([{ ...backendMessages[0], mentions: [] }]);
     expect(shell.activeConversation.subtitle).toBe('我上午可以处理补卡。');
     expect(shell.activeConversation.panel.attachments).toEqual(backendMessages[0].attachments);
   });
@@ -662,7 +662,7 @@ describe('useShellStore', () => {
     const shell = useShellStore();
 
     expect(shell.profile.map((item) => item.id)).toEqual(['profile', 'organization', 'security', 'preferences']);
-    expect(shell.activeProfile.title).toBe('个人中心');
+    expect(shell.activeProfile.title).toBe('个人资料');
     expect(normalizeSettingsPanel('center')).toBe('profile');
     expect(normalizeSettingsPanel('profile')).toBe('profile');
     expect(normalizeSettingsPanel('storage')).toBe('profile');
@@ -671,7 +671,7 @@ describe('useShellStore', () => {
   it('finds profile center entries by real field and action keywords', () => {
     const shell = useShellStore();
 
-    shell.setSearch('settings', '工号');
+    shell.setSearch('settings', '入职日期');
     expect(shell.filteredProfile.map((item) => item.id)).toContain('profile');
 
     shell.setSearch('settings', '修改密码');

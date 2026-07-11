@@ -337,7 +337,7 @@ onMounted(loadPage);
 
 <template>
   <main class="page-grid">
-    <AdminPanel :span="12" title="考勤管理">
+    <AdminPanel :span="12">
       <template #actions>
         <button class="secondary-button" :disabled="loading" @click="loadPage">
           <RefreshCcw :size="16" />

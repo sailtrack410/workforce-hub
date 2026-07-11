@@ -98,7 +98,7 @@ async function submitAdjustment() {
 
 <template>
   <main class="page-grid">
-    <AdminPanel :span="12" title="假期余额">
+    <AdminPanel :span="7" :title="`员工假期账户 (${accounts.length})`">
       <template #actions>
         <button class="secondary-button" :disabled="loading" @click="loadPage">
           <RefreshCcw :size="16" />
@@ -114,9 +114,6 @@ async function submitAdjustment() {
           </option>
         </select>
       </AdminFilterBar>
-    </AdminPanel>
-
-    <AdminPanel :span="7" :title="`员工假期账户 (${accounts.length})`">
       <AdminTable :columns="accountColumns" :rows="accounts" :loading="loading" row-key="accountId" @select="fillAdjustment">
         <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
         <template #cell-leaveName="{ row }">

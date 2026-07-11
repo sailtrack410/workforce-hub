@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Sparkles, MessageCircle, ChevronLeft, X } from 'lucide-vue-next';
+import { MessageCircle, ChevronLeft, X } from 'lucide-vue-next';
 import type { AgentResponse } from '@/api';
 import { employeeApi } from '@/api';
 import { useAgentsSectionContext } from '../employee-shell-context';
@@ -126,10 +126,6 @@ watch(agents, (rows) => {
       </button>
       <div class="workspace-head-text">
         <h2 class="workspace-title">AI 助手</h2>
-        <div class="workspace-meta-line">
-          <span>{{ agents.length }} 个可用</span>
-          <span v-if="addedAgents.length">{{ addedAgents.length }} 个已添加</span>
-        </div>
       </div>
     </div>
   </header>
@@ -139,8 +135,7 @@ watch(agents, (rows) => {
     <p v-else-if="agentsError" class="dialog-error">{{ agentsError }}</p>
     <AppEmptyState
       v-else-if="!filteredAgents.length"
-      title="暂无 AI 助手"
-      :description="keyword ? '未匹配到 AI 助手' : '暂无可用 AI 助手'"
+      :title="keyword ? '未匹配到 AI 助手' : '暂无可用 AI 助手'"
       icon="workbench"
     />
 
@@ -167,9 +162,8 @@ watch(agents, (rows) => {
           />
           <div class="agent-card-copy">
             <strong>{{ humanizeText(agent.agentName) }}</strong>
-            <small>{{ agentVisibleType(agent) }}</small>
+            <small v-if="agentVisibleType(agent) !== humanizeText(agent.agentName)">{{ agentVisibleType(agent) }}</small>
           </div>
-          <AppTag tone="success">已添加</AppTag>
         </button>
       </div>
     </article>
@@ -196,9 +190,8 @@ watch(agents, (rows) => {
           />
           <div class="agent-card-copy">
             <strong>{{ humanizeText(agent.agentName) }}</strong>
-            <small>{{ agentVisibleType(agent) }}</small>
+            <small v-if="agentVisibleType(agent) !== humanizeText(agent.agentName)">{{ agentVisibleType(agent) }}</small>
           </div>
-          <AppTag tone="neutral">可添加</AppTag>
         </button>
       </div>
     </article>
@@ -221,10 +214,6 @@ watch(agents, (rows) => {
         />
         <h3>{{ humanizeText(profileAgent.agentName) }}</h3>
         <div class="agent-profile-badges">
-          <AppTag tone="success">
-            <Sparkles :size="11" />
-            AI 助手
-          </AppTag>
           <AppTag tone="neutral">{{ agentVisibleType(profileAgent) }}</AppTag>
           <AppTag v-if="profileAgent.publishedVersionLabel" tone="primary">
             v{{ profileAgent.publishedVersionLabel }}
@@ -232,10 +221,6 @@ watch(agents, (rows) => {
         </div>
       </header>
       <dl class="agent-profile-detail">
-        <div>
-          <dt>类型</dt>
-          <dd>{{ agentVisibleType(profileAgent) }}</dd>
-        </div>
         <div>
           <dt>身份模式</dt>
           <dd>{{ profileAgent.identityModeName || identityModeLabel(profileAgent.identityMode) }}</dd>

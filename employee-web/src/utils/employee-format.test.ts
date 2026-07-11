@@ -19,7 +19,7 @@ describe('employee format helpers', () => {
     expect(displayField('  ')).toBe('-');
     expect(displayField(0)).toBe('0');
     expect(statusText('IN_APPROVAL')).toBe('审批中');
-    expect(statusText('UNKNOWN')).toBe('UNKNOWN');
+    expect(statusText('UNKNOWN')).toBe('其他状态');
     expect(bizTypeLabel('LEAVE')).toBe('请假');
     expect(punchTypeLabel('OFF_DUTY')).toBe('下班');
     expect(actionTypeLabel('AGENT_PRE_REVIEW')).toBe('AI 预审');

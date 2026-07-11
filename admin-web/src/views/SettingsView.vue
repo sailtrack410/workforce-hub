@@ -155,9 +155,12 @@ function testStateClass(item?: LlmModelResponse | null) {
 
 function testStateDetail(item?: LlmModelResponse | null) {
   if (!item) return '等待检测';
-  if (item.lastTestedAt && item.lastTestMessage) return `${safeBusinessMessage(item.lastTestMessage, '已检测')} · ${formatDateTime(item.lastTestedAt)}`;
-  if (item.lastTestedAt) return `上次 ${formatDateTime(item.lastTestedAt)}`;
-  return safeBusinessMessage(item.lastTestMessage, '等待检测');
+  const message = safeBusinessMessage(item.lastTestMessage, '');
+  if (item.lastTestedAt) {
+    const testedAt = formatDateTime(item.lastTestedAt);
+    return message && message !== testState(item) ? `${message} · ${testedAt}` : testedAt;
+  }
+  return message || '等待检测';
 }
 
 function providerDotClass(provider?: AiProviderResponse | null) {
@@ -711,12 +714,12 @@ onMounted(async () => {
             </div>
             <div class="state-line">
               <span>自检</span>
-              <strong>每 30 分钟检查供应商端点，{{ safeBusinessMessage(selectedProvider.lastTestMessage, providerStatus) }}</strong>
+              <strong>每 30 分钟 · {{ safeBusinessMessage(selectedProvider.lastTestMessage, providerStatus) }}</strong>
             </div>
           </div>
         </AdminPanel>
 
-        <AdminPanel title="模型列表" :subtitle="`当前供应商下共 ${providerModels.length} 个模型`">
+        <AdminPanel :title="`模型列表 (${providerModels.length})`">
           <template #actions>
             <button class="primary-button" :disabled="!selectedProvider" @click="openCreateModel">
               <Plus :size="16" />添加模型

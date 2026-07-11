@@ -96,7 +96,6 @@ const {
   clockCorrectionError,
   activeFile,
   activeWorkbench,
-  selectedLeaveType,
   canSubmitLeave,
   activeWorkbenchTitle,
   workflowDetailRows,
@@ -154,13 +153,11 @@ interface OaProcessDefinition {
   key: string;
   processCode?: string;
   title: string;
-  description: string;
   statusLabel: string;
   statusTone: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
   availability: OaProcessAvailability;
   tone: OaProcessTone;
   icon: Component;
-  tags: string[];
   formFields?: GenericOaField[];
 }
 
@@ -196,36 +193,30 @@ const oaProcessCatalog: OaProcessDefinition[] = [
   {
     key: 'leave',
     title: '请假申请',
-    description: '年假、病假、事假等假期申请，提交后进入直属上级审批。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'primary',
     icon: CalendarDays,
-    tags: ['假期', '审批'],
   },
   {
     key: 'clockCorrection',
     title: '补卡申请',
-    description: '缺卡、漏打卡或异常考勤说明，支持上传证明附件。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'warning',
     icon: Clock3,
-    tags: ['考勤', '异常闭环'],
   },
   {
     key: 'expense',
     processCode: 'EXPENSE',
     title: '费用报销',
-    description: '差旅、交通、招待、办公费用等报销申请。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'success',
     icon: ReceiptText,
-    tags: ['财务', '发票'],
     formFields: [
       {
         key: 'expenseCategory',
@@ -250,13 +241,11 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     key: 'businessTrip',
     processCode: 'BUSINESS_TRIP',
     title: '出差申请',
-    description: '出差城市、周期、预算和同行人审批。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'primary',
     icon: Plane,
-    tags: ['差旅', '预算'],
     formFields: [
       { key: 'destination', label: '出差地点', type: 'text', required: true },
       { key: 'startAt', label: '开始时间', type: 'datetime', required: true },
@@ -269,13 +258,11 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     key: 'overtime',
     processCode: 'OVERTIME',
     title: '加班申请',
-    description: '工作日、休息日、节假日加班登记与审批。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'warning',
     icon: Timer,
-    tags: ['考勤', '补偿'],
     formFields: [
       { key: 'overtimeDate', label: '加班日期', type: 'date', required: true },
       { key: 'startAt', label: '开始时间', type: 'time', required: true },
@@ -298,13 +285,11 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     key: 'seal',
     processCode: 'SEAL',
     title: '用章申请',
-    description: '合同章、公章、法人章等用章审批和留痕。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'neutral',
     icon: Stamp,
-    tags: ['行政', '合同'],
     formFields: [
       {
         key: 'sealType',
@@ -329,13 +314,11 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     key: 'purchase',
     processCode: 'PURCHASE',
     title: '采购申请',
-    description: '办公用品、设备、服务采购需求和预算审批。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'success',
     icon: ShoppingCart,
-    tags: ['采购', '预算'],
     formFields: [
       { key: 'itemName', label: '采购内容', type: 'text', required: true },
       { key: 'quantity', label: '数量', type: 'number', required: true },
@@ -348,13 +331,11 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     key: 'certificate',
     processCode: 'CERTIFICATE',
     title: '证明开具',
-    description: '在职证明、收入证明、实习证明等申请。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'neutral',
     icon: FileCheck2,
-    tags: ['人事', '证明'],
     formFields: [
       {
         key: 'certificateType',
@@ -387,13 +368,11 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     key: 'borrow',
     processCode: 'BORROW',
     title: '备用金借款',
-    description: '项目备用金、活动预支和后续核销流程。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'success',
     icon: CreditCard,
-    tags: ['财务', '核销'],
     formFields: [
       { key: 'amount', label: '借款金额', type: 'money', required: true },
       { key: 'useDate', label: '使用日期', type: 'date', required: true },
@@ -406,13 +385,11 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     key: 'project',
     processCode: 'PROJECT',
     title: '项目立项',
-    description: '项目目标、周期、人员和预算立项审批。',
     statusLabel: '可提交',
     statusTone: 'success',
     availability: 'enabled',
     tone: 'primary',
     icon: BriefcaseBusiness,
-    tags: ['项目', '预算'],
     formFields: [
       { key: 'projectName', label: '项目名称', type: 'text', required: true },
       { key: 'startAt', label: '开始日期', type: 'date', required: true },
@@ -445,18 +422,11 @@ const activeWorkflowDetail = computed(() => (
 ));
 const activeWorkflowAttachments = computed(() => activeWorkflowDetail.value?.attachments ?? []);
 const activeWorkflowCanWithdraw = computed(() => activeWorkflowDetail.value?.status === 'IN_APPROVAL');
-const oaQuickProcessCards = computed(() => oaProcessCatalog.slice(0, 6));
 
 function leaveAccountTone(account: LeaveAccountResponse) {
   if (account.status !== 'ACTIVE') return 'neutral';
   if ((account.frozenMinutes ?? 0) > 0) return 'warning';
   return 'success';
-}
-
-function leaveAccountMeta(account: LeaveAccountResponse) {
-  if (account.lastChangeMinutes === undefined || account.lastChangeMinutes === null) return '暂无近期变动';
-  const prefix = account.lastChangeMinutes > 0 ? '+' : '';
-  return `${account.lastTxnType ?? '最近变动'} ${prefix}${minutesToDayLabel(Math.abs(account.lastChangeMinutes))}`;
 }
 
 function leaveAccountToneClass(index: number) {
@@ -479,9 +449,10 @@ function leaveBalanceModeText(account: LeaveAccountResponse) {
   return account.balanceMode === 'NO_DEDUCT' ? '不扣余额' : '按时长扣减';
 }
 
-function openLeaveInOa() {
+async function openLeaveInOa() {
   shell.selectItem('workbench', 'oa');
-  void router.push({ name: 'employee-workbench-detail', params: { app: 'oa' } });
+  await router.push({ name: 'employee-workbench-detail', params: { app: 'oa' } });
+  await openLeaveDialog();
 }
 
 function openProcessCatalog() {
@@ -604,10 +575,21 @@ const workflowProgressSteps = computed(() => {
   ];
 });
 
-const workflowActionItems = computed(() => workflowActions.value.map((action) => ({
-  action,
-  agentDecision: action.actionType === 'AGENT_PRE_REVIEW' ? parseAgentPreReviewDecision(action.agentDecisionJson) : null,
-})));
+const workflowActionItems = computed(() => workflowActions.value.map((action) => {
+  const actionLabel = actionTypeLabel(action.actionType);
+  const stepLabel = humanizeText(displayField(action.stepName));
+  const sameLabel = actionLabel.replace(/\s+/g, '') === stepLabel.replace(/\s+/g, '');
+  return {
+    action,
+    meta: sameLabel ? formatDateTime(action.actedAt) : `${stepLabel} · ${formatDateTime(action.actedAt)}`,
+    agentDecision: action.actionType === 'AGENT_PRE_REVIEW' ? parseAgentPreReviewDecision(action.agentDecisionJson) : null,
+  };
+}));
+
+function agentDecisionCheckValue(result: string, status: string) {
+  if (!result) return statusText(status);
+  return /^\d{4}-\d{2}-\d{2}T/.test(result) ? formatDateTime(result) : displayField(result);
+}
 
 async function loadAttachmentPickerFiles() {
   attachmentPickerLoading.value = true;
@@ -862,9 +844,6 @@ watch(workflowRequests, () => {
       </button>
       <div class="workspace-head-text">
         <h2 class="workspace-title">{{ activeWorkbenchTitle }}</h2>
-        <div class="workspace-meta-line">
-          <span>{{ activeWorkbench.subtitle }}</span>
-        </div>
       </div>
     </div>
     <div class="head-actions">
@@ -881,7 +860,7 @@ watch(workflowRequests, () => {
     <template v-if="activeWorkbench.id === 'oa'">
       <AppErrorState
         v-if="workbenchError"
-        title="仪表盘数据加载失败"
+        title="工作台数据加载失败"
         :description="workbenchError"
         action-label="重试"
         @retry="refreshActiveWorkbench"
@@ -907,29 +886,11 @@ watch(workflowRequests, () => {
             <header class="oa-panel-head">
               <div>
                 <h3>我的申请</h3>
-                <span>{{ activeWorkflowBucket.label }} · {{ filteredWorkflowRequests.length }} 条</span>
               </div>
               <AppButton variant="primary" size="sm" @click="openProcessCatalog">
                 发起申请
               </AppButton>
             </header>
-            <section class="oa-process-strip" aria-label="常用流程">
-              <button
-                v-for="process in oaQuickProcessCards"
-                :key="process.key"
-                type="button"
-                :class="[`tone-${process.tone}`, { planned: process.availability === 'planned' }]"
-                @click="handleOaProcess(process)"
-              >
-                <span class="oa-process-icon" aria-hidden="true">
-                  <component :is="process.icon" :size="17" />
-                </span>
-                <span>
-                  <strong>{{ process.title }}</strong>
-                  <small>{{ process.statusLabel }}</small>
-                </span>
-              </button>
-            </section>
             <AppErrorState
               v-if="workflowRequestsError"
               title="申请加载失败"
@@ -938,8 +899,8 @@ watch(workflowRequests, () => {
               @retry="loadWorkflowRequests"
             />
             <AppLoadingState v-else-if="workflowRequestsLoading" />
-            <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" description="暂无申请" />
-            <AppEmptyState v-else-if="!filteredWorkflowRequests.length" :title="`暂无${activeWorkflowBucket.label}申请`" :description="`暂无${activeWorkflowBucket.label}申请`" />
+            <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" />
+            <AppEmptyState v-else-if="!filteredWorkflowRequests.length" :title="`暂无${activeWorkflowBucket.label}申请`" />
             <div v-else class="oa-request-list">
               <button
                 v-for="request in filteredWorkflowRequests"
@@ -975,7 +936,7 @@ watch(workflowRequests, () => {
               </div>
             </header>
             <AppLoadingState v-if="workflowDetailLoading" />
-            <AppEmptyState v-else-if="!activeWorkflowDetail" title="暂无详情" description="暂无详情" />
+            <AppEmptyState v-else-if="!activeWorkflowDetail" title="选择一条申请查看详情" />
             <div v-else class="request-detail-stack oa-detail-body">
               <div class="workflow-node-map" aria-label="流程进度">
                 <span
@@ -1018,7 +979,7 @@ watch(workflowRequests, () => {
               <div class="timeline-list">
                 <span v-for="item in workflowActionItems" :key="item.action.actionId">
                   <strong>{{ actionTypeLabel(item.action.actionType) }}</strong>
-                  <small>{{ humanizeText(displayField(item.action.stepName)) }} · {{ formatDateTime(item.action.actedAt) }}</small>
+                  <small>{{ item.meta }}</small>
                   <em v-if="item.action.comment">{{ humanizeText(item.action.comment) }}</em>
                   <div v-if="item.agentDecision" class="agent-decision-panel">
                     <div class="agent-decision-head">
@@ -1031,7 +992,7 @@ watch(workflowRequests, () => {
                     <ul v-if="item.agentDecision.checks.length">
                       <li v-for="check in item.agentDecision.checks" :key="`${check.name}-${check.result}`">
                         <span>{{ displayField(check.name) }}</span>
-                        <em>{{ check.result ? displayField(check.result) : statusText(check.status) }}</em>
+                        <em>{{ agentDecisionCheckValue(check.result, check.status) }}</em>
                       </li>
                     </ul>
                   </div>
@@ -1058,7 +1019,7 @@ watch(workflowRequests, () => {
               <h3>今日考勤</h3>
               <span>{{ todayKey }}</span>
             </div>
-            <AppTag :tone="todayExceptions.length ? 'warning' : 'success'">{{ todayResult ? statusText(todayResult.resultStatus) : '待打卡' }}</AppTag>
+            <AppTag v-if="todayResult" :tone="todayExceptions.length ? 'warning' : 'success'">{{ statusText(todayResult.resultStatus) }}</AppTag>
           </div>
           <div class="attendance-status-panel">
             <strong>{{ todayExceptions.length ? '今日异常' : (todayResult ? '今日正常' : '等待打卡') }}</strong>
@@ -1085,13 +1046,12 @@ watch(workflowRequests, () => {
           <div class="attendance-card-head">
             <div>
               <h3>异常闭环</h3>
-              <span>{{ todayExceptions.length }} 条今日异常</span>
             </div>
             <AppButton variant="secondary" size="sm" @click="openClockCorrectionDialog()">
               补卡
             </AppButton>
           </div>
-          <AppEmptyState v-if="!attendanceExceptions.length" title="暂无异常" description="暂无异常" />
+          <AppEmptyState v-if="!attendanceExceptions.length" title="今日无考勤异常" />
           <div v-else class="attendance-action-list">
             <div v-for="item in attendanceExceptions.slice(0, 5)" :key="item.exceptionId" class="attendance-action-row">
               <div>
@@ -1121,7 +1081,7 @@ watch(workflowRequests, () => {
             </div>
           </div>
           <AppLoadingState v-if="attendanceLoading" />
-          <AppEmptyState v-else-if="!teamAttendanceRows.length" title="暂无团队风险" description="暂无团队风险" />
+          <AppEmptyState v-else-if="!teamAttendanceRows.length" title="团队考勤正常" />
           <div v-else class="attendance-action-list">
             <div v-for="item in teamAttendanceRows" :key="`team-${item.userId}-${item.workDate}`" class="attendance-action-row">
               <div>
@@ -1136,7 +1096,7 @@ watch(workflowRequests, () => {
         <article class="detail-card attendance-history-card">
           <h3>月度记录</h3>
           <AppLoadingState v-if="attendanceLoading" />
-          <AppEmptyState v-else-if="!attendanceDailyResults.length" title="暂无日结果" description="暂无日结果" />
+          <AppEmptyState v-else-if="!attendanceDailyResults.length" title="暂无月度记录" />
           <div v-else class="compact-table">
             <div v-for="item in attendanceDailyResults" :key="item.dailyResultId">
               <strong>{{ item.workDate }}</strong>
@@ -1181,7 +1141,7 @@ watch(workflowRequests, () => {
                 </span>
               </div>
               <AppButton variant="primary" size="sm" type="button" @click="openLeaveInOa">
-                前往 OA 请假
+                请假
               </AppButton>
             </div>
           </article>
@@ -1214,17 +1174,9 @@ watch(workflowRequests, () => {
                       <dt>冻结</dt>
                       <dd>{{ minutesToDayLabel(account.frozenMinutes) }}</dd>
                     </div>
-                    <div>
-                      <dt>近期</dt>
-                      <dd>{{ leaveAccountMeta(account) }}</dd>
-                    </div>
-                    <div>
-                      <dt>状态</dt>
-                      <dd>{{ statusText(account.status) }}</dd>
-                    </div>
                   </dl>
                 </article>
-                <AppEmptyState v-if="!leaveAccounts.length" class="leave-account-empty" title="暂无假期账户" description="暂无假期账户" />
+                <AppEmptyState v-if="!leaveAccounts.length" class="leave-account-empty" title="暂无假期账户" />
               </section>
             </section>
 
@@ -1232,7 +1184,6 @@ watch(workflowRequests, () => {
               <header class="leave-panel-head">
                 <div>
                   <h3>近期变动</h3>
-                  <span>{{ recentLeaveAccounts.length }} 条</span>
                 </div>
               </header>
               <div v-if="recentLeaveAccounts.length" class="leave-change-list">
@@ -1246,7 +1197,7 @@ watch(workflowRequests, () => {
                   </em>
                 </div>
               </div>
-              <AppEmptyState v-else title="暂无近期变动" description="暂无近期变动" />
+              <AppEmptyState v-else title="暂无近期变动" />
             </aside>
           </div>
         </template>
@@ -1261,7 +1212,6 @@ watch(workflowRequests, () => {
     <header class="dialog-head dialog-head-row">
       <div>
         <h2>发起申请</h2>
-        <p>常用 OA 流程</p>
       </div>
       <button class="field-icon-button" type="button" aria-label="关闭" @click="closeProcessCatalog">
         <X :size="15" />
@@ -1282,11 +1232,7 @@ watch(workflowRequests, () => {
         <span class="oa-process-copy">
           <span class="oa-process-title-row">
             <strong>{{ process.title }}</strong>
-            <AppTag :tone="process.statusTone">{{ process.statusLabel }}</AppTag>
-          </span>
-          <small>{{ process.description }}</small>
-          <span class="oa-process-tags">
-            <em v-for="tag in process.tags" :key="`${process.key}-${tag}`">{{ tag }}</em>
+            <AppTag v-if="process.availability !== 'enabled'" :tone="process.statusTone">{{ process.statusLabel }}</AppTag>
           </span>
         </span>
       </button>
@@ -1299,7 +1245,6 @@ watch(workflowRequests, () => {
     <header class="dialog-head dialog-head-row">
       <div>
         <h2>请假申请</h2>
-        <p>{{ selectedLeaveType?.leaveName ?? '暂无假种' }}</p>
       </div>
       <button class="field-icon-button" type="button" aria-label="关闭" @click="leaveDialogOpen = false">
         <X :size="15" />
@@ -1365,7 +1310,6 @@ watch(workflowRequests, () => {
     <header class="dialog-head dialog-head-row">
       <div>
         <h2>补卡申请</h2>
-        <p>{{ clockCorrectionForm.targetDate || '考勤日期' }}</p>
       </div>
       <button class="field-icon-button" type="button" aria-label="关闭" @click="clockCorrectionDialogOpen = false">
         <X :size="15" />
@@ -1427,7 +1371,6 @@ watch(workflowRequests, () => {
     <header class="dialog-head dialog-head-row">
       <div>
         <h2>{{ activeGenericProcess.title }}</h2>
-        <p>{{ activeGenericProcess.statusLabel }}</p>
       </div>
       <button class="field-icon-button" type="button" aria-label="关闭" @click="closeGenericOaDialog">
         <X :size="15" />
@@ -1544,7 +1487,6 @@ watch(workflowRequests, () => {
     <AppEmptyState
       v-else-if="!attachmentPickerFolders.length && !attachmentPickerFiles.length"
       title="暂无附件"
-      description="暂无附件"
     />
     <div v-else class="attachment-picker-list">
       <button

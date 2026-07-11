@@ -107,7 +107,7 @@ describe('useWorkbenchState', () => {
     expect(state.leaveAccounts.value).toEqual([]);
     expect(state.attendanceExceptions.value).toEqual([]);
     expect(state.attendanceDailyResults.value).toEqual([]);
-    expect(state.workbenchError?.value).toBe('仪表盘数据加载失败');
+    expect(state.workbenchError?.value).toBe('工作台数据加载失败');
   });
 
   it('keeps the latest workflow detail when an older request resolves later', async () => {

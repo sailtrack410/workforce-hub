@@ -103,7 +103,7 @@ onMounted(loadTree);
 
 <template>
   <div class="page-grid">
-    <AdminPanel :span="7" title="部门树">
+    <AdminPanel :span="selected ? 7 : 12" title="部门树">
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadTree"><RefreshCcw :size="16" />刷新</button>
       </template>
@@ -127,7 +127,11 @@ onMounted(loadTree);
           class="clickable"
           :class="{ selected: store.selectedDepartmentId === f.node.id }"
           :style="{ paddingLeft: 10 + f.depth * 20 + 'px' }"
+          role="button"
+          tabindex="0"
           @click="selectNode(f.node)"
+          @keydown.enter.prevent="selectNode(f.node)"
+          @keydown.space.prevent="selectNode(f.node)"
         >
           <strong>{{ f.node.deptName }}</strong>
           <span>{{ statusLabel(f.node.status) }}</span>
@@ -135,14 +139,11 @@ onMounted(loadTree);
       </AdminCompactList>
     </AdminPanel>
 
-    <AdminPanel :span="5" title="部门详情">
-      <template v-if="selected">
-        <AdminDetailList :rows="detailRows" />
-        <div class="detail-actions">
-          <button class="secondary-button" @click="handleUpdate">保存修改</button>
-        </div>
-      </template>
-      <template v-else><div class="empty-state">选择左侧部门查看详情</div></template>
+    <AdminPanel v-if="selected" :span="5" title="部门详情">
+      <AdminDetailList :rows="detailRows" />
+      <div class="detail-actions">
+        <button class="secondary-button" @click="handleUpdate">保存修改</button>
+      </div>
     </AdminPanel>
   </div>
 </template>
