@@ -101,6 +101,7 @@ onMounted(loadList);
         </button>
       </AdminFilterBar>
       <AdminTable
+        interactive
         :columns="columns"
         :rows="items"
         :loading="loading"

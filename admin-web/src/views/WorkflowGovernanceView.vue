@@ -31,6 +31,7 @@ import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminCompactList from '@/components/AdminCompactList.vue';
+import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
 import AdminPagination from '@/components/AdminPagination.vue';
 
 const store = useWorkflowGovernanceStore();
@@ -44,6 +45,8 @@ const templates = ref<WorkflowTemplateResponse[]>([]);
 const templateVersions = ref<WorkflowTemplateVersionResponse[]>([]);
 const actions = ref<WorkflowTaskActionResponse[]>([]);
 const publishingVersionId = ref<string | number | null>(null);
+const publishTarget = ref<WorkflowTemplateVersionResponse | null>(null);
+const publishConfirmVisible = ref(false);
 const STATUS_APPROVING = ['IN', 'APPROVAL'].join('_');
 const BIZ_LEAVE = ['LEA', 'VE'].join('');
 
@@ -53,6 +56,23 @@ const requestColumns: TableColumn[] = [
   { key: 'status', label: '状态' },
   { key: 'submittedAt', label: '提交时间' },
 ];
+
+const selectedTemplate = computed(() => templates.value.find((item) => String(item.templateId) === String(store.selectedTemplateId)) ?? null);
+const currentPublishedVersion = computed(() => selectedTemplate.value?.currentVersion ?? templateVersions.value.find((item) => item.status === 'PUBLISHED') ?? null);
+const publishDefinitionKey = computed(() => {
+  const definitionKeys: Record<string, string> = {
+    [BIZ_LEAVE]: 'leave_manager_approval',
+    CLOCK_CORRECTION: 'clock_correction_manager_approval',
+    EXPENSE: 'expense_manager_approval',
+    BUSINESS_TRIP: 'business_trip_manager_approval',
+    OVERTIME: 'overtime_manager_approval',
+    SEAL: 'seal_manager_approval',
+    PURCHASE: 'purchase_manager_approval',
+  };
+  return selectedTemplate.value?.processCode ? definitionKeys[selectedTemplate.value.processCode] ?? '' : '';
+});
+const formConfigChanged = computed(() => normalizedJson(currentPublishedVersion.value?.formSchemaJson) !== normalizedJson(publishTarget.value?.formSchemaJson));
+const ruleConfigChanged = computed(() => normalizedJson(currentPublishedVersion.value?.ruleSnapshotJson) !== normalizedJson(publishTarget.value?.ruleSnapshotJson));
 
 const detailRows = computed<DetailRow[]>(() => {
   const r = selectedDetail.value;
@@ -147,26 +167,31 @@ async function selectTemplate(templateId: string | number) {
   }
 }
 
-async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) {
-  const template = templates.value.find((item) => String(item.templateId) === String(version.templateId));
-  const definitionKeys: Record<string, string> = {
-    [BIZ_LEAVE]: 'leave_manager_approval',
-    CLOCK_CORRECTION: 'clock_correction_manager_approval',
-    EXPENSE: 'expense_manager_approval',
-    BUSINESS_TRIP: 'business_trip_manager_approval',
-    OVERTIME: 'overtime_manager_approval',
-    SEAL: 'seal_manager_approval',
-    PURCHASE: 'purchase_manager_approval',
-  };
-  const flowableDefinitionKey = template?.processCode ? definitionKeys[template.processCode] ?? '' : '';
-  if (!flowableDefinitionKey) {
+function normalizedJson(value?: string | null) {
+  if (!value?.trim()) return '';
+  try {
+    return JSON.stringify(JSON.parse(value));
+  } catch {
+    return value.trim();
+  }
+}
+
+function requestPublishTemplateVersion(version: WorkflowTemplateVersionResponse) {
+  publishTarget.value = version;
+  if (!publishDefinitionKey.value) {
     toast.error('未配置审批流程');
     return;
   }
+  publishConfirmVisible.value = true;
+}
 
-  publishingVersionId.value = version.versionId;
+async function publishTemplateVersion() {
+  if (!publishTarget.value || !publishDefinitionKey.value || publishingVersionId.value) return;
+  publishingVersionId.value = publishTarget.value.versionId;
   try {
-    await adminApi.workflow.publishTemplateVersion(version.versionId, { flowableDefinitionKey });
+    await adminApi.workflow.publishTemplateVersion(publishTarget.value.versionId, { flowableDefinitionKey: publishDefinitionKey.value });
+    publishConfirmVisible.value = false;
+    publishTarget.value = null;
     toast.success('模板版本已发布');
     await loadPage();
   } catch (e) {
@@ -208,6 +233,7 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
         <input v-model="store.filters.keyword" placeholder="申请标题" />
       </AdminFilterBar>
       <AdminTable
+        interactive
         :columns="requestColumns"
         :rows="items"
         :loading="loading"
@@ -269,7 +295,11 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
             :key="formatId(tpl.templateId)"
             class="clickable"
             :class="{ selected: store.selectedTemplateId === tpl.templateId }"
+            role="button"
+            tabindex="0"
             @click="selectTemplate(tpl.templateId)"
+            @keydown.enter.prevent="selectTemplate(tpl.templateId)"
+            @keydown.space.prevent="selectTemplate(tpl.templateId)"
           >
             <strong>{{ tpl.templateName }}</strong>
             <span>{{ workflowBizLabel(tpl.processCode) }} · {{ tpl.statusName || workflowStatusLabel(tpl.status) }}</span>
@@ -283,7 +313,7 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
               v-if="ver.status === 'DRAFT'"
               class="primary-button action-btn"
               :disabled="publishingVersionId === ver.versionId"
-              @click.stop="publishTemplateVersion(ver)"
+              @click.stop="requestPublishTemplateVersion(ver)"
             >
               发布
             </button>
@@ -291,6 +321,46 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
         </AdminCompactList>
       </div>
     </AdminPanel>
+
+    <AdminConfirmDialog
+      v-model:visible="publishConfirmVisible"
+      title="发布流程模板"
+      confirm-label="确认发布"
+      :close-on-confirm="false"
+      :confirm-disabled="Boolean(publishingVersionId)"
+      :cancel-disabled="Boolean(publishingVersionId)"
+      @confirm="publishTemplateVersion"
+    >
+      <div class="publish-impact">
+        <p>发布后，后续新申请将使用目标版本；正在审批的申请不受影响。</p>
+        <dl>
+          <div>
+            <dt>模板</dt>
+            <dd>{{ selectedTemplate?.templateName || '-' }}</dd>
+          </div>
+          <div>
+            <dt>版本切换</dt>
+            <dd>v{{ currentPublishedVersion?.versionNo ?? '-' }} → v{{ publishTarget?.versionNo ?? '-' }}</dd>
+          </div>
+          <div>
+            <dt>流程定义</dt>
+            <dd>{{ workflowDefinitionLabel(publishDefinitionKey) }}</dd>
+          </div>
+          <div>
+            <dt>表单配置</dt>
+            <dd :class="formConfigChanged ? 'changed' : 'unchanged'">{{ formConfigChanged ? '有变化' : '无变化' }}</dd>
+          </div>
+          <div>
+            <dt>规则配置</dt>
+            <dd :class="ruleConfigChanged ? 'changed' : 'unchanged'">{{ ruleConfigChanged ? '有变化' : '无变化' }}</dd>
+          </div>
+          <div>
+            <dt>目标状态</dt>
+            <dd>{{ publishTarget?.statusName || workflowStatusLabel(publishTarget?.status) }}</dd>
+          </div>
+        </dl>
+      </div>
+    </AdminConfirmDialog>
   </main>
 </template>
 
@@ -301,7 +371,57 @@ async function publishTemplateVersion(version: WorkflowTemplateVersionResponse) 
   gap: var(--space-lg);
 }
 
+.publish-impact {
+  display: grid;
+  gap: var(--space-base);
+}
+
+.publish-impact p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.publish-impact dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.publish-impact dl div {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+}
+
+.publish-impact dt {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.publish-impact dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.publish-impact .changed {
+  color: var(--amber);
+}
+
+.publish-impact .unchanged {
+  color: var(--success);
+}
+
 @media (max-width: 980px) {
   .split-content { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .publish-impact dl { grid-template-columns: 1fr; }
 }
 </style>

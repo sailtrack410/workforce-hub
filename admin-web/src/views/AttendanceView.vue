@@ -445,6 +445,7 @@ onMounted(loadPage);
           </button>
         </form>
         <AdminTable
+          interactive
           :columns="groupColumns"
           :rows="groups"
           :loading="loading"
@@ -542,6 +543,7 @@ onMounted(loadPage);
 
       <AdminPanel :span="7" :title="`排班 (${schedules.length})`">
         <AdminTable
+          interactive
           :columns="scheduleColumns"
           :rows="schedules"
           :loading="loading"

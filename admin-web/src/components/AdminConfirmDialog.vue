@@ -11,8 +11,10 @@ const props = withDefaults(
     confirmLabel?: string;
     danger?: boolean;
     closeOnConfirm?: boolean;
+    confirmDisabled?: boolean;
+    cancelDisabled?: boolean;
   }>(),
-  { title: '确认操作', message: '', confirmLabel: '确认', danger: false, closeOnConfirm: true },
+  { title: '确认操作', message: '', confirmLabel: '确认', danger: false, closeOnConfirm: true, confirmDisabled: false, cancelDisabled: false },
 );
 
 const emit = defineEmits<{
@@ -28,6 +30,7 @@ watch(
 );
 
 function handleConfirm() {
+  if (props.confirmDisabled) return;
   if (props.closeOnConfirm) {
     opened.value = false;
     emit('update:visible', false);
@@ -36,6 +39,7 @@ function handleConfirm() {
 }
 
 function handleCancel() {
+  if (props.cancelDisabled) return;
   opened.value = false;
   emit('update:visible', false);
   emit('cancel');
@@ -47,6 +51,7 @@ function handleCancel() {
     v-model:visible="opened"
     :width="$slots.default ? 'min(860px, 92vw)' : 'min(400px, 90vw)'"
     :show-close="false"
+    :close-disabled="cancelDisabled"
     @close="handleCancel"
   >
     <div class="confirm-header">
@@ -57,8 +62,8 @@ function handleCancel() {
       <p v-if="message">{{ message }}</p>
     </slot>
     <div class="confirm-actions">
-      <button class="secondary-button" @click="handleCancel">取消</button>
-      <button :class="danger ? 'danger-button' : 'primary-button'" @click="handleConfirm">
+      <button class="secondary-button" type="button" :disabled="cancelDisabled" @click="handleCancel">取消</button>
+      <button :class="danger ? 'danger-button' : 'primary-button'" type="button" :disabled="confirmDisabled" @click="handleConfirm">
         {{ confirmLabel }}
       </button>
     </div>

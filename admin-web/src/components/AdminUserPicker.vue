@@ -95,7 +95,7 @@ function clearUser() {
           <span>搜索</span>
         </button>
       </form>
-      <AdminTable :columns="columns" :rows="users" :loading="loading" row-key="userId" @row-click="pickUser">
+      <AdminTable interactive :columns="columns" :rows="users" :loading="loading" row-key="userId" @row-click="pickUser">
         <template #cell-primaryDeptName="{ row }">{{ row.primaryDeptName || '-' }}</template>
         <template #cell-positionName="{ row }">{{ row.positionName || '-' }}</template>
       </AdminTable>

@@ -511,6 +511,7 @@ onBeforeUnmount(() => {
       </details>
 
       <AdminTable
+        interactive
         :columns="columns"
         :rows="items"
         :loading="loading"

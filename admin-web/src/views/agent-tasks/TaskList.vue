@@ -54,6 +54,7 @@ const columns: TableColumn[] = [
       </select>
     </AdminFilterBar>
     <AdminTable
+      interactive
       :columns="columns"
       :rows="items"
       :loading="loading"

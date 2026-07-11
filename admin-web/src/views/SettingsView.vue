@@ -773,7 +773,7 @@ onMounted(async () => {
           <button class="secondary-button" :disabled="loading" @click="loadAiBase"><RefreshCcw :size="16" />刷新</button>
           <button class="primary-button" :disabled="!selectedProvider" @click="openCreateModel"><Plus :size="16" />添加模型</button>
         </template>
-        <AdminTable :columns="modelColumns" :rows="models" :loading="loading" :selected-id="selectedModel?.modelId" row-key="modelId" @row-click="selectedModel = $event">
+        <AdminTable interactive :columns="modelColumns" :rows="models" :loading="loading" :selected-id="selectedModel?.modelId" row-key="modelId" @row-click="selectedModel = $event">
           <template #cell-displayName="{ row }">
             <strong>{{ row.displayName }}</strong>
             <span>{{ providerTypeLabel(row.provider) }} / {{ row.modelName }}</span>

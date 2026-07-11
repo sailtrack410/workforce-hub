@@ -99,7 +99,7 @@ function visibilityLabel(value?: string | null) {
       </button>
     </template>
 
-    <AdminTable :columns="columns" :rows="items" :loading="loading" row-key="spaceId" @row-click="emit('open-space', $event)">
+    <AdminTable interactive :columns="columns" :rows="items" :loading="loading" row-key="spaceId" @row-click="emit('open-space', $event)">
       <template #cell-spaceName="{ row }">
         <strong>{{ row.spaceName }}</strong>
       </template>

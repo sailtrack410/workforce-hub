@@ -18,8 +18,9 @@ const props = withDefaults(
     loading?: boolean;
     rowKey?: string;
     selectedId?: EntityId | null;
+    interactive?: boolean;
   }>(),
-  { loading: false, rowKey: 'id', selectedId: null },
+  { loading: false, rowKey: 'id', selectedId: null, interactive: false },
 );
 
 const emit = defineEmits<{
@@ -84,15 +85,15 @@ function toggleSort(col: TableColumn) {
             scope="col"
             :class="{ sortable: col.sortable, sorted: sortKey === col.key }"
             :style="col.width ? { width: col.width } : undefined"
-            @click="toggleSort(col)"
           >
-            <span class="th-content">
+            <button v-if="col.sortable" class="sort-button" type="button" @click="toggleSort(col)">
               {{ col.label }}
-              <template v-if="col.sortable && sortKey === col.key">
+              <template v-if="sortKey === col.key">
                 <ArrowUp v-if="sortDir === 'asc'" :size="12" />
                 <ArrowDown v-else :size="12" />
               </template>
-            </span>
+            </button>
+            <span v-else class="th-content">{{ col.label }}</span>
           </th>
         </tr>
       </thead>
@@ -100,8 +101,12 @@ function toggleSort(col: TableColumn) {
         <tr
           v-for="row in sortedRows"
           :key="getKey(row)"
-          :class="{ selected: isSelected(row) }"
-          @click="handleRowClick(row)"
+          :class="{ selected: isSelected(row), interactive }"
+          :tabindex="interactive ? 0 : undefined"
+          :aria-selected="interactive ? isSelected(row) : undefined"
+          @click="interactive && handleRowClick(row)"
+          @keydown.enter.prevent="interactive && handleRowClick(row)"
+          @keydown.space.prevent="interactive && handleRowClick(row)"
         >
           <td v-for="col in columns" :key="col.key">
             <slot :name="`cell-${col.key}`" :row="row">
@@ -151,15 +156,19 @@ td strong, td span { display: block; }
 
 td span { color: var(--muted); margin-top: 3px; }
 
-tbody tr { cursor: pointer; }
+tbody tr.interactive { cursor: pointer; }
 
-tbody tr:hover,
+tbody tr.interactive:hover,
 tbody tr.selected {
   background: var(--hover-bg);
 }
 
+tbody tr.interactive:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
 .sortable {
-  cursor: pointer;
   user-select: none;
 }
 
@@ -171,6 +180,21 @@ tbody tr.selected {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 28px;
+  margin: calc(var(--space-xs) * -1);
+  padding: var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
 }
 
 .sorted {

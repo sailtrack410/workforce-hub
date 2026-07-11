@@ -114,7 +114,7 @@ async function submitAdjustment() {
           </option>
         </select>
       </AdminFilterBar>
-      <AdminTable :columns="accountColumns" :rows="accounts" :loading="loading" row-key="accountId" @select="fillAdjustment">
+      <AdminTable interactive :columns="accountColumns" :rows="accounts" :loading="loading" row-key="accountId" @select="fillAdjustment">
         <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
         <template #cell-leaveName="{ row }">
           <strong>{{ row.leaveName }}</strong>
