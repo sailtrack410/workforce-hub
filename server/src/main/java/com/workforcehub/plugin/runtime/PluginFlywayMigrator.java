@@ -32,10 +32,10 @@ public final class PluginFlywayMigrator {
     /**
      * 执行插件数据库迁移。
      * 从 JAR 内部的 db/migration/ 目录读取迁移脚本。
+     * 如果 JAR 内没有 db/migration 目录，跳过迁移（不是错误）。
      *
      * @param pluginId 插件ID
      * @param pluginJarPath 插件JAR文件路径
-     * @throws PluginMigrationException 迁移失败时抛出
      */
     public void migrate(String pluginId, Path pluginJarPath) {
         String safeId = sanitizePluginId(pluginId);
@@ -47,10 +47,9 @@ public final class PluginFlywayMigrator {
             throw new PluginMigrationException("插件 JAR 不存在: " + pluginJarPath, null);
         }
 
-        // 验证 JAR 内存在 db/migration 目录
+        // JAR 内没有 db/migration 目录，跳过迁移
         if (!hasMigrationDirectory(pluginJarPath)) {
-            throw new PluginMigrationException(
-                "插件 [%s] JAR 内缺少 %s 目录".formatted(pluginId, MIGRATION_PATH), null);
+            return;
         }
 
         // 使用 JAR URL 作为 Flyway 位置
@@ -151,6 +150,28 @@ public final class PluginFlywayMigrator {
     static void validateTableName(String tableName) {
         if (!SAFE_ID.matcher(tableName).matches()) {
             throw new IllegalArgumentException("非法表名: " + tableName);
+        }
+    }
+
+    /**
+     * 静态方法：获取 history 表名（测试用）。
+     */
+    static String getHistoryTableStatic(String pluginId) {
+        String safeId = sanitizePluginId(pluginId);
+        String historyTable = "flyway_plugin_" + safeId;
+        validateTableName(historyTable);
+        return historyTable;
+    }
+
+    /**
+     * 静态方法：检查 JAR 内是否存在 db/migration 目录（测试用）。
+     */
+    static boolean hasMigrationDirectoryStatic(Path jarPath) {
+        try (FileSystem fs = FileSystems.newFileSystem(jarPath, Collections.emptyMap())) {
+            Path migrationPath = fs.getPath(MIGRATION_PATH);
+            return Files.exists(migrationPath) && Files.isDirectory(migrationPath);
+        } catch (IOException e) {
+            return false;
         }
     }
 

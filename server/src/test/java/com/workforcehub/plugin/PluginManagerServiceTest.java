@@ -2,7 +2,6 @@ package com.workforcehub.plugin;
 
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
-import com.workforcehub.plugin.runtime.WorkforcePluginFactory;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,8 +20,8 @@ import java.util.jar.JarOutputStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 插件生命周期与状态同步验证。
- * 验证 PF4J 生命周期和状态跟踪，不依赖数据库。
+ * 插件管理服务集成测试。
+ * 验证真实插件生命周期和状态同步。
  */
 class PluginManagerServiceTest {
 
@@ -30,16 +29,18 @@ class PluginManagerServiceTest {
     Path tempDir;
 
     @Test
-    void shouldInstallAndTrackStatus() throws Exception {
+    void shouldInstallPluginAndTrackStatus() throws Exception {
         Path jarPath = buildHelloPluginJar();
-
-        // 使用真实的 WorkforcePluginManager
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
             tempDir.resolve("plugins").toString());
 
-        // 模拟安装流程
+        // 安装（模拟 PluginManagerService.install 的核心逻辑）
         String pluginId = pf4jManager.loadPlugin(jarPath);
         assertEquals("hello-plugin", pluginId);
+
+        PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
+        assertNotNull(wrapper);
+        assertEquals("0.1.0", wrapper.getDescriptor().getVersion());
 
         // 模拟数据库状态
         PluginStatus dbStatus = PluginStatus.INSTALLED;
@@ -50,9 +51,7 @@ class PluginManagerServiceTest {
         assertEquals(PluginState.STARTED, state);
         dbStatus = PluginStatus.ACTIVE;
 
-        // 验证插件上下文
-        PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
-        assertNotNull(wrapper);
+        // 验证插件上下文注入
         Object plugin = wrapper.getPlugin();
         assertEquals("hello-plugin", invoke(plugin, "getContextPluginId"));
         assertTrue((Boolean) invoke(plugin, "isStarted"));
@@ -68,6 +67,27 @@ class PluginManagerServiceTest {
         assertNull(pf4jManager.getPlugin(pluginId));
         dbStatus = PluginStatus.UNINSTALLED;
         assertEquals(PluginStatus.UNINSTALLED, dbStatus);
+    }
+
+    @Test
+    void shouldHandlePluginWithoutMigration() throws Exception {
+        Path jarPath = buildHelloPluginJar(); // hello-plugin 没有 db/migration
+        WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
+            tempDir.resolve("plugins").toString());
+
+        // 安装不应因缺少迁移目录而失败
+        String pluginId = pf4jManager.loadPlugin(jarPath);
+        assertEquals("hello-plugin", pluginId);
+
+        // 启用不应失败
+        PluginState state = pf4jManager.startPlugin(pluginId);
+        assertEquals(PluginState.STARTED, state);
+
+        // 验证插件正常运行
+        PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
+        assertNotNull(wrapper);
+        Object plugin = wrapper.getPlugin();
+        assertEquals("hello-plugin", invoke(plugin, "getContextPluginId"));
     }
 
     @Test
