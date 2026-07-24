@@ -30,6 +30,22 @@ describe('adminApi', () => {
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ flowableDefinitionKey: 'leave_manager_approval' });
   });
 
+  it('maps workflow template creation endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ processTypeId: '7001', templateId: '8001', versionId: '9001' }));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.workflow.createProcessType({ processCode: 'EXPENSE', processName: '费用报销', status: 'ACTIVE' });
+    await api.workflow.createTemplate({ processTypeId: '7001', templateCode: 'EXPENSE_DEFAULT', templateName: '费用报销默认模板', status: 'ACTIVE' });
+    await api.workflow.createTemplateVersion('8001', { versionNo: 1, formSchemaJson: '{}', ruleSnapshotJson: '{}' });
+
+    expect(fetcher.mock.calls.map((call) => call[0])).toEqual([
+      '/api/admin/workflow/process-types',
+      '/api/admin/workflow/templates',
+      '/api/admin/workflow/templates/8001/versions',
+    ]);
+    expect(fetcher.mock.calls.every((call) => call[1]?.method === 'POST')).toBe(true);
+  });
+
   it('maps high-risk operation endpoints', async () => {
     const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ jobRunId: 'x', jobType: 'ALL_EXPIRED', dryRun: true, jobStatus: 'SUCCESS' }));
     const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
@@ -38,6 +54,28 @@ describe('adminApi', () => {
 
     expect(fetcher.mock.calls[0][0]).toBe('/api/admin/files/cleanup-jobs/run');
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ jobType: 'ALL_EXPIRED', dryRun: true });
+  });
+
+  it('maps enterprise file catalog filters', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ pageNo: 1, pageSize: 20, total: 0, list: [] }));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.files.list({ keyword: '张三', ownerType: 'PERSONAL_FILE', lifecycleStatus: 'ACTIVE' });
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/files?keyword=%E5%BC%A0%E4%B8%89&ownerType=PERSONAL_FILE&lifecycleStatus=ACTIVE');
+  });
+
+  it('maps IM outbox governance endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({}));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.imOutbox.batchRetry(['1001', '1002']);
+    await api.imOutbox.dispatch(50);
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/im/outbox-events/batch-retry');
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ eventIds: ['1001', '1002'] });
+    expect(fetcher.mock.calls[1][0]).toBe('/api/admin/im/outbox-events/dispatch');
+    expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body))).toEqual({ batchSize: 50 });
   });
 
   it('maps agent workflow validation endpoint', async () => {

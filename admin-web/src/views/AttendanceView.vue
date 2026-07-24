@@ -18,12 +18,18 @@ import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminUserPicker from '@/components/AdminUserPicker.vue';
+import AdminDialog from '@/components/AdminDialog.vue';
 
 const toast = useToast();
 
 const activeTab = ref<'shifts' | 'groups' | 'schedules' | 'results'>('shifts');
 const loading = ref(false);
 const submitting = ref(false);
+const shiftDialogVisible = ref(false);
+const calendarDialogVisible = ref(false);
+const groupDialogVisible = ref(false);
+const memberDialogVisible = ref(false);
+const scheduleDialogVisible = ref(false);
 
 const calendars = ref<AttendanceCalendarResponse[]>([]);
 const shifts = ref<AttendanceShiftResponse[]>([]);
@@ -189,6 +195,7 @@ async function createCalendar() {
       status: calendarForm.status,
     });
     calendarForm.calendarName = '';
+    calendarDialogVisible.value = false;
     await loadBase();
   } catch (e) {
     toast.error(errorMessage(e));
@@ -205,6 +212,7 @@ async function createShift() {
       shiftCode: generatedCode('SHIFT', shiftForm.shiftName),
     });
     shiftForm.shiftName = '';
+    shiftDialogVisible.value = false;
     await loadBase();
   } catch (e) {
     toast.error(errorMessage(e));
@@ -226,6 +234,7 @@ async function createGroup() {
       status: groupForm.status,
     });
     groupForm.groupName = '';
+    groupDialogVisible.value = false;
     await loadBase();
   } catch (e) {
     toast.error(errorMessage(e));
@@ -255,6 +264,7 @@ async function addGroupMember() {
     });
     memberForm.userId = '';
     memberUserId.value = null;
+    memberDialogVisible.value = false;
     groupMembers.value = await adminApi.attendance.groupMembers(selectedGroupId.value);
   } catch (e) {
     toast.error(errorMessage(e));
@@ -282,6 +292,7 @@ async function submitSchedule() {
       });
     }
     clearScheduleSelection();
+    scheduleDialogVisible.value = false;
     await loadSchedules();
   } catch (e) {
     toast.error(errorMessage(e));
@@ -299,6 +310,7 @@ function selectSchedule(row: AttendanceScheduleResponse) {
   scheduleForm.calendarId = row.calendarId == null ? '' : String(row.calendarId);
   scheduleForm.scheduleSource = row.scheduleSource;
   scheduleForm.status = row.status;
+  scheduleDialogVisible.value = true;
 }
 
 function clearScheduleSelection() {
@@ -310,6 +322,11 @@ function clearScheduleSelection() {
   scheduleForm.calendarId = '';
   scheduleForm.scheduleSource = 'MANUAL';
   scheduleForm.status = 'ACTIVE';
+}
+
+function newSchedule() {
+  clearScheduleSelection();
+  scheduleDialogVisible.value = true;
 }
 
 function onMemberUser(user: OrgUserSummaryResponse | null) {
@@ -353,30 +370,8 @@ onMounted(loadPage);
     </AdminPanel>
 
     <template v-if="activeTab === 'shifts'">
-      <AdminPanel :span="5" title="新建班次">
-        <form class="attendance-form" @submit.prevent="createShift">
-          <label><span>名称</span><input v-model="shiftForm.shiftName" required maxlength="128" /></label>
-          <label><span>上班</span><input v-model="shiftForm.startTime" required type="time" step="1" /></label>
-          <label><span>下班</span><input v-model="shiftForm.endTime" required type="time" step="1" /></label>
-          <label><span>上班打卡开始</span><input v-model="shiftForm.onDutyPunchStart" type="time" step="1" /></label>
-          <label><span>上班打卡结束</span><input v-model="shiftForm.onDutyPunchEnd" type="time" step="1" /></label>
-          <label><span>下班打卡开始</span><input v-model="shiftForm.offDutyPunchStart" type="time" step="1" /></label>
-          <label><span>下班打卡结束</span><input v-model="shiftForm.offDutyPunchEnd" type="time" step="1" /></label>
-          <label>
-            <span>状态</span>
-            <select v-model="shiftForm.status">
-              <option value="ACTIVE">启用</option>
-              <option value="INACTIVE">停用</option>
-            </select>
-          </label>
-          <button class="primary-button" :disabled="submitting" type="submit">
-            <Plus :size="16" />
-            <span>新建班次</span>
-          </button>
-        </form>
-      </AdminPanel>
-
-      <AdminPanel :span="7" :title="`班次 (${shifts.length})`">
+      <AdminPanel :span="12" :title="`班次 (${shifts.length})`">
+        <template #actions><button class="primary-button" type="button" @click="shiftDialogVisible = true"><Plus :size="16" />新建班次</button></template>
         <AdminTable :columns="shiftColumns" :rows="shifts" :loading="loading" row-key="shiftId">
           <template #cell-workTime="{ row }">{{ row.startTime }} - {{ row.endTime }}</template>
           <template #cell-punchTime="{ row }">
@@ -389,61 +384,15 @@ onMounted(loadPage);
     </template>
 
     <template v-else-if="activeTab === 'groups'">
-      <AdminPanel :span="5" title="工作日历">
-        <form class="attendance-form" @submit.prevent="createCalendar">
-          <label><span>名称</span><input v-model="calendarForm.calendarName" required maxlength="128" /></label>
-          <label>
-            <span>状态</span>
-            <select v-model="calendarForm.status">
-              <option value="ACTIVE">启用</option>
-              <option value="INACTIVE">停用</option>
-            </select>
-          </label>
-          <button class="primary-button" :disabled="submitting" type="submit">
-            <Plus :size="16" />
-            <span>新建日历</span>
-          </button>
-        </form>
+      <AdminPanel :span="5" :title="`工作日历 (${calendars.length})`">
+        <template #actions><button class="primary-button" type="button" @click="calendarDialogVisible = true"><Plus :size="16" />新建日历</button></template>
         <AdminTable :columns="calendarColumns" :rows="calendars" :loading="loading" row-key="calendarId">
           <template #cell-status="{ row }"><span class="status-pill">{{ statusLabel(row.status) }}</span></template>
         </AdminTable>
       </AdminPanel>
 
-      <AdminPanel :span="7" title="考勤组">
-        <form class="attendance-form group-form" @submit.prevent="createGroup">
-          <label><span>名称</span><input v-model="groupForm.groupName" required maxlength="128" /></label>
-          <label>
-            <span>日历</span>
-            <select v-model="groupForm.calendarId" required>
-              <option value="">请选择</option>
-              <option v-for="calendar in activeCalendars" :key="formatId(calendar.calendarId)" :value="String(calendar.calendarId)">
-                {{ calendar.calendarName }}
-              </option>
-            </select>
-          </label>
-          <label>
-            <span>默认班次</span>
-            <select v-model="groupForm.defaultShiftId" required>
-              <option value="">请选择</option>
-              <option v-for="shift in activeShifts" :key="formatId(shift.shiftId)" :value="String(shift.shiftId)">
-                {{ shift.shiftName }}
-              </option>
-            </select>
-          </label>
-          <label><span>迟到宽限</span><input v-model.number="groupForm.lateGraceMinutes" min="0" type="number" /></label>
-          <label><span>早退宽限</span><input v-model.number="groupForm.earlyLeaveGraceMinutes" min="0" type="number" /></label>
-          <label>
-            <span>状态</span>
-            <select v-model="groupForm.status">
-              <option value="ACTIVE">启用</option>
-              <option value="INACTIVE">停用</option>
-            </select>
-          </label>
-          <button class="primary-button" :disabled="submitting" type="submit">
-            <Plus :size="16" />
-            <span>新建考勤组</span>
-          </button>
-        </form>
+      <AdminPanel :span="7" :title="`考勤组 (${groups.length})`">
+        <template #actions><button class="primary-button" type="button" @click="groupDialogVisible = true"><Plus :size="16" />新建考勤组</button></template>
         <AdminTable
           interactive
           :columns="groupColumns"
@@ -461,21 +410,7 @@ onMounted(loadPage);
       </AdminPanel>
 
       <AdminPanel :span="12" title="考勤组成员">
-        <form class="attendance-form member-form" @submit.prevent="addGroupMember">
-          <AdminUserPicker v-model="memberUserId" label="员工" @select="onMemberUser" />
-          <label><span>开始日</span><input v-model="memberForm.effectiveFrom" required type="date" /></label>
-          <label><span>结束日</span><input v-model="memberForm.effectiveTo" type="date" /></label>
-          <label>
-            <span>来源</span>
-            <select v-model="memberForm.sourceType">
-              <option value="MANUAL">手动</option>
-            </select>
-          </label>
-          <button class="primary-button" :disabled="submitting || !selectedGroupId" type="submit">
-            <Plus :size="16" />
-            <span>添加成员</span>
-          </button>
-        </form>
+        <template #actions><button class="primary-button" type="button" :disabled="!selectedGroupId" @click="memberDialogVisible = true"><Plus :size="16" />添加成员</button></template>
         <AdminTable :columns="memberColumns" :rows="groupMembers" :loading="loading" row-key="memberId">
           <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
           <template #cell-effectiveTo="{ row }">{{ row.effectiveTo || '-' }}</template>
@@ -494,54 +429,8 @@ onMounted(loadPage);
         </AdminFilterBar>
       </AdminPanel>
 
-      <AdminPanel :span="5" :title="selectedScheduleId ? '修改排班' : '新建排班'">
-        <form class="attendance-form" @submit.prevent="submitSchedule">
-          <AdminUserPicker v-model="scheduleUserId" label="员工" :disabled="!!selectedScheduleId" @select="onScheduleUser" />
-          <label><span>日期</span><input v-model="scheduleForm.workDate" :disabled="!!selectedScheduleId" required type="date" /></label>
-          <label>
-            <span>班次</span>
-            <select v-model="scheduleForm.shiftId" required>
-              <option value="">请选择</option>
-              <option v-for="shift in activeShifts" :key="formatId(shift.shiftId)" :value="String(shift.shiftId)">
-                {{ shift.shiftName }}
-              </option>
-            </select>
-          </label>
-          <label>
-            <span>日历</span>
-            <select v-model="scheduleForm.calendarId">
-              <option value="">无</option>
-              <option v-for="calendar in activeCalendars" :key="formatId(calendar.calendarId)" :value="String(calendar.calendarId)">
-                {{ calendar.calendarName }}
-              </option>
-            </select>
-          </label>
-          <label>
-            <span>来源</span>
-            <select v-model="scheduleForm.scheduleSource">
-              <option value="MANUAL">手动</option>
-              <option value="AUTO">自动</option>
-              <option value="TEMPLATE">模板</option>
-            </select>
-          </label>
-          <label>
-            <span>状态</span>
-            <select v-model="scheduleForm.status">
-              <option value="ACTIVE">启用</option>
-              <option value="INACTIVE">停用</option>
-            </select>
-          </label>
-          <div class="button-row">
-            <button class="primary-button" :disabled="submitting" type="submit">
-              <Save :size="16" />
-              <span>{{ selectedScheduleId ? '保存排班' : '新建排班' }}</span>
-            </button>
-            <button class="secondary-button" type="button" @click="clearScheduleSelection">清空</button>
-          </div>
-        </form>
-      </AdminPanel>
-
-      <AdminPanel :span="7" :title="`排班 (${schedules.length})`">
+      <AdminPanel :span="12" :title="`排班 (${schedules.length})`">
+        <template #actions><button class="primary-button" type="button" @click="newSchedule"><Plus :size="16" />新建排班</button></template>
         <AdminTable
           interactive
           :columns="scheduleColumns"
@@ -581,6 +470,62 @@ onMounted(loadPage);
         </AdminTable>
       </AdminPanel>
     </template>
+
+    <AdminDialog v-model:visible="shiftDialogVisible" title="新建班次" width="min(680px, 92vw)">
+      <form class="attendance-form" @submit.prevent="createShift">
+        <label><span>名称</span><input v-model="shiftForm.shiftName" required maxlength="128" /></label>
+        <label><span>上班</span><input v-model="shiftForm.startTime" required type="time" step="1" /></label>
+        <label><span>下班</span><input v-model="shiftForm.endTime" required type="time" step="1" /></label>
+        <label><span>上班打卡开始</span><input v-model="shiftForm.onDutyPunchStart" type="time" step="1" /></label>
+        <label><span>上班打卡结束</span><input v-model="shiftForm.onDutyPunchEnd" type="time" step="1" /></label>
+        <label><span>下班打卡开始</span><input v-model="shiftForm.offDutyPunchStart" type="time" step="1" /></label>
+        <label><span>下班打卡结束</span><input v-model="shiftForm.offDutyPunchEnd" type="time" step="1" /></label>
+        <label><span>状态</span><select v-model="shiftForm.status"><option value="ACTIVE">启用</option><option value="INACTIVE">停用</option></select></label>
+        <button class="primary-button" :disabled="submitting" type="submit"><Plus :size="16" />新建班次</button>
+      </form>
+    </AdminDialog>
+
+    <AdminDialog v-model:visible="calendarDialogVisible" title="新建工作日历">
+      <form class="attendance-form single-form" @submit.prevent="createCalendar">
+        <label><span>名称</span><input v-model="calendarForm.calendarName" required maxlength="128" /></label>
+        <label><span>状态</span><select v-model="calendarForm.status"><option value="ACTIVE">启用</option><option value="INACTIVE">停用</option></select></label>
+        <button class="primary-button" :disabled="submitting" type="submit"><Plus :size="16" />新建日历</button>
+      </form>
+    </AdminDialog>
+
+    <AdminDialog v-model:visible="groupDialogVisible" title="新建考勤组" width="min(680px, 92vw)">
+      <form class="attendance-form" @submit.prevent="createGroup">
+        <label><span>名称</span><input v-model="groupForm.groupName" required maxlength="128" /></label>
+        <label><span>日历</span><select v-model="groupForm.calendarId" required><option value="">请选择</option><option v-for="calendar in activeCalendars" :key="formatId(calendar.calendarId)" :value="String(calendar.calendarId)">{{ calendar.calendarName }}</option></select></label>
+        <label><span>默认班次</span><select v-model="groupForm.defaultShiftId" required><option value="">请选择</option><option v-for="shift in activeShifts" :key="formatId(shift.shiftId)" :value="String(shift.shiftId)">{{ shift.shiftName }}</option></select></label>
+        <label><span>迟到宽限</span><input v-model.number="groupForm.lateGraceMinutes" min="0" type="number" /></label>
+        <label><span>早退宽限</span><input v-model.number="groupForm.earlyLeaveGraceMinutes" min="0" type="number" /></label>
+        <label><span>状态</span><select v-model="groupForm.status"><option value="ACTIVE">启用</option><option value="INACTIVE">停用</option></select></label>
+        <button class="primary-button" :disabled="submitting" type="submit"><Plus :size="16" />新建考勤组</button>
+      </form>
+    </AdminDialog>
+
+    <AdminDialog v-model:visible="memberDialogVisible" title="添加考勤组成员">
+      <form class="attendance-form single-form" @submit.prevent="addGroupMember">
+        <AdminUserPicker v-model="memberUserId" label="员工" @select="onMemberUser" />
+        <label><span>开始日</span><input v-model="memberForm.effectiveFrom" required type="date" /></label>
+        <label><span>结束日</span><input v-model="memberForm.effectiveTo" type="date" /></label>
+        <label><span>来源</span><select v-model="memberForm.sourceType"><option value="MANUAL">手动</option></select></label>
+        <button class="primary-button" :disabled="submitting || !selectedGroupId" type="submit"><Plus :size="16" />添加成员</button>
+      </form>
+    </AdminDialog>
+
+    <AdminDialog v-model:visible="scheduleDialogVisible" :title="selectedScheduleId ? '修改排班' : '新建排班'" width="min(680px, 92vw)" @close="clearScheduleSelection">
+      <form class="attendance-form" @submit.prevent="submitSchedule">
+        <AdminUserPicker v-model="scheduleUserId" label="员工" :disabled="!!selectedScheduleId" @select="onScheduleUser" />
+        <label><span>日期</span><input v-model="scheduleForm.workDate" :disabled="!!selectedScheduleId" required type="date" /></label>
+        <label><span>班次</span><select v-model="scheduleForm.shiftId" required><option value="">请选择</option><option v-for="shift in activeShifts" :key="formatId(shift.shiftId)" :value="String(shift.shiftId)">{{ shift.shiftName }}</option></select></label>
+        <label><span>日历</span><select v-model="scheduleForm.calendarId"><option value="">无</option><option v-for="calendar in activeCalendars" :key="formatId(calendar.calendarId)" :value="String(calendar.calendarId)">{{ calendar.calendarName }}</option></select></label>
+        <label><span>来源</span><select v-model="scheduleForm.scheduleSource"><option value="MANUAL">手动</option><option value="AUTO">自动</option><option value="TEMPLATE">模板</option></select></label>
+        <label><span>状态</span><select v-model="scheduleForm.status"><option value="ACTIVE">启用</option><option value="INACTIVE">停用</option></select></label>
+        <button class="primary-button" :disabled="submitting" type="submit"><Save :size="16" />{{ selectedScheduleId ? '保存排班' : '新建排班' }}</button>
+      </form>
+    </AdminDialog>
   </main>
 </template>
 
@@ -617,7 +562,7 @@ onMounted(loadPage);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-md);
-  margin-bottom: var(--space-lg);
+  margin-bottom: 0;
 }
 
 .attendance-form label {
@@ -633,10 +578,7 @@ onMounted(loadPage);
   align-self: end;
 }
 
-.group-form,
-.member-form {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
+.single-form { grid-template-columns: 1fr; }
 
 .button-row {
   display: flex;
@@ -646,8 +588,7 @@ onMounted(loadPage);
 
 @media (max-width: 900px) {
   .attendance-form,
-  .group-form,
-  .member-form {
+  .single-form {
     grid-template-columns: 1fr;
   }
 }

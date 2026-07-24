@@ -10,6 +10,7 @@ import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
+import { maxLength, requiredText } from '@/utils/validation';
 
 const store = usePositionStore();
 const toast = useToast();
@@ -19,6 +20,8 @@ const items = ref<OrgPositionResponse[]>([]);
 
 const createForm = reactive<OrgPositionSaveRequest>({ positionCode: '', positionName: '', status: 'ACTIVE' });
 const creating = ref(false);
+const createNameTouched = ref(false);
+const createNameError = computed(() => requiredText(createForm.positionName, '岗位名称') || maxLength(createForm.positionName, 128, '岗位名称'));
 
 const selected = computed(() =>
   store.selectedPositionId ? items.value.find((i) => i.id === store.selectedPositionId) ?? null : null,
@@ -53,11 +56,13 @@ async function loadList() {
 }
 
 async function handleCreate() {
+  if (createNameError.value) return;
   creating.value = true;
   try {
     await adminApi.org.createPosition(createForm);
     createForm.positionCode = '';
     createForm.positionName = '';
+    createNameTouched.value = false;
     await loadList();
   } catch (e) {
     toast.error(errorMessage(e));
@@ -94,9 +99,12 @@ onMounted(loadList);
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
-      <AdminFilterBar>
-        <input v-model="createForm.positionName" placeholder="岗位名称" />
-        <button class="primary-button" :disabled="creating || !createForm.positionName" @click="handleCreate">
+      <AdminFilterBar :show-search="false">
+        <label class="filter-field">
+          <input v-model="createForm.positionName" :aria-invalid="createNameTouched && Boolean(createNameError)" maxlength="128" placeholder="岗位名称" @blur="createNameTouched = true" />
+          <small v-if="createNameTouched && createNameError" class="field-error">{{ createNameError }}</small>
+        </label>
+        <button class="primary-button" :disabled="creating || Boolean(createNameError)" @click="handleCreate">
           <Plus :size="16" /> 新建
         </button>
       </AdminFilterBar>
@@ -128,4 +136,6 @@ onMounted(loadList);
   display: flex;
   margin-top: var(--space-base);
 }
+
+.filter-field { display: grid; gap: var(--space-xs); }
 </style>

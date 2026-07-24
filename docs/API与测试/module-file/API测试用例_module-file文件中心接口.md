@@ -226,12 +226,13 @@
 | `FILE-DL-006` | P0 | `GET /api/employee/files/download/{ticketNo}` | 有效下载票据返回原始文件并标记已使用 | 下载票据有效且文件对象存在 | 访问下载入口 | HTTP `200`；Body 等于原始文件字节；票据状态更新为 `USED`；写入下载执行审计 |
 | `FILE-DL-007` | P0 | 并发集成测试 | 员工端同一下载票据只能成功执行一次 | 员工下载票据有效；两个请求并发访问同一票据 | 并发访问员工下载入口 | 仅一个请求返回文件；另一个返回 `code=409`；票据最终为 `USED` |
 | `FILE-DL-008` | P0 | `POST /api/employee/files/{attachmentRefId}/download-tickets` | 普通员工文件入口不允许业务归档附件 | 员工拿到 `WF_REQUEST` 审批附件引用 | 使用普通文件接口申请下载票据 | HTTP `200`；`code=403`；提示 `员工端文件接口仅允许下载个人文件` |
-| `FILE-ADM-DL-001` | P0 | `GET /api/admin/files` | 后台查询有效治理文件列表 | 管理员已登录；存在 `ADMIN_FILE` 有效文件 | 分页查询 | HTTP `200`；只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的文件 |
+| `FILE-ADM-DL-001` | P0 | `GET /api/admin/files` | 后台查询企业文件目录 | 管理员已登录；存在员工个人文件和后台文件 | 分页查询 | HTTP `200`；返回企业全部附件引用及上传人元数据 |
 | `FILE-ADM-DL-002` | P0 | `POST /api/admin/files/{attachmentRefId}/download-tickets` | 后台申请治理文件下载票据 | 管理员已登录；后台治理文件未删除 | `downloadType=SINGLE` | HTTP `200`；返回 `/api/admin/files/download/{ticketNo}` |
 | `FILE-ADM-DL-003` | P0 | `GET /api/admin/files/download/{ticketNo}` | 后台有效下载票据返回原始文件 | 下载票据有效且文件对象存在 | 访问后台下载入口 | HTTP `200`；Body 等于原始文件字节；票据状态更新为 `USED`；写入后台下载执行审计 |
 | `FILE-ADM-DL-004` | P0 | 并发集成测试 | 后台同一下载票据只能成功执行一次 | 后台下载票据有效；两个请求并发访问同一票据 | 并发访问后台下载入口 | 仅一个请求返回文件；另一个返回 `code=409`；票据最终为 `USED` |
 | `FILE-ADM-DL-005` | P1 | `GET /api/admin/files` | 后台列表默认隐藏存储内部字段 | 管理员已登录；存在后台治理文件 | 分页查询 | 响应不包含 `contentSha256`、`storageProvider`、`bucketName`、`objectKey` |
 | `FILE-ADM-DL-006` | P1 | `GET /api/admin/files/download/{ticketNo}` | 非法 MIME 降级为二进制下载 | 历史数据或手工数据写入非法 MIME | 访问后台下载入口 | HTTP `200`；`Content-Type=application/octet-stream`；Body 等于原始文件字节 |
+| `FILE-ADM-DL-007` | P0 | `GET /api/admin/files` | 企业文件目录组合筛选 | 管理员已登录；存在员工个人文件 | 文件名、来源、上传主体、上传人、检测状态组合筛选 | HTTP `200`；只返回匹配文件，包含员工姓名和工号，不包含对象存储内部字段 |
 
 ## 6.6 回收站
 

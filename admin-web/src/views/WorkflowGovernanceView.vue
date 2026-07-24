@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { RefreshCcw } from 'lucide-vue-next';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { FileSearch, LayoutTemplate, Plus, RefreshCcw } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type {
   WorkflowRequestDetailResponse,
   WorkflowRequestSummaryResponse,
+  WorkflowProcessTypeResponse,
   WorkflowTaskActionResponse,
   WorkflowTemplateResponse,
   WorkflowTemplateVersionResponse,
@@ -33,20 +34,31 @@ import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminCompactList from '@/components/AdminCompactList.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
 import AdminPagination from '@/components/AdminPagination.vue';
+import AdminDialog from '@/components/AdminDialog.vue';
 
 const store = useWorkflowGovernanceStore();
 const toast = useToast();
+const activeTab = ref<'requests' | 'templates'>('requests');
 
 const loading = ref(false);
 const detailLoading = ref(false);
+const submitting = ref(false);
+const requestDetailVisible = ref(false);
+const createProcessTypeVisible = ref(false);
+const createTemplateVisible = ref(false);
+const createVersionVisible = ref(false);
 const items = ref<WorkflowRequestSummaryResponse[]>([]);
 const selectedDetail = ref<WorkflowRequestDetailResponse | null>(null);
+const processTypes = ref<WorkflowProcessTypeResponse[]>([]);
 const templates = ref<WorkflowTemplateResponse[]>([]);
 const templateVersions = ref<WorkflowTemplateVersionResponse[]>([]);
 const actions = ref<WorkflowTaskActionResponse[]>([]);
 const publishingVersionId = ref<string | number | null>(null);
 const publishTarget = ref<WorkflowTemplateVersionResponse | null>(null);
 const publishConfirmVisible = ref(false);
+const processTypeForm = reactive({ processCode: '', processName: '', bizType: '', status: 'ACTIVE' });
+const templateForm = reactive({ processTypeId: '', templateCode: '', templateName: '', status: 'ACTIVE' });
+const versionForm = reactive({ versionNo: 1, formSchemaJson: '{}', ruleSnapshotJson: '{}' });
 const STATUS_APPROVING = ['IN', 'APPROVAL'].join('_');
 const BIZ_LEAVE = ['LEA', 'VE'].join('');
 
@@ -111,7 +123,7 @@ async function loadPage() {
   loading.value = true;
 
   try {
-    const [requestPage, templateRows] = await Promise.all([
+    const [requestPage, processTypeRows, templateRows] = await Promise.all([
       adminApi.workflow.requests({
         pageNo: store.pagination.pageNo,
         pageSize: store.pagination.pageSize,
@@ -119,16 +131,13 @@ async function loadPage() {
         bizType: store.filters.bizType,
         keyword: store.filters.keyword,
       }),
+      adminApi.workflow.processTypes(),
       adminApi.workflow.templates(),
     ]);
     items.value = requestPage.list;
     store.pagination.total = requestPage.total;
+    processTypes.value = processTypeRows;
     templates.value = templateRows;
-    if (store.selectedRequestId && requestPage.list.some((r) => r.requestId === store.selectedRequestId)) {
-      await selectRequest(requestPage.list.find((r) => r.requestId === store.selectedRequestId)!);
-    } else if (requestPage.list.length > 0) {
-      await selectRequest(requestPage.list[0]);
-    }
     if (store.selectedTemplateId && templateRows.some((t) => t.templateId === store.selectedTemplateId)) {
       await selectTemplate(store.selectedTemplateId);
     } else if (templateRows.length > 0) {
@@ -151,11 +160,87 @@ async function selectRequest(request: WorkflowRequestSummaryResponse) {
     ]);
     selectedDetail.value = detailResult;
     actions.value = actionRows;
+    requestDetailVisible.value = true;
   } catch (e) {
     toast.error(errorMessage(e));
   } finally {
     detailLoading.value = false;
   }
+}
+
+function validJson(value: string, label: string) {
+  if (!value.trim()) return true;
+  try {
+    JSON.parse(value);
+    return true;
+  } catch {
+    toast.error(`${label}不是有效 JSON`);
+    return false;
+  }
+}
+
+async function createProcessType() {
+  submitting.value = true;
+  try {
+    const created = await adminApi.workflow.createProcessType({ ...processTypeForm });
+    createProcessTypeVisible.value = false;
+    processTypeForm.processCode = '';
+    processTypeForm.processName = '';
+    processTypeForm.bizType = '';
+    await loadPage();
+    templateForm.processTypeId = String(created.processTypeId);
+    toast.success('流程类型已创建');
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    submitting.value = false;
+  }
+}
+
+async function createTemplate() {
+  submitting.value = true;
+  try {
+    const created = await adminApi.workflow.createTemplate({
+      ...templateForm,
+      processTypeId: templateForm.processTypeId,
+    });
+    createTemplateVisible.value = false;
+    templateForm.templateCode = '';
+    templateForm.templateName = '';
+    await loadPage();
+    await selectTemplate(created.templateId);
+    toast.success('流程模板已创建');
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    submitting.value = false;
+  }
+}
+
+async function createTemplateVersion() {
+  if (!store.selectedTemplateId) return;
+  if (!validJson(versionForm.formSchemaJson, '表单配置') || !validJson(versionForm.ruleSnapshotJson, '规则配置')) return;
+  submitting.value = true;
+  try {
+    await adminApi.workflow.createTemplateVersion(store.selectedTemplateId, { ...versionForm });
+    createVersionVisible.value = false;
+    versionForm.versionNo += 1;
+    await selectTemplate(store.selectedTemplateId);
+    await loadPage();
+    toast.success('模板版本已创建');
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    submitting.value = false;
+  }
+}
+
+function openVersionDialog() {
+  const maxVersion = templateVersions.value.reduce((max, item) => Math.max(max, item.versionNo), 0);
+  versionForm.versionNo = maxVersion + 1;
+  versionForm.formSchemaJson = currentPublishedVersion.value?.formSchemaJson || '{}';
+  versionForm.ruleSnapshotJson = currentPublishedVersion.value?.ruleSnapshotJson || '{}';
+  createVersionVisible.value = true;
 }
 
 async function selectTemplate(templateId: string | number) {
@@ -203,8 +288,17 @@ async function publishTemplateVersion() {
 </script>
 
 <template>
-  <main class="page-grid">
-    <AdminPanel :span="7" :title="`申请列表 (${store.pagination.total})`">
+  <main class="workflow-page">
+    <div class="workflow-tabs" role="tablist" aria-label="审批治理任务">
+      <button type="button" role="tab" :aria-selected="activeTab === 'requests'" :class="{ active: activeTab === 'requests' }" @click="activeTab = 'requests'">
+        <FileSearch :size="16" />申请监控
+      </button>
+      <button type="button" role="tab" :aria-selected="activeTab === 'templates'" :class="{ active: activeTab === 'templates' }" @click="activeTab = 'templates'">
+        <LayoutTemplate :size="16" />流程模板
+      </button>
+    </div>
+
+    <AdminPanel v-if="activeTab === 'requests'" :span="12" :title="`申请列表 (${store.pagination.total})`">
       <template #actions>
         <button class="secondary-button" :disabled="loading" @click="loadPage">
           <RefreshCcw :size="16" />
@@ -239,7 +333,7 @@ async function publishTemplateVersion() {
         :loading="loading"
         row-key="requestId"
         :selected-id="store.selectedRequestId"
-        @select="selectRequest"
+        @row-click="selectRequest"
       >
         <template #cell-title="{ row }">
           <strong>{{ row.title }}</strong>
@@ -263,33 +357,16 @@ async function publishTemplateVersion() {
       />
     </AdminPanel>
 
-    <AdminPanel :span="5" title="申请详情">
-      <AdminDetailList :rows="detailRows" />
-
-      <h3>附件</h3>
-      <AdminCompactList :empty="!selectedDetail || selectedDetail.attachments.length === 0">
-        <template v-if="selectedDetail">
-          <article v-for="att in selectedDetail.attachments" :key="formatId(att.attachmentRefId)">
-            <strong>{{ att.displayName }}</strong>
-            <span>{{ formatBytes(att.fileSize) }} · {{ att.scanStatusName || fileScanStatusLabel(att.scanStatus) }}</span>
-          </article>
-        </template>
-      </AdminCompactList>
-
-      <h3>审批轨迹</h3>
-      <AdminCompactList :loading="detailLoading" :empty="actions.length === 0">
-        <article v-for="action in actions" :key="formatId(action.actionId)">
-          <strong>{{ action.actionTypeName || workflowActionLabel(action.actionType) }} · {{ action.stepName || workflowStepLabel(action.stepKey) }}</strong>
-          <span>{{ action.actorName || action.actorTypeName || '系统处理' }} · {{ formatDateTime(action.actedAt) }}</span>
-          <span>{{ action.beforeStatusName || workflowStatusLabel(action.beforeStatus) }} → {{ action.afterStatusName || workflowStatusLabel(action.afterStatus) }}</span>
-          <span>{{ action.comment || '无备注' }}</span>
-        </article>
-      </AdminCompactList>
-    </AdminPanel>
-
-    <AdminPanel :span="12" title="模板版本">
+    <AdminPanel v-else :span="12" title="模板版本" subtitle="先选择模板，再创建和发布版本">
+      <template #actions>
+        <div class="template-actions">
+          <button class="secondary-button" type="button" @click="createProcessTypeVisible = true"><Plus :size="16" />流程类型</button>
+          <button class="secondary-button" type="button" :disabled="processTypes.length === 0" @click="createTemplateVisible = true"><Plus :size="16" />流程模板</button>
+          <button class="primary-button" type="button" :disabled="!store.selectedTemplateId" @click="openVersionDialog"><Plus :size="16" />模板版本</button>
+        </div>
+      </template>
       <div class="split-content">
-        <AdminCompactList>
+        <AdminCompactList :empty="templates.length === 0">
           <article
             v-for="tpl in templates"
             :key="formatId(tpl.templateId)"
@@ -321,6 +398,59 @@ async function publishTemplateVersion() {
         </AdminCompactList>
       </div>
     </AdminPanel>
+
+    <AdminDialog v-model:visible="requestDetailVisible" title="申请详情" width="min(760px, 92vw)">
+      <AdminDetailList :rows="detailRows" />
+
+      <h3>附件</h3>
+      <AdminCompactList :empty="!selectedDetail || selectedDetail.attachments.length === 0">
+        <template v-if="selectedDetail">
+          <article v-for="att in selectedDetail.attachments" :key="formatId(att.attachmentRefId)">
+            <strong>{{ att.displayName }}</strong>
+            <span>{{ formatBytes(att.fileSize) }} · {{ att.scanStatusName || fileScanStatusLabel(att.scanStatus) }}</span>
+          </article>
+        </template>
+      </AdminCompactList>
+
+      <h3>审批轨迹</h3>
+      <AdminCompactList :loading="detailLoading" :empty="actions.length === 0">
+        <article v-for="action in actions" :key="formatId(action.actionId)">
+          <strong>{{ action.actionTypeName || workflowActionLabel(action.actionType) }} · {{ action.stepName || workflowStepLabel(action.stepKey) }}</strong>
+          <span>{{ action.actorName || action.actorTypeName || '系统处理' }} · {{ formatDateTime(action.actedAt) }}</span>
+          <span>{{ action.beforeStatusName || workflowStatusLabel(action.beforeStatus) }} → {{ action.afterStatusName || workflowStatusLabel(action.afterStatus) }}</span>
+          <span>{{ action.comment || '无备注' }}</span>
+        </article>
+      </AdminCompactList>
+    </AdminDialog>
+
+    <AdminDialog v-model:visible="createProcessTypeVisible" title="新建流程类型">
+      <form class="stack-form" @submit.prevent="createProcessType">
+        <label><span>流程编码</span><input v-model.trim="processTypeForm.processCode" required maxlength="64" placeholder="例如 EXPENSE" /></label>
+        <label><span>流程名称</span><input v-model.trim="processTypeForm.processName" required maxlength="128" placeholder="例如 费用报销" /></label>
+        <label><span>业务类型</span><input v-model.trim="processTypeForm.bizType" maxlength="64" placeholder="可选" /></label>
+        <label><span>状态</span><select v-model="processTypeForm.status"><option value="ACTIVE">启用</option><option value="INACTIVE">停用</option></select></label>
+        <button class="primary-button" :disabled="submitting" type="submit">创建流程类型</button>
+      </form>
+    </AdminDialog>
+
+    <AdminDialog v-model:visible="createTemplateVisible" title="新建流程模板">
+      <form class="stack-form" @submit.prevent="createTemplate">
+        <label><span>流程类型</span><select v-model="templateForm.processTypeId" required><option value="">请选择</option><option v-for="item in processTypes" :key="formatId(item.processTypeId)" :value="String(item.processTypeId)">{{ item.processName }}</option></select></label>
+        <label><span>模板编码</span><input v-model.trim="templateForm.templateCode" required maxlength="64" /></label>
+        <label><span>模板名称</span><input v-model.trim="templateForm.templateName" required maxlength="128" /></label>
+        <label><span>状态</span><select v-model="templateForm.status"><option value="ACTIVE">启用</option><option value="INACTIVE">停用</option></select></label>
+        <button class="primary-button" :disabled="submitting" type="submit">创建流程模板</button>
+      </form>
+    </AdminDialog>
+
+    <AdminDialog v-model:visible="createVersionVisible" title="新建模板版本" width="min(680px, 92vw)">
+      <form class="stack-form" @submit.prevent="createTemplateVersion">
+        <label><span>版本号</span><input v-model.number="versionForm.versionNo" required min="1" type="number" /></label>
+        <label><span>表单配置 JSON</span><textarea v-model="versionForm.formSchemaJson" maxlength="8192" rows="7" /></label>
+        <label><span>规则配置 JSON</span><textarea v-model="versionForm.ruleSnapshotJson" maxlength="8192" rows="7" /></label>
+        <button class="primary-button" :disabled="submitting" type="submit">创建模板版本</button>
+      </form>
+    </AdminDialog>
 
     <AdminConfirmDialog
       v-model:visible="publishConfirmVisible"
@@ -365,6 +495,37 @@ async function publishTemplateVersion() {
 </template>
 
 <style scoped>
+.workflow-page {
+  display: grid;
+  gap: var(--space-base);
+}
+
+.workflow-tabs {
+  display: inline-flex;
+  width: max-content;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.workflow-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: 0 var(--space-base);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.workflow-tabs button.active { background: var(--primary-soft); color: var(--green-dark); }
+.template-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+
 .split-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -422,6 +583,9 @@ async function publishTemplateVersion() {
 }
 
 @media (max-width: 640px) {
+  .workflow-tabs,
+  .workflow-tabs button { width: 100%; }
+  .workflow-tabs button { justify-content: center; }
   .publish-impact dl { grid-template-columns: 1fr; }
 }
 </style>

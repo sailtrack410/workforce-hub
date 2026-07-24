@@ -199,6 +199,19 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
 }
 
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--red);
+}
+
+.field-error {
+  color: var(--red-dark);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 /* =========================================================
    Shared Forms
    ========================================================= */
@@ -263,7 +276,7 @@ input:focus, select:focus, textarea:focus {
   line-height: 1.35;
 }
 
-.panel-title span {
+.panel-title .panel-subtitle {
   color: var(--muted);
   font-size: var(--text-sm);
 }
@@ -422,7 +435,18 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 640px) {
-  .toolbar { align-items: stretch; flex-direction: column; }
+  .panel { padding: var(--space-base); }
+
+  .panel-title,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .panel-title > :not(:first-child),
+  .toolbar > :not(:first-child) {
+    width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

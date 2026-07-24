@@ -35,6 +35,7 @@ const editForm = reactive({ leaveCode: '', balanceMode: 'DEDUCT', status: 'ACTIV
 const saving = ref(false);
 const deleting = ref(false);
 const deleteVisible = ref(false);
+const createError = computed(() => items.value.some((item) => item.leaveCode === createForm.leaveCode) ? '该假种已存在，请直接编辑现有假种' : '');
 
 const selected = computed(() =>
   store.selectedLeaveTypeId ? items.value.find((i) => i.leaveTypeId === store.selectedLeaveTypeId) ?? null : null,
@@ -75,6 +76,7 @@ function selectedLeaveType(leaveCode: string) {
 }
 
 async function handleCreate() {
+  if (createError.value) return;
   const option = selectedLeaveType(createForm.leaveCode);
   if (!option) {
     toast.error('请选择假种');
@@ -164,7 +166,7 @@ onMounted(loadList);
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
-      <AdminFilterBar>
+      <AdminFilterBar :show-search="false">
         <select v-model="createForm.leaveCode">
           <option v-for="type in leaveTypeOptions" :key="type.leaveCode" :value="type.leaveCode">
             {{ type.leaveName }}
@@ -174,10 +176,11 @@ onMounted(loadList);
           <option value="DEDUCT">扣减余额</option>
           <option value="NO_DEDUCT">不扣减余额</option>
         </select>
-        <button class="primary-button" :disabled="creating || !createForm.leaveCode" @click="handleCreate">
+        <button class="primary-button" :disabled="creating || !createForm.leaveCode || Boolean(createError)" @click="handleCreate">
           <Plus :size="16" /> 新建假种
         </button>
       </AdminFilterBar>
+      <p v-if="createError" class="field-error create-error">{{ createError }}</p>
       <AdminTable
         interactive
         :columns="columns"
@@ -247,5 +250,7 @@ onMounted(loadList);
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
+
+.create-error { margin: calc(var(--space-sm) * -1) 0 var(--space-md); }
 
 </style>

@@ -796,15 +796,16 @@ http://localhost:8080
 - 后台治理文件只计入企业总池，不占员工个人云空间
 - 权限当前由后台管理员会话隔离，细分后台角色权限后再接入权限点
 
-### 7.2 查询后台文件列表
+### 7.2 查询企业文件目录
 
-`GET /api/admin/files?pageNo=1&pageSize=20`
+`GET /api/admin/files?pageNo=1&pageSize=20&keyword=张三&ownerType=PERSONAL_FILE&uploaderType=USER&scanStatus=PASSED&lifecycleStatus=ACTIVE`
 
 用途：
 
-- 分页查询当前有效的后台治理文件
-- 第一版只返回 `ownerType=ADMIN_FILE` 且 `uploaderType=ADMIN` 的附件引用
-- 不返回员工个人文件、知识库文件、文档空间文件或群文件
+- 分页查询企业内全部附件引用，包括个人文件、审批附件、消息附件、群文件、后台文件和知识库文件
+- 支持按文件名或员工姓名、业务来源、上传主体、上传人、检测状态和生命周期状态筛选
+- 返回上传人姓名与员工工号，便于管理员定位文件归属
+- 此接口只提供元数据目录；审批、消息等业务文件不能通过后台文件下载接口绕过原业务权限
 - 默认不返回 `contentSha256`、`storageProvider`、`bucketName`、`objectKey` 等对象存储内部字段；排障详情后续通过更高权限接口单独开放
 
 成功响应：
@@ -821,12 +822,14 @@ http://localhost:8080
       {
         "attachmentRefId": 9001,
         "fileObjectId": 8001,
-        "ownerType": "ADMIN_FILE",
+        "ownerType": "PERSONAL_FILE",
         "ownerId": null,
-        "originalFileName": "后台制度文件.pdf",
-        "displayName": "后台制度文件.pdf",
-        "uploaderType": "ADMIN",
-        "uploaderId": 8001,
+        "originalFileName": "报销凭证.pdf",
+        "displayName": "报销凭证.pdf",
+        "uploaderType": "USER",
+        "uploaderId": 2003,
+        "uploaderName": "张三",
+        "employeeNo": "E1003",
         "mimeType": "application/pdf",
         "fileSize": 1048576,
         "scanStatus": "PENDING",

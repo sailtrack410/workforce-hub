@@ -294,6 +294,88 @@ public class FileQueryService {
         return PageResult.of(safePageNo, safePageSize, total == null ? 0L : total, rows);
     }
 
+    public PageResult<AdminFileResponse> listEnterpriseFiles(long pageNo,
+                                                             long pageSize,
+                                                             String keyword,
+                                                             String ownerType,
+                                                             String uploaderType,
+                                                             Long uploaderId,
+                                                             String scanStatus,
+                                                             String lifecycleStatus) {
+        CurrentUserHolder.requireUserId();
+        long safePageNo = Math.max(pageNo, 1L);
+        long safePageSize = Math.min(Math.max(pageSize, 1L), 100L);
+        long offset = (safePageNo - 1L) * safePageSize;
+        String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String normalizedOwnerType = StringUtils.hasText(ownerType) ? ownerType.trim().toUpperCase() : null;
+        String normalizedUploaderType = StringUtils.hasText(uploaderType) ? uploaderType.trim().toUpperCase() : null;
+        String normalizedScanStatus = StringUtils.hasText(scanStatus) ? scanStatus.trim().toUpperCase() : null;
+        boolean trashed = "TRASHED".equalsIgnoreCase(lifecycleStatus);
+        String deletedFilter = trashed ? "ar.deleted_at IS NOT NULL" : "ar.deleted_at IS NULL";
+        Object[] filters = {
+            normalizedKeyword, normalizedKeyword, normalizedKeyword, normalizedKeyword,
+            normalizedOwnerType, normalizedOwnerType,
+            normalizedUploaderType, normalizedUploaderType,
+            uploaderId, uploaderId,
+            normalizedScanStatus, normalizedScanStatus
+        };
+        String where = """
+              AND (? IS NULL OR ar.display_name LIKE CONCAT('%', ?, '%')
+                  OR ar.original_file_name LIKE CONCAT('%', ?, '%')
+                  OR ou.real_name LIKE CONCAT('%', ?, '%'))
+              AND (? IS NULL OR ar.owner_type = ?)
+              AND (? IS NULL OR ar.uploader_type = ?)
+              AND (? IS NULL OR ar.uploader_id = ?)
+              AND (? IS NULL OR fo.scan_status = ?)
+            """;
+
+        Long total = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            LEFT JOIN org_user ou ON ar.uploader_type = 'USER' AND ou.id = ar.uploader_id AND ou.is_deleted = 0
+            WHERE ar.is_deleted = 0
+              AND fo.is_deleted = 0
+              AND %s
+            %s
+            """.formatted(deletedFilter, where), Long.class, filters);
+
+        List<Object> queryArgs = new ArrayList<>();
+        Collections.addAll(queryArgs, filters);
+        queryArgs.add(safePageSize);
+        queryArgs.add(offset);
+        List<AdminFileResponse> rows = jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id, ar.file_object_id, ar.owner_type, ar.owner_id,
+                   ar.original_file_name, ar.display_name, ar.uploader_type, ar.uploader_id,
+                   CASE
+                       WHEN ar.uploader_type = 'USER' THEN ou.real_name
+                       WHEN ar.uploader_type = 'ADMIN' THEN au.display_name
+                       ELSE NULL
+                   END AS uploader_name,
+                   ou.employee_no,
+                   ar.deleted_at, ar.purge_after, ar.created_at, ar.updated_at,
+                   fo.mime_type, fo.file_size, fo.scan_status
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            LEFT JOIN org_user ou ON ar.uploader_type = 'USER' AND ou.id = ar.uploader_id AND ou.is_deleted = 0
+            LEFT JOIN admin_user au ON ar.uploader_type = 'ADMIN' AND au.id = ar.uploader_id AND au.is_deleted = 0
+            WHERE ar.is_deleted = 0
+              AND fo.is_deleted = 0
+              AND %s
+            %s
+            ORDER BY ar.created_at DESC, ar.id DESC
+            LIMIT ? OFFSET ?
+            """.formatted(deletedFilter, where), this::mapEnterpriseFile, queryArgs.toArray());
+        return PageResult.of(safePageNo, safePageSize, total == null ? 0L : total, rows);
+    }
+
+    private AdminFileResponse mapEnterpriseFile(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        AdminFileResponse response = mapAdminFile(rs, rowNum);
+        response.setUploaderName(rs.getString("uploader_name"));
+        response.setEmployeeNo(rs.getString("employee_no"));
+        return response;
+    }
+
     private AdminFileResponse mapAdminFile(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
         AdminFileResponse response = new AdminFileResponse();
         response.setAttachmentRefId(rs.getLong("attachment_ref_id"));
@@ -342,10 +424,13 @@ public class FileQueryService {
     }
 
     private String ownerTypeName(String value) {
-        if ("USER_FILE".equals(value)) return "个人文件";
+        if ("PERSONAL_FILE".equals(value) || "USER_FILE".equals(value)) return "个人文件";
         if ("ADMIN_FILE".equals(value)) return "管理文件";
+        if ("IM_MESSAGE".equals(value)) return "消息附件";
         if ("IM_GROUP_FILE".equals(value)) return "群文件";
-        if ("WORKFLOW_ATTACHMENT".equals(value)) return "审批附件";
+        if ("WF_REQUEST".equals(value) || "WORKFLOW_ATTACHMENT".equals(value)) return "审批附件";
+        if ("RAGFLOW_DOCUMENT".equals(value)) return "知识库文件";
+        if ("USER_AVATAR".equals(value)) return "用户头像";
         return value == null ? null : "业务文件";
     }
 
@@ -357,9 +442,10 @@ public class FileQueryService {
     }
 
     private String scanStatusName(String value) {
-        if ("CLEAN".equals(value) || "READY".equals(value)) return "已通过";
+        if ("CLEAN".equals(value) || "READY".equals(value) || "PASSED".equals(value)) return "已通过";
         if ("PENDING".equals(value)) return "检测中";
         if ("FAILED".equals(value) || "INFECTED".equals(value)) return "未通过";
+        if ("SKIPPED".equals(value)) return "已跳过";
         return value == null ? null : "未知状态";
     }
 

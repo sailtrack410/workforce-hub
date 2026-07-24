@@ -11,6 +11,7 @@ import AdminCompactList from '@/components/AdminCompactList.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminSkeleton from '@/components/AdminSkeleton.vue';
+import { maxLength, requiredText } from '@/utils/validation';
 
 const store = useDepartmentStore();
 const toast = useToast();
@@ -26,6 +27,8 @@ const createForm = reactive<OrgDepartmentSaveRequest>({
   status: 'ACTIVE',
 });
 const creating = ref(false);
+const createNameTouched = ref(false);
+const createNameError = computed(() => requiredText(createForm.deptName, '部门名称') || maxLength(createForm.deptName, 128, '部门名称'));
 
 const selected = computed(() => {
   if (!store.selectedDepartmentId) return null;
@@ -51,11 +54,13 @@ function selectNode(node: OrgDepartmentTreeNodeResponse) {
 }
 
 async function handleCreate() {
+  if (createNameError.value) return;
   creating.value = true;
   try {
     await adminApi.org.createDepartment(createForm);
     createForm.deptCode = '';
     createForm.deptName = '';
+    createNameTouched.value = false;
     await loadTree();
   } catch (e) {
     toast.error(errorMessage(e));
@@ -108,13 +113,16 @@ onMounted(loadTree);
         <button class="secondary-button" title="刷新" @click="loadTree"><RefreshCcw :size="16" />刷新</button>
       </template>
 
-      <AdminFilterBar>
-        <input v-model="createForm.deptName" placeholder="部门名称" />
+      <AdminFilterBar :show-search="false">
+        <label class="filter-field">
+          <input v-model="createForm.deptName" :aria-invalid="createNameTouched && Boolean(createNameError)" maxlength="128" placeholder="部门名称" @blur="createNameTouched = true" />
+          <small v-if="createNameTouched && createNameError" class="field-error">{{ createNameError }}</small>
+        </label>
         <select v-model="createForm.parentId">
           <option :value="null">根节点</option>
           <option v-for="f in flatList" :key="f.node.id" :value="f.node.id">{{ '&nbsp;'.repeat(f.depth * 4) }}{{ f.node.deptName }}</option>
         </select>
-        <button class="primary-button" :disabled="creating || !createForm.deptName" @click="handleCreate">
+        <button class="primary-button" :disabled="creating || Boolean(createNameError)" @click="handleCreate">
           <Plus :size="16" /> 新建
         </button>
       </AdminFilterBar>
@@ -153,4 +161,6 @@ onMounted(loadTree);
   display: flex;
   margin-top: var(--space-base);
 }
+
+.filter-field { display: grid; gap: var(--space-xs); }
 </style>

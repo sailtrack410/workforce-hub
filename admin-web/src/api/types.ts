@@ -212,6 +212,99 @@ export interface AdminAgentTaskTimeoutRunResponse {
   updatedAt?: string | null;
 }
 
+export interface AdminImOutboxEventQuery extends QueryParams {
+  pageNo?: number;
+  pageSize?: number;
+  status?: string;
+  eventType?: string;
+  conversationId?: EntityId;
+  messageId?: EntityId;
+  actorUserId?: EntityId;
+  createdFrom?: string;
+  createdTo?: string;
+}
+
+export interface AdminImOutboxEventResponse {
+  eventId: EntityId;
+  eventType: string;
+  eventTypeName?: string | null;
+  conversationId: EntityId;
+  messageId?: EntityId | null;
+  seqNo?: EntityId | null;
+  actorUserId?: EntityId | null;
+  actorName?: string | null;
+  recipientUserIdsJson?: string | null;
+  payloadJson: string;
+  status: string;
+  statusName?: string | null;
+  retryCount: number;
+  nextRetryAt?: string | null;
+  lastError?: string | null;
+  claimedAt?: string | null;
+  sentAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AdminImOutboxSummaryResponse {
+  totalCount: number;
+  dueDispatchCount: number;
+  staleSendingCount: number;
+  earliestCreatedAt?: string | null;
+  earliestNextRetryAt?: string | null;
+  generatedAt?: string | null;
+  sendingStaleBefore?: string | null;
+  statusCounts: Array<{ status: string; statusName?: string | null; count: number }>;
+}
+
+export interface AdminImOutboxFailureSummaryResponse {
+  status: string;
+  statusName?: string | null;
+  lastError?: string | null;
+  eventCount: number;
+  maxRetryCount: number;
+  firstOccurredAt?: string | null;
+  lastOccurredAt?: string | null;
+}
+
+export interface AdminImOutboxAuditResponse {
+  auditId: EntityId;
+  operatorType: string;
+  operatorTypeName?: string | null;
+  operatorId?: EntityId | null;
+  operatorName?: string | null;
+  actionType: string;
+  actionTypeName?: string | null;
+  targetType: string;
+  targetTypeName?: string | null;
+  targetId?: EntityId | null;
+  targetDisplayName?: string | null;
+  result: string;
+  resultName?: string | null;
+  detailJson?: string | null;
+  occurredAt?: string | null;
+}
+
+export interface AdminImOutboxBatchRetryResponse {
+  requestedCount: number;
+  succeededCount: number;
+  skippedCount: number;
+  items: Array<{
+    eventId: EntityId;
+    succeeded: boolean;
+    beforeStatus?: string | null;
+    beforeStatusName?: string | null;
+    afterStatus?: string | null;
+    afterStatusName?: string | null;
+    skipReason?: string | null;
+  }>;
+}
+
+export interface AdminImOutboxDispatchResponse {
+  requestedBatchSize: number;
+  dispatchedCount: number;
+}
+
 export interface WorkflowRequestListQuery extends QueryParams {
   pageNo?: number;
   pageSize?: number;
@@ -293,6 +386,38 @@ export interface WorkflowTaskActionResponse {
   afterStatus?: string | null;
   afterStatusName?: string | null;
   actedAt?: string | null;
+}
+
+export interface WorkflowProcessTypeCreateRequest {
+  processCode: string;
+  processName: string;
+  bizType?: string | null;
+  status?: string | null;
+}
+
+export interface WorkflowProcessTypeResponse {
+  processTypeId: EntityId;
+  processCode: string;
+  processName: string;
+  bizType?: string | null;
+  bizTypeName?: string | null;
+  status: string;
+  statusName?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface WorkflowTemplateCreateRequest {
+  processTypeId: EntityId;
+  templateCode: string;
+  templateName: string;
+  status?: string | null;
+}
+
+export interface WorkflowTemplateVersionCreateRequest {
+  versionNo: number;
+  formSchemaJson?: string | null;
+  ruleSnapshotJson?: string | null;
 }
 
 export interface WorkflowTemplateResponse {
@@ -578,6 +703,40 @@ export interface StorageSummaryResponse {
   attachmentRefCount?: number | null;
   recycleBinCount?: number | null;
   pendingCleanupObjectCount?: number | null;
+}
+
+export interface AdminFileResponse {
+  attachmentRefId: EntityId;
+  fileObjectId: EntityId;
+  ownerType: string;
+  ownerTypeName?: string | null;
+  ownerId?: EntityId | null;
+  originalFileName?: string | null;
+  displayName?: string | null;
+  uploaderType: string;
+  uploaderTypeName?: string | null;
+  uploaderId?: EntityId | null;
+  uploaderName?: string | null;
+  employeeNo?: string | null;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  scanStatus: string;
+  scanStatusName?: string | null;
+  deletedAt?: string | null;
+  purgeAfter?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AdminFileQuery extends QueryParams {
+  pageNo?: number;
+  pageSize?: number;
+  keyword?: string;
+  ownerType?: string;
+  uploaderType?: string;
+  uploaderId?: EntityId;
+  scanStatus?: string;
+  lifecycleStatus?: string;
 }
 
 export interface CleanupJobRunResponse {

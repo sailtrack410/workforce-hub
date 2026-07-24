@@ -472,6 +472,46 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("后台企业文件目录应包含员工文件并支持筛选")
+    void adminShouldBrowseEnterpriseFileCatalog() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee();
+        seedGlobalQuotaPolicy();
+        Long employeeAttachmentRefId = createConfirmedEmployeeFile(
+            employeeSession, "员工目录凭证.pdf", "employee-catalog-content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(get("/api/admin/files")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20")
+                .param("keyword", "员工目录凭证")
+                .param("ownerType", "PERSONAL_FILE")
+                .param("uploaderType", "USER")
+                .param("uploaderId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("scanStatus", "PENDING"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonLong("$.data.list[0].attachmentRefId", employeeAttachmentRefId))
+            .andExpect(jsonPath("$.data.list[0].ownerType").value("PERSONAL_FILE"))
+            .andExpect(jsonPath("$.data.list[0].uploaderType").value("USER"))
+            .andExpect(jsonPath("$.data.list[0].uploaderName").value("张三"))
+            .andExpect(jsonPath("$.data.list[0].employeeNo").value("E1003"))
+            .andExpect(jsonPath("$.data.list[0].contentSha256").doesNotExist())
+            .andExpect(jsonPath("$.data.list[0].objectKey").doesNotExist());
+
+        mockMvc.perform(get("/api/admin/files")
+                .cookie(adminSession)
+                .param("pageNo", "1")
+                .param("pageSize", "20")
+                .param("keyword", "不存在的文件"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.total").value(0));
+    }
+
+    @Test
     @DisplayName("后台下载遇到非法MIME时降级为二进制响应")
     void adminDownloadShouldFallbackWhenMimeTypeInvalid() throws Exception {
         Cookie adminSession = loginAdmin();

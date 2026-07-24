@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import { adminApi } from '@/api/admin';
 import type {
   AdminAgentTaskAuditResponse,
@@ -20,6 +21,7 @@ import TaskScanPanel from './agent-tasks/TaskScanPanel.vue';
 
 const store = useAgentTasksStore();
 const toast = useToast();
+const route = useRoute();
 
 const loading = ref(false);
 const detailLoading = ref(false);
@@ -35,7 +37,14 @@ function getSelected() {
   return store.selectedTaskId ? items.value.find((i) => i.taskId === store.selectedTaskId) ?? null : null;
 }
 
-onMounted(() => { void loadPage(); });
+onMounted(() => {
+  const status = typeof route.query.status === 'string' ? route.query.status : '';
+  if (['PENDING', 'RUNNING', 'WAITING_HUMAN_CONFIRM', 'SUCCEEDED', 'FAILED', 'CANCELLED'].includes(status)) {
+    store.filters.status = status;
+    store.pagination.pageNo = 1;
+  }
+  void loadPage();
+});
 
   // 并行加载指标、失败汇总、任务列表、超时扫描记录
 async function loadPage() {

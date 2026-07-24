@@ -79,8 +79,16 @@ public class AdminFileController {
 
     @GetMapping
     public R<PageResult<AdminFileResponse>> listFiles(@RequestParam(defaultValue = "1") long pageNo,
-                                                      @RequestParam(defaultValue = "20") long pageSize) {
-        return R.ok(fileQueryService.listAdminFiles(pageNo, pageSize, false));
+                                                      @RequestParam(defaultValue = "20") long pageSize,
+                                                      @RequestParam(required = false) String keyword,
+                                                      @RequestParam(required = false) String ownerType,
+                                                      @RequestParam(required = false) String uploaderType,
+                                                      @RequestParam(required = false) Long uploaderId,
+                                                      @RequestParam(required = false) String scanStatus,
+                                                      @RequestParam(defaultValue = "ACTIVE") String lifecycleStatus) {
+        return R.ok(fileQueryService.listEnterpriseFiles(
+            pageNo, pageSize, keyword, ownerType, uploaderType, uploaderId, scanStatus, lifecycleStatus
+        ));
     }
 
     @GetMapping("/recycle-bin")

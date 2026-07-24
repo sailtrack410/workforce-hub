@@ -504,6 +504,7 @@ export function permissionModuleLabel(value?: string | null) {
     FILE: '文件',
     RAGFLOW: '知识库',
     NOTIFICATION: '通知',
+    SYSTEM: '系统治理',
   };
   if (!value) return '-';
   return labels[value] ?? '其他模块';

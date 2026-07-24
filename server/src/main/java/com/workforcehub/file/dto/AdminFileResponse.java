@@ -17,6 +17,8 @@ public class AdminFileResponse {
     private String uploaderType;
     private String uploaderTypeName;
     private Long uploaderId;
+    private String uploaderName;
+    private String employeeNo;
     private String mimeType;
     private Long fileSize;
     private String scanStatus;

@@ -15,6 +15,7 @@ import AdminPagination from '@/components/AdminPagination.vue';
 import OrgMindTree from '@/components/OrgMindTree.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
 import AdminDialog from '@/components/AdminDialog.vue';
+import { maxLength, mobileFormat, requiredText } from '@/utils/validation';
 
 const store = useUserViewStore();
 const toast = useToast();
@@ -28,10 +29,11 @@ const selectedDetail = ref<OrgUserDetailResponse | null>(null);
 const depts = ref<OrgDepartmentTreeNodeResponse[]>([]);
 const positions = ref<OrgPositionResponse[]>([]);
 const creating = ref(false);
-const createForm = reactive({ realName: '', gender: 'MALE', mobile: '', primaryDeptId: undefined as number | undefined, positionId: undefined as number | undefined, employmentStatus: 'ACTIVE', status: 'ACTIVE' });
+const createForm = reactive({ employeeNo: '', realName: '', gender: 'MALE', mobile: '', primaryDeptId: undefined as EntityId | undefined, positionId: undefined as EntityId | undefined, employmentStatus: 'ACTIVE', status: 'ACTIVE' });
 const departmentCreating = ref(false);
 const departmentFormOpen = ref(false);
 const departmentForm = reactive({ parentId: undefined as EntityId | undefined, deptCode: '', deptName: '' });
+const userCreateTouched = reactive({ employeeNo: false, realName: false, mobile: false, primaryDeptId: false, positionId: false });
 const ORG_ROOT_ID = '__org_root__';
 const orgViewportRef = ref<HTMLElement | null>(null);
 const orgCanvasRef = ref<HTMLElement | null>(null);
@@ -44,6 +46,16 @@ const orgPanState = { active: false, moved: false, pointerId: 0, x: 0, y: 0, lef
 let orgLinkFrame = 0;
 let orgPanClearTimer = 0;
 let orgResizeObserver: ResizeObserver | null = null;
+
+const userCreateErrors = computed(() => ({
+  employeeNo: maxLength(createForm.employeeNo, 64, '员工编号'),
+  realName: requiredText(createForm.realName, '姓名') || maxLength(createForm.realName, 64, '姓名'),
+  mobile: maxLength(createForm.mobile, 32, '手机号') || mobileFormat(createForm.mobile),
+  primaryDeptId: createForm.primaryDeptId == null ? '请选择部门' : '',
+  positionId: createForm.positionId == null ? '请选择岗位' : '',
+}));
+const userCreateInvalid = computed(() => Object.values(userCreateErrors.value).some(Boolean));
+const departmentNameError = computed(() => requiredText(departmentForm.deptName, '部门名称') || maxLength(departmentForm.deptName, 128, '部门名称'));
 
 interface OrgLink {
   key: string;
@@ -178,11 +190,14 @@ async function loadMeta() {
 }
 
 async function handleCreate() {
+  if (userCreateInvalid.value) return;
   creating.value = true;
   try {
     await adminApi.org.createUser(createForm);
+    createForm.employeeNo = '';
     createForm.realName = '';
     createForm.mobile = '';
+    Object.keys(userCreateTouched).forEach((key) => { userCreateTouched[key as keyof typeof userCreateTouched] = false; });
     await Promise.all([loadList(), loadMeta()]);
   } catch (e) {
     toast.error(errorMessage(e));
@@ -199,6 +214,7 @@ function startCreateDepartment(parent?: OrgDepartmentTreeNodeResponse | null) {
 }
 
 async function handleCreateDepartment() {
+  if (departmentNameError.value) return;
   departmentCreating.value = true;
   try {
     const parentId = departmentForm.parentId;
@@ -397,10 +413,10 @@ onBeforeUnmount(() => {
             <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ f.node.deptName }}</option>
           </select>
         </label>
-        <label>部门名称 <input v-model="departmentForm.deptName" /></label>
+        <label>部门名称 <input v-model="departmentForm.deptName" :aria-invalid="Boolean(departmentNameError)" maxlength="128" /><small v-if="departmentNameError" class="field-error">{{ departmentNameError }}</small></label>
         <div class="department-actions">
           <button class="secondary-button" @click="departmentFormOpen = false">取消</button>
-          <button class="primary-button" :disabled="departmentCreating || !departmentForm.deptName.trim()" @click="handleCreateDepartment">
+          <button class="primary-button" :disabled="departmentCreating || Boolean(departmentNameError)" @click="handleCreateDepartment">
             <Plus :size="16" /> 创建
           </button>
         </div>
@@ -472,7 +488,7 @@ onBeforeUnmount(() => {
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
-      <AdminFilterBar>
+      <AdminFilterBar @search="loadList">
         <input v-model="store.filters.keyword" placeholder="搜索姓名" @keyup.enter="loadList" />
         <select v-model="store.filters.deptId" @change="loadList">
           <option :value="undefined">全部部门</option>
@@ -484,27 +500,29 @@ onBeforeUnmount(() => {
           <option value="PROBATION">试用</option>
           <option value="RESIGNED">离职</option>
         </select>
-        <button class="primary-button" @click="loadList">搜索</button>
       </AdminFilterBar>
 
       <details class="create-section">
         <summary class="create-summary">新建员工</summary>
         <div class="stack-form create-form">
-          <label>姓名 <input v-model="createForm.realName" /></label>
-          <label>手机 <input v-model="createForm.mobile" /></label>
+          <label>员工编号 <input v-model="createForm.employeeNo" :aria-invalid="userCreateTouched.employeeNo && Boolean(userCreateErrors.employeeNo)" maxlength="64" placeholder="可选" @blur="userCreateTouched.employeeNo = true" /><small v-if="userCreateTouched.employeeNo && userCreateErrors.employeeNo" class="field-error">{{ userCreateErrors.employeeNo }}</small></label>
+          <label>姓名 <input v-model="createForm.realName" :aria-invalid="userCreateTouched.realName && Boolean(userCreateErrors.realName)" maxlength="64" @blur="userCreateTouched.realName = true" /><small v-if="userCreateTouched.realName && userCreateErrors.realName" class="field-error">{{ userCreateErrors.realName }}</small></label>
+          <label>手机 <input v-model="createForm.mobile" :aria-invalid="userCreateTouched.mobile && Boolean(userCreateErrors.mobile)" maxlength="32" inputmode="tel" placeholder="可选" @blur="userCreateTouched.mobile = true" /><small v-if="userCreateTouched.mobile && userCreateErrors.mobile" class="field-error">{{ userCreateErrors.mobile }}</small></label>
           <label>部门
-            <select v-model="createForm.primaryDeptId">
+            <select v-model="createForm.primaryDeptId" :aria-invalid="userCreateTouched.primaryDeptId && Boolean(userCreateErrors.primaryDeptId)" @blur="userCreateTouched.primaryDeptId = true">
               <option :value="undefined">请选择</option>
               <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ f.node.deptName }}</option>
             </select>
+            <small v-if="userCreateTouched.primaryDeptId && userCreateErrors.primaryDeptId" class="field-error">{{ userCreateErrors.primaryDeptId }}</small>
           </label>
           <label>岗位
-            <select v-model="createForm.positionId">
+            <select v-model="createForm.positionId" :aria-invalid="userCreateTouched.positionId && Boolean(userCreateErrors.positionId)" @blur="userCreateTouched.positionId = true">
               <option :value="undefined">请选择</option>
               <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.positionName }}</option>
             </select>
+            <small v-if="userCreateTouched.positionId && userCreateErrors.positionId" class="field-error">{{ userCreateErrors.positionId }}</small>
           </label>
-          <button class="primary-button" :disabled="creating || !createForm.realName || !createForm.primaryDeptId" @click="handleCreate">
+          <button class="primary-button" :disabled="creating || userCreateInvalid" @click="handleCreate">
             <Plus :size="16" /> 创建
           </button>
         </div>

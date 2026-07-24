@@ -19,7 +19,9 @@ const UserView = () => import('@/views/UserView.vue');
 const FileCleanupView = () => import('@/views/FileCleanupView.vue');
 const RagflowView = () => import('@/views/RagflowView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
-const SystemGovernanceView = () => import('@/views/SystemGovernanceView.vue');
+const ImOutboxGovernanceView = () => import('@/views/ImOutboxGovernanceView.vue');
+const PermissionView = () => import('@/views/PermissionView.vue');
+const AuditLogView = () => import('@/views/AuditLogView.vue');
 
 export const adminRoutes = [
   {
@@ -52,7 +54,10 @@ export const adminRoutes = [
       { path: 'files', name: 'admin-files', component: FileCleanupView, meta: { permission: 'ADMIN_FILE_MANAGE' } },
       { path: 'ragflow', name: 'admin-ragflow', component: RagflowView, meta: { permission: 'ADMIN_RAGFLOW_MANAGE' } },
       { path: 'ai-models', name: 'admin-ai-models', component: SettingsView, meta: { permission: 'ADMIN_AGENT_MANAGE' } },
-      { path: 'system', name: 'admin-system', component: SystemGovernanceView },
+      { path: 'system', name: 'admin-system', redirect: '/audit-logs' },
+      { path: 'permissions', name: 'admin-permissions', component: PermissionView, meta: { permission: 'ADMIN_RBAC_MANAGE' } },
+      { path: 'audit-logs', name: 'admin-audit-logs', component: AuditLogView },
+      { path: 'message-delivery', name: 'admin-message-delivery', component: ImOutboxGovernanceView },
       { path: 'settings', name: 'admin-settings', component: SettingsView, meta: { permission: 'ADMIN_NOTIFICATION_CHANNEL_MANAGE' } },
     ],
   },

@@ -12,7 +12,11 @@ const props = defineProps<{
   deleteVisible: boolean;
   agentOptions: { value: string; label: string }[];
   createForm: { agentCode: string; agentName: string };
+  createErrors: { agentCode: string; agentName: string };
+  creating: boolean;
   editForm: { agentName: string };
+  editNameError: string;
+  editing: boolean;
   disableTarget: AgentResponse | null;
   enableTarget: AgentResponse | null;
   deleteTarget: AgentResponse | null;
@@ -56,19 +60,24 @@ function selectAgentCode() {
     title="新建 AI 助手"
     message=""
     confirm-label="创建"
+    :close-on-confirm="false"
+    :confirm-disabled="creating || Boolean(createErrors.agentCode || createErrors.agentName)"
+    :cancel-disabled="creating"
     @update:visible="emit('update:createVisible', $event)"
     @confirm="emit('create')"
   >
     <div class="create-dialog-form">
       <label>
         <span>助手用途</span>
-        <select v-model="createForm.agentCode" autofocus @change="selectAgentCode">
+        <select v-model="createForm.agentCode" autofocus :aria-invalid="Boolean(createErrors.agentCode)" @change="selectAgentCode">
           <option v-for="item in agentOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
+        <small v-if="createErrors.agentCode" class="field-error">{{ createErrors.agentCode }}</small>
       </label>
       <label>
         <span>助手名称</span>
-        <input v-model="createForm.agentName" placeholder="如 假期助手" />
+        <input v-model="createForm.agentName" :aria-invalid="Boolean(createErrors.agentName)" maxlength="128" placeholder="如 假期助手" />
+        <small v-if="createErrors.agentName" class="field-error">{{ createErrors.agentName }}</small>
       </label>
     </div>
   </AdminConfirmDialog>
@@ -78,13 +87,17 @@ function selectAgentCode() {
     title="编辑 AI 助手"
     message=""
     confirm-label="保存"
+    :close-on-confirm="false"
+    :confirm-disabled="editing || Boolean(editNameError)"
+    :cancel-disabled="editing"
     @update:visible="emit('update:editVisible', $event)"
     @confirm="emit('edit')"
   >
     <div class="create-dialog-form">
       <label>
         <span>助手名称</span>
-        <input v-model="editForm.agentName" placeholder="如 假期助手" autofocus />
+        <input v-model="editForm.agentName" :aria-invalid="Boolean(editNameError)" maxlength="128" placeholder="如 假期助手" autofocus />
+        <small v-if="editNameError" class="field-error">{{ editNameError }}</small>
       </label>
     </div>
   </AdminConfirmDialog>

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { Search } from 'lucide-vue-next';
 
+withDefaults(defineProps<{
+  showSearch?: boolean;
+}>(), { showSearch: true });
+
 defineEmits<{
   search: [];
 }>();
@@ -9,7 +13,7 @@ defineEmits<{
 <template>
   <form class="filter-row" @submit.prevent="$emit('search')">
     <slot />
-    <button class="secondary-button" type="submit">
+    <button v-if="showSearch" class="secondary-button" type="submit">
       <Search :size="16" />
       <span>筛选</span>
     </button>

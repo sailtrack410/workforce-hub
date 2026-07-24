@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { AlertCircle, Pencil, PlayCircle, Plus, PowerOff, RefreshCcw, Search, Send, Settings, Trash2 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { adminApi } from '@/api/admin';
@@ -10,6 +10,7 @@ import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminIconAvatar from '@/components/AdminIconAvatar.vue';
 import AgentConfigDialogs from '@/components/AgentConfigDialogs.vue';
+import { codeFormat, maxLength, requiredText } from '@/utils/validation';
 
 const router = useRouter();
 const toast = useToast();
@@ -34,6 +35,12 @@ const enabling = ref(false);
 const deleteTarget = ref<AgentResponse | null>(null);
 const deleteVisible = ref(false);
 const deleting = ref(false);
+
+const createErrors = computed(() => ({
+  agentCode: requiredText(createForm.agentCode, '助手用途') || codeFormat(createForm.agentCode, '助手编码') || maxLength(createForm.agentCode, 64, '助手编码'),
+  agentName: requiredText(createForm.agentName, '助手名称') || maxLength(createForm.agentName, 128, '助手名称'),
+}));
+const editNameError = computed(() => requiredText(editForm.agentName, '助手名称') || maxLength(editForm.agentName, 128, '助手名称'));
 
 const agentOptions = [
   { value: 'LEAVE_HELPER', label: '假期助手' },
@@ -88,7 +95,7 @@ function avatarRef(value: string) {
 }
 
 async function handleCreate() {
-  if (!createForm.agentCode.trim() || !createForm.agentName.trim()) return;
+  if (createErrors.value.agentCode || createErrors.value.agentName) return;
   creating.value = true;
   try {
     await adminApi.agentConfig.create({
@@ -116,7 +123,7 @@ function openEdit(agent: AgentResponse) {
 }
 
 async function handleEdit() {
-  if (!editTarget.value || !editForm.agentName.trim()) return;
+  if (!editTarget.value || editNameError.value) return;
   editing.value = true;
   try {
     await adminApi.agentConfig.update(editTarget.value.agentId, {
@@ -313,9 +320,13 @@ onMounted(() => {
     v-model:enable-visible="enableVisible"
     :agent-options="agentOptions"
     :create-form="createForm"
+    :create-errors="createErrors"
+    :creating="creating"
     :disable-target="disableTarget"
     :delete-target="deleteTarget"
     :edit-form="editForm"
+    :edit-name-error="editNameError"
+    :editing="editing"
     :enable-target="enableTarget"
     @create="handleCreate"
     @disable="handleDisable"
