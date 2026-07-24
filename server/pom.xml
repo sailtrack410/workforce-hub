@@ -25,6 +25,7 @@
         <mybatis.version>3.0.3</mybatis.version>
         <flowable.version>7.0.1</flowable.version>
         <spring-ai.version>0.8.1</spring-ai.version>
+        <pf4j.version>3.15.0</pf4j.version>
         <!-- Lombok 由 spring-boot-starter-parent 锁定，但显式声明便于注解处理器路径引用 -->
         <lombok.version>1.18.32</lombok.version>
     </properties>
@@ -85,6 +86,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.pf4j</groupId>
+            <artifactId>pf4j</artifactId>
+            <version>${pf4j.version}</version>
         </dependency>
 
         <!-- ==================== Database ==================== -->
@@ -191,6 +197,25 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>add-plugin-sdk-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../plugin-sdk/src/main/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!--
                 统一 JDK 基线为 17
                 Docker 镜像、本地 Maven、CI 都应使用同一版本，避免“本地能跑/容器报错”或反过来的情况
