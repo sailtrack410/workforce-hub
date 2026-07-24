@@ -814,3 +814,12 @@ public interface PermissionService {
     boolean checkPermission(InvocationContext ctx, String capability, Long targetUserId);
 }
 ```
+
+---
+
+## 相关文档
+
+- [公共能力目录.md](./公共能力目录.md) — 所有 HostService 索引
+- [后端架构.md](./后端架构.md) — PluginManager、签名校验、Flyway
+- [插件规范.md](./插件规范.md) — 能力编码、plugin.json
+- [开发计划.md](./开发计划.md) — PoC阻断项
