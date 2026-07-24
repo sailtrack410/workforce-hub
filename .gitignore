@@ -40,3 +40,4 @@ docs/申报材料/
 # Local log files
 *.log
 server-8080.log
+docs/.obsidian/
