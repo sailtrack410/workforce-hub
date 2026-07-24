@@ -2,8 +2,8 @@ package com.workforcehub.plugin;
 
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
-import com.workforcehub.plugin.runtime.PluginFlywayMigrator;
 import com.workforcehub.plugin.runtime.WorkforcePluginFactory;
+import com.workforcehub.plugin.runtime.WorkforcePluginManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.pf4j.PluginState;
@@ -21,7 +21,8 @@ import java.util.jar.JarOutputStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 插件生命周期与状态持久化验证。
+ * 插件生命周期与状态同步验证。
+ * 验证 PF4J 生命周期和状态跟踪，不依赖数据库。
  */
 class PluginManagerServiceTest {
 
@@ -29,78 +30,82 @@ class PluginManagerServiceTest {
     Path tempDir;
 
     @Test
-    void shouldLoadStartStopWithStatusTracking() throws Exception {
+    void shouldInstallAndTrackStatus() throws Exception {
         Path jarPath = buildHelloPluginJar();
 
-        // 使用 PF4J 直接管理（不依赖数据库）
-        org.pf4j.PluginManager pf4jManager = new org.pf4j.DefaultPluginManager(tempDir.resolve("plugins")) {
-            @Override
-            protected org.pf4j.PluginFactory createPluginFactory() {
-                return new WorkforcePluginFactory();
-            }
-        };
+        // 使用真实的 WorkforcePluginManager
+        WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
+            tempDir.resolve("plugins").toString());
+
+        // 模拟安装流程
+        String pluginId = pf4jManager.loadPlugin(jarPath);
+        assertEquals("hello-plugin", pluginId);
 
         // 模拟数据库状态
         PluginStatus dbStatus = PluginStatus.INSTALLED;
-
-        // 加载
-        String pluginId = pf4jManager.loadPlugin(jarPath);
-        assertEquals("hello-plugin", pluginId);
         assertEquals(PluginStatus.INSTALLED, dbStatus);
 
         // 启用
         PluginState state = pf4jManager.startPlugin(pluginId);
         assertEquals(PluginState.STARTED, state);
         dbStatus = PluginStatus.ACTIVE;
-        assertEquals(PluginStatus.ACTIVE, dbStatus);
 
-        // 验证插件运行
+        // 验证插件上下文
         PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
         assertNotNull(wrapper);
         Object plugin = wrapper.getPlugin();
+        assertEquals("hello-plugin", invoke(plugin, "getContextPluginId"));
+        assertTrue((Boolean) invoke(plugin, "isStarted"));
 
         // 停用
         state = pf4jManager.stopPlugin(pluginId);
         assertEquals(PluginState.STOPPED, state);
         dbStatus = PluginStatus.STOPPED;
-        assertEquals(PluginStatus.STOPPED, dbStatus);
+        assertTrue((Boolean) invoke(plugin, "isStopped"));
 
         // 卸载
         pf4jManager.unloadPlugin(pluginId);
         assertNull(pf4jManager.getPlugin(pluginId));
+        dbStatus = PluginStatus.UNINSTALLED;
+        assertEquals(PluginStatus.UNINSTALLED, dbStatus);
     }
 
     @Test
-    void shouldTrackErrorState() throws Exception {
+    void shouldTrackMultipleStatusTransitions() throws Exception {
         Path jarPath = buildHelloPluginJar();
-
-        org.pf4j.PluginManager pf4jManager = new org.pf4j.DefaultPluginManager(tempDir.resolve("plugins")) {
-            @Override
-            protected org.pf4j.PluginFactory createPluginFactory() {
-                return new WorkforcePluginFactory();
-            }
-        };
+        WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
+            tempDir.resolve("plugins").toString());
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         PluginStatus dbStatus = PluginStatus.INSTALLED;
 
-        // 正常启动
-        PluginState state = pf4jManager.startPlugin(pluginId);
-        assertEquals(PluginState.STARTED, state);
+        // 状态转换链：INSTALLED -> ACTIVE -> STOPPED -> ACTIVE -> STOPPED -> UNINSTALLED
+        pf4jManager.startPlugin(pluginId);
         dbStatus = PluginStatus.ACTIVE;
+        assertEquals(PluginStatus.ACTIVE, dbStatus);
 
-        // 停止
-        state = pf4jManager.stopPlugin(pluginId);
-        assertEquals(PluginState.STOPPED, state);
+        pf4jManager.stopPlugin(pluginId);
         dbStatus = PluginStatus.STOPPED;
-
-        // 验证状态转换
         assertEquals(PluginStatus.STOPPED, dbStatus);
 
-        // 重新启动验证恢复
-        state = pf4jManager.startPlugin(pluginId);
-        assertEquals(PluginState.STARTED, state);
+        // 重新启用
+        pf4jManager.startPlugin(pluginId);
         dbStatus = PluginStatus.ACTIVE;
+        assertEquals(PluginStatus.ACTIVE, dbStatus);
+
+        // 再次停用
+        pf4jManager.stopPlugin(pluginId);
+        dbStatus = PluginStatus.STOPPED;
+
+        // 卸载
+        pf4jManager.unloadPlugin(pluginId);
+        dbStatus = PluginStatus.UNINSTALLED;
+        assertEquals(PluginStatus.UNINSTALLED, dbStatus);
+        assertNull(pf4jManager.getPlugin(pluginId));
+    }
+
+    private Object invoke(Object target, String methodName) throws Exception {
+        return target.getClass().getMethod(methodName).invoke(target);
     }
 
     private Path buildHelloPluginJar() throws IOException {

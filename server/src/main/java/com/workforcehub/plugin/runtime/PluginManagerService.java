@@ -3,7 +3,6 @@ package com.workforcehub.plugin.runtime;
 import com.workforcehub.plugin.repository.PluginRepository;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
-import org.pf4j.PluginFactory;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
@@ -13,29 +12,27 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 插件管理服务 - 整合 PF4J 和数据库持久化。
+ * 使用单一 WorkforcePluginManager 实例。
  */
 @Service
 public class PluginManagerService {
 
     private static final Logger log = LoggerFactory.getLogger(PluginManagerService.class);
 
-    private final org.pf4j.PluginManager pf4jManager;
+    private final WorkforcePluginManager pf4jManager;
     private final PluginRepository pluginRepository;
     private final PluginFlywayMigrator flywayMigrator;
 
-    public PluginManagerService(PluginRepository pluginRepository, PluginFlywayMigrator flywayMigrator) {
+    public PluginManagerService(
+            WorkforcePluginManager pf4jManager,
+            PluginRepository pluginRepository,
+            PluginFlywayMigrator flywayMigrator) {
+        this.pf4jManager = pf4jManager;
         this.pluginRepository = pluginRepository;
         this.flywayMigrator = flywayMigrator;
-        this.pf4jManager = new org.pf4j.DefaultPluginManager() {
-            @Override
-            protected PluginFactory createPluginFactory() {
-                return new WorkforcePluginFactory();
-            }
-        };
     }
 
     /**
@@ -66,13 +63,17 @@ public class PluginManagerService {
 
     /**
      * 安装插件。
+     * 包含：加载 JAR、执行数据库迁移、入库。
      */
     public PluginRow install(Path jarPath, PluginRow metadata) {
-        // 加载插件获取 PF4J 分配的 ID
+        // 1. 加载插件获取 PF4J 分配的 ID
         String pluginId = pf4jManager.loadPlugin(jarPath);
         PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
 
-        // 构建数据库记录
+        // 2. 执行数据库迁移
+        flywayMigrator.migrate(pluginId, jarPath);
+
+        // 3. 构建数据库记录
         PluginRow row = new PluginRow();
         row.setPluginId(pluginId);
         row.setName(metadata.getName() != null ? metadata.getName() : pluginId);
@@ -81,10 +82,15 @@ public class PluginManagerService {
         row.setSdkVersion(metadata.getSdkVersion() != null ? metadata.getSdkVersion() : "1.0.0");
         row.setMinHostVersion(metadata.getMinHostVersion());
         row.setMaxHostVersion(metadata.getMaxHostVersion());
+        row.setJavaVersion(metadata.getJavaVersion() != null ? metadata.getJavaVersion() : "17");
         row.setType(metadata.getType() != null ? metadata.getType() : "FUNCTIONAL");
         row.setStatus(PluginStatus.INSTALLED);
         row.setJarPath(jarPath.toAbsolutePath().toString());
         row.setJarSha256(metadata.getJarSha256());
+        row.setSignature(metadata.getSignature());
+        row.setSignerId(metadata.getSignerId());
+        row.setFrontendEntry(metadata.getFrontendEntry());
+        row.setFrontendSha384(metadata.getFrontendSha384());
         row.setProvider(metadata.getProvider());
         row.setInstalledAt(LocalDateTime.now());
         row.setUpdatedAt(LocalDateTime.now());
@@ -127,8 +133,8 @@ public class PluginManagerService {
             pf4jManager.unloadPlugin(pluginId);
         }
 
-        // 更新状态，不删除数据库记录
-        pluginRepository.updateStatus(pluginId, PluginStatus.STOPPED, "已卸载");
+        // 更新状态为 UNINSTALLED，不删除数据库记录
+        pluginRepository.updateStatus(pluginId, PluginStatus.UNINSTALLED, "已卸载");
     }
 
     /**

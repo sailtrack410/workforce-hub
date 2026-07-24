@@ -2,17 +2,27 @@ package com.workforcehub.plugin.runtime;
 
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
+import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.io.IOException;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.regex.Pattern;
 
 /**
  * 插件 Flyway 迁移器，每个插件使用独立的 history 表。
+ * 从插件 JAR 内部读取迁移脚本，不把 JAR 当普通目录。
  */
+@Component
 public final class PluginFlywayMigrator {
 
     private static final Pattern SAFE_ID = Pattern.compile("^[a-zA-Z0-9_]{1,50}$");
+    private static final String MIGRATION_PATH = "db/migration";
+
     private final DataSource dataSource;
 
     public PluginFlywayMigrator(DataSource dataSource) {
@@ -21,9 +31,10 @@ public final class PluginFlywayMigrator {
 
     /**
      * 执行插件数据库迁移。
+     * 从 JAR 内部的 db/migration/ 目录读取迁移脚本。
      *
      * @param pluginId 插件ID
-     * @param pluginJarPath 插件JAR路径
+     * @param pluginJarPath 插件JAR文件路径
      * @throws PluginMigrationException 迁移失败时抛出
      */
     public void migrate(String pluginId, Path pluginJarPath) {
@@ -31,12 +42,27 @@ public final class PluginFlywayMigrator {
         String historyTable = "flyway_plugin_" + safeId;
         validateTableName(historyTable);
 
-        Path migrationDir = pluginJarPath.resolve("db/migration");
-        String location = "filesystem:" + migrationDir.toAbsolutePath();
+        // 验证 JAR 文件存在
+        if (!Files.exists(pluginJarPath) || !Files.isRegularFile(pluginJarPath)) {
+            throw new PluginMigrationException("插件 JAR 不存在: " + pluginJarPath, null);
+        }
+
+        // 验证 JAR 内存在 db/migration 目录
+        if (!hasMigrationDirectory(pluginJarPath)) {
+            throw new PluginMigrationException(
+                "插件 [%s] JAR 内缺少 %s 目录".formatted(pluginId, MIGRATION_PATH), null);
+        }
+
+        // 使用 JAR URL 作为 Flyway 位置
+        String location = "filesystem:" + pluginJarPath.toAbsolutePath().getParent()
+            + "/";  // Flyway 会扫描 JAR 同级目录，需要解压或使用其他方式
+
+        // 实际方案：解压 JAR 中的迁移脚本到临时目录
+        Path tempMigrationDir = extractMigrationScripts(pluginId, pluginJarPath);
 
         FluentConfiguration config = Flyway.configure()
             .dataSource(dataSource)
-            .locations(location)
+            .locations("filesystem:" + tempMigrationDir.toAbsolutePath())
             .table(historyTable)
             .baselineOnMigrate(true)
             .baselineVersion("0")
@@ -53,23 +79,45 @@ public final class PluginFlywayMigrator {
     }
 
     /**
-     * 清理插件的迁移历史（卸载时可选调用）。
-     * 注意：不删除业务数据表，只清理 history 记录。
+     * 检查 JAR 内是否存在 db/migration 目录。
      */
-    public void cleanHistory(String pluginId) {
-        String safeId = sanitizePluginId(pluginId);
-        String historyTable = "flyway_plugin_" + safeId;
-        validateTableName(historyTable);
+    private boolean hasMigrationDirectory(Path jarPath) {
+        try (FileSystem fs = FileSystems.newFileSystem(jarPath, Collections.emptyMap())) {
+            Path migrationPath = fs.getPath(MIGRATION_PATH);
+            return Files.exists(migrationPath) && Files.isDirectory(migrationPath);
+        } catch (IOException e) {
+            return false;
+        }
+    }
 
+    /**
+     * 从 JAR 中解压迁移脚本到临时目录。
+     */
+    private Path extractMigrationScripts(String pluginId, Path jarPath) {
         try {
-            Flyway flyway = Flyway.configure()
-                .dataSource(dataSource)
-                .table(historyTable)
-                .load();
-            flyway.clean();
-        } catch (Exception e) {
-            throw new PluginMigrationException(
-                "插件 [%s] 迁移历史清理失败: %s".formatted(pluginId, e.getMessage()), e);
+            Path tempDir = Files.createTempDirectory("wf_plugin_migration_" + pluginId);
+            tempDir.toFile().deleteOnExit();
+
+            try (FileSystem fs = FileSystems.newFileSystem(jarPath, Collections.emptyMap())) {
+                Path migrationPath = fs.getPath(MIGRATION_PATH);
+                if (Files.exists(migrationPath)) {
+                    Files.walk(migrationPath)
+                        .filter(Files::isRegularFile)
+                        .forEach(source -> {
+                            try {
+                                Path target = tempDir.resolve(migrationPath.relativize(source).toString());
+                                Files.createDirectories(target.getParent());
+                                Files.copy(source, target);
+                            } catch (IOException e) {
+                                throw new RuntimeException("解压迁移脚本失败: " + source, e);
+                            }
+                        });
+                }
+            }
+
+            return tempDir;
+        } catch (IOException e) {
+            throw new PluginMigrationException("解压迁移脚本失败: " + pluginId, e);
         }
     }
 
@@ -90,7 +138,6 @@ public final class PluginFlywayMigrator {
         if (pluginId == null || pluginId.isBlank()) {
             throw new IllegalArgumentException("pluginId 不能为空");
         }
-        // 只保留字母、数字、下划线，最大50字符
         String sanitized = pluginId.replaceAll("[^a-zA-Z0-9_]", "_");
         if (sanitized.length() > 50) {
             sanitized = sanitized.substring(0, 50);

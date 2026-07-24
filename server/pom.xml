@@ -26,7 +26,6 @@
         <flowable.version>7.0.1</flowable.version>
         <spring-ai.version>0.8.1</spring-ai.version>
         <pf4j.version>3.15.0</pf4j.version>
-        <!-- Lombok 由 spring-boot-starter-parent 锁定，但显式声明便于注解处理器路径引用 -->
         <lombok.version>1.18.32</lombok.version>
     </properties>
 
@@ -122,12 +121,7 @@
             <artifactId>flyway-mysql</artifactId>
         </dependency>
 
-        <!-- ==================== Flowable (精简: 仅 BPMN 流程引擎) ==================== -->
-        <!-- 注意:
-             - 仅引入 process starter，确保只带入 BPMN 流程引擎所需依赖
-             - 不引入 flowable-spring-boot-starter-rest，避免传递回 cmmn/dmn/app/content 整套
-             - 第一版不暴露 Flowable 原生 REST 接口，业务接口全部走 module-workflow 服务层
-        -->
+        <!-- ==================== Flowable ==================== -->
         <dependency>
             <groupId>org.flowable</groupId>
             <artifactId>flowable-spring-boot-starter-process</artifactId>
@@ -182,6 +176,13 @@
             <version>2.3.0</version>
         </dependency>
 
+        <!-- ==================== Plugin SDK ==================== -->
+        <dependency>
+            <groupId>com.workforcehub</groupId>
+            <artifactId>plugin-sdk</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- ==================== Test ==================== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -197,28 +198,9 @@
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.6.1</version>
-                <executions>
-                    <execution>
-                        <id>add-plugin-sdk-source</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>add-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.basedir}/../plugin-sdk/src/main/java</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <!--
                 统一 JDK 基线为 17
-                Docker 镜像、本地 Maven、CI 都应使用同一版本，避免“本地能跑/容器报错”或反过来的情况
+                Docker 镜像、本地 Maven、CI 都应使用同一版本，避免"本地能跑/容器报错"或反过来的情况
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

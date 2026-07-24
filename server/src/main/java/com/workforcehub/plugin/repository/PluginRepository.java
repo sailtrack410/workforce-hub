@@ -43,9 +43,10 @@ public class PluginRepository {
         jdbc.update("""
             INSERT INTO sys_plugin
                 (plugin_id, name, description, version, sdk_version,
-                 min_host_version, max_host_version, type, status,
-                 jar_path, jar_sha256, provider, installed_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 min_host_version, max_host_version, java_version, type, status,
+                 jar_path, jar_sha256, signature, signer_id,
+                 frontend_entry, frontend_sha384, provider, installed_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             row.getPluginId(),
             row.getName(),
@@ -54,10 +55,15 @@ public class PluginRepository {
             row.getSdkVersion(),
             row.getMinHostVersion(),
             row.getMaxHostVersion(),
+            row.getJavaVersion(),
             row.getType(),
             row.getStatus().name(),
             row.getJarPath(),
             row.getJarSha256(),
+            row.getSignature(),
+            row.getSignerId(),
+            row.getFrontendEntry(),
+            row.getFrontendSha384(),
             row.getProvider(),
             row.getInstalledAt(),
             row.getUpdatedAt()
@@ -98,10 +104,15 @@ public class PluginRepository {
             row.setSdkVersion(rs.getString("sdk_version"));
             row.setMinHostVersion(rs.getString("min_host_version"));
             row.setMaxHostVersion(rs.getString("max_host_version"));
+            row.setJavaVersion(rs.getString("java_version"));
             row.setType(rs.getString("type"));
             row.setStatus(PluginStatus.valueOf(rs.getString("status")));
             row.setJarPath(rs.getString("jar_path"));
             row.setJarSha256(rs.getString("jar_sha256"));
+            row.setSignature(rs.getBytes("signature"));
+            row.setSignerId(rs.getString("signer_id"));
+            row.setFrontendEntry(rs.getString("frontend_entry"));
+            row.setFrontendSha384(rs.getString("frontend_sha384"));
             row.setProvider(rs.getString("provider"));
             row.setErrorMessage(rs.getString("error_message"));
             row.setInstalledAt(rs.getTimestamp("installed_at").toLocalDateTime());

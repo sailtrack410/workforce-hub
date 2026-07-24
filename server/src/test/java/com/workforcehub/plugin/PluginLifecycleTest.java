@@ -30,7 +30,8 @@ class PluginLifecycleTest {
     @Test
     void shouldLoadStartStopAndUnloadPluginWithHostContext() throws Exception {
         Path pluginJar = resolvePluginJar();
-        WorkforcePluginManager pluginManager = new WorkforcePluginManager(tempDir.resolve("plugins"));
+        WorkforcePluginManager pluginManager = new WorkforcePluginManager(
+            tempDir.resolve("plugins").toString());
 
         String pluginId = pluginManager.loadPlugin(pluginJar);
         assertEquals("hello-plugin", pluginId);

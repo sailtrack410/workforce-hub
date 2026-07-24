@@ -14,10 +14,15 @@ public class PluginRow {
     private String sdkVersion;
     private String minHostVersion;
     private String maxHostVersion;
+    private String javaVersion;
     private String type;
     private PluginStatus status;
     private String jarPath;
     private String jarSha256;
+    private byte[] signature;
+    private String signerId;
+    private String frontendEntry;
+    private String frontendSha384;
     private String provider;
     private String errorMessage;
     private LocalDateTime installedAt;
@@ -48,6 +53,9 @@ public class PluginRow {
     public String getMaxHostVersion() { return maxHostVersion; }
     public void setMaxHostVersion(String maxHostVersion) { this.maxHostVersion = maxHostVersion; }
 
+    public String getJavaVersion() { return javaVersion; }
+    public void setJavaVersion(String javaVersion) { this.javaVersion = javaVersion; }
+
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
 
@@ -59,6 +67,18 @@ public class PluginRow {
 
     public String getJarSha256() { return jarSha256; }
     public void setJarSha256(String jarSha256) { this.jarSha256 = jarSha256; }
+
+    public byte[] getSignature() { return signature; }
+    public void setSignature(byte[] signature) { this.signature = signature; }
+
+    public String getSignerId() { return signerId; }
+    public void setSignerId(String signerId) { this.signerId = signerId; }
+
+    public String getFrontendEntry() { return frontendEntry; }
+    public void setFrontendEntry(String frontendEntry) { this.frontendEntry = frontendEntry; }
+
+    public String getFrontendSha384() { return frontendSha384; }
+    public void setFrontendSha384(String frontendSha384) { this.frontendSha384 = frontendSha384; }
 
     public String getProvider() { return provider; }
     public void setProvider(String provider) { this.provider = provider; }
