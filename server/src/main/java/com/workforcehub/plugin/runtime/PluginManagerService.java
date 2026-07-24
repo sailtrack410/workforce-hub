@@ -1,0 +1,155 @@
+package com.workforcehub.plugin.runtime;
+
+import com.workforcehub.plugin.repository.PluginRepository;
+import com.workforcehub.plugin.repository.PluginRow;
+import com.workforcehub.plugin.repository.PluginStatus;
+import org.pf4j.PluginFactory;
+import org.pf4j.PluginState;
+import org.pf4j.PluginWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * 插件管理服务 - 整合 PF4J 和数据库持久化。
+ */
+@Service
+public class PluginManagerService {
+
+    private static final Logger log = LoggerFactory.getLogger(PluginManagerService.class);
+
+    private final org.pf4j.PluginManager pf4jManager;
+    private final PluginRepository pluginRepository;
+    private final PluginFlywayMigrator flywayMigrator;
+
+    public PluginManagerService(PluginRepository pluginRepository, PluginFlywayMigrator flywayMigrator) {
+        this.pluginRepository = pluginRepository;
+        this.flywayMigrator = flywayMigrator;
+        this.pf4jManager = new org.pf4j.DefaultPluginManager() {
+            @Override
+            protected PluginFactory createPluginFactory() {
+                return new WorkforcePluginFactory();
+            }
+        };
+    }
+
+    /**
+     * 启动时恢复已启用的插件。
+     */
+    public void restorePlugins() {
+        List<PluginRow> activePlugins = pluginRepository.findByStatus(PluginStatus.ACTIVE);
+        log.info("恢复 {} 个已启用的插件", activePlugins.size());
+
+        for (PluginRow plugin : activePlugins) {
+            try {
+                Path jarPath = Path.of(plugin.getJarPath());
+                if (!jarPath.toFile().exists()) {
+                    log.warn("插件 JAR 不存在，标记为错误: {}", plugin.getPluginId());
+                    pluginRepository.updateStatus(plugin.getPluginId(), PluginStatus.ERROR, "JAR文件不存在");
+                    continue;
+                }
+
+                String pluginId = pf4jManager.loadPlugin(jarPath);
+                pf4jManager.startPlugin(pluginId);
+                log.info("恢复插件成功: {}", pluginId);
+            } catch (Exception e) {
+                log.error("恢复插件失败: {}", plugin.getPluginId(), e);
+                pluginRepository.updateStatus(plugin.getPluginId(), PluginStatus.ERROR, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 安装插件。
+     */
+    public PluginRow install(Path jarPath, PluginRow metadata) {
+        // 加载插件获取 PF4J 分配的 ID
+        String pluginId = pf4jManager.loadPlugin(jarPath);
+        PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
+
+        // 构建数据库记录
+        PluginRow row = new PluginRow();
+        row.setPluginId(pluginId);
+        row.setName(metadata.getName() != null ? metadata.getName() : pluginId);
+        row.setDescription(metadata.getDescription());
+        row.setVersion(wrapper.getDescriptor().getVersion());
+        row.setSdkVersion(metadata.getSdkVersion() != null ? metadata.getSdkVersion() : "1.0.0");
+        row.setMinHostVersion(metadata.getMinHostVersion());
+        row.setMaxHostVersion(metadata.getMaxHostVersion());
+        row.setType(metadata.getType() != null ? metadata.getType() : "FUNCTIONAL");
+        row.setStatus(PluginStatus.INSTALLED);
+        row.setJarPath(jarPath.toAbsolutePath().toString());
+        row.setJarSha256(metadata.getJarSha256());
+        row.setProvider(metadata.getProvider());
+        row.setInstalledAt(LocalDateTime.now());
+        row.setUpdatedAt(LocalDateTime.now());
+
+        pluginRepository.insert(row);
+        return row;
+    }
+
+    /**
+     * 启用插件。
+     */
+    public void enable(String pluginId) {
+        PluginState state = pf4jManager.startPlugin(pluginId);
+        if (state == PluginState.STARTED) {
+            pluginRepository.updateStatus(pluginId, PluginStatus.ACTIVE);
+        } else {
+            throw new RuntimeException("插件启动失败: " + state);
+        }
+    }
+
+    /**
+     * 停用插件。
+     */
+    public void disable(String pluginId) {
+        PluginState state = pf4jManager.stopPlugin(pluginId);
+        if (state == PluginState.STOPPED) {
+            pluginRepository.updateStatus(pluginId, PluginStatus.STOPPED);
+        } else {
+            throw new RuntimeException("插件停止失败: " + state);
+        }
+    }
+
+    /**
+     * 卸载插件（保留数据库数据）。
+     */
+    public void uninstall(String pluginId) {
+        // 先停止
+        if (pf4jManager.getPlugin(pluginId) != null) {
+            pf4jManager.stopPlugin(pluginId);
+            pf4jManager.unloadPlugin(pluginId);
+        }
+
+        // 更新状态，不删除数据库记录
+        pluginRepository.updateStatus(pluginId, PluginStatus.STOPPED, "已卸载");
+    }
+
+    /**
+     * 获取所有插件。
+     */
+    public List<PluginRow> listPlugins() {
+        return pluginRepository.findAll();
+    }
+
+    /**
+     * 获取单个插件。
+     */
+    public PluginRow getPlugin(String pluginId) {
+        return pluginRepository.findById(pluginId)
+            .orElseThrow(() -> new RuntimeException("插件不存在: " + pluginId));
+    }
+
+    /**
+     * 获取运行中的插件（员工端用）。
+     */
+    public List<PluginRow> getActivePlugins() {
+        return pluginRepository.findByStatus(PluginStatus.ACTIVE);
+    }
+}

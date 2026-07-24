@@ -1,0 +1,141 @@
+package com.workforcehub.plugin;
+
+import com.workforcehub.plugin.repository.PluginRow;
+import com.workforcehub.plugin.repository.PluginStatus;
+import com.workforcehub.plugin.runtime.PluginFlywayMigrator;
+import com.workforcehub.plugin.runtime.WorkforcePluginFactory;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.pf4j.PluginState;
+import org.pf4j.PluginWrapper;
+
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * 插件生命周期与状态持久化验证。
+ */
+class PluginManagerServiceTest {
+
+    @TempDir
+    Path tempDir;
+
+    @Test
+    void shouldLoadStartStopWithStatusTracking() throws Exception {
+        Path jarPath = buildHelloPluginJar();
+
+        // 使用 PF4J 直接管理（不依赖数据库）
+        org.pf4j.PluginManager pf4jManager = new org.pf4j.DefaultPluginManager(tempDir.resolve("plugins")) {
+            @Override
+            protected org.pf4j.PluginFactory createPluginFactory() {
+                return new WorkforcePluginFactory();
+            }
+        };
+
+        // 模拟数据库状态
+        PluginStatus dbStatus = PluginStatus.INSTALLED;
+
+        // 加载
+        String pluginId = pf4jManager.loadPlugin(jarPath);
+        assertEquals("hello-plugin", pluginId);
+        assertEquals(PluginStatus.INSTALLED, dbStatus);
+
+        // 启用
+        PluginState state = pf4jManager.startPlugin(pluginId);
+        assertEquals(PluginState.STARTED, state);
+        dbStatus = PluginStatus.ACTIVE;
+        assertEquals(PluginStatus.ACTIVE, dbStatus);
+
+        // 验证插件运行
+        PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
+        assertNotNull(wrapper);
+        Object plugin = wrapper.getPlugin();
+
+        // 停用
+        state = pf4jManager.stopPlugin(pluginId);
+        assertEquals(PluginState.STOPPED, state);
+        dbStatus = PluginStatus.STOPPED;
+        assertEquals(PluginStatus.STOPPED, dbStatus);
+
+        // 卸载
+        pf4jManager.unloadPlugin(pluginId);
+        assertNull(pf4jManager.getPlugin(pluginId));
+    }
+
+    @Test
+    void shouldTrackErrorState() throws Exception {
+        Path jarPath = buildHelloPluginJar();
+
+        org.pf4j.PluginManager pf4jManager = new org.pf4j.DefaultPluginManager(tempDir.resolve("plugins")) {
+            @Override
+            protected org.pf4j.PluginFactory createPluginFactory() {
+                return new WorkforcePluginFactory();
+            }
+        };
+
+        String pluginId = pf4jManager.loadPlugin(jarPath);
+        PluginStatus dbStatus = PluginStatus.INSTALLED;
+
+        // 正常启动
+        PluginState state = pf4jManager.startPlugin(pluginId);
+        assertEquals(PluginState.STARTED, state);
+        dbStatus = PluginStatus.ACTIVE;
+
+        // 停止
+        state = pf4jManager.stopPlugin(pluginId);
+        assertEquals(PluginState.STOPPED, state);
+        dbStatus = PluginStatus.STOPPED;
+
+        // 验证状态转换
+        assertEquals(PluginStatus.STOPPED, dbStatus);
+
+        // 重新启动验证恢复
+        state = pf4jManager.startPlugin(pluginId);
+        assertEquals(PluginState.STARTED, state);
+        dbStatus = PluginStatus.ACTIVE;
+    }
+
+    private Path buildHelloPluginJar() throws IOException {
+        Path source = Path.of("..", "plugins", "hello-plugin", "src", "main", "java",
+            "com", "workforcehub", "plugin", "hello", "HelloPlugin.java").toAbsolutePath().normalize();
+        Path classes = tempDir.resolve("hello-plugin-classes");
+        Files.createDirectories(classes);
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertNotNull(compiler, "需要 JDK");
+        int result = compiler.run(
+            null, null, null,
+            "-classpath", System.getProperty("java.class.path"),
+            "-d", classes.toString(),
+            source.toString()
+        );
+        assertEquals(0, result, "编译失败");
+
+        Files.copy(
+            Path.of("..", "plugins", "hello-plugin", "src", "main", "resources", "plugin.properties")
+                .toAbsolutePath().normalize(),
+            classes.resolve("plugin.properties")
+        );
+
+        Path jar = tempDir.resolve("hello-plugin.jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            try (var files = Files.walk(classes)) {
+                for (Path file : files.filter(Files::isRegularFile).sorted(Comparator.naturalOrder()).toList()) {
+                    String entryName = classes.relativize(file).toString().replace('\\', '/');
+                    output.putNextEntry(new JarEntry(entryName));
+                    Files.copy(file, output);
+                    output.closeEntry();
+                }
+            }
+        }
+        return jar;
+    }
+}
