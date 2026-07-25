@@ -68,35 +68,47 @@ public class PluginManagerService {
     public PluginRow install(Path jarPath, PluginRow metadata) {
         // 1. 加载插件获取 PF4J 分配的 ID
         String pluginId = pf4jManager.loadPlugin(jarPath);
-        PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
+        try {
+            PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
+            if (wrapper == null) {
+                throw new IllegalStateException("插件加载后未找到: " + pluginId);
+            }
 
-        // 2. 执行数据库迁移
-        flywayMigrator.migrate(pluginId, jarPath);
+            // 2. 执行数据库迁移
+            flywayMigrator.migrate(pluginId, jarPath);
 
-        // 3. 构建数据库记录
-        PluginRow row = new PluginRow();
-        row.setPluginId(pluginId);
-        row.setName(metadata.getName() != null ? metadata.getName() : pluginId);
-        row.setDescription(metadata.getDescription());
-        row.setVersion(wrapper.getDescriptor().getVersion());
-        row.setSdkVersion(metadata.getSdkVersion() != null ? metadata.getSdkVersion() : "1.0.0");
-        row.setMinHostVersion(metadata.getMinHostVersion());
-        row.setMaxHostVersion(metadata.getMaxHostVersion());
-        row.setJavaVersion(metadata.getJavaVersion() != null ? metadata.getJavaVersion() : "17");
-        row.setType(metadata.getType() != null ? metadata.getType() : "FUNCTIONAL");
-        row.setStatus(PluginStatus.INSTALLED);
-        row.setJarPath(jarPath.toAbsolutePath().toString());
-        row.setJarSha256(metadata.getJarSha256());
-        row.setSignature(metadata.getSignature());
-        row.setSignerId(metadata.getSignerId());
-        row.setFrontendEntry(metadata.getFrontendEntry());
-        row.setFrontendSha384(metadata.getFrontendSha384());
-        row.setProvider(metadata.getProvider());
-        row.setInstalledAt(LocalDateTime.now());
-        row.setUpdatedAt(LocalDateTime.now());
+            // 3. 构建数据库记录
+            PluginRow row = new PluginRow();
+            row.setPluginId(pluginId);
+            row.setName(metadata.getName() != null ? metadata.getName() : pluginId);
+            row.setDescription(metadata.getDescription());
+            row.setVersion(wrapper.getDescriptor().getVersion());
+            row.setSdkVersion(metadata.getSdkVersion() != null ? metadata.getSdkVersion() : "1.0.0");
+            row.setMinHostVersion(metadata.getMinHostVersion());
+            row.setMaxHostVersion(metadata.getMaxHostVersion());
+            row.setJavaVersion(metadata.getJavaVersion() != null ? metadata.getJavaVersion() : "17");
+            row.setType(metadata.getType() != null ? metadata.getType() : "FUNCTIONAL");
+            row.setStatus(PluginStatus.INSTALLED);
+            row.setJarPath(jarPath.toAbsolutePath().toString());
+            row.setJarSha256(metadata.getJarSha256());
+            row.setSignature(metadata.getSignature());
+            row.setSignerId(metadata.getSignerId());
+            row.setFrontendEntry(metadata.getFrontendEntry());
+            row.setFrontendSha384(metadata.getFrontendSha384());
+            row.setProvider(metadata.getProvider());
+            row.setInstalledAt(LocalDateTime.now());
+            row.setUpdatedAt(LocalDateTime.now());
 
-        pluginRepository.insert(row);
-        return row;
+            pluginRepository.insert(row);
+            return row;
+        } catch (RuntimeException installError) {
+            try {
+                pf4jManager.unloadPlugin(pluginId);
+            } catch (RuntimeException unloadError) {
+                installError.addSuppressed(unloadError);
+            }
+            throw installError;
+        }
     }
 
     /**

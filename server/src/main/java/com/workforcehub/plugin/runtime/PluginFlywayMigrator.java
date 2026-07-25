@@ -10,8 +10,13 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * 插件 Flyway 迁移器，每个插件使用独立的 history 表。
@@ -20,7 +25,8 @@ import java.util.regex.Pattern;
 @Component
 public final class PluginFlywayMigrator {
 
-    private static final Pattern SAFE_ID = Pattern.compile("^[a-zA-Z0-9_]{1,50}$");
+    // Flyway 会为 history 表生成 <table>_pk，MySQL 标识符上限为 64 字符。
+    private static final Pattern SAFE_ID = Pattern.compile("^[a-zA-Z0-9_]{1,61}$");
     private static final String MIGRATION_PATH = "db/migration";
 
     private final DataSource dataSource;
@@ -38,7 +44,7 @@ public final class PluginFlywayMigrator {
      * @param pluginJarPath 插件JAR文件路径
      */
     public void migrate(String pluginId, Path pluginJarPath) {
-        String safeId = sanitizePluginId(pluginId);
+        String safeId = historyId(pluginId);
         String historyTable = "flyway_plugin_" + safeId;
         validateTableName(historyTable);
 
@@ -52,28 +58,34 @@ public final class PluginFlywayMigrator {
             return;
         }
 
-        // 使用 JAR URL 作为 Flyway 位置
-        String location = "filesystem:" + pluginJarPath.toAbsolutePath().getParent()
-            + "/";  // Flyway 会扫描 JAR 同级目录，需要解压或使用其他方式
-
         // 实际方案：解压 JAR 中的迁移脚本到临时目录
         Path tempMigrationDir = extractMigrationScripts(pluginId, pluginJarPath);
-
-        FluentConfiguration config = Flyway.configure()
-            .dataSource(dataSource)
-            .locations("filesystem:" + tempMigrationDir.toAbsolutePath())
-            .table(historyTable)
-            .baselineOnMigrate(true)
-            .baselineVersion("0")
-            .validateOnMigrate(true)
-            .outOfOrder(false);
-
+        PluginMigrationException migrationFailure = null;
         try {
+            FluentConfiguration config = Flyway.configure()
+                .dataSource(dataSource)
+                .locations("filesystem:" + tempMigrationDir.toAbsolutePath())
+                .table(historyTable)
+                .baselineOnMigrate(true)
+                .baselineVersion("0")
+                .validateOnMigrate(true)
+                .outOfOrder(false);
             Flyway flyway = config.load();
             flyway.migrate();
         } catch (Exception e) {
-            throw new PluginMigrationException(
+            migrationFailure = new PluginMigrationException(
                 "插件 [%s] 数据库迁移失败: %s".formatted(pluginId, e.getMessage()), e);
+            throw migrationFailure;
+        } finally {
+            try {
+                deleteMigrationDirectory(tempMigrationDir);
+            } catch (IOException cleanupError) {
+                if (migrationFailure != null) {
+                    migrationFailure.addSuppressed(cleanupError);
+                } else {
+                    throw new PluginMigrationException("清理插件迁移临时目录失败: " + pluginId, cleanupError);
+                }
+            }
         }
     }
 
@@ -93,30 +105,49 @@ public final class PluginFlywayMigrator {
      * 从 JAR 中解压迁移脚本到临时目录。
      */
     private Path extractMigrationScripts(String pluginId, Path jarPath) {
+        Path tempDir;
         try {
-            Path tempDir = Files.createTempDirectory("wf_plugin_migration_" + pluginId);
-            tempDir.toFile().deleteOnExit();
+            tempDir = Files.createTempDirectory("wf_plugin_migration_" + historyId(pluginId) + "_");
+        } catch (IOException e) {
+            throw new PluginMigrationException("创建插件迁移临时目录失败: " + pluginId, e);
+        }
 
+        try {
+            Path extractionDir = tempDir;
             try (FileSystem fs = FileSystems.newFileSystem(jarPath, Collections.emptyMap())) {
                 Path migrationPath = fs.getPath(MIGRATION_PATH);
                 if (Files.exists(migrationPath)) {
-                    Files.walk(migrationPath)
-                        .filter(Files::isRegularFile)
-                        .forEach(source -> {
-                            try {
-                                Path target = tempDir.resolve(migrationPath.relativize(source).toString());
-                                Files.createDirectories(target.getParent());
-                                Files.copy(source, target);
-                            } catch (IOException e) {
-                                throw new RuntimeException("解压迁移脚本失败: " + source, e);
-                            }
-                        });
+                    try (Stream<Path> paths = Files.walk(migrationPath)) {
+                        paths.filter(Files::isRegularFile)
+                            .forEach(source -> {
+                                try {
+                                    Path target = extractionDir.resolve(migrationPath.relativize(source).toString());
+                                    Files.createDirectories(target.getParent());
+                                    Files.copy(source, target);
+                                } catch (IOException e) {
+                                    throw new MigrationExtractionException(source, e);
+                                }
+                            });
+                    }
                 }
             }
 
             return tempDir;
-        } catch (IOException e) {
+        } catch (IOException | MigrationExtractionException e) {
+            try {
+                deleteMigrationDirectory(tempDir);
+            } catch (IOException cleanupError) {
+                e.addSuppressed(cleanupError);
+            }
             throw new PluginMigrationException("解压迁移脚本失败: " + pluginId, e);
+        }
+    }
+
+    private void deleteMigrationDirectory(Path tempDir) throws IOException {
+        try (Stream<Path> paths = Files.walk(tempDir)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
         }
     }
 
@@ -124,7 +155,7 @@ public final class PluginFlywayMigrator {
      * 获取插件的 history 表名。
      */
     public String getHistoryTable(String pluginId) {
-        String safeId = sanitizePluginId(pluginId);
+        String safeId = historyId(pluginId);
         String historyTable = "flyway_plugin_" + safeId;
         validateTableName(historyTable);
         return historyTable;
@@ -144,6 +175,22 @@ public final class PluginFlywayMigrator {
         return sanitized;
     }
 
+    private static String historyId(String pluginId) {
+        String sanitized = sanitizePluginId(pluginId);
+        if (pluginId.equals(sanitized) && sanitized.length() <= 47) {
+            return sanitized;
+        }
+        return sanitized.substring(0, Math.min(34, sanitized.length())) + "_" + sha256(pluginId).substring(0, 12);
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+    }
+
     /**
      * 校验表名安全性，防止 SQL 注入。
      */
@@ -157,7 +204,7 @@ public final class PluginFlywayMigrator {
      * 静态方法：获取 history 表名（测试用）。
      */
     static String getHistoryTableStatic(String pluginId) {
-        String safeId = sanitizePluginId(pluginId);
+        String safeId = historyId(pluginId);
         String historyTable = "flyway_plugin_" + safeId;
         validateTableName(historyTable);
         return historyTable;
@@ -172,6 +219,12 @@ public final class PluginFlywayMigrator {
             return Files.exists(migrationPath) && Files.isDirectory(migrationPath);
         } catch (IOException e) {
             return false;
+        }
+    }
+
+    private static final class MigrationExtractionException extends RuntimeException {
+        private MigrationExtractionException(Path source, IOException cause) {
+            super("解压迁移脚本失败: " + source, cause);
         }
     }
 

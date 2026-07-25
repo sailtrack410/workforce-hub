@@ -62,16 +62,28 @@ class PluginFlywayMigratorTest {
             PluginFlywayMigrator.validateTableName("flyway_plugin_'hello'"));
         assertThrows(IllegalArgumentException.class, () ->
             PluginFlywayMigrator.validateTableName(""));
+        assertThrows(IllegalArgumentException.class, () ->
+            PluginFlywayMigrator.validateTableName("a".repeat(62)));
     }
 
     @Test
     void shouldReturnCorrectHistoryTable() {
         assertEquals("flyway_plugin_hello",
             PluginFlywayMigrator.getHistoryTableStatic("hello"));
-        assertEquals("flyway_plugin_leave_plugin",
-            PluginFlywayMigrator.getHistoryTableStatic("leave-plugin"));
-        assertEquals("flyway_plugin_my_plugin",
-            PluginFlywayMigrator.getHistoryTableStatic("my.plugin"));
+        assertNotEquals(
+            PluginFlywayMigrator.getHistoryTableStatic("leave-plugin"),
+            PluginFlywayMigrator.getHistoryTableStatic("leave_plugin")
+        );
+        assertNotEquals(
+            PluginFlywayMigrator.getHistoryTableStatic("my.plugin"),
+            PluginFlywayMigrator.getHistoryTableStatic("my_plugin")
+        );
+        String longPluginId = "a".repeat(64);
+        assertTrue(PluginFlywayMigrator.getHistoryTableStatic(longPluginId).length() <= 61);
+        assertNotEquals(
+            PluginFlywayMigrator.getHistoryTableStatic(longPluginId),
+            PluginFlywayMigrator.getHistoryTableStatic(longPluginId + "b")
+        );
     }
 
     @Test
