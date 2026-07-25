@@ -4,7 +4,8 @@ import java.util.Objects;
 
 /**
  * 由宿主绑定的插件调用上下文。
- * 通过静态工厂方法创建，防止插件伪造。
+ * 插件只能读取，不能构造身份。
+ * 构造器公开，但安全边界在网关权限校验，不在编译期。
  */
 public final class InvocationContext {
 
@@ -14,7 +15,11 @@ public final class InvocationContext {
     private final String requestId;
     private final TriggerSource source;
 
-    private InvocationContext(
+    /**
+     * 构造调用上下文（仅限宿主使用）。
+     * 安全边界在网关权限校验，不在编译期。
+     */
+    public InvocationContext(
             String pluginId,
             Long userId,
             CallerType callerType,
@@ -25,19 +30,6 @@ public final class InvocationContext {
         this.callerType = Objects.requireNonNull(callerType, "callerType");
         this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.source = Objects.requireNonNull(source, "source");
-    }
-
-    /**
-     * 创建调用上下文（仅限宿主使用）。
-     * 插件无法伪造，因为无法获取有效的 HostToken。
-     */
-    public static InvocationContext create(
-            String pluginId,
-            Long userId,
-            CallerType callerType,
-            String requestId,
-            TriggerSource source) {
-        return new InvocationContext(pluginId, userId, callerType, requestId, source);
     }
 
     public String getPluginId() {

@@ -11,7 +11,7 @@ public class TestInvocationContextBinder extends InvocationContextBinder {
 
     @Override
     public InvocationContext forPluginStartup(String pluginId) {
-        return InvocationContext.create(
+        return new InvocationContext(
             pluginId,
             null,
             InvocationContext.CallerType.PLUGIN,

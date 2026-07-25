@@ -38,7 +38,7 @@ public class InvocationContextBinder {
             requestId = UUID.randomUUID().toString();
         }
 
-        return InvocationContext.create(
+        return new InvocationContext(
             pluginId,
             userId,
             callerType,
@@ -51,7 +51,7 @@ public class InvocationContextBinder {
      * 为插件启动创建上下文。
      */
     public InvocationContext forPluginStartup(String pluginId) {
-        return InvocationContext.create(
+        return new InvocationContext(
             pluginId,
             null,
             InvocationContext.CallerType.PLUGIN,
@@ -64,7 +64,7 @@ public class InvocationContextBinder {
      * 为定时任务创建上下文。
      */
     public InvocationContext forScheduledTask(String pluginId) {
-        return InvocationContext.create(
+        return new InvocationContext(
             pluginId,
             null,
             InvocationContext.CallerType.PLUGIN,

@@ -39,7 +39,7 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
             binder = new InvocationContextBinder() {
                 @Override
                 public com.workforcehub.plugin.sdk.InvocationContext forPluginStartup(String pluginId) {
-                    return com.workforcehub.plugin.sdk.InvocationContext.create(
+                    return new com.workforcehub.plugin.sdk.InvocationContext(
                         pluginId,
                         null,
                         com.workforcehub.plugin.sdk.InvocationContext.CallerType.PLUGIN,
