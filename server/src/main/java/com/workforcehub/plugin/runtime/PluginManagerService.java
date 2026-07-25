@@ -3,6 +3,7 @@ package com.workforcehub.plugin.runtime;
 import com.workforcehub.plugin.repository.PluginRepository;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
+import com.workforcehub.plugin.sdk.PluginActionHandler;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 插件管理服务 - 整合 PF4J 和数据库持久化。
@@ -169,5 +171,42 @@ public class PluginManagerService {
      */
     public List<PluginRow> getActivePlugins() {
         return pluginRepository.findByStatus(PluginStatus.ACTIVE);
+    }
+
+    /**
+     * 发现指定插件的动作处理器。
+     *
+     * @param pluginId   插件ID
+     * @param actionCode 动作编码
+     * @return 动作处理器
+     */
+    public Optional<PluginActionHandler> findActionHandler(String pluginId, String actionCode) {
+        // 检查插件状态
+        PluginRow plugin = pluginRepository.findById(pluginId)
+            .orElseThrow(() -> new RuntimeException("插件不存在: " + pluginId));
+
+        if (plugin.getStatus() != PluginStatus.ACTIVE) {
+            throw new RuntimeException("插件未启用: " + pluginId + " (状态: " + plugin.getStatus() + ")");
+        }
+
+        // 从 PF4J 获取扩展
+        List<PluginActionHandler> handlers = pf4jManager.getExtensions(PluginActionHandler.class, pluginId);
+        return handlers.stream()
+            .filter(h -> h.getActionCode().equals(actionCode))
+            .findFirst();
+    }
+
+    /**
+     * 发现所有活跃插件的动作处理器。
+     */
+    public List<PluginActionHandler> findAllActionHandlers() {
+        return pf4jManager.getExtensions(PluginActionHandler.class);
+    }
+
+    /**
+     * 获取 PF4J 管理器（用于扩展查询）。
+     */
+    public org.pf4j.PluginManager getPf4jManager() {
+        return pf4jManager;
     }
 }

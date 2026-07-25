@@ -13,7 +13,7 @@ public final class InvocationContext {
     private final String requestId;
     private final TriggerSource source;
 
-    InvocationContext(
+    public InvocationContext(
             String pluginId,
             Long userId,
             CallerType callerType,
