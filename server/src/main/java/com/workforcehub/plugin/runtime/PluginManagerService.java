@@ -192,7 +192,7 @@ public class PluginManagerService {
         // 从 PF4J 获取扩展
         List<PluginActionHandler> handlers = pf4jManager.getExtensions(PluginActionHandler.class, pluginId);
         return handlers.stream()
-            .filter(h -> h.getActionCode().equals(actionCode))
+            .filter(h -> h.getDescriptor().actionCode().equals(actionCode))
             .findFirst();
     }
 

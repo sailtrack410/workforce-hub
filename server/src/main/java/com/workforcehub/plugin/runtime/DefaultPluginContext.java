@@ -2,7 +2,6 @@ package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.sdk.HostService;
 import com.workforcehub.plugin.sdk.InvocationContext;
-import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.PluginContext;
 
 /**
@@ -13,9 +12,9 @@ public final class DefaultPluginContext implements PluginContext {
     private final String pluginId;
     private final InvocationContext invocationContext;
 
-    public DefaultPluginContext(String pluginId) {
+    public DefaultPluginContext(String pluginId, InvocationContextBinder binder) {
         this.pluginId = pluginId;
-        this.invocationContext = InvocationContextBinder.forPluginStartup(pluginId);
+        this.invocationContext = binder.forPluginStartup(pluginId);
     }
 
     @Override

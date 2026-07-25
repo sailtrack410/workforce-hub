@@ -11,10 +11,16 @@ import org.pf4j.PluginWrapper;
  */
 public final class WorkforcePluginFactory implements PluginFactory {
 
+    private final InvocationContextBinder contextBinder;
+
+    public WorkforcePluginFactory(InvocationContextBinder contextBinder) {
+        this.contextBinder = contextBinder;
+    }
+
     @Override
     public Plugin create(PluginWrapper pluginWrapper) {
         String pluginClassName = pluginWrapper.getDescriptor().getPluginClass();
-        PluginContext context = new DefaultPluginContext(pluginWrapper.getPluginId());
+        PluginContext context = new DefaultPluginContext(pluginWrapper.getPluginId(), contextBinder);
 
         try {
             Class<?> pluginClass = pluginWrapper.getPluginClassLoader().loadClass(pluginClassName);

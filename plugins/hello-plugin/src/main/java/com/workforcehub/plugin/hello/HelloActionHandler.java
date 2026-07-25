@@ -19,11 +19,6 @@ public final class HelloActionHandler implements PluginActionHandler {
     public static final String CAPABILITY = "HELLO_GREET";
 
     @Override
-    public String getActionCode() {
-        return ACTION_CODE;
-    }
-
-    @Override
     public ActionDescriptor getDescriptor() {
         return new ActionDescriptor(
             ACTION_CODE,
@@ -39,7 +34,13 @@ public final class HelloActionHandler implements PluginActionHandler {
 
     @Override
     public ServiceResult<Object> execute(InvocationContext ctx, Map<String, Object> params) {
-        String name = (String) params.getOrDefault("name", "World");
+        // 参数校验
+        Object nameObj = params.get("name");
+        if (nameObj == null || !(nameObj instanceof String) || ((String) nameObj).isBlank()) {
+            return ServiceResult.fail(1001, "缺少必填参数: name");
+        }
+
+        String name = (String) nameObj;
         String message = "Hello, " + name + "! (from plugin: " + ctx.getPluginId() + ")";
         return ServiceResult.ok(Map.of("message", message));
     }

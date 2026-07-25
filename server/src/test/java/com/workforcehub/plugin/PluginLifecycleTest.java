@@ -1,5 +1,6 @@
 package com.workforcehub.plugin;
 
+import com.workforcehub.plugin.runtime.TestInvocationContextBinder;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,7 +32,7 @@ class PluginLifecycleTest {
     void shouldLoadStartStopAndUnloadPluginWithHostContext() throws Exception {
         Path pluginJar = resolvePluginJar();
         WorkforcePluginManager pluginManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         String pluginId = pluginManager.loadPlugin(pluginJar);
         assertEquals("hello-plugin", pluginId);

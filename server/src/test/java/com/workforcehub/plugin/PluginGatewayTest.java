@@ -1,6 +1,7 @@
 package com.workforcehub.plugin;
 
 import com.workforcehub.plugin.runtime.InvocationContextBinder;
+import com.workforcehub.plugin.runtime.TestInvocationContextBinder;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
@@ -37,7 +38,7 @@ class PluginGatewayTest {
     void shouldCallActionSuccessfully() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         // 安装并启用
         String pluginId = pf4jManager.loadPlugin(jarPath);
@@ -48,12 +49,12 @@ class PluginGatewayTest {
         assertFalse(handlers.isEmpty());
 
         PluginActionHandler handler = handlers.stream()
-            .filter(h -> h.getActionCode().equals(ACTION_CODE))
+            .filter(h -> h.getDescriptor().actionCode().equals(ACTION_CODE))
             .findFirst()
             .orElseThrow();
 
         // 绑定调用上下文
-        InvocationContext ctx = new InvocationContext(
+        InvocationContext ctx = InvocationContext.create(
             pluginId, 123L, InvocationContext.CallerType.USER,
             "test-request-1", InvocationContext.TriggerSource.HTTP_REQUEST
         );
@@ -73,7 +74,7 @@ class PluginGatewayTest {
     void shouldNotCallActionWhenPluginStopped() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         pf4jManager.startPlugin(pluginId);
@@ -91,7 +92,7 @@ class PluginGatewayTest {
     void shouldNotCallActionAfterUninstall() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         pf4jManager.startPlugin(pluginId);
@@ -113,7 +114,7 @@ class PluginGatewayTest {
     void shouldReturnCorrectActionDescriptor() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         pf4jManager.startPlugin(pluginId);

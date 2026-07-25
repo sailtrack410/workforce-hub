@@ -2,6 +2,7 @@ package com.workforcehub.plugin;
 
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
+import com.workforcehub.plugin.runtime.TestInvocationContextBinder;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,7 +33,7 @@ class PluginManagerServiceTest {
     void shouldInstallPluginAndTrackStatus() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         // 安装（模拟 PluginManagerService.install 的核心逻辑）
         String pluginId = pf4jManager.loadPlugin(jarPath);
@@ -73,7 +74,7 @@ class PluginManagerServiceTest {
     void shouldHandlePluginWithoutMigration() throws Exception {
         Path jarPath = buildHelloPluginJar(); // hello-plugin 没有 db/migration
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         // 安装不应因缺少迁移目录而失败
         String pluginId = pf4jManager.loadPlugin(jarPath);
@@ -94,7 +95,7 @@ class PluginManagerServiceTest {
     void shouldTrackMultipleStatusTransitions() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString());
+            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         PluginStatus dbStatus = PluginStatus.INSTALLED;

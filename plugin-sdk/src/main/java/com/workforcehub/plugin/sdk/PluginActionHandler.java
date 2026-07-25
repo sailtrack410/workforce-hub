@@ -11,11 +11,6 @@ import java.util.Map;
 public interface PluginActionHandler extends ExtensionPoint {
 
     /**
-     * 动作编码（唯一标识）。
-     */
-    String getActionCode();
-
-    /**
      * 动作描述（用于能力发现和文档生成）。
      */
     ActionDescriptor getDescriptor();
