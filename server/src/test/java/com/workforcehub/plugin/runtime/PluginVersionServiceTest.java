@@ -1,6 +1,8 @@
 package com.workforcehub.plugin.runtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -102,6 +104,42 @@ class PluginVersionServiceTest {
     }
 
     @Test
+    void shouldRejectEmptyPluginProvider() throws Exception {
+        String json = pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17")
+            .replace("\"provider\":\"Workforce Hub\"", "\"provider\":\"\"");
+        Path jarPath = buildJar(json);
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    @Test
+    void shouldRejectBlankPluginProvider() throws Exception {
+        String json = pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17")
+            .replace("\"provider\":\"Workforce Hub\"", "\"provider\":\"   \"");
+        Path jarPath = buildJar(json);
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    @Test
+    void shouldRejectNonStringPluginProvider() throws Exception {
+        String json = pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17")
+            .replace("\"provider\":\"Workforce Hub\"", "\"provider\":123");
+        Path jarPath = buildJar(json);
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    @Test
     void shouldRejectUnsupportedPluginType() throws Exception {
         Path jarPath = buildJar(pluginJson(
             "2.0.0",
@@ -169,6 +207,26 @@ class PluginVersionServiceTest {
             "FUNCTIONAL",
             "Workforce Hub",
             FRONTEND_SRI
+        ));
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    @Test
+    void shouldRejectFunctionalPluginWithExplicitNullFrontendSri() throws Exception {
+        Path jarPath = buildJar(pluginJson(
+            "2.0.0",
+            "1.2.9",
+            "1.0.0",
+            "1.4.0",
+            "17",
+            "FUNCTIONAL",
+            "Workforce Hub",
+            null,
+            true
         ));
 
         assertThrows(
@@ -339,6 +397,18 @@ class PluginVersionServiceTest {
     }
 
     @Test
+    void shouldRejectDuplicatePluginJsonEntries() throws Exception {
+        Path jarPath = buildJarWithDuplicatePluginJson(
+            pluginJson("2.0.0", "1.3.0", "1.0.0", null, "17")
+        );
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    @Test
     void shouldRejectOversizedPluginJson() throws Exception {
         Path jarPath = buildJar(" ".repeat(64 * 1024 + 1));
 
@@ -381,6 +451,19 @@ class PluginVersionServiceTest {
         return jarPath;
     }
 
+    private Path buildJarWithDuplicatePluginJson(String pluginJson) throws Exception {
+        Path jarPath = tempDir.resolve("duplicate-plugin-json.jar");
+        byte[] content = pluginJson.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try (ZipArchiveOutputStream output = new ZipArchiveOutputStream(jarPath)) {
+            for (int i = 0; i < 2; i++) {
+                output.putArchiveEntry(new ZipArchiveEntry("plugin.json"));
+                output.write(content);
+                output.closeArchiveEntry();
+            }
+        }
+        return jarPath;
+    }
+
     private String pluginJson(
             String pluginVersion,
             String sdkVersion,
@@ -408,14 +491,39 @@ class PluginVersionServiceTest {
             String type,
             String provider,
             String frontendSha384) {
+        return pluginJson(
+            pluginVersion,
+            sdkVersion,
+            minHostVersion,
+            maxHostVersion,
+            javaVersion,
+            type,
+            provider,
+            frontendSha384,
+            frontendSha384 != null
+        );
+    }
+
+    private String pluginJson(
+            String pluginVersion,
+            String sdkVersion,
+            String minHostVersion,
+            String maxHostVersion,
+            String javaVersion,
+            String type,
+            String provider,
+            String frontendSha384,
+            boolean includeFrontendSha384) {
         String maxHost = maxHostVersion == null
             ? ""
             : ",\"maxHostVersion\":\"" + maxHostVersion + "\"";
         String pluginType = type == null ? "" : ",\"type\":\"" + type + "\"";
         String pluginProvider = provider == null ? "" : ",\"provider\":\"" + provider + "\"";
-        String frontendSri = frontendSha384 == null
+        String frontendSri = !includeFrontendSha384
             ? ""
-            : ",\"frontendSha384\":\"" + frontendSha384 + "\"";
+            : frontendSha384 == null
+                ? ",\"frontendSha384\":null"
+                : ",\"frontendSha384\":\"" + frontendSha384 + "\"";
         return """
             {
               "id":"version-plugin",

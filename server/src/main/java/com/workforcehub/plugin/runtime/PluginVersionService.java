@@ -57,7 +57,7 @@ public class PluginVersionService {
                 && (frontendSha384 == null || !VALID_SRI.matcher(frontendSha384).matches())) {
             throw new PluginVersionException("UI 插件必须声明有效 frontendSha384");
         }
-        if ("FUNCTIONAL".equals(type) && frontendSha384 != null) {
+        if ("FUNCTIONAL".equals(type) && pluginJson.has("frontendSha384")) {
             throw new PluginVersionException("FUNCTIONAL 插件不得声明 frontendSha384");
         }
         PluginVersionDescriptor descriptor = new PluginVersionDescriptor(
