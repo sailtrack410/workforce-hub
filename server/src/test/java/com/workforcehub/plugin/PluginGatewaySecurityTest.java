@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -243,11 +244,14 @@ class PluginGatewaySecurityTest {
             .andExpect(jsonPath("$.code").value(4004));
     }
 
-    @Test
-    void shouldReturn409WhenPluginNotActive() throws Exception {
+    @ParameterizedTest
+    @EnumSource(value = PluginStatus.class, names = {
+        "INSTALLED", "STOPPED", "ERROR", "DISABLING", "UNINSTALLED"
+    })
+    void shouldReturn409WhenPluginNotActive(PluginStatus status) throws Exception {
         PluginRow plugin = new PluginRow();
         plugin.setPluginId(PLUGIN_ID);
-        plugin.setStatus(PluginStatus.STOPPED);
+        plugin.setStatus(status);
         when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin);
 
         mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
