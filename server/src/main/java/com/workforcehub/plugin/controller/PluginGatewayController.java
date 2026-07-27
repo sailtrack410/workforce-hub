@@ -13,16 +13,24 @@ import com.workforcehub.plugin.sdk.ServiceResult;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 插件动作调用网关。
@@ -39,18 +47,21 @@ public class PluginGatewayController {
     private final PluginPermissionService permissionService;
     private final PluginParamValidator paramValidator;
     private final PluginLifecycleGuard lifecycleGuard;
+    private final Set<String> allowedOrigins;
 
     public PluginGatewayController(
             PluginManagerService pluginManagerService,
             InvocationContextBinder contextBinder,
             PluginPermissionService permissionService,
             PluginParamValidator paramValidator,
-            PluginLifecycleGuard lifecycleGuard) {
+            PluginLifecycleGuard lifecycleGuard,
+            @Value("${workforce.plugin.gateway.csrf.allowed-origins}") String allowedOrigins) {
         this.pluginManagerService = pluginManagerService;
         this.contextBinder = contextBinder;
         this.permissionService = permissionService;
         this.paramValidator = paramValidator;
         this.lifecycleGuard = lifecycleGuard;
+        this.allowedOrigins = parseAllowedOrigins(allowedOrigins);
     }
 
     /**
@@ -62,6 +73,11 @@ public class PluginGatewayController {
             @PathVariable String actionCode,
             @RequestBody(required = false) Map<String, Object> params,
             HttpServletRequest request) {
+
+        if (!isTrustedRequestSource(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ServiceResult.fail(4003, "请求来源不受信任"));
+        }
 
         if (params == null) {
             params = Map.of();
@@ -157,5 +173,73 @@ public class PluginGatewayController {
         log.error("网关异常", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(ServiceResult.fail(5000, "服务内部错误"));
+    }
+
+    private boolean isTrustedRequestSource(HttpServletRequest request) {
+        String origin = request.getHeader(HttpHeaders.ORIGIN);
+        if (origin != null) {
+            String normalized = normalizeOrigin(origin, false);
+            return normalized != null && allowedOrigins.contains(normalized);
+        }
+
+        String referer = request.getHeader(HttpHeaders.REFERER);
+        if (referer == null) {
+            return false;
+        }
+        String normalized = normalizeOrigin(referer, true);
+        return normalized != null && allowedOrigins.contains(normalized);
+    }
+
+    private Set<String> parseAllowedOrigins(String configuredOrigins) {
+        Set<String> parsed = new LinkedHashSet<>();
+        Arrays.stream(configuredOrigins.split(","))
+            .map(String::trim)
+            .filter(value -> !value.isEmpty())
+            .forEach(value -> {
+                String normalized = normalizeOrigin(value, false);
+                if (normalized == null) {
+                    throw new IllegalArgumentException("非法插件网关允许来源: " + value);
+                }
+                parsed.add(normalized);
+            });
+        return Set.copyOf(parsed);
+    }
+
+    private String normalizeOrigin(String value, boolean allowPath) {
+        if (value == null || value.isBlank() || "null".equalsIgnoreCase(value.trim())) {
+            return null;
+        }
+
+        try {
+            URI uri = new URI(value.trim());
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (scheme == null || host == null || uri.getUserInfo() != null) {
+                return null;
+            }
+            scheme = scheme.toLowerCase(Locale.ROOT);
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return null;
+            }
+            if (uri.getQuery() != null || uri.getFragment() != null) {
+                return null;
+            }
+            if (!allowPath && uri.getPath() != null && !uri.getPath().isEmpty()) {
+                return null;
+            }
+
+            int port = uri.getPort();
+            if (("http".equals(scheme) && port == 80) || ("https".equals(scheme) && port == 443)) {
+                port = -1;
+            }
+
+            host = host.toLowerCase(Locale.ROOT);
+            if (host.indexOf(':') >= 0) {
+                host = "[" + host + "]";
+            }
+            return scheme + "://" + host + (port < 0 ? "" : ":" + port);
+        } catch (URISyntaxException e) {
+            return null;
+        }
     }
 }

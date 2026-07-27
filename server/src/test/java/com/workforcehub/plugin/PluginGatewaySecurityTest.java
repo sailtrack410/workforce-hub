@@ -22,13 +22,19 @@ import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.plugin.sdk.ServiceResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -41,15 +47,18 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -62,6 +71,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 覆盖：匿名401、权限缺失403、插件不存在404、动作不存在404、未启用409、参数缺失400。
  */
 @WebMvcTest(PluginGatewayController.class)
+@TestPropertySource(properties =
+    "workforce.plugin.gateway.csrf.allowed-origins=http://localhost:5174,http://127.0.0.1:5174,"
+        + "https://app.example.com,http://standard.example,https://secure.example")
 @ContextConfiguration(classes = {
     PluginGatewayController.class,
     SecurityConfig.class,
@@ -75,6 +87,7 @@ class PluginGatewaySecurityTest {
 
     private static final String PLUGIN_ID = "hello-plugin";
     private static final String ACTION_CODE = "hello.greet";
+    private static final String TRUSTED_ORIGIN = "http://localhost:5174";
 
     @Autowired
     private MockMvc mockMvc;
@@ -127,9 +140,80 @@ class PluginGatewaySecurityTest {
     @Test
     void shouldReturn401WhenAnonymous() throws Exception {
         mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isUnauthorized());
+
+        verifyGatewayNotEntered();
+    }
+
+    @Test
+    void shouldAcceptTrustedOrigin() throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
+                .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+    }
+
+    @Test
+    void shouldAcceptTrustedRefererWithPath() throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
+                .header(HttpHeaders.REFERER, TRUSTED_ORIGIN + "/messages/42")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http://standard.example:80", "https://secure.example:443"})
+    void shouldNormalizeStandardOriginPorts(String origin) throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
+                .header(HttpHeaders.ORIGIN, origin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+    }
+
+    @Test
+    void shouldRejectAuthenticatedRequestWithoutOriginOrReferer() throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(4003));
+
+        verifyGatewayNotEntered();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("untrustedRequestSources")
+    void shouldRejectUntrustedRequestBeforePluginLookup(
+            String caseName, String origin, String referer) throws Exception {
+        var request = post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}");
+        if (origin != null) {
+            request.header(HttpHeaders.ORIGIN, origin);
+        }
+        if (referer != null) {
+            request.header(HttpHeaders.REFERER, referer);
+        }
+
+        mockMvc.perform(request)
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(4003));
+
+        verifyGatewayNotEntered();
     }
 
     @Test
@@ -139,6 +223,7 @@ class PluginGatewaySecurityTest {
 
         mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
                 .with(authentication(authentication))
+                .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isForbidden())
@@ -339,15 +424,47 @@ class PluginGatewaySecurityTest {
         assertEquals(200, result.getResponse().getStatus());
     }
 
+    private static Stream<Arguments> untrustedRequestSources() {
+        return Stream.of(
+            Arguments.of("Origin null", "null", null),
+            Arguments.of("相似域名前缀", "https://app.example.com.evil.test", null),
+            Arguments.of("端口不匹配", "http://localhost:5173", null),
+            Arguments.of("非法 URI", TRUSTED_ORIGIN + "/%", null),
+            Arguments.of("非 HTTP(S)", "ftp://localhost:5174", null),
+            Arguments.of("userinfo", "http://user@localhost:5174", null),
+            Arguments.of("Origin 携带路径", TRUSTED_ORIGIN + "/messages", null),
+            Arguments.of("Origin 尾斜杠", TRUSTED_ORIGIN + "/", null),
+            Arguments.of("Origin 携带查询", TRUSTED_ORIGIN + "?next=/messages", null),
+            Arguments.of("恶意 Referer", null, "https://app.example.com.evil.test/messages"),
+            Arguments.of("非法 Referer", null, "not a uri"),
+            Arguments.of("Origin 优先于 Referer", "https://attacker.example", TRUSTED_ORIGIN + "/messages")
+        );
+    }
+
+    private void verifyGatewayNotEntered() {
+        verify(pluginManagerService, never()).getPlugin(anyString());
+        verify(pluginManagerService, never()).findActionHandler(anyString(), anyString());
+        verify(permissionService, never()).checkPermission(any(), anyString(), anyString());
+        verify(handler, never()).execute(any(), anyMap());
+        assertEquals(0, lifecycleGuard.getActiveCount(PLUGIN_ID));
+    }
+
     private RequestPostProcessor authenticated(UserType userType, Long userId) {
+        return request -> {
+            authentication(authenticatedPrincipal(userType, userId)).postProcessRequest(request);
+            request.addHeader(HttpHeaders.ORIGIN, TRUSTED_ORIGIN);
+            return request;
+        };
+    }
+
+    private Authentication authenticatedPrincipal(UserType userType, Long userId) {
         WfhUserDetails principal = mock(WfhUserDetails.class);
         when(principal.getUserType()).thenReturn(userType);
         when(principal.getUserId()).thenReturn(userId);
         when(principal.getUsername()).thenReturn("test-user");
         when(principal.getAuthorities()).thenReturn(List.of());
 
-        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+        return UsernamePasswordAuthenticationToken.authenticated(
             principal, null, principal.getAuthorities());
-        return authentication(authentication);
     }
 }

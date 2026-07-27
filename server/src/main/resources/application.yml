@@ -108,6 +108,10 @@ workforce:
       enabled: ${AUTH_EMAIL_VERIFY_ENABLED:false}
   file:
     storage-provider: ${FILE_STORAGE_PROVIDER:LOCAL}
+  plugin:
+    gateway:
+      csrf:
+        allowed-origins: ${WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS:http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
   im:
     websocket:
       allowed-origin-patterns: ${IM_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
