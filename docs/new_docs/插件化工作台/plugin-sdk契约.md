@@ -224,7 +224,7 @@ public record DomainEvent(
 
 ### 规划中的 v1 payload schema
 
-以下字段是设计约定，当前只存在通用 `PluginDomainEventAdapter` 和分发器，尚未接入六类真实业务发布点，也没有在运行时逐字段校验这些 payload。
+以下字段是设计约定，当前只存在通用 `PluginDomainEventAdapter` 和 `PluginEventDispatcher`，尚未接入 `DomainEventPublisher` 或六类真实业务发布点，也没有在运行时逐字段校验这些 payload。
 
 #### WORKFLOW_APPROVED / WORKFLOW_REJECTED
 
@@ -298,7 +298,9 @@ POST /api/plugin-gateway/{pluginId}/actions/{actionCode}
 
 请求体是可选 JSON 对象。调用身份完全来自当前登录会话和宿主 `InvocationContextBinder`；当前协议不读取 `X-Plugin-Id`、`X-Operation-Reason` 等客户端身份头。
 
-网关先校验插件状态和生命周期入口，再由宿主绑定 `InvocationContext` 并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作、校验输入 Schema 并执行处理器。网关返回 `ServiceResult`，内部异常统一转换，不回传插件异常细节。
+网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。该校验仅覆盖当前动作 `POST` 网关，宿主 `SecurityConfig` 仍全局 `csrf.disable`，不代表全站 CSRF 已完成。
+
+来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后再校验插件状态和生命周期入口，由宿主绑定 `InvocationContext` 并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作、校验输入 Schema 并执行处理器。网关返回 `ServiceResult`，内部异常统一转换，不回传插件异常细节。`ActionDescriptor.defaultTimeout` 尚未执行，`idempotent` 仍不构成自动幂等保证。
 
 ---
 
