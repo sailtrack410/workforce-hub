@@ -2,11 +2,12 @@ package com.workforcehub.plugin.controller;
 
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
-import com.workforcehub.plugin.runtime.InvocationContextBinder;
+import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
 import com.workforcehub.plugin.runtime.PluginManagerService;
 import com.workforcehub.plugin.runtime.PluginParamValidator;
 import com.workforcehub.plugin.runtime.PluginPermissionService;
 import com.workforcehub.plugin.sdk.InvocationContext;
+import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.plugin.sdk.ServiceResult;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,10 +15,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 
 /**
  * 插件动作调用网关。
@@ -33,16 +38,19 @@ public class PluginGatewayController {
     private final InvocationContextBinder contextBinder;
     private final PluginPermissionService permissionService;
     private final PluginParamValidator paramValidator;
+    private final PluginLifecycleGuard lifecycleGuard;
 
     public PluginGatewayController(
             PluginManagerService pluginManagerService,
             InvocationContextBinder contextBinder,
             PluginPermissionService permissionService,
-            PluginParamValidator paramValidator) {
+            PluginParamValidator paramValidator,
+            PluginLifecycleGuard lifecycleGuard) {
         this.pluginManagerService = pluginManagerService;
         this.contextBinder = contextBinder;
         this.permissionService = permissionService;
         this.paramValidator = paramValidator;
+        this.lifecycleGuard = lifecycleGuard;
     }
 
     /**
@@ -63,7 +71,7 @@ public class PluginGatewayController {
         PluginRow plugin;
         try {
             plugin = pluginManagerService.getPlugin(pluginId);
-        } catch (RuntimeException e) {
+        } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ServiceResult.fail(4004, "插件不存在"));
         }
@@ -74,8 +82,41 @@ public class PluginGatewayController {
                 .body(ServiceResult.fail(4009, "插件未启用"));
         }
 
+        // 并发守卫：原子检查门开 + 计数（在状态确认之后）
+        if (!lifecycleGuard.tryAcquire(pluginId)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ServiceResult.fail(4009, "插件正在停用"));
+        }
+        try {
+            return doExecute(pluginId, actionCode, params, request);
+        } finally {
+            lifecycleGuard.release(pluginId);
+        }
+    }
+
+    private ResponseEntity<ServiceResult<Object>> doExecute(
+            String pluginId, String actionCode, Map<String, Object> params, HttpServletRequest request) {
+
+        // 4. 绑定调用上下文
+        InvocationContext ctx;
+        try {
+            ctx = contextBinder.bindFromRequest(request, pluginId);
+            // 5. 权限校验（三重：插件能力 + 动作授权 + 调用者权限）
+            permissionService.checkPermission(ctx, pluginId, actionCode);
+        } catch (PluginPermissionService.PermissionDeniedException | AccessDeniedException e) {
+            log.debug("权限校验失败: pluginId={}, actionCode={}, reason={}", pluginId, actionCode, e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ServiceResult.fail(4003, "权限不足"));
+        }
+
         // 3. 发现动作处理器
-        var handlerOpt = pluginManagerService.findActionHandler(pluginId, actionCode);
+        Optional<PluginActionHandler> handlerOpt;
+        try {
+            handlerOpt = pluginManagerService.findActionHandler(pluginId, actionCode);
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ServiceResult.fail(4004, "插件不存在"));
+        }
         if (handlerOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ServiceResult.fail(4004, "动作不存在"));
@@ -83,25 +124,11 @@ public class PluginGatewayController {
 
         PluginActionHandler handler = handlerOpt.get();
 
-        // 4. 参数校验（根据 inputSchema）
+        // 6. 参数校验（根据 inputSchema）
         List<String> paramErrors = paramValidator.validate(handler.getDescriptor(), params);
         if (!paramErrors.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ServiceResult.fail(1000, String.join("; ", paramErrors)));
-        }
-
-        // 5. 绑定调用上下文
-        InvocationContext ctx = contextBinder.bindFromRequest(request, pluginId);
-
-        // 6. 权限校验（三重：插件能力 + 动作授权 + 调用者权限）
-        String capabilityCode = handler.getDescriptor().requiredCapability();
-        if (capabilityCode != null && !capabilityCode.isBlank()) {
-            try {
-                permissionService.checkPermission(ctx, pluginId, actionCode, capabilityCode);
-            } catch (PluginPermissionService.PermissionDeniedException e) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ServiceResult.fail(4003, "权限不足"));
-            }
         }
 
         // 7. 执行动作
@@ -114,6 +141,12 @@ public class PluginGatewayController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ServiceResult.fail(5000, "动作执行失败"));
         }
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ServiceResult<Object>> handleInvalidJson(HttpMessageNotReadableException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ServiceResult.fail(1000, "请求参数格式错误"));
     }
 
     /**

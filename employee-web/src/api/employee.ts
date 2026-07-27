@@ -19,6 +19,7 @@ import type {
   EmployeeFileBrowserResponse,
   EmployeeFileFolderResponse,
   EmployeeFileResponse,
+  EmployeePluginResponse,
   EmployeePreferenceResponse,
   EntityId,
   FileListQuery,
@@ -236,6 +237,9 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
     },
     agents: {
       list: (query: { keyword?: string } = {}) => client.get<AgentResponse[]>('/api/employee/agents', { query }),
+    },
+    plugins: {
+      mine: () => client.get<EmployeePluginResponse[]>('/api/employee/plugins/mine'),
     },
     files: {
       list: (query: FileListQuery = {}) => client.get<PageResult<EmployeeFileResponse>>('/api/employee/files', { query }),

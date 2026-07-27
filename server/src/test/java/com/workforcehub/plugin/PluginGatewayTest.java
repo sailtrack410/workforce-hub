@@ -1,11 +1,12 @@
 package com.workforcehub.plugin;
 
-import com.workforcehub.plugin.runtime.InvocationContextBinder;
-import com.workforcehub.plugin.runtime.TestInvocationContextBinder;
+import com.workforcehub.plugin.runtime.PluginPermissionService;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
 import com.workforcehub.plugin.sdk.InvocationContext;
+import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.plugin.sdk.ServiceResult;
+import com.workforcehub.plugin.sdk.TestInvocationContextBinder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.pf4j.PluginState;
@@ -13,6 +14,7 @@ import org.pf4j.PluginState;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -21,6 +23,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * 插件动作网关端到端测试。
@@ -38,7 +41,7 @@ class PluginGatewayTest {
     void shouldCallActionSuccessfully() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         // 安装并启用
         String pluginId = pf4jManager.loadPlugin(jarPath);
@@ -54,9 +57,8 @@ class PluginGatewayTest {
             .orElseThrow();
 
         // 绑定调用上下文
-        InvocationContext ctx = InvocationContext.create(
-            pluginId, 123L, InvocationContext.CallerType.USER,
-            "test-request-1", InvocationContext.TriggerSource.HTTP_REQUEST
+        InvocationContext ctx = new TestInvocationContextBinder().forHttpRequest(
+            pluginId, 123L, InvocationContext.CallerType.USER, "test-request-1"
         );
 
         // 执行动作
@@ -74,7 +76,7 @@ class PluginGatewayTest {
     void shouldNotCallActionWhenPluginStopped() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         pf4jManager.startPlugin(pluginId);
@@ -92,7 +94,7 @@ class PluginGatewayTest {
     void shouldNotCallActionAfterUninstall() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         pf4jManager.startPlugin(pluginId);
@@ -114,7 +116,7 @@ class PluginGatewayTest {
     void shouldReturnCorrectActionDescriptor() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         pf4jManager.startPlugin(pluginId);
@@ -129,21 +131,20 @@ class PluginGatewayTest {
         assertTrue(descriptor.idempotent());
     }
 
-    private Path buildHelloPluginJar() throws IOException {
-        // 使用预构建的 JAR
-        Path prebuiltJar = Path.of(System.getProperty("user.dir"), "..", "plugins", "hello-plugin",
-            "target", "hello-plugin-0.1.0-SNAPSHOT.jar").toAbsolutePath().normalize();
-        if (Files.exists(prebuiltJar)) {
-            Path jar = tempDir.resolve("hello-plugin.jar");
-            Files.copy(prebuiltJar, jar);
-            return jar;
-        }
+    @Test
+    void shouldNotExposeInvocationContextCreation() {
+        assertTrue(java.util.Arrays.stream(InvocationContext.class.getDeclaredConstructors())
+            .noneMatch(constructor -> Modifier.isPublic(constructor.getModifiers())));
+        assertTrue(java.util.Arrays.stream(InvocationContextBinder.class.getDeclaredConstructors())
+            .noneMatch(constructor -> Modifier.isPublic(constructor.getModifiers())));
+    }
 
-        // 如果预构建 JAR 不存在，从源码编译
-        Path source = Path.of("..", "hello-plugin", "src", "main", "java",
-            "com", "workforcehub", "plugin", "hello", "HelloPlugin.java").toAbsolutePath().normalize();
-        Path source2 = Path.of("..", "hello-plugin", "src", "main", "java",
-            "com", "workforcehub", "plugin", "hello", "HelloActionHandler.java").toAbsolutePath().normalize();
+    private Path buildHelloPluginJar() throws IOException {
+        // 始终从当前源码编译，避免测试误用 target 中的旧 JAR
+        Path sourceDir = Path.of(System.getProperty("user.dir"), "..", "plugins", "hello-plugin",
+            "src", "main", "java").toAbsolutePath().normalize();
+        Path source1 = sourceDir.resolve("com/workforcehub/plugin/hello/HelloPlugin.java");
+        Path source2 = sourceDir.resolve("com/workforcehub/plugin/hello/HelloActionHandler.java");
         Path classes = tempDir.resolve("hello-plugin-classes");
         Files.createDirectories(classes);
 
@@ -153,14 +154,13 @@ class PluginGatewayTest {
             null, null, null,
             "-classpath", System.getProperty("java.class.path"),
             "-d", classes.toString(),
-            source.toString(),
+            source1.toString(),
             source2.toString()
         );
         assertEquals(0, result, "编译失败");
 
         Files.copy(
-            Path.of("..", "hello-plugin", "src", "main", "resources", "plugin.properties")
-                .toAbsolutePath().normalize(),
+            sourceDir.getParent().resolve("resources/plugin.properties"),
             classes.resolve("plugin.properties")
         );
 

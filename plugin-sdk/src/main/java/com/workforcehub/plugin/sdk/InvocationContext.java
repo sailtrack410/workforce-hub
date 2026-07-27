@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * 由宿主绑定的插件调用上下文。
  * 插件只能读取，不能构造身份。
- * 构造器公开，但安全边界在网关权限校验，不在编译期。
+ * 构造器包级私有，仅宿主侧绑定器可创建。
  */
 public final class InvocationContext {
 
@@ -17,9 +17,9 @@ public final class InvocationContext {
 
     /**
      * 构造调用上下文（仅限宿主使用）。
-     * 安全边界在网关权限校验，不在编译期。
+     * 插件 SDK 不提供公开创建入口。
      */
-    public InvocationContext(
+    InvocationContext(
             String pluginId,
             Long userId,
             CallerType callerType,

@@ -1,12 +1,14 @@
 package com.workforcehub.plugin.runtime;
 
+import com.workforcehub.plugin.sdk.HostService;
 import org.pf4j.DefaultPluginManager;
 import org.pf4j.PluginFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
-import java.util.UUID;
+import java.util.List;
 
 /**
  * Workforce Hub 的 PF4J 管理器（Spring 单例）。
@@ -15,40 +17,31 @@ import java.util.UUID;
 @Component
 public final class WorkforcePluginManager extends DefaultPluginManager {
 
-    private InvocationContextBinder contextBinder;
+    private final HostServiceRegistry serviceRegistry;
 
+    @Autowired
     public WorkforcePluginManager(
             @Value("${workforce.plugin.root:plugins}") String pluginsRoot,
-            InvocationContextBinder contextBinder) {
+            List<HostService> hostServices,
+            PluginPermissionService permissionService) {
         super(Path.of(pluginsRoot));
-        this.contextBinder = contextBinder;
+        this.serviceRegistry = new HostServiceRegistry(hostServices, permissionService);
     }
 
     /**
-     * 设置上下文绑定器（用于测试或延迟初始化）。
+     * 测试用构造器，无 HostService 注入。
+     * permissionService 必须显式传入，fail closed。
      */
-    public void setContextBinder(InvocationContextBinder contextBinder) {
-        this.contextBinder = contextBinder;
+    public WorkforcePluginManager(String pluginsRoot, PluginPermissionService permissionService) {
+        this(pluginsRoot, List.of(), permissionService);
     }
 
     @Override
     protected PluginFactory createPluginFactory() {
-        // 如果 contextBinder 未设置，创建一个简单的默认实现
-        InvocationContextBinder binder = contextBinder;
-        if (binder == null) {
-            binder = new InvocationContextBinder() {
-                @Override
-                public com.workforcehub.plugin.sdk.InvocationContext forPluginStartup(String pluginId) {
-                    return new com.workforcehub.plugin.sdk.InvocationContext(
-                        pluginId,
-                        null,
-                        com.workforcehub.plugin.sdk.InvocationContext.CallerType.PLUGIN,
-                        UUID.randomUUID().toString(),
-                        com.workforcehub.plugin.sdk.InvocationContext.TriggerSource.STARTUP
-                    );
-                }
-            };
-        }
-        return new WorkforcePluginFactory(binder);
+        return new WorkforcePluginFactory(() -> serviceRegistry);
+    }
+
+    boolean unloadPluginWithoutDependents(String pluginId) {
+        return super.unloadPlugin(pluginId, false, false);
     }
 }

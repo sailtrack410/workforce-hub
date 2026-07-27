@@ -412,14 +412,10 @@ async function confirmLogout() {
   logoutSubmitting.value = true;
   try {
     await session.logout();
-    logoutConfirmOpen.value = false;
-    shell.setAvatarUrl('');
-    showToast('已退出登录');
-    void router.replace({ name: 'employee-messages' });
   } catch (error) {
     showToast(error instanceof Error ? error.message : '退出登录失败');
   } finally {
-    logoutSubmitting.value = false;
+    window.location.reload();
   }
 }
 

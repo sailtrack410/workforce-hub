@@ -747,3 +747,10 @@ export interface AgentResponse {
   createdAt?: string | null;
   updatedAt?: string | null;
 }
+
+export interface EmployeePluginResponse {
+  id: string;
+  name: string;
+  frontendEntry: string;
+  integrity: string;
+}

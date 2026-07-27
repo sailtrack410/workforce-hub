@@ -47,10 +47,11 @@ import {
   shellUser,
   useShellStore,
   normalizeSettingsPanel,
-  normalizeWorkbenchApp,
+  resolveWorkbenchRoute,
 } from '../stores/shell';
 import { useImStore } from '../stores/im';
 import { useSessionStore } from '../stores/session';
+import { usePluginsStore } from '../stores/plugins';
 import { useCurrentUserAvatarUrl } from '../composables/useCurrentUserAvatarUrl';
 import { useEmployeeAuthFlow } from '../composables/useEmployeeAuthFlow';
 import { useFileUpload } from '../composables/useFileUpload';
@@ -88,6 +89,7 @@ import type { EmployeeShellContexts } from './employee-shell-context';
 const shell = useShellStore();
 const im = useImStore();
 const session = useSessionStore();
+const plugins = usePluginsStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -498,6 +500,7 @@ function openProfileSettings() {
 
 async function loadAuthenticatedWorkspace() {
   if (!session.isAuthenticated) return;
+  void plugins.loadAccessiblePlugins().catch(() => undefined);
   await Promise.all([
     session.loadOrgProfile().then(() => {
       shell.setColleagues(session.colleagues);
@@ -915,13 +918,7 @@ watch(
       if (typeof todoId === 'string') shell.selectItem('todos', todoId);
       else shell.setMobileView('list');
     } else if (typedSection === 'workbench') {
-      if (typeof app === 'string') {
-        const canonical = normalizeWorkbenchApp(app);
-        shell.selectItem('workbench', canonical);
-        if (canonical !== app) {
-          void router.replace({ name: 'employee-workbench-detail', params: { app: canonical } });
-        }
-      } else {
+      if (typeof app !== 'string') {
         shell.setMobileView('list');
       }
     } else if (typedSection === 'settings') {
@@ -948,8 +945,40 @@ watch(() => session.isAuthenticated, (authenticated) => {
     connectImSocket();
   } else {
     closeImSocket();
+    plugins.reset();
   }
 });
+
+let pendingReplaceTarget: string | null = null;
+
+watch(
+  () => [
+    route.meta.section,
+    route.params.app,
+    session.initialized,
+    session.isAuthenticated,
+    plugins.resolved,
+    plugins.manifest,
+    plugins.loadedIds,
+  ] as const,
+  ([section, app, initialized, authenticated, resolved, manifest, loadedIds]) => {
+    shell.rebuildWorkbench(manifest, loadedIds);
+    if (section !== 'workbench' || typeof app !== 'string') return;
+
+    const workbenchIds = shell.workbench.map((item) => item.id);
+    const resolution = resolveWorkbenchRoute(app, initialized, authenticated, resolved, workbenchIds);
+    if (resolution.pending) return;
+
+    shell.selectItem('workbench', resolution.id);
+    if (resolution.replace && resolution.id !== pendingReplaceTarget) {
+      pendingReplaceTarget = resolution.id;
+      void router.replace({ name: 'employee-workbench-detail', params: { app: resolution.id } })
+        .finally(() => { pendingReplaceTarget = null; })
+        .catch(() => {});
+    }
+  },
+  { immediate: true },
+);
 
 const employeeShellContexts = {
   messages: {

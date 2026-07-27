@@ -1,7 +1,6 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.sdk.HostService;
-import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.PluginContext;
 
 /**
@@ -10,11 +9,11 @@ import com.workforcehub.plugin.sdk.PluginContext;
 public final class DefaultPluginContext implements PluginContext {
 
     private final String pluginId;
-    private final InvocationContext invocationContext;
+    private final HostServiceRegistry serviceRegistry;
 
-    public DefaultPluginContext(String pluginId, InvocationContextBinder binder) {
+    public DefaultPluginContext(String pluginId, HostServiceRegistry serviceRegistry) {
         this.pluginId = pluginId;
-        this.invocationContext = binder.forPluginStartup(pluginId);
+        this.serviceRegistry = serviceRegistry;
     }
 
     @Override
@@ -23,12 +22,7 @@ public final class DefaultPluginContext implements PluginContext {
     }
 
     @Override
-    public InvocationContext getInvocationContext() {
-        return invocationContext;
-    }
-
-    @Override
     public <T extends HostService> T getService(Class<T> type) {
-        throw new IllegalArgumentException("宿主服务尚未注册: " + type.getName());
+        return serviceRegistry.getRequired(type, pluginId);
     }
 }

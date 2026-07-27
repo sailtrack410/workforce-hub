@@ -4,6 +4,7 @@ import {
   navItems,
   normalizeWorkbenchApp,
   normalizeSettingsPanel,
+  resolveWorkbenchRoute,
   sectionMeta,
   todoLifecycle,
   todoSectionFilters,
@@ -778,6 +779,163 @@ describe('useShellStore', () => {
       id: 'personal-file-2053928981082898666',
       name: '旧证明.txt',
       status: '回收站',
+    });
+  });
+
+  it('rebuildWorkbench appends loaded plugins after built-in items in manifest order', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench(
+      [
+        { id: 'p-b', name: 'Beta' },
+        { id: 'p-a', name: 'Alpha' },
+      ],
+      ['p-a', 'p-b'],
+    );
+
+    expect(shell.workbench.map((item) => item.id)).toEqual(['oa', 'attendance', 'balance', 'p-b', 'p-a']);
+    expect(shell.workbench[3]).toMatchObject({ id: 'p-b', title: 'Beta', tone: 'gray' });
+    expect(shell.workbench[4]).toMatchObject({ id: 'p-a', title: 'Alpha', tone: 'gray' });
+  });
+
+  it('rebuildWorkbench skips plugins that failed to load', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench(
+      [
+        { id: 'p-ok', name: 'OK' },
+        { id: 'p-fail', name: 'Fail' },
+      ],
+      ['p-ok'],
+    );
+
+    expect(shell.workbench.map((item) => item.id)).toEqual(['oa', 'attendance', 'balance', 'p-ok']);
+  });
+
+  it('rebuildWorkbench rejects plugins with reserved or legacy alias IDs', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench(
+      [
+        { id: 'oa', name: 'Fake OA' },
+        { id: 'attendance', name: 'Fake Attendance' },
+        { id: 'balance', name: 'Fake Balance' },
+        { id: 'agent', name: 'Fake Agent' },
+        { id: 'files', name: 'Fake Files' },
+        { id: 'leave', name: 'Fake Leave' },
+        { id: 'requests', name: 'Fake Requests' },
+        { id: 'p-ok', name: 'OK' },
+      ],
+      ['oa', 'attendance', 'balance', 'agent', 'files', 'leave', 'requests', 'p-ok'],
+    );
+
+    const ids = shell.workbench.map((item) => item.id);
+    expect(ids).toEqual(['oa', 'attendance', 'balance', 'p-ok']);
+    expect(shell.workbench.find((item) => item.id === 'oa')?.title).toBe('OA 申请');
+  });
+
+  it('rebuildWorkbench deduplicates repeated plugin IDs', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench(
+      [
+        { id: 'p-x', name: 'X1' },
+        { id: 'p-x', name: 'X2' },
+      ],
+      ['p-x'],
+    );
+
+    expect(shell.workbench.filter((item) => item.id === 'p-x')).toHaveLength(1);
+  });
+
+  it('normalizeWorkbenchApp resolves dynamic plugin IDs', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench(
+      [{ id: 'my-plugin', name: 'My Plugin' }],
+      ['my-plugin'],
+    );
+
+    expect(normalizeWorkbenchApp('my-plugin', shell.workbench)).toBe('my-plugin');
+    expect(normalizeWorkbenchApp('unknown', shell.workbench)).toBe('oa');
+  });
+
+  it('normalizeWorkbenchApp still maps legacy aliases to oa', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench([], []);
+
+    expect(normalizeWorkbenchApp('agent', shell.workbench)).toBe('oa');
+    expect(normalizeWorkbenchApp('files', shell.workbench)).toBe('oa');
+    expect(normalizeWorkbenchApp('leave', shell.workbench)).toBe('oa');
+    expect(normalizeWorkbenchApp('requests', shell.workbench)).toBe('oa');
+  });
+
+  it('selectItem normalizes workbench using dynamic list', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench(
+      [{ id: 'my-plugin', name: 'My Plugin' }],
+      ['my-plugin'],
+    );
+
+    shell.selectItem('workbench', 'my-plugin');
+    expect(shell.active.workbench).toBe('my-plugin');
+
+    shell.selectItem('workbench', 'nonexistent');
+    expect(shell.active.workbench).toBe('oa');
+  });
+
+  it('rebuildWorkbench resets active workbench if current selection disappears', () => {
+    const shell = useShellStore();
+    shell.rebuildWorkbench(
+      [{ id: 'p-a', name: 'A' }],
+      ['p-a'],
+    );
+    shell.selectItem('workbench', 'p-a');
+    expect(shell.active.workbench).toBe('p-a');
+
+    shell.rebuildWorkbench([], []);
+    expect(shell.active.workbench).toBe('oa');
+  });
+
+  describe('resolveWorkbenchRoute', () => {
+    it('returns oa without replace when no candidate', () => {
+      expect(resolveWorkbenchRoute('', true, true, true, ['oa'])).toEqual({ id: 'oa', replace: false, pending: false });
+      expect(resolveWorkbenchRoute(undefined, true, true, true, ['oa'])).toEqual({ id: 'oa', replace: false, pending: false });
+    });
+
+    it('preserves candidate as pending when session not initialized', () => {
+      expect(resolveWorkbenchRoute('my-plugin', false, false, false, [])).toEqual({ id: 'my-plugin', replace: false, pending: true });
+    });
+
+    it('returns oa with replace when initialized but not authenticated', () => {
+      expect(resolveWorkbenchRoute('my-plugin', true, false, false, [])).toEqual({ id: 'oa', replace: true, pending: false });
+    });
+
+    it('returns oa without replace when not authenticated and candidate is oa', () => {
+      expect(resolveWorkbenchRoute('oa', true, false, false, [])).toEqual({ id: 'oa', replace: false, pending: false });
+    });
+
+    it('maps legacy aliases to oa with replace regardless of auth state', () => {
+      for (const alias of ['agent', 'files', 'leave', 'requests']) {
+        expect(resolveWorkbenchRoute(alias, true, true, false, [])).toEqual({ id: 'oa', replace: true, pending: false });
+      }
+    });
+
+    it('selects built-in or valid plugin in workbenchIds immediately', () => {
+      expect(resolveWorkbenchRoute('oa', true, true, false, ['oa', 'attendance', 'balance']))
+        .toEqual({ id: 'oa', replace: false, pending: false });
+      expect(resolveWorkbenchRoute('my-plugin', true, true, true, ['oa', 'attendance', 'balance', 'my-plugin']))
+        .toEqual({ id: 'my-plugin', replace: false, pending: false });
+    });
+
+    it('preserves unknown candidate as pending when plugins not resolved', () => {
+      expect(resolveWorkbenchRoute('my-plugin', true, true, false, ['oa', 'attendance', 'balance']))
+        .toEqual({ id: 'my-plugin', replace: false, pending: true });
+    });
+
+    it('replaces unknown ID with oa after plugins resolved', () => {
+      expect(resolveWorkbenchRoute('unknown', true, true, true, ['oa', 'attendance', 'balance']))
+        .toEqual({ id: 'oa', replace: true, pending: false });
+    });
+
+    it('replaces failed plugin ID with oa after resolution', () => {
+      expect(resolveWorkbenchRoute('failed-plugin', true, true, true, ['oa', 'attendance', 'balance']))
+        .toEqual({ id: 'oa', replace: true, pending: false });
     });
   });
 });

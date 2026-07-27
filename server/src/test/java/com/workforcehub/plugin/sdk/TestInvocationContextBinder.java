@@ -1,6 +1,4 @@
-package com.workforcehub.plugin.runtime;
-
-import com.workforcehub.plugin.sdk.InvocationContext;
+package com.workforcehub.plugin.sdk;
 
 import java.util.UUID;
 
@@ -17,6 +15,20 @@ public class TestInvocationContextBinder extends InvocationContextBinder {
             InvocationContext.CallerType.PLUGIN,
             UUID.randomUUID().toString(),
             InvocationContext.TriggerSource.STARTUP
+        );
+    }
+
+    public InvocationContext forHttpRequest(
+            String pluginId,
+            Long userId,
+            InvocationContext.CallerType callerType,
+            String requestId) {
+        return new InvocationContext(
+            pluginId,
+            userId,
+            callerType,
+            requestId,
+            InvocationContext.TriggerSource.HTTP_REQUEST
         );
     }
 }

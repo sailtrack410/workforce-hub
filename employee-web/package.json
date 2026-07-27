@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vue-tsc --noEmit && vite build",
+    "build:plugin-poc": "vite build --config vite.plugin-poc.config.ts",
     "build:file": "vue-tsc --noEmit && vite build --config vite.file.config.ts",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run"

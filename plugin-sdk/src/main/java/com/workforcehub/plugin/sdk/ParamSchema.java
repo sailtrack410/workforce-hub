@@ -20,4 +20,12 @@ public record ParamSchema(
     public static ParamSchema bool(String description, boolean required) {
         return new ParamSchema("boolean", description, required, null);
     }
+
+    public static ParamSchema object(String description, boolean required) {
+        return new ParamSchema("object", description, required, null);
+    }
+
+    public static ParamSchema array(String description, boolean required) {
+        return new ParamSchema("array", description, required, null);
+    }
 }

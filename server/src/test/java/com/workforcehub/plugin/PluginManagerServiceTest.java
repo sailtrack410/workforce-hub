@@ -2,7 +2,7 @@ package com.workforcehub.plugin;
 
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
-import com.workforcehub.plugin.runtime.TestInvocationContextBinder;
+import com.workforcehub.plugin.runtime.PluginPermissionService;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,6 +19,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * 插件管理服务集成测试。
@@ -33,7 +34,7 @@ class PluginManagerServiceTest {
     void shouldInstallPluginAndTrackStatus() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         // 安装（模拟 PluginManagerService.install 的核心逻辑）
         String pluginId = pf4jManager.loadPlugin(jarPath);
@@ -74,7 +75,7 @@ class PluginManagerServiceTest {
     void shouldHandlePluginWithoutMigration() throws Exception {
         Path jarPath = buildHelloPluginJar(); // hello-plugin 没有 db/migration
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         // 安装不应因缺少迁移目录而失败
         String pluginId = pf4jManager.loadPlugin(jarPath);
@@ -95,7 +96,7 @@ class PluginManagerServiceTest {
     void shouldTrackMultipleStatusTransitions() throws Exception {
         Path jarPath = buildHelloPluginJar();
         WorkforcePluginManager pf4jManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         String pluginId = pf4jManager.loadPlugin(jarPath);
         PluginStatus dbStatus = PluginStatus.INSTALLED;

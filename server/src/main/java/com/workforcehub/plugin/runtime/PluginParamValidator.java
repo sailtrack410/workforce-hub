@@ -23,12 +23,17 @@ public class PluginParamValidator {
      */
     public List<String> validate(ActionDescriptor descriptor, Map<String, Object> params) {
         List<String> errors = new ArrayList<>();
+        Map<String, ParamSchema> inputSchema = descriptor.inputSchema() != null
+            ? descriptor.inputSchema()
+            : Map.of();
 
-        if (descriptor.inputSchema() == null) {
-            return errors;
+        for (String key : params.keySet()) {
+            if (!inputSchema.containsKey(key)) {
+                errors.add("未声明参数: " + key);
+            }
         }
 
-        for (var entry : descriptor.inputSchema().entrySet()) {
+        for (var entry : inputSchema.entrySet()) {
             String key = entry.getKey();
             ParamSchema schema = entry.getValue();
             Object value = params.get(key);
@@ -59,7 +64,9 @@ public class PluginParamValidator {
             case "string" -> value instanceof String ? null : "参数类型错误: " + key + " 应为字符串";
             case "number" -> value instanceof Number ? null : "参数类型错误: " + key + " 应为数字";
             case "boolean" -> value instanceof Boolean ? null : "参数类型错误: " + key + " 应为布尔值";
-            default -> null;
+            case "object" -> value instanceof Map ? null : "参数类型错误: " + key + " 应为对象";
+            case "array" -> value instanceof List ? null : "参数类型错误: " + key + " 应为数组";
+            default -> "参数 Schema 类型不支持: " + key;
         };
     }
 }

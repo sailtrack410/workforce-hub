@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-vue-next';
 import { employeeApi, type AttendanceExceptionResponse, type EmployeeFileFolderResponse, type EmployeeFileResponse, type EntityId, type LeaveAccountResponse } from '@/api';
+import { usePluginsStore } from '@/stores/plugins';
 import { useWorkbenchSectionContext } from '../employee-shell-context';
 import { useWorkbenchState } from '@/composables/useWorkbenchState';
 import { usePersonalFileTransfer } from '@/composables/usePersonalFileTransfer';
@@ -51,6 +52,7 @@ import AppErrorState from '../../components/ui/AppErrorState.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppLoadingState from '../../components/ui/AppLoadingState.vue';
 import AppTag from '../../components/ui/AppTag.vue';
+import PluginWorkbenchHost from '../../components/plugins/PluginWorkbenchHost.vue';
 
 const {
   shell,
@@ -58,6 +60,7 @@ const {
   showToast,
 } = useWorkbenchSectionContext();
 const router = useRouter();
+const plugins = usePluginsStore();
 
 const {
   leaveAccounts,
@@ -400,6 +403,16 @@ const oaProcessCatalog: OaProcessDefinition[] = [
     ],
   },
 ];
+
+const BUILT_IN_WORKBENCH_IDS = new Set(['oa', 'attendance', 'balance']);
+
+const activePlugin = computed(() => {
+  const id = shell.active.workbench;
+  if (BUILT_IN_WORKBENCH_IDS.has(id)) return null;
+  const entry = plugins.manifest.find((p) => p.id === id);
+  if (!entry || !plugins.loadedIds.includes(id)) return null;
+  return entry;
+});
 
 const currentAttachmentIds = computed(() => attachmentIdsFor(attachmentPickerTarget.value));
 const currentAttachmentIdSet = computed(() => new Set(currentAttachmentIds.value.map((item) => String(item))));
@@ -843,21 +856,22 @@ watch(workflowRequests, () => {
         <ChevronLeft :size="22" />
       </button>
       <div class="workspace-head-text">
-        <h2 class="workspace-title">{{ activeWorkbenchTitle }}</h2>
+        <h2 class="workspace-title">{{ activePlugin ? activePlugin.name : activeWorkbenchTitle }}</h2>
       </div>
     </div>
     <div class="head-actions">
-      <AppButton v-if="activeWorkbench.id === 'oa'" variant="secondary" size="sm" :disabled="workflowRequestsLoading" @click="loadWorkflowRequests">
+      <AppButton v-if="!activePlugin && activeWorkbench.id === 'oa'" variant="secondary" size="sm" :disabled="workflowRequestsLoading" @click="loadWorkflowRequests">
         {{ workflowRequestsLoading ? '刷新中' : '刷新' }}
       </AppButton>
-      <AppButton v-if="activeWorkbench.id === 'attendance'" variant="secondary" size="sm" :disabled="attendanceLoading" @click="refreshAttendancePanel">
+      <AppButton v-if="!activePlugin && activeWorkbench.id === 'attendance'" variant="secondary" size="sm" :disabled="attendanceLoading" @click="refreshAttendancePanel">
         {{ attendanceLoading ? '刷新中' : '刷新' }}
       </AppButton>
     </div>
   </header>
 
   <section class="content-stack">
-    <template v-if="activeWorkbench.id === 'oa'">
+    <PluginWorkbenchHost v-if="activePlugin" :plugin-id="activePlugin.id" />
+    <template v-else-if="activeWorkbench.id === 'oa'">
       <AppErrorState
         v-if="workbenchError"
         title="工作台数据加载失败"

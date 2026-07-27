@@ -1,9 +1,11 @@
 package com.workforcehub.plugin;
 
-import com.workforcehub.plugin.runtime.TestInvocationContextBinder;
+import com.workforcehub.plugin.runtime.PluginPermissionService;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
+import com.workforcehub.plugin.sdk.PluginActionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.pf4j.PluginClassLoader;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 
@@ -14,14 +16,17 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 class PluginLifecycleTest {
 
@@ -32,7 +37,7 @@ class PluginLifecycleTest {
     void shouldLoadStartStopAndUnloadPluginWithHostContext() throws Exception {
         Path pluginJar = resolvePluginJar();
         WorkforcePluginManager pluginManager = new WorkforcePluginManager(
-            tempDir.resolve("plugins").toString(), new TestInvocationContextBinder());
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
 
         String pluginId = pluginManager.loadPlugin(pluginJar);
         assertEquals("hello-plugin", pluginId);
@@ -54,6 +59,58 @@ class PluginLifecycleTest {
         assertNull(pluginManager.getPlugin(pluginId));
     }
 
+    @Test
+    void shouldReleaseClassLoaderAndExtensionsAfterUnload() throws Exception {
+        Path pluginJar = buildPluginJar();
+        // 复制到 tempDir 内部，避免删除外部文件
+        Path safeJar = tempDir.resolve("test-hello-plugin.jar");
+        Files.copy(pluginJar, safeJar);
+
+        WorkforcePluginManager pluginManager = new WorkforcePluginManager(
+            tempDir.resolve("plugins").toString(), mock(PluginPermissionService.class));
+
+        String pluginId = pluginManager.loadPlugin(safeJar);
+        pluginManager.startPlugin(pluginId);
+
+        // 获取原始 ClassLoader
+        // 使用 PF4J 公共状态验证 close() 已执行
+        ClassLoader originalLoader = pluginManager.getPluginClassLoader(pluginId);
+        assertNotNull(originalLoader, "start 后应有 ClassLoader");
+        PluginClassLoader pluginClassLoader = assertInstanceOf(
+            PluginClassLoader.class, originalLoader, "ClassLoader 应为 PluginClassLoader");
+
+        // 验证扩展存在
+        List<PluginActionHandler> handlers = pluginManager.getExtensions(PluginActionHandler.class, pluginId);
+        assertFalse(handlers.isEmpty(), "start 后应有扩展");
+
+        // stop + unload
+        pluginManager.stopPlugin(pluginId);
+        assertTrue(pluginManager.unloadPlugin(pluginId));
+
+        // getPlugin 应为 null
+        assertNull(pluginManager.getPlugin(pluginId), "unload 后 getPlugin 应为 null");
+
+        // ClassLoader 已关闭（确定性主断言）
+        assertTrue(pluginClassLoader.isClosed(), "unload 后 PluginClassLoader.isClosed() 应为 true");
+
+        // ClassLoader 不再可用
+        ClassLoader afterLoader = pluginManager.getPluginClassLoader(pluginId);
+        assertNull(afterLoader, "unload 后 getPluginClassLoader 应返回 null");
+
+        // 扩展查询应为空
+        List<PluginActionHandler> afterHandlers = pluginManager.getExtensions(PluginActionHandler.class, pluginId);
+        assertTrue(afterHandlers.isEmpty(), "unload 后扩展应为空");
+
+        // isClosed 是确定性主断言，文件移动仅为补充验证
+        // JAR 可删除：先 move 到新路径再 delete，确保 ClassLoader 已释放
+        Path movedJar = tempDir.resolve("moved-hello-plugin.jar");
+        Files.move(safeJar, movedJar);
+        assertTrue(Files.exists(movedJar), "move 后文件应存在");
+        Files.delete(movedJar);
+        assertFalse(Files.exists(movedJar), "delete 后文件应不存在");
+        assertFalse(Files.exists(safeJar), "原路径也应不存在");
+    }
+
     private Path resolvePluginJar() throws IOException {
         String configuredJar = System.getProperty("hello.plugin.jar");
         if (configuredJar != null && !configuredJar.isBlank()) {
@@ -65,22 +122,21 @@ class PluginLifecycleTest {
     }
 
     private Path buildPluginJar() throws IOException {
-        Path source = Path.of("..", "plugins", "hello-plugin", "src", "main", "java",
-            "com", "workforcehub", "plugin", "hello", "HelloPlugin.java").toAbsolutePath().normalize();
+        Path pluginSrc = Path.of("..", "plugins", "hello-plugin", "src", "main", "java",
+            "com", "workforcehub", "plugin", "hello").toAbsolutePath().normalize();
+        Path source1 = pluginSrc.resolve("HelloPlugin.java");
+        Path source2 = pluginSrc.resolve("HelloActionHandler.java");
         Path classes = tempDir.resolve("hello-plugin-classes");
         Files.createDirectories(classes);
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         assertNotNull(compiler, "生命周期测试需要 JDK，不能只使用 JRE");
         int result = compiler.run(
-            null,
-            null,
-            null,
-            "-classpath",
-            System.getProperty("java.class.path"),
-            "-d",
-            classes.toString(),
-            source.toString()
+            null, null, null,
+            "-classpath", System.getProperty("java.class.path"),
+            "-d", classes.toString(),
+            source1.toString(),
+            source2.toString()
         );
         assertEquals(0, result, "hello-plugin 源码编译失败");
 

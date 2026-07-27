@@ -5,11 +5,14 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -52,6 +55,41 @@ class PluginVersionServiceTest {
         assertEquals("UI", descriptor.type());
         assertEquals("Workforce Hub", descriptor.provider());
         assertEquals(FRONTEND_SRI, descriptor.frontendSha384());
+    }
+
+    @Test
+    void shouldAcceptHelloPluginId() throws Exception {
+        Path jarPath = buildJar(
+            pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17")
+                .replace("\"id\":\"version-plugin\"", "\"id\":\"hello-plugin\"")
+        );
+
+        PluginVersionService.PluginVersionDescriptor descriptor = service.checkCompatibility(jarPath);
+
+        assertEquals("hello-plugin", descriptor.pluginId());
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidPluginIds")
+    void shouldRejectPluginIdOutsideStaticPathContract(String pluginId) throws Exception {
+        Path jarPath = buildJar(
+            pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17")
+                .replace("\"id\":\"version-plugin\"", "\"id\":\"" + pluginId + "\"")
+        );
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    private static Stream<String> invalidPluginIds() {
+        return Stream.of(
+            "../hello-plugin",
+            "hello/plugin",
+            "Hello-plugin",
+            "a".repeat(65)
+        );
     }
 
     @Test

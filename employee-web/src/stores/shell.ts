@@ -809,10 +809,54 @@ const WORKBENCH_ALIAS: Record<string, string> = {
   requests: 'oa',
 };
 
-export function normalizeWorkbenchApp(id?: string | null): string {
-  if (!id) return workbenchItems[0]?.id ?? 'oa';
+const RESERVED_WORKBENCH_IDS = new Set(['oa', 'attendance', 'balance', 'agent', 'files', 'leave', 'requests']);
+
+export function normalizeWorkbenchApp(id?: string | null, list?: WorkbenchRecord[]): string {
+  const items = list ?? workbenchItems;
+  if (!id) return items[0]?.id ?? 'oa';
   if (WORKBENCH_ALIAS[id]) return WORKBENCH_ALIAS[id];
-  return workbenchItems.some((item) => item.id === id) ? id : (workbenchItems[0]?.id ?? 'oa');
+  return items.some((item) => item.id === id) ? id : (items[0]?.id ?? 'oa');
+}
+
+export function resolveWorkbenchRoute(
+  candidate: string | undefined,
+  initialized: boolean,
+  authenticated: boolean,
+  pluginsResolved: boolean,
+  workbenchIds: string[],
+): { id: string; replace: boolean; pending: boolean } {
+  if (!candidate) return { id: 'oa', replace: false, pending: false };
+  if (!initialized) return { id: candidate, replace: false, pending: true };
+  if (!authenticated) return { id: 'oa', replace: candidate !== 'oa', pending: false };
+  if (WORKBENCH_ALIAS[candidate]) return { id: 'oa', replace: true, pending: false };
+  if (workbenchIds.includes(candidate)) return { id: candidate, replace: false, pending: false };
+  if (!pluginsResolved) return { id: candidate, replace: false, pending: true };
+  return { id: 'oa', replace: true, pending: false };
+}
+
+function buildWorkbenchList(manifest: { id: string; name: string }[], loadedIds: string[]): WorkbenchRecord[] {
+  const loaded = new Set(loadedIds);
+  const seen = new Set(workbenchItems.map((item) => item.id));
+  const pluginItems: WorkbenchRecord[] = [];
+  for (const p of manifest) {
+    if (RESERVED_WORKBENCH_IDS.has(p.id)) continue;
+    if (!loaded.has(p.id)) continue;
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    pluginItems.push({
+      id: p.id,
+      title: p.name,
+      label: p.id,
+      subtitle: '',
+      note: '',
+      tone: 'gray',
+      status: '',
+      fields: [],
+      stats: [],
+      steps: [],
+    });
+  }
+  return [...workbenchItems, ...pluginItems];
 }
 
 function findById<T extends { id: string }>(items: T[], id: string, fallback: T) {
@@ -1123,7 +1167,7 @@ export const useShellStore = defineStore('employee-shell', {
     selectItem(section: SectionId, id: string) {
       let normalized = id;
       if (section === 'settings') normalized = normalizeSettingsPanel(id);
-      else if (section === 'workbench') normalized = normalizeWorkbenchApp(id);
+      else if (section === 'workbench') normalized = normalizeWorkbenchApp(id, this.workbench);
       this.active[section] = normalized;
       this.mobileView = 'detail';
       if (section === 'workbench') {
@@ -1249,6 +1293,12 @@ export const useShellStore = defineStore('employee-shell', {
     },
     setColleagues(rows: OrgUserSummaryResponse[]) {
       this.colleagues = rows ?? [];
+    },
+    rebuildWorkbench(manifest: { id: string; name: string }[], loadedIds: string[]) {
+      this.workbench = buildWorkbenchList(manifest, loadedIds);
+      if (!this.workbench.some((item) => item.id === this.active.workbench)) {
+        this.active.workbench = this.workbench[0]?.id ?? 'oa';
+      }
     },
     setFriends(rows: OrgUserSummaryResponse[]) {
       this.friends = rows ?? [];

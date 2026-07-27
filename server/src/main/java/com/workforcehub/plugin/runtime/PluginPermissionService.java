@@ -1,9 +1,10 @@
 package com.workforcehub.plugin.runtime;
 
-import com.workforcehub.plugin.repository.PluginRepository;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * 插件权限校验服务。
@@ -14,17 +15,28 @@ import org.springframework.stereotype.Component;
 public class PluginPermissionService {
 
     private final JdbcTemplate jdbc;
-    private final PluginRepository pluginRepository;
 
-    public PluginPermissionService(JdbcTemplate jdbc, PluginRepository pluginRepository) {
+    public PluginPermissionService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.pluginRepository = pluginRepository;
+    }
+
+    /**
+     * 仅检查插件能力（数据库为准）。
+     * 供 HostService 代理逐次调用校验使用。
+     */
+    public void checkPluginCapability(String pluginId, String capabilityCode) {
+        if (capabilityCode == null || capabilityCode.isBlank()) {
+            throw new PermissionDeniedException("能力码不能为空");
+        }
+        if (!hasPluginCapability(pluginId, capabilityCode)) {
+            throw new PermissionDeniedException("插件未被授予能力: " + capabilityCode);
+        }
     }
 
     /**
      * 检查插件是否被授予某能力（数据库为准）。
      */
-    public boolean hasPluginCapability(String pluginId, String capabilityCode) {
+    private boolean hasPluginCapability(String pluginId, String capabilityCode) {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM sys_plugin_capability WHERE plugin_id = ? AND capability_code = ?",
             Integer.class, pluginId, capabilityCode
@@ -33,70 +45,68 @@ public class PluginPermissionService {
     }
 
     /**
-     * 检查动作是否已授权（数据库为准）。
+     * 获取动作授权对应的能力码（数据库为准）。
+     * 必须存在明确映射，禁止回退为仅检查 sys_plugin_capability。
      */
-    public boolean isActionAuthorized(String pluginId, String actionCode) {
-        Integer count = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM sys_plugin_action_permission WHERE plugin_id = ? AND action_code = ?",
-            Integer.class, pluginId, actionCode
+    private String getActionCapability(String pluginId, String actionCode) {
+        List<String> capabilityCodes = jdbc.query(
+            "SELECT capability_code FROM sys_plugin_action_permission WHERE plugin_id = ? AND action_code = ?",
+            (rs, rowNum) -> rs.getString("capability_code"),
+            pluginId,
+            actionCode
         );
-        return count != null && count > 0;
+        return capabilityCodes.isEmpty() ? null : capabilityCodes.get(0);
     }
 
     /**
      * 检查调用者是否有权操作。
+     * CallerType.PLUGIN 只用于宿主内部调用（定时任务等）。
+     * 普通员工暂未实现显式授权时，安全默认拒绝。
      */
-    public boolean hasCallerPermission(InvocationContext ctx) {
-        // 插件身份（定时任务等）允许
+    private boolean hasCallerPermission(InvocationContext ctx) {
         if (ctx.getCallerType() == InvocationContext.CallerType.PLUGIN) {
             return true;
         }
-
-        // 管理员：检查是否有 ADMIN_PLUGIN_CALL 权限
         if (ctx.getCallerType() == InvocationContext.CallerType.ADMIN) {
-            return hasAdminPermission(ctx.getUserId(), "ADMIN_PLUGIN_CALL");
+            return ctx.getUserId() != null && hasAdminPermission(ctx.getUserId(), "ADMIN_PLUGIN_CALL");
         }
-
-        // 普通员工：默认允许调用已授权的插件动作
-        // 安全边界在动作授权表，不在员工身份
-        if (ctx.getCallerType() == InvocationContext.CallerType.USER) {
-            return true;
-        }
-
+        // 普通员工：默认拒绝
         return false;
     }
 
     /**
      * 完整权限校验（三重）。
-     *
-     * @throws PermissionDeniedException 权限不足时抛出
+     * 宿主能力配置为空不得跳过授权。
      */
-    public void checkPermission(InvocationContext ctx, String pluginId, String actionCode, String capabilityCode) {
-        // 1. 检查插件是否被授予该能力（数据库为准）
-        if (!hasPluginCapability(pluginId, capabilityCode)) {
-            throw new PermissionDeniedException(
-                "插件未被授予能力: " + capabilityCode);
+    public void checkPermission(InvocationContext ctx, String pluginId, String actionCode) {
+        // 1. 动作必须在授权表中有记录，能力码以宿主配置为准
+        String capabilityCode = getActionCapability(pluginId, actionCode);
+        if (capabilityCode == null || capabilityCode.isBlank()) {
+            throw new PermissionDeniedException("动作未授权");
         }
 
-        // 2. 检查动作是否已授权（数据库为准）
-        if (!isActionAuthorized(pluginId, actionCode)) {
-            throw new PermissionDeniedException(
-                "动作未授权: " + actionCode);
+        // 2. 检查插件是否被授予该能力
+        if (!hasPluginCapability(pluginId, capabilityCode)) {
+            throw new PermissionDeniedException("插件未被授予能力");
         }
 
         // 3. 检查调用者权限
         if (!hasCallerPermission(ctx)) {
-            throw new PermissionDeniedException(
-                "调用者无权执行此操作");
+            throw new PermissionDeniedException("调用者无权执行此操作");
         }
     }
 
     private boolean hasAdminPermission(Long userId, String permissionCode) {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM admin_user_role ur " +
+            "JOIN admin_user u ON ur.admin_user_id = u.id " +
+            "JOIN admin_role r ON ur.role_id = r.id " +
             "JOIN admin_role_permission rp ON ur.role_id = rp.role_id " +
             "JOIN admin_permission p ON rp.permission_id = p.id " +
-            "WHERE ur.admin_user_id = ? AND p.perm_code = ?",
+            "WHERE ur.admin_user_id = ? AND p.perm_code = ? " +
+            "AND u.status = 'ACTIVE' AND u.is_deleted = 0 " +
+            "AND r.status = 'ACTIVE' AND r.is_deleted = 0 " +
+            "AND p.status = 'ACTIVE' AND p.is_deleted = 0",
             Integer.class, userId, permissionCode
         );
         return count != null && count > 0;

@@ -1,0 +1,353 @@
+package com.workforcehub.plugin;
+
+import com.workforcehub.auth.security.AdminPermissionFilter;
+import com.workforcehub.auth.security.AdminUserDetailsService;
+import com.workforcehub.auth.security.EmployeeUserDetailsService;
+import com.workforcehub.auth.security.UserTypePathFilter;
+import com.workforcehub.auth.security.WfhUserDetails;
+import com.workforcehub.common.config.SecurityConfig;
+import com.workforcehub.common.enums.UserType;
+import com.workforcehub.plugin.controller.PluginGatewayController;
+import com.workforcehub.plugin.repository.PluginRow;
+import com.workforcehub.plugin.repository.PluginStatus;
+import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
+import com.workforcehub.plugin.runtime.PluginManagerService;
+import com.workforcehub.plugin.runtime.PluginParamValidator;
+import com.workforcehub.plugin.runtime.PluginPermissionService;
+import com.workforcehub.plugin.sdk.ActionDescriptor;
+import com.workforcehub.plugin.sdk.InvocationContext;
+import com.workforcehub.plugin.sdk.InvocationContextBinder;
+import com.workforcehub.plugin.sdk.ParamSchema;
+import com.workforcehub.plugin.sdk.PluginActionHandler;
+import com.workforcehub.plugin.sdk.ServiceResult;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * 插件网关安全测试（MockMvc）。
+ * 覆盖：匿名401、权限缺失403、插件不存在404、动作不存在404、未启用409、参数缺失400。
+ */
+@WebMvcTest(PluginGatewayController.class)
+@ContextConfiguration(classes = {
+    PluginGatewayController.class,
+    SecurityConfig.class,
+    UserTypePathFilter.class,
+    AdminPermissionFilter.class,
+    InvocationContextBinder.class,
+    PluginParamValidator.class,
+    PluginLifecycleGuard.class
+})
+class PluginGatewaySecurityTest {
+
+    private static final String PLUGIN_ID = "hello-plugin";
+    private static final String ACTION_CODE = "hello.greet";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private PluginManagerService pluginManagerService;
+
+    @MockBean
+    private PluginPermissionService permissionService;
+
+    @MockBean(name = "employeeUserDetailsService")
+    private EmployeeUserDetailsService employeeUserDetailsService;
+
+    @MockBean(name = "adminUserDetailsService")
+    private AdminUserDetailsService adminUserDetailsService;
+
+    @Autowired
+    private PluginLifecycleGuard lifecycleGuard;
+
+    private PluginActionHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        // 每个测试前 enable 插件，使 guard 有 slot
+        lifecycleGuard.enable(PLUGIN_ID);
+
+        PluginRow plugin = new PluginRow();
+        plugin.setPluginId(PLUGIN_ID);
+        plugin.setStatus(PluginStatus.ACTIVE);
+
+        handler = mock(PluginActionHandler.class);
+        ActionDescriptor descriptor = new ActionDescriptor(
+            ACTION_CODE,
+            "问候",
+            "返回问候语",
+            Map.of("name", ParamSchema.string("姓名", true)),
+            Map.of(),
+            "PLUGIN_HELLO",
+            Duration.ofSeconds(5),
+            true
+        );
+
+        when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin);
+        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE)).thenReturn(Optional.of(handler));
+        when(handler.getDescriptor()).thenReturn(descriptor);
+        when(handler.execute(any(InvocationContext.class), anyMap()))
+            .thenReturn(ServiceResult.ok(Map.of("message", "Hello")));
+    }
+
+    @Test
+    void shouldReturn401WhenAnonymous() throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn403ForAuthenticatedNonWorkforcePrincipal() throws Exception {
+        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+            "admin", null, List.of());
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authentication(authentication))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(4003));
+    }
+
+    @Test
+    void shouldReturn404WhenPluginNotFound() throws Exception {
+        when(pluginManagerService.getPlugin("missing"))
+            .thenThrow(new NoSuchElementException("插件不存在"));
+
+        mockMvc.perform(post("/api/plugin-gateway/missing/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(4004));
+    }
+
+    @Test
+    void shouldReturn409WhenPluginNotActive() throws Exception {
+        PluginRow plugin = new PluginRow();
+        plugin.setPluginId(PLUGIN_ID);
+        plugin.setStatus(PluginStatus.STOPPED);
+        when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin);
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(4009));
+    }
+
+    @Test
+    void shouldReturn404WhenHostPermissionAllowsButActionHandlerMissing() throws Exception {
+        doNothing().when(permissionService)
+            .checkPermission(any(), eq(PLUGIN_ID), eq("missing.action"));
+        when(pluginManagerService.findActionHandler(PLUGIN_ID, "missing.action"))
+            .thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/missing.action")
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(4004));
+
+        verify(permissionService).checkPermission(any(), eq(PLUGIN_ID), eq("missing.action"));
+        verify(pluginManagerService).findActionHandler(PLUGIN_ID, "missing.action");
+    }
+
+    @Test
+    void shouldReturn403WhenHostPermissionDenied() throws Exception {
+        doThrow(new PluginPermissionService.PermissionDeniedException("动作未授权"))
+            .when(permissionService).checkPermission(any(), eq(PLUGIN_ID), eq(ACTION_CODE));
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(4003));
+
+        verify(pluginManagerService, org.mockito.Mockito.never())
+            .findActionHandler(PLUGIN_ID, ACTION_CODE);
+    }
+
+    @Test
+    void shouldReturn400WhenMissingRequiredParam() throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(1000));
+
+        verify(permissionService).checkPermission(any(), eq(PLUGIN_ID), eq(ACTION_CODE));
+    }
+
+    @Test
+    void shouldReturn400ForMalformedJson() throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(1000))
+            .andExpect(jsonPath("$.message").value("请求参数格式错误"));
+    }
+
+    @Test
+    void shouldReturn500WithoutLeakingInternalMessage() throws Exception {
+        when(pluginManagerService.getPlugin(PLUGIN_ID))
+            .thenThrow(new IllegalStateException("internal detail"));
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.code").value(5000))
+            .andExpect(jsonPath("$.message").value("服务内部错误"));
+    }
+
+    @Test
+    void shouldBindAuthoritativeAdminContext() throws Exception {
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 42L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        verify(permissionService).checkPermission(
+            org.mockito.ArgumentMatchers.argThat(ctx ->
+                ctx.getUserId().equals(42L)
+                    && ctx.getCallerType() == InvocationContext.CallerType.ADMIN
+                    && ctx.getPluginId().equals(PLUGIN_ID)),
+            eq(PLUGIN_ID),
+            eq(ACTION_CODE)
+        );
+    }
+
+    @Test
+    void shouldReturn409WhenGuardClosedAndHandlerNotExecuted() throws Exception {
+        // 关门
+        lifecycleGuard.beginDisable(PLUGIN_ID);
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(4009));
+
+        // handler 不应被调用
+        verify(handler, org.mockito.Mockito.never()).execute(any(), anyMap());
+    }
+
+    @Test
+    void shouldReleaseGuardWhenHandlerThrows() throws Exception {
+        when(handler.execute(any(InvocationContext.class), anyMap()))
+            .thenThrow(new RuntimeException("handler boom"));
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.code").value(5000));
+
+        // guard 应释放，activeCount 回到 0
+        assertEquals(0, lifecycleGuard.getActiveCount(PLUGIN_ID));
+    }
+
+    @Test
+    void shouldCompleteAcquiredRequestEvenAfterConcurrentDisable() throws Exception {
+        // acquire 成功后，即使并发关门/状态进入 DISABLING，已在途请求仍完成
+        // 网关 acquire 前检查 ACTIVE，acquire 后 guard 是权威
+
+        CountDownLatch handlerStarted = new CountDownLatch(1);
+        CountDownLatch handlerFinish = new CountDownLatch(1);
+        when(handler.execute(any(InvocationContext.class), anyMap()))
+            .thenAnswer(inv -> {
+                handlerStarted.countDown();
+                assertTrue(handlerFinish.await(5, TimeUnit.SECONDS), "handlerFinish 应在 5 秒内到达");
+                return ServiceResult.ok(Map.of("message", "done"));
+            });
+
+        CompletableFuture<MvcResult> resultFuture =
+            CompletableFuture.supplyAsync(() -> {
+            try {
+                return mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                        .with(authenticated(UserType.ADMIN, 1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"test\"}"))
+                    .andReturn();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        assertTrue(handlerStarted.await(2, TimeUnit.SECONDS), "handler 应在 2 秒内开始");
+
+        lifecycleGuard.beginDisable(PLUGIN_ID);
+
+        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(4009));
+
+        handlerFinish.countDown();
+
+        var result = resultFuture.get(5, TimeUnit.SECONDS);
+        assertEquals(200, result.getResponse().getStatus());
+    }
+
+    private RequestPostProcessor authenticated(UserType userType, Long userId) {
+        WfhUserDetails principal = mock(WfhUserDetails.class);
+        when(principal.getUserType()).thenReturn(userType);
+        when(principal.getUserId()).thenReturn(userId);
+        when(principal.getUsername()).thenReturn("test-user");
+        when(principal.getAuthorities()).thenReturn(List.of());
+
+        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+            principal, null, principal.getAuthorities());
+        return authentication(authentication);
+    }
+}

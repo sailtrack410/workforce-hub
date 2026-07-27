@@ -296,4 +296,15 @@ describe('createEmployeeApi', () => {
       ['put', '/api/employee/me/profile', { mobile: '13900002202', avatarAttachmentRefId: '2053928981082898444' }],
     ]);
   });
+
+  it('maps plugins.mine to GET /api/employee/plugins/mine', async () => {
+    const { client, calls } = createSpyClient();
+    const api = createEmployeeApi(client);
+
+    await api.plugins.mine();
+
+    expect(calls).toEqual([
+      ['get', '/api/employee/plugins/mine', undefined],
+    ]);
+  });
 });

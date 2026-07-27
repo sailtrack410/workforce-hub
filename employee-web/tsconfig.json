@@ -19,5 +19,5 @@
       "@shared/*": ["../shared-web/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "../shared-web/**/*.ts", "vite.config.ts", "vite.file.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "../shared-web/**/*.ts", "vite.config.ts", "vite.file.config.ts", "vite.plugin-poc.config.ts", "../plugins/hello-plugin/frontend/src/index.ts"]
 }

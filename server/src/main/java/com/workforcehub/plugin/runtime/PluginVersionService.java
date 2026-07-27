@@ -28,6 +28,7 @@ public class PluginVersionService {
         "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
     );
     private static final Pattern JAVA_VERSION = Pattern.compile("^(0|[1-9]\\d*)$");
+    private static final Pattern PLUGIN_ID = Pattern.compile("^[a-z0-9-]{1,64}$");
     private static final Pattern VALID_SRI = Pattern.compile(
         "^sha384-[A-Za-z0-9+/]{64}$"
     );
@@ -60,8 +61,12 @@ public class PluginVersionService {
         if ("FUNCTIONAL".equals(type) && pluginJson.has("frontendSha384")) {
             throw new PluginVersionException("FUNCTIONAL 插件不得声明 frontendSha384");
         }
+        String pluginId = requiredText(pluginJson, "id");
+        if (!PLUGIN_ID.matcher(pluginId).matches()) {
+            throw new PluginVersionException("plugin.json id 仅支持 1-64 位小写字母、数字或连字符");
+        }
         PluginVersionDescriptor descriptor = new PluginVersionDescriptor(
-            requiredText(pluginJson, "id"),
+            pluginId,
             requiredText(pluginJson, "version"),
             requiredText(pluginJson, "sdkVersion"),
             requiredText(pluginJson, "minHostVersion"),
@@ -207,25 +212,6 @@ public class PluginVersionService {
         String provider,
         String frontendSha384
     ) {
-        public PluginVersionDescriptor(
-                String pluginId,
-                String pluginVersion,
-                String sdkVersion,
-                String minHostVersion,
-                String maxHostVersion,
-                String javaVersion) {
-            this(
-                pluginId,
-                pluginVersion,
-                sdkVersion,
-                minHostVersion,
-                maxHostVersion,
-                javaVersion,
-                null,
-                null,
-                null
-            );
-        }
     }
 
     private record SemanticVersion(int major, int minor, int patch)

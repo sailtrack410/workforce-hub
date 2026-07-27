@@ -12,7 +12,9 @@ WORKDIR /workspace/employee-web
 COPY employee-web/package*.json ./
 RUN npm ci
 COPY employee-web/ ./
+COPY plugins/hello-plugin/frontend/ /workspace/plugins/hello-plugin/frontend/
 RUN npm run build
+RUN npm run build:plugin-poc
 
 FROM nginx:1.27-alpine
 
