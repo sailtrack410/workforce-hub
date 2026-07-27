@@ -4,10 +4,12 @@ import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginRepository;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginFlywayMigrator;
+import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
 import com.workforcehub.plugin.runtime.PluginManagerService;
 import com.workforcehub.plugin.runtime.PluginSignatureVerifier;
 import com.workforcehub.plugin.runtime.PluginVersionService;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
+import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.pf4j.PluginClassLoader;
+import org.pf4j.PluginState;
+import org.pf4j.PluginWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
@@ -41,9 +46,11 @@ import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -93,6 +100,9 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private PluginFlywayMigrator flywayMigrator;
+
+    @Autowired
+    private PluginLifecycleGuard lifecycleGuard;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -177,6 +187,75 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         assertNull(pluginManager.getPlugin(SUCCESS_PLUGIN_ID));
         assertTrue(Files.isRegularFile(snapshotPath));
         assertFalse(hasMigrationTempDirectory(SUCCESS_PLUGIN_ID));
+    }
+
+    @Test
+    void shouldSurviveOneHundredSerialEnableDisableCycles() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+
+        PluginWrapper wrapper = pluginManager.getPlugin(HELLO_PLUGIN_ID);
+        assertNotNull(wrapper);
+        ClassLoader classLoader = pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID);
+        assertNotNull(classLoader);
+        PluginClassLoader pluginClassLoader = assertInstanceOf(PluginClassLoader.class, classLoader);
+
+        for (int cycle = 1; cycle <= 100; cycle++) {
+            String round = "第 " + cycle + " 轮";
+            pluginManagerService.enable(HELLO_PLUGIN_ID);
+
+            assertEquals(PluginStatus.ACTIVE,
+                pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus(), round);
+            assertEquals(PluginState.STARTED,
+                pluginManager.getPlugin(HELLO_PLUGIN_ID).getPluginState(), round);
+            assertSame(wrapper, pluginManager.getPlugin(HELLO_PLUGIN_ID), round);
+            assertSame(classLoader, pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID), round);
+            var handlers = pluginManager.getExtensions(PluginActionHandler.class, HELLO_PLUGIN_ID);
+            assertEquals(1, handlers.size(), round);
+            assertEquals("hello.greet", handlers.get(0).getDescriptor().actionCode(), round);
+            assertTrue(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID), round);
+            lifecycleGuard.release(HELLO_PLUGIN_ID);
+            assertEquals(0, lifecycleGuard.getActiveCount(HELLO_PLUGIN_ID), round);
+
+            pluginManagerService.disable(HELLO_PLUGIN_ID);
+
+            assertEquals(PluginStatus.STOPPED,
+                pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus(), round);
+            assertEquals(PluginState.STOPPED,
+                pluginManager.getPlugin(HELLO_PLUGIN_ID).getPluginState(), round);
+            assertSame(wrapper, pluginManager.getPlugin(HELLO_PLUGIN_ID), round);
+            assertSame(classLoader, pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID), round);
+            assertTrue(pluginManager.getExtensions(PluginActionHandler.class, HELLO_PLUGIN_ID).isEmpty(), round);
+            assertTrue(pluginManagerService.findActionHandler(HELLO_PLUGIN_ID, "hello.greet").isEmpty(), round);
+            assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID), round);
+            assertEquals(0, lifecycleGuard.getActiveCount(HELLO_PLUGIN_ID), round);
+            assertEquals(1L,
+                pluginManager.getPlugins().stream()
+                    .filter(item -> HELLO_PLUGIN_ID.equals(item.getPluginId()))
+                    .count(),
+                round);
+        }
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin WHERE plugin_id = ?",
+            Integer.class,
+            HELLO_PLUGIN_ID
+        ));
+
+        pluginManagerService.uninstall(HELLO_PLUGIN_ID);
+
+        assertEquals(PluginStatus.UNINSTALLED,
+            pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertTrue(pluginClassLoader.isClosed());
+        assertTrue(pluginManager.getExtensions(PluginActionHandler.class).stream()
+            .noneMatch(handler -> {
+                PluginWrapper owner = pluginManager.whichPlugin(handler.getClass());
+                return owner != null && HELLO_PLUGIN_ID.equals(owner.getPluginId());
+            }));
+        assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+        assertEquals(0, lifecycleGuard.getActiveCount(HELLO_PLUGIN_ID));
     }
 
     @Test
@@ -546,6 +625,7 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             pluginManager.stopPlugin(pluginId);
             pluginManager.unloadPlugin(pluginId);
         }
+        lifecycleGuard.remove(pluginId);
     }
 
     private boolean hasMigrationTempDirectory(String pluginId) throws IOException {
