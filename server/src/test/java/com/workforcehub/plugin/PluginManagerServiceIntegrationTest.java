@@ -6,9 +6,11 @@ import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginFlywayMigrator;
 import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
 import com.workforcehub.plugin.runtime.PluginManagerService;
+import com.workforcehub.plugin.runtime.PluginPermissionService;
 import com.workforcehub.plugin.runtime.PluginSignatureVerifier;
 import com.workforcehub.plugin.runtime.PluginVersionService;
 import com.workforcehub.plugin.runtime.WorkforcePluginManager;
+import com.workforcehub.plugin.sdk.HostService;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import org.junit.jupiter.api.AfterEach;
@@ -41,6 +43,7 @@ import java.security.Signature;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -49,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -100,6 +104,18 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private PluginFlywayMigrator flywayMigrator;
+
+    @Autowired
+    private PluginSignatureVerifier signatureVerifier;
+
+    @Autowired
+    private PluginVersionService versionService;
+
+    @Autowired
+    private PluginPermissionService permissionService;
+
+    @Autowired
+    private List<HostService> hostServices;
 
     @Autowired
     private PluginLifecycleGuard lifecycleGuard;
@@ -256,6 +272,102 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             }));
         assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
         assertEquals(0, lifecycleGuard.getActiveCount(HELLO_PLUGIN_ID));
+    }
+
+    @Test
+    void shouldRestoreActivePluginWithFreshManagerInSameJvm() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        PluginRow installed = pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+        Path snapshotPath = Path.of(installed.getJarPath());
+        assertNotEquals(jarPath.toAbsolutePath(), snapshotPath);
+        assertTrue(snapshotPath.startsWith(
+            pluginManager.getPluginsRoot().toAbsolutePath().normalize().resolve(".snapshots")
+        ));
+        assertEquals(snapshotPath.toString(),
+            pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getJarPath());
+        Files.delete(jarPath);
+        assertFalse(Files.exists(jarPath));
+        assertTrue(Files.isRegularFile(snapshotPath));
+        pluginManagerService.enable(HELLO_PLUGIN_ID);
+
+        PluginWrapper oldWrapper = pluginManager.getPlugin(HELLO_PLUGIN_ID);
+        assertNotNull(oldWrapper);
+        PluginClassLoader oldClassLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+
+        lifecycleGuard.beginDisable(HELLO_PLUGIN_ID);
+        assertTrue(lifecycleGuard.awaitDrain(HELLO_PLUGIN_ID));
+        assertEquals(PluginState.STOPPED, pluginManager.stopPlugin(HELLO_PLUGIN_ID));
+        assertTrue(pluginManager.unloadPlugin(HELLO_PLUGIN_ID));
+        lifecycleGuard.remove(HELLO_PLUGIN_ID);
+
+        assertEquals(PluginStatus.ACTIVE,
+            pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertTrue(oldClassLoader.isClosed());
+        assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+
+        WorkforcePluginManager restartedManager = new WorkforcePluginManager(
+            pluginManager.getPluginsRoot().toString(),
+            hostServices,
+            permissionService
+        );
+        PluginLifecycleGuard restartedGuard = new PluginLifecycleGuard();
+        PluginManagerService restartedService = new PluginManagerService(
+            restartedManager,
+            pluginRepository,
+            signatureVerifier,
+            versionService,
+            flywayMigrator,
+            restartedGuard
+        );
+
+        try {
+            restartedService.restorePlugins();
+
+            PluginWrapper restartedWrapper = restartedManager.getPlugin(HELLO_PLUGIN_ID);
+            assertNotNull(restartedWrapper);
+            PluginClassLoader restartedClassLoader = assertInstanceOf(
+                PluginClassLoader.class,
+                restartedManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+            );
+            assertEquals(PluginStatus.ACTIVE,
+                restartedService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+            assertEquals(PluginState.STARTED, restartedWrapper.getPluginState());
+            assertNotSame(oldWrapper, restartedWrapper);
+            assertNotSame(oldClassLoader, restartedClassLoader);
+
+            var handlers = restartedManager.getExtensions(PluginActionHandler.class, HELLO_PLUGIN_ID);
+            assertEquals(1, handlers.size());
+            assertEquals("hello.greet", handlers.get(0).getDescriptor().actionCode());
+            assertTrue(restartedGuard.tryAcquire(HELLO_PLUGIN_ID));
+            restartedGuard.release(HELLO_PLUGIN_ID);
+            assertEquals(0, restartedGuard.getActiveCount(HELLO_PLUGIN_ID));
+
+            restartedService.uninstall(HELLO_PLUGIN_ID);
+
+            assertEquals(PluginStatus.UNINSTALLED,
+                restartedService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+            assertNull(restartedManager.getPlugin(HELLO_PLUGIN_ID));
+            assertTrue(restartedClassLoader.isClosed());
+            assertFalse(restartedGuard.tryAcquire(HELLO_PLUGIN_ID));
+        } finally {
+            try {
+                if (restartedManager.getPlugin(HELLO_PLUGIN_ID) != null) {
+                    restartedGuard.beginDisable(HELLO_PLUGIN_ID);
+                    restartedGuard.awaitDrain(HELLO_PLUGIN_ID);
+                    try {
+                        restartedManager.stopPlugin(HELLO_PLUGIN_ID);
+                    } finally {
+                        assertTrue(restartedManager.unloadPlugin(HELLO_PLUGIN_ID));
+                    }
+                }
+            } finally {
+                restartedGuard.remove(HELLO_PLUGIN_ID);
+            }
+        }
     }
 
     @Test
