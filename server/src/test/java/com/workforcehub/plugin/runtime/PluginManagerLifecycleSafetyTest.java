@@ -31,6 +31,7 @@ import static org.mockito.Mockito.*;
 /**
  * PluginManagerService 生命周期安全测试。
  * Mock Guard，精确验证 disable/uninstall/enable 的调用顺序和状态写入。
+ * 真实 Guard 覆盖 0 秒排空超时边界。
  */
 @ExtendWith(MockitoExtension.class)
 class PluginManagerLifecycleSafetyTest {
@@ -85,10 +86,45 @@ class PluginManagerLifecycleSafetyTest {
         order.verify(lifecycleGuard).beginDisable(PID);
         order.verify(pluginRepository).updateStatus(PID, PluginStatus.DISABLING);
         order.verify(lifecycleGuard).awaitDrain(PID);
-        order.verify(pluginRepository).updateStatus(PID, PluginStatus.ERROR, "排空超时或中断");
+        order.verify(pluginRepository).updateStatus(PID, PluginStatus.ERROR, "排空超时或中断，需重启");
         verify(pf4jManager, never()).stopPlugin(any());
         // 不应写 STOPPED
         verify(pluginRepository, never()).updateStatus(PID, PluginStatus.STOPPED);
+    }
+
+    @Test
+    void disable_shouldMarkRestartRequiredAndKeepGateClosed_whenRealGuardDrainTimesOut() {
+        PluginLifecycleGuard realGuard = new PluginLifecycleGuard(0);
+        PluginManagerService realGuardService = new PluginManagerService(
+            pf4jManager,
+            pluginRepository,
+            signatureVerifier,
+            versionService,
+            flywayMigrator,
+            realGuard
+        );
+        realGuard.enable(PID);
+        assertTrue(realGuard.tryAcquire(PID));
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> realGuardService.disable(PID)
+        );
+
+        assertAll(
+            () -> assertTrue(thrown.getMessage().contains("需重启")),
+            () -> verify(pluginRepository, atLeastOnce()).updateStatus(
+                eq(PID),
+                eq(PluginStatus.ERROR),
+                contains("排空超时或中断，需重启")
+            ),
+            () -> assertFalse(realGuard.tryAcquire(PID), "排空失败后入口应保持关闭"),
+            () -> assertTrue(realGuard.hasSlot(PID), "排空失败后不得移除守卫"),
+            () -> assertEquals(1, realGuard.getActiveCount(PID))
+        );
+        verify(pf4jManager, never()).stopPlugin(any());
+        verify(pf4jManager, never()).unloadPlugin(any());
+        realGuard.release(PID);
     }
 
     @Test
@@ -138,6 +174,41 @@ class PluginManagerLifecycleSafetyTest {
         verify(pf4jManager, never()).unloadPlugin(any());
         verify(pluginRepository, never()).updateStatus(eq(PID), eq(PluginStatus.UNINSTALLED), any());
         verify(lifecycleGuard, never()).remove(PID);
+    }
+
+    @Test
+    void uninstall_shouldMarkRestartRequiredAndKeepGateClosed_whenRealGuardDrainTimesOut() {
+        PluginLifecycleGuard realGuard = new PluginLifecycleGuard(0);
+        PluginManagerService realGuardService = new PluginManagerService(
+            pf4jManager,
+            pluginRepository,
+            signatureVerifier,
+            versionService,
+            flywayMigrator,
+            realGuard
+        );
+        realGuard.enable(PID);
+        assertTrue(realGuard.tryAcquire(PID));
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> realGuardService.uninstall(PID)
+        );
+
+        assertAll(
+            () -> assertTrue(thrown.getMessage().contains("需重启")),
+            () -> verify(pluginRepository, atLeastOnce()).updateStatus(
+                eq(PID),
+                eq(PluginStatus.ERROR),
+                contains("排空超时或中断，需重启")
+            ),
+            () -> assertFalse(realGuard.tryAcquire(PID), "排空失败后入口应保持关闭"),
+            () -> assertTrue(realGuard.hasSlot(PID), "排空失败后不得移除守卫"),
+            () -> assertEquals(1, realGuard.getActiveCount(PID))
+        );
+        verify(pf4jManager, never()).stopPlugin(any());
+        verify(pf4jManager, never()).unloadPlugin(any());
+        realGuard.release(PID);
     }
 
     @Test

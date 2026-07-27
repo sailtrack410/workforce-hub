@@ -388,8 +388,8 @@ public class PluginManagerService {
             // 2. 等待在途请求排空
             if (!lifecycleGuard.awaitDrain(pluginId)) {
                 // 排空失败，不继续 stop，标记 ERROR
-                pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "排空超时或中断");
-                throw new RuntimeException("插件排空超时或中断: " + pluginId);
+                pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "排空超时或中断，需重启");
+                throw new RuntimeException("插件排空超时或中断，需重启: " + pluginId);
             }
 
             // 3. PF4J stop
@@ -428,8 +428,8 @@ public class PluginManagerService {
 
                 // 2. 等待在途请求排空
                 if (!lifecycleGuard.awaitDrain(pluginId)) {
-                    pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "排空超时或中断");
-                    throw new RuntimeException("插件排空超时或中断: " + pluginId);
+                    pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "排空超时或中断，需重启");
+                    throw new RuntimeException("插件排空超时或中断，需重启: " + pluginId);
                 }
 
                 // 3. PF4J stop — 校验返回状态，抛异常也标记 ERROR
