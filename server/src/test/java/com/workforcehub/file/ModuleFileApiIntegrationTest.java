@@ -2,8 +2,12 @@ package com.workforcehub.file;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.plugin.runtime.PluginEventDispatcher;
+import com.workforcehub.plugin.sdk.DomainEvent;
+import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -25,6 +30,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,6 +41,8 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -64,6 +72,9 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private DataSource dataSource;
+
+    @MockBean
+    private PluginEventDispatcher pluginEventDispatcher;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
@@ -276,11 +287,34 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonLong("$.data.attachmentRefId", firstAttachmentRefId));
 
-        createUploadTicket(employeeSession, "病假材料.pdf", content.length, sha256)
+        String deduplicatedClientRequestId = "file-event-dedup-" + System.nanoTime();
+        MvcResult deduplicatedResult = createUploadTicket(
+                employeeSession,
+                "病假材料.pdf",
+                content.length,
+                sha256,
+                deduplicatedClientRequestId)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.deduplicated").value(true))
-            .andExpect(jsonPath("$.data.attachmentRefId").isString());
+            .andExpect(jsonPath("$.data.attachmentRefId").isString())
+            .andReturn();
+        Long deduplicatedAttachmentRefId = data(deduplicatedResult).get("attachmentRefId").asLong();
+        createUploadTicket(
+                employeeSession,
+                "病假材料.pdf",
+                content.length,
+                sha256,
+                deduplicatedClientRequestId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data.attachmentRefId", deduplicatedAttachmentRefId));
+
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(pluginEventDispatcher, times(2)).dispatch(eventCaptor.capture());
+        List<DomainEvent> uploadedEvents = eventCaptor.getAllValues();
+        assertFileUploadedEvent(uploadedEvents.get(0), firstAttachmentRefId, "请假证明.pdf", content.length);
+        assertFileUploadedEvent(uploadedEvents.get(1), deduplicatedAttachmentRefId, "病假材料.pdf", content.length);
 
         Integer fileObjectCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM sys_file_object WHERE content_sha256 = ? AND file_size = ?",
@@ -1333,6 +1367,40 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
             long fileSize,
             String sha256) throws Exception {
         return createUploadTicket(session, fileName, fileSize, sha256, "file-test-" + System.nanoTime());
+    }
+
+    private void assertFileUploadedEvent(DomainEvent event,
+                                         Long attachmentRefId,
+                                         String displayName,
+                                         long fileSize) {
+        String stableId = "file-uploaded-" + attachmentRefId;
+        assertEquals(EventTypes.FILE_UPLOADED, event.eventType());
+        assertEquals(stableId, event.eventId());
+        assertEquals(stableId, event.idempotencyKey());
+        assertEquals(1L, event.version());
+        assertEquals(EMPLOYEE_USER_ID + "", event.triggeredBy());
+        assertTrue(event.occurredAt() > 0);
+        assertEquals(Set.of(
+            "attachmentRefId",
+            "ownerType",
+            "ownerId",
+            "displayName",
+            "mimeType",
+            "fileSize",
+            "uploaderType",
+            "uploaderId",
+            "scanStatus"
+        ), event.payload().keySet());
+        assertEquals(attachmentRefId, event.payload().get("attachmentRefId"));
+        assertEquals("PERSONAL_FILE", event.payload().get("ownerType"));
+        assertTrue(event.payload().containsKey("ownerId"));
+        assertEquals(null, event.payload().get("ownerId"));
+        assertEquals(displayName, event.payload().get("displayName"));
+        assertEquals("text/plain", event.payload().get("mimeType"));
+        assertEquals(fileSize, event.payload().get("fileSize"));
+        assertEquals("USER", event.payload().get("uploaderType"));
+        assertEquals(EMPLOYEE_USER_ID, event.payload().get("uploaderId"));
+        assertEquals("PENDING", event.payload().get("scanStatus"));
     }
 
     private org.springframework.test.web.servlet.ResultActions createUploadTicket(

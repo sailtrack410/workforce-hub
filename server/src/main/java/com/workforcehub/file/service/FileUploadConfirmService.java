@@ -2,6 +2,8 @@ package com.workforcehub.file.service;
 
 import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.audit.AuditLogWriter;
+import com.workforcehub.common.event.DomainEventPublisher;
+import com.workforcehub.common.event.file.FileUploadedEvent;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.common.util.TextValues;
@@ -38,6 +40,7 @@ public class FileUploadConfirmService {
     private final FileQuotaPolicyService fileQuotaPolicyService;
     private final FileUploadRules fileUploadRules;
     private final AuditLogWriter auditLogWriter;
+    private final DomainEventPublisher domainEventPublisher;
 
     public FileUploadConfirmService(JdbcTemplate jdbcTemplate,
                                     StorageProviderRegistry storageProviderRegistry,
@@ -46,7 +49,8 @@ public class FileUploadConfirmService {
                                     AttachmentRefRepository attachmentRefRepository,
                                     FileQuotaPolicyService fileQuotaPolicyService,
                                     FileUploadRules fileUploadRules,
-                                    AuditLogWriter auditLogWriter) {
+                                    AuditLogWriter auditLogWriter,
+                                    DomainEventPublisher domainEventPublisher) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.storageUsageLedgerService = storageUsageLedgerService;
@@ -55,6 +59,7 @@ public class FileUploadConfirmService {
         this.fileQuotaPolicyService = fileQuotaPolicyService;
         this.fileUploadRules = fileUploadRules;
         this.auditLogWriter = auditLogWriter;
+        this.domainEventPublisher = domainEventPublisher;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -126,6 +131,7 @@ public class FileUploadConfirmService {
             }
             throw e;
         }
+        publishFileUploadedEvent(attachmentRefId, userId);
         fileObjectRepository.increaseRefCount(fileObject.id());
         fileUploadRules.increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
         storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
@@ -205,6 +211,7 @@ public class FileUploadConfirmService {
             }
             throw e;
         }
+        publishFileUploadedEvent(attachmentRefId, adminId);
         fileObjectRepository.increaseRefCount(fileObject.id());
         storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
         if (deduplicated) {
@@ -277,6 +284,23 @@ public class FileUploadConfirmService {
             folderId
         );
         return attachmentRefId;
+    }
+
+    private void publishFileUploadedEvent(Long attachmentRefId, Long operatorId) {
+        AttachmentRow attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
+        domainEventPublisher.publishAfterCommit(new FileUploadedEvent(
+            attachment.id(),
+            attachment.ownerType(),
+            attachment.ownerId(),
+            attachment.displayName(),
+            attachment.mimeType(),
+            attachment.fileSize(),
+            attachment.uploaderType(),
+            attachment.uploaderId(),
+            attachment.scanStatus(),
+            operatorId,
+            attachment.createdAt()
+        ));
     }
 
     private void scheduleDeduplicatedUploadObjectCleanup(UploadTicketRow ticket, FileObjectRow fileObject) {

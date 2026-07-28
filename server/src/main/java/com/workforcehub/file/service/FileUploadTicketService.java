@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.common.audit.AuditLogWriter;
+import com.workforcehub.common.event.DomainEventPublisher;
+import com.workforcehub.common.event.file.FileUploadedEvent;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.common.util.TextValues;
@@ -43,6 +45,7 @@ public class FileUploadTicketService {
     private final FileQuotaPolicyService fileQuotaPolicyService;
     private final FileUploadRules fileUploadRules;
     private final AuditLogWriter auditLogWriter;
+    private final DomainEventPublisher domainEventPublisher;
 
     public FileUploadTicketService(JdbcTemplate jdbcTemplate,
                                    StorageProviderRegistry storageProviderRegistry,
@@ -53,7 +56,8 @@ public class FileUploadTicketService {
                                    AttachmentRefRepository attachmentRefRepository,
                                    FileQuotaPolicyService fileQuotaPolicyService,
                                    FileUploadRules fileUploadRules,
-                                   AuditLogWriter auditLogWriter) {
+                                   AuditLogWriter auditLogWriter,
+                                   DomainEventPublisher domainEventPublisher) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageProviderRegistry = storageProviderRegistry;
         this.fileStorageProperties = fileStorageProperties;
@@ -64,6 +68,7 @@ public class FileUploadTicketService {
         this.fileQuotaPolicyService = fileQuotaPolicyService;
         this.fileUploadRules = fileUploadRules;
         this.auditLogWriter = auditLogWriter;
+        this.domainEventPublisher = domainEventPublisher;
     }
 
     // 员工上传票据：幂等（同 clientRequestId 返回已有票据）、校验配额、秒传检测
@@ -102,6 +107,7 @@ public class FileUploadTicketService {
                     userId,
                     request.getFolderId()
                 );
+                publishFileUploadedEvent(attachmentRefId, userId);
             } catch (DuplicateKeyException e) {
                 UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(
                     "USER",
@@ -157,6 +163,7 @@ public class FileUploadTicketService {
                     adminId,
                     null
                 );
+                publishFileUploadedEvent(attachmentRefId, adminId);
             } catch (DuplicateKeyException e) {
                 UploadTicketResponse concurrentTicket = findUploadTicketByClientRequestId(
                     "ADMIN",
@@ -369,6 +376,23 @@ public class FileUploadTicketService {
             folderId
         );
         return attachmentRefId;
+    }
+
+    private void publishFileUploadedEvent(Long attachmentRefId, Long operatorId) {
+        var attachment = attachmentRefRepository.getAttachmentOrThrow(attachmentRefId);
+        domainEventPublisher.publishAfterCommit(new FileUploadedEvent(
+            attachment.id(),
+            attachment.ownerType(),
+            attachment.ownerId(),
+            attachment.displayName(),
+            attachment.mimeType(),
+            attachment.fileSize(),
+            attachment.uploaderType(),
+            attachment.uploaderId(),
+            attachment.scanStatus(),
+            operatorId,
+            attachment.createdAt()
+        ));
     }
 
     private UploadTicketResponse findUploadTicketByClientRequestId(String uploaderType,
