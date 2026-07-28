@@ -9,7 +9,8 @@
     "build:plugin-poc": "vite build --config vite.plugin-poc.config.ts",
     "build:file": "vue-tsc --noEmit && vite build --config vite.file.config.ts",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:csp": "python3 scripts/plugin_csp_browser_test.py"
   },
   "dependencies": {
     "@icon-park/vue-next": "^1.4.2",

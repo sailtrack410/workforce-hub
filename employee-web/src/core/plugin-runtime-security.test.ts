@@ -27,4 +27,24 @@ describe('plugin runtime security boundaries', () => {
     expect(logout).toContain('window.location.reload();');
     expect(logout).not.toContain('router.replace');
   });
+
+  it('Nginx 对员工端和管理端文档启用最小 CSP', () => {
+    const source = readFileSync(resolve(currentDir, '../../../deploy/nginx/default.conf'), 'utf8');
+    const defaultServer = source.slice(source.indexOf('listen 80 default_server;'));
+    const firstLocation = defaultServer.indexOf('location ');
+    const serverHeaders = defaultServer.slice(0, firstLocation);
+
+    expect(serverHeaders).toContain(
+      'add_header Content-Security-Policy "script-src \'self\'; object-src \'none\'; base-uri \'none\'; frame-ancestors \'none\'" always;',
+    );
+    expect(serverHeaders).not.toContain("'unsafe-inline'");
+    expect(serverHeaders).not.toContain("'unsafe-eval'");
+
+    for (const marker of ['location /admin/ {', 'location / {']) {
+      const start = defaultServer.indexOf(marker);
+      const end = defaultServer.indexOf('\n    }', start);
+      expect(start).toBeGreaterThan(-1);
+      expect(defaultServer.slice(start, end)).not.toContain('add_header');
+    }
+  });
 });
