@@ -43,18 +43,55 @@ export interface ApiClientOptions {
   unsafeIntegerFieldNames?: Iterable<string>;
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+
+function readCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const prefix = `${name}=`;
+  const raw = document.cookie.split(';').map((value) => value.trim()).find((value) => value.startsWith(prefix));
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw.slice(prefix.length));
+  } catch {
+    return null;
+  }
+}
+
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? '');
   const fetcher = options.fetcher ?? fetch.bind(globalThis);
   const defaultHeaders = headersToRecord(options.defaultHeaders);
   const unsafeIntegerFieldNames = new Set(options.unsafeIntegerFieldNames ?? []);
+  let csrfBootstrapPromise: Promise<{ headerName?: string; token?: string }> | null = null;
+
+  async function addCsrfHeader(method: string, headers: Record<string, string>) {
+    if (SAFE_METHODS.has(method) || new Headers(headers).has('X-XSRF-TOKEN')) return;
+
+    let token = readCookie('XSRF-TOKEN');
+    let headerName = 'X-XSRF-TOKEN';
+    if (!token) {
+      if (!csrfBootstrapPromise) {
+        csrfBootstrapPromise = request<{ headerName?: string; token?: string }>('/api/csrf', { method: 'GET' })
+          .catch((error) => {
+            csrfBootstrapPromise = null;
+            throw error;
+          });
+      }
+      const bootstrap = await csrfBootstrapPromise;
+      headerName = bootstrap.headerName || headerName;
+      token = readCookie('XSRF-TOKEN') || bootstrap.token || null;
+    }
+    if (token) headers[headerName] = token;
+  }
 
   async function request<T>(path: string, requestOptions: ApiRequestOptions = {}): Promise<T> {
+    const method = (requestOptions.method ?? 'GET').toUpperCase();
     const headers = {
       Accept: 'application/json',
       ...defaultHeaders,
       ...headersToRecord(requestOptions.headers),
     };
+    await addCsrfHeader(method, headers);
     const body = normalizeBody(requestOptions.body, headers);
     const response = await fetcher(buildUrl(baseUrl, path, requestOptions.query), {
       ...requestOptions,

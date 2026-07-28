@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { adminApi } from '@/api/admin';
 import type { EntityId, LlmModelResponse, OrgDepartmentTreeNodeResponse, OrgPositionResponse, RagflowAclResponse, RagflowDocumentResponse, RagflowGlobalSettingResponse, RagflowSearchTestResponse, RagflowSpaceResponse, RbacRoleResponse } from '@/api/types';
 import { errorMessage, roleCodeLabel } from '@/utils/format';
+import { uploadToTicketTarget } from '@/utils/upload-target';
 import { useToast } from '@/composables/useToast';
 import type { TableColumn } from '@/components/AdminTable.vue';
 import RagflowCreateDialog from '@/components/ragflow/RagflowCreateDialog.vue';
@@ -712,33 +713,6 @@ async function sha256Hex(file: File) {
 
 function createClientId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-}
-
-function uploadToTicketTarget(uploadUrl: string, file: File, uploadHeaders: Record<string, string>, onProgress: (percent: number) => void) {
-  const remote = /^https?:\/\//i.test(uploadUrl);
-  const requestUrl = remote ? uploadUrl : '/__admin-local-upload';
-  const headers = remote
-    ? uploadHeaders
-    : {
-      'Content-Type': uploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
-      'X-Upload-Path': encodeURIComponent(uploadUrl),
-    };
-  return new Promise<Response>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', requestUrl);
-    Object.entries(headers).forEach(([key, value]) => {
-      if (value) xhr.setRequestHeader(key, value);
-    });
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && event.total > 0) {
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-    xhr.onload = () => resolve(new Response(xhr.responseText, { status: xhr.status, statusText: xhr.statusText }));
-    xhr.onerror = () => reject(new Error('文件上传失败'));
-    xhr.onabort = () => reject(new Error('文件上传已取消'));
-    xhr.send(file);
-  });
 }
 
 function normalizeUploadHeaders(headers: Record<string, string>, file: File) {

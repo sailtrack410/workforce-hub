@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient, parseJsonPreservingUnsafeIntegers } from './http';
 import { createAdminApi } from './admin';
 
@@ -9,6 +9,14 @@ function jsonResponse(data: unknown) {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+beforeEach(() => {
+  vi.stubGlobal('document', { cookie: 'XSRF-TOKEN=admin-api-test-token' });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('adminApi', () => {
   it('maps workflow request endpoints', async () => {

@@ -128,6 +128,7 @@ export function usePersonalFileTransfer() {
         method: 'PUT',
         body: file,
         headers: uploadHeaders,
+        credentials: 'omit',
       });
     }
     return fetch('/__employee-local-upload', {
@@ -137,6 +138,7 @@ export function usePersonalFileTransfer() {
         'Content-Type': uploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
         'X-Upload-Path': uploadUrl,
       },
+      credentials: 'omit',
     });
   }
 
