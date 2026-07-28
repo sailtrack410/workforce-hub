@@ -26,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -33,17 +34,23 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.Signature;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -122,6 +129,9 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private Environment environment;
 
     @BeforeEach
     void resetPluginState() {
@@ -368,6 +378,49 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
                 restartedGuard.remove(HELLO_PLUGIN_ID);
             }
         }
+    }
+
+    @Test
+    void shouldRestoreActivePluginAcrossTwoIndependentJvmProcesses() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        PluginRow installed = pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+        Path snapshotPath = Path.of(installed.getJarPath());
+        Files.delete(jarPath);
+        assertFalse(Files.exists(jarPath));
+        assertTrue(Files.isRegularFile(snapshotPath));
+        pluginManagerService.enable(HELLO_PLUGIN_ID);
+
+        PluginClassLoader parentClassLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+        lifecycleGuard.beginDisable(HELLO_PLUGIN_ID);
+        assertTrue(lifecycleGuard.awaitDrain(HELLO_PLUGIN_ID));
+        assertEquals(PluginState.STOPPED, pluginManager.stopPlugin(HELLO_PLUGIN_ID));
+        assertTrue(pluginManager.unloadPlugin(HELLO_PLUGIN_ID));
+        lifecycleGuard.remove(HELLO_PLUGIN_ID);
+
+        assertEquals(PluginStatus.ACTIVE,
+            pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertTrue(parentClassLoader.isClosed());
+        assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+
+        PluginRow activeBeforeRestart = pluginManagerService.getPlugin(HELLO_PLUGIN_ID);
+        long parentPid = ProcessHandle.current().pid();
+        long firstChildPid = runRestartProcessProbe("verify");
+        assertNotEquals(parentPid, firstChildPid);
+        PluginRow activeAfterFirstChild = pluginManagerService.getPlugin(HELLO_PLUGIN_ID);
+        assertEquals(PluginStatus.ACTIVE, activeAfterFirstChild.getStatus());
+        assertEquals(activeBeforeRestart.getUpdatedAt(), activeAfterFirstChild.getUpdatedAt());
+        assertTrue(Files.isRegularFile(snapshotPath));
+
+        long secondChildPid = runRestartProcessProbe("uninstall");
+        assertNotEquals(parentPid, secondChildPid);
+        assertNotEquals(firstChildPid, secondChildPid);
+        assertEquals(PluginStatus.UNINSTALLED,
+            pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertTrue(Files.isRegularFile(snapshotPath));
     }
 
     @Test
@@ -718,6 +771,221 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             }
         }
         return jar;
+    }
+
+    private long runRestartProcessProbe(String mode) throws Exception {
+        String configuredClasspath = System.getProperty(
+            "surefire.test.class.path",
+            System.getProperty("java.class.path")
+        );
+        Path workingDirectory = Files.createDirectory(tempDir.resolve("restart-process-" + mode));
+        Path launchDirectory = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        String childClasspath = Arrays.stream(configuredClasspath.split(File.pathSeparator))
+            .map(Path::of)
+            .map(path -> path.isAbsolute() ? path : launchDirectory.resolve(path).normalize())
+            .map(Path::toString)
+            .collect(Collectors.joining(File.pathSeparator));
+        ProcessBuilder processBuilder = new ProcessBuilder(
+            Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            "-cp",
+            childClasspath,
+            "com.workforcehub.plugin.PluginRestartProcessProbe",
+            mode,
+            "--spring.config.location=optional:classpath:/plugin-restart-process-none.properties",
+            "--mybatis.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl"
+        );
+        processBuilder.directory(workingDirectory.toFile());
+        processBuilder.redirectErrorStream(true);
+
+        var childEnvironment = processBuilder.environment();
+        childEnvironment.clear();
+        childEnvironment.put("SPRING_PROFILES_ACTIVE", "api");
+        childEnvironment.put("SPRING_MAIN_BANNER_MODE", "off");
+        childEnvironment.put("SERVER_PORT", "0");
+        String datasourceUrl = environment.getRequiredProperty("spring.datasource.url");
+        String datasourceUsername = environment.getRequiredProperty("spring.datasource.username");
+        String datasourcePassword = environment.getRequiredProperty("spring.datasource.password");
+        String redisHost = environment.getRequiredProperty("spring.data.redis.host");
+        String redisPort = environment.getRequiredProperty("spring.data.redis.port");
+        String redisPassword = environment.getProperty("spring.data.redis.password", "");
+        childEnvironment.put("SPRING_DATASOURCE_URL", datasourceUrl);
+        childEnvironment.put("SPRING_DATASOURCE_USERNAME", datasourceUsername);
+        childEnvironment.put("SPRING_DATASOURCE_PASSWORD", datasourcePassword);
+        childEnvironment.put("SPRING_DATA_REDIS_HOST", redisHost);
+        childEnvironment.put("SPRING_DATA_REDIS_PORT", redisPort);
+        childEnvironment.put("SPRING_DATA_REDIS_PASSWORD", redisPassword);
+        childEnvironment.put("SPRING_SESSION_REDIS_NAMESPACE",
+            environment.getRequiredProperty("spring.session.redis.namespace"));
+        childEnvironment.put("WORKFORCE_AUTH_REDIS_KEY_PREFIX",
+            environment.getRequiredProperty("workforce.auth.redis-key-prefix"));
+        childEnvironment.put("SPRING_AUTOCONFIGURE_EXCLUDE",
+            environment.getRequiredProperty("spring.autoconfigure.exclude"));
+        childEnvironment.put("WORKFORCE_PLUGIN_ROOT",
+            pluginManager.getPluginsRoot().toAbsolutePath().normalize().toString());
+        String trustedSigners = TEST_SIGNER_ID + "="
+            + Base64.getEncoder().encodeToString(SIGNING_KEY.getPublic().getEncoded());
+        childEnvironment.put("WORKFORCE_PLUGIN_TRUSTED_SIGNERS", trustedSigners);
+        childEnvironment.put("WORKFORCE_WORKFLOW_ENABLED", "false");
+        childEnvironment.put("WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED", "false");
+        childEnvironment.put("MANAGEMENT_HEALTH_MAIL_ENABLED", "false");
+        childEnvironment.put("WORKFORCE_AGENT_MODEL_ENABLED", "false");
+        childEnvironment.put("WORKFORCE_AGENT_TIMEOUT_SCAN_ENABLED", "false");
+        childEnvironment.put("WORKFORCE_AGENT_PROVIDER_HEALTH_CHECK_ENABLED", "false");
+        childEnvironment.put("WORKFORCE_IM_OUTBOX_DISPATCHER_ENABLED", "false");
+        childEnvironment.put("FLOWABLE_ASYNC_EXECUTOR_ACTIVATE", "false");
+        childEnvironment.put("WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS", "http://127.0.0.1:8080");
+        String mailHost = environment.getRequiredProperty("spring.mail.host");
+        String mailPort = environment.getRequiredProperty("spring.mail.port");
+        String mailUsername = environment.getProperty("spring.mail.username", "");
+        String mailPassword = environment.getProperty("spring.mail.password", "");
+        childEnvironment.put("SPRING_MAIL_HOST", mailHost);
+        childEnvironment.put("SPRING_MAIL_PORT", mailPort);
+        childEnvironment.put("SPRING_MAIL_USERNAME", mailUsername);
+        childEnvironment.put("SPRING_MAIL_PASSWORD", mailPassword);
+        String minioEndpoint = environment.getRequiredProperty("minio.endpoint");
+        String minioAccessKey = environment.getRequiredProperty("minio.access-key");
+        String minioSecretKey = environment.getRequiredProperty("minio.secret-key");
+        String minioBucket = environment.getRequiredProperty("minio.bucket");
+        childEnvironment.put("MINIO_ENDPOINT", minioEndpoint);
+        childEnvironment.put("MINIO_ACCESS_KEY", minioAccessKey);
+        childEnvironment.put("MINIO_SECRET_KEY", minioSecretKey);
+        childEnvironment.put("MINIO_BUCKET", minioBucket);
+        childEnvironment.put("WORKFORCE_FILE_LOCAL_ROOT",
+            tempDir.resolve("restart-process-file-storage").toAbsolutePath().toString());
+        childEnvironment.put("LOGGING_LEVEL_ROOT", "warn");
+        childEnvironment.put("LOGGING_LEVEL_COM_WORKFORCEHUB", "info");
+
+        List<String> sensitiveValues = new ArrayList<>();
+        for (String value : List.of(
+            datasourceUrl, datasourceUsername, datasourcePassword,
+            redisHost, redisPassword, trustedSigners,
+            mailHost, mailPort, mailUsername, mailPassword,
+            minioEndpoint, minioAccessKey, minioSecretKey, minioBucket
+        )) {
+            if (value != null && !value.isBlank()) {
+                sensitiveValues.add(value);
+            }
+        }
+        sensitiveValues.sort(Comparator.comparingInt(String::length).reversed());
+
+        Process process = processBuilder.start();
+        long pid = process.pid();
+        SanitizedLogTail logTail = new SanitizedLogTail(8192);
+        Thread logReader = new Thread(
+            () -> captureSanitizedLog(process, sensitiveValues, logTail),
+            "plugin-restart-process-" + mode + "-log"
+        );
+        logReader.setDaemon(true);
+        logReader.start();
+        try {
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroy();
+                if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                    if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                        throw new AssertionError("插件重启子进程强制终止后仍存活，mode=" + mode);
+                    }
+                }
+                awaitLogReaderTermination(process, logReader, mode);
+                throw new AssertionError(
+                    "插件重启子进程超时，mode=" + mode + "\n" + logTail.text()
+                );
+            }
+            awaitLogReaderTermination(process, logReader, mode);
+            assertEquals(
+                0,
+                process.exitValue(),
+                () -> "插件重启子进程失败，mode=" + mode + "\n" + logTail.text()
+            );
+            return pid;
+        } finally {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+                if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                    throw new AssertionError("插件重启子进程清理后仍存活，mode=" + mode);
+                }
+            }
+            awaitLogReaderTermination(process, logReader, mode);
+        }
+    }
+
+    private void awaitLogReaderTermination(Process process, Thread logReader, String mode)
+        throws Exception {
+        if (!logReader.isAlive()) {
+            return;
+        }
+        try {
+            process.getInputStream().close();
+        } catch (IOException ignored) {
+            // 子进程已结束时，关闭其输出管道失败不影响清理判定。
+        }
+        logReader.interrupt();
+        logReader.join(5_000);
+        if (logReader.isAlive()) {
+            throw new AssertionError("插件重启子进程日志线程清理后仍存活，mode=" + mode);
+        }
+    }
+
+    private void captureSanitizedLog(
+        Process process,
+        List<String> sensitiveValues,
+        SanitizedLogTail logTail
+    ) {
+        try (var reader = process.inputReader(StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String sanitized = line;
+                for (String sensitiveValue : sensitiveValues) {
+                    sanitized = sanitized.replace(sensitiveValue, "<redacted>");
+                }
+                logTail.append(sanitized);
+                logTail.append(System.lineSeparator());
+            }
+        } catch (IOException e) {
+            logTail.append("<无法读取子进程日志>");
+        }
+    }
+
+    private static final class SanitizedLogTail {
+
+        private final byte[] bytes;
+        private int length;
+
+        private SanitizedLogTail(int maxBytes) {
+            this.bytes = new byte[maxBytes];
+        }
+
+        private synchronized void append(String value) {
+            byte[] incoming = value.getBytes(StandardCharsets.UTF_8);
+            if (incoming.length >= bytes.length) {
+                System.arraycopy(incoming, incoming.length - bytes.length, bytes, 0, bytes.length);
+                length = bytes.length;
+                return;
+            }
+            int overflow = Math.max(0, length + incoming.length - bytes.length);
+            if (overflow > 0) {
+                System.arraycopy(bytes, overflow, bytes, 0, length - overflow);
+                length -= overflow;
+            }
+            System.arraycopy(incoming, 0, bytes, length, incoming.length);
+            length += incoming.length;
+        }
+
+        private synchronized String text() {
+            String text = new String(bytes, 0, length, StandardCharsets.UTF_8);
+            while (text.startsWith("\uFFFD")) {
+                text = text.substring(1);
+            }
+            while (text.endsWith("\uFFFD")) {
+                text = text.substring(0, text.length() - 1);
+            }
+            byte[] encoded = text.getBytes(StandardCharsets.UTF_8);
+            while (encoded.length > bytes.length && !text.isEmpty()) {
+                text = text.substring(1);
+                encoded = text.getBytes(StandardCharsets.UTF_8);
+            }
+            return text;
+        }
     }
 
     private int tableExists(String tableName) {
