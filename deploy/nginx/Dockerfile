@@ -1,17 +1,19 @@
-FROM node:20-alpine AS admin-build
+FROM node:22-alpine AS admin-build
 
 WORKDIR /workspace/admin-web
 COPY admin-web/package*.json ./
 RUN npm ci
 COPY admin-web/ ./
+COPY shared-web/ /workspace/shared-web/
 RUN npm run build
 
-FROM node:20-alpine AS employee-build
+FROM node:22-alpine AS employee-build
 
 WORKDIR /workspace/employee-web
 COPY employee-web/package*.json ./
 RUN npm ci
 COPY employee-web/ ./
+COPY shared-web/ /workspace/shared-web/
 COPY plugins/hello-plugin/frontend/ /workspace/plugins/hello-plugin/frontend/
 RUN npm run build
 RUN npm run build:plugin-poc
