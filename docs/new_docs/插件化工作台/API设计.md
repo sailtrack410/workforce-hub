@@ -24,7 +24,7 @@
 
 ### 插件动作网关
 
-请求体是可选 JSON 对象。网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。校验仅覆盖当前插件动作 `POST` 网关，不代表全站 CSRF 已完成。
+请求体是可选 JSON 对象。网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。该校验是插件动作 `POST` 的附加来源防线；宿主 SecurityFilterChain 已用 `CookieCsrfTokenRepository` 覆盖 Session 写请求，不能用来源白名单替代 CSRF。
 
 来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后，网关再校验插件状态和生命周期入口，绑定当前登录会话并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作并校验输入 Schema，最后返回 `ServiceResult<Object>`。拿到员工清单不代表拥有动作调用权限，每次调用都会重新鉴权。
 

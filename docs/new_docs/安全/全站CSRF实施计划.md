@@ -1,6 +1,6 @@
 # 全站 CSRF Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+本计划按任务拆分记录实现、测试、浏览器验证和文档收口；完成项使用 `[x]` 标记。
 
 **Goal:** 为所有宿主不安全 HTTP 方法启用 Spring Security CSRF，并让 admin-web、employee-web 自动取得和发送 token。
 
@@ -15,7 +15,7 @@
 **Files:**
 - Create: `server/src/test/java/com/workforcehub/common/GlobalCsrfIntegrationTest.java`
 
-- [ ] **Step 1: 写 `/api/csrf` 与缺 token 的失败测试**
+- [x] **Step 1: 写 `/api/csrf` 与缺 token 的失败测试**
 
 测试使用 `MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build()` 创建不带测试默认 token 的 `rawMockMvc`，断言：
 
@@ -36,7 +36,7 @@ rawMockMvc.perform(post("/api/admin/auth/login")
     .andExpect(jsonPath("$.requestId").value("csrf-missing-login"));
 ```
 
-- [ ] **Step 2: 运行 RED**
+- [x] **Step 2: 运行 RED**
 
 ```bash
 TEST_DB_NAME=workforce_hub_csrf_tdd_20260728 mvn -pl server -am -Dtest=GlobalCsrfIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
@@ -44,7 +44,7 @@ TEST_DB_NAME=workforce_hub_csrf_tdd_20260728 mvn -pl server -am -Dtest=GlobalCsr
 
 预期：`/api/csrf` 为 404，缺 token 登录仍进入现有登录流程，测试失败原因与未启用 CSRF 一致。
 
-- [ ] **Step 3: 补齐真实 Cookie/Header 矩阵**
+- [x] **Step 3: 补齐真实 Cookie/Header 矩阵**
 
 用 bootstrap 响应取得 token Cookie 和响应 token，覆盖错误 Header、正确 Cookie+Header、匿名有 token 后 401、GET me 无 Header、logout 缺/错/正确 token、公开验证码和密码重置 POST 缺 token。
 
@@ -54,7 +54,7 @@ TEST_DB_NAME=workforce_hub_csrf_tdd_20260728 mvn -pl server -am -Dtest=GlobalCsr
 - Modify: `server/src/main/java/com/workforcehub/common/config/SecurityConfig.java`
 - Create: `server/src/main/java/com/workforcehub/common/controller/CsrfController.java`
 
-- [ ] **Step 1: 启用标准 Cookie CSRF**
+- [x] **Step 1: 启用标准 Cookie CSRF**
 
 核心配置：
 
@@ -77,7 +77,7 @@ http.csrf(csrf -> csrf
 
 不增加任何 ignore matcher。
 
-- [ ] **Step 2: 新增 bootstrap Controller**
+- [x] **Step 2: 新增 bootstrap Controller**
 
 ```java
 @RestController
@@ -90,7 +90,7 @@ public class CsrfController {
 }
 ```
 
-- [ ] **Step 3: 运行 GREEN**
+- [x] **Step 3: 运行 GREEN**
 
 使用 Task 1 命令，预期全部通过。
 
@@ -102,7 +102,7 @@ public class CsrfController {
 - Modify: `server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java`
 - Modify: `server/src/test/java/com/workforcehub/plugin/PluginGatewaySecurityTest.java`
 
-- [ ] **Step 1: 为既有业务测试配置有效 token**
+- [x] **Step 1: 为既有业务测试配置有效 token**
 
 ```java
 @TestConfiguration(proxyBeanMethods = false)
@@ -116,7 +116,7 @@ public class CsrfMockMvcTestConfiguration {
 
 两个集成测试基类通过 `@Import(CsrfMockMvcTestConfiguration.class)` 使用；`PluginGatewaySecurityTest.gatewayRequest()` 显式 `.with(csrf().asHeader())`。
 
-- [ ] **Step 2: 运行安全链定向测试**
+- [x] **Step 2: 运行安全链定向测试**
 
 ```bash
 TEST_DB_NAME=workforce_hub_csrf_tdd_20260728 mvn -pl server -am -Dtest=GlobalCsrfIntegrationTest,ModuleAuthApiIntegrationTest,PluginGatewaySecurityTest,PluginGatewayCsrfIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
@@ -124,7 +124,7 @@ TEST_DB_NAME=workforce_hub_csrf_tdd_20260728 mvn -pl server -am -Dtest=GlobalCsr
 
 预期：CSRF 专项、认证和插件双层防护全部通过，原有 403 不因缺 token 假绿。
 
-- [ ] **Step 3: 提交后端批次**
+- [x] **Step 3: 提交后端批次**
 
 只暂存上述七个生产/测试文件，提交：
 
@@ -137,8 +137,9 @@ feat: 启用全站 CSRF 防护
 **Files:**
 - Modify: `employee-web/src/api/http.test.ts`
 - Create: `admin-web/src/api/http.test.ts`
+- Modify: `admin-web/src/api/admin.test.ts`
 
-- [ ] **Step 1: 写共享客户端失败测试**
+- [x] **Step 1: 写共享客户端失败测试**
 
 覆盖：
 
@@ -159,11 +160,11 @@ it('does not attach csrf to safe or caller-overridden requests', async () => {
 
 同时覆盖 PUT、DELETE、损坏 Cookie 编码、无 `document` 和并发首次写请求只 bootstrap 一次。
 
-- [ ] **Step 2: 运行 RED**
+- [x] **Step 2: 运行 RED**
 
 ```bash
-cd employee-web && npm run test -- src/api/http.test.ts
-cd admin-web && npm run test -- src/api/http.test.ts
+(cd employee-web && npm run test -- src/api/http.test.ts)
+(cd admin-web && npm run test -- src/api/http.test.ts)
 ```
 
 预期：当前共享客户端未请求 `/api/csrf`、未发送 `X-XSRF-TOKEN`，新增测试失败。
@@ -173,7 +174,7 @@ cd admin-web && npm run test -- src/api/http.test.ts
 **Files:**
 - Modify: `shared-web/api-http.ts`
 
-- [ ] **Step 1: 增加不安全方法判断和 Cookie 读取**
+- [x] **Step 1: 增加不安全方法判断和 Cookie 读取**
 
 ```typescript
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
@@ -191,34 +192,38 @@ function readCookie(name: string) {
 }
 ```
 
-- [ ] **Step 2: 缺 token 时共享 bootstrap Promise**
+- [x] **Step 2: 缺 token 时共享 bootstrap Promise**
 
 `createApiClient` 内维护一个仅用于首次缺 Cookie 场景的 Promise，请求 `${baseUrl}/api/csrf`，解析 `R` 中的 `headerName/token`。每次业务写请求先读 Cookie，Cookie 优先于 bootstrap 返回值；调用方已显式提供同名 Header 时不覆盖。
 
-- [ ] **Step 3: 运行 GREEN**
+- [x] **Step 3: 运行 GREEN**
 
 使用 Task 4 命令，预期全部通过。
 
 ### Task 6：直传隔离测试
 
 **Files:**
+- Modify: `admin-web/src/views/RagflowView.vue`
 - Modify: `admin-web/src/views/RagflowView.test.ts`
-- Create: `employee-web/src/composables/usePersonalFileTransfer.test.ts`
+- Create: `admin-web/src/utils/upload-target.ts`
+- Create: `admin-web/src/utils/upload-target.test.ts`
+- Modify: `employee-web/src/composables/usePersonalFileTransfer.ts`
+- Modify: `employee-web/src/composables/usePersonalFileTransfer.test.ts`
 
-- [ ] **Step 1: 固定对象存储不泄漏宿主 token**
+- [x] **Step 1: 固定对象存储不泄漏宿主 token**
 
-管理员测试确认 XHR 直传不设置 `withCredentials` 和 `X-XSRF-TOKEN`；员工测试直接调用 `uploadToTicketTarget`，断言远程 URL 与 Vite bridge 的 fetch options 都没有 `credentials` 和 CSRF Header。
+管理员测试通过真实 helper 调用覆盖同源/本地桥 fetch、跨源预签名 XHR、进度回调、`credentials: 'omit'`、`withCredentials=false`，并用大小写变体输入确认 `X-XSRF-TOKEN` 不泄漏；员工测试直接调用传输 composable，覆盖远程 URL 与 Vite bridge 的同一边界。
 
-- [ ] **Step 2: 运行定向测试**
+- [x] **Step 2: 运行定向测试**
 
 ```bash
-cd admin-web && npm run test -- src/api/http.test.ts src/views/RagflowView.test.ts
-cd employee-web && npm run test -- src/api/http.test.ts src/composables/usePersonalFileTransfer.test.ts src/composables/useFilePreview.test.ts
+(cd admin-web && npm run test -- src/api/http.test.ts src/views/RagflowView.test.ts src/utils/upload-target.test.ts)
+(cd employee-web && npm run test -- src/api/http.test.ts src/composables/usePersonalFileTransfer.test.ts src/composables/useFilePreview.test.ts)
 ```
 
-- [ ] **Step 3: 提交前端批次**
+- [x] **Step 3: 提交前端批次**
 
-只暂存 shared-web 和上述前端测试文件，提交：
+暂存 shared-web、双端生产改动和上述可执行测试文件，提交：
 
 ```text
 feat: 为双前端请求附加 CSRF token
@@ -227,36 +232,51 @@ feat: 为双前端请求附加 CSRF token
 ### Task 7：全量验证、浏览器和文档
 
 **Files:**
+- Modify: `docs/new_docs/安全/全站CSRF设计.md`
+- Modify: `docs/new_docs/安全/全站CSRF实施计划.md`
 - Modify: `docs/new_docs/插件化工作台/风险与约束.md`
 - Modify: `docs/new_docs/插件化工作台/开发计划.md`
 - Modify: `docs/new_docs/插件化工作台/验收记录.md`
-- Modify: `docs/new_docs/安全/全站CSRF设计.md`
+- Modify: `docs/new_docs/插件化工作台/API设计.md`
+- Modify: `docs/new_docs/插件化工作台/plugin-sdk契约.md`
+- Modify: `docs/new_docs/插件化工作台/后端架构.md`
 
-- [ ] **Step 1: 后端全量**
-
-```bash
-TEST_DB_NAME=workforce_hub_csrf_full_20260728 mvn -pl server -am test
-```
-
-- [ ] **Step 2: 双前端全量**
+- [x] **Step 1: 后端全量**
 
 ```bash
-cd admin-web && npm run test && npm run build
-cd employee-web && npm run test && npm run build
+cd server && TEST_DB_NAME=workforce_hub_test_csrf_20260729 mvn test
 ```
 
-- [ ] **Step 3: 浏览器验证**
+结果：`Tests run: 685, Failures: 0, Errors: 0, Skipped: 2`；`BUILD SUCCESS`。
 
-分别验证员工、管理员：首次登录前出现 `/api/csrf`；登录 POST 带 `X-XSRF-TOKEN`；登录后代表性写请求成功；手工移除 Header 后同请求为 403；对象存储 PUT 不含宿主 token。保存非敏感截图到根目录 `csrf-admin.png`、`csrf-employee.png`。
+- [x] **Step 2: 双前端全量**
 
-- [ ] **Step 4: 同步文档与风险**
+```bash
+(cd admin-web && npm run test && npm run build)
+(cd employee-web && npm run test && npm run build)
+```
 
-记录真实测试统计、Cookie/Header 契约、全站 403 语义、同源部署边界；将插件计划中的“全站 CSRF 未完成”改为已完成，同时保留插件 Origin/Referer 为附加防线。
+结果：admin-web `Test Files 13 passed (13)`、`Tests 73 passed (73)`，构建退出码 0；employee-web `Test Files 35 passed (35)`、`Tests 232 passed (232)`，构建退出码 0。
 
-- [ ] **Step 5: 独立复审和最终提交**
+- [x] **Step 3: 浏览器验证**
+
+分别验证员工、管理员登录页：首次写请求先出现 `/api/csrf`，登录 POST 带 `X-XSRF-TOKEN`，缺失/错误认证信息在 CSRF 校验通过后进入认证错误分支；对象存储隔离由真实 helper 测试覆盖。浏览器链路使用本地协议 stub，不输入真实凭证；保存截图到根目录 `csrf-admin.png`、`csrf-employee.png`。
+
+- [x] **Step 4: 同步文档与风险**
+
+记录真实测试统计、Cookie/Header 契约、全站 403 语义、同源部署边界；已同步插件计划的 CSRF 完成状态，同时保留插件 Origin/Referer 为附加防线。
+
+- [x] **Step 5: 独立复审和最终提交**
 
 执行 `git diff --check`，独立复审安全语义、测试覆盖与文档准确性，只精确暂存文档并提交：
 
 ```text
 docs: 记录全站 CSRF 验收结果
 ```
+
+### 实施结果
+
+- 后端采用 `CookieCsrfTokenRepository`，`GET /api/csrf` 匿名可用且 `no-store`；未配置 CSRF ignore，宿主不安全方法统一受保护。
+- 双端共享客户端覆盖 Cookie 精确读取/解码、动态 Header 名持续使用、并发 bootstrap、失败重试、调用方 Header 优先和 403 不重放。
+- 对象存储/本地上传桥不发送浏览器 `SESSION` Cookie 或宿主 `X-XSRF-TOKEN` Header；管理端同源/桥接 fetch 使用 `credentials: 'omit'`，跨源预签名使用 `withCredentials=false` 的 XHR；所有上传分支过滤大小写变体的 `X-XSRF-TOKEN`。
+- 未覆盖跨站部署的 CORS/SameSite/Secure/TLS 验证、强制 token 轮换、自动重放、默认 Flowable/Docker 启动和插件自有资源泄漏协议。

@@ -4,12 +4,19 @@
 
 为所有基于 `SESSION` Cookie 的宿主写接口启用 Spring Security CSRF，覆盖管理员端、员工端、匿名登录、验证码和密码重置接口；保持对象存储直传、WebSocket 和插件网关既有边界不变。
 
-## 当前事实
+## 实施前基线
 
 - `SecurityConfig` 当前全局 `csrf.disable`，Session 策略为 `IF_REQUIRED`。
 - 双前端全部宿主业务请求统一经过 `shared-web/api-http.ts`，默认发送 `credentials: include`。
 - 直接 `fetch`/`XMLHttpRequest` 仅用于文件 GET 预览、远程对象存储 PUT 或 Vite 本地上传桥，不经过 Spring 写接口。
 - 插件动作网关已有 Origin/Referer 白名单，WebSocket 握手已有 Origin 与 Session 校验；两者都不能替代全站 CSRF。
+
+## 实施后状态
+
+- `SecurityConfig` 已启用 `CookieCsrfTokenRepository`，未配置任何 `ignoringRequestMatchers`。
+- `GET /api/csrf` 匿名可访问，返回 `headerName/token`，设置 `Cache-Control: no-store`；所有宿主不安全方法（POST、PUT、PATCH、DELETE）均进入同一 CSRF 过滤器。
+- 登录、验证码、密码重置、登出和插件动作均要求 Cookie/Header 双提交；缺失或错误 token 返回统一 HTTP 403，正确 token 的匿名写请求继续进入认证链并返回 401。
+- `shared-web/api-http.ts` 已在两端接线：每次写请求重读 Cookie，缺失时共享 bootstrap Promise；bootstrap 返回的 `headerName` 会在同一 client 的后续请求持续使用，调用方显式 Header 优先，bootstrap 失败可由后续请求重试，业务 403 不自动重放。
 
 ## 方案比较
 
@@ -55,19 +62,19 @@
 
 `shared-web/api-http.ts` 在每次不安全请求前执行：
 
-1. 调用方已显式提供 `X-XSRF-TOKEN` 时保持原值，不重复 bootstrap。
+1. 调用方已显式提供当前 CSRF Header（默认 `X-XSRF-TOKEN`）时保持原值，不覆盖。
 2. 从 `document.cookie` 精确读取并 URL 解码 `XSRF-TOKEN`。
 3. Cookie 不存在时，用同一 `fetcher` 请求 `GET /api/csrf`；并发首次写请求共享同一个 Promise。
-4. 将 token 写入后端返回的 `headerName`，默认是 `X-XSRF-TOKEN`。
+4. 将 token 写入后端返回的 `headerName`，并在同一 client 的后续写请求继续使用该名称；默认是 `X-XSRF-TOKEN`。
 5. 浏览器 Cookie 优先于 bootstrap 缓存，保证服务端以后更新 Cookie 时下一次请求读取最新值。
 
 Cookie 缺失、损坏编码或无 `document` 的测试/非浏览器环境不得直接抛错；bootstrap 响应体提供 token 作为回退。
 
-## 不携带宿主 Token 的请求
+## 不携带宿主 CSRF Header 的请求
 
-- 管理端 RAGFlow 文件 XHR PUT：远程预签名 URL或 `/__admin-local-upload`。
-- 员工端文件 fetch PUT：远程预签名 URL或 `/__employee-local-upload`。
-- 文件预览和下载 GET。
+- 管理端 RAGFlow 文件：同源/本地桥 fetch 使用 `credentials: 'omit'`，跨源预签名 URL 使用 `withCredentials=false` 的 XHR 并报告进度；远程、同源和桥接分支均过滤大小写变体的 `X-XSRF-TOKEN`，不发送浏览器 `SESSION` Cookie。
+- 员工端文件 fetch PUT：远程预签名 URL或 `/__employee-local-upload`，使用 `credentials: 'omit'` 并过滤大小写变体的 `X-XSRF-TOKEN`，不发送浏览器 `SESSION` Cookie。
+- 文件预览和下载 GET 可按既有会话策略发送凭证，但不附加 CSRF Header。
 - WebSocket Upgrade。
 
 不得向对象存储 URL 附加 `SESSION` 或 `X-XSRF-TOKEN`，避免泄漏 token、破坏签名或触发额外 CORS 预检。
@@ -76,7 +83,7 @@ Cookie 缺失、损坏编码或无 `document` 的测试/非浏览器环境不得
 
 ### 真实后端协议
 
-新增独立集成测试，使用真实 `XSRF-TOKEN` Cookie 和 `X-XSRF-TOKEN` Header，覆盖：
+已新增独立集成测试，使用真实 `XSRF-TOKEN` Cookie 和 `X-XSRF-TOKEN` Header，覆盖：
 
 - `/api/csrf` 的响应、Cookie 属性和禁止缓存。
 - 管理员/员工登录缺 token、错误 token、正确 token。
@@ -94,8 +101,8 @@ Cookie 缺失、损坏编码或无 `document` 的测试/非浏览器环境不得
 
 - 当前共享客户端暴露的 POST/PUT/DELETE 注入，GET 不注入；Spring 后端同时保护未来可能出现的 PATCH。
 - Cookie 精确匹配、URL 解码、损坏编码、无 `document`。
-- 调用方 Header 优先、每次重读新 Cookie、并发 bootstrap 只发一次 GET。
-- 远程对象存储和 Vite 上传桥不携带宿主 token/Session。
+- 调用方 Header 优先、每次重读新 Cookie、动态 Header 名持续生效、并发 bootstrap 只发一次 GET、失败后可重试且 403 不重放。
+- 远程对象存储和 Vite 上传桥不发送浏览器 `SESSION` Cookie 或宿主 `X-XSRF-TOKEN` Header；管理端上传 helper 与员工端传输 composable 均有可执行 fetch/XHR 测试。
 - `shared-web` 改动后运行 admin-web、employee-web 全量测试和构建。
 
 ## 部署边界
