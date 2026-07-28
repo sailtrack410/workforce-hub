@@ -2,6 +2,7 @@ package com.workforcehub.file;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.common.audit.AuditLogWriter;
 import com.workforcehub.plugin.runtime.PluginEventDispatcher;
 import com.workforcehub.plugin.sdk.DomainEvent;
 import com.workforcehub.plugin.sdk.EventTypes;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -41,8 +43,14 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -75,6 +83,9 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @MockBean
     private PluginEventDispatcher pluginEventDispatcher;
+
+    @SpyBean
+    private AuditLogWriter auditLogWriter;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
@@ -350,6 +361,201 @@ class ModuleFileApiIntegrationTest extends LocalIntegrationTestSupport {
         assertAuditCountAtLeast("FILE_UPLOAD_CONFIRMED", 1);
         assertAuditCountAtLeast("FILE_UPLOAD_DEDUP", 1);
         assertAuditCountAtLeast("FILE_DOWNLOAD_TICKET_CREATED", 1);
+    }
+
+    @Test
+    @DisplayName("确认上传事务回滚时不应发布文件上传插件事件")
+    void confirmUploadRollbackShouldNotDispatchFileUploadedEvent() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "rollback-file-upload-event".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        MvcResult ticketResult = createUploadTicket(employeeSession, "回滚验证.txt", content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        doThrow(new IllegalStateException("audit failure"))
+            .when(auditLogWriter)
+            .write(
+                eq("USER"),
+                eq(EMPLOYEE_USER_ID),
+                eq("FILE_UPLOAD_CONFIRMED"),
+                eq("ATTACHMENT_REF"),
+                anyLong(),
+                eq("SUCCESS"),
+                anyString()
+            );
+
+        confirmUpload(employeeSession, uploadTicketId, objectKey, sha256, content.length, "回滚验证.txt")
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.code").value(100500));
+
+        Integer attachmentCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_attachment_ref WHERE source_upload_ticket_id = ?",
+            Integer.class,
+            uploadTicketId
+        );
+        assertEquals(0, attachmentCount);
+        assertEquals(0L, usedBytes("USER", EMPLOYEE_USER_ID));
+        assertEquals(0L, usedBytes("GLOBAL", null));
+        assertEquals(0L, fileCount("USER", EMPLOYEE_USER_ID));
+        assertEquals(0L, fileCount("GLOBAL", null));
+        verifyNoInteractions(pluginEventDispatcher);
+    }
+
+    @Test
+    @DisplayName("同一待确认票据并发确认应只创建一个附件并发布一次文件上传事件")
+    void concurrentConfirmShouldCreateOneAttachmentAndDispatchOnce() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "concurrent-confirm-file-event".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+
+        MvcResult ticketResult = createUploadTicket(employeeSession, "并发确认事件.txt", content.length, sha256)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        JsonNode ticketData = data(ticketResult);
+        Long uploadTicketId = ticketData.get("uploadTicketId").asLong();
+        String objectKey = ticketData.get("objectKey").asText();
+        writeLocalObject(objectKey, content);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<MvcResult> first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return confirmUpload(
+                    employeeSession,
+                    uploadTicketId,
+                    objectKey,
+                    sha256,
+                    content.length,
+                    "并发确认事件.txt"
+                ).andReturn();
+            });
+            Future<MvcResult> second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return confirmUpload(
+                    employeeSession,
+                    uploadTicketId,
+                    objectKey,
+                    sha256,
+                    content.length,
+                    "并发确认事件.txt"
+                ).andReturn();
+            });
+            ready.await();
+            start.countDown();
+
+            MvcResult firstResult = first.get();
+            MvcResult secondResult = second.get();
+            assertEquals(200, firstResult.getResponse().getStatus());
+            assertEquals(200, secondResult.getResponse().getStatus());
+            Long firstAttachmentRefId = data(firstResult).get("attachmentRefId").asLong();
+            Long secondAttachmentRefId = data(secondResult).get("attachmentRefId").asLong();
+            assertEquals(firstAttachmentRefId, secondAttachmentRefId);
+
+            Integer attachmentCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_attachment_ref WHERE source_upload_ticket_id = ? AND is_deleted = 0",
+                Integer.class,
+                uploadTicketId
+            );
+            assertEquals(1, attachmentCount);
+            assertEquals(content.length, usedBytes("USER", EMPLOYEE_USER_ID));
+            assertEquals(content.length, usedBytes("GLOBAL", null));
+            assertEquals(1L, fileCount("USER", EMPLOYEE_USER_ID));
+            assertEquals(1L, fileCount("GLOBAL", null));
+
+            ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+            verify(pluginEventDispatcher, times(1)).dispatch(eventCaptor.capture());
+            assertEquals(firstAttachmentRefId, eventCaptor.getValue().payload().get("attachmentRefId"));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("同一客户端请求并发秒传应只创建一个附件并发布一次文件上传事件")
+    void concurrentDeduplicatedUploadShouldCreateOneAttachmentAndDispatchOnce() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        seedDefaultQuotaPolicy();
+        byte[] content = "concurrent-deduplicated-file-event".getBytes(StandardCharsets.UTF_8);
+        String sha256 = sha256(content);
+        createConfirmedPersonalFile(employeeSession, "秒传事件源文件.txt", content);
+        clearInvocations(pluginEventDispatcher);
+        String clientRequestId = "concurrent-file-event-" + System.nanoTime();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<MvcResult> first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return createUploadTicket(
+                    employeeSession,
+                    "并发秒传事件.txt",
+                    content.length,
+                    sha256,
+                    clientRequestId
+                ).andReturn();
+            });
+            Future<MvcResult> second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return createUploadTicket(
+                    employeeSession,
+                    "并发秒传事件.txt",
+                    content.length,
+                    sha256,
+                    clientRequestId
+                ).andReturn();
+            });
+            ready.await();
+            start.countDown();
+
+            MvcResult firstResult = first.get();
+            MvcResult secondResult = second.get();
+            assertEquals(200, firstResult.getResponse().getStatus());
+            assertEquals(200, secondResult.getResponse().getStatus());
+            Long firstAttachmentRefId = data(firstResult).get("attachmentRefId").asLong();
+            Long secondAttachmentRefId = data(secondResult).get("attachmentRefId").asLong();
+            assertEquals(firstAttachmentRefId, secondAttachmentRefId);
+
+            Long attachmentCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM sys_attachment_ref ar
+                JOIN sys_file_object fo ON fo.id = ar.file_object_id
+                WHERE fo.content_sha256 = ? AND fo.file_size = ? AND ar.is_deleted = 0
+                """, Long.class, sha256, content.length);
+            Long uploadTicketCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_upload_ticket WHERE client_request_id = ? AND is_deleted = 0",
+                Long.class,
+                clientRequestId
+            );
+            assertEquals(2L, attachmentCount);
+            assertEquals(1L, uploadTicketCount);
+            assertEquals(content.length * 2L, usedBytes("USER", EMPLOYEE_USER_ID));
+            assertEquals(content.length * 2L, usedBytes("GLOBAL", null));
+            assertEquals(2L, fileCount("USER", EMPLOYEE_USER_ID));
+            assertEquals(2L, fileCount("GLOBAL", null));
+
+            ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+            verify(pluginEventDispatcher, times(1)).dispatch(eventCaptor.capture());
+            assertEquals(firstAttachmentRefId, eventCaptor.getValue().payload().get("attachmentRefId"));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

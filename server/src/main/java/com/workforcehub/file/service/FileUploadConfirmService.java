@@ -17,6 +17,7 @@ import com.workforcehub.file.storage.StorageProviderRegistry;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -62,7 +63,7 @@ public class FileUploadConfirmService {
         this.domainEventPublisher = domainEventPublisher;
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public AttachmentRefResponse confirmEmployeeUpload(ConfirmUploadRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         UploadTicketRow ticket = getUploadTicketOrThrow(request.getUploadTicketId());
@@ -144,7 +145,7 @@ public class FileUploadConfirmService {
         return buildAttachmentResponse(attachmentRefId, deduplicated);
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public AttachmentRefResponse confirmAdminUpload(ConfirmUploadRequest request) {
         Long adminId = CurrentUserHolder.requireUserId();
         UploadTicketRow ticket = getUploadTicketOrThrow(request.getUploadTicketId());

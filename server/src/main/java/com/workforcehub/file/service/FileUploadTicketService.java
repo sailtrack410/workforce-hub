@@ -22,6 +22,7 @@ import com.workforcehub.file.storage.StorageUploadTarget;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -72,7 +73,7 @@ public class FileUploadTicketService {
     }
 
     // 员工上传票据：幂等（同 clientRequestId 返回已有票据）、校验配额、秒传检测
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public UploadTicketResponse createEmployeeUploadTicket(CreateUploadTicketRequest request) {
         Long userId = CurrentUserHolder.requireUserId();
         fileUploadRules.validateEmployeeOwner(request.getOwnerType(), request.getOwnerId());
@@ -130,7 +131,7 @@ public class FileUploadTicketService {
         return createPendingUploadTicket("USER", userId, request, "FILE_UPLOAD_TICKET_CREATED");
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public UploadTicketResponse createAdminUploadTicket(CreateUploadTicketRequest request) {
         Long adminId = CurrentUserHolder.requireUserId();
         fileUploadRules.validateAdminOwner(request.getOwnerType(), request.getOwnerId());

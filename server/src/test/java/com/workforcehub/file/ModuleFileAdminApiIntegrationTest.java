@@ -2,14 +2,19 @@ package com.workforcehub.file;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.plugin.runtime.PluginEventDispatcher;
+import com.workforcehub.plugin.sdk.DomainEvent;
+import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -34,6 +39,8 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -51,6 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
 
     private static final long EMPLOYEE_USER_ID = 2003L;
+    private static final long ADMIN_USER_ID = 8001L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -63,6 +71,9 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private DataSource dataSource;
+
+    @MockBean
+    private PluginEventDispatcher pluginEventDispatcher;
 
     @Value("${workforce.file.local-root:target/test-file-storage}")
     private String localRoot;
@@ -157,6 +168,13 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
 
         assertEquals(firstUploadTicketId, data(secondDedupResult).get("uploadTicketId").asLong());
         assertEquals(firstAttachmentRefId, data(secondDedupResult).get("attachmentRefId").asLong());
+
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(pluginEventDispatcher, times(2)).dispatch(eventCaptor.capture());
+        List<DomainEvent> uploadedEvents = eventCaptor.getAllValues();
+        assertAdminFileUploadedEvent(uploadedEvents.get(0), existingAttachmentRefId);
+        assertAdminFileUploadedEvent(uploadedEvents.get(1), firstAttachmentRefId);
+
         assertEquals(content.length * 2L, usedBytes("GLOBAL", null));
         assertEquals(2L, fileCount("GLOBAL", null));
         assertEquals(2L, attachmentRefCount(sha256, content.length));
@@ -869,6 +887,14 @@ class ModuleFileAdminApiIntegrationTest extends LocalIntegrationTestSupport {
             WHERE client_request_id = ? AND status = 'CONFIRMED' AND is_deleted = 0
             """, Long.class, clientRequestId);
         return value == null ? 0L : value;
+    }
+
+    private void assertAdminFileUploadedEvent(DomainEvent event, Long attachmentRefId) {
+        assertEquals(EventTypes.FILE_UPLOADED, event.eventType());
+        assertEquals(attachmentRefId, event.payload().get("attachmentRefId"));
+        assertEquals("ADMIN_FILE", event.payload().get("ownerType"));
+        assertEquals("ADMIN", event.payload().get("uploaderType"));
+        assertEquals(ADMIN_USER_ID, event.payload().get("uploaderId"));
     }
 
     private long cleanupDetailCountByObjectKey(String objectKey, String itemType, String status) {

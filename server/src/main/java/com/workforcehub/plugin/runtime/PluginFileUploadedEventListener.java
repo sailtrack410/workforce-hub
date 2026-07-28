@@ -51,9 +51,9 @@ public class PluginFileUploadedEventListener {
             eventDispatcher.dispatch(pluginEvent);
         } catch (RuntimeException e) {
             log.warn(
-                "文件上传插件事件分发失败: attachmentRefId={}, exceptionType={}",
+                "文件上传插件事件分发失败: attachmentRefId={}",
                 event.attachmentRefId(),
-                e.getClass().getSimpleName()
+                e
             );
         }
     }
