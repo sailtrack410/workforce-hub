@@ -24,6 +24,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 /**
  * 安全配置
@@ -89,8 +91,15 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie.path("/").sameSite("Lax"));
+        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
+
         http
-            .csrf(AbstractHttpConfigurer::disable)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(repository)
+                .csrfTokenRequestHandler(requestHandler)
+            )
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
             .logout(AbstractHttpConfigurer::disable)
@@ -101,6 +110,7 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
                 // 匿名入口（按接口粒度拆开，避免通配符把不同安全级别接口混在一起）
+                .requestMatchers("/api/csrf").permitAll()
                 .requestMatchers("/api/employee/auth/login").permitAll()
                 .requestMatchers("/api/employee/auth/login/send-code").permitAll()
                 .requestMatchers("/api/employee/auth/email/send-code").permitAll()
@@ -127,7 +137,12 @@ public class SecurityConfig {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     response.setCharacterEncoding("UTF-8");
-                    objectMapper.writeValue(response.getWriter(), R.fail(BusinessErrorCode.FORBIDDEN.code(), "无权限访问"));
+                    R<Void> body = R.fail(BusinessErrorCode.FORBIDDEN.code(), "无权限访问");
+                    Object requestId = request.getAttribute(RequestIdFilter.MDC_KEY);
+                    if (requestId != null) {
+                        body.setRequestId(requestId.toString());
+                    }
+                    objectMapper.writeValue(response.getWriter(), body);
                 })
             );
 

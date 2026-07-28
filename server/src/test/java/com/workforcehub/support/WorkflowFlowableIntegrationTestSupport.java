@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * module-workflow 专用集成测试支撑。
  * 与普通本地集成测试基线不同，本基线显式保留 Flowable 自动配置，用真实流程引擎跑审批闭环。
  */
+@Import(CsrfMockMvcTestConfiguration.class)
 public abstract class WorkflowFlowableIntegrationTestSupport {
 
     private static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;

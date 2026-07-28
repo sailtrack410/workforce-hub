@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * - 统一注入本地 MySQL / Redis 连接参数
  * - 在测试开始前装载 module-org 冒烟种子数据
  */
+@Import(CsrfMockMvcTestConfiguration.class)
 public abstract class LocalIntegrationTestSupport {
 
     private static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;

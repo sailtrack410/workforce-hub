@@ -38,6 +38,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.Duration;
@@ -63,6 +64,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -140,7 +142,7 @@ class PluginGatewaySecurityTest {
 
     @Test
     void shouldReturn401WhenAnonymous() throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -151,7 +153,7 @@ class PluginGatewaySecurityTest {
 
     @Test
     void shouldAcceptTrustedOrigin() throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
                 .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -162,7 +164,7 @@ class PluginGatewaySecurityTest {
 
     @Test
     void shouldAcceptTrustedRefererWithPath() throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
                 .header(HttpHeaders.REFERER, TRUSTED_ORIGIN + "/messages/42")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -174,7 +176,7 @@ class PluginGatewaySecurityTest {
     @ParameterizedTest
     @ValueSource(strings = {"http://standard.example:80", "https://secure.example:443"})
     void shouldNormalizeStandardOriginPorts(String origin) throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
                 .header(HttpHeaders.ORIGIN, origin)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -185,7 +187,7 @@ class PluginGatewaySecurityTest {
 
     @Test
     void shouldRejectAuthenticatedRequestWithoutOriginOrReferer() throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -199,7 +201,7 @@ class PluginGatewaySecurityTest {
     @MethodSource("untrustedRequestSources")
     void shouldRejectUntrustedRequestBeforePluginLookup(
             String caseName, String origin, String referer) throws Exception {
-        var request = post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        var request = gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authentication(authenticatedPrincipal(UserType.ADMIN, 1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}");
@@ -222,7 +224,7 @@ class PluginGatewaySecurityTest {
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
             "admin", null, List.of());
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authentication(authentication))
                 .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -236,7 +238,7 @@ class PluginGatewaySecurityTest {
         when(pluginManagerService.getPlugin("missing"))
             .thenThrow(new NoSuchElementException("插件不存在"));
 
-        mockMvc.perform(post("/api/plugin-gateway/missing/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest("missing", ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -254,7 +256,7 @@ class PluginGatewaySecurityTest {
         plugin.setStatus(status);
         when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin);
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -269,7 +271,7 @@ class PluginGatewaySecurityTest {
         when(pluginManagerService.findActionHandler(PLUGIN_ID, "missing.action"))
             .thenReturn(Optional.empty());
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/missing.action")
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, "missing.action")
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -285,7 +287,7 @@ class PluginGatewaySecurityTest {
         doThrow(new PluginPermissionService.PermissionDeniedException("动作未授权"))
             .when(permissionService).checkPermission(any(), eq(PLUGIN_ID), eq(ACTION_CODE));
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -298,7 +300,7 @@ class PluginGatewaySecurityTest {
 
     @Test
     void shouldReturn400WhenMissingRequiredParam() throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -310,7 +312,7 @@ class PluginGatewaySecurityTest {
 
     @Test
     void shouldReturn400ForMalformedJson() throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":"))
@@ -324,7 +326,7 @@ class PluginGatewaySecurityTest {
         when(pluginManagerService.getPlugin(PLUGIN_ID))
             .thenThrow(new IllegalStateException("internal detail"));
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -335,7 +337,7 @@ class PluginGatewaySecurityTest {
 
     @Test
     void shouldBindAuthoritativeAdminContext() throws Exception {
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 42L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -357,7 +359,7 @@ class PluginGatewaySecurityTest {
         // 关门
         lifecycleGuard.beginDisable(PLUGIN_ID);
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -373,7 +375,7 @@ class PluginGatewaySecurityTest {
         when(handler.execute(any(InvocationContext.class), anyMap()))
             .thenThrow(new RuntimeException("handler boom"));
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -401,7 +403,7 @@ class PluginGatewaySecurityTest {
         CompletableFuture<MvcResult> resultFuture =
             CompletableFuture.supplyAsync(() -> {
             try {
-                return mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+                return mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                         .with(authenticated(UserType.ADMIN, 1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"test\"}"))
@@ -415,7 +417,7 @@ class PluginGatewaySecurityTest {
 
         lifecycleGuard.beginDisable(PLUGIN_ID);
 
-        mockMvc.perform(post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
                 .with(authenticated(UserType.ADMIN, 1L))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
@@ -426,6 +428,11 @@ class PluginGatewaySecurityTest {
 
         var result = resultFuture.get(5, TimeUnit.SECONDS);
         assertEquals(200, result.getResponse().getStatus());
+    }
+
+    private MockHttpServletRequestBuilder gatewayRequest(String pluginId, String actionCode) {
+        return post("/api/plugin-gateway/" + pluginId + "/actions/" + actionCode)
+            .with(csrf().asHeader());
     }
 
     private static Stream<Arguments> untrustedRequestSources() {
