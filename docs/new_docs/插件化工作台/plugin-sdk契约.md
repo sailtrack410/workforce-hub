@@ -222,9 +222,9 @@ public record DomainEvent(
 - 只接受 `null`、String、Boolean、有限数字、String-key Map 和 List；拒绝 DTO、Date、Set、数组、NaN 与 Infinity。
 - `DomainEvent` 本身允许未知事件类型；订阅服务只接受上列六种类型。
 
-### 规划中的 v1 payload schema
+### v1 payload schema
 
-以下字段是设计约定，当前只存在通用 `PluginDomainEventAdapter` 和 `PluginEventDispatcher`，尚未接入 `DomainEventPublisher` 或六类真实业务发布点，也没有在运行时逐字段校验这些 payload。
+以下字段是 v1 设计约定。`FILE_UPLOADED` 已接入真实业务发布点；其余五类尚未接入。当前适配器不在运行时逐字段校验 payload，字段正确性由宿主发布代码和测试保证。
 
 #### WORKFLOW_APPROVED / WORKFLOW_REJECTED
 
@@ -275,6 +275,15 @@ public record DomainEvent(
 | `uploaderType` | string | 是 | `USER` 或 `ADMIN` |
 | `uploaderId` | number | 是 | 上传者 ID |
 | `scanStatus` | string | 是 | 上传确认时的安全扫描状态 |
+
+宿主发布语义：
+
+- 员工和管理员普通确认、秒传仅在首次创建 `sys_attachment_ref` 后注册提交后事件；顺序幂等重试和并发冲突的失败方不重复发布，事务回滚不发布
+- `eventId` 与 `idempotencyKey` 均为 `file-uploaded-{attachmentRefId}`，`version=1`，`triggeredBy` 为当前上传操作者 ID，`occurredAt` 使用附件引用创建时间
+- 四个顶层上传事务使用 `READ_COMMITTED`，避免 MySQL `REPEATABLE_READ` 下唯一键冲突事务因旧快照看不到并发赢家记录；唯一约束仍负责裁决唯一业务记录
+- 分发为事务提交后同步、best-effort；插件分发异常只记录完整堆栈，不反向影响已提交文件业务。当前没有 outbox、持久化重试或崩溃补偿
+- `publishEvent`、`@EventListener` 和订阅 handler 沿上传请求线程同步执行；慢或卡死插件会延迟或阻塞响应，`ActionDescriptor.defaultTimeout` 当前不构成事件 handler 超时约束
+- 业务发布到 dispatcher、listener 转换与异常隔离已有自动化测试；真实 PF4J 插件订阅处理器端到端仍未完成
 
 #### ATTENDANCE_EXCEPTION
 
