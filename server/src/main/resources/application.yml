@@ -100,6 +100,10 @@ flowable:
   database-schema-update: ${FLOWABLE_DB_SCHEMA_UPDATE:false}
   async-executor-activate: true
   history-level: audit
+  idm:
+    enabled: false
+  eventregistry:
+    enabled: false
 
 # ==================== Workforce Hub 业务配置 ====================
 workforce:
