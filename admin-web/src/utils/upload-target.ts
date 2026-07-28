@@ -1,10 +1,11 @@
 export async function uploadToTicketTarget(uploadUrl: string, file: File, uploadHeaders: Record<string, string>, onProgress: (percent: number) => void) {
   const remote = /^https?:\/\//i.test(uploadUrl);
   const requestUrl = remote ? uploadUrl : '/__admin-local-upload';
+  const safeUploadHeaders = stripHostCsrfHeader(uploadHeaders);
   const headers = remote
-    ? uploadHeaders
+    ? safeUploadHeaders
     : {
-      'Content-Type': uploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
+      'Content-Type': safeUploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
       'X-Upload-Path': encodeURIComponent(uploadUrl),
     };
   const crossOrigin = remote && new URL(uploadUrl).origin !== window.location.origin;
@@ -35,4 +36,10 @@ export async function uploadToTicketTarget(uploadUrl: string, file: File, upload
     xhr.onabort = () => reject(new Error('文件上传已取消'));
     xhr.send(file);
   });
+}
+
+function stripHostCsrfHeader(headers: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([key]) => key.toLowerCase() !== 'x-xsrf-token'),
+  );
 }

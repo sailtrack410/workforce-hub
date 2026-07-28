@@ -15,6 +15,7 @@ describe('usePersonalFileTransfer', () => {
     await uploadToTicketTarget('https://objects.example/upload', file, {
       'Content-Type': 'text/plain',
       'X-Object-Header': 'signed-value',
+      'x-xsrf-token': 'lowercase-token',
     });
 
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -28,7 +29,7 @@ describe('usePersonalFileTransfer', () => {
         'X-Object-Header': 'signed-value',
       },
     });
-    expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('X-XSRF-TOKEN')).toBe(false);
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('x-xsrf-token')).toBe(false);
   });
 
   it('uploads through the Vite bridge without host credentials or csrf', async () => {
@@ -40,6 +41,7 @@ describe('usePersonalFileTransfer', () => {
     await uploadToTicketTarget('target/uploads/hello.txt', file, {
       'Content-Type': 'text/plain',
       'X-Object-Header': 'signed-value',
+      'X-xSrF-ToKeN': 'mixed-case-token',
     });
 
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -53,6 +55,6 @@ describe('usePersonalFileTransfer', () => {
         'X-Upload-Path': 'target/uploads/hello.txt',
       },
     });
-    expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('X-XSRF-TOKEN')).toBe(false);
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('X-XsRf-ToKeN')).toBe(false);
   });
 });

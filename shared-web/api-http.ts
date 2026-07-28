@@ -62,13 +62,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const fetcher = options.fetcher ?? fetch.bind(globalThis);
   const defaultHeaders = headersToRecord(options.defaultHeaders);
   const unsafeIntegerFieldNames = new Set(options.unsafeIntegerFieldNames ?? []);
+  let csrfHeaderName = 'X-XSRF-TOKEN';
   let csrfBootstrapPromise: Promise<{ headerName?: string; token?: string }> | null = null;
 
   async function addCsrfHeader(method: string, headers: Record<string, string>) {
-    if (SAFE_METHODS.has(method) || new Headers(headers).has('X-XSRF-TOKEN')) return;
+    if (SAFE_METHODS.has(method) || new Headers(headers).has(csrfHeaderName)) return;
 
     let token = readCookie('XSRF-TOKEN');
-    let headerName = 'X-XSRF-TOKEN';
     if (!token) {
       if (!csrfBootstrapPromise) {
         csrfBootstrapPromise = request<{ headerName?: string; token?: string }>('/api/csrf', { method: 'GET' })
@@ -78,10 +78,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           });
       }
       const bootstrap = await csrfBootstrapPromise;
-      headerName = bootstrap.headerName || headerName;
+      csrfHeaderName = bootstrap.headerName || csrfHeaderName;
       token = readCookie('XSRF-TOKEN') || bootstrap.token || null;
     }
-    if (token) headers[headerName] = token;
+    if (token && !new Headers(headers).has(csrfHeaderName)) headers[csrfHeaderName] = token;
   }
 
   async function request<T>(path: string, requestOptions: ApiRequestOptions = {}): Promise<T> {

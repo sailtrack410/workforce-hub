@@ -158,6 +158,29 @@ describe('createApiClient csrf', () => {
     expect(new Headers(fetcher.mock.calls[1][1]?.headers).get('X-XSRF-TOKEN')).toBe('cookie-after-bootstrap');
   });
 
+  it('keeps the bootstrap header name for later requests and honors a caller override', async () => {
+    const documentStub = stubDocumentCookie('');
+    const fetcher = vi.fn()
+      .mockImplementationOnce(async () => {
+        documentStub.cookie = 'XSRF-TOKEN=first-cookie';
+        return csrfResponse('bootstrap-body-token', 'X-CSRF-TOKEN');
+      })
+      .mockImplementation(() => Promise.resolve(successResponse()));
+    const client = createApiClient({ fetcher });
+
+    await client.post('/api/custom-first');
+    documentStub.cookie = 'XSRF-TOKEN=second-cookie';
+    await client.put('/api/custom-second');
+    await client.delete('/api/custom-caller', { headers: { 'X-CSRF-TOKEN': 'caller-token' } });
+
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).get('X-CSRF-TOKEN')).toBe('first-cookie');
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).has('X-XSRF-TOKEN')).toBe(false);
+    expect(new Headers(fetcher.mock.calls[2][1]?.headers).get('X-CSRF-TOKEN')).toBe('second-cookie');
+    expect(new Headers(fetcher.mock.calls[2][1]?.headers).has('X-XSRF-TOKEN')).toBe(false);
+    expect(new Headers(fetcher.mock.calls[3][1]?.headers).get('X-CSRF-TOKEN')).toBe('caller-token');
+    expect(new Headers(fetcher.mock.calls[3][1]?.headers).has('X-XSRF-TOKEN')).toBe(false);
+  });
+
   it('allows a later unsafe request to retry after bootstrap fails', async () => {
     vi.stubGlobal('document', undefined);
     const fetcher = vi.fn()

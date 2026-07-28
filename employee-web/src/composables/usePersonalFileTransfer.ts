@@ -123,11 +123,12 @@ export function usePersonalFileTransfer() {
   }
 
   function uploadToTicketTarget(uploadUrl: string, file: File, uploadHeaders: Record<string, string>) {
+    const safeUploadHeaders = stripHostCsrfHeader(uploadHeaders);
     if (/^https?:\/\//i.test(uploadUrl)) {
       return fetch(uploadUrl, {
         method: 'PUT',
         body: file,
-        headers: uploadHeaders,
+        headers: safeUploadHeaders,
         credentials: 'omit',
       });
     }
@@ -135,7 +136,7 @@ export function usePersonalFileTransfer() {
       method: 'PUT',
       body: file,
       headers: {
-        'Content-Type': uploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
+        'Content-Type': safeUploadHeaders['Content-Type'] ?? (file.type || 'application/octet-stream'),
         'X-Upload-Path': uploadUrl,
       },
       credentials: 'omit',
@@ -157,6 +158,12 @@ export function usePersonalFileTransfer() {
     uploadToTicketTarget,
     resolveDownloadUrl,
   };
+}
+
+function stripHostCsrfHeader(headers: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([key]) => key.toLowerCase() !== 'x-xsrf-token'),
+  );
 }
 
 function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
