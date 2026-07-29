@@ -37,7 +37,9 @@
 
 HTTP 动作必须声明 `ActionDescriptor.idempotent=true`，并提交恰好一个 `Idempotency-Key` Header；键只允许 `[A-Za-z0-9._:-]`，长度 1–128，大小写敏感。唯一作用域为插件、动作、宿主绑定的调用者类型与 ID、幂等键；请求摘要使用递归排序对象键后的 JSON 参数，数组顺序和数值类型保留，空请求体与 `{}` 等价。客户端身份 Header 和 `X-Request-Id` 不参与幂等身份。
 
-首次请求用短事务写入 `IN_PROGRESS` claim，插件 handler 在事务外执行。相同作用域、相同参数的并发请求在执行记录存在时返回 HTTP `409`、业务码 `3002`、`retryable=true` 和 `Retry-After: 1`；相同键但不同参数返回 HTTP `409`、业务码 `3001`。成功及 `retryable=false` 的业务失败通过有界输出流缓存不超过 256 KiB 的 JSON `ServiceResult`，后续请求严格校验结构后回放；异常和 `retryable=true` 结果释放 claim。响应序列化、大小校验或最终写库失败时保留 claim，避免重跑可能已经产生副作用的动作。
+首次请求用短事务写入 `IN_PROGRESS` claim，插件 handler 在事务外执行。相同作用域、相同参数的并发请求在执行记录存在时返回 HTTP `409`、业务码 `3002`、`retryable=true` 和 `Retry-After: 1`；相同键但不同参数返回 HTTP `409`、业务码 `3001`。成功及 `retryable=false` 的业务失败通过有界输出流缓存不超过 256 KiB 的 JSON `ServiceResult`，后续请求严格校验结构后回放；`ServiceResult.fail(...)` 拒绝使用成功码 `0`，只有显式 `retryable=true` 的失败结果释放 claim。handler 抛出的普通异常或非致命 `Error`、返回 `null`、响应序列化、大小校验或最终写库失败均保留 claim，避免重跑可能已经产生副作用的动作。
+
+`PLUGIN_ACTION_EXECUTED` 是正常进程内的结果审计，不是强一致合规审计：handler 返回、普通异常或非致命 `Error` 均尝试写脱敏审计；HTTP 调用者记录为宿主绑定的 `USER / ADMIN + userId`。明细只包含 `pluginId / actionCode / triggerSource / serviceCode / retryable`，不包含参数、请求 ID、幂等键、摘要、响应、异常或路径。完成响应回放、执行中冲突、同键不同参数冲突及所有 handler 执行前阻断都不新增“已执行”审计。成功/不可重试结果的完成更新与审计同事务，显式可重试结果的 claim 释放与审计同事务；抛出异常、非致命 `Error`、`null` 和响应处理失败会另写失败审计并保留 `IN_PROGRESS`。当前不预写 `PENDING`；JVM 崩溃、致命错误或最终写库失败仍可能留下真实副作用和 `IN_PROGRESS`，但没有审计行。
 
 `IN_PROGRESS` 不设置租期，不自动重领或清理；进程崩溃、响应序列化失败或最终写库状态不确定时，幂等键保持 fail closed，必须由运维确认外部副作用后人工恢复。完成响应用数据库时间计算 24 小时重放期，过期后可安全复用该键，定时任务每轮最多分 100 批清理过期完成记录。HTTP `defaultTimeout` 当前不强制中断 handler，也不改变 claim 所有权；Nginx 网关等待上限为 330 秒。自动幂等只承诺持久化去重与响应回放，不承诺外部系统副作用的 exactly-once。六类事件均已接入真实业务事务提交后发布，其中 `EMPLOYEE_HIRED` 已通过真实签名 PF4J 订阅处理器完成端到端验证；事件 handler 只接受 `idempotent=true`，由分发器执行有界异步回调和协作式超时中断。
 

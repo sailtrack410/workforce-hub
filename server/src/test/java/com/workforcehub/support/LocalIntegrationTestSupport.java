@@ -73,6 +73,9 @@ public abstract class LocalIntegrationTestSupport {
         registry.add("spring.datasource.username", () -> envOrFallback("TEST_DB_USER", "DB_USER", "root"));
         registry.add("spring.datasource.password", () -> envOrFallback("TEST_DB_PASSWORD", "DB_PASSWORD", "REDACTED_DB_PASSWORD"));
         registry.add("spring.data.redis.host", () -> env("REDIS_HOST", "localhost"));
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
+        registry.add("spring.datasource.hikari.minimum-idle", () -> "0");
+        registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
         registry.add("spring.data.redis.port", () -> env("REDIS_PORT", "6379"));
         registry.add("spring.data.redis.password", () -> env("REDIS_PASSWORD", ""));
         registry.add("spring.session.redis.namespace", LocalIntegrationTestSupport::testSessionRedisNamespace);

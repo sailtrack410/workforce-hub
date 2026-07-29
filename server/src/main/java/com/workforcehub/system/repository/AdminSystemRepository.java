@@ -199,6 +199,9 @@ public class AdminSystemRepository {
         if ("PLUGIN_ENABLED".equals(value)) return "启用插件";
         if ("PLUGIN_DISABLED".equals(value)) return "停用插件";
         if ("PLUGIN_UNINSTALLED".equals(value)) return "卸载插件";
+        if ("PLUGIN_ACTION_EXECUTED".equals(value)) return "执行插件动作";
+        if ("PLUGIN_EVENT_SUBSCRIBED".equals(value)) return "订阅插件事件";
+        if ("PLUGIN_EVENT_UNSUBSCRIBED".equals(value)) return "取消插件事件订阅";
         if ("APPROVE".equals(value)) return "审批通过";
         if ("REJECT".equals(value)) return "审批驳回";
         if ("SUBMIT".equals(value)) return "提交申请";
@@ -225,6 +228,8 @@ public class AdminSystemRepository {
         if ("ATTENDANCE_DAILY_RESULT".equals(value)) return "考勤日结果";
         if ("OPS_ALERT".equals(value)) return "系统告警";
         if ("PLUGIN".equals(value)) return "插件";
+        if ("PLUGIN_ACTION".equals(value)) return "插件动作";
+        if ("PLUGIN_EVENT_SUBSCRIPTION".equals(value)) return "插件事件订阅";
         return value == null ? null : "业务对象";
     }
 

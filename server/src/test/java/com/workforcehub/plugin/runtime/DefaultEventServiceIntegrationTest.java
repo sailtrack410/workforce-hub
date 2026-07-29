@@ -1,5 +1,6 @@
 package com.workforcehub.plugin.runtime;
 
+import com.workforcehub.common.audit.AuditLogWriter;
 import com.workforcehub.plugin.repository.PluginEventSubscriptionRepository;
 import com.workforcehub.plugin.repository.PluginOperationIdempotencyRepository;
 import com.workforcehub.plugin.sdk.ActionDescriptor;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -64,6 +66,9 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
 
     @SpyBean
     private PluginOperationIdempotencyRepository idempotencyRepository;
+
+    @SpyBean
+    private AuditLogWriter auditLogWriter;
 
     private InvocationContext ctx;
 
@@ -109,6 +114,13 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
             PLUGIN_ID,
             EVENT_TYPE
         ));
+        assertEquals(1, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
+        assertEquals("SYSTEM", jdbc.queryForObject("""
+            SELECT operator_type
+            FROM sys_audit_log
+            WHERE action_type = 'PLUGIN_EVENT_SUBSCRIBED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, String.class, PLUGIN_ID));
     }
 
     @Test
@@ -128,6 +140,7 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
             PLUGIN_ID,
             EVENT_TYPE
         ));
+        assertEquals(1, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
     }
 
     @Test
@@ -150,6 +163,7 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
             PLUGIN_ID,
             EVENT_TYPE
         ));
+        assertEquals(1, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
     }
 
     @Test
@@ -178,6 +192,7 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
             PLUGIN_ID,
             EVENT_TYPE
         ));
+        assertEquals(1, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
     }
 
     @Test
@@ -190,6 +205,69 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
 
         assertEquals(0, countRows("sys_plugin_event_subscription"));
         assertEquals(0, countRows("sys_plugin_operation_idempotency"));
+        assertEquals(0, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
+    }
+
+    @Test
+    void auditFailureShouldRollBackSubscriptionAndIdempotencyClaim() {
+        doThrow(new DataAccessResourceFailureException("forced audit failure"))
+            .when(auditLogWriter).write(
+                eq("SYSTEM"),
+                isNull(),
+                eq("PLUGIN_EVENT_SUBSCRIBED"),
+                eq("PLUGIN_EVENT_SUBSCRIPTION"),
+                isNull(),
+                eq("SUCCESS"),
+                anyString()
+            );
+
+        assertThrows(DataAccessResourceFailureException.class,
+            () -> eventService.subscribe(ctx, EVENT_TYPE, "handle-a", "subscribe-audit-failure"));
+
+        assertEquals(0, countRows("sys_plugin_event_subscription"));
+        assertEquals(0, countRows("sys_plugin_operation_idempotency"));
+        assertEquals(0, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
+    }
+
+    @Test
+    void unsubscribeShouldPersistOneAuditWithoutReplayingSubscribeAudit() {
+        assertEquals(ErrorCodes.SUCCESS,
+            eventService.subscribe(ctx, EVENT_TYPE, "handle-a", "subscribe-before-unsubscribe").getCode());
+
+        assertEquals(ErrorCodes.SUCCESS,
+            eventService.unsubscribe(ctx, EVENT_TYPE, "unsubscribe-1").getCode());
+        assertEquals(ErrorCodes.SUCCESS,
+            eventService.unsubscribe(ctx, EVENT_TYPE, "unsubscribe-1").getCode());
+
+        assertEquals(0, countRows("sys_plugin_event_subscription"));
+        assertEquals(2, countRows("sys_plugin_operation_idempotency"));
+        assertEquals(1, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
+        assertEquals(1, auditCount("PLUGIN_EVENT_UNSUBSCRIBED"));
+    }
+
+    @Test
+    void unsubscribeAuditFailureShouldRollBackDeleteAndIdempotencyClaim() {
+        assertEquals(ErrorCodes.SUCCESS,
+            eventService.subscribe(ctx, EVENT_TYPE, "handle-a", "subscribe-before-audit-failure").getCode());
+        doThrow(new DataAccessResourceFailureException("forced audit failure"))
+            .when(auditLogWriter).write(
+                eq("SYSTEM"),
+                isNull(),
+                eq("PLUGIN_EVENT_UNSUBSCRIBED"),
+                eq("PLUGIN_EVENT_SUBSCRIPTION"),
+                isNull(),
+                eq("SUCCESS"),
+                anyString()
+            );
+
+        assertThrows(DataAccessResourceFailureException.class,
+            () -> eventService.unsubscribe(
+                ctx, EVENT_TYPE, "unsubscribe-audit-failure"));
+
+        assertEquals(1, countRows("sys_plugin_event_subscription"));
+        assertEquals(1, countRows("sys_plugin_operation_idempotency"));
+        assertEquals(1, auditCount("PLUGIN_EVENT_SUBSCRIBED"));
+        assertEquals(0, auditCount("PLUGIN_EVENT_UNSUBSCRIBED"));
     }
 
     @Test
@@ -230,6 +308,16 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
             Integer.class,
             PLUGIN_ID
         );
+        return count == null ? 0 : count;
+    }
+
+    private int auditCount(String actionType) {
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_audit_log
+            WHERE action_type = ?
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, Integer.class, actionType, PLUGIN_ID);
         return count == null ? 0 : count;
     }
 

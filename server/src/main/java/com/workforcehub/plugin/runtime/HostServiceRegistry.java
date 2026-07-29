@@ -150,38 +150,53 @@ final class HostServiceRegistry {
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            // 跳过 Object 方法
-            if (method.getDeclaringClass() == Object.class) {
-                return method.invoke(delegate, args);
-            }
-
-            // 首参必须为非 null InvocationContext
-            if (args == null || args.length == 0 || !(args[0] instanceof InvocationContext ctx)) {
-                throw new PluginPermissionService.PermissionDeniedException(
-                    "HostService 方法首参必须为 InvocationContext");
-            }
-
-            // ctx.pluginId 必须等于代理绑定的 pluginId
-            if (!pluginId.equals(ctx.getPluginId())) {
-                throw new PluginPermissionService.PermissionDeniedException(
-                    "调用者 pluginId 不匹配: 期望 %s, 实际 %s"
-                        .formatted(pluginId, ctx.getPluginId()));
-            }
-
-            // 方法必须有非空能力注解
-            RequiresCapability annotation = method.getAnnotation(RequiresCapability.class);
-            if (annotation == null || annotation.value().isBlank()) {
-                throw new PluginPermissionService.PermissionDeniedException(
-                    "方法缺少能力声明: " + method.getName());
-            }
-
-            // 检查插件能力（数据库为准）
-            permissionService.checkPluginCapability(pluginId, annotation.value());
-
+            Thread callerThread = Thread.currentThread();
+            ClassLoader originalContextClassLoader = callerThread.getContextClassLoader();
+            boolean originallyInterrupted = callerThread.isInterrupted();
             try {
-                return method.invoke(delegate, args);
-            } catch (InvocationTargetException e) {
-                throw e.getCause();
+                callerThread.setContextClassLoader(HostServiceRegistry.class.getClassLoader());
+                Thread.interrupted();
+
+                // 跳过 Object 方法
+                if (method.getDeclaringClass() == Object.class) {
+                    return method.invoke(delegate, args);
+                }
+
+                // 首参必须为非 null InvocationContext
+                if (args == null || args.length == 0 || !(args[0] instanceof InvocationContext ctx)) {
+                    throw new PluginPermissionService.PermissionDeniedException(
+                        "HostService 方法首参必须为 InvocationContext");
+                }
+
+                // ctx.pluginId 必须等于代理绑定的 pluginId
+                if (!pluginId.equals(ctx.getPluginId())) {
+                    throw new PluginPermissionService.PermissionDeniedException(
+                        "调用者 pluginId 不匹配: 期望 %s, 实际 %s"
+                            .formatted(pluginId, ctx.getPluginId()));
+                }
+
+                // 方法必须有非空能力注解
+                RequiresCapability annotation = method.getAnnotation(RequiresCapability.class);
+                if (annotation == null || annotation.value().isBlank()) {
+                    throw new PluginPermissionService.PermissionDeniedException(
+                        "方法缺少能力声明: " + method.getName());
+                }
+
+                // 检查插件能力（数据库为准）
+                permissionService.checkPluginCapability(pluginId, annotation.value());
+
+                try {
+                    return method.invoke(delegate, args);
+                } catch (InvocationTargetException e) {
+                    throw e.getCause();
+                }
+            } finally {
+                callerThread.setContextClassLoader(originalContextClassLoader);
+                if (originallyInterrupted) {
+                    callerThread.interrupt();
+                } else {
+                    Thread.interrupted();
+                }
             }
         }
     }

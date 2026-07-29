@@ -17,6 +17,7 @@ import com.workforcehub.plugin.runtime.PluginManagerService;
 import com.workforcehub.plugin.runtime.PluginParamValidator;
 import com.workforcehub.plugin.runtime.PluginPermissionService;
 import com.workforcehub.plugin.sdk.ActionDescriptor;
+import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.ParamSchema;
@@ -54,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -489,8 +492,37 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isInternalServerError())
-            .andExpect(jsonPath("$.code").value(5000))
+            .andExpect(jsonPath("$.code").value(ErrorCodes.INTERNAL_ERROR))
             .andExpect(jsonPath("$.message").value("服务内部错误"));
+    }
+
+    @Test
+    void shouldReturn500AndRestoreThreadStateWhenDescriptorThrowsError() throws Exception {
+        Thread requestThread = Thread.currentThread();
+        ClassLoader original = requestThread.getContextClassLoader();
+        ClassLoader pluginClassLoader = new ClassLoader(original) { };
+        when(handler.getDescriptor()).thenAnswer(invocation -> {
+            requestThread.setContextClassLoader(pluginClassLoader);
+            requestThread.interrupt();
+            throw new AssertionError("descriptor failure");
+        });
+
+        try {
+            mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
+                    .with(authenticated(UserType.ADMIN, 1L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"test\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value(ErrorCodes.INTERNAL_ERROR))
+                .andExpect(jsonPath("$.message").value("动作执行失败"));
+
+            assertSame(original, requestThread.getContextClassLoader());
+            assertFalse(requestThread.isInterrupted());
+            assertEquals(0, lifecycleGuard.getActiveCount(PLUGIN_ID));
+        } finally {
+            requestThread.setContextClassLoader(original);
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -538,7 +570,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isInternalServerError())
-            .andExpect(jsonPath("$.code").value(5000));
+            .andExpect(jsonPath("$.code").value(ErrorCodes.INTERNAL_ERROR));
 
         // guard 应释放，activeCount 回到 0
         assertEquals(0, lifecycleGuard.getActiveCount(PLUGIN_ID));

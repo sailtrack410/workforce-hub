@@ -1,5 +1,7 @@
 package com.workforcehub.plugin;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
@@ -29,7 +31,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.reset;
@@ -66,6 +70,9 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private PluginLifecycleGuard lifecycleGuard;
@@ -166,6 +173,24 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.data.executed").value(true));
 
         verify(handler).execute(any(InvocationContext.class), anyMap());
+        assertEquals(1, pluginActionAuditCount());
+        Map<String, Object> audit = jdbcTemplate.queryForMap("""
+            SELECT operator_type, operator_id, result, target_type, target_id,
+                   CAST(detail_json AS CHAR) AS detail_json
+            FROM sys_audit_log
+            WHERE action_type = 'PLUGIN_ACTION_EXECUTED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, PLUGIN_ID);
+        assertEquals("ADMIN", audit.get("operator_type"));
+        assertEquals(8001L, ((Number) audit.get("operator_id")).longValue());
+        assertEquals("SUCCESS", audit.get("result"));
+        assertEquals("PLUGIN_ACTION", audit.get("target_type"));
+        assertEquals(null, audit.get("target_id"));
+        JsonNode detail = objectMapper.readTree((String) audit.get("detail_json"));
+        assertEquals(
+            Set.of("pluginId", "actionCode", "triggerSource", "serviceCode", "retryable"),
+            objectMapper.convertValue(detail, Map.class).keySet()
+        );
     }
 
     @Test
@@ -184,6 +209,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
 
         verify(pluginManagerService, never()).getPlugin(PLUGIN_ID);
         verify(handler, never()).execute(any(), anyMap());
+        assertEquals(0, pluginActionAuditCount());
     }
 
     @Test
@@ -205,6 +231,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.code").value(4003));
 
         verify(handler, times(1)).execute(any(), anyMap());
+        assertEquals(1, pluginActionAuditCount());
     }
 
     @Test
@@ -219,6 +246,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.data.executed").value(true));
 
         verify(handler, times(1)).execute(any(), anyMap());
+        assertEquals(1, pluginActionAuditCount());
     }
 
     @Test
@@ -242,6 +270,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.code").value(3001));
 
         verify(handler, times(1)).execute(any(), anyMap());
+        assertEquals(1, pluginActionAuditCount());
     }
 
     @Test
@@ -376,6 +405,16 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return result.getResponse().getCookie("SESSION");
+    }
+
+    private int pluginActionAuditCount() {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_audit_log
+            WHERE action_type = 'PLUGIN_ACTION_EXECUTED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, Integer.class, PLUGIN_ID);
+        return count == null ? 0 : count;
     }
 
     private Cookie loginEmployee() throws Exception {

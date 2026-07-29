@@ -7,6 +7,7 @@ import com.workforcehub.plugin.runtime.PluginActionIdempotencyService;
 import com.workforcehub.plugin.runtime.PluginManagerService;
 import com.workforcehub.plugin.runtime.PluginParamValidator;
 import com.workforcehub.plugin.runtime.PluginPermissionService;
+import com.workforcehub.plugin.sdk.ActionDescriptor;
 import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.InvocationContextBinder;
@@ -124,10 +125,33 @@ public class PluginGatewayController {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ServiceResult.fail(4009, "插件正在停用"));
         }
+        Thread requestThread = Thread.currentThread();
+        ClassLoader originalContextClassLoader = requestThread.getContextClassLoader();
+        boolean originallyInterrupted = requestThread.isInterrupted();
         try {
             return doExecute(pluginId, actionCode, params, request, ctx);
+        } catch (Throwable e) {
+            rethrowIfFatal(e);
+            log.error(
+                "插件动作网关失败: pluginId={}, actionCode={}, errorType={}",
+                pluginId,
+                actionCode,
+                e.getClass().getName()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ServiceResult.fail(ErrorCodes.INTERNAL_ERROR, "动作执行失败"));
         } finally {
-            lifecycleGuard.release(pluginId);
+            try {
+                useHostThreadState(requestThread);
+                lifecycleGuard.release(pluginId);
+            } finally {
+                requestThread.setContextClassLoader(originalContextClassLoader);
+                if (originallyInterrupted) {
+                    requestThread.interrupt();
+                } else {
+                    Thread.interrupted();
+                }
+            }
         }
     }
 
@@ -145,6 +169,8 @@ public class PluginGatewayController {
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ServiceResult.fail(4004, "插件不存在"));
+        } finally {
+            useHostThreadState(Thread.currentThread());
         }
         if (handlerOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -154,13 +180,19 @@ public class PluginGatewayController {
         PluginActionHandler handler = handlerOpt.get();
 
         // 6. 参数校验（根据 inputSchema）
-        List<String> paramErrors = paramValidator.validate(handler.getDescriptor(), params);
+        ActionDescriptor descriptor;
+        try {
+            descriptor = handler.getDescriptor();
+        } finally {
+            useHostThreadState(Thread.currentThread());
+        }
+        List<String> paramErrors = paramValidator.validate(descriptor, params);
         if (!paramErrors.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ServiceResult.fail(1000, String.join("; ", paramErrors)));
         }
 
-        if (!handler.getDescriptor().idempotent()) {
+        if (!descriptor.idempotent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ServiceResult.fail(ErrorCodes.STATE_CONFLICT, "动作未声明为幂等，禁止 HTTP 调用"));
         }
@@ -195,10 +227,15 @@ public class PluginGatewayController {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ServiceResult.fail(ErrorCodes.DUPLICATE_OPERATION, "幂等键已用于不同请求"));
         } catch (Exception e) {
-            log.error("插件动作执行失败: pluginId={}, actionCode={}", pluginId, actionCode, e);
+            log.error(
+                "插件动作执行失败: pluginId={}, actionCode={}, errorType={}",
+                pluginId,
+                actionCode,
+                e.getClass().getName()
+            );
             // 不泄露内部信息
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ServiceResult.fail(5000, "动作执行失败"));
+                .body(ServiceResult.fail(ErrorCodes.INTERNAL_ERROR, "动作执行失败"));
         }
     }
 
@@ -213,9 +250,9 @@ public class PluginGatewayController {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ServiceResult<Object>> handleException(Exception e) {
-        log.error("网关异常", e);
+        log.error("网关异常: errorType={}", e.getClass().getName());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ServiceResult.fail(5000, "服务内部错误"));
+            .body(ServiceResult.fail(ErrorCodes.INTERNAL_ERROR, "服务内部错误"));
     }
 
     private boolean isTrustedRequestSource(HttpServletRequest request) {
@@ -246,6 +283,20 @@ public class PluginGatewayController {
                 parsed.add(normalized);
             });
         return Set.copyOf(parsed);
+    }
+
+    private static void useHostThreadState(Thread thread) {
+        thread.setContextClassLoader(PluginGatewayController.class.getClassLoader());
+        Thread.interrupted();
+    }
+
+    private static void rethrowIfFatal(Throwable throwable) {
+        if (throwable instanceof VirtualMachineError error) {
+            throw error;
+        }
+        if (throwable instanceof ThreadDeath threadDeath) {
+            throw threadDeath;
+        }
     }
 
     private String normalizeOrigin(String value, boolean allowPath) {

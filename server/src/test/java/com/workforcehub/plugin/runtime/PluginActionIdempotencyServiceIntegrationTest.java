@@ -1,7 +1,11 @@
 package com.workforcehub.plugin.runtime;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.common.audit.AuditLogWriter;
 import com.workforcehub.plugin.repository.PluginActionIdempotencyRepository;
 import com.workforcehub.plugin.sdk.ActionDescriptor;
+import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.plugin.sdk.ServiceResult;
@@ -31,14 +35,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -60,8 +68,14 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @SpyBean
     private PluginActionIdempotencyRepository repository;
+
+    @SpyBean
+    private AuditLogWriter auditLogWriter;
 
     private TestInvocationContextBinder binder;
     private InvocationContext ctx;
@@ -106,6 +120,13 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
         assertEquals(initial.getData(), replay.getData());
         assertEquals(1, executions.get());
         assertEquals("COMPLETED", status("replay-key", 1001L, ACTION_CODE));
+        assertEquals(1, auditCount());
+        JsonNode detail = auditDetail();
+        assertEquals(PLUGIN_ID, detail.get("pluginId").asText());
+        assertEquals(ACTION_CODE, detail.get("actionCode").asText());
+        assertEquals("HTTP_REQUEST", detail.get("triggerSource").asText());
+        assertEquals(0, detail.get("serviceCode").asInt());
+        assertEquals(false, detail.get("retryable").asBoolean());
     }
 
     @Test
@@ -140,6 +161,7 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
             executor.shutdownNow();
         }
         assertEquals(1, executions.get());
+        assertEquals(1, auditCount());
     }
 
     @Test
@@ -191,6 +213,7 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
             () -> service.execute(
                 PLUGIN_ID, ACTION_CODE, "conflict-key", ctx, Map.of("value", "b"), handler));
         assertEquals(1, executions.get());
+        assertEquals(1, auditCount());
     }
 
     @Test
@@ -328,22 +351,136 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
     }
 
     @Test
-    void handlerExceptionShouldReleaseClaimForRetry() {
+    void handlerExceptionShouldKeepClaimAndPreventDuplicateExecution() {
         AtomicInteger executions = new AtomicInteger();
         PluginActionHandler handler = handler(params -> {
-            if (executions.incrementAndGet() == 1) {
-                throw new IllegalStateException("handler failure");
-            }
-            return ServiceResult.ok(Map.of("value", "retried"));
+            executions.incrementAndGet();
+            throw new IllegalStateException("handler failure");
         });
 
         assertThrows(IllegalStateException.class,
             () -> service.execute(PLUGIN_ID, ACTION_CODE, "handler-failure", ctx, Map.of(), handler));
-        assertEquals(0, rowCount());
+        assertEquals("IN_PROGRESS", status("handler-failure", 1001L, ACTION_CODE));
+        assertEquals(1, auditCount());
+        assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+            () -> service.execute(PLUGIN_ID, ACTION_CODE, "handler-failure", ctx, Map.of(), handler));
+        assertEquals(1, executions.get());
+        assertEquals(1, auditCount());
+    }
 
-        assertEquals(0,
-            service.execute(PLUGIN_ID, ACTION_CODE, "handler-failure", ctx, Map.of(), handler).getCode());
-        assertEquals(2, executions.get());
+    @Test
+    void handlerFailureAuditFailureShouldKeepClaimAndPreventDuplicateExecution() {
+        AtomicInteger executions = new AtomicInteger();
+        PluginActionHandler handler = handler(params -> {
+            executions.incrementAndGet();
+            throw new IllegalStateException("handler failure");
+        });
+        doThrow(new DataAccessResourceFailureException("forced audit failure"))
+            .when(auditLogWriter).write(
+                eq("ADMIN"),
+                eq(1001L),
+                eq("PLUGIN_ACTION_EXECUTED"),
+                eq("PLUGIN_ACTION"),
+                isNull(),
+                eq("FAIL"),
+                anyString()
+            );
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+            () -> service.execute(
+                PLUGIN_ID, ACTION_CODE, "handler-audit-failure", ctx, Map.of(), handler));
+        assertEquals(1, error.getSuppressed().length);
+        assertTrue(error.getSuppressed()[0] instanceof DataAccessResourceFailureException);
+        assertEquals("IN_PROGRESS", status("handler-audit-failure", 1001L, ACTION_CODE));
+        assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+            () -> service.execute(
+                PLUGIN_ID, ACTION_CODE, "handler-audit-failure", ctx, Map.of(), handler));
+        assertEquals(1, executions.get());
+        assertEquals(0, auditCount());
+    }
+
+    @Test
+    void nullHandlerResultShouldAuditFailClosedAndRestoreThreadState() {
+        Thread requestThread = Thread.currentThread();
+        ClassLoader original = requestThread.getContextClassLoader();
+        ClassLoader pluginClassLoader = new ClassLoader(original) { };
+        AtomicInteger executions = new AtomicInteger();
+        PluginActionHandler handler = handler(params -> {
+            executions.incrementAndGet();
+            requestThread.setContextClassLoader(pluginClassLoader);
+            requestThread.interrupt();
+            return null;
+        });
+
+        try {
+            IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> service.execute(
+                    PLUGIN_ID, ACTION_CODE, "handler-null", ctx, Map.of(), handler));
+
+            assertEquals("插件动作返回 null", error.getMessage());
+            assertSame(original, requestThread.getContextClassLoader());
+            assertFalse(requestThread.isInterrupted());
+            assertEquals("IN_PROGRESS", status("handler-null", 1001L, ACTION_CODE));
+            assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+                () -> service.execute(
+                    PLUGIN_ID, ACTION_CODE, "handler-null", ctx, Map.of(), handler));
+            assertEquals(1, executions.get());
+            assertEquals(1, auditCount());
+            assertEquals(ErrorCodes.INTERNAL_ERROR, auditDetail().get("serviceCode").asInt());
+        } finally {
+            requestThread.setContextClassLoader(original);
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void nonFatalHandlerErrorShouldAuditFailClosedAndRestoreThreadState() {
+        Thread requestThread = Thread.currentThread();
+        ClassLoader original = requestThread.getContextClassLoader();
+        ClassLoader pluginClassLoader = new ClassLoader(original) { };
+        AtomicInteger executions = new AtomicInteger();
+        AtomicReference<ClassLoader> auditClassLoader = new AtomicReference<>();
+        AtomicReference<Boolean> auditInterrupted = new AtomicReference<>();
+        PluginActionHandler handler = handler(params -> {
+            executions.incrementAndGet();
+            requestThread.setContextClassLoader(pluginClassLoader);
+            requestThread.interrupt();
+            throw new AssertionError("handler failure");
+        });
+        doAnswer(invocation -> {
+            auditClassLoader.set(requestThread.getContextClassLoader());
+            auditInterrupted.set(requestThread.isInterrupted());
+            return invocation.callRealMethod();
+        }).when(auditLogWriter).write(
+            eq("ADMIN"),
+            eq(1001L),
+            eq("PLUGIN_ACTION_EXECUTED"),
+            eq("PLUGIN_ACTION"),
+            isNull(),
+            eq("FAIL"),
+            anyString()
+        );
+
+        try {
+            IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> service.execute(
+                    PLUGIN_ID, ACTION_CODE, "handler-error", ctx, Map.of(), handler));
+
+            assertTrue(error.getCause() instanceof AssertionError);
+            assertSame(PluginActionIdempotencyService.class.getClassLoader(), auditClassLoader.get());
+            assertEquals(Boolean.FALSE, auditInterrupted.get());
+            assertSame(original, requestThread.getContextClassLoader());
+            assertFalse(requestThread.isInterrupted());
+            assertEquals("IN_PROGRESS", status("handler-error", 1001L, ACTION_CODE));
+            assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+                () -> service.execute(
+                    PLUGIN_ID, ACTION_CODE, "handler-error", ctx, Map.of(), handler));
+            assertEquals(1, executions.get());
+            assertEquals(1, auditCount());
+        } finally {
+            requestThread.setContextClassLoader(original);
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -357,10 +494,41 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
             PLUGIN_ID, ACTION_CODE, "retryable-key", ctx, Map.of(), handler);
         assertTrue(retryable.isRetryable());
         assertEquals(0, rowCount());
+        assertEquals(1, auditCount());
 
         assertEquals(0,
             service.execute(PLUGIN_ID, ACTION_CODE, "retryable-key", ctx, Map.of(), handler).getCode());
         assertEquals(2, executions.get());
+        assertEquals(2, auditCount());
+    }
+
+    @Test
+    void retryableAuditFailureShouldKeepClaimAndPreventDuplicateExecution() {
+        AtomicInteger executions = new AtomicInteger();
+        PluginActionHandler handler = handler(params -> {
+            executions.incrementAndGet();
+            return ServiceResult.fail(4001, "retry", true);
+        });
+        doThrow(new DataAccessResourceFailureException("forced audit failure"))
+            .when(auditLogWriter).write(
+                eq("ADMIN"),
+                eq(1001L),
+                eq("PLUGIN_ACTION_EXECUTED"),
+                eq("PLUGIN_ACTION"),
+                isNull(),
+                eq("FAIL"),
+                anyString()
+            );
+
+        assertThrows(DataAccessResourceFailureException.class,
+            () -> service.execute(
+                PLUGIN_ID, ACTION_CODE, "retryable-audit-failure", ctx, Map.of(), handler));
+        assertEquals("IN_PROGRESS", status("retryable-audit-failure", 1001L, ACTION_CODE));
+        assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+            () -> service.execute(
+                PLUGIN_ID, ACTION_CODE, "retryable-audit-failure", ctx, Map.of(), handler));
+        assertEquals(1, executions.get());
+        assertEquals(0, auditCount());
     }
 
     @Test
@@ -379,34 +547,63 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
         assertEquals(3000, initial.getCode());
         assertEquals(initial.getMessage(), replay.getMessage());
         assertEquals(1, executions.get());
+        assertEquals(1, auditCount());
     }
 
     @Test
     void serializationFailureShouldLeaveFailClosedClaim() {
+        Thread requestThread = Thread.currentThread();
+        ClassLoader original = requestThread.getContextClassLoader();
+        ClassLoader pluginClassLoader = new ClassLoader(original) { };
         AtomicInteger executions = new AtomicInteger();
+        AtomicReference<ClassLoader> auditClassLoader = new AtomicReference<>();
+        AtomicReference<Boolean> auditInterrupted = new AtomicReference<>();
         PluginActionHandler handler = handler(params -> {
             executions.incrementAndGet();
-            return ServiceResult.ok(new BrokenResponse());
+            return ServiceResult.ok(new BrokenResponse(pluginClassLoader));
         });
+        doAnswer(invocation -> {
+            auditClassLoader.set(requestThread.getContextClassLoader());
+            auditInterrupted.set(requestThread.isInterrupted());
+            return invocation.callRealMethod();
+        }).when(auditLogWriter).write(
+            eq("ADMIN"),
+            eq(1001L),
+            eq("PLUGIN_ACTION_EXECUTED"),
+            eq("PLUGIN_ACTION"),
+            isNull(),
+            eq("FAIL"),
+            anyString()
+        );
 
-        assertThrows(IllegalStateException.class,
-            () -> service.execute(PLUGIN_ID, ACTION_CODE, "serialization-key", ctx, Map.of(), handler));
-        assertEquals("IN_PROGRESS", status("serialization-key", 1001L, ACTION_CODE));
-        assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
-            () -> service.execute(PLUGIN_ID, ACTION_CODE, "serialization-key", ctx, Map.of(), handler));
-        assertEquals(1, executions.get());
+        try {
+            assertThrows(IllegalStateException.class,
+                () -> service.execute(PLUGIN_ID, ACTION_CODE, "serialization-key", ctx, Map.of(), handler));
+            assertSame(PluginActionIdempotencyService.class.getClassLoader(), auditClassLoader.get());
+            assertEquals(Boolean.FALSE, auditInterrupted.get());
+            assertSame(original, requestThread.getContextClassLoader());
+            assertFalse(requestThread.isInterrupted());
+            assertEquals("IN_PROGRESS", status("serialization-key", 1001L, ACTION_CODE));
+            assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+                () -> service.execute(PLUGIN_ID, ACTION_CODE, "serialization-key", ctx, Map.of(), handler));
+            assertEquals(1, executions.get());
+            assertEquals(1, auditCount());
 
-        jdbc.update("""
-            UPDATE sys_plugin_action_idempotency
-            SET created_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 25 HOUR)
-            WHERE plugin_id = ? AND idempotency_key = ?
-            """, PLUGIN_ID, "serialization-key");
-        cleanupJob.cleanupExpired();
+            jdbc.update("""
+                UPDATE sys_plugin_action_idempotency
+                SET created_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 25 HOUR)
+                WHERE plugin_id = ? AND idempotency_key = ?
+                """, PLUGIN_ID, "serialization-key");
+            cleanupJob.cleanupExpired();
 
-        assertEquals("IN_PROGRESS", status("serialization-key", 1001L, ACTION_CODE));
-        assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
-            () -> service.execute(PLUGIN_ID, ACTION_CODE, "serialization-key", ctx, Map.of(), handler));
-        assertEquals(1, executions.get());
+            assertEquals("IN_PROGRESS", status("serialization-key", 1001L, ACTION_CODE));
+            assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+                () -> service.execute(PLUGIN_ID, ACTION_CODE, "serialization-key", ctx, Map.of(), handler));
+            assertEquals(1, executions.get());
+        } finally {
+            requestThread.setContextClassLoader(original);
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -425,6 +622,7 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
             () -> service.execute(PLUGIN_ID, ACTION_CODE, "large-response", ctx, Map.of(), handler));
         assertEquals(1, executions.get());
         assertTrue(serializedValues.get() < 1_000_000);
+        assertEquals(1, auditCount());
     }
 
     @Test
@@ -443,6 +641,34 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
         assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
             () -> service.execute(PLUGIN_ID, ACTION_CODE, "complete-failure", ctx, Map.of(), handler));
         assertEquals(1, executions.get());
+        assertEquals(0, auditCount());
+    }
+
+    @Test
+    void auditFailureShouldRollBackCompletionAndPreventDuplicateExecution() {
+        AtomicInteger executions = new AtomicInteger();
+        PluginActionHandler handler = handler(params -> {
+            executions.incrementAndGet();
+            return ServiceResult.ok(Map.of("value", "done"));
+        });
+        doThrow(new DataAccessResourceFailureException("forced audit failure"))
+            .when(auditLogWriter).write(
+                eq("ADMIN"),
+                eq(1001L),
+                eq("PLUGIN_ACTION_EXECUTED"),
+                eq("PLUGIN_ACTION"),
+                isNull(),
+                eq("SUCCESS"),
+                anyString()
+            );
+
+        assertThrows(DataAccessResourceFailureException.class,
+            () -> service.execute(PLUGIN_ID, ACTION_CODE, "audit-failure", ctx, Map.of(), handler));
+        assertEquals("IN_PROGRESS", status("audit-failure", 1001L, ACTION_CODE));
+        assertThrows(PluginActionIdempotencyService.ActionInProgressException.class,
+            () -> service.execute(PLUGIN_ID, ACTION_CODE, "audit-failure", ctx, Map.of(), handler));
+        assertEquals(1, executions.get());
+        assertEquals(0, auditCount());
     }
 
     @Test
@@ -556,6 +782,32 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
         return count == null ? 0 : count;
     }
 
+    private int auditCount() {
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_audit_log
+            WHERE action_type = 'PLUGIN_ACTION_EXECUTED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, Integer.class, PLUGIN_ID);
+        return count == null ? 0 : count;
+    }
+
+    private JsonNode auditDetail() {
+        try {
+            String detail = jdbc.queryForObject("""
+                SELECT CAST(detail_json AS CHAR)
+                FROM sys_audit_log
+                WHERE action_type = 'PLUGIN_ACTION_EXECUTED'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+                ORDER BY occurred_at, id
+                LIMIT 1
+                """, String.class, PLUGIN_ID);
+            return objectMapper.readTree(detail);
+        } catch (Exception e) {
+            throw new IllegalStateException("审计详情读取失败", e);
+        }
+    }
+
     private String status(String key, Long callerId, String actionCode) {
         return jdbc.queryForObject("""
             SELECT status
@@ -647,7 +899,15 @@ class PluginActionIdempotencyServiceIntegrationTest extends LocalIntegrationTest
 
     private static final class BrokenResponse {
 
+        private final ClassLoader pluginClassLoader;
+
+        private BrokenResponse(ClassLoader pluginClassLoader) {
+            this.pluginClassLoader = pluginClassLoader;
+        }
+
         public String getValue() {
+            Thread.currentThread().setContextClassLoader(pluginClassLoader);
+            Thread.currentThread().interrupt();
             throw new IllegalStateException("broken response");
         }
     }

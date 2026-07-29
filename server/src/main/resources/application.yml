@@ -90,7 +90,7 @@ mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
 # ==================== Flowable ====================
 # Flowable BPMN 引擎表（ACT_* / FLW_*）已通过 Flyway V11 纳入主库迁移。

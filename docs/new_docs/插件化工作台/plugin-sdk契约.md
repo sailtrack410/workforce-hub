@@ -165,7 +165,7 @@ public final class ServiceResult<T> {
 }
 ```
 
-`ok(...)` 固定返回 `code=0`、`message=success`、`retryable=false`；失败结果的 `data` 为 `null`。
+`ok(...)` 固定返回 `code=0`、`message=success`、`retryable=false`；失败结果的 `data` 为 `null`，且 `fail(...)` 拒绝使用成功码 `0`。
 
 | 范围 | 当前常量 |
 |------|----------|
@@ -381,7 +381,7 @@ POST /api/plugin-gateway/{pluginId}/actions/{actionCode}
 
 来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后由宿主绑定 `InvocationContext` 并完成插件/动作/用户权限校验，未授权请求统一返回 `403`；权限通过后才校验插件状态和生命周期入口、发现 PF4J 动作并校验输入 Schema。非法或未授权请求不会占用幂等键，也不能回放旧响应。
 
-HTTP handler 必须声明 `idempotent=true`。每次调用必须携带唯一 `Idempotency-Key`，格式为 `[A-Za-z0-9._:-]{1,128}`，不能复用 `X-Request-Id`。作用域包含插件、动作、宿主绑定调用者类型与 ID；同作用域同键同参数只执行一次并在 24 小时内回放完整 `ServiceResult`，执行中返回可重试 `409`，同键不同参数返回 `409/3001`。异常和 `retryable=true` 在 claim 成功释放后允许同请求重试；`IN_PROGRESS` 不按时间自动重领或清理，响应序列化、超限或完成写库失败会永久阻断该键，直到运维确认副作用后人工恢复。`defaultTimeout` 尚不强制中断 HTTP handler，也不改变 claim 所有权；宿主不承诺外部副作用 exactly-once。
+HTTP handler 必须声明 `idempotent=true`。每次调用必须携带唯一 `Idempotency-Key`，格式为 `[A-Za-z0-9._:-]{1,128}`，不能复用 `X-Request-Id`。作用域包含插件、动作、宿主绑定调用者类型与 ID；同作用域同键同参数只执行一次并在 24 小时内回放完整 `ServiceResult`，执行中返回可重试 `409`，同键不同参数返回 `409/3001`。只有显式 `retryable=true` 的 `ServiceResult` 在 claim 成功释放后允许同请求重试；handler 抛出异常、非致命 `Error`、返回 `null`、响应序列化、超限或完成写库失败会阻断该键，直到运维确认副作用后人工恢复。`IN_PROGRESS` 不按时间自动重领或清理；`defaultTimeout` 尚不强制中断 HTTP handler，也不改变 claim 所有权，宿主不承诺外部副作用 exactly-once。
 
 ---
 

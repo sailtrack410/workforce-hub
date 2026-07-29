@@ -42,14 +42,17 @@ public class PluginActionIdempotencyService {
 
     private final PluginActionIdempotencyRepository repository;
     private final ObjectMapper objectMapper;
+    private final PluginAuditService auditService;
     private final TransactionTemplate transactionTemplate;
 
     public PluginActionIdempotencyService(
             PluginActionIdempotencyRepository repository,
             ObjectMapper objectMapper,
+            PluginAuditService auditService,
             PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -61,58 +64,109 @@ public class PluginActionIdempotencyService {
             InvocationContext ctx,
             Map<String, Object> params,
             PluginActionHandler handler) {
-        if (ctx.getUserId() == null) {
-            throw new IllegalStateException("HTTP 插件动作缺少调用者身份");
-        }
-        if (!pluginId.equals(ctx.getPluginId())
-                || ctx.getSource() != InvocationContext.TriggerSource.HTTP_REQUEST) {
-            throw new IllegalStateException("HTTP 插件动作上下文不匹配");
-        }
-
-        ActionDescriptor descriptor = handler.getDescriptor();
-        if (!descriptor.idempotent()) {
-            throw new IllegalStateException("HTTP 插件动作必须声明为幂等");
-        }
-        ClaimScope scope = new ClaimScope(
-            pluginId,
-            actionCode,
-            ctx.getCallerType().name(),
-            ctx.getUserId(),
-            idempotencyKey
-        );
-        String requestHash = requestHash(params);
-        ClaimResult claim = claim(scope, requestHash);
-
-        if (claim.status() == ClaimStatus.REPLAY) {
-            return readResponse(claim.responseJson());
-        }
-        if (claim.status() == ClaimStatus.IN_PROGRESS) {
-            throw new ActionInProgressException();
-        }
-        if (claim.status() == ClaimStatus.CONFLICT) {
-            throw new IdempotencyConflictException();
-        }
-
-        ServiceResult<Object> result;
+        Thread requestThread = Thread.currentThread();
+        ClassLoader originalContextClassLoader = requestThread.getContextClassLoader();
+        boolean originallyInterrupted = requestThread.isInterrupted();
         try {
-            result = handler.execute(ctx, params);
-        } catch (RuntimeException e) {
-            releaseAfterHandlerFailure(scope, requestHash, claim.claimToken(), e);
-            throw e;
-        }
+            if (ctx.getUserId() == null) {
+                throw new IllegalStateException("HTTP 插件动作缺少调用者身份");
+            }
+            if (!pluginId.equals(ctx.getPluginId())
+                    || ctx.getSource() != InvocationContext.TriggerSource.HTTP_REQUEST) {
+                throw new IllegalStateException("HTTP 插件动作上下文不匹配");
+            }
 
-        if (result == null) {
-            throw new IllegalStateException("插件动作返回 null");
-        }
-        if (result.isRetryable()) {
-            release(scope, requestHash, claim.claimToken());
-            return result;
-        }
+            ActionDescriptor descriptor;
+            try {
+                descriptor = handler.getDescriptor();
+            } finally {
+                useHostThreadState(requestThread);
+            }
+            if (!descriptor.idempotent()) {
+                throw new IllegalStateException("HTTP 插件动作必须声明为幂等");
+            }
+            ClaimScope scope = new ClaimScope(
+                pluginId,
+                actionCode,
+                ctx.getCallerType().name(),
+                ctx.getUserId(),
+                idempotencyKey
+            );
+            String requestHash = requestHash(params);
+            ClaimResult claim = claim(scope, requestHash);
 
-        String responseJson = writeResponse(result);
-        ServiceResult<Object> replayableResult = readResponse(responseJson);
-        complete(scope, requestHash, claim.claimToken(), responseJson);
-        return replayableResult;
+            if (claim.status() == ClaimStatus.REPLAY) {
+                return readResponse(claim.responseJson());
+            }
+            if (claim.status() == ClaimStatus.IN_PROGRESS) {
+                throw new ActionInProgressException();
+            }
+            if (claim.status() == ClaimStatus.CONFLICT) {
+                throw new IdempotencyConflictException();
+            }
+
+            ServiceResult<Object> result = null;
+            Throwable handlerError = null;
+            try {
+                result = handler.execute(ctx, params);
+            } catch (Throwable e) {
+                handlerError = e;
+            } finally {
+                useHostThreadState(requestThread);
+            }
+            if (handlerError != null) {
+                rethrowIfFatal(handlerError);
+                auditFailureKeepingClaim(ctx, pluginId, actionCode, handlerError);
+                if (handlerError instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+                throw new IllegalStateException("插件动作执行失败", handlerError);
+            }
+
+            if (result == null) {
+                IllegalStateException error = new IllegalStateException("插件动作返回 null");
+                auditFailureKeepingClaim(ctx, pluginId, actionCode, error);
+                throw error;
+            }
+            if (result.isRetryable()) {
+                release(scope, requestHash, claim.claimToken(), ctx, pluginId, actionCode, result);
+                return result;
+            }
+
+            String responseJson = null;
+            ServiceResult<Object> replayableResult = null;
+            Throwable responseError = null;
+            try {
+                try {
+                    responseJson = writeResponse(result);
+                } finally {
+                    useHostThreadState(requestThread);
+                }
+                replayableResult = readResponse(responseJson);
+            } catch (Throwable e) {
+                responseError = e;
+            } finally {
+                useHostThreadState(requestThread);
+            }
+            if (responseError != null) {
+                rethrowIfFatal(responseError);
+                auditFailureKeepingClaim(ctx, pluginId, actionCode, responseError);
+                if (responseError instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+                throw new IllegalStateException("插件动作响应处理失败", responseError);
+            }
+            complete(
+                scope, requestHash, claim.claimToken(), responseJson, ctx, pluginId, actionCode, result);
+            return replayableResult;
+        } finally {
+            requestThread.setContextClassLoader(originalContextClassLoader);
+            if (originallyInterrupted) {
+                requestThread.interrupt();
+            } else {
+                Thread.interrupted();
+            }
+        }
     }
 
     private ClaimResult claim(ClaimScope scope, String requestHash) {
@@ -180,36 +234,59 @@ public class PluginActionIdempotencyService {
         return ClaimResult.claimed(claimToken);
     }
 
-    private void complete(ClaimScope scope, String requestHash, String claimToken, String responseJson) {
-        Integer updated = transactionTemplate.execute(status -> repository.complete(
-            scope,
-            requestHash,
-            claimToken,
-            responseJson,
-            RESPONSE_TTL.toSeconds()
-        ));
-        if (updated == null || updated != 1) {
-            throw new IllegalStateException("幂等响应写入失败");
-        }
-    }
-
-    private void release(ClaimScope scope, String requestHash, String claimToken) {
-        Integer deleted = transactionTemplate.execute(status -> repository.release(scope, requestHash, claimToken));
-        if (deleted == null || deleted != 1) {
-            throw new IllegalStateException("幂等占用释放失败");
-        }
-    }
-
-    private void releaseAfterHandlerFailure(
+    private void complete(
             ClaimScope scope,
             String requestHash,
             String claimToken,
-            RuntimeException handlerError) {
+            String responseJson,
+            InvocationContext context,
+            String pluginId,
+            String actionCode,
+            ServiceResult<Object> result) {
+        transactionTemplate.executeWithoutResult(status -> {
+            int updated = repository.complete(
+                scope,
+                requestHash,
+                claimToken,
+                responseJson,
+                RESPONSE_TTL.toSeconds()
+            );
+            if (updated != 1) {
+                throw new IllegalStateException("幂等响应写入失败");
+            }
+            auditService.writeAction(
+                context, pluginId, actionCode, result.getCode(), result.isRetryable());
+        });
+    }
+
+    private void release(
+            ClaimScope scope,
+            String requestHash,
+            String claimToken,
+            InvocationContext context,
+            String pluginId,
+            String actionCode,
+            ServiceResult<Object> result) {
+        transactionTemplate.executeWithoutResult(status -> {
+            int deleted = repository.release(scope, requestHash, claimToken);
+            if (deleted != 1) {
+                throw new IllegalStateException("幂等占用释放失败");
+            }
+            auditService.writeAction(
+                context, pluginId, actionCode, result.getCode(), result.isRetryable());
+        });
+    }
+
+    private void auditFailureKeepingClaim(
+            InvocationContext context,
+            String pluginId,
+            String actionCode,
+            Throwable originalError) {
         try {
-            release(scope, requestHash, claimToken);
-        } catch (RuntimeException releaseError) {
-            releaseError.addSuppressed(handlerError);
-            throw releaseError;
+            transactionTemplate.executeWithoutResult(status ->
+                auditService.writeActionFailure(context, pluginId, actionCode));
+        } catch (RuntimeException auditError) {
+            originalError.addSuppressed(auditError);
         }
     }
 
@@ -222,6 +299,20 @@ public class PluginActionIdempotencyService {
             throw new IllegalStateException("SHA-256 不可用", e);
         } catch (Exception e) {
             throw new IllegalStateException("插件动作参数摘要失败", e);
+        }
+    }
+
+    private static void useHostThreadState(Thread thread) {
+        thread.setContextClassLoader(PluginActionIdempotencyService.class.getClassLoader());
+        Thread.interrupted();
+    }
+
+    private static void rethrowIfFatal(Throwable throwable) {
+        if (throwable instanceof VirtualMachineError error) {
+            throw error;
+        }
+        if (throwable instanceof ThreadDeath threadDeath) {
+            throw threadDeath;
         }
     }
 

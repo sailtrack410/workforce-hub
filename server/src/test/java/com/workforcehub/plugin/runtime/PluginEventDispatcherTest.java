@@ -6,6 +6,7 @@ import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.sdk.ActionDescriptor;
 import com.workforcehub.plugin.sdk.DomainEvent;
+import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.InvocationContextBinder;
@@ -43,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -63,6 +65,7 @@ class PluginEventDispatcherTest {
     @Mock private PluginLifecycleGuard lifecycleGuard;
     @Mock private PluginPermissionService permissionService;
     @Mock private InvocationContextBinder contextBinder;
+    @Mock private PluginAuditService auditService;
     @Mock private PluginActionHandler handler;
     @Mock private InvocationContext context;
 
@@ -78,6 +81,7 @@ class PluginEventDispatcherTest {
             lifecycleGuard,
             permissionService,
             contextBinder,
+            auditService,
             Runnable::run,
             timeoutScheduler
         );
@@ -134,6 +138,7 @@ class PluginEventDispatcherTest {
         assertEquals(event.idempotencyKey(), paramsCaptor.getValue().get("idempotencyKey"));
         assertEquals(event.triggeredBy(), paramsCaptor.getValue().get("triggeredBy"));
         assertEquals(event.payload(), paramsCaptor.getValue().get("payload"));
+        verify(auditService).writeAction(context, PLUGIN_ID, ACTION_CODE, 0, false);
         verify(lifecycleGuard).release(PLUGIN_ID);
     }
 
@@ -231,8 +236,76 @@ class PluginEventDispatcherTest {
 
         verify(firstHandler).execute(any(), anyMap());
         verify(secondHandler).execute(any(), anyMap());
+        verify(auditService).writeAction(
+            context, PLUGIN_ID, ACTION_CODE, ErrorCodes.INTERNAL_ERROR, false);
+        verify(auditService).writeAction(
+            secondContext, secondPluginId, secondActionCode, 0, false);
         verify(lifecycleGuard).release(PLUGIN_ID);
         verify(lifecycleGuard).release(secondPluginId);
+    }
+
+    @Test
+    void auditFailureShouldNotChangeEventResultOrLifecycleCleanup() {
+        DomainEvent event = event();
+        when(subscriptionRepository.findByEventType(event.eventType()))
+            .thenReturn(List.of(subscription(PLUGIN_ID, ACTION_CODE)));
+        when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin(PluginStatus.ACTIVE));
+        when(lifecycleGuard.tryAcquire(PLUGIN_ID)).thenReturn(true);
+        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
+            .thenReturn(Optional.of(handler));
+        when(contextBinder.forEventCallback(PLUGIN_ID, event)).thenReturn(context);
+        when(handler.execute(eq(context), anyMap())).thenReturn(ServiceResult.ok(null));
+        doThrow(new IllegalStateException("audit unavailable"))
+            .when(auditService).writeAction(context, PLUGIN_ID, ACTION_CODE, 0, false);
+
+        assertDoesNotThrow(() -> dispatcher.dispatch(event));
+
+        verify(handler).execute(eq(context), anyMap());
+        verify(lifecycleGuard).release(PLUGIN_ID);
+    }
+
+    @Test
+    void nullHandlerResultShouldWriteFailedAudit() {
+        DomainEvent event = event();
+        when(subscriptionRepository.findByEventType(event.eventType()))
+            .thenReturn(List.of(subscription(PLUGIN_ID, ACTION_CODE)));
+        when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin(PluginStatus.ACTIVE));
+        when(lifecycleGuard.tryAcquire(PLUGIN_ID)).thenReturn(true);
+        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
+            .thenReturn(Optional.of(handler));
+        when(contextBinder.forEventCallback(PLUGIN_ID, event)).thenReturn(context);
+        when(handler.execute(eq(context), anyMap())).thenReturn(null);
+
+        assertDoesNotThrow(() -> dispatcher.dispatch(event));
+
+        verify(auditService).writeAction(
+            context, PLUGIN_ID, ACTION_CODE, ErrorCodes.INTERNAL_ERROR, false);
+        verify(lifecycleGuard).release(PLUGIN_ID);
+    }
+
+    @Test
+    void slowAuditShouldNotBeCountedAgainstHandlerTimeout() {
+        DomainEvent event = event();
+        AtomicReference<Boolean> auditInterrupted = new AtomicReference<>();
+        when(subscriptionRepository.findByEventType(event.eventType()))
+            .thenReturn(List.of(subscription(PLUGIN_ID, ACTION_CODE)));
+        when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin(PluginStatus.ACTIVE));
+        when(lifecycleGuard.tryAcquire(PLUGIN_ID)).thenReturn(true);
+        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
+            .thenReturn(Optional.of(handler));
+        when(handler.getDescriptor()).thenReturn(descriptor(ACTION_CODE, Duration.ofMillis(25)));
+        when(contextBinder.forEventCallback(PLUGIN_ID, event)).thenReturn(context);
+        when(handler.execute(eq(context), anyMap())).thenReturn(ServiceResult.ok(null));
+        doAnswer(invocation -> {
+            Thread.sleep(100);
+            auditInterrupted.set(Thread.currentThread().isInterrupted());
+            return null;
+        }).when(auditService).writeAction(context, PLUGIN_ID, ACTION_CODE, 0, false);
+
+        dispatcher.dispatch(event);
+
+        assertEquals(Boolean.FALSE, auditInterrupted.get());
+        verify(lifecycleGuard).release(PLUGIN_ID);
     }
 
     @Test
@@ -324,6 +397,8 @@ class PluginEventDispatcherTest {
         DomainEvent event = event();
         ClassLoader original = Thread.currentThread().getContextClassLoader();
         ClassLoader pluginClassLoader = new ClassLoader(original) { };
+        AtomicReference<ClassLoader> auditClassLoader = new AtomicReference<>();
+        AtomicReference<Boolean> auditInterrupted = new AtomicReference<>();
         when(subscriptionRepository.findByEventType(event.eventType()))
             .thenReturn(List.of(subscription(PLUGIN_ID, ACTION_CODE)));
         when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(plugin(PluginStatus.ACTIVE));
@@ -332,16 +407,26 @@ class PluginEventDispatcherTest {
         when(contextBinder.forEventCallback(PLUGIN_ID, event)).thenReturn(context);
         when(handler.execute(eq(context), anyMap())).thenAnswer(invocation -> {
             Thread.currentThread().setContextClassLoader(pluginClassLoader);
+            Thread.currentThread().interrupt();
             return ServiceResult.ok(null);
         });
+        doAnswer(invocation -> {
+            auditClassLoader.set(Thread.currentThread().getContextClassLoader());
+            auditInterrupted.set(Thread.currentThread().isInterrupted());
+            return null;
+        }).when(auditService).writeAction(context, PLUGIN_ID, ACTION_CODE, 0, false);
 
         try {
             dispatcher.dispatch(event);
 
+            assertSame(PluginEventDispatcher.class.getClassLoader(), auditClassLoader.get());
+            assertEquals(Boolean.FALSE, auditInterrupted.get());
             assertSame(original, Thread.currentThread().getContextClassLoader());
+            assertFalse(Thread.currentThread().isInterrupted());
             verify(lifecycleGuard).release(PLUGIN_ID);
         } finally {
             Thread.currentThread().setContextClassLoader(original);
+            Thread.interrupted();
         }
     }
 
@@ -368,7 +453,8 @@ class PluginEventDispatcherTest {
             pluginManagerService,
             lifecycleGuard,
             permissionService,
-            contextBinder
+            contextBinder,
+            auditService
         );
         Thread caller = new Thread(() -> asyncDispatcher.dispatch(event));
         caller.setContextClassLoader(pluginClassLoader);
@@ -422,6 +508,7 @@ class PluginEventDispatcherTest {
             lifecycleGuard,
             permissionService,
             contextBinder,
+            auditService,
             callbacks::add,
             scheduler
         );
@@ -463,7 +550,8 @@ class PluginEventDispatcherTest {
             pluginManagerService,
             lifecycleGuard,
             permissionService,
-            contextBinder
+            contextBinder,
+            auditService
         );
 
         try {
@@ -504,7 +592,8 @@ class PluginEventDispatcherTest {
             pluginManagerService,
             lifecycleGuard,
             permissionService,
-            contextBinder
+            contextBinder,
+            auditService
         );
 
         try {
@@ -545,7 +634,8 @@ class PluginEventDispatcherTest {
             pluginManagerService,
             lifecycleGuard,
             permissionService,
-            contextBinder
+            contextBinder,
+            auditService
         );
         ExecutorService shutdownExecutor = Executors.newSingleThreadExecutor();
 

@@ -4,6 +4,7 @@ import com.workforcehub.plugin.repository.PluginEventSubscriptionRepository;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.sdk.ActionDescriptor;
 import com.workforcehub.plugin.sdk.DomainEvent;
+import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
@@ -46,6 +47,7 @@ public class PluginEventDispatcher {
     private final PluginLifecycleGuard lifecycleGuard;
     private final PluginPermissionService permissionService;
     private final InvocationContextBinder contextBinder;
+    private final PluginAuditService auditService;
     private final Executor callbackExecutor;
     private final ScheduledExecutorService timeoutScheduler;
 
@@ -55,13 +57,15 @@ public class PluginEventDispatcher {
             PluginManagerService pluginManagerService,
             PluginLifecycleGuard lifecycleGuard,
             PluginPermissionService permissionService,
-            InvocationContextBinder contextBinder) {
+            InvocationContextBinder contextBinder,
+            PluginAuditService auditService) {
         this(
             subscriptionRepository,
             pluginManagerService,
             lifecycleGuard,
             permissionService,
             contextBinder,
+            auditService,
             createCallbackExecutor(),
             createTimeoutScheduler()
         );
@@ -73,6 +77,7 @@ public class PluginEventDispatcher {
             PluginLifecycleGuard lifecycleGuard,
             PluginPermissionService permissionService,
             InvocationContextBinder contextBinder,
+            PluginAuditService auditService,
             Executor callbackExecutor,
             ScheduledExecutorService timeoutScheduler) {
         this.subscriptionRepository = subscriptionRepository;
@@ -80,6 +85,7 @@ public class PluginEventDispatcher {
         this.lifecycleGuard = lifecycleGuard;
         this.permissionService = permissionService;
         this.contextBinder = contextBinder;
+        this.auditService = auditService;
         this.callbackExecutor = callbackExecutor;
         this.timeoutScheduler = timeoutScheduler;
     }
@@ -133,13 +139,22 @@ public class PluginEventDispatcher {
             permissionService.checkPluginCapability(pluginId, "EVENT_SUBSCRIBE");
             permissionService.checkPluginCapability(pluginId, "EVENT_SUBSCRIBE_" + event.eventType());
 
-            Optional<PluginActionHandler> handler =
-                pluginManagerService.findActionHandler(pluginId, actionCode);
+            Optional<PluginActionHandler> handler;
+            try {
+                handler = pluginManagerService.findActionHandler(pluginId, actionCode);
+            } finally {
+                useHostThreadState(callbackThread);
+            }
             if (handler.isEmpty()) {
                 return;
             }
 
-            ActionDescriptor descriptor = handler.get().getDescriptor();
+            ActionDescriptor descriptor;
+            try {
+                descriptor = handler.get().getDescriptor();
+            } finally {
+                useHostThreadState(callbackThread);
+            }
             if (!descriptor.idempotent()) {
                 log.warn(
                     "插件事件处理器非幂等，已跳过: pluginId={}, eventType={}, actionCode={}",
@@ -189,13 +204,27 @@ public class PluginEventDispatcher {
         } catch (Throwable e) {
             rethrowIfFatal(e);
             log.warn(
-                "插件事件分发失败: pluginId={}, eventType={}, actionCode={}",
+                "插件事件分发失败: pluginId={}, eventType={}, actionCode={}, errorType={}",
                 pluginId,
                 event.eventType(),
                 actionCode,
-                e
+                e.getClass().getName()
             );
         } finally {
+            try {
+                useHostThreadState(callbackThread);
+            } catch (Throwable e) {
+                rethrowIfFatal(e);
+                log.warn("插件事件回调线程宿主上下文恢复失败: pluginId={}", pluginId, e);
+            }
+            if (acquired) {
+                try {
+                    lifecycleGuard.release(pluginId);
+                } catch (Throwable e) {
+                    rethrowIfFatal(e);
+                    log.warn("插件事件生命周期计数释放失败: pluginId={}", pluginId, e);
+                }
+            }
             try {
                 callbackThread.setContextClassLoader(originalContextClassLoader);
             } catch (Throwable e) {
@@ -206,14 +235,6 @@ public class PluginEventDispatcher {
                 callbackThread.interrupt();
             } else {
                 Thread.interrupted();
-            }
-            if (acquired) {
-                try {
-                    lifecycleGuard.release(pluginId);
-                } catch (Throwable e) {
-                    rethrowIfFatal(e);
-                    log.warn("插件事件生命周期计数释放失败: pluginId={}", pluginId, e);
-                }
             }
         }
     }
@@ -246,8 +267,10 @@ public class PluginEventDispatcher {
             }
         }, Math.max(1L, timeout.toMillis()), TimeUnit.MILLISECONDS);
 
+        ServiceResult<Object> result = null;
+        Throwable handlerError = null;
         try {
-            return handler.execute(context, Map.of(
+            result = handler.execute(context, Map.of(
                 "eventId", event.eventId(),
                 "eventType", event.eventType(),
                 "occurredAt", event.occurredAt(),
@@ -256,11 +279,54 @@ public class PluginEventDispatcher {
                 "triggeredBy", event.triggeredBy(),
                 "payload", event.payload()
             ));
+        } catch (Throwable e) {
+            handlerError = e;
         } finally {
             synchronized (timeoutLock) {
                 running[0] = false;
                 timeoutFuture.cancel(false);
             }
+            useHostThreadState(callbackThread);
+        }
+
+        if (handlerError != null) {
+            rethrowIfFatal(handlerError);
+            auditBestEffort(context, pluginId, actionCode, ErrorCodes.INTERNAL_ERROR, false);
+            if (handlerError instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (handlerError instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("插件事件处理失败", handlerError);
+        }
+
+        auditBestEffort(
+            context,
+            pluginId,
+            actionCode,
+            result == null ? ErrorCodes.INTERNAL_ERROR : result.getCode(),
+            result != null && result.isRetryable()
+        );
+        return result;
+    }
+
+    private void auditBestEffort(
+            InvocationContext context,
+            String pluginId,
+            String actionCode,
+            int serviceCode,
+            boolean retryable) {
+        try {
+            auditService.writeAction(context, pluginId, actionCode, serviceCode, retryable);
+        } catch (Throwable e) {
+            rethrowIfFatal(e);
+            log.warn(
+                "插件事件动作审计失败: pluginId={}, actionCode={}, errorType={}",
+                pluginId,
+                actionCode,
+                e.getClass().getName()
+            );
         }
     }
 
@@ -312,6 +378,11 @@ public class PluginEventDispatcher {
             thread.setContextClassLoader(PluginEventDispatcher.class.getClassLoader());
             return thread;
         };
+    }
+
+    private static void useHostThreadState(Thread thread) {
+        thread.setContextClassLoader(PluginEventDispatcher.class.getClassLoader());
+        Thread.interrupted();
     }
 
     private static void rethrowIfFatal(Throwable throwable) {

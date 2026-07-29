@@ -57,6 +57,48 @@ class AdminAuditLogApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.list[0].targetType").value("TEST_TARGET"));
     }
 
+    @Test
+    @DisplayName("管理员审计列表应展示插件动作语义")
+    void adminShouldSeePluginActionAuditNames() throws Exception {
+        Cookie session = login();
+        jdbcTemplate.update("""
+            INSERT INTO sys_audit_log
+                (id, operator_type, operator_id, action_type, target_type, result, detail_json, occurred_at)
+            VALUES
+                (99002, 'SYSTEM', NULL, 'PLUGIN_ACTION_EXECUTED', 'PLUGIN_ACTION', 'FAIL',
+                 JSON_OBJECT('pluginId', 'audit-plugin', 'actionCode', 'audit.execute',
+                             'triggerSource', 'EVENT_CALLBACK', 'serviceCode', 4000,
+                             'retryable', false),
+                 '2026-06-29 10:00:01'),
+                (99003, 'SYSTEM', NULL, 'PLUGIN_EVENT_SUBSCRIBED', 'PLUGIN_EVENT_SUBSCRIPTION', 'SUCCESS',
+                 JSON_OBJECT('pluginId', 'audit-plugin', 'eventType', 'WORKFLOW_APPROVED',
+                             'actionCode', 'audit.execute', 'triggerSource', 'EVENT_CALLBACK'),
+                 '2026-06-29 10:00:02')
+            """);
+
+        mockMvc.perform(get("/api/admin/audit-logs")
+                .cookie(session)
+                .param("actionType", "PLUGIN_ACTION_EXECUTED")
+                .param("pageNo", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].operatorTypeName").value("系统"))
+            .andExpect(jsonPath("$.data.list[0].actionTypeName").value("执行插件动作"))
+            .andExpect(jsonPath("$.data.list[0].targetTypeName").value("插件动作"))
+            .andExpect(jsonPath("$.data.list[0].resultName").value("失败"));
+
+        mockMvc.perform(get("/api/admin/audit-logs")
+                .cookie(session)
+                .param("actionType", "PLUGIN_EVENT_SUBSCRIBED")
+                .param("pageNo", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.list[0].actionTypeName").value("订阅插件事件"))
+            .andExpect(jsonPath("$.data.list[0].targetTypeName").value("插件事件订阅"));
+    }
+
     private Cookie login() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/admin/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)

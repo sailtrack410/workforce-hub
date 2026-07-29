@@ -1,5 +1,7 @@
 package com.workforcehub.plugin;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.auth.security.AdminUserDetails;
 import com.workforcehub.org.dto.OrgUserCreateRequest;
 import com.workforcehub.org.service.OrgManagementService;
@@ -47,6 +49,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -91,6 +94,9 @@ class PluginEventEndToEndIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -176,6 +182,26 @@ class PluginEventEndToEndIntegrationTest extends LocalIntegrationTestSupport {
             "requestId", eventId,
             "source", "EVENT_CALLBACK"
         ), context);
+
+        Map<String, Object> audit = jdbc.queryForMap("""
+            SELECT operator_type, operator_id, result, target_type,
+                   CAST(detail_json AS CHAR) AS detail_json
+            FROM sys_audit_log
+            WHERE action_type = 'PLUGIN_ACTION_EXECUTED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, PLUGIN_ID);
+        assertEquals("SYSTEM", audit.get("operator_type"));
+        assertNull(audit.get("operator_id"));
+        assertEquals("SUCCESS", audit.get("result"));
+        assertEquals("PLUGIN_ACTION", audit.get("target_type"));
+        JsonNode auditDetail = objectMapper.readTree((String) audit.get("detail_json"));
+        assertEquals(
+            Set.of("pluginId", "actionCode", "triggerSource", "serviceCode", "retryable"),
+            objectMapper.convertValue(auditDetail, Map.class).keySet()
+        );
+        assertFalse(audit.toString().contains("Sensitive Employee Name"));
+        assertFalse(audit.toString().contains("PF4J-E2E-EMPLOYEE"));
+        assertFalse(audit.toString().contains(eventId));
     }
 
     private void grantEventCapabilities() {
