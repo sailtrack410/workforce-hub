@@ -8,6 +8,8 @@ import com.workforcehub.auth.domain.OrgUser;
 import com.workforcehub.auth.mapper.AuthUserAccountMapper;
 import com.workforcehub.auth.mapper.OrgUserMapper;
 import com.workforcehub.common.event.DomainEventPublisher;
+import com.workforcehub.common.event.org.EmployeeHiredEvent;
+import com.workforcehub.common.event.org.EmployeeLeftEvent;
 import com.workforcehub.common.event.org.OrgDepartmentStructureChangedEvent;
 import com.workforcehub.common.event.org.OrgUserAccountChangedEvent;
 import com.workforcehub.common.event.org.OrgUserCreatedEvent;
@@ -288,6 +290,9 @@ public class OrgManagementService {
         user.setUpdatedBy(operatorId);
         orgUserMapper.insert(user);
         publishUserCreatedEvent(user, operatorId);
+        if (isInitialHireStatus(user.getEmploymentStatus())) {
+            publishEmployeeHiredEvent(user, operatorId);
+        }
         return user.getId();
     }
 
@@ -356,7 +361,7 @@ public class OrgManagementService {
     @Transactional(rollbackFor = Exception.class)
     public void updateEmploymentStatus(Long userId, OrgEmploymentStatusUpdateRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        OrgUser user = getUserOrThrow(userId);
+        OrgUser user = getUserForUpdateOrThrow(userId);
         String targetStatus = normalizeEmploymentStatus(request.getEmploymentStatus());
         String currentStatus = user.getEmploymentStatus();
         if (currentStatus.equals(targetStatus)) {
@@ -381,6 +386,12 @@ public class OrgManagementService {
         Map<String, Object> afterSnapshot = userSnapshot(user);
         recordEmployeeEvent(userId, resolveEmploymentChangeType(currentStatus, targetStatus), beforeSnapshot, afterSnapshot, operatorId);
         publishUserStatusChangedEvent("EMPLOYMENT_STATUS", user, currentStatus, targetStatus, operatorId);
+        if (isHireTransition(currentStatus, targetStatus)) {
+            publishEmployeeHiredEvent(user, operatorId);
+        }
+        if (isLeaveTransition(currentStatus, targetStatus)) {
+            publishEmployeeLeftEvent(user, currentStatus, operatorId);
+        }
         if (accountMutation != null) {
             publishUserAccountChangedEvent(userId, accountMutation, operatorId);
         }
@@ -575,6 +586,14 @@ public class OrgManagementService {
 
     private OrgUser getUserOrThrow(Long userId) {
         OrgUser user = orgUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(404, "员工不存在");
+        }
+        return user;
+    }
+
+    private OrgUser getUserForUpdateOrThrow(Long userId) {
+        OrgUser user = orgUserMapper.selectByIdForUpdate(userId);
         if (user == null) {
             throw new BizException(404, "员工不存在");
         }
@@ -791,6 +810,18 @@ public class OrgManagementService {
         return "CHANGE_EMPLOYMENT_STATUS";
     }
 
+    private boolean isInitialHireStatus(String status) {
+        return "PROBATION".equals(status) || "ACTIVE".equals(status);
+    }
+
+    private boolean isHireTransition(String beforeStatus, String afterStatus) {
+        return "PENDING_ONBOARD".equals(beforeStatus) && isInitialHireStatus(afterStatus);
+    }
+
+    private boolean isLeaveTransition(String beforeStatus, String afterStatus) {
+        return "PENDING_OFFBOARD".equals(beforeStatus) && "OFFBOARDED".equals(afterStatus);
+    }
+
     private void recordEmployeeEvent(Long userId,
                                      String changeType,
                                      Map<String, Object> beforeSnapshot,
@@ -871,6 +902,34 @@ public class OrgManagementService {
             user.getManagerUserId(),
             user.getEmploymentStatus(),
             user.getStatus(),
+            operatorId,
+            LocalDateTime.now()
+        ));
+    }
+
+    private void publishEmployeeHiredEvent(OrgUser user, Long operatorId) {
+        domainEventPublisher.publishAfterCommit(new EmployeeHiredEvent(
+            user.getId(),
+            user.getEmployeeNo(),
+            user.getPrimaryDeptId(),
+            user.getPositionId(),
+            user.getManagerUserId(),
+            user.getEmploymentStatus(),
+            user.getHireDate(),
+            operatorId,
+            LocalDateTime.now()
+        ));
+    }
+
+    private void publishEmployeeLeftEvent(OrgUser user, String beforeStatus, Long operatorId) {
+        domainEventPublisher.publishAfterCommit(new EmployeeLeftEvent(
+            user.getId(),
+            user.getEmployeeNo(),
+            user.getPrimaryDeptId(),
+            user.getPositionId(),
+            user.getManagerUserId(),
+            beforeStatus,
+            user.getEmploymentStatus(),
             operatorId,
             LocalDateTime.now()
         ));

@@ -33,6 +33,7 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
 
     private final HostServiceRegistry serviceRegistry;
     private final Function<String, PluginConfig> configFactory;
+    private final PluginLifecycleGuard lifecycleGuard;
     private final Map<String, WorkforcePlugin> pluginInstances = new ConcurrentHashMap<>();
 
     @Autowired
@@ -41,19 +42,46 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
             List<HostService> hostServices,
             PluginPermissionService permissionService,
             PluginConfigRepository configRepository,
-            PluginConfigCipher configCipher) {
+            PluginConfigCipher configCipher,
+            PluginLifecycleGuard lifecycleGuard) {
         super(Path.of(pluginsRoot));
         this.serviceRegistry = new HostServiceRegistry(hostServices, permissionService);
         this.configFactory = pluginId -> new DefaultPluginConfig(pluginId, configRepository, configCipher);
+        this.lifecycleGuard = lifecycleGuard;
+    }
+
+    public WorkforcePluginManager(
+            String pluginsRoot,
+            List<HostService> hostServices,
+            PluginPermissionService permissionService,
+            PluginConfigRepository configRepository,
+            PluginConfigCipher configCipher) {
+        this(
+            pluginsRoot,
+            hostServices,
+            permissionService,
+            configRepository,
+            configCipher,
+            new PluginLifecycleGuard()
+        );
     }
 
     public WorkforcePluginManager(
             String pluginsRoot,
             List<HostService> hostServices,
             PluginPermissionService permissionService) {
+        this(pluginsRoot, hostServices, permissionService, new PluginLifecycleGuard());
+    }
+
+    WorkforcePluginManager(
+            String pluginsRoot,
+            List<HostService> hostServices,
+            PluginPermissionService permissionService,
+            PluginLifecycleGuard lifecycleGuard) {
         super(Path.of(pluginsRoot));
         this.serviceRegistry = new HostServiceRegistry(hostServices, permissionService);
         this.configFactory = pluginId -> key -> java.util.Optional.empty();
+        this.lifecycleGuard = lifecycleGuard;
     }
 
     /**
@@ -140,6 +168,10 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
         }
     }
 
+    synchronized List<String> getDependentPluginIds(String pluginId) {
+        return List.copyOf(dependencyResolver.getDependents(pluginId));
+    }
+
     @Override
     public synchronized void stopPlugins() {
         List<PluginWrapper> started = new ArrayList<>(startedPlugins);
@@ -169,8 +201,30 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
 
     @PreDestroy
     public synchronized void close() {
+        List<PluginWrapper> plugins = new ArrayList<>(getPlugins());
         Throwable failure = null;
-        for (PluginWrapper wrapper : new ArrayList<>(getPlugins())) {
+        for (PluginWrapper wrapper : plugins) {
+            String pluginId = wrapper.getPluginId();
+            if (getPlugin(pluginId) == null) {
+                continue;
+            }
+            lifecycleGuard.beginDisable(pluginId);
+        }
+        for (PluginWrapper wrapper : plugins) {
+            String pluginId = wrapper.getPluginId();
+            if (getPlugin(pluginId) == null) {
+                continue;
+            }
+            if (!lifecycleGuard.awaitDrain(pluginId)) {
+                failure = mergeFailure(
+                    failure,
+                    new PluginRuntimeException("插件关闭排空超时或中断: %s", pluginId)
+                );
+            }
+        }
+        throwIfFailed(failure);
+
+        for (PluginWrapper wrapper : plugins) {
             String pluginId = wrapper.getPluginId();
             if (getPlugin(pluginId) == null) {
                 continue;
@@ -185,6 +239,11 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
                 }
             } catch (Throwable closeError) {
                 failure = mergeFailure(failure, closeError);
+            }
+        }
+        for (PluginWrapper wrapper : plugins) {
+            if (getPlugin(wrapper.getPluginId()) == null) {
+                lifecycleGuard.remove(wrapper.getPluginId());
             }
         }
         throwIfFailed(failure);

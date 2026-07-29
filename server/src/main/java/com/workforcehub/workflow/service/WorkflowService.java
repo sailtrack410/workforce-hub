@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.workforcehub.common.event.DomainEventPublisher;
+import com.workforcehub.common.event.workflow.WorkflowCompletedEvent;
 import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.exception.BizException;
@@ -113,6 +115,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
     private final AttendanceService attendanceService;
     private final ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider;
     private final ObjectMapper objectMapper;
+    private final DomainEventPublisher domainEventPublisher;
 
     public WorkflowService(WorkflowRepository workflowRepository,
                            OrgDirectoryService orgDirectoryService,
@@ -123,7 +126,8 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                            LeaveService leaveService,
                            AttendanceService attendanceService,
                            ObjectProvider<WorkflowAgentPreReviewTrigger> agentPreReviewTriggerProvider,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           DomainEventPublisher domainEventPublisher) {
         this.workflowRepository = workflowRepository;
         this.orgDirectoryService = orgDirectoryService;
         this.runtimeService = runtimeService;
@@ -134,6 +138,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         this.attendanceService = attendanceService;
         this.agentPreReviewTriggerProvider = agentPreReviewTriggerProvider;
         this.objectMapper = objectMapper;
+        this.domainEventPublisher = domainEventPublisher;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -626,7 +631,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                                                               String actionType,
                                                               String afterStatus) {
         Long approverUserId = CurrentUserHolder.requireUserId();
-        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByTaskIdOrThrow(taskId);
+        WorkflowRequestRow workflowRequest = workflowRepository.getRequestByTaskIdForUpdateOrThrow(taskId);
         Task task = taskService.createTaskQuery()
             .taskId(taskId)
             .taskAssignee(String.valueOf(approverUserId))
@@ -694,7 +699,19 @@ public class WorkflowService implements WorkflowAgentResultCallback {
                 approverUserId
             );
         }
-        return statusResponse(workflowRequest.id(), afterStatus);
+        WorkflowRequestStatusResponse response = statusResponse(workflowRequest.id(), afterStatus);
+        domainEventPublisher.publishAfterCommit(new WorkflowCompletedEvent(
+            workflowRequest.id(),
+            workflowRequest.requestNo(),
+            workflowRequest.bizType(),
+            workflowRequest.applicantUserId(),
+            taskId,
+            workflowRequest.status(),
+            afterStatus,
+            approverUserId,
+            LocalDateTime.now()
+        ));
+        return response;
     }
 
     // 只有请假类型需要释放冻结余额，补卡/其他类型直接跳过

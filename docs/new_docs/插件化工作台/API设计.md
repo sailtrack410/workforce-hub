@@ -31,7 +31,7 @@
 
 来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后，网关再校验插件状态和生命周期入口，绑定当前登录会话并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作并校验输入 Schema，最后返回 `ServiceResult<Object>`。拿到员工清单不代表拥有动作调用权限，每次调用都会重新鉴权。
 
-`ActionDescriptor.defaultTimeout` 尚未在网关层执行，`idempotent` 仍只是描述字段，不构成自动幂等保证。`FILE_UPLOADED` 已接入员工/管理员普通确认与秒传；其余五类真实业务发布点和真实 PF4J 订阅处理器端到端仍未完成。
+`ActionDescriptor.defaultTimeout` 尚未在网关层执行，`idempotent` 仍只是描述字段，不构成动作自动幂等保证。六类事件均已接入真实业务事务提交后发布，其中 `EMPLOYEE_HIRED` 已通过真实签名 PF4J 订阅处理器完成端到端验证；事件 handler 只接受 `idempotent=true`，由分发器执行有界异步回调和协作式超时中断。
 
 ### 插件配置管理
 

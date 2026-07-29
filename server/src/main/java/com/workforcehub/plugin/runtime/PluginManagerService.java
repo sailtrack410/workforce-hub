@@ -386,6 +386,8 @@ public class PluginManagerService {
      * 排空超时或中断时，绝不能继续 stop；入口保持关闭，抛出异常，标记 ERROR。
      */
     public synchronized void disable(String pluginId) {
+        rejectLoadedDependents(pluginId, "停用");
+
         // 1. 关门，拒绝新请求
         lifecycleGuard.beginDisable(pluginId);
 
@@ -426,6 +428,8 @@ public class PluginManagerService {
     public synchronized void uninstall(String pluginId) {
         // 先停止
         if (pf4jManager.getPlugin(pluginId) != null) {
+            rejectLoadedDependents(pluginId, "卸载");
+
             // 1. 关门，拒绝新请求
             lifecycleGuard.beginDisable(pluginId);
 
@@ -477,6 +481,16 @@ public class PluginManagerService {
         lifecycleGuard.remove(pluginId);
         // 更新状态为 UNINSTALLED，不删除数据库记录
         pluginRepository.updateStatus(pluginId, PluginStatus.UNINSTALLED, "已卸载");
+    }
+
+    private void rejectLoadedDependents(String pluginId, String operation) {
+        List<String> dependents = pf4jManager.getDependentPluginIds(pluginId);
+        if (!dependents.isEmpty()) {
+            throw new IllegalStateException(
+                "插件仍被其他已加载插件依赖，不能" + operation + ": "
+                    + pluginId + " <- " + String.join(",", dependents)
+            );
+        }
     }
 
     /**

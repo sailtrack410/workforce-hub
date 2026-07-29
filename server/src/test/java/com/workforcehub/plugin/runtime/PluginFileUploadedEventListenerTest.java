@@ -62,4 +62,28 @@ class PluginFileUploadedEventListenerTest {
             appender.stop();
         }
     }
+
+    @Test
+    void dispatcherAssertionErrorMustNotEscapeListener() {
+        PluginEventDispatcher dispatcher = mock(PluginEventDispatcher.class);
+        doThrow(new AssertionError("dispatcher failure"))
+            .when(dispatcher)
+            .dispatch(any(DomainEvent.class));
+        PluginFileUploadedEventListener listener = new PluginFileUploadedEventListener(dispatcher);
+        FileUploadedEvent event = new FileUploadedEvent(
+            9002L,
+            "PERSONAL_FILE",
+            null,
+            "employee.txt",
+            "text/plain",
+            12L,
+            "USER",
+            2003L,
+            "PENDING",
+            2003L,
+            LocalDateTime.of(2026, 7, 28, 10, 0)
+        );
+
+        assertDoesNotThrow(() -> listener.onFileUploaded(event));
+    }
 }

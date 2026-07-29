@@ -21,7 +21,7 @@ public class PluginOperationIdempotencyRepository {
 
     public Optional<PluginOperationIdempotencyRow> find(String pluginId, String operationCode, String idempotencyKey) {
         List<PluginOperationIdempotencyRow> rows = jdbc.query(
-            "SELECT * FROM sys_plugin_operation_idempotency WHERE plugin_id = ? AND operation_code = ? AND idempotency_key = ?",
+            "SELECT * FROM sys_plugin_operation_idempotency WHERE plugin_id = ? AND operation_code = ? AND idempotency_key = ? FOR UPDATE",
             ROW_MAPPER, pluginId, operationCode, idempotencyKey
         );
         return rows.stream().findFirst();

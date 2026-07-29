@@ -14,6 +14,7 @@ import org.pf4j.Plugin;
 import org.pf4j.PluginDescriptor;
 import org.pf4j.PluginFactory;
 import org.pf4j.PluginRuntimeException;
+import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 
 import java.nio.file.Path;
@@ -149,6 +150,63 @@ class WorkforcePluginManagerTest {
         assertNotNull(
             WorkforcePluginManager.class.getMethod("close").getAnnotation(PreDestroy.class)
         );
+    }
+
+    @Test
+    void closeShouldNotUnloadPluginWhileCallbackIsActive() {
+        String pluginId = "active-callback-plugin";
+        PluginLifecycleGuard lifecycleGuard = new PluginLifecycleGuard(0);
+        lifecycleGuard.enable(pluginId);
+        assertTrue(lifecycleGuard.tryAcquire(pluginId));
+        WorkforcePluginManager manager = spy(new WorkforcePluginManager(
+            tempDir.resolve("active-callback-plugins").toString(),
+            List.of(),
+            mock(PluginPermissionService.class),
+            lifecycleGuard
+        ));
+        PluginWrapper wrapper = mock(PluginWrapper.class);
+        when(wrapper.getPluginId()).thenReturn(pluginId);
+        when(wrapper.getPluginState()).thenReturn(PluginState.STARTED);
+        doReturn(List.of(wrapper)).when(manager).getPlugins();
+        doReturn(wrapper).when(manager).getPlugin(pluginId);
+
+        assertThrows(PluginRuntimeException.class, manager::close);
+
+        verify(manager, never()).unloadPlugin(pluginId);
+        assertEquals(1, lifecycleGuard.getActiveCount(pluginId));
+        assertFalse(lifecycleGuard.tryAcquire(pluginId));
+        lifecycleGuard.release(pluginId);
+    }
+
+    @Test
+    void closeShouldNotCascadeUnloadBeforeAllPluginsDrain() {
+        String dependencyId = "dependency-plugin";
+        String dependentId = "dependent-plugin";
+        PluginLifecycleGuard lifecycleGuard = new PluginLifecycleGuard(0);
+        lifecycleGuard.enable(dependencyId);
+        lifecycleGuard.enable(dependentId);
+        assertTrue(lifecycleGuard.tryAcquire(dependentId));
+        WorkforcePluginManager manager = spy(new WorkforcePluginManager(
+            tempDir.resolve("dependent-callback-plugins").toString(),
+            List.of(),
+            mock(PluginPermissionService.class),
+            lifecycleGuard
+        ));
+        PluginWrapper dependency = mock(PluginWrapper.class);
+        PluginWrapper dependent = mock(PluginWrapper.class);
+        when(dependency.getPluginId()).thenReturn(dependencyId);
+        when(dependent.getPluginId()).thenReturn(dependentId);
+        doReturn(List.of(dependency, dependent)).when(manager).getPlugins();
+        doReturn(dependency).when(manager).getPlugin(dependencyId);
+        doReturn(dependent).when(manager).getPlugin(dependentId);
+
+        assertThrows(PluginRuntimeException.class, manager::close);
+
+        verify(manager, never()).unloadPlugin(anyString());
+        assertFalse(lifecycleGuard.tryAcquire(dependencyId));
+        assertFalse(lifecycleGuard.tryAcquire(dependentId));
+        assertEquals(1, lifecycleGuard.getActiveCount(dependentId));
+        lifecycleGuard.release(dependentId);
     }
 
     @Test

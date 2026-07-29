@@ -79,8 +79,12 @@ public class DefaultEventService implements EventService {
         if (pms == null) {
             throw new IllegalStateException("PluginManagerService 不可用");
         }
-        if (pms.findActionHandler(pluginId, actionCode).isEmpty()) {
+        var handler = pms.findActionHandler(pluginId, actionCode);
+        if (handler.isEmpty()) {
             return ServiceResult.fail(ErrorCodes.STATE_CONFLICT, "插件动作不存在: " + actionCode);
+        }
+        if (!handler.get().getDescriptor().idempotent()) {
+            return ServiceResult.fail(ErrorCodes.STATE_CONFLICT, "事件处理动作必须声明为幂等");
         }
 
         String requestHash = computeHash(eventType, actionCode);

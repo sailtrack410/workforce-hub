@@ -3,9 +3,11 @@ package com.workforcehub.plugin.runtime;
 import com.workforcehub.plugin.repository.PluginEventSubscriptionRepository;
 import com.workforcehub.plugin.repository.PluginOperationIdempotencyRepository;
 import com.workforcehub.plugin.repository.PluginOperationIdempotencyRow;
+import com.workforcehub.plugin.sdk.ActionDescriptor;
 import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.plugin.sdk.InvocationContext;
+import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.plugin.sdk.ServiceResult;
 import com.workforcehub.plugin.sdk.TestInvocationContextBinder;
 import com.workforcehub.plugin.sdk.service.EventService;
@@ -16,7 +18,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,6 +39,7 @@ class DefaultEventServiceTest {
     private PluginOperationIdempotencyRepository idempotencyRepo;
     private PluginPermissionService permissionService;
     private PluginManagerService pluginManagerService;
+    private PluginActionHandler pluginActionHandler;
     private DefaultEventService service;
     private TestInvocationContextBinder binder;
     private InvocationContext ctx;
@@ -46,19 +51,29 @@ class DefaultEventServiceTest {
         idempotencyRepo = mock(PluginOperationIdempotencyRepository.class);
         permissionService = mock(PluginPermissionService.class);
         pluginManagerService = mock(PluginManagerService.class);
+        pluginActionHandler = mock(PluginActionHandler.class);
         binder = new TestInvocationContextBinder();
         ctx = binder.forPluginStartup(PLUGIN_ID);
 
         when(pluginManagerProvider.getIfAvailable()).thenReturn(pluginManagerService);
+        lenient().when(pluginActionHandler.getDescriptor()).thenReturn(new ActionDescriptor(
+            ACTION_CODE,
+            "test",
+            "test",
+            Map.of(),
+            Map.of(),
+            "EVENT_SUBSCRIBE",
+            Duration.ofSeconds(5),
+            true
+        ));
+        lenient().when(pluginManagerService.findActionHandler(anyString(), anyString()))
+            .thenReturn(Optional.of(pluginActionHandler));
 
         service = new DefaultEventService(pluginManagerProvider, subscriptionRepo, idempotencyRepo, permissionService);
     }
 
     @Test
     void subscribeSuccess() {
-        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
-            .thenReturn(Optional.of(mock(com.workforcehub.plugin.sdk.PluginActionHandler.class)));
-
         ServiceResult<Void> result = service.subscribe(ctx, EVENT_TYPE, ACTION_CODE, IDEMPOTENCY_KEY);
 
         assertEquals(0, result.getCode());
@@ -105,9 +120,6 @@ class DefaultEventServiceTest {
 
     @Test
     void subscribeChecksCorrectCapabilityForEachEventType() {
-        when(pluginManagerService.findActionHandler(anyString(), anyString()))
-            .thenReturn(Optional.of(mock(com.workforcehub.plugin.sdk.PluginActionHandler.class)));
-
         record TestCase(String eventType, String expectedCap) {}
         var cases = new TestCase[] {
             new TestCase(EventTypes.WORKFLOW_APPROVED, "EVENT_SUBSCRIBE_WORKFLOW_APPROVED"),
@@ -140,9 +152,6 @@ class DefaultEventServiceTest {
 
     @Test
     void duplicateSameSubscribeHashReturnsOkWithoutRewrite() {
-        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
-            .thenReturn(Optional.of(mock(com.workforcehub.plugin.sdk.PluginActionHandler.class)));
-
         String hash = DefaultEventService.computeHash(EVENT_TYPE, ACTION_CODE);
         doThrow(new DuplicateKeyException("dup"))
             .when(idempotencyRepo).insert(eq(PLUGIN_ID), eq("EVENT_SUBSCRIBE"), eq(IDEMPOTENCY_KEY), anyString());
@@ -187,9 +196,6 @@ class DefaultEventServiceTest {
 
     @Test
     void duplicateDifferentSubscribeHashReturnsConflict() {
-        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
-            .thenReturn(Optional.of(mock(com.workforcehub.plugin.sdk.PluginActionHandler.class)));
-
         doThrow(new DuplicateKeyException("dup"))
             .when(idempotencyRepo).insert(eq(PLUGIN_ID), eq("EVENT_SUBSCRIBE"), eq(IDEMPOTENCY_KEY), anyString());
         when(idempotencyRepo.find(PLUGIN_ID, "EVENT_SUBSCRIBE", IDEMPOTENCY_KEY))
@@ -322,9 +328,26 @@ class DefaultEventServiceTest {
     }
 
     @Test
+    void nonIdempotentActionCannotSubscribeToEvents() {
+        when(pluginActionHandler.getDescriptor()).thenReturn(new ActionDescriptor(
+            ACTION_CODE,
+            "test",
+            "test",
+            Map.of(),
+            Map.of(),
+            "EVENT_SUBSCRIBE",
+            Duration.ofSeconds(5),
+            false
+        ));
+
+        ServiceResult<Void> result = service.subscribe(ctx, EVENT_TYPE, ACTION_CODE, IDEMPOTENCY_KEY);
+
+        assertEquals(ErrorCodes.STATE_CONFLICT, result.getCode());
+        verifyNoInteractions(idempotencyRepo, subscriptionRepo);
+    }
+
+    @Test
     void nonDuplicateKeyExceptionPropagates() {
-        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
-            .thenReturn(Optional.of(mock(com.workforcehub.plugin.sdk.PluginActionHandler.class)));
         doThrow(new RuntimeException("db error"))
             .when(idempotencyRepo).insert(anyString(), anyString(), anyString(), anyString());
 
@@ -334,8 +357,6 @@ class DefaultEventServiceTest {
 
     @Test
     void duplicateKeyWithFindEmptyThrowsIllegalState() {
-        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
-            .thenReturn(Optional.of(mock(com.workforcehub.plugin.sdk.PluginActionHandler.class)));
         doThrow(new DuplicateKeyException("dup"))
             .when(idempotencyRepo).insert(eq(PLUGIN_ID), eq("EVENT_SUBSCRIBE"), eq(IDEMPOTENCY_KEY), anyString());
         when(idempotencyRepo.find(PLUGIN_ID, "EVENT_SUBSCRIBE", IDEMPOTENCY_KEY))
@@ -379,9 +400,6 @@ class DefaultEventServiceTest {
 
     @Test
     void hashCapturedFromInsertIsValid64Hex() {
-        when(pluginManagerService.findActionHandler(PLUGIN_ID, ACTION_CODE))
-            .thenReturn(Optional.of(mock(com.workforcehub.plugin.sdk.PluginActionHandler.class)));
-
         var captor = org.mockito.ArgumentCaptor.forClass(String.class);
         service.subscribe(ctx, EVENT_TYPE, ACTION_CODE, IDEMPOTENCY_KEY);
 

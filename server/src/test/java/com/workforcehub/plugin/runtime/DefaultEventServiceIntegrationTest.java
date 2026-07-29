@@ -1,6 +1,8 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.repository.PluginEventSubscriptionRepository;
+import com.workforcehub.plugin.repository.PluginOperationIdempotencyRepository;
+import com.workforcehub.plugin.sdk.ActionDescriptor;
 import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.plugin.sdk.InvocationContext;
@@ -20,10 +22,22 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -48,6 +62,9 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
     @SpyBean
     private PluginEventSubscriptionRepository subscriptionRepository;
 
+    @SpyBean
+    private PluginOperationIdempotencyRepository idempotencyRepository;
+
     private InvocationContext ctx;
 
     @BeforeEach
@@ -66,10 +83,12 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
             "integration test"
         );
         ctx = new TestInvocationContextBinder().forPluginStartup(PLUGIN_ID);
+        PluginActionHandler handlerA = eventHandler("handle-a");
+        PluginActionHandler handlerB = eventHandler("handle-b");
         when(pluginManagerService.findActionHandler(PLUGIN_ID, "handle-a"))
-            .thenReturn(Optional.of(mock(PluginActionHandler.class)));
+            .thenReturn(Optional.of(handlerA));
         when(pluginManagerService.findActionHandler(PLUGIN_ID, "handle-b"))
-            .thenReturn(Optional.of(mock(PluginActionHandler.class)));
+            .thenReturn(Optional.of(handlerB));
     }
 
     @AfterEach
@@ -104,6 +123,56 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
         assertEquals(1, countRows("sys_plugin_event_subscription"));
         assertEquals(1, countRows("sys_plugin_operation_idempotency"));
         assertEquals("handle-a", jdbc.queryForObject(
+            "SELECT action_code FROM sys_plugin_event_subscription WHERE plugin_id = ? AND event_type = ?",
+            String.class,
+            PLUGIN_ID,
+            EVENT_TYPE
+        ));
+    }
+
+    @Test
+    void concurrentSameKeyAndActionShouldBothSucceed() throws Exception {
+        String idempotencyKey = "subscribe-concurrent-same";
+        synchronizeIdempotencyInserts(idempotencyKey);
+
+        List<ServiceResult<Void>> results = runConcurrentSubscriptions(
+            "handle-a",
+            "handle-a",
+            idempotencyKey
+        );
+
+        assertTrue(results.stream().allMatch(result -> result.getCode() == ErrorCodes.SUCCESS));
+        assertEquals(1, countRows("sys_plugin_event_subscription"));
+        assertEquals(1, countRows("sys_plugin_operation_idempotency"));
+        assertEquals("handle-a", jdbc.queryForObject(
+            "SELECT action_code FROM sys_plugin_event_subscription WHERE plugin_id = ? AND event_type = ?",
+            String.class,
+            PLUGIN_ID,
+            EVENT_TYPE
+        ));
+    }
+
+    @Test
+    void concurrentSameKeyAndDifferentActionShouldReturnOneConflict() throws Exception {
+        String idempotencyKey = "subscribe-concurrent-different";
+        synchronizeIdempotencyInserts(idempotencyKey);
+
+        List<ServiceResult<Void>> results = runConcurrentSubscriptions(
+            "handle-a",
+            "handle-b",
+            idempotencyKey
+        );
+
+        assertEquals(1L, results.stream()
+            .filter(result -> result.getCode() == ErrorCodes.SUCCESS)
+            .count());
+        assertEquals(1L, results.stream()
+            .filter(result -> result.getCode() == ErrorCodes.DUPLICATE_OPERATION)
+            .count());
+        assertEquals(1, countRows("sys_plugin_event_subscription"));
+        assertEquals(1, countRows("sys_plugin_operation_idempotency"));
+        String expectedAction = results.get(0).getCode() == ErrorCodes.SUCCESS ? "handle-a" : "handle-b";
+        assertEquals(expectedAction, jdbc.queryForObject(
             "SELECT action_code FROM sys_plugin_event_subscription WHERE plugin_id = ? AND event_type = ?",
             String.class,
             PLUGIN_ID,
@@ -164,9 +233,59 @@ class DefaultEventServiceIntegrationTest extends LocalIntegrationTestSupport {
         return count == null ? 0 : count;
     }
 
+    private void synchronizeIdempotencyInserts(String idempotencyKey) {
+        CountDownLatch entered = new CountDownLatch(2);
+        doAnswer(invocation -> {
+            entered.countDown();
+            assertTrue(entered.await(10, TimeUnit.SECONDS), "并发订阅未同时到达幂等写入");
+            return invocation.callRealMethod();
+        }).when(idempotencyRepository).insert(
+            eq(PLUGIN_ID),
+            eq("EVENT_SUBSCRIBE"),
+            eq(idempotencyKey),
+            anyString()
+        );
+    }
+
+    private List<ServiceResult<Void>> runConcurrentSubscriptions(
+            String firstAction,
+            String secondAction,
+            String idempotencyKey) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<ServiceResult<Void>> first = executor.submit(() ->
+                eventService.subscribe(ctx, EVENT_TYPE, firstAction, idempotencyKey)
+            );
+            Future<ServiceResult<Void>> second = executor.submit(() ->
+                eventService.subscribe(ctx, EVENT_TYPE, secondAction, idempotencyKey)
+            );
+            return List.of(
+                first.get(20, TimeUnit.SECONDS),
+                second.get(20, TimeUnit.SECONDS)
+            );
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private void cleanupPluginRows() {
         jdbc.update("DELETE FROM sys_plugin_event_subscription WHERE plugin_id = ?", PLUGIN_ID);
         jdbc.update("DELETE FROM sys_plugin_operation_idempotency WHERE plugin_id = ?", PLUGIN_ID);
         jdbc.update("DELETE FROM sys_plugin_capability WHERE plugin_id = ?", PLUGIN_ID);
+    }
+
+    private PluginActionHandler eventHandler(String actionCode) {
+        PluginActionHandler handler = mock(PluginActionHandler.class);
+        when(handler.getDescriptor()).thenReturn(new ActionDescriptor(
+            actionCode,
+            "test",
+            "test",
+            Map.of(),
+            Map.of(),
+            "EVENT_SUBSCRIBE",
+            Duration.ofSeconds(5),
+            true
+        ));
+        return handler;
     }
 }

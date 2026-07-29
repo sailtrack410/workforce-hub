@@ -77,6 +77,22 @@ class PluginManagerLifecycleSafetyTest {
     // ---- disable ----
 
     @Test
+    void disable_shouldRejectLoadedDependentsBeforeClosingGate() {
+        when(pf4jManager.getDependentPluginIds(PID)).thenReturn(List.of("dependent-plugin"));
+
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
+            () -> service.disable(PID)
+        );
+
+        assertTrue(thrown.getMessage().contains("dependent-plugin"));
+        verifyNoInteractions(lifecycleGuard);
+        verify(pluginRepository, never()).updateStatus(anyString(), any(), anyString());
+        verify(pluginRepository, never()).updateStatus(anyString(), any());
+        verify(pf4jManager, never()).stopPlugin(anyString());
+    }
+
+    @Test
     void disable_shouldNotCallStopPlugin_whenDrainReturnsFalse() {
         when(lifecycleGuard.awaitDrain(PID)).thenReturn(false);
 
@@ -163,6 +179,23 @@ class PluginManagerLifecycleSafetyTest {
     }
 
     // ---- uninstall ----
+
+    @Test
+    void uninstall_shouldRejectLoadedDependentsBeforeClosingGate() {
+        when(pf4jManager.getDependentPluginIds(PID)).thenReturn(List.of("dependent-plugin"));
+
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
+            () -> service.uninstall(PID)
+        );
+
+        assertTrue(thrown.getMessage().contains("dependent-plugin"));
+        verifyNoInteractions(lifecycleGuard);
+        verify(pluginRepository, never()).updateStatus(anyString(), any(), anyString());
+        verify(pluginRepository, never()).updateStatus(anyString(), any());
+        verify(pf4jManager, never()).stopPlugin(anyString());
+        verify(pf4jManager, never()).unloadPlugin(anyString());
+    }
 
     @Test
     void uninstall_shouldNotCallStopUnload_whenDrainReturnsFalse() {

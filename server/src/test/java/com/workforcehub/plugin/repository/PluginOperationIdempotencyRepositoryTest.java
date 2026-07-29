@@ -39,7 +39,7 @@ class PluginOperationIdempotencyRepositoryTest {
         when(rs.getTimestamp("created_at")).thenReturn(ts);
 
         when(jdbc.query(
-            eq("SELECT * FROM sys_plugin_operation_idempotency WHERE plugin_id = ? AND operation_code = ? AND idempotency_key = ?"),
+            eq("SELECT * FROM sys_plugin_operation_idempotency WHERE plugin_id = ? AND operation_code = ? AND idempotency_key = ? FOR UPDATE"),
             any(RowMapper.class),
             eq("leave-plugin"), eq("LEAVE_APPROVE"), eq("key-001")
         )).thenAnswer(invocation -> {

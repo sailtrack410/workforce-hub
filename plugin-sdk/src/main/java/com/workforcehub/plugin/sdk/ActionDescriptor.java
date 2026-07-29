@@ -16,9 +16,17 @@ public record ActionDescriptor(
     Duration defaultTimeout,              // 默认超时
     boolean idempotent                    // 是否幂等
 ) {
+    private static final Duration MAX_TIMEOUT = Duration.ofMinutes(5);
+
     public ActionDescriptor {
         if (actionCode == null || actionCode.isBlank()) {
             throw new IllegalArgumentException("actionCode 不能为空");
+        }
+        if (defaultTimeout == null || defaultTimeout.isZero() || defaultTimeout.isNegative()) {
+            throw new IllegalArgumentException("defaultTimeout 必须大于 0");
+        }
+        if (defaultTimeout.compareTo(MAX_TIMEOUT) > 0) {
+            throw new IllegalArgumentException("defaultTimeout 不能超过 5 分钟");
         }
     }
 
