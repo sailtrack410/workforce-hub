@@ -1,12 +1,14 @@
 package com.workforcehub.plugin.runtime;
 
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -16,6 +18,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipException;
 
 /**
  * 从已签名 JAR 的 plugin.json 读取并校验版本兼容性。
@@ -115,7 +118,7 @@ public class PluginVersionService {
 
     private JsonNode readPluginJson(Path jarPath) {
         if (!Files.isRegularFile(jarPath)) {
-            throw new PluginVersionException("插件 JAR 不存在或不是普通文件");
+            throw new IllegalStateException("插件 JAR 不存在或不是普通文件");
         }
 
         try (JarFile jarFile = new JarFile(jarPath.toFile())) {
@@ -146,8 +149,10 @@ public class PluginVersionService {
                 }
                 return json;
             }
-        } catch (IOException e) {
+        } catch (JsonProcessingException | ZipException | EOFException e) {
             throw new PluginVersionException("读取 plugin.json 失败", e);
+        } catch (IOException e) {
+            throw new IllegalStateException("读取 plugin.json 失败", e);
         }
     }
 

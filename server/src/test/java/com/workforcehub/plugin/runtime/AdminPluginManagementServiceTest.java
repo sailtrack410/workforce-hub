@@ -15,10 +15,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -106,6 +111,133 @@ class AdminPluginManagementServiceTest {
         assertFalse(fields.contains("signerId"));
         assertFalse(fields.contains("integrity"));
         assertFalse(fields.contains("errorMessage"));
+    }
+
+    @Test
+    void uploadShouldInstallFromTemporaryFileAndDeleteIt() throws Exception {
+        MockMultipartFile jar = jarPart();
+        MockMultipartFile signature = signaturePart();
+        AtomicReference<Path> uploadPath = new AtomicReference<>();
+        when(pluginManagerService.installNew(any(Path.class), any(PluginRow.class)))
+            .thenAnswer(invocation -> {
+                Path path = invocation.getArgument(0);
+                uploadPath.set(path);
+                assertTrue(Files.isRegularFile(path));
+                assertEquals("jar-content", Files.readString(path));
+                return plugin(PluginStatus.INSTALLED);
+            });
+
+        AdminPluginResponse response = service.upload(
+            jar, signature, " official ", " Hello Plugin ", " 测试插件 ");
+
+        assertEquals(PLUGIN_ID, response.id());
+        assertFalse(Files.exists(uploadPath.get()));
+        ArgumentCaptor<PluginRow> metadata = ArgumentCaptor.forClass(PluginRow.class);
+        verify(pluginManagerService).installNew(any(Path.class), metadata.capture());
+        assertEquals("official", metadata.getValue().getSignerId());
+        assertEquals("Hello Plugin", metadata.getValue().getName());
+        assertEquals("测试插件", metadata.getValue().getDescription());
+        assertEquals(256, metadata.getValue().getSignature().length);
+        JsonNode detail = capturedAudit("PLUGIN_UPLOADED", "SUCCESS");
+        assertEquals(PLUGIN_ID, detail.get("pluginId").asText());
+        assertEquals("INSTALLED", detail.get("afterStatus").asText());
+    }
+
+    @Test
+    void uploadShouldDeleteTemporaryFileAndHideSignatureFailureDetails() throws Exception {
+        AtomicReference<Path> uploadPath = new AtomicReference<>();
+        when(pluginManagerService.installNew(any(Path.class), any(PluginRow.class)))
+            .thenAnswer(invocation -> {
+                uploadPath.set(invocation.getArgument(0));
+                throw new PluginSignatureVerifier.PluginSignatureException(
+                    "private signer and path details");
+            });
+
+        BizException thrown = assertThrows(BizException.class, () -> service.upload(
+            jarPart(), signaturePart(), "official", null, null));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, thrown.getHttpStatus());
+        assertEquals("插件签名校验失败", thrown.getMessage());
+        assertFalse(Files.exists(uploadPath.get()));
+        JsonNode detail = capturedAudit("PLUGIN_UPLOADED", "BLOCKED");
+        assertTrue(detail.get("pluginId").isNull());
+        assertFalse(detail.toString().contains("private signer and path details"));
+    }
+
+    @Test
+    void uploadShouldPreserveCleanupFailureAsServerError() throws Exception {
+        PluginSignatureVerifier.PluginSignatureException installFailure =
+            new PluginSignatureVerifier.PluginSignatureException("signature failed");
+        installFailure.addSuppressed(new IllegalStateException(
+            "删除未持久化插件 JAR 快照失败"
+        ));
+        when(pluginManagerService.installNew(any(Path.class), any(PluginRow.class)))
+            .thenThrow(installFailure);
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service.upload(
+            jarPart(), signaturePart(), "official", null, null));
+
+        assertEquals(installFailure, thrown);
+        capturedAudit("PLUGIN_UPLOADED", "FAIL");
+        verify(auditLogWriter, never()).write(
+            eq("ADMIN"), eq(9001L), eq("PLUGIN_UPLOADED"), eq("PLUGIN"), eq(null),
+            eq("BLOCKED"), anyString()
+        );
+    }
+
+    @Test
+    void uploadShouldPreserveInfrastructureFailureAsServerError() throws Exception {
+        IllegalStateException installFailure = new IllegalStateException(
+            "private storage details",
+            new IOException("private file descriptor details")
+        );
+        when(pluginManagerService.installNew(any(Path.class), any(PluginRow.class)))
+            .thenThrow(installFailure);
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service.upload(
+            jarPart(), signaturePart(), "official", null, null));
+
+        assertEquals(installFailure, thrown);
+        capturedAudit("PLUGIN_UPLOADED", "FAIL");
+        verify(auditLogWriter, never()).write(
+            eq("ADMIN"), eq(9001L), eq("PLUGIN_UPLOADED"), eq("PLUGIN"), eq(null),
+            eq("BLOCKED"), anyString()
+        );
+    }
+
+    @Test
+    void uploadShouldRejectExistingIdWithoutReplacement() throws Exception {
+        AtomicReference<Path> uploadPath = new AtomicReference<>();
+        when(pluginManagerService.installNew(any(Path.class), any(PluginRow.class)))
+            .thenAnswer(invocation -> {
+                uploadPath.set(invocation.getArgument(0));
+                throw new PluginManagerService.PluginAlreadyExistsException(PLUGIN_ID);
+            });
+
+        BizException thrown = assertThrows(BizException.class, () -> service.upload(
+            jarPart(), signaturePart(), "official", null, null));
+
+        assertEquals(HttpStatus.CONFLICT, thrown.getHttpStatus());
+        assertEquals("插件 ID 已存在，上传接口不支持替换安装", thrown.getMessage());
+        assertFalse(Files.exists(uploadPath.get()));
+        JsonNode detail = capturedAudit("PLUGIN_UPLOADED", "BLOCKED");
+        assertEquals(PLUGIN_ID, detail.get("pluginId").asText());
+    }
+
+    @Test
+    void uploadShouldRejectOversizedJarBeforeCreatingTemporaryFile() throws Exception {
+        org.springframework.web.multipart.MultipartFile oversized =
+            mock(org.springframework.web.multipart.MultipartFile.class);
+        when(oversized.isEmpty()).thenReturn(false);
+        when(oversized.getSize()).thenReturn(PluginManagerService.MAX_JAR_BYTES + 1);
+
+        BizException thrown = assertThrows(BizException.class, () -> service.upload(
+            oversized, signaturePart(), "official", null, null));
+
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, thrown.getHttpStatus());
+        assertEquals("插件 JAR 不能超过 32 MiB", thrown.getMessage());
+        verify(pluginManagerService, never()).installNew(any(Path.class), any(PluginRow.class));
+        assertTrue(capturedAudit("PLUGIN_UPLOADED", "BLOCKED").get("pluginId").isNull());
     }
 
     @Test
@@ -405,5 +537,23 @@ class AdminPluginManagementServiceTest {
         row.setInstalledAt(LocalDateTime.of(2026, 7, 30, 10, 0));
         row.setUpdatedAt(LocalDateTime.of(2026, 7, 30, 10, 0));
         return row;
+    }
+
+    private MockMultipartFile jarPart() {
+        return new MockMultipartFile(
+            "jar",
+            "hello-plugin.jar",
+            "application/java-archive",
+            "jar-content".getBytes(StandardCharsets.UTF_8)
+        );
+    }
+
+    private MockMultipartFile signaturePart() {
+        return new MockMultipartFile(
+            "signature",
+            "hello-plugin.sig",
+            "application/octet-stream",
+            new byte[256]
+        );
     }
 }

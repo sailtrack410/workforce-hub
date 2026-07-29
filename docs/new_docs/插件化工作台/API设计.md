@@ -7,6 +7,7 @@
 | GET | `/api/employee/plugins/mine` | 当前员工可见且可加载的 UI 插件清单 |
 | POST | `/api/plugin-gateway/{pluginId}/actions/{actionCode}` | 执行已启用插件的动作 |
 | GET | `/api/admin/plugins` | 管理员插件列表 |
+| POST | `/api/admin/plugins/upload` | 上传 JAR 和 RSA 分离签名，仅首次安装 |
 | PUT | `/api/admin/plugins/{pluginId}/enable` | 启用插件 |
 | PUT | `/api/admin/plugins/{pluginId}/disable` | 停用插件 |
 | DELETE | `/api/admin/plugins/{pluginId}` | 卸载插件并保留注册记录与配置 |
@@ -14,7 +15,7 @@
 | PUT | `/api/admin/plugins/{pluginId}/config/{configKey}` | 创建或按版本更新单个配置 |
 | DELETE | `/api/admin/plugins/{pluginId}/config/{configKey}?expectedVersion={version}` | 按版本删除单个配置，返回墓碑版本 |
 
-上传接口、可信依赖视图和管理端页面仍未实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 已支持符合条件的 `UNINSTALLED` 同 ID 替换，但没有 HTTP 控制器、管理员上传授权/CSRF 或上传审计契约，不能视为已有 JAR 上传、在线升级或回滚 API。
+可信依赖视图和管理端页面仍未实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 继续支持符合条件的 `UNINSTALLED` 同 ID 替换；HTTP 上传使用独立的首次安装入口，不是在线升级或回滚 API。
 
 ### 员工插件清单
 
@@ -93,13 +94,28 @@ HTTP 控制器复用 `PluginManagerService` 的入口关闭、最长 30 秒排�
 
 `GET` 允许查看包括 `UNINSTALLED` 在内的保留配置；`PUT` 拒绝 `DISABLING` 和 `UNINSTALLED`，允许 `INSTALLED / ACTIVE / STOPPED / ERROR`；`DELETE` 拒绝 `DISABLING`，允许管理员显式清理 `UNINSTALLED` 遗留配置。墓碑不会出现在列表或插件读取结果中，但计入 128 个键命名空间上限，防止循环创建/删除不同键导致表无限增长。成功创建、更新和删除会在同一事务写入脱敏审计，只记录插件 ID、配置键、类型、版本和重启标记，不记录值、密文或值哈希。
 
-## 尚未实现的管理端 API
+### 管理员插件上传
 
-| 方法 | 路径 | 说明 |
+`POST /api/admin/plugins/upload` 使用 `multipart/form-data`：
+
+| 字段 | 类型 | 约束 |
 |------|------|------|
-| POST | `/api/admin/plugins/upload` | 上传 JAR 和分离签名 |
+| `jar` | 文件 | 必填，完整 JAR 原始字节，最多 32 MiB |
+| `signature` | 文件 | 必填，`SHA256withRSA` 原始签名字节，最多 65535 字节且长度必须等于可信 RSA 模数字节数 |
+| `signerId` | 文本 | 必填，去除首尾空白后 1–128 字符，必须命中宿主可信公钥白名单 |
+| `name` | 文本 | 可选，去除首尾空白后最多 128 字符；空值回退为已签名插件 ID |
+| `description` | 文本 | 可选，去除首尾空白后最多 512 字符 |
 
-上传接口、可信依赖视图和管理端页面仍未实现。现有安装能力只可由宿主内部调用 `PluginManagerService.install(Path, PluginRow)`，不能视为已有 HTTP 上传入口。
+请求即使额外提交 `pluginId`、版本、摘要、类型、发布方、前端入口或 SRI，也不会被控制器绑定或被安装逻辑信任；这些字段只来自宿主计算或已签名 `plugin.json`。路由要求管理员身份、`ADMIN_PLUGIN_MANAGE` 和全站 Cookie/Header CSRF。Nginx 请求上限为 33 MiB，Spring multipart 单文件/请求上限为 32/33 MiB，核心安装快照复制还会再次执行 32 MiB 有界检查。
+
+成功返回安全 `AdminPluginResponse`，状态为 `INSTALLED`，不会自动启用，也不返回路径、摘要、签名者、签名或内部错误。任何已存在插件 ID，包括 `UNINSTALLED`，统一返回 HTTP `409`；内部同 ID 替换仍只允许宿主显式调用 `install(...)`。缺失字段、签名/签名者或展示 metadata 超限及非法格式返回 `400`，JAR 或 multipart 请求总量超限返回 `413`，非 multipart 返回 `415`，无效签名、清单内容或兼容性失败返回脱敏 `422`；快照读取、JCA、存储或未分类安装故障返回脱敏 `500`。
+
+控制器先把 multipart JAR 移入随机 OS 临时文件，`PluginManagerService.installNew(...)` 再复制到宿主 `.snapshots` 并串行完成验签、清单校验、PF4J、Flyway 和持久化。请求临时文件始终 best-effort 删除；候选 wrapper/快照的失败补偿沿用核心安装契约。`PLUGIN_UPLOADED` 审计只记录可信插件 ID、前后状态和 `SUCCESS / BLOCKED / FAIL`，不记录文件名、路径、摘要、签名或异常。当前没有上传幂等键、多实例安装锁、升级、降级或回滚 API。
+
+## 尚未实现的管理端能力
+
+- 可信依赖解析、持久化和列表展示
+- 启停/卸载、配置和错误展示页面
 
 ---
 

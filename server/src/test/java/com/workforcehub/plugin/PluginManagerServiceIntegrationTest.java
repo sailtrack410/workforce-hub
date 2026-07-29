@@ -34,6 +34,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -88,6 +89,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
@@ -103,6 +105,7 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
     private static final String PERSISTENCE_FAILURE_PLUGIN_ID = "migration-plugin-persistence-failure";
     private static final String TAMPERED_PLUGIN_ID = "migration-plugin-tampered";
     private static final String REINSTALL_PLUGIN_ID = "plugin-reinstall";
+    private static final String UPLOAD_PLUGIN_ID = "plugin-upload-http";
     private static final String HELLO_PLUGIN_ID = "hello-plugin";
     private static final String HELLO_PLUGIN_FRONTEND_SRI =
         "sha384-c527zMMh7jwa0gTNl9fI1Mg5xEqGXyEFnTFCcjr7fokaoyPHzkIY7kC9f13c4zUQ";
@@ -170,6 +173,7 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         unloadIfPresent(PERSISTENCE_FAILURE_PLUGIN_ID);
         unloadIfPresent(TAMPERED_PLUGIN_ID);
         unloadIfPresent(REINSTALL_PLUGIN_ID);
+        unloadIfPresent(UPLOAD_PLUGIN_ID);
         unloadIfPresent(HELLO_PLUGIN_ID);
         dropTable(REINSTALL_TRANSACTION_GUARD_TABLE);
         jdbcTemplate.update(
@@ -208,6 +212,12 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             HELLO_PLUGIN_ID
         );
         jdbcTemplate.update("DELETE FROM sys_plugin WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("DELETE FROM sys_plugin WHERE plugin_id = ?", UPLOAD_PLUGIN_ID);
+        jdbcTemplate.update("""
+            DELETE FROM sys_audit_log
+            WHERE target_type = 'PLUGIN'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, UPLOAD_PLUGIN_ID);
         dropTable("plugin_migration_success");
         dropTable(PERSISTENCE_GUARD_TABLE);
         dropTable(REINSTALL_DATA_TABLE);
@@ -217,6 +227,7 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         dropTable(flywayMigrator.getHistoryTable(PERSISTENCE_FAILURE_PLUGIN_ID));
         dropTable(flywayMigrator.getHistoryTable(TAMPERED_PLUGIN_ID));
         dropTable(flywayMigrator.getHistoryTable(REINSTALL_PLUGIN_ID));
+        dropTable(flywayMigrator.getHistoryTable(UPLOAD_PLUGIN_ID));
         clearTestSnapshots();
     }
 
@@ -997,6 +1008,103 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    void adminHttpUploadShouldInstallSignedJarAndRejectSameIdReplacement() throws Exception {
+        Path jarPath = buildPluginJar(UPLOAD_PLUGIN_ID, "SELECT 1;");
+        byte[] jarBytes = Files.readAllBytes(jarPath);
+        byte[] signature = sign(jarPath);
+
+        MvcResult installedResult = mockMvc.perform(multipart("/api/admin/plugins/upload")
+                .file(new MockMultipartFile(
+                    "jar", "plugin.jar", "application/java-archive", jarBytes))
+                .file(new MockMultipartFile(
+                    "signature", "plugin.sig", "application/octet-stream", signature))
+                .param("signerId", TEST_SIGNER_ID)
+                .param("name", "HTTP Upload Plugin")
+                .param("description", "HTTP upload integration test")
+                .with(adminPluginManager())
+                .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, installedResult.getResponse().getStatus());
+        assertEquals(UPLOAD_PLUGIN_ID, JsonPath.read(
+            installedResult.getResponse().getContentAsString(), "$.data.id"));
+        assertEquals("INSTALLED", JsonPath.read(
+            installedResult.getResponse().getContentAsString(), "$.data.status"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("jarPath"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("jarSha256"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("signerId"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("signature"));
+
+        PluginRow installed = pluginManagerService.getPlugin(UPLOAD_PLUGIN_ID);
+        assertEquals(PluginStatus.INSTALLED, installed.getStatus());
+        assertEquals(TEST_SIGNER_ID, installed.getSignerId());
+        assertEquals(sha256(jarPath), installed.getJarSha256());
+        assertNotNull(pluginManager.getPlugin(UPLOAD_PLUGIN_ID));
+        assertEquals(1, tableExists(flywayMigrator.getHistoryTable(UPLOAD_PLUGIN_ID)));
+        assertEquals(1L, snapshotCount());
+
+        MvcResult duplicateResult = mockMvc.perform(multipart("/api/admin/plugins/upload")
+                .file(new MockMultipartFile(
+                    "jar", "plugin.jar", "application/java-archive", jarBytes))
+                .file(new MockMultipartFile(
+                    "signature", "plugin.sig", "application/octet-stream", signature))
+                .param("signerId", TEST_SIGNER_ID)
+                .with(adminPluginManager())
+                .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(409, duplicateResult.getResponse().getStatus());
+        assertEquals("插件 ID 已存在，上传接口不支持替换安装", JsonPath.read(
+            duplicateResult.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.message"));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin WHERE plugin_id = ?",
+            Integer.class,
+            UPLOAD_PLUGIN_ID
+        ));
+        assertEquals(1L, snapshotCount());
+        assertEquals(
+            List.of("PLUGIN_UPLOADED:SUCCESS", "PLUGIN_UPLOADED:BLOCKED"),
+            jdbcTemplate.query("""
+                SELECT action_type, result
+                FROM sys_audit_log
+                WHERE target_type = 'PLUGIN'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+                ORDER BY occurred_at, id
+                """, (rs, rowNum) -> rs.getString("action_type") + ":" + rs.getString("result"),
+                UPLOAD_PLUGIN_ID)
+        );
+    }
+
+    @Test
+    void adminHttpUploadShouldRejectInvalidSignatureWithoutResidue() throws Exception {
+        Path jarPath = buildPluginJar(UPLOAD_PLUGIN_ID, "SELECT 1;");
+        byte[] invalidSignature = sign(jarPath);
+        invalidSignature[0] ^= 1;
+
+        MvcResult result = mockMvc.perform(multipart("/api/admin/plugins/upload")
+                .file(new MockMultipartFile(
+                    "jar", "plugin.jar", "application/java-archive", Files.readAllBytes(jarPath)))
+                .file(new MockMultipartFile(
+                    "signature", "plugin.sig", "application/octet-stream", invalidSignature))
+                .param("signerId", TEST_SIGNER_ID)
+                .with(adminPluginManager())
+                .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(422, result.getResponse().getStatus());
+        assertEquals("插件签名校验失败", JsonPath.read(
+            result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.message"));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin WHERE plugin_id = ?",
+            Integer.class,
+            UPLOAD_PLUGIN_ID
+        ));
+        assertNull(pluginManager.getPlugin(UPLOAD_PLUGIN_ID));
+        assertEquals(0, tableExists(flywayMigrator.getHistoryTable(UPLOAD_PLUGIN_ID)));
+        assertEquals(0L, snapshotCount());
+    }
+
+    @Test
     void adminHttpShouldUninstallInstalledPluginWithoutStartingIt() throws Exception {
         Path jarPath = buildRealHelloPluginJar();
         pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
@@ -1582,6 +1690,19 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             .substring("flyway_plugin_".length()) + "_";
         try (var paths = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
             return paths.anyMatch(path -> path.getFileName().toString().startsWith(prefix));
+        }
+    }
+
+    private long snapshotCount() throws IOException {
+        Path snapshotDirectory = pluginManager.getPluginsRoot()
+            .toAbsolutePath()
+            .normalize()
+            .resolve(".snapshots");
+        if (!Files.isDirectory(snapshotDirectory)) {
+            return 0;
+        }
+        try (var snapshots = Files.list(snapshotDirectory)) {
+            return snapshots.filter(Files::isRegularFile).count();
         }
     }
 

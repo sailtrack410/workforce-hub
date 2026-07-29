@@ -17,8 +17,11 @@ import org.pf4j.PluginDescriptor;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -250,6 +253,27 @@ class PluginManagerSignatureSafetyTest {
         verify(pluginRepository, never()).insert(any(PluginRow.class));
     }
 
+    @Test
+    void installShouldRejectOversizedJarBeforeVerification() throws Exception {
+        Path jarPath = tempDir.resolve("oversized-plugin.jar");
+        try (FileChannel channel = FileChannel.open(
+                jarPath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE)) {
+            channel.position(PluginManagerService.MAX_JAR_BYTES);
+            channel.write(ByteBuffer.wrap(new byte[] {1}));
+        }
+
+        assertThrows(
+            PluginManagerService.PluginPackageTooLargeException.class,
+            () -> service.install(jarPath, metadata(new byte[] {1}))
+        );
+
+        verify(signatureVerifier, never()).verify(any(Path.class), anyString(), any(byte[].class));
+        verify(pf4jManager, never()).loadPlugin(any(Path.class));
+        assertSnapshotDirectoryEmpty();
+    }
+
     @ParameterizedTest
     @EnumSource(value = PluginStatus.class, names = "UNINSTALLED", mode = EnumSource.Mode.EXCLUDE)
     void installShouldRejectExistingPluginBeforePf4jLoadAndMigration(
@@ -276,6 +300,33 @@ class PluginManagerSignatureSafetyTest {
         verify(pf4jManager, never()).loadPlugin(any(Path.class));
         verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
         verify(pluginRepository, never()).insert(any(PluginRow.class));
+        assertSnapshotDirectoryEmpty();
+    }
+
+    @Test
+    void installNewShouldRejectUninstalledExistingIdBeforePf4jLoadAndMigration()
+            throws Exception {
+        Path jarPath = Files.writeString(tempDir.resolve("upload-existing.jar"), "signed-content");
+        Path previousJarPath = Files.writeString(tempDir.resolve("previous-upload.jar"), "previous");
+        PluginRow existing = storedPlugin(previousJarPath, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+
+        PluginManagerService.PluginAlreadyExistsException thrown = assertThrows(
+            PluginManagerService.PluginAlreadyExistsException.class,
+            () -> service.installNew(jarPath, metadata(new byte[] {1, 2, 3}))
+        );
+
+        assertEquals(PLUGIN_ID, thrown.getPluginId());
+        verify(pf4jManager, never()).getPlugin(PLUGIN_ID);
+        verify(pf4jManager, never()).loadPlugin(any(Path.class));
+        verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
+        verify(pluginRepository, never()).replaceUninstalled(
+            any(PluginRow.class), anyString(), anyString());
         assertSnapshotDirectoryEmpty();
     }
 

@@ -8,11 +8,18 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.stream.Stream;
+import java.util.zip.CRC32;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -435,6 +442,16 @@ class PluginVersionServiceTest {
     }
 
     @Test
+    void shouldTreatMissingJarAsInfrastructureFailure() {
+        Path jarPath = tempDir.resolve("missing-plugin.jar");
+
+        assertThrows(
+            IllegalStateException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    @Test
     void shouldRejectDuplicatePluginJsonEntries() throws Exception {
         Path jarPath = buildJarWithDuplicatePluginJson(
             pluginJson("2.0.0", "1.3.0", "1.0.0", null, "17")
@@ -444,6 +461,19 @@ class PluginVersionServiceTest {
             PluginVersionService.PluginVersionException.class,
             () -> service.checkCompatibility(jarPath)
         );
+    }
+
+    @Test
+    void shouldRejectTruncatedDeflatedPluginJson() throws Exception {
+        Path jarPath = buildJarWithTruncatedDeflatedPluginJson(
+            pluginJson("2.0.0", "1.3.0", "1.0.0", null, "17")
+        );
+
+        PluginVersionService.PluginVersionException thrown = assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+        assertEquals(EOFException.class, thrown.getCause().getClass());
     }
 
     @Test
@@ -498,6 +528,35 @@ class PluginVersionServiceTest {
                 output.write(content);
                 output.closeArchiveEntry();
             }
+        }
+        return jarPath;
+    }
+
+    private Path buildJarWithTruncatedDeflatedPluginJson(String pluginJson) throws Exception {
+        byte[] content = pluginJson.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+        Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, true);
+        try (DeflaterOutputStream output = new DeflaterOutputStream(
+                compressed,
+                deflater)) {
+            output.write(content);
+        } finally {
+            deflater.end();
+        }
+        byte[] compressedBytes = compressed.toByteArray();
+        byte[] truncatedBytes = Arrays.copyOf(compressedBytes, compressedBytes.length / 2);
+        CRC32 crc = new CRC32();
+        crc.update(content);
+
+        ZipArchiveEntry entry = new ZipArchiveEntry("plugin.json");
+        entry.setMethod(ZipArchiveEntry.DEFLATED);
+        entry.setSize(content.length);
+        entry.setCompressedSize(truncatedBytes.length);
+        entry.setCrc(crc.getValue());
+
+        Path jarPath = tempDir.resolve("truncated-plugin-json.jar");
+        try (ZipArchiveOutputStream output = new ZipArchiveOutputStream(jarPath)) {
+            output.addRawArchiveEntry(entry, new ByteArrayInputStream(truncatedBytes));
         }
         return jarPath;
     }

@@ -196,6 +196,7 @@ public class AdminSystemRepository {
         if ("TASK_CREATED".equals(value)) return "创建 AI 任务";
         if ("TASK_SUCCEEDED".equals(value)) return "AI 任务完成";
         if ("TASK_FAILED".equals(value)) return "AI 任务失败";
+        if ("PLUGIN_UPLOADED".equals(value)) return "上传插件";
         if ("PLUGIN_ENABLED".equals(value)) return "启用插件";
         if ("PLUGIN_DISABLED".equals(value)) return "停用插件";
         if ("PLUGIN_UNINSTALLED".equals(value)) return "卸载插件";

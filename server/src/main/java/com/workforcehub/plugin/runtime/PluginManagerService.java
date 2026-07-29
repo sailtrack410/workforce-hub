@@ -13,9 +13,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -30,6 +31,7 @@ import java.util.Optional;
 public class PluginManagerService {
 
     private static final Logger log = LoggerFactory.getLogger(PluginManagerService.class);
+    static final long MAX_JAR_BYTES = 32L * 1024 * 1024;
 
     private final WorkforcePluginManager pf4jManager;
     private final PluginRepository pluginRepository;
@@ -166,6 +168,17 @@ public class PluginManagerService {
      * 版本信息只信任已签名 JAR 内的 plugin.json。
      */
     public synchronized PluginRow install(Path jarPath, PluginRow metadata) {
+        return install(jarPath, metadata, true);
+    }
+
+    /**
+     * 管理端首次安装入口，不允许借由上传接口替换历史插件 ID。
+     */
+    public synchronized PluginRow installNew(Path jarPath, PluginRow metadata) {
+        return install(jarPath, metadata, false);
+    }
+
+    private PluginRow install(Path jarPath, PluginRow metadata, boolean allowReplacement) {
         Path snapshotPath = createJarSnapshot(jarPath);
         String pluginId = null;
         List<String> pluginIdsBeforeLoad = null;
@@ -213,6 +226,9 @@ public class PluginManagerService {
             validateInstallRow(row);
             Optional<PluginRow> previousRow = pluginRepository.findById(row.getPluginId());
             if (previousRow.isPresent()) {
+                if (!allowReplacement) {
+                    throw new PluginAlreadyExistsException(row.getPluginId());
+                }
                 PluginRow previous = previousRow.get();
                 if (previous.getStatus() != PluginStatus.UNINSTALLED) {
                     throw new IllegalStateException("插件已存在: " + row.getPluginId());
@@ -377,8 +393,26 @@ public class PluginManagerService {
                 .normalize()
                 .resolve(".snapshots");
             Files.createDirectories(snapshotDirectory);
+            if (!Files.isRegularFile(sourceJar)) {
+                throw new IllegalArgumentException("插件 JAR 不存在或不是普通文件");
+            }
+            if (Files.size(sourceJar) > MAX_JAR_BYTES) {
+                throw new PluginPackageTooLargeException();
+            }
             snapshotPath = Files.createTempFile(snapshotDirectory, "plugin-", ".jar");
-            Files.copy(sourceJar, snapshotPath, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream input = Files.newInputStream(sourceJar);
+                 OutputStream output = Files.newOutputStream(snapshotPath)) {
+                byte[] buffer = new byte[8192];
+                long copied = 0;
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    copied += read;
+                    if (copied > MAX_JAR_BYTES) {
+                        throw new PluginPackageTooLargeException();
+                    }
+                    output.write(buffer, 0, read);
+                }
+            }
             return snapshotPath;
         } catch (IOException | RuntimeException e) {
             if (snapshotPath != null) {
@@ -387,6 +421,9 @@ public class PluginManagerService {
                 } catch (IOException | RuntimeException cleanupError) {
                     e.addSuppressed(cleanupError);
                 }
+            }
+            if (e instanceof PluginPackageTooLargeException tooLarge) {
+                throw tooLarge;
             }
             throw new IllegalStateException("创建插件 JAR 快照失败", e);
         }
@@ -591,6 +628,25 @@ public class PluginManagerService {
     static final class PluginDependencyConflictException extends IllegalStateException {
         PluginDependencyConflictException(String message) {
             super(message);
+        }
+    }
+
+    static final class PluginAlreadyExistsException extends IllegalStateException {
+        private final String pluginId;
+
+        PluginAlreadyExistsException(String pluginId) {
+            super("插件已存在: " + pluginId);
+            this.pluginId = pluginId;
+        }
+
+        String getPluginId() {
+            return pluginId;
+        }
+    }
+
+    static final class PluginPackageTooLargeException extends IllegalArgumentException {
+        PluginPackageTooLargeException() {
+            super("插件 JAR 超过 32 MiB");
         }
     }
 
