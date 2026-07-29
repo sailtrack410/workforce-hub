@@ -260,9 +260,9 @@ class PluginLifecycleGuardTest {
                     return;
                 }
                 boolean acquired = guard.tryAcquire("p1");
-                acquireAttempted.countDown();
                 if (acquired) {
                     acquiredSucceeded.incrementAndGet();
+                    acquireAttempted.countDown();
                     try {
                         assertTrue(releaseSignal.await(5, TimeUnit.SECONDS), "releaseSignal 应在 5 秒内打开");
                     } catch (InterruptedException e) {
@@ -271,6 +271,7 @@ class PluginLifecycleGuardTest {
                     guard.release("p1");
                 } else {
                     acquiredFailed.incrementAndGet();
+                    acquireAttempted.countDown();
                 }
             });
 

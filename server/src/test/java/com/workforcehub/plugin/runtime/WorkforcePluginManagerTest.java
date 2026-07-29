@@ -1,5 +1,7 @@
 package com.workforcehub.plugin.runtime;
 
+import com.workforcehub.plugin.repository.PluginConfigRepository;
+import com.workforcehub.plugin.repository.PluginConfigRow;
 import com.workforcehub.plugin.sdk.HostService;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.PluginContext;
@@ -15,7 +17,10 @@ import org.pf4j.PluginRuntimeException;
 import org.pf4j.PluginWrapper;
 
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -38,6 +43,10 @@ class WorkforcePluginManagerTest {
 
         public StubService probeService() {
             return context.getService(StubService.class);
+        }
+
+        public Optional<String> probeConfig(String key) {
+            return context.getConfig().get(key);
         }
     }
 
@@ -101,6 +110,38 @@ class WorkforcePluginManagerTest {
 
         assertThrows(PluginRuntimeException.class, () -> factory.create(wrapper));
         assertFalse(InvalidPlugin.constructorCalled.get());
+    }
+
+    @Test
+    void springConstructorShouldBindPluginConfigNamespace() {
+        PluginPermissionService permService = mock(PluginPermissionService.class);
+        PluginConfigRepository configRepository = mock(PluginConfigRepository.class);
+        when(configRepository.find("probe-plugin", "shared.key")).thenReturn(Optional.of(
+            new PluginConfigRow(
+                "probe-plugin", "shared.key", "bound-value", "STRING", null, null,
+                false, false, false, 1, LocalDateTime.of(2026, 7, 29, 0, 0)
+            )
+        ));
+        PluginConfigCipher cipher = new PluginConfigCipher(
+            Base64.getEncoder().encodeToString(new byte[32]));
+        WorkforcePluginManager manager = new WorkforcePluginManager(
+            tempDir.resolve("plugins").toString(),
+            List.of(),
+            permService,
+            configRepository,
+            cipher
+        );
+        PluginDescriptor descriptor = mock(PluginDescriptor.class);
+        when(descriptor.getPluginClass()).thenReturn(ContextProbePlugin.class.getName());
+        PluginWrapper wrapper = mock(PluginWrapper.class);
+        when(wrapper.getDescriptor()).thenReturn(descriptor);
+        when(wrapper.getPluginClassLoader()).thenReturn(getClass().getClassLoader());
+        when(wrapper.getPluginId()).thenReturn("probe-plugin");
+
+        ContextProbePlugin plugin = (ContextProbePlugin) manager.createPluginFactory().create(wrapper);
+
+        assertEquals(Optional.of("bound-value"), plugin.probeConfig("shared.key"));
+        verify(configRepository).find("probe-plugin", "shared.key");
     }
 
     @Test

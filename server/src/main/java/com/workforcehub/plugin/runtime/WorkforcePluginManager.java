@@ -1,7 +1,9 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.sdk.HostService;
+import com.workforcehub.plugin.sdk.PluginConfig;
 import com.workforcehub.plugin.sdk.WorkforcePlugin;
+import com.workforcehub.plugin.repository.PluginConfigRepository;
 import jakarta.annotation.PreDestroy;
 import org.pf4j.DefaultPluginManager;
 import org.pf4j.PluginFactory;
@@ -20,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * Workforce Hub 的 PF4J 管理器（Spring 单例）。
@@ -29,15 +32,28 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class WorkforcePluginManager extends DefaultPluginManager {
 
     private final HostServiceRegistry serviceRegistry;
+    private final Function<String, PluginConfig> configFactory;
     private final Map<String, WorkforcePlugin> pluginInstances = new ConcurrentHashMap<>();
 
     @Autowired
     public WorkforcePluginManager(
             @Value("${workforce.plugin.root:plugins}") String pluginsRoot,
             List<HostService> hostServices,
+            PluginPermissionService permissionService,
+            PluginConfigRepository configRepository,
+            PluginConfigCipher configCipher) {
+        super(Path.of(pluginsRoot));
+        this.serviceRegistry = new HostServiceRegistry(hostServices, permissionService);
+        this.configFactory = pluginId -> new DefaultPluginConfig(pluginId, configRepository, configCipher);
+    }
+
+    public WorkforcePluginManager(
+            String pluginsRoot,
+            List<HostService> hostServices,
             PluginPermissionService permissionService) {
         super(Path.of(pluginsRoot));
         this.serviceRegistry = new HostServiceRegistry(hostServices, permissionService);
+        this.configFactory = pluginId -> key -> java.util.Optional.empty();
     }
 
     /**
@@ -52,6 +68,7 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
     protected PluginFactory createPluginFactory() {
         return new WorkforcePluginFactory(
             () -> serviceRegistry,
+            pluginId -> configFactory.apply(pluginId),
             (pluginId, plugin) -> pluginInstances.put(pluginId, plugin)
         );
     }

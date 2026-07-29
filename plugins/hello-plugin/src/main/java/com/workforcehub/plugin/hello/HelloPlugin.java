@@ -32,6 +32,10 @@ public final class HelloPlugin extends WorkforcePlugin {
         return getContext().getPluginId();
     }
 
+    public String getConfigValue(String key) {
+        return getContext().getConfig().get(key).orElse(null);
+    }
+
     public boolean isStarted() {
         return started;
     }

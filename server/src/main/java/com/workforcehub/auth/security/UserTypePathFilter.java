@@ -17,6 +17,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+import static com.workforcehub.common.config.RequestPathResolver.resolve;
+
 /**
  * 用户类型路径校验
  * 路径隔离过滤器：/api/admin/** 仅允许管理员访问，/api/employee/** 仅允许员工访问
@@ -43,7 +45,7 @@ public class UserTypePathFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String uri = request.getRequestURI();
+        String uri = resolve(request);
         if (EMPLOYEE_LOGIN_PATH.equals(uri) || ADMIN_LOGIN_PATH.equals(uri)) {
             filterChain.doFilter(request, response);
             return;

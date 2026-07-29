@@ -52,16 +52,33 @@ HTTP 绑定要求存在当前登录用户；事件绑定的 `triggeredBy` 只接
 
 ## 三、PluginContext 与插件基类
 
-当前 `PluginContext` 只有两个方法：
+当前 `PluginContext` 有三个方法：
 
 ```java
 public interface PluginContext {
     String getPluginId();
+    PluginConfig getConfig();
     <T extends HostService> T getService(Class<T> type);
 }
 ```
 
-当前没有 `getInvocationContext()`、`getConfig()` 或可长期持有的启动身份。每次业务调用使用 `PluginActionHandler.execute(...)` 或 `HostService` 首参收到的宿主上下文。
+当前没有 `getInvocationContext()` 或可长期持有的启动身份。每次业务调用使用 `PluginActionHandler.execute(...)` 或 `HostService` 首参收到的宿主上下文。
+
+`getConfig()` 返回宿主绑定到当前 PF4J pluginId 的只读配置视图：
+
+```java
+@FunctionalInterface
+public interface PluginConfig {
+    Optional<String> get(String key);
+}
+```
+
+- 插件只提交配置键，不能指定或切换 pluginId；宿主查询始终限定 `(当前 pluginId, key)`。
+- 键必须匹配 `^[a-z0-9][a-z0-9._-]{0,127}$`，非法键抛出 `IllegalArgumentException`。
+- 有效值优先使用 `config_value`，仅当其为 `null` 时回退 `default_value`；配置不存在或两者均为空时返回 `Optional.empty()`。
+- `STRING / INT / BOOL / SECRET` 均以 `String` 返回，SDK 当前没有 typed getter；`INT` 和 `BOOL` 是管理端写入时已规范化的字符串。
+- `SECRET` 在宿主内按当前 pluginId 和 key 解密后返回明文；缺少或错误主密钥、密文损坏、命名空间不匹配及历史明文都会 fail closed 并抛出 `IllegalStateException`，不会回退明文。
+- 该接口没有写方法，也不经过 `HostService` capability；配置创建、更新和删除只能走受管理员权限与 CSRF 保护的宿主管理 API。
 
 插件主类继承 `WorkforcePlugin`，构造器必须公开并接受 `(PluginWrapper, PluginContext)`：
 
@@ -355,7 +372,7 @@ POST /api/plugin-gateway/{pluginId}/actions/{actionCode}
 - `NotificationService`、`MessageService`、`FileService`
 - `AgentService`、`KnowledgeService`
 - `AuditService`、`ConfigService`、`SchedulerService`
-- `PluginConfig`、`PageRequest`、`PageResult`
+- `PageRequest`、`PageResult`
 - `VersionService`、`PermissionService`
 - 通用 `PluginExtension`
 

@@ -1,12 +1,14 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.sdk.PluginContext;
+import com.workforcehub.plugin.sdk.PluginConfig;
 import com.workforcehub.plugin.sdk.WorkforcePlugin;
 import org.pf4j.PluginFactory;
 import org.pf4j.PluginRuntimeException;
 import org.pf4j.PluginWrapper;
 
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -15,12 +17,15 @@ import java.util.function.Supplier;
 public final class WorkforcePluginFactory implements PluginFactory {
 
     private final Supplier<HostServiceRegistry> registrySupplier;
+    private final Function<String, PluginConfig> configFactory;
     private final BiConsumer<String, WorkforcePlugin> instanceConsumer;
 
     public WorkforcePluginFactory(
             Supplier<HostServiceRegistry> registrySupplier,
+            Function<String, PluginConfig> configFactory,
             BiConsumer<String, WorkforcePlugin> instanceConsumer) {
         this.registrySupplier = registrySupplier;
+        this.configFactory = configFactory;
         this.instanceConsumer = instanceConsumer;
     }
 
@@ -28,7 +33,9 @@ public final class WorkforcePluginFactory implements PluginFactory {
     public WorkforcePlugin create(PluginWrapper pluginWrapper) {
         String pluginClassName = pluginWrapper.getDescriptor().getPluginClass();
         PluginContext context = new DefaultPluginContext(
-            pluginWrapper.getPluginId(), registrySupplier.get());
+            pluginWrapper.getPluginId(),
+            registrySupplier.get(),
+            configFactory.apply(pluginWrapper.getPluginId()));
 
         try {
             Class<?> pluginClass = pluginWrapper.getPluginClassLoader().loadClass(pluginClassName);

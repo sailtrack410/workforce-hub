@@ -130,8 +130,9 @@ class PluginCallPermissionMigrationIntegrationTest extends LocalIntegrationTestS
         assertEquals("ADMIN_NOTIFICATION_CHANNEL_MANAGE", notification.get("perm_code"));
 
         Map<String, Object> pluginPermission = jdbcTemplate.queryForMap(
-            "SELECT id, perm_code FROM admin_permission WHERE id = 7011");
+            "SELECT id, perm_code FROM admin_permission WHERE perm_code = 'ADMIN_PLUGIN_CALL'");
         assertEquals("ADMIN_PLUGIN_CALL", pluginPermission.get("perm_code"));
+        assertTrue(((Number) pluginPermission.get("id")).longValue() > 7010L);
 
         Map<String, Object> oldRelation = jdbcTemplate.queryForMap("""
             SELECT role_id, permission_id

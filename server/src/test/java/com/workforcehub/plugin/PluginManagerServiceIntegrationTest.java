@@ -143,6 +143,8 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         unloadIfPresent(TAMPERED_PLUGIN_ID);
         unloadIfPresent(HELLO_PLUGIN_ID);
         jdbcTemplate.update(
+            "DELETE FROM sys_plugin_config WHERE plugin_id = ?", HELLO_PLUGIN_ID);
+        jdbcTemplate.update(
             "DELETE FROM sys_plugin WHERE plugin_id IN (?, ?, ?, ?, ?, ?)",
             SUCCESS_PLUGIN_ID,
             FAILURE_PLUGIN_ID,
@@ -213,6 +215,35 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         assertNull(pluginManager.getPlugin(SUCCESS_PLUGIN_ID));
         assertTrue(Files.isRegularFile(snapshotPath));
         assertFalse(hasMigrationTempDirectory(SUCCESS_PLUGIN_ID));
+    }
+
+    @Test
+    void realPf4jPluginShouldReadBoundConfigAndUninstallShouldPreserveIt() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_config
+                (plugin_id, config_key, config_value, value_type)
+            VALUES (?, 'shared.key', 'configured-value', 'STRING')
+            """, HELLO_PLUGIN_ID);
+        pluginManagerService.enable(HELLO_PLUGIN_ID);
+
+        Object plugin = pluginManager.getPlugin(HELLO_PLUGIN_ID).getPlugin();
+        assertEquals(
+            "configured-value",
+            plugin.getClass().getMethod("getConfigValue", String.class)
+                .invoke(plugin, "shared.key")
+        );
+        assertNull(plugin.getClass().getMethod("getConfigValue", String.class)
+            .invoke(plugin, "missing.key"));
+
+        pluginManagerService.uninstall(HELLO_PLUGIN_ID);
+
+        assertEquals(1, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_plugin_config
+            WHERE plugin_id = ? AND config_key = 'shared.key'
+            """, Integer.class, HELLO_PLUGIN_ID));
     }
 
     @Test
