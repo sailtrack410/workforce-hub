@@ -1,5 +1,7 @@
 package com.workforcehub.plugin;
 
+import com.jayway.jsonpath.JsonPath;
+import com.workforcehub.auth.security.AdminUserDetails;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginRepository;
 import com.workforcehub.plugin.repository.PluginStatus;
@@ -23,14 +25,21 @@ import org.pf4j.PluginClassLoader;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
@@ -43,12 +52,14 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.Signature;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.jar.JarEntry;
@@ -67,11 +78,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 @SpringBootTest(properties = "workforce.plugin.root=target/test-plugins")
+@AutoConfigureMockMvc
 @ActiveProfiles("api")
 class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
@@ -132,6 +152,9 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private Environment environment;
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @BeforeEach
     void resetPluginState() {
@@ -674,6 +697,201 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         verify(pluginManager, never()).loadPlugin(any(Path.class));
         assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
         assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+    }
+
+    @Test
+    void adminHttpShouldUninstallInstalledPluginWithoutStartingIt() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+
+        PluginWrapper wrapper = pluginManager.getPlugin(HELLO_PLUGIN_ID);
+        assertNotNull(wrapper);
+        assertEquals(PluginState.RESOLVED, wrapper.getPluginState());
+        PluginClassLoader classLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+        clearInvocations(pluginManager);
+
+        MvcResult uninstallResult = mockMvc.perform(
+                delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, uninstallResult.getResponse().getStatus());
+        assertEquals("UNINSTALLED", JsonPath.read(
+            uninstallResult.getResponse().getContentAsString(), "$.data.status"));
+        LocalDateTime responseUpdatedAt = LocalDateTime.parse(JsonPath.read(
+            uninstallResult.getResponse().getContentAsString(), "$.data.updatedAt"));
+        PluginRow persisted = pluginManagerService.getPlugin(HELLO_PLUGIN_ID);
+        assertEquals(PluginStatus.UNINSTALLED, persisted.getStatus());
+        assertEquals(persisted.getUpdatedAt(), responseUpdatedAt);
+        verify(pluginManager, never()).stopPlugin(HELLO_PLUGIN_ID);
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertTrue(classLoader.isClosed());
+        assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+    }
+
+    @Test
+    void adminHttpShouldKeepPluginRecoverableWhenClassLoaderCloseFails() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+
+        PluginClassLoader originalClassLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+        PluginClassLoader failingClassLoader = mock(PluginClassLoader.class);
+        doThrow(new IOException("close failed")).when(failingClassLoader).close();
+
+        MvcResult failedResult;
+        try {
+            doReturn(failingClassLoader)
+                .when(pluginManager)
+                .getPluginClassLoader(HELLO_PLUGIN_ID);
+            failedResult = mockMvc.perform(
+                    delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                        .with(adminPluginManager())
+                        .with(csrf().asHeader()))
+                .andReturn();
+        } finally {
+            doCallRealMethod()
+                .when(pluginManager)
+                .getPluginClassLoader(HELLO_PLUGIN_ID);
+        }
+
+        assertEquals(500, failedResult.getResponse().getStatus());
+        assertEquals(PluginStatus.ERROR, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNotNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertSame(originalClassLoader, pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertFalse(originalClassLoader.isClosed());
+
+        MvcResult retryResult = mockMvc.perform(
+                delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, retryResult.getResponse().getStatus());
+        assertEquals(PluginStatus.UNINSTALLED, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertTrue(originalClassLoader.isClosed());
+    }
+
+    @Test
+    void adminHttpLifecycleShouldDrainAndUnloadRealPlugin() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+
+        MvcResult enableResult = mockMvc.perform(
+                put("/api/admin/plugins/{pluginId}/enable", HELLO_PLUGIN_ID)
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, enableResult.getResponse().getStatus());
+        assertEquals("ACTIVE", JsonPath.read(
+            enableResult.getResponse().getContentAsString(), "$.data.status"));
+        assertEquals(PluginStatus.ACTIVE, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        PluginWrapper wrapper = pluginManager.getPlugin(HELLO_PLUGIN_ID);
+        assertNotNull(wrapper);
+        assertEquals(PluginState.STARTED, wrapper.getPluginState());
+        PluginClassLoader classLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+        assertFalse(classLoader.isClosed());
+        assertEquals(1, pluginManager.getExtensions(PluginActionHandler.class, HELLO_PLUGIN_ID).size());
+
+        // 模拟已经越过网关 acquire 的在途请求，后续新请求仍通过真实 MockMvc 网关验证拒绝。
+        assertTrue(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+        CompletableFuture<MvcResult> uninstallFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                return mockMvc.perform(delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                        .with(adminPluginManager())
+                        .with(csrf().asHeader()))
+                    .andReturn();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        PluginStatus statusWhileDraining;
+        boolean uninstallCompletedWhileHeld;
+        MvcResult rejectedResult;
+        try {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus() != PluginStatus.DISABLING
+                    && System.nanoTime() < deadline) {
+                TimeUnit.MILLISECONDS.sleep(10);
+            }
+            statusWhileDraining = pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus();
+            uninstallCompletedWhileHeld = uninstallFuture.isDone();
+            rejectedResult = mockMvc.perform(post(
+                    "/api/plugin-gateway/{pluginId}/actions/{actionCode}",
+                    HELLO_PLUGIN_ID,
+                    "hello.greet")
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader())
+                    .header(HttpHeaders.ORIGIN, "http://localhost")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"test\"}"))
+                .andReturn();
+        } finally {
+            lifecycleGuard.release(HELLO_PLUGIN_ID);
+        }
+
+        MvcResult uninstallResult = uninstallFuture.get(10, TimeUnit.SECONDS);
+        assertEquals(PluginStatus.DISABLING, statusWhileDraining);
+        assertFalse(uninstallCompletedWhileHeld);
+        assertEquals(409, rejectedResult.getResponse().getStatus());
+        assertEquals(4009, ((Number) JsonPath.read(
+            rejectedResult.getResponse().getContentAsString(), "$.code")).intValue());
+        assertEquals(200, uninstallResult.getResponse().getStatus());
+        assertEquals("UNINSTALLED", JsonPath.read(
+            uninstallResult.getResponse().getContentAsString(), "$.data.status"));
+        assertEquals(PluginStatus.UNINSTALLED, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertTrue(classLoader.isClosed());
+        assertTrue(pluginManager.getExtensions(PluginActionHandler.class).stream()
+            .noneMatch(handler -> {
+                PluginWrapper owner = pluginManager.whichPlugin(handler.getClass());
+                return owner != null && HELLO_PLUGIN_ID.equals(owner.getPluginId());
+            }));
+        assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+        assertEquals(0, lifecycleGuard.getActiveCount(HELLO_PLUGIN_ID));
+        assertEquals(
+            List.of("PLUGIN_ENABLED:SUCCESS", "PLUGIN_UNINSTALLED:SUCCESS"),
+            jdbcTemplate.query("""
+                SELECT action_type, result
+                FROM sys_audit_log
+                WHERE target_type = 'PLUGIN'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+                ORDER BY occurred_at, id
+                """, (rs, rowNum) -> rs.getString("action_type") + ":" + rs.getString("result"),
+                HELLO_PLUGIN_ID)
+        );
+    }
+
+    private RequestPostProcessor adminPluginManager() {
+        AdminUserDetails principal = new AdminUserDetails(
+            9_001L,
+            "plugin.lifecycle.admin",
+            "unused",
+            "插件生命周期管理员",
+            "ACTIVE",
+            List.of(),
+            List.of("ADMIN_PLUGIN_MANAGE")
+        );
+        return authentication(UsernamePasswordAuthenticationToken.authenticated(
+            principal,
+            null,
+            principal.getAuthorities()
+        ));
     }
 
     private PluginRow metadata(String name, Path jarPath) throws Exception {

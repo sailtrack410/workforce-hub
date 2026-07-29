@@ -17,6 +17,7 @@ import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,7 +62,9 @@ class PluginManagerLifecycleSafetyTest {
         row.setPluginId(PID);
         row.setStatus(PluginStatus.ACTIVE);
         lenient().when(pluginRepository.findById(PID)).thenReturn(Optional.of(row));
-        lenient().when(pf4jManager.getPlugin(PID)).thenReturn(mock(PluginWrapper.class));
+        PluginWrapper wrapper = mock(PluginWrapper.class);
+        lenient().when(wrapper.getPluginState()).thenReturn(PluginState.STARTED);
+        lenient().when(pf4jManager.getPlugin(PID)).thenReturn(wrapper);
     }
 
     @Test
@@ -313,6 +316,51 @@ class PluginManagerLifecycleSafetyTest {
         order.verify(lifecycleGuard).awaitDrain(PID);
         order.verify(lifecycleGuard).remove(PID);
         order.verify(pluginRepository).updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
+    }
+
+    @Test
+    void uninstall_shouldUnloadWithoutStop_whenPluginWasNeverStarted() {
+        PluginWrapper wrapper = pf4jManager.getPlugin(PID);
+        when(wrapper.getPluginState()).thenReturn(PluginState.RESOLVED);
+        when(lifecycleGuard.awaitDrain(PID)).thenReturn(true);
+        when(pf4jManager.unloadPlugin(PID)).thenReturn(true);
+
+        assertDoesNotThrow(() -> service.uninstall(PID));
+
+        verify(pf4jManager, never()).stopPlugin(PID);
+        verify(pf4jManager).unloadPlugin(PID);
+        verify(pluginRepository).updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
+    }
+
+    @Test
+    void uninstall_shouldRetryFinalStatusWriteWithoutRepeatingPf4jUnload() {
+        PluginWrapper wrapper = mock(PluginWrapper.class);
+        when(wrapper.getPluginState()).thenReturn(PluginState.STARTED);
+        when(pf4jManager.getPlugin(PID))
+            .thenReturn(wrapper)
+            .thenReturn((PluginWrapper) null);
+        when(lifecycleGuard.awaitDrain(PID)).thenReturn(true);
+        when(pf4jManager.stopPlugin(PID)).thenReturn(PluginState.STOPPED);
+        when(pf4jManager.unloadPlugin(PID)).thenReturn(true);
+        doReturn(LocalDateTime.of(2026, 7, 30, 10, 0))
+            .when(pluginRepository)
+            .updateStatus(PID, PluginStatus.DISABLING);
+        RuntimeException dbError = new RuntimeException("uninstalled status write failed");
+        doThrow(dbError)
+            .doReturn(LocalDateTime.of(2026, 7, 30, 10, 1))
+            .when(pluginRepository)
+            .updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
+
+        assertSame(dbError, assertThrows(RuntimeException.class, () -> service.uninstall(PID)));
+        assertDoesNotThrow(() -> service.uninstall(PID));
+
+        verify(lifecycleGuard).beginDisable(PID);
+        verify(lifecycleGuard).awaitDrain(PID);
+        verify(pf4jManager).stopPlugin(PID);
+        verify(pf4jManager).unloadPlugin(PID);
+        verify(lifecycleGuard, times(2)).remove(PID);
+        verify(pluginRepository, times(2))
+            .updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
     }
 
     // ---- enable ----

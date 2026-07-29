@@ -6,6 +6,10 @@
 |------|------|------|
 | GET | `/api/employee/plugins/mine` | 当前员工可见且可加载的 UI 插件清单 |
 | POST | `/api/plugin-gateway/{pluginId}/actions/{actionCode}` | 执行已启用插件的动作 |
+| GET | `/api/admin/plugins` | 管理员插件列表 |
+| PUT | `/api/admin/plugins/{pluginId}/enable` | 启用插件 |
+| PUT | `/api/admin/plugins/{pluginId}/disable` | 停用插件 |
+| DELETE | `/api/admin/plugins/{pluginId}` | 卸载插件并保留注册记录与配置 |
 | GET | `/api/admin/plugins/{pluginId}/config` | 查询指定插件配置 |
 | PUT | `/api/admin/plugins/{pluginId}/config/{configKey}` | 创建或按版本更新单个配置 |
 | DELETE | `/api/admin/plugins/{pluginId}/config/{configKey}?expectedVersion={version}` | 按版本删除单个配置，返回墓碑版本 |
@@ -32,6 +36,23 @@
 来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后，网关再校验插件状态和生命周期入口，绑定当前登录会话并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作并校验输入 Schema，最后返回 `ServiceResult<Object>`。拿到员工清单不代表拥有动作调用权限，每次调用都会重新鉴权。
 
 `ActionDescriptor.defaultTimeout` 尚未在网关层执行，`idempotent` 仍只是描述字段，不构成动作自动幂等保证。六类事件均已接入真实业务事务提交后发布，其中 `EMPLOYEE_HIRED` 已通过真实签名 PF4J 订阅处理器完成端到端验证；事件 handler 只接受 `idempotent=true`，由分发器执行有界异步回调和协作式超时中断。
+
+### 管理员插件列表与生命周期
+
+四个接口都要求管理员登录并拥有 `ADMIN_PLUGIN_MANAGE`；`SUPER_ADMIN` 按现有后台权限契约放行。`PUT`、`DELETE` 继承全站 Cookie/Header CSRF，员工身份、匿名请求、缺少权限或 CSRF 不合法都会在进入管理服务前拒绝。
+
+列表和生命周期操作返回 `AdminPluginResponse`，包含插件 ID、名称、描述、版本兼容字段、类型、状态、固定前端入口、发布方和安装/更新时间；不会返回宿主 JAR 路径、JAR/SRI 摘要、签名者 ID、签名字节或内部错误信息。当前响应不包含依赖关系：`plugin.json.dependencies` 的可信解析、`sys_plugin_dependency` 权威写入和管理端依赖展示尚未实现，不能据此把“插件列表（含依赖）”标记完成。
+
+状态语义：
+
+- `enable` 只允许 `INSTALLED / STOPPED`；已经 `ACTIVE` 时直接返回成功，不重复调用底层启用。
+- `disable` 只允许 `ACTIVE`；已经 `STOPPED` 时直接返回成功，不重复调用底层停用。
+- `uninstall` 允许所有已存在的非终态进入底层恢复流程；`DISABLING` 可用于插件已卸载但最终状态写库失败后的安全重试，已经 `UNINSTALLED` 时直接返回成功，不重复调用底层卸载。
+- 插件 ID 格式错误返回 HTTP `400`，不存在返回 `404`，非法状态或已加载 dependent 阻断返回脱敏的 `409`；未分类的数据库或程序异常由全局异常处理返回脱敏的 `500`。
+
+上述是基于持久化终态的重试幂等，不接受幂等键，也不提供跨请求、跨进程的持久化去重。管理服务使用与 `PluginManagerService` 相同的单 JVM 监视器包住“读取状态—判断—执行”，避免并发停用/卸载覆盖终态；底层成功后返回终态写库时间，响应不再依赖二次查询，也不会携带操作前的旧 `updatedAt`。每次成功、阻止或失败操作分别写入 `SUCCESS / BLOCKED / FAIL` 脱敏审计，记录管理员 ID、插件 ID、前后状态和动作类型，不记录路径、摘要或签名；PF4J 生命周期与审计无法组成单一事务，审计写入失败只记录错误，不回滚已经成功的生命周期操作。
+
+HTTP 控制器复用 `PluginManagerService` 的入口关闭、最长 30 秒排空、PF4J stop/unload 和 ClassLoader 关闭协议。真实签名 hello-plugin 的 MockMvc 链路已验证未启用插件直接卸载、ClassLoader 关闭失败保留并重试，以及管理 API 启用、守卫存在在途计数时卸载等待、新网关请求拒绝、排空后 `UNINSTALLED`、wrapper/扩展/守卫清理、`PluginClassLoader.isClosed()` 和审计落库；在途请求通过直接占用真实守卫模拟，未构造阻塞型插件 handler。
 
 ### 插件配置管理
 
@@ -64,17 +85,13 @@
 
 `GET` 允许查看包括 `UNINSTALLED` 在内的保留配置；`PUT` 拒绝 `DISABLING` 和 `UNINSTALLED`，允许 `INSTALLED / ACTIVE / STOPPED / ERROR`；`DELETE` 拒绝 `DISABLING`，允许管理员显式清理 `UNINSTALLED` 遗留配置。墓碑不会出现在列表或插件读取结果中，但计入 128 个键命名空间上限，防止循环创建/删除不同键导致表无限增长。成功创建、更新和删除会在同一事务写入脱敏审计，只记录插件 ID、配置键、类型、版本和重启标记，不记录值、密文或值哈希。
 
-## 规划中的管理端 API（尚未实现）
+## 尚未实现的管理端 API
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/admin/plugins` | 插件列表 |
 | POST | `/api/admin/plugins/upload` | 上传 JAR 和分离签名 |
-| PUT | `/api/admin/plugins/{id}/enable` | 启用 |
-| PUT | `/api/admin/plugins/{id}/disable` | 停用 |
-| DELETE | `/api/admin/plugins/{id}` | 卸载 |
 
-`ADMIN_PLUGIN_MANAGE` 已用于配置接口并加入 `AdminPermissionFilter`；表中其余插件列表、上传、启停和卸载路由仍未实现。
+上传接口、可信依赖视图和管理端页面仍未实现。现有安装能力只可由宿主内部调用 `PluginManagerService.install(Path, PluginRow)`，不能视为已有 HTTP 上传入口。
 
 ---
 

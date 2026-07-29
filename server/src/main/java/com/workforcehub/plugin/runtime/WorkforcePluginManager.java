@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -139,6 +141,7 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
         }
 
         try {
+            closePluginClassLoaders(pluginsToUnload);
             return super.unloadPlugin(pluginId);
         } finally {
             removeUnloadedInstances(pluginsToUnload);
@@ -160,6 +163,7 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
             return false;
         }
         try {
+            closePluginClassLoaders(List.of(wrapper));
             return super.unloadPlugin(pluginId, false, false);
         } finally {
             if (getPlugin(pluginId) == null) {
@@ -323,6 +327,23 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
         for (PluginWrapper wrapper : wrappers) {
             if (getPlugin(wrapper.getPluginId()) == null) {
                 pluginInstances.remove(wrapper.getPluginId());
+            }
+        }
+    }
+
+    private void closePluginClassLoaders(List<PluginWrapper> wrappers) {
+        for (PluginWrapper wrapper : wrappers) {
+            ClassLoader classLoader = getPluginClassLoader(wrapper.getPluginId());
+            if (classLoader instanceof Closeable closeable) {
+                try {
+                    closeable.close();
+                } catch (IOException e) {
+                    throw new PluginRuntimeException(
+                        e,
+                        "无法关闭插件 ClassLoader: %s",
+                        wrapper.getPluginId()
+                    );
+                }
             }
         }
     }

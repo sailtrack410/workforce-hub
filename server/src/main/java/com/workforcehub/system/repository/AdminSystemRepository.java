@@ -196,6 +196,9 @@ public class AdminSystemRepository {
         if ("TASK_CREATED".equals(value)) return "创建 AI 任务";
         if ("TASK_SUCCEEDED".equals(value)) return "AI 任务完成";
         if ("TASK_FAILED".equals(value)) return "AI 任务失败";
+        if ("PLUGIN_ENABLED".equals(value)) return "启用插件";
+        if ("PLUGIN_DISABLED".equals(value)) return "停用插件";
+        if ("PLUGIN_UNINSTALLED".equals(value)) return "卸载插件";
         if ("APPROVE".equals(value)) return "审批通过";
         if ("REJECT".equals(value)) return "审批驳回";
         if ("SUBMIT".equals(value)) return "提交申请";
@@ -221,12 +224,14 @@ public class AdminSystemRepository {
         if ("ATTENDANCE_SCHEDULE".equals(value)) return "排班";
         if ("ATTENDANCE_DAILY_RESULT".equals(value)) return "考勤日结果";
         if ("OPS_ALERT".equals(value)) return "系统告警";
+        if ("PLUGIN".equals(value)) return "插件";
         return value == null ? null : "业务对象";
     }
 
     private String resultName(String value) {
         if ("SUCCESS".equals(value) || "SUCCEEDED".equals(value)) return "成功";
-        if ("FAILED".equals(value)) return "失败";
+        if ("FAIL".equals(value) || "FAILED".equals(value)) return "失败";
+        if ("BLOCKED".equals(value)) return "已阻止";
         return value == null ? null : "未知结果";
     }
 }

@@ -341,7 +341,7 @@ public class PluginManagerService {
      * 启用插件。
      * PF4J 真正 STARTED 且状态更新成功后才开门。
      */
-    public synchronized void enable(String pluginId) {
+    public synchronized LocalDateTime enable(String pluginId) {
         // 1. 启动插件
         PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
         boolean alreadyStarted = wrapper != null
@@ -358,8 +358,9 @@ public class PluginManagerService {
         }
 
         // 2. 更新数据库状态
+        LocalDateTime updatedAt;
         try {
-            pluginRepository.updateStatus(pluginId, PluginStatus.ACTIVE);
+            updatedAt = pluginRepository.updateStatus(pluginId, PluginStatus.ACTIVE);
         } catch (RuntimeException updateError) {
             if (!alreadyStarted) {
                 try {
@@ -378,6 +379,7 @@ public class PluginManagerService {
 
         // 3. 开门接受请求
         lifecycleGuard.enable(pluginId);
+        return updatedAt;
     }
 
     /**
@@ -385,7 +387,7 @@ public class PluginManagerService {
      * 关门 → 等排空 → stop → 更新状态。
      * 排空超时或中断时，绝不能继续 stop；入口保持关闭，抛出异常，标记 ERROR。
      */
-    public synchronized void disable(String pluginId) {
+    public synchronized LocalDateTime disable(String pluginId) {
         rejectLoadedDependents(pluginId, "停用");
 
         // 1. 关门，拒绝新请求
@@ -408,7 +410,7 @@ public class PluginManagerService {
             }
 
             // 4. 更新状态
-            pluginRepository.updateStatus(pluginId, PluginStatus.STOPPED);
+            return pluginRepository.updateStatus(pluginId, PluginStatus.STOPPED);
         } catch (RuntimeException e) {
             // 入口保持关闭，不重新开门
             if (!pluginRepository.findById(pluginId)
@@ -425,9 +427,10 @@ public class PluginManagerService {
      * 关门 → 等排空 → stop → unload → 清理守卫。
      * 排空超时或中断时，绝不能继续 unload；入口保持关闭，抛出异常，标记 ERROR。
      */
-    public synchronized void uninstall(String pluginId) {
+    public synchronized LocalDateTime uninstall(String pluginId) {
         // 先停止
-        if (pf4jManager.getPlugin(pluginId) != null) {
+        PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
+        if (wrapper != null) {
             rejectLoadedDependents(pluginId, "卸载");
 
             // 1. 关门，拒绝新请求
@@ -443,16 +446,19 @@ public class PluginManagerService {
                 }
 
                 // 3. PF4J stop — 校验返回状态，抛异常也标记 ERROR
-                PluginState stopState;
-                try {
-                    stopState = pf4jManager.stopPlugin(pluginId);
-                } catch (RuntimeException e) {
-                    pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "停止异常: " + e.getMessage());
-                    throw e;
-                }
-                if (stopState != PluginState.STOPPED) {
-                    pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "停止失败: " + stopState);
-                    throw new RuntimeException("插件停止失败: " + stopState);
+                PluginState currentState = wrapper.getPluginState();
+                if (currentState == PluginState.STARTED || currentState == PluginState.FAILED) {
+                    PluginState stopState;
+                    try {
+                        stopState = pf4jManager.stopPlugin(pluginId);
+                    } catch (RuntimeException e) {
+                        pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "停止异常: " + e.getMessage());
+                        throw e;
+                    }
+                    if (stopState != PluginState.STOPPED) {
+                        pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, "停止失败: " + stopState);
+                        throw new RuntimeException("插件停止失败: " + stopState);
+                    }
                 }
 
                 // 4. PF4J unload — 校验返回值，抛异常也标记 ERROR
@@ -480,16 +486,22 @@ public class PluginManagerService {
         // 5. 清理守卫并标记已卸载
         lifecycleGuard.remove(pluginId);
         // 更新状态为 UNINSTALLED，不删除数据库记录
-        pluginRepository.updateStatus(pluginId, PluginStatus.UNINSTALLED, "已卸载");
+        return pluginRepository.updateStatus(pluginId, PluginStatus.UNINSTALLED, "已卸载");
     }
 
     private void rejectLoadedDependents(String pluginId, String operation) {
         List<String> dependents = pf4jManager.getDependentPluginIds(pluginId);
         if (!dependents.isEmpty()) {
-            throw new IllegalStateException(
+            throw new PluginDependencyConflictException(
                 "插件仍被其他已加载插件依赖，不能" + operation + ": "
                     + pluginId + " <- " + String.join(",", dependents)
             );
+        }
+    }
+
+    static final class PluginDependencyConflictException extends IllegalStateException {
+        PluginDependencyConflictException(String message) {
+            super(message);
         }
     }
 

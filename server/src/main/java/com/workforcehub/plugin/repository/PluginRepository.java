@@ -70,15 +70,17 @@ public class PluginRepository {
         );
     }
 
-    public void updateStatus(String pluginId, PluginStatus status, String errorMessage) {
+    public LocalDateTime updateStatus(String pluginId, PluginStatus status, String errorMessage) {
+        LocalDateTime updatedAt = LocalDateTime.now().withNano(0);
         jdbc.update(
             "UPDATE sys_plugin SET status = ?, error_message = ?, updated_at = ? WHERE plugin_id = ?",
-            status.name(), errorMessage, LocalDateTime.now(), pluginId
+            status.name(), errorMessage, updatedAt, pluginId
         );
+        return updatedAt;
     }
 
-    public void updateStatus(String pluginId, PluginStatus status) {
-        updateStatus(pluginId, status, null);
+    public LocalDateTime updateStatus(String pluginId, PluginStatus status) {
+        return updateStatus(pluginId, status, null);
     }
 
     public void delete(String pluginId) {
