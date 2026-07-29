@@ -17,12 +17,14 @@ public final class HelloPlugin extends WorkforcePlugin {
     }
 
     @Override
-    public void start() {
+    protected void onStart() {
         started = true;
+        stopped = false;
     }
 
     @Override
-    public void stop() {
+    protected void onStop() {
+        started = false;
         stopped = true;
     }
 

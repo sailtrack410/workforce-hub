@@ -348,7 +348,13 @@ public class PluginManagerService {
             && wrapper.getPluginState() == PluginState.STARTED;
         PluginState state = pf4jManager.startPlugin(pluginId);
         if (state != PluginState.STARTED) {
-            throw new RuntimeException("插件启动失败: " + state);
+            RuntimeException startError = new RuntimeException("插件启动失败: " + state);
+            try {
+                pluginRepository.updateStatus(pluginId, PluginStatus.ERROR, startError.getMessage());
+            } catch (RuntimeException statusError) {
+                startError.addSuppressed(statusError);
+            }
+            throw startError;
         }
 
         // 2. 更新数据库状态

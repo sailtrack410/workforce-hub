@@ -70,10 +70,44 @@ public final class HelloPlugin extends WorkforcePlugin {
     public HelloPlugin(PluginWrapper wrapper, PluginContext context) {
         super(wrapper, context);
     }
+
+    @Override
+    protected void onStart() {
+    }
+
+    @Override
+    protected void onStop() {
+    }
 }
 ```
 
-宿主 `WorkforcePluginFactory` 使用插件 ClassLoader 加载 `plugin.properties` 指定的主类，并通过上述构造器注入 `DefaultPluginContext`。v0.1 不创建插件 Spring 子 Context。
+宿主 `WorkforcePluginFactory` 使用插件 ClassLoader 加载 `plugin.properties` 指定的主类，并通过上述构造器注入 `DefaultPluginContext`；未继承 `WorkforcePlugin` 的主类直接拒绝。v0.1 不创建插件 Spring 子 Context。
+
+`WorkforcePlugin.start()` / `stop()` 为不可覆盖的生命周期边界。插件只实现 `onStart()` / `onStop()`，并在取得线程、线程池、驱动、文件句柄等长期资源后立即注册关闭动作：
+
+```java
+registerCleanup(() -> {
+    running = false;
+    worker.interrupt();
+    worker.join(2000);
+});
+```
+
+关闭动作按注册逆序执行；启动中途失败和每次停止都会执行全部已注册动作。只有成功关闭的动作会移出队列，失败动作保留供后续 `stop` / `unload` / 宿主 `close` 重试；存在未完成动作时禁止再次启动或关闭 ClassLoader。业务生命周期异常作为主异常，关闭异常按发生顺序加入 suppressed；只有关闭异常时以首个关闭异常为主，同一异常实例不会自抑制。`InterruptedException` 只记录到全部动作执行完毕后再恢复线程中断位，非 JVM 致命 `Error` 包装为 `PluginRuntimeException`，因此 PF4J 稳定返回 `FAILED`，`PluginManagerService` 标记 `ERROR`。
+
+资源约束：
+
+1. 构造器和静态初始化器不得创建长期资源；资源在 `onStart()` 调用线程中同步创建并立即注册，禁止在 `onStart()` 返回后由后台任务继续创建或登记长期资源。
+2. 关闭动作必须使用有界等待并可安全重复调用；宿主关闭时也会执行 stop/unload。
+3. 插件自有线程必须停止、清理线程内 `ThreadLocal`，并释放指向插件 ClassLoader 的 TCCL。
+4. 宿主线程中的 `ThreadLocal` 只能在同一次回调中用 `finally remove()`；停止线程无法代替其他线程清理。
+5. JDBC `Driver` 必须由插件 ClassLoader 中的关闭动作注销准确实例；`DriverManager` 的调用方 ClassLoader 限制使宿主无法可靠枚举或代为注销插件驱动。
+
+当前 JDBC 自动化仅使用插件 ClassLoader 动态加载的最小 `Driver` 注册表/CallerSensitive 探针，验证插件侧准确注销、宿主侧直接注销被拒绝和 `DriverAction` 回调；不覆盖 MySQL/PostgreSQL 驱动、连接池或厂商后台线程。
+
+该协议只管理插件主动登记的资源，不能自动发现未注册的 native/global 资源；宿主尚未对插件 `onStop()` / cleanup 提供强制执行超时，内存增长监控也未落地。
+
+当前 SDK 仍是 `0.1.0-SNAPSHOT`、尚未对外发布；final `start()` / `stop()` 是发布前契约替换，已有本地旧插件 JAR 必须重新编译。
 
 ---
 

@@ -290,7 +290,22 @@ class PluginManagerLifecycleSafetyTest {
 
         assertThrows(RuntimeException.class, () -> service.enable(PID));
 
+        verify(pluginRepository).updateStatus(PID, PluginStatus.ERROR, "插件启动失败: FAILED");
         verify(pluginRepository, never()).updateStatus(PID, PluginStatus.ACTIVE);
+        verify(lifecycleGuard, never()).enable(PID);
+    }
+
+    @Test
+    void enable_shouldPreserveStartFailure_whenErrorStatusWriteFails() {
+        RuntimeException dbError = new RuntimeException("error status write failed");
+        when(pf4jManager.startPlugin(PID)).thenReturn(PluginState.FAILED);
+        doThrow(dbError).when(pluginRepository)
+            .updateStatus(PID, PluginStatus.ERROR, "插件启动失败: FAILED");
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service.enable(PID));
+
+        assertEquals("插件启动失败: FAILED", thrown.getMessage());
+        assertEquals(List.of(dbError), List.of(thrown.getSuppressed()));
         verify(lifecycleGuard, never()).enable(PID);
     }
 
