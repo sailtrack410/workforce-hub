@@ -14,6 +14,8 @@
 | PUT | `/api/admin/plugins/{pluginId}/config/{configKey}` | 创建或按版本更新单个配置 |
 | DELETE | `/api/admin/plugins/{pluginId}/config/{configKey}?expectedVersion={version}` | 按版本删除单个配置，返回墓碑版本 |
 
+上传接口、可信依赖视图和管理端页面仍未实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 已支持符合条件的 `UNINSTALLED` 同 ID 替换，但没有 HTTP 控制器、管理员上传授权/CSRF 或上传审计契约，不能视为已有 JAR 上传、在线升级或回滚 API。
+
 ### 员工插件清单
 
 接口返回 `R<List<EmployeePluginResponse>>`。`data` 中单项示例：

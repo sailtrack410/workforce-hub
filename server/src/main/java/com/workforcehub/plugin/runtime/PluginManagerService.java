@@ -169,6 +169,9 @@ public class PluginManagerService {
         Path snapshotPath = createJarSnapshot(jarPath);
         String pluginId = null;
         List<String> pluginIdsBeforeLoad = null;
+        PluginRow row = null;
+        PluginRow previousInstallation = null;
+        boolean persistenceAttempted = false;
         try {
             byte[] submittedSignature = metadata.getSignature();
             byte[] verifiedSignature = submittedSignature == null
@@ -184,7 +187,7 @@ public class PluginManagerService {
                 versionService.checkCompatibility(snapshotPath);
 
             // 1. 构建数据库记录并完成迁移前预检
-            PluginRow row = new PluginRow();
+            row = new PluginRow();
             row.setPluginId(versionDescriptor.pluginId());
             row.setName(metadata.getName() != null ? metadata.getName() : versionDescriptor.pluginId());
             row.setDescription(metadata.getDescription());
@@ -208,8 +211,19 @@ public class PluginManagerService {
             row.setUpdatedAt(LocalDateTime.now());
 
             validateInstallRow(row);
-            if (pluginRepository.exists(row.getPluginId())) {
-                throw new IllegalStateException("插件已存在: " + row.getPluginId());
+            Optional<PluginRow> previousRow = pluginRepository.findById(row.getPluginId());
+            if (previousRow.isPresent()) {
+                PluginRow previous = previousRow.get();
+                if (previous.getStatus() != PluginStatus.UNINSTALLED) {
+                    throw new IllegalStateException("插件已存在: " + row.getPluginId());
+                }
+                if (!Objects.equals(previous.getSignerId(), row.getSignerId())) {
+                    throw new IllegalStateException("插件签名者与原安装记录不一致: " + row.getPluginId());
+                }
+                if (pf4jManager.getPlugin(row.getPluginId()) != null) {
+                    throw new IllegalStateException("已卸载插件仍存在运行时实例: " + row.getPluginId());
+                }
+                previousInstallation = previous;
             }
 
             // 2. 加载插件获取 PF4J 分配的 ID
@@ -228,9 +242,58 @@ public class PluginManagerService {
             flywayMigrator.migrate(pluginId, snapshotPath);
 
             // 4. 持久化安装记录
-            pluginRepository.insert(row);
+            if (previousRow.isEmpty()) {
+                persistenceAttempted = true;
+                pluginRepository.insert(row);
+            } else {
+                PluginRow previous = previousRow.get();
+                persistenceAttempted = true;
+                if (!pluginRepository.replaceUninstalled(
+                        row,
+                        previous.getJarPath(),
+                        previous.getSignerId())) {
+                    throw new IllegalStateException("插件状态已变化，替换安装失败: " + pluginId);
+                }
+                deletePreviousSnapshot(row.getPluginId(), previous.getJarPath(), snapshotPath);
+            }
             return row;
         } catch (RuntimeException installError) {
+            if (persistenceAttempted && row != null) {
+                Optional<PluginRow> persisted;
+                try {
+                    persisted = pluginRepository.findById(row.getPluginId());
+                } catch (RuntimeException readbackError) {
+                    installError.addSuppressed(new IllegalStateException(
+                        "插件安装提交结果无法确认，需重启",
+                        readbackError
+                    ));
+                    throw installError;
+                }
+                if (persisted.isPresent()) {
+                    PluginRow stored = persisted.get();
+                    boolean candidatePersisted = Objects.equals(stored.getJarPath(), row.getJarPath())
+                        && Objects.equals(stored.getJarSha256(), row.getJarSha256())
+                        && Objects.equals(stored.getSignerId(), row.getSignerId())
+                        && Objects.equals(stored.getVersion(), row.getVersion());
+                    if (candidatePersisted && stored.getStatus() == PluginStatus.INSTALLED) {
+                        if (previousInstallation != null) {
+                            deletePreviousSnapshot(
+                                row.getPluginId(),
+                                previousInstallation.getJarPath(),
+                                snapshotPath
+                            );
+                        }
+                        log.warn("插件安装提交异常，但回读确认已持久化: {}", row.getPluginId());
+                        return stored;
+                    }
+                    if (candidatePersisted) {
+                        installError.addSuppressed(new IllegalStateException(
+                            "插件安装提交后状态已再次变化，需重启"
+                        ));
+                        throw installError;
+                    }
+                }
+            }
             String failedPluginId = findFailedPluginId(pluginId, snapshotPath, pluginIdsBeforeLoad);
             if (unloadFailedPlugin(failedPluginId, installError)) {
                 deleteUnpersistedSnapshot(snapshotPath, installError);
@@ -334,6 +397,32 @@ public class PluginManagerService {
             Files.deleteIfExists(snapshotPath);
         } catch (IOException | RuntimeException cleanupError) {
             installError.addSuppressed(new IllegalStateException("删除未持久化插件 JAR 快照失败", cleanupError));
+        }
+    }
+
+    private void deletePreviousSnapshot(
+            String pluginId,
+            String previousJarPath,
+            Path currentSnapshotPath) {
+        try {
+            Path snapshotDirectory = pf4jManager.getPluginsRoot()
+                .toAbsolutePath()
+                .normalize()
+                .resolve(".snapshots");
+            Path previousSnapshotPath = Path.of(previousJarPath).toAbsolutePath().normalize();
+            if (!previousSnapshotPath.equals(currentSnapshotPath.toAbsolutePath().normalize())
+                    && snapshotDirectory.equals(previousSnapshotPath.getParent())
+                    && previousSnapshotPath.getFileName().toString().startsWith("plugin-")
+                    && previousSnapshotPath.getFileName().toString().endsWith(".jar")
+                    && Files.isRegularFile(previousSnapshotPath)
+                    && !pluginRepository.isJarPathReferencedByAnotherPlugin(
+                        previousJarPath,
+                        pluginId
+                    )) {
+                Files.deleteIfExists(previousSnapshotPath);
+            }
+        } catch (IOException | RuntimeException cleanupError) {
+            log.warn("删除旧插件 JAR 快照失败，替换安装结果保持有效", cleanupError);
         }
     }
 

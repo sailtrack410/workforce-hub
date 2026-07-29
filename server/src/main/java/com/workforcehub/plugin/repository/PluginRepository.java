@@ -3,6 +3,7 @@ package com.workforcehub.plugin.repository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -70,6 +71,53 @@ public class PluginRepository {
         );
     }
 
+    @Transactional
+    public boolean replaceUninstalled(
+            PluginRow row,
+            String previousJarPath,
+            String previousSignerId) {
+        int updated = jdbc.update("""
+            UPDATE sys_plugin
+            SET name = ?, description = ?, version = ?, sdk_version = ?,
+                min_host_version = ?, max_host_version = ?, java_version = ?, type = ?,
+                status = ?, jar_path = ?, jar_sha256 = ?, signature = ?, signer_id = ?,
+                frontend_entry = ?, frontend_sha384 = ?, provider = ?, error_message = NULL,
+                installed_at = ?, updated_at = ?
+            WHERE plugin_id = ? AND status = ? AND jar_path = ? AND signer_id = ?
+            """,
+            row.getName(),
+            row.getDescription(),
+            row.getVersion(),
+            row.getSdkVersion(),
+            row.getMinHostVersion(),
+            row.getMaxHostVersion(),
+            row.getJavaVersion(),
+            row.getType(),
+            row.getStatus().name(),
+            row.getJarPath(),
+            row.getJarSha256(),
+            row.getSignature(),
+            row.getSignerId(),
+            row.getFrontendEntry(),
+            row.getFrontendSha384(),
+            row.getProvider(),
+            row.getInstalledAt(),
+            row.getUpdatedAt(),
+            row.getPluginId(),
+            PluginStatus.UNINSTALLED.name(),
+            previousJarPath,
+            previousSignerId
+        );
+        if (updated != 1) {
+            return false;
+        }
+
+        jdbc.update("DELETE FROM sys_plugin_operation_idempotency WHERE plugin_id = ?", row.getPluginId());
+        jdbc.update("DELETE FROM sys_plugin_event_subscription WHERE plugin_id = ?", row.getPluginId());
+        jdbc.update("DELETE FROM sys_plugin_dependency WHERE plugin_id = ?", row.getPluginId());
+        return true;
+    }
+
     public LocalDateTime updateStatus(String pluginId, PluginStatus status, String errorMessage) {
         LocalDateTime updatedAt = LocalDateTime.now().withNano(0);
         jdbc.update(
@@ -91,6 +139,16 @@ public class PluginRepository {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM sys_plugin WHERE plugin_id = ?",
             Integer.class, pluginId
+        );
+        return count != null && count > 0;
+    }
+
+    public boolean isJarPathReferencedByAnotherPlugin(String jarPath, String pluginId) {
+        Integer count = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin WHERE jar_path = ? AND plugin_id <> ?",
+            Integer.class,
+            jarPath,
+            pluginId
         );
         return count != null && count > 0;
     }
