@@ -105,7 +105,7 @@ registerCleanup(() -> {
 
 当前 JDBC 自动化仅使用插件 ClassLoader 动态加载的最小 `Driver` 注册表/CallerSensitive 探针，验证插件侧准确注销、宿主侧直接注销被拒绝和 `DriverAction` 回调；不覆盖 MySQL/PostgreSQL 驱动、连接池或厂商后台线程。
 
-该协议只管理插件主动登记的资源，不能自动发现未注册的 native/global 资源；宿主尚未对插件 `onStop()` / cleanup 提供强制执行超时，内存增长监控也未落地。
+该协议只管理插件主动登记的资源，不能自动发现未注册的 native/global 资源；宿主尚未对插件 `onStop()` / cleanup 提供强制执行超时。隔离 JVM 回归仅比较有界 GC 后的进程级已用 Java heap 中位数，不构成 SDK 对单插件无泄漏的保证，也不提供插件级归因、生产长期监控或 native/off-heap/RSS 观测。
 
 当前 SDK 仍是 `0.1.0-SNAPSHOT`、尚未对外发布；final `start()` / `stop()` 是发布前契约替换，已有本地旧插件 JAR 必须重新编译。
 
