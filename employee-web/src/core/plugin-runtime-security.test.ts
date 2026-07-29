@@ -47,4 +47,16 @@ describe('plugin runtime security boundaries', () => {
       expect(defaultServer.slice(start, end)).not.toContain('add_header');
     }
   });
+
+  it('Nginx 限制插件网关请求体并覆盖最长动作等待时间', () => {
+    const source = readFileSync(resolve(currentDir, '../../../deploy/nginx/default.conf'), 'utf8');
+    const marker = 'location ~ ^/api/plugin-gateway/[^/]+/actions/[^/]+$ {';
+    const start = source.indexOf(marker);
+    const end = source.indexOf('\n    }', start);
+    const gateway = source.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(gateway).toContain('client_max_body_size 256k;');
+    expect(gateway).toContain('proxy_read_timeout 330s;');
+  });
 });

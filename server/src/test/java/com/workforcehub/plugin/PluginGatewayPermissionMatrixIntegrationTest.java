@@ -77,6 +77,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
 
     @BeforeEach
     void setUpPluginFixture() {
+        jdbcTemplate.update("DELETE FROM sys_plugin_action_idempotency WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_action_permission WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_capability WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_visibility WHERE plugin_id = ?", PLUGIN_ID);
@@ -120,6 +121,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
     @AfterEach
     void tearDownPluginFixture() {
         lifecycleGuard.remove(PLUGIN_ID);
+        jdbcTemplate.update("DELETE FROM sys_plugin_action_idempotency WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_visibility WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_action_permission WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_capability WHERE plugin_id = ?", PLUGIN_ID);
@@ -180,6 +182,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value(4003));
 
+        verify(pluginManagerService, never()).getPlugin(PLUGIN_ID);
         verify(handler, never()).execute(any(), anyMap());
     }
 
@@ -202,6 +205,55 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.code").value(4003));
 
         verify(handler, times(1)).execute(any(), anyMap());
+    }
+
+    @Test
+    void duplicateSameRequestShouldReplayWithoutExecutingAgain() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        invokeGateway(adminSession)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.executed").value(true));
+        invokeGateway(adminSession)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.executed").value(true));
+
+        verify(handler, times(1)).execute(any(), anyMap());
+    }
+
+    @Test
+    void sameKeyWithDifferentParamsShouldConflict() throws Exception {
+        when(handler.getDescriptor()).thenReturn(new ActionDescriptor(
+            ACTION_CODE,
+            "权限矩阵动作",
+            "权限矩阵集成测试动作",
+            Map.of("value", com.workforcehub.plugin.sdk.ParamSchema.string("值", false)),
+            Map.of(),
+            DB_CAPABILITY,
+            java.time.Duration.ofSeconds(5),
+            true
+        ));
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(gatewayRequest(adminSession, "same-key", "{\"value\":\"a\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(gatewayRequest(adminSession, "same-key", "{\"value\":\"b\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(3001));
+
+        verify(handler, times(1)).execute(any(), anyMap());
+    }
+
+    @Test
+    void idempotencyKeyShouldBeCaseSensitive() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(gatewayRequest(adminSession, "Case-Key", "{}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(gatewayRequest(adminSession, "case-key", "{}"))
+            .andExpect(status().isOk());
+
+        verify(handler, times(2)).execute(any(), anyMap());
     }
 
     @Test
@@ -298,11 +350,16 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
     }
 
     private MockHttpServletRequestBuilder gatewayRequest(Cookie session) {
+        return gatewayRequest(session, "permission-matrix-key", "{}");
+    }
+
+    private MockHttpServletRequestBuilder gatewayRequest(Cookie session, String idempotencyKey, String content) {
         return post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
             .cookie(session)
             .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
+            .header("Idempotency-Key", idempotencyKey)
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{}");
+            .content(content);
     }
 
     private Cookie loginAdmin() throws Exception {

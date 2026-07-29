@@ -45,14 +45,15 @@ class PluginGatewayCsrfIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
-    void trustedOriginShouldReachPluginLookupWithRealSession() throws Exception {
+    void trustedOriginShouldReachPermissionCheckWithRealSession() throws Exception {
         Cookie session = login();
 
         mockMvc.perform(gatewayRequest()
                 .cookie(session)
                 .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN))
-            .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value(4004));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(4003))
+            .andExpect(jsonPath("$.message").value("权限不足"));
     }
 
     @Test
@@ -63,11 +64,13 @@ class PluginGatewayCsrfIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(session)
                 .header(HttpHeaders.ORIGIN, "https://attacker.example"))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(4003))
+            .andExpect(jsonPath("$.message").value("请求来源不受信任"));
 
         mockMvc.perform(gatewayRequest().cookie(session))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(4003))
+            .andExpect(jsonPath("$.message").value("请求来源不受信任"));
     }
 
     @Test
@@ -79,6 +82,7 @@ class PluginGatewayCsrfIntegrationTest extends LocalIntegrationTestSupport {
 
     private MockHttpServletRequestBuilder gatewayRequest() {
         return post("/api/plugin-gateway/" + MISSING_PLUGIN_ID + "/actions/" + ACTION_CODE)
+            .header("Idempotency-Key", "csrf-test-key")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{}");
     }

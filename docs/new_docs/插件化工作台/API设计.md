@@ -31,11 +31,15 @@
 
 ### 插件动作网关
 
-请求体是可选 JSON 对象。网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。该校验是插件动作 `POST` 的附加来源防线；宿主 SecurityFilterChain 已用 `CookieCsrfTokenRepository` 覆盖 Session 写请求，不能用来源白名单替代 CSRF。
+请求体是可选 JSON 对象，Nginx 与应用反序列化前均限制为 256 KiB。网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。该校验是插件动作 `POST` 的附加来源防线；宿主 SecurityFilterChain 已用 `CookieCsrfTokenRepository` 覆盖 Session 写请求，不能用来源白名单替代 CSRF。
 
-来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后，网关再校验插件状态和生命周期入口，绑定当前登录会话并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作并校验输入 Schema，最后返回 `ServiceResult<Object>`。拿到员工清单不代表拥有动作调用权限，每次调用都会重新鉴权。
+来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后，宿主先绑定当前登录会话并完成插件/动作/用户权限校验；未授权请求统一返回 `403`，不会通过 `404/409` 枚举插件存在性或状态。权限通过后才校验插件状态和生命周期入口、发现 PF4J 动作并校验输入 Schema。幂等查询和响应回放位于这些检查之后，因此权限撤销、插件停用或参数非法时不会读取旧响应，也不会写入幂等记录。拿到员工清单不代表拥有动作调用权限，每次调用都会重新鉴权。
 
-`ActionDescriptor.defaultTimeout` 尚未在网关层执行，`idempotent` 仍只是描述字段，不构成动作自动幂等保证。六类事件均已接入真实业务事务提交后发布，其中 `EMPLOYEE_HIRED` 已通过真实签名 PF4J 订阅处理器完成端到端验证；事件 handler 只接受 `idempotent=true`，由分发器执行有界异步回调和协作式超时中断。
+HTTP 动作必须声明 `ActionDescriptor.idempotent=true`，并提交恰好一个 `Idempotency-Key` Header；键只允许 `[A-Za-z0-9._:-]`，长度 1–128，大小写敏感。唯一作用域为插件、动作、宿主绑定的调用者类型与 ID、幂等键；请求摘要使用递归排序对象键后的 JSON 参数，数组顺序和数值类型保留，空请求体与 `{}` 等价。客户端身份 Header 和 `X-Request-Id` 不参与幂等身份。
+
+首次请求用短事务写入 `IN_PROGRESS` claim，插件 handler 在事务外执行。相同作用域、相同参数的并发请求在执行记录存在时返回 HTTP `409`、业务码 `3002`、`retryable=true` 和 `Retry-After: 1`；相同键但不同参数返回 HTTP `409`、业务码 `3001`。成功及 `retryable=false` 的业务失败通过有界输出流缓存不超过 256 KiB 的 JSON `ServiceResult`，后续请求严格校验结构后回放；异常和 `retryable=true` 结果释放 claim。响应序列化、大小校验或最终写库失败时保留 claim，避免重跑可能已经产生副作用的动作。
+
+`IN_PROGRESS` 不设置租期，不自动重领或清理；进程崩溃、响应序列化失败或最终写库状态不确定时，幂等键保持 fail closed，必须由运维确认外部副作用后人工恢复。完成响应用数据库时间计算 24 小时重放期，过期后可安全复用该键，定时任务每轮最多分 100 批清理过期完成记录。HTTP `defaultTimeout` 当前不强制中断 handler，也不改变 claim 所有权；Nginx 网关等待上限为 330 秒。自动幂等只承诺持久化去重与响应回放，不承诺外部系统副作用的 exactly-once。六类事件均已接入真实业务事务提交后发布，其中 `EMPLOYEE_HIRED` 已通过真实签名 PF4J 订阅处理器完成端到端验证；事件 handler 只接受 `idempotent=true`，由分发器执行有界异步回调和协作式超时中断。
 
 ### 管理员插件列表与生命周期
 

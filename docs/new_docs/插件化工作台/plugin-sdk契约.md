@@ -205,7 +205,7 @@ public record ActionDescriptor(
 
 `actionCode` 不能为空；`defaultTimeout` 必须大于 0 且不超过 5 分钟。四参数简化构造器把输入/输出 Schema 设为空、超时设为 30 秒、`idempotent` 设为 `true`。
 
-`ParamSchema` 支持 `string`、`number`、`boolean`、`object`、`array`，并提供对应静态工厂方法。通用 HTTP 网关当前会执行输入 Schema 校验，但尚未执行 `defaultTimeout`，也没有把 `idempotent` 转换为自动幂等保证。事件回调会按 `defaultTimeout` 发出线程中断，并拒绝订阅或执行 `idempotent=false` 的 handler；该声明仍不等于宿主自动去重。
+`ParamSchema` 支持 `string`、`number`、`boolean`、`object`、`array`，并提供对应静态工厂方法。通用 HTTP 网关会执行输入 Schema 校验，并只允许 `idempotent=true` 的 handler；客户端必须提供 `Idempotency-Key`，宿主完成持久化 claim、并发去重和响应回放。HTTP `defaultTimeout` 当前不强制中断 handler，也不用于自动重领执行中 claim；事件回调则会按该值发出线程中断，并同样拒绝订阅或执行 `idempotent=false` 的 handler。
 
 ---
 
@@ -375,11 +375,13 @@ public record DomainEvent(
 POST /api/plugin-gateway/{pluginId}/actions/{actionCode}
 ```
 
-请求体是可选 JSON 对象。调用身份完全来自当前登录会话和宿主 `InvocationContextBinder`；当前协议不读取 `X-Plugin-Id`、`X-Operation-Reason` 等客户端身份头。
+请求体是可选 JSON 对象，最大 256 KiB。调用身份完全来自当前登录会话和宿主 `InvocationContextBinder`；当前协议不读取 `X-Plugin-Id`、`X-Operation-Reason` 等客户端身份头。
 
 网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。该校验是插件动作 `POST` 的附加来源防线；全站 Session 写请求由 `SecurityConfig` 的 `CookieCsrfTokenRepository` 统一覆盖。
 
-来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后再校验插件状态和生命周期入口，由宿主绑定 `InvocationContext` 并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作、校验输入 Schema 并执行处理器。网关返回 `ServiceResult`，内部异常统一转换，不回传插件异常细节。`ActionDescriptor.defaultTimeout` 尚未执行，`idempotent` 仍不构成自动幂等保证。
+来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后由宿主绑定 `InvocationContext` 并完成插件/动作/用户权限校验，未授权请求统一返回 `403`；权限通过后才校验插件状态和生命周期入口、发现 PF4J 动作并校验输入 Schema。非法或未授权请求不会占用幂等键，也不能回放旧响应。
+
+HTTP handler 必须声明 `idempotent=true`。每次调用必须携带唯一 `Idempotency-Key`，格式为 `[A-Za-z0-9._:-]{1,128}`，不能复用 `X-Request-Id`。作用域包含插件、动作、宿主绑定调用者类型与 ID；同作用域同键同参数只执行一次并在 24 小时内回放完整 `ServiceResult`，执行中返回可重试 `409`，同键不同参数返回 `409/3001`。异常和 `retryable=true` 在 claim 成功释放后允许同请求重试；`IN_PROGRESS` 不按时间自动重领或清理，响应序列化、超限或完成写库失败会永久阻断该键，直到运维确认副作用后人工恢复。`defaultTimeout` 尚不强制中断 HTTP handler，也不改变 claim 所有权；宿主不承诺外部副作用 exactly-once。
 
 ---
 

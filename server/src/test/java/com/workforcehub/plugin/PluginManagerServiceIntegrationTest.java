@@ -166,6 +166,12 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         unloadIfPresent(TAMPERED_PLUGIN_ID);
         unloadIfPresent(HELLO_PLUGIN_ID);
         jdbcTemplate.update(
+            "DELETE FROM sys_plugin_action_idempotency WHERE plugin_id = ?", HELLO_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_action_permission WHERE plugin_id = ?", HELLO_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_capability WHERE plugin_id = ?", HELLO_PLUGIN_ID);
+        jdbcTemplate.update(
             "DELETE FROM sys_plugin_config WHERE plugin_id = ?", HELLO_PLUGIN_ID);
         jdbcTemplate.update(
             "DELETE FROM sys_plugin WHERE plugin_id IN (?, ?, ?, ?, ?, ?)",
@@ -785,6 +791,14 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
     void adminHttpLifecycleShouldDrainAndUnloadRealPlugin() throws Exception {
         Path jarPath = buildRealHelloPluginJar();
         pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_capability (plugin_id, capability_code)
+            VALUES (?, 'HELLO_GREET')
+            """, HELLO_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_action_permission (plugin_id, action_code, capability_code)
+            VALUES (?, 'hello.greet', 'HELLO_GREET')
+            """, HELLO_PLUGIN_ID);
 
         MvcResult enableResult = mockMvc.perform(
                 put("/api/admin/plugins/{pluginId}/enable", HELLO_PLUGIN_ID)
@@ -837,6 +851,7 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
                     .with(adminPluginManager())
                     .with(csrf().asHeader())
                     .header(HttpHeaders.ORIGIN, "http://localhost")
+                    .header("Idempotency-Key", "lifecycle-drain-key")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"name\":\"test\"}"))
                 .andReturn();
@@ -879,8 +894,8 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
     private RequestPostProcessor adminPluginManager() {
         AdminUserDetails principal = new AdminUserDetails(
-            9_001L,
-            "plugin.lifecycle.admin",
+            8_001L,
+            "admin.demo",
             "unused",
             "插件生命周期管理员",
             "ACTIVE",
