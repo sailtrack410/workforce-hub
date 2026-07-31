@@ -52,10 +52,10 @@ public class PluginConfigService {
     }
 
     @Transactional(readOnly = true)
-    public List<PluginConfigResponse> list(String pluginId) {
+    public List<PluginConfigResponse> list(String pluginId, boolean includeDeleted) {
         validatePluginId(pluginId);
         requirePlugin(repository.findPluginStatus(pluginId).orElse(null));
-        return repository.findByPluginId(pluginId).stream().map(this::toResponse).toList();
+        return repository.findByPluginId(pluginId, includeDeleted).stream().map(this::toResponse).toList();
     }
 
     @Transactional
@@ -286,6 +286,7 @@ public class PluginConfigService {
             row.requiresRestart(),
             secret,
             row.configValue() != null,
+            row.deleted(),
             row.version(),
             row.updatedAt()
         );

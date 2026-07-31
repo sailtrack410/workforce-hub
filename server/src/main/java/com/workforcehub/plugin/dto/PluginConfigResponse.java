@@ -11,6 +11,7 @@ public record PluginConfigResponse(
     boolean requiresRestart,
     boolean secret,
     boolean hasValue,
+    boolean deleted,
     long version,
     LocalDateTime updatedAt
 ) {}

@@ -224,11 +224,15 @@ class AdminPluginConfigIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value(3));
         Map<String, Object> tombstone = jdbcTemplate.queryForMap("""
-            SELECT config_value, is_secret, is_deleted, version
+            SELECT config_value, value_type, description, requires_restart,
+                   is_secret, is_deleted, version
             FROM sys_plugin_config
             WHERE plugin_id = ? AND config_key = 'api.token'
             """, PLUGIN_A);
         assertNull(tombstone.get("config_value"));
+        assertEquals("STRING", tombstone.get("value_type"));
+        assertNull(tombstone.get("description"));
+        assertEquals(0, ((Number) tombstone.get("requires_restart")).intValue());
         assertEquals(0, ((Number) tombstone.get("is_secret")).intValue());
         assertEquals(1, ((Number) tombstone.get("is_deleted")).intValue());
         assertEquals(3L, ((Number) tombstone.get("version")).longValue());
@@ -282,7 +286,19 @@ class AdminPluginConfigIntegrationTest extends LocalIntegrationTestSupport {
     void staleVersionShouldNotMatchRecreatedConfiguration() throws Exception {
         Cookie session = loginAdmin("admin.demo", "Admin@123456");
 
-        putConfig(session, PLUGIN_A, "recreated.key", 0, "STRING", "old-value", null, false)
+        mockMvc.perform(put(configBase(PLUGIN_A) + "/recreated.key")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "expectedVersion": 0,
+                      "valueType": "STRING",
+                      "value": "old-value",
+                      "defaultValue": "old-default",
+                      "description": "old description",
+                      "requiresRestart": true
+                    }
+                    """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.version").value(1));
         mockMvc.perform(delete(configBase(PLUGIN_A) + "/recreated.key")
@@ -305,13 +321,32 @@ class AdminPluginConfigIntegrationTest extends LocalIntegrationTestSupport {
             """, Integer.class, PLUGIN_A));
 
         Map<String, Object> tombstone = jdbcTemplate.queryForMap("""
-            SELECT config_value, is_deleted, version
+            SELECT config_value, default_value, description, requires_restart,
+                   is_deleted, version
             FROM sys_plugin_config
             WHERE plugin_id = ? AND config_key = 'recreated.key'
             """, PLUGIN_A);
         assertNull(tombstone.get("config_value"));
+        assertNull(tombstone.get("default_value"));
+        assertNull(tombstone.get("description"));
+        assertEquals(0, ((Number) tombstone.get("requires_restart")).intValue());
         assertEquals(1, ((Number) tombstone.get("is_deleted")).intValue());
         assertEquals(2L, ((Number) tombstone.get("version")).longValue());
+
+        mockMvc.perform(get(configBase(PLUGIN_A))
+                .queryParam("includeDeleted", "true")
+                .cookie(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].key").value("recreated.key"))
+            .andExpect(jsonPath("$.data[0].deleted").value(true))
+            .andExpect(jsonPath("$.data[0].hasValue").value(false))
+            .andExpect(jsonPath("$.data[0].secret").value(false))
+            .andExpect(jsonPath("$.data[0].requiresRestart").value(false))
+            .andExpect(jsonPath("$.data[0].value").isEmpty())
+            .andExpect(jsonPath("$.data[0].defaultValue").isEmpty())
+            .andExpect(jsonPath("$.data[0].description").isEmpty())
+            .andExpect(jsonPath("$.data[0].version").value(2));
 
         putConfig(session, PLUGIN_A, "recreated.key", 0, "STRING", "stale-create", null, false)
             .andExpect(status().isConflict());

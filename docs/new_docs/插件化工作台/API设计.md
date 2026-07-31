@@ -11,11 +11,11 @@
 | PUT | `/api/admin/plugins/{pluginId}/enable` | 启用插件 |
 | PUT | `/api/admin/plugins/{pluginId}/disable` | 停用插件 |
 | DELETE | `/api/admin/plugins/{pluginId}` | 卸载插件并保留注册记录与配置 |
-| GET | `/api/admin/plugins/{pluginId}/config` | 查询指定插件配置 |
+| GET | `/api/admin/plugins/{pluginId}/config[?includeDeleted=true]` | 查询指定插件配置；可选返回已清空墓碑元数据 |
 | PUT | `/api/admin/plugins/{pluginId}/config/{configKey}` | 创建或按版本更新单个配置 |
 | DELETE | `/api/admin/plugins/{pluginId}/config/{configKey}?expectedVersion={version}` | 按版本删除单个配置，返回墓碑版本 |
 
-可信依赖的解析、持久化和管理 API 视图已实现；Vue 管理端页面仍未实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 继续支持符合条件的 `UNINSTALLED` 同 ID 替换；HTTP 上传使用独立的首次安装入口，不是在线升级或回滚 API。
+可信依赖的解析、持久化、管理 API 视图和 Vue 管理端页面已实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 继续支持符合条件的 `UNINSTALLED` 同 ID 替换；HTTP 上传使用独立的首次安装入口，不是在线升级或回滚 API。
 
 ### 员工插件清单
 
@@ -82,17 +82,17 @@ HTTP 控制器复用 `PluginManagerService` 的入口关闭、最长 30 秒排�
 }
 ```
 
-- `expectedVersion=0` 只用于从未存在过的键；更新必须提交当前正版本，删除后同键重建必须提交 DELETE 返回的墓碑版本。并发请求使用同一版本时只允许一个成功，其余返回 HTTP `409`。删除会保留只含命名空间、键和递增版本的内部墓碑并清空配置内容；DELETE 响应丢失时，用原删除版本重复请求会幂等返回同一墓碑版本且不重复审计。重建沿用下一代版本，因此旧创建、更新和删除请求都不能命中重建后的配置。
+- `expectedVersion=0` 只用于从未存在过的键；更新必须提交当前正版本，删除后同键重建必须提交 DELETE 返回或 `includeDeleted=true` 列表恢复的墓碑版本。并发请求使用同一版本时只允许一个成功，其余返回 HTTP `409`。删除会保留只含命名空间、键和递增版本的内部墓碑并清空配置内容；DELETE 响应丢失时，用原删除版本重复请求会幂等返回同一墓碑版本且不重复审计。重建沿用下一代版本，因此旧创建、更新和删除请求都不能命中新记录。
 - 类型只支持 `STRING / INT / BOOL / SECRET`。`INT` 规范化为 64 位十进制，`BOOL` 只接受 `true` 或 `false`；创建后修改类型必须先删除再重建。
 - 非敏感配置的 `value` 与 `defaultValue` 不能同时为 `null`，两者都会按同一类型校验并持久化。允许 `value=null + defaultValue`；此时插件侧读取会回退到默认值，更新时也可用该组合切换为默认值生效。
 - `SECRET` 不允许默认值。首次创建和删除后重建必须提交非空值；更新时 `value=null` 只在当前主密钥可用且能解密原密文时保留原密文，缺钥、错钥、损坏或历史明文均返回 HTTP `422`。提交新 `value` 可使用当前主密钥重新设置。
 - `requiresRestart` 当前只是插件配置元数据；更新 `ACTIVE` 插件不会自动停用、重启或持久化“待重启”状态。
 
-响应中的敏感配置始终返回 `value=null`、`defaultValue=null`，只通过 `secret=true` 和 `hasValue` 表示状态。数据库使用 AES-256-GCM 随机 nonce 加密，AAD 绑定 `pluginId + NUL + configKey`；部署必须通过 `WORKFORCE_PLUGIN_CONFIG_ENCRYPTION_KEY_BASE64` 提供 Base64 编码的 32 字节主密钥。缺少密钥时普通配置仍可用，所有 `SECRET` PUT 均返回 HTTP `422`；密钥格式非法会使应用启动失败。已有明文或无法解密的敏感行不会回退明文，必须提交新值重新设置或删除。
+响应中的敏感配置始终返回 `value=null`、`defaultValue=null`，只通过 `secret=true` 和 `hasValue` 表示状态。`includeDeleted=true` 返回的墓碑沿用同一 DTO：`value/defaultValue/description=null`、`valueType=STRING`、`requiresRestart/secret/hasValue=false`、`deleted=true`；管理页只使用其 `key / deleted / version` 支持跨刷新重建和统计命名空间占用。`version` 超出 JavaScript 安全整数范围时由宿主全局 Jackson 配置序列化为十进制字符串，管理端同时接受数字与字符串令牌。数据库使用 AES-256-GCM 随机 nonce 加密，AAD 绑定 `pluginId + NUL + configKey`；部署必须通过 `WORKFORCE_PLUGIN_CONFIG_ENCRYPTION_KEY_BASE64` 提供 Base64 编码的 32 字节主密钥。缺少密钥时普通配置仍可用，所有 `SECRET` PUT 均返回 HTTP `422`；密钥格式非法会使应用启动失败。已有明文或无法解密的敏感行不会回退明文，必须提交新值重新设置或删除。
 
 当前密文没有 key ID 或多密钥能力，也没有自动轮换、重加密或 KMS 集成。数据库备份必须与原主密钥分开备份并成对恢复；直接更换或丢失主密钥会使既有敏感配置不可解密。
 
-`GET` 允许查看包括 `UNINSTALLED` 在内的保留配置；`PUT` 拒绝 `DISABLING` 和 `UNINSTALLED`，允许 `INSTALLED / ACTIVE / STOPPED / ERROR`；`DELETE` 拒绝 `DISABLING`，允许管理员显式清理 `UNINSTALLED` 遗留配置。墓碑不会出现在列表或插件读取结果中，但计入 128 个键命名空间上限，防止循环创建/删除不同键导致表无限增长。成功创建、更新和删除会在同一事务写入脱敏审计，只记录插件 ID、配置键、类型、版本和重启标记，不记录值、密文或值哈希。
+`GET` 允许查看包括 `UNINSTALLED` 在内的保留配置；默认不返回墓碑，只有显式 `includeDeleted=true` 的管理员请求会收到已清空墓碑元数据，插件读取始终排除墓碑。`PUT` 拒绝 `DISABLING` 和 `UNINSTALLED`，允许 `INSTALLED / ACTIVE / STOPPED / ERROR`；`DELETE` 拒绝 `DISABLING`，允许管理员显式清理 `UNINSTALLED` 遗留配置。墓碑计入 128 个键命名空间上限，防止循环创建/删除不同键导致表无限增长。成功创建、更新和删除会在同一事务写入脱敏审计，只记录插件 ID、配置键、类型、版本和重启标记，不记录值、密文或值哈希。
 
 ### 管理员插件上传
 
@@ -112,9 +112,9 @@ HTTP 控制器复用 `PluginManagerService` 的入口关闭、最长 30 秒排�
 
 控制器先把 multipart JAR 移入随机 OS 临时文件，`PluginManagerService.installNew(...)` 再复制到宿主 `.snapshots` 并串行完成验签、清单校验、PF4J、Flyway 和持久化。请求临时文件始终 best-effort 删除；候选 wrapper/快照的失败补偿沿用核心安装契约。`PLUGIN_UPLOADED` 审计只记录可信插件 ID、前后状态和 `SUCCESS / BLOCKED / FAIL`，不记录文件名、路径、摘要、签名或异常。当前没有上传幂等键、多实例安装锁、升级、降级或回滚 API。
 
-## 尚未实现的管理端能力
+## 管理端页面
 
-- 启停/卸载、配置和错误展示页面
+`admin-web` 的 `/plugins` 页面已接入本节 API，支持签名 JAR 安装、列表筛选、可信依赖、启停/卸载、配置 CRUD 和固定脱敏诊断。页面不读取路径、摘要、签名者、签名字节或内部错误，也不通过通用审计接口在客户端拼装插件历史。
 
 ---
 

@@ -37,9 +37,11 @@ public class PluginConfigRepository {
         return rows.stream().findFirst();
     }
 
-    public List<PluginConfigRow> findByPluginId(String pluginId) {
+    public List<PluginConfigRow> findByPluginId(String pluginId, boolean includeDeleted) {
         return jdbc.query(
-            SELECT_SQL + " WHERE plugin_id = ? AND is_deleted = 0 ORDER BY config_key",
+            SELECT_SQL + " WHERE plugin_id = ?"
+                + (includeDeleted ? "" : " AND is_deleted = 0")
+                + " ORDER BY config_key",
             ROW_MAPPER,
             pluginId
         );

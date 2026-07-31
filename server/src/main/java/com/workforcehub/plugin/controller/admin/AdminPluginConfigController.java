@@ -27,8 +27,10 @@ public class AdminPluginConfigController {
     }
 
     @GetMapping
-    public R<List<PluginConfigResponse>> list(@PathVariable String pluginId) {
-        return R.ok(service.list(pluginId));
+    public R<List<PluginConfigResponse>> list(
+            @PathVariable String pluginId,
+            @RequestParam(defaultValue = "false") boolean includeDeleted) {
+        return R.ok(service.list(pluginId, includeDeleted));
     }
 
     @PutMapping("/{configKey}")

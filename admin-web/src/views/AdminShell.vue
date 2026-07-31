@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   BarChart3,
   Bot,
+  Blocks,
   CalendarCheck,
   FileArchive,
   Cpu,
@@ -23,7 +24,6 @@ import {
   X,
 } from 'lucide-vue-next';
 import { useSessionStore } from '@/stores/session';
-import AdminToast from '@/components/AdminToast.vue';
 import AdminIconAvatar from '@/components/AdminIconAvatar.vue';
 
 const route = useRoute();
@@ -65,6 +65,7 @@ const navGroups = [
       { path: '/roles', label: '角色权限', icon: ShieldCheck, permission: 'ADMIN_RBAC_MANAGE' },
       { path: '/permissions', label: '权限点', icon: ShieldCheck, permission: 'ADMIN_RBAC_MANAGE' },
       { path: '/files', label: '文件空间', icon: FileArchive, permission: 'ADMIN_FILE_MANAGE' },
+      { path: '/plugins', label: '插件管理', icon: Blocks, permission: 'ADMIN_PLUGIN_MANAGE' },
       { path: '/message-delivery', label: '消息投递', icon: MessageSquareWarning },
       { path: '/audit-logs', label: '审计日志', icon: ShieldCheck },
       { path: '/settings', label: '设置', icon: Settings, permission: 'ADMIN_NOTIFICATION_CHANNEL_MANAGE' },
@@ -147,7 +148,6 @@ async function logout() {
     </section>
     <button v-if="mobileMenuOpen" class="nav-backdrop" type="button" aria-label="关闭导航菜单" @click="mobileMenuOpen = false" />
   </div>
-  <AdminToast />
 </template>
 
 <style scoped>

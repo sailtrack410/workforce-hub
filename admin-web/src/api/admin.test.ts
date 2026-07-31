@@ -149,6 +149,58 @@ describe('adminApi', () => {
     expect(fetcher.mock.calls[2][0]).toBe('/api/admin/system/audit-logs?pageNo=2&pageSize=10&actionType=UPLOAD');
   });
 
+  it('maps plugin upload and lifecycle endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ id: 'hello-plugin', status: 'INSTALLED' }));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+    const request = new FormData();
+    request.append('jar', new Blob(['plugin']), 'hello-plugin.jar');
+    request.append('signature', new Blob(['signature']), 'hello-plugin.sig');
+    request.append('signerId', 'trusted-signer');
+
+    await api.plugins.list();
+    await api.plugins.upload(request);
+    await api.plugins.enable('hello-plugin');
+    await api.plugins.disable('hello-plugin');
+    await api.plugins.uninstall('hello-plugin');
+
+    expect(fetcher.mock.calls.map((call) => call[0])).toEqual([
+      '/api/admin/plugins',
+      '/api/admin/plugins/upload',
+      '/api/admin/plugins/hello-plugin/enable',
+      '/api/admin/plugins/hello-plugin/disable',
+      '/api/admin/plugins/hello-plugin',
+    ]);
+    expect(fetcher.mock.calls[1][1]?.body).toBe(request);
+    expect([...request.keys()]).toEqual(['jar', 'signature', 'signerId']);
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).has('Content-Type')).toBe(false);
+    expect(fetcher.mock.calls.slice(1).map((call) => call[1]?.method)).toEqual(['POST', 'PUT', 'PUT', 'DELETE']);
+    expect(fetcher.mock.calls.slice(1).every((call) => new Headers(call[1]?.headers).get('X-XSRF-TOKEN') === 'admin-api-test-token')).toBe(true);
+  });
+
+  it('maps plugin configuration endpoints with optimistic locking', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+    const request = {
+      expectedVersion: '9007199254740992',
+      valueType: 'STRING',
+      value: 'https://example.internal',
+      defaultValue: null,
+      description: '服务地址',
+      requiresRestart: false,
+    };
+
+    await api.plugins.configs('hello-plugin', true);
+    await api.plugins.saveConfig('hello-plugin', 'service.url', request);
+    await api.plugins.deleteConfig('hello-plugin', 'service.url', '9007199254740993');
+
+    expect(fetcher.mock.calls[0][0]).toBe('/api/admin/plugins/hello-plugin/config?includeDeleted=true');
+    expect(fetcher.mock.calls[1][0]).toBe('/api/admin/plugins/hello-plugin/config/service.url');
+    expect(fetcher.mock.calls[1][1]?.method).toBe('PUT');
+    expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body))).toEqual(request);
+    expect(fetcher.mock.calls[2][0]).toBe('/api/admin/plugins/hello-plugin/config/service.url?expectedVersion=9007199254740993');
+    expect(fetcher.mock.calls[2][1]?.method).toBe('DELETE');
+  });
+
   it('maps ragflow global settings endpoint', async () => {
     const fetcher: FetcherMock = vi.fn(async () => jsonResponse({ settingId: '1' }));
     const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));

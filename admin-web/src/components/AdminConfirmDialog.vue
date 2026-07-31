@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, useId, watch } from 'vue';
 import { AlertTriangle } from 'lucide-vue-next';
 import AdminDialog from '@/components/AdminDialog.vue';
 
@@ -24,6 +24,7 @@ const emit = defineEmits<{
 }>();
 
 const opened = ref(false);
+const titleId = useId();
 watch(
   () => props.visible,
   (val) => { opened.value = val; },
@@ -50,13 +51,14 @@ function handleCancel() {
   <AdminDialog
     v-model:visible="opened"
     :width="$slots.default ? 'min(860px, 92vw)' : 'min(400px, 90vw)'"
+    :labelled-by="titleId"
     :show-close="false"
     :close-disabled="cancelDisabled"
     @close="handleCancel"
   >
     <div class="confirm-header">
       <AlertTriangle v-if="danger" :size="20" class="confirm-icon-danger" />
-      <h3>{{ title }}</h3>
+      <h3 :id="titleId">{{ title }}</h3>
     </div>
     <slot>
       <p v-if="message">{{ message }}</p>

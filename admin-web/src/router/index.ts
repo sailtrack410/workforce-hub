@@ -22,6 +22,7 @@ const SettingsView = () => import('@/views/SettingsView.vue');
 const ImOutboxGovernanceView = () => import('@/views/ImOutboxGovernanceView.vue');
 const PermissionView = () => import('@/views/PermissionView.vue');
 const AuditLogView = () => import('@/views/AuditLogView.vue');
+const PluginManagementView = () => import('@/views/PluginManagementView.vue');
 
 export const adminRoutes = [
   {
@@ -52,6 +53,7 @@ export const adminRoutes = [
       { path: 'positions', name: 'admin-positions', component: PositionView, meta: { permission: 'ADMIN_ORG_MANAGE' } },
       { path: 'users', name: 'admin-users', component: UserView, meta: { permission: 'ADMIN_ORG_MANAGE' } },
       { path: 'files', name: 'admin-files', component: FileCleanupView, meta: { permission: 'ADMIN_FILE_MANAGE' } },
+      { path: 'plugins', name: 'admin-plugins', component: PluginManagementView, meta: { permission: 'ADMIN_PLUGIN_MANAGE' } },
       { path: 'ragflow', name: 'admin-ragflow', component: RagflowView, meta: { permission: 'ADMIN_RAGFLOW_MANAGE' } },
       { path: 'ai-models', name: 'admin-ai-models', component: SettingsView, meta: { permission: 'ADMIN_AGENT_MANAGE' } },
       { path: 'system', name: 'admin-system', redirect: '/audit-logs' },
