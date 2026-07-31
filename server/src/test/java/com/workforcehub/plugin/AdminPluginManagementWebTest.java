@@ -11,6 +11,7 @@ import com.workforcehub.common.enums.UserType;
 import com.workforcehub.common.exception.GlobalExceptionHandler;
 import com.workforcehub.plugin.controller.admin.AdminPluginController;
 import com.workforcehub.plugin.dto.AdminPluginResponse;
+import com.workforcehub.plugin.dto.AdminPluginResponse.DependencyResponse;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.AdminPluginManagementService;
 import org.junit.jupiter.api.Test;
@@ -102,6 +103,12 @@ class AdminPluginManagementWebTest {
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data[0].id").value(PLUGIN_ID))
             .andExpect(jsonPath("$.data[0].status").value("INSTALLED"))
+            .andExpect(jsonPath("$.data[0].dependencies[0].pluginId").value("alpha-plugin"))
+            .andExpect(jsonPath("$.data[0].dependencies[0].minVersion").value("1.0.0"))
+            .andExpect(jsonPath("$.data[0].dependencies[0].maxVersion").value("1.9.9"))
+            .andExpect(jsonPath("$.data[0].dependencies[0].id").doesNotExist())
+            .andExpect(jsonPath("$.data[0].dependencies[0].status").doesNotExist())
+            .andExpect(jsonPath("$.data[0].dependencies[1].pluginId").value("zeta-plugin"))
             .andExpect(jsonPath("$.data[0].jarPath").doesNotExist())
             .andExpect(jsonPath("$.data[0].jarSha256").doesNotExist())
             .andExpect(jsonPath("$.data[0].signature").doesNotExist())
@@ -229,6 +236,10 @@ class AdminPluginManagementWebTest {
             PluginStatus.INSTALLED,
             null,
             "Workforce Hub",
+            List.of(
+                new DependencyResponse("zeta-plugin", "2.0.0", null),
+                new DependencyResponse("alpha-plugin", "1.0.0", "1.9.9")
+            ),
             installedAt,
             installedAt
         );

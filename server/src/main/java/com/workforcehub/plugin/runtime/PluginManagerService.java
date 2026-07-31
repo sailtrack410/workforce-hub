@@ -1,9 +1,12 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.repository.PluginRepository;
+import com.workforcehub.plugin.repository.PluginDependencySpec;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
+import org.pf4j.PluginDescriptor;
+import org.pf4j.PluginRuntimeException;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
@@ -18,10 +21,16 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 插件管理服务 - 整合 PF4J 和数据库持久化。
@@ -67,10 +76,8 @@ public class PluginManagerService {
             .toList();
         log.info("恢复 {} 个可用插件", restorablePlugins.size());
 
+        Map<String, RestoreCandidate> candidates = new LinkedHashMap<>();
         for (PluginRow plugin : restorablePlugins) {
-            String loadedPluginId = null;
-            Path loadingJarPath = null;
-            List<String> pluginIdsBeforeLoad = null;
             try {
                 Path jarPath = Path.of(plugin.getJarPath());
                 if (!jarPath.toFile().exists()) {
@@ -90,41 +97,50 @@ public class PluginManagerService {
 
                 PluginVersionService.PluginVersionDescriptor versionDescriptor =
                     versionService.checkCompatibility(jarPath);
-                if (!Objects.equals(plugin.getPluginId(), versionDescriptor.pluginId())
-                        || !Objects.equals(plugin.getVersion(), versionDescriptor.pluginVersion())
-                        || !Objects.equals(plugin.getSdkVersion(), versionDescriptor.sdkVersion())
-                        || !Objects.equals(plugin.getMinHostVersion(), versionDescriptor.minHostVersion())
-                        || !Objects.equals(plugin.getMaxHostVersion(), versionDescriptor.maxHostVersion())
-                        || !Objects.equals(plugin.getJavaVersion(), versionDescriptor.javaVersion())
-                        || !Objects.equals(plugin.getType(), versionDescriptor.type())
-                        || !Objects.equals(plugin.getProvider(), versionDescriptor.provider())
-                        || !Objects.equals(
-                            plugin.getFrontendEntry(),
-                            "UI".equals(versionDescriptor.type())
-                                ? "/plugins/" + versionDescriptor.pluginId() + "/index.js"
-                                : null
-                        )
-                        || !Objects.equals(
-                            plugin.getFrontendSha384(),
-                            versionDescriptor.frontendSha384()
-                        )) {
+                if (!matchesStoredManifest(plugin, versionDescriptor)) {
                     throw new PluginVersionService.PluginVersionException("插件清单与安装记录不一致");
                 }
+                validateSignedPf4jDescriptor(jarPath, versionDescriptor);
+                candidates.put(plugin.getPluginId(), new RestoreCandidate(plugin, jarPath, versionDescriptor));
+            } catch (Exception e) {
+                String errorMessage = e.getMessage() == null ? "插件恢复失败" : e.getMessage();
+                log.error("恢复插件预检失败: {}", plugin.getPluginId(), e);
+                recordRestoreFailure(plugin.getPluginId(), errorMessage, e);
+            }
+        }
 
+        List<RestoreCandidate> orderedCandidates = orderRestoreCandidates(candidates);
+        Set<String> runtimeFailures = new HashSet<>();
+        for (RestoreCandidate candidate : orderedCandidates) {
+            PluginRow plugin = candidate.row();
+            String failedDependency = plugin.getDependencies().stream()
+                .map(PluginDependencySpec::pluginId)
+                .filter(runtimeFailures::contains)
+                .findFirst()
+                .orElse(null);
+            if (failedDependency != null) {
+                runtimeFailures.add(plugin.getPluginId());
+                recordRestoreFailure(
+                    plugin.getPluginId(),
+                    "插件依赖恢复失败: " + failedDependency,
+                    null
+                );
+                continue;
+            }
+
+            String loadedPluginId = null;
+            List<String> pluginIdsBeforeLoad = null;
+            try {
                 pluginIdsBeforeLoad = loadedPluginIds();
-                loadingJarPath = jarPath;
-                loadedPluginId = pf4jManager.loadPlugin(jarPath);
-                if (!Objects.equals(loadedPluginId, versionDescriptor.pluginId())) {
-                    throw new IllegalStateException("PF4J 插件标识与 plugin.json 不一致");
-                }
+                loadedPluginId = loadTrustedPlugin(candidate.jarPath());
                 PluginWrapper wrapper = pf4jManager.getPlugin(loadedPluginId);
-                if (wrapper == null
-                        || !Objects.equals(
-                            wrapper.getDescriptor().getVersion(),
-                            versionDescriptor.pluginVersion()
-                        )) {
-                    throw new IllegalStateException("PF4J 插件标识与 plugin.json 不一致");
+                if (!Objects.equals(loadedPluginId, candidate.descriptor().pluginId())
+                        || wrapper == null) {
+                    throw new PluginVersionService.PluginVersionException(
+                        "PF4J 插件描述符与 plugin.json 不一致"
+                    );
                 }
+                versionService.validatePf4jDescriptor(candidate.descriptor(), wrapper.getDescriptor());
 
                 if (plugin.getStatus() == PluginStatus.ACTIVE) {
                     PluginState state = pf4jManager.startPlugin(loadedPluginId);
@@ -135,10 +151,11 @@ public class PluginManagerService {
                 }
                 log.info("恢复插件成功: {} ({})", loadedPluginId, plugin.getStatus());
             } catch (Exception e) {
+                runtimeFailures.add(plugin.getPluginId());
                 String errorMessage = e.getMessage() == null ? "插件恢复失败" : e.getMessage();
                 String failedPluginId = findFailedPluginId(
                     loadedPluginId,
-                    loadingJarPath,
+                    candidate.jarPath(),
                     pluginIdsBeforeLoad
                 );
                 if (!unloadFailedPlugin(failedPluginId, e)) {
@@ -148,6 +165,101 @@ public class PluginManagerService {
                 recordRestoreFailure(plugin.getPluginId(), errorMessage, e);
             }
         }
+    }
+
+    private List<RestoreCandidate> orderRestoreCandidates(
+            Map<String, RestoreCandidate> verifiedCandidates) {
+        Map<String, RestoreCandidate> candidates = new LinkedHashMap<>(verifiedCandidates);
+        boolean removed;
+        do {
+            removed = false;
+            for (RestoreCandidate candidate : new ArrayList<>(candidates.values())) {
+                String conflict = restoreDependencyConflict(candidate, candidates);
+                if (conflict == null) {
+                    continue;
+                }
+                candidates.remove(candidate.row().getPluginId());
+                recordRestoreFailure(candidate.row().getPluginId(), conflict, null);
+                removed = true;
+            }
+        } while (removed);
+
+        List<RestoreCandidate> ordered = new ArrayList<>();
+        Set<String> resolved = new HashSet<>();
+        while (ordered.size() < candidates.size()) {
+            boolean progressed = false;
+            for (RestoreCandidate candidate : candidates.values()) {
+                String pluginId = candidate.row().getPluginId();
+                if (resolved.contains(pluginId)) {
+                    continue;
+                }
+                boolean ready = candidate.row().getDependencies().stream()
+                    .map(PluginDependencySpec::pluginId)
+                    .allMatch(resolved::contains);
+                if (ready) {
+                    ordered.add(candidate);
+                    resolved.add(pluginId);
+                    progressed = true;
+                }
+            }
+            if (!progressed) {
+                for (RestoreCandidate candidate : candidates.values()) {
+                    if (!resolved.contains(candidate.row().getPluginId())) {
+                        recordRestoreFailure(
+                            candidate.row().getPluginId(),
+                            "插件依赖存在循环",
+                            null
+                        );
+                    }
+                }
+                break;
+            }
+        }
+        return ordered;
+    }
+
+    private String restoreDependencyConflict(
+            RestoreCandidate candidate,
+            Map<String, RestoreCandidate> candidates) {
+        for (PluginDependencySpec dependency : candidate.row().getDependencies()) {
+            RestoreCandidate required = candidates.get(dependency.pluginId());
+            if (required == null) {
+                return "插件依赖不可用: " + dependency.pluginId();
+            }
+            try {
+                if (!versionService.matchesVersion(dependency, required.row().getVersion())) {
+                    return "插件依赖版本不兼容: " + dependency.pluginId();
+                }
+            } catch (PluginVersionService.PluginVersionException e) {
+                return "插件依赖版本记录无效: " + dependency.pluginId();
+            }
+            if (candidate.row().getStatus() == PluginStatus.ACTIVE
+                    && required.row().getStatus() != PluginStatus.ACTIVE) {
+                return "已启用插件依赖未启用: " + dependency.pluginId();
+            }
+        }
+        return null;
+    }
+
+    private boolean matchesStoredManifest(
+            PluginRow plugin,
+            PluginVersionService.PluginVersionDescriptor descriptor) {
+        return Objects.equals(plugin.getPluginId(), descriptor.pluginId())
+            && Objects.equals(plugin.getVersion(), descriptor.pluginVersion())
+            && Objects.equals(plugin.getSdkVersion(), descriptor.sdkVersion())
+            && Objects.equals(plugin.getMinHostVersion(), descriptor.minHostVersion())
+            && Objects.equals(plugin.getMaxHostVersion(), descriptor.maxHostVersion())
+            && Objects.equals(plugin.getJavaVersion(), descriptor.javaVersion())
+            && Objects.equals(plugin.getType(), descriptor.type())
+            && Objects.equals(plugin.getProvider(), descriptor.provider())
+            && Objects.equals(
+                plugin.getFrontendEntry(),
+                "UI".equals(descriptor.type())
+                    ? "/plugins/" + descriptor.pluginId() + "/index.js"
+                    : null
+            )
+            && Objects.equals(plugin.getFrontendSha384(), descriptor.frontendSha384())
+            && Objects.equals(plugin.getDependencies(), descriptor.dependencies());
     }
 
     private void recordRestoreFailure(String pluginId, String errorMessage, Exception restoreError) {
@@ -198,6 +310,7 @@ public class PluginManagerService {
             );
             PluginVersionService.PluginVersionDescriptor versionDescriptor =
                 versionService.checkCompatibility(snapshotPath);
+            validateSignedPf4jDescriptor(snapshotPath, versionDescriptor);
 
             // 1. 构建数据库记录并完成迁移前预检
             row = new PluginRow();
@@ -220,6 +333,7 @@ public class PluginManagerService {
                 : null);
             row.setFrontendSha384(versionDescriptor.frontendSha384());
             row.setProvider(versionDescriptor.provider());
+            row.setDependencies(versionDescriptor.dependencies());
             row.setInstalledAt(LocalDateTime.now());
             row.setUpdatedAt(LocalDateTime.now());
 
@@ -244,15 +358,17 @@ public class PluginManagerService {
 
             // 2. 加载插件获取 PF4J 分配的 ID
             pluginIdsBeforeLoad = loadedPluginIds();
-            pluginId = pf4jManager.loadPlugin(snapshotPath);
+            pluginId = loadTrustedPlugin(snapshotPath);
             PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
             if (wrapper == null) {
                 throw new IllegalStateException("插件加载后未找到: " + pluginId);
             }
-            if (!pluginId.equals(versionDescriptor.pluginId())
-                    || !wrapper.getDescriptor().getVersion().equals(versionDescriptor.pluginVersion())) {
-                throw new IllegalStateException("PF4J 插件标识与 plugin.json 不一致");
+            if (!pluginId.equals(versionDescriptor.pluginId())) {
+                throw new PluginVersionService.PluginVersionException(
+                    "PF4J 插件描述符与 plugin.json 不一致"
+                );
             }
+            versionService.validatePf4jDescriptor(versionDescriptor, wrapper.getDescriptor());
 
             // 3. 执行数据库迁移
             flywayMigrator.migrate(pluginId, snapshotPath);
@@ -290,7 +406,8 @@ public class PluginManagerService {
                     boolean candidatePersisted = Objects.equals(stored.getJarPath(), row.getJarPath())
                         && Objects.equals(stored.getJarSha256(), row.getJarSha256())
                         && Objects.equals(stored.getSignerId(), row.getSignerId())
-                        && Objects.equals(stored.getVersion(), row.getVersion());
+                        && Objects.equals(stored.getVersion(), row.getVersion())
+                        && Objects.equals(stored.getDependencies(), row.getDependencies());
                     if (candidatePersisted && stored.getStatus() == PluginStatus.INSTALLED) {
                         if (previousInstallation != null) {
                             deletePreviousSnapshot(
@@ -315,6 +432,33 @@ public class PluginManagerService {
                 deleteUnpersistedSnapshot(snapshotPath, installError);
             }
             throw installError;
+        }
+    }
+
+    private void validateSignedPf4jDescriptor(
+            Path jarPath,
+            PluginVersionService.PluginVersionDescriptor descriptor) {
+        try {
+            PluginDescriptor pf4jDescriptor = pf4jManager.readPluginDescriptor(jarPath);
+            versionService.validatePf4jDescriptor(descriptor, pf4jDescriptor);
+        } catch (PluginVersionService.PluginVersionException e) {
+            throw e;
+        } catch (PluginRuntimeException | IllegalArgumentException e) {
+            throw new PluginVersionService.PluginVersionException(
+                "PF4J 插件描述符校验失败",
+                e
+            );
+        }
+    }
+
+    private String loadTrustedPlugin(Path jarPath) {
+        try {
+            return pf4jManager.loadPlugin(jarPath);
+        } catch (PluginRuntimeException | IllegalArgumentException e) {
+            throw new PluginVersionService.PluginVersionException(
+                "插件依赖或描述符校验失败",
+                e
+            );
         }
     }
 
@@ -468,6 +612,10 @@ public class PluginManagerService {
      * PF4J 真正 STARTED 且状态更新成功后才开门。
      */
     public synchronized LocalDateTime enable(String pluginId) {
+        PluginRow plugin = pluginRepository.findById(pluginId)
+            .orElseThrow(() -> new NoSuchElementException("插件不存在: " + pluginId));
+        validateDependenciesForEnable(plugin);
+
         // 1. 启动插件
         PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
         boolean alreadyStarted = wrapper != null
@@ -508,13 +656,43 @@ public class PluginManagerService {
         return updatedAt;
     }
 
+    private void validateDependenciesForEnable(PluginRow plugin) {
+        for (PluginDependencySpec dependency : plugin.getDependencies()) {
+            PluginRow required = pluginRepository.findById(dependency.pluginId())
+                .orElseThrow(() -> new PluginDependencyConflictException(
+                    "插件依赖不存在: " + dependency.pluginId()
+                ));
+            PluginWrapper requiredWrapper = pf4jManager.getPlugin(dependency.pluginId());
+            boolean compatible;
+            try {
+                compatible = versionService.matchesVersion(dependency, required.getVersion());
+            } catch (PluginVersionService.PluginVersionException e) {
+                throw new PluginDependencyConflictException(
+                    "插件依赖版本记录无效: " + dependency.pluginId()
+                );
+            }
+            if (required.getStatus() != PluginStatus.ACTIVE
+                    || requiredWrapper == null
+                    || requiredWrapper.getPluginState() != PluginState.STARTED
+                    || !compatible) {
+                throw new PluginDependencyConflictException(
+                    "插件依赖未启用或版本不兼容: " + dependency.pluginId()
+                );
+            }
+        }
+    }
+
     /**
      * 停用插件。
      * 关门 → 等排空 → stop → 更新状态。
      * 排空超时或中断时，绝不能继续 stop；入口保持关闭，抛出异常，标记 ERROR。
      */
     public synchronized LocalDateTime disable(String pluginId) {
-        rejectLoadedDependents(pluginId, "停用");
+        rejectLoadedDependents(
+            pluginId,
+            "停用",
+            pf4jManager.getPlugin(pluginId) != null
+        );
 
         // 1. 关门，拒绝新请求
         lifecycleGuard.beginDisable(pluginId);
@@ -554,11 +732,11 @@ public class PluginManagerService {
      * 排空超时或中断时，绝不能继续 unload；入口保持关闭，抛出异常，标记 ERROR。
      */
     public synchronized LocalDateTime uninstall(String pluginId) {
-        // 先停止
         PluginWrapper wrapper = pf4jManager.getPlugin(pluginId);
-        if (wrapper != null) {
-            rejectLoadedDependents(pluginId, "卸载");
+        rejectLoadedDependents(pluginId, "卸载", wrapper != null);
 
+        // 先停止
+        if (wrapper != null) {
             // 1. 关门，拒绝新请求
             lifecycleGuard.beginDisable(pluginId);
 
@@ -615,11 +793,21 @@ public class PluginManagerService {
         return pluginRepository.updateStatus(pluginId, PluginStatus.UNINSTALLED, "已卸载");
     }
 
-    private void rejectLoadedDependents(String pluginId, String operation) {
-        List<String> dependents = pf4jManager.getDependentPluginIds(pluginId);
+    private void rejectLoadedDependents(
+            String pluginId,
+            String operation,
+            boolean targetLoaded) {
+        Set<String> dependents = new TreeSet<>();
+        if (targetLoaded) {
+            dependents.addAll(pf4jManager.getDependentPluginIds(pluginId));
+        }
+        List<String> persistedDependents = pluginRepository.findDependentPluginIds(pluginId);
+        if (persistedDependents != null) {
+            dependents.addAll(persistedDependents);
+        }
         if (!dependents.isEmpty()) {
             throw new PluginDependencyConflictException(
-                "插件仍被其他已加载插件依赖，不能" + operation + ": "
+                "插件仍被其他插件依赖，不能" + operation + ": "
                     + pluginId + " <- " + String.join(",", dependents)
             );
         }
@@ -702,5 +890,12 @@ public class PluginManagerService {
      */
     public org.pf4j.PluginManager getPf4jManager() {
         return pf4jManager;
+    }
+
+    private record RestoreCandidate(
+        PluginRow row,
+        Path jarPath,
+        PluginVersionService.PluginVersionDescriptor descriptor
+    ) {
     }
 }

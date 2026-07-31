@@ -5,6 +5,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.plugin.repository.PluginDependencySpec;
+import org.pf4j.PluginDependency;
+import org.pf4j.PluginDescriptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +16,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -27,6 +35,12 @@ import java.util.zip.ZipException;
 public class PluginVersionService {
 
     private static final int MAX_PLUGIN_JSON_BYTES = 64 * 1024;
+    private static final int MAX_DEPENDENCIES = 128;
+    private static final String PF4J_DESCRIPTOR_MISMATCH =
+        "PF4J 插件描述符与 plugin.json 不一致";
+    private static final Set<String> DEPENDENCY_FIELDS = Set.of(
+        "pluginId", "minVersion", "maxVersion"
+    );
     private static final Pattern SEMANTIC_VERSION = Pattern.compile(
         "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
     );
@@ -68,6 +82,7 @@ public class PluginVersionService {
         if (!PLUGIN_ID.matcher(pluginId).matches()) {
             throw new PluginVersionException("plugin.json id 仅支持 1-64 位小写字母、数字或连字符");
         }
+        List<PluginDependencySpec> dependencies = parseDependencies(pluginJson, pluginId);
         PluginVersionDescriptor descriptor = new PluginVersionDescriptor(
             pluginId,
             requiredText(pluginJson, "version"),
@@ -77,7 +92,8 @@ public class PluginVersionService {
             requiredText(pluginJson, "javaVersion"),
             type,
             provider,
-            frontendSha384
+            frontendSha384,
+            dependencies
         );
 
         parseSemanticVersion("插件版本", descriptor.pluginVersion());
@@ -114,6 +130,50 @@ public class PluginVersionService {
             );
         }
         return descriptor;
+    }
+
+    public void validatePf4jDescriptor(
+            PluginVersionDescriptor manifest,
+            PluginDescriptor descriptor) {
+        if (descriptor == null
+                || !Objects.equals(manifest.pluginId(), descriptor.getPluginId())
+                || !Objects.equals(manifest.pluginVersion(), descriptor.getVersion())) {
+            throw new PluginVersionException(PF4J_DESCRIPTOR_MISMATCH);
+        }
+
+        List<PluginDependency> pf4jDependencies = descriptor.getDependencies();
+        if (pf4jDependencies == null || pf4jDependencies.size() != manifest.dependencies().size()) {
+            throw new PluginVersionException(PF4J_DESCRIPTOR_MISMATCH);
+        }
+        Set<String> seen = new HashSet<>();
+        for (PluginDependency dependency : pf4jDependencies) {
+            if (dependency == null || dependency.isOptional()
+                    || !seen.add(dependency.getPluginId())) {
+                throw new PluginVersionException(PF4J_DESCRIPTOR_MISMATCH);
+            }
+            PluginDependencySpec expected = manifest.dependencies().stream()
+                .filter(item -> item.pluginId().equals(dependency.getPluginId()))
+                .findFirst()
+                .orElseThrow(() -> new PluginVersionException(PF4J_DESCRIPTOR_MISMATCH));
+            if (!pf4jVersionSupport(expected).equals(dependency.getPluginVersionSupport())) {
+                throw new PluginVersionException(PF4J_DESCRIPTOR_MISMATCH);
+            }
+        }
+    }
+
+    public boolean matchesVersion(PluginDependencySpec dependency, String version) {
+        SemanticVersion actual = parseSemanticVersion("依赖插件版本", version);
+        SemanticVersion minimum = dependency.minVersion() == null
+            ? null
+            : parseSemanticVersion("依赖最低版本", dependency.minVersion());
+        SemanticVersion maximum = dependency.maxVersion() == null
+            ? null
+            : parseSemanticVersion("依赖最高版本", dependency.maxVersion());
+        if (minimum != null && maximum != null && minimum.compareTo(maximum) > 0) {
+            throw new PluginVersionException("插件依赖版本范围无效: " + dependency.pluginId());
+        }
+        return (minimum == null || actual.compareTo(minimum) >= 0)
+            && (maximum == null || actual.compareTo(maximum) <= 0);
     }
 
     private JsonNode readPluginJson(Path jarPath) {
@@ -175,7 +235,85 @@ public class PluginVersionService {
         return value.textValue();
     }
 
+    private List<PluginDependencySpec> parseDependencies(JsonNode pluginJson, String pluginId) {
+        JsonNode dependencies = pluginJson.get("dependencies");
+        if (dependencies == null) {
+            return List.of();
+        }
+        if (!dependencies.isArray()) {
+            throw new PluginVersionException("plugin.json dependencies 必须是数组");
+        }
+        if (dependencies.size() > MAX_DEPENDENCIES) {
+            throw new PluginVersionException("plugin.json dependencies 不能超过 128 项");
+        }
+
+        List<PluginDependencySpec> result = new ArrayList<>(dependencies.size());
+        Set<String> dependencyIds = new HashSet<>();
+        for (JsonNode dependency : dependencies) {
+            if (dependency == null || !dependency.isObject()) {
+                throw new PluginVersionException("plugin.json dependency 必须是对象");
+            }
+            dependency.fieldNames().forEachRemaining(field -> {
+                if (!DEPENDENCY_FIELDS.contains(field)) {
+                    throw new PluginVersionException("plugin.json dependency 包含未知字段: " + field);
+                }
+            });
+            String dependencyId = requiredText(dependency, "pluginId");
+            if (!PLUGIN_ID.matcher(dependencyId).matches()) {
+                throw new PluginVersionException("plugin.json dependency pluginId 格式无效");
+            }
+            if (pluginId.equals(dependencyId)) {
+                throw new PluginVersionException("插件不能依赖自身");
+            }
+            if (!dependencyIds.add(dependencyId)) {
+                throw new PluginVersionException("plugin.json dependency 不能重复: " + dependencyId);
+            }
+
+            String minVersion = dependencyVersion(dependency, "minVersion");
+            String maxVersion = dependencyVersion(dependency, "maxVersion");
+            SemanticVersion minimum = minVersion == null
+                ? null
+                : parseSemanticVersion("依赖最低版本", minVersion);
+            SemanticVersion maximum = maxVersion == null
+                ? null
+                : parseSemanticVersion("依赖最高版本", maxVersion);
+            if (minimum != null && maximum != null && minimum.compareTo(maximum) > 0) {
+                throw new PluginVersionException("插件依赖版本范围无效: " + dependencyId);
+            }
+            result.add(new PluginDependencySpec(dependencyId, minVersion, maxVersion));
+        }
+        result.sort(Comparator.comparing(PluginDependencySpec::pluginId));
+        return List.copyOf(result);
+    }
+
+    private String dependencyVersion(JsonNode dependency, String field) {
+        JsonNode value = dependency.get(field);
+        if (value == null) {
+            return null;
+        }
+        if (!value.isTextual() || value.textValue().isBlank()) {
+            throw new PluginVersionException("plugin.json dependency 字段无效: " + field);
+        }
+        return value.textValue();
+    }
+
+    private String pf4jVersionSupport(PluginDependencySpec dependency) {
+        if (dependency.minVersion() == null && dependency.maxVersion() == null) {
+            return "*";
+        }
+        if (dependency.minVersion() == null) {
+            return "<=" + dependency.maxVersion();
+        }
+        if (dependency.maxVersion() == null) {
+            return ">=" + dependency.minVersion();
+        }
+        return ">=" + dependency.minVersion() + " & <=" + dependency.maxVersion();
+    }
+
     private SemanticVersion parseSemanticVersion(String name, String value) {
+        if (value == null) {
+            throw new PluginVersionException(name + "必须使用 major.minor.patch 格式: null");
+        }
         Matcher matcher = SEMANTIC_VERSION.matcher(value);
         if (!matcher.matches()) {
             throw new PluginVersionException(name + "必须使用 major.minor.patch 格式: " + value);
@@ -215,8 +353,14 @@ public class PluginVersionService {
         String javaVersion,
         String type,
         String provider,
-        String frontendSha384
+        String frontendSha384,
+        List<PluginDependencySpec> dependencies
     ) {
+        public PluginVersionDescriptor {
+            dependencies = Objects.requireNonNull(dependencies).stream()
+                .sorted(Comparator.comparing(PluginDependencySpec::pluginId))
+                .toList();
+        }
     }
 
     private record SemanticVersion(int major, int minor, int patch)

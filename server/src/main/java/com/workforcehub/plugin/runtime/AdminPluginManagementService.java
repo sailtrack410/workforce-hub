@@ -133,6 +133,10 @@ public class AdminPluginManagementService {
                 writeAudit(operatorId, "PLUGIN_ENABLED", pluginId,
                     before.getStatus(), PluginStatus.ACTIVE, "SUCCESS");
                 return AdminPluginResponse.from(before, PluginStatus.ACTIVE, updatedAt);
+            } catch (PluginManagerService.PluginDependencyConflictException e) {
+                writeAudit(operatorId, "PLUGIN_ENABLED", pluginId,
+                    before.getStatus(), before.getStatus(), "BLOCKED");
+                throw new BizException(BusinessErrorCode.CONFLICT, "插件依赖未满足，不能启用");
             } catch (RuntimeException e) {
                 writeAudit(operatorId, "PLUGIN_ENABLED", pluginId,
                     before.getStatus(), currentStatus(pluginId, before.getStatus()), "FAIL");

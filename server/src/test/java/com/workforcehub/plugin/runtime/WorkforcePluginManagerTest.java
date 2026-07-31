@@ -17,12 +17,16 @@ import org.pf4j.PluginRuntimeException;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -111,6 +115,36 @@ class WorkforcePluginManagerTest {
 
         assertThrows(PluginRuntimeException.class, () -> factory.create(wrapper));
         assertFalse(InvalidPlugin.constructorCalled.get());
+    }
+
+    @Test
+    void readPluginDescriptorShouldUsePf4jDescriptorFinderWithoutLoadingPlugin() throws Exception {
+        Path jarPath = tempDir.resolve("descriptor-plugin.jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jarPath))) {
+            output.putNextEntry(new JarEntry("plugin.properties"));
+            output.write("""
+                plugin.id=descriptor-plugin
+                plugin.class=com.example.DescriptorPlugin
+                plugin.version=1.2.3
+                plugin.dependencies=base-plugin@>=1.0.0 & <=2.0.0,optional-plugin?
+                """.getBytes(StandardCharsets.ISO_8859_1));
+            output.closeEntry();
+        }
+        WorkforcePluginManager manager = new WorkforcePluginManager(
+            tempDir.resolve("plugins").toString(),
+            mock(PluginPermissionService.class)
+        );
+
+        PluginDescriptor descriptor = manager.readPluginDescriptor(jarPath);
+
+        assertEquals("descriptor-plugin", descriptor.getPluginId());
+        assertEquals("1.2.3", descriptor.getVersion());
+        assertEquals(2, descriptor.getDependencies().size());
+        assertEquals("base-plugin", descriptor.getDependencies().get(0).getPluginId());
+        assertEquals(">=1.0.0 & <=2.0.0",
+            descriptor.getDependencies().get(0).getPluginVersionSupport());
+        assertTrue(descriptor.getDependencies().get(1).isOptional());
+        assertNull(manager.getPlugin("descriptor-plugin"));
     }
 
     @Test

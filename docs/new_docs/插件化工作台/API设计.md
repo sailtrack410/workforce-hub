@@ -15,7 +15,7 @@
 | PUT | `/api/admin/plugins/{pluginId}/config/{configKey}` | 创建或按版本更新单个配置 |
 | DELETE | `/api/admin/plugins/{pluginId}/config/{configKey}?expectedVersion={version}` | 按版本删除单个配置，返回墓碑版本 |
 
-可信依赖视图和管理端页面仍未实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 继续支持符合条件的 `UNINSTALLED` 同 ID 替换；HTTP 上传使用独立的首次安装入口，不是在线升级或回滚 API。
+可信依赖的解析、持久化和管理 API 视图已实现；Vue 管理端页面仍未实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 继续支持符合条件的 `UNINSTALLED` 同 ID 替换；HTTP 上传使用独立的首次安装入口，不是在线升级或回滚 API。
 
 ### 员工插件清单
 
@@ -50,14 +50,14 @@ HTTP 动作必须声明 `ActionDescriptor.idempotent=true`，并提交恰好一�
 
 四个接口都要求管理员登录并拥有 `ADMIN_PLUGIN_MANAGE`；`SUPER_ADMIN` 按现有后台权限契约放行。`PUT`、`DELETE` 继承全站 Cookie/Header CSRF，员工身份、匿名请求、缺少权限或 CSRF 不合法都会在进入管理服务前拒绝。
 
-列表和生命周期操作返回 `AdminPluginResponse`，包含插件 ID、名称、描述、版本兼容字段、类型、状态、固定前端入口、发布方和安装/更新时间；不会返回宿主 JAR 路径、JAR/SRI 摘要、签名者 ID、签名字节或内部错误信息。当前响应不包含依赖关系：`plugin.json.dependencies` 的可信解析、`sys_plugin_dependency` 权威写入和管理端依赖展示尚未实现，不能据此把“插件列表（含依赖）”标记完成。
+列表和生命周期操作返回 `AdminPluginResponse`，包含插件 ID、名称、描述、版本兼容字段、类型、状态、固定前端入口、发布方、按 ID 排序的 `dependencies` 和安装/更新时间。每项依赖只返回 `pluginId / minVersion / maxVersion`；不会返回宿主 JAR 路径、JAR/SRI 摘要、签名者 ID、签名字节或内部错误信息。
 
 状态语义：
 
-- `enable` 只允许 `INSTALLED / STOPPED`；已经 `ACTIVE` 时直接返回成功，不重复调用底层启用。
-- `disable` 只允许 `ACTIVE`；已经 `STOPPED` 时直接返回成功，不重复调用底层停用。
+- `enable` 只允许 `INSTALLED / STOPPED`；已经 `ACTIVE` 时直接返回成功，不重复调用底层启用。每个必需依赖必须同时为数据库 `ACTIVE`、PF4J `STARTED` 且版本兼容，否则返回脱敏 `409`。
+- `disable` 只允许 `ACTIVE`；已经 `STOPPED` 时直接返回成功，不重复调用底层停用。存在 PF4J 或持久化 dependent 时不级联，直接返回脱敏 `409`。
 - `uninstall` 允许所有已存在的非终态进入底层恢复流程；`DISABLING` 可用于插件已卸载但最终状态写库失败后的安全重试，已经 `UNINSTALLED` 时直接返回成功，不重复调用底层卸载。
-- 插件 ID 格式错误返回 HTTP `400`，不存在返回 `404`，非法状态或已加载 dependent 阻断返回脱敏的 `409`；未分类的数据库或程序异常由全局异常处理返回脱敏的 `500`。
+- 插件 ID 格式错误返回 HTTP `400`，不存在返回 `404`，非法状态、依赖未满足、损坏依赖版本或 dependent 阻断返回脱敏的 `409`；未分类的数据库或程序异常由全局异常处理返回脱敏的 `500`。
 
 上述是基于持久化终态的重试幂等，不接受幂等键，也不提供跨请求、跨进程的持久化去重。管理服务使用与 `PluginManagerService` 相同的单 JVM 监视器包住“读取状态—判断—执行”，避免并发停用/卸载覆盖终态；底层成功后返回终态写库时间，响应不再依赖二次查询，也不会携带操作前的旧 `updatedAt`。每次成功、阻止或失败操作分别写入 `SUCCESS / BLOCKED / FAIL` 脱敏审计，记录管理员 ID、插件 ID、前后状态和动作类型，不记录路径、摘要或签名；PF4J 生命周期与审计无法组成单一事务，审计写入失败只记录错误，不回滚已经成功的生命周期操作。
 
@@ -108,13 +108,12 @@ HTTP 控制器复用 `PluginManagerService` 的入口关闭、最长 30 秒排�
 
 请求即使额外提交 `pluginId`、版本、摘要、类型、发布方、前端入口或 SRI，也不会被控制器绑定或被安装逻辑信任；这些字段只来自宿主计算或已签名 `plugin.json`。路由要求管理员身份、`ADMIN_PLUGIN_MANAGE` 和全站 Cookie/Header CSRF。Nginx 请求上限为 33 MiB，Spring multipart 单文件/请求上限为 32/33 MiB，核心安装快照复制还会再次执行 32 MiB 有界检查。
 
-成功返回安全 `AdminPluginResponse`，状态为 `INSTALLED`，不会自动启用，也不返回路径、摘要、签名者、签名或内部错误。任何已存在插件 ID，包括 `UNINSTALLED`，统一返回 HTTP `409`；内部同 ID 替换仍只允许宿主显式调用 `install(...)`。缺失字段、签名/签名者或展示 metadata 超限及非法格式返回 `400`，JAR 或 multipart 请求总量超限返回 `413`，非 multipart 返回 `415`，无效签名、清单内容或兼容性失败返回脱敏 `422`；快照读取、JCA、存储或未分类安装故障返回脱敏 `500`。
+成功返回安全 `AdminPluginResponse`，状态为 `INSTALLED`，包含已签名依赖范围，不会自动启用，也不返回路径、摘要、签名者、签名或内部错误。任何已存在插件 ID，包括 `UNINSTALLED`，统一返回 HTTP `409`；内部同 ID 替换仍只允许宿主显式调用 `install(...)`。缺失字段、签名/签名者或展示 metadata 超限及非法格式返回 `400`，JAR 或 multipart 请求总量超限返回 `413`，非 multipart 返回 `415`，无效签名、清单内容、PF4J 依赖描述漂移或兼容性失败返回脱敏 `422`；快照读取、JCA、存储或未分类安装故障返回脱敏 `500`。
 
 控制器先把 multipart JAR 移入随机 OS 临时文件，`PluginManagerService.installNew(...)` 再复制到宿主 `.snapshots` 并串行完成验签、清单校验、PF4J、Flyway 和持久化。请求临时文件始终 best-effort 删除；候选 wrapper/快照的失败补偿沿用核心安装契约。`PLUGIN_UPLOADED` 审计只记录可信插件 ID、前后状态和 `SUCCESS / BLOCKED / FAIL`，不记录文件名、路径、摘要、签名或异常。当前没有上传幂等键、多实例安装锁、升级、降级或回滚 API。
 
 ## 尚未实现的管理端能力
 
-- 可信依赖解析、持久化和列表展示
 - 启停/卸载、配置和错误展示页面
 
 ---

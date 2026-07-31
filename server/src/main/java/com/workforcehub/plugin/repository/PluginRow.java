@@ -1,6 +1,7 @@
 package com.workforcehub.plugin.repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 插件注册表实体。
@@ -25,6 +26,7 @@ public class PluginRow {
     private String frontendSha384;
     private String provider;
     private String errorMessage;
+    private List<PluginDependencySpec> dependencies = List.of();
     private LocalDateTime installedAt;
     private LocalDateTime updatedAt;
 
@@ -85,6 +87,11 @@ public class PluginRow {
 
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+
+    public List<PluginDependencySpec> getDependencies() { return dependencies; }
+    public void setDependencies(List<PluginDependencySpec> dependencies) {
+        this.dependencies = List.copyOf(dependencies);
+    }
 
     public LocalDateTime getInstalledAt() { return installedAt; }
     public void setInstalledAt(LocalDateTime installedAt) { this.installedAt = installedAt; }

@@ -6,6 +6,8 @@ import com.workforcehub.auth.security.AdminUserDetails;
 import com.workforcehub.common.audit.AuditLogWriter;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.plugin.dto.AdminPluginResponse;
+import com.workforcehub.plugin.dto.AdminPluginResponse.DependencyResponse;
+import com.workforcehub.plugin.repository.PluginDependencySpec;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import org.junit.jupiter.api.AfterEach;
@@ -95,6 +97,7 @@ class AdminPluginManagementServiceTest {
         row.setJarPath("/internal/plugins/secret.jar");
         row.setJarSha256("secret-hash");
         row.setSignature(new byte[] {1, 2, 3});
+        row.setDependencies(dependencies());
         when(pluginManagerService.listPlugins()).thenReturn(List.of(row));
 
         List<AdminPluginResponse> result = service.list();
@@ -102,15 +105,29 @@ class AdminPluginManagementServiceTest {
         assertEquals(1, result.size());
         assertEquals(PLUGIN_ID, result.get(0).id());
         assertEquals(PluginStatus.ERROR, result.get(0).status());
+        assertEquals(List.of(
+            new DependencyResponse("alpha-plugin", "1.0.0", "1.9.9"),
+            new DependencyResponse("zeta-plugin", "2.0.0", null)
+        ), result.get(0).dependencies());
+        assertThrows(UnsupportedOperationException.class, () -> result.get(0).dependencies().add(
+            new DependencyResponse("other-plugin", null, null)
+        ));
         List<String> fields = Arrays.stream(AdminPluginResponse.class.getRecordComponents())
             .map(component -> component.getName())
             .toList();
+        assertTrue(fields.contains("dependencies"));
         assertFalse(fields.contains("jarPath"));
         assertFalse(fields.contains("jarSha256"));
         assertFalse(fields.contains("signature"));
         assertFalse(fields.contains("signerId"));
         assertFalse(fields.contains("integrity"));
         assertFalse(fields.contains("errorMessage"));
+        assertEquals(
+            List.of("pluginId", "minVersion", "maxVersion"),
+            Arrays.stream(DependencyResponse.class.getRecordComponents())
+                .map(component -> component.getName())
+                .toList()
+        );
     }
 
     @Test
@@ -118,19 +135,23 @@ class AdminPluginManagementServiceTest {
         MockMultipartFile jar = jarPart();
         MockMultipartFile signature = signaturePart();
         AtomicReference<Path> uploadPath = new AtomicReference<>();
+        PluginRow installed = plugin(PluginStatus.INSTALLED);
+        installed.setDependencies(dependencies());
         when(pluginManagerService.installNew(any(Path.class), any(PluginRow.class)))
             .thenAnswer(invocation -> {
                 Path path = invocation.getArgument(0);
                 uploadPath.set(path);
                 assertTrue(Files.isRegularFile(path));
                 assertEquals("jar-content", Files.readString(path));
-                return plugin(PluginStatus.INSTALLED);
+                return installed;
             });
 
         AdminPluginResponse response = service.upload(
             jar, signature, " official ", " Hello Plugin ", " 测试插件 ");
 
         assertEquals(PLUGIN_ID, response.id());
+        assertEquals("alpha-plugin", response.dependencies().get(0).pluginId());
+        assertEquals("zeta-plugin", response.dependencies().get(1).pluginId());
         assertFalse(Files.exists(uploadPath.get()));
         ArgumentCaptor<PluginRow> metadata = ArgumentCaptor.forClass(PluginRow.class);
         verify(pluginManagerService).installNew(any(Path.class), metadata.capture());
@@ -243,6 +264,7 @@ class AdminPluginManagementServiceTest {
     @Test
     void enableShouldChangeStateAndWriteSanitizedAudit() throws Exception {
         PluginRow before = plugin(PluginStatus.INSTALLED);
+        before.setDependencies(dependencies());
         when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(before);
         when(pluginManagerService.enable(PLUGIN_ID)).thenReturn(UPDATED_AT);
 
@@ -250,6 +272,8 @@ class AdminPluginManagementServiceTest {
 
         assertEquals(PluginStatus.ACTIVE, response.status());
         assertEquals(UPDATED_AT, response.updatedAt());
+        assertEquals("alpha-plugin", response.dependencies().get(0).pluginId());
+        assertEquals("zeta-plugin", response.dependencies().get(1).pluginId());
         verify(pluginManagerService).enable(PLUGIN_ID);
         JsonNode detail = capturedAudit("PLUGIN_ENABLED", "SUCCESS");
         assertEquals(PLUGIN_ID, detail.get("pluginId").asText());
@@ -373,6 +397,25 @@ class AdminPluginManagementServiceTest {
             eq("ADMIN"), eq(9001L), eq("PLUGIN_DISABLED"), eq("PLUGIN"), eq(null),
             eq("BLOCKED"), anyString()
         );
+    }
+
+    @Test
+    void enableDependencyConflictShouldReturnSafe409AndAuditBlocked() throws Exception {
+        PluginRow installed = plugin(PluginStatus.INSTALLED);
+        installed.setDependencies(dependencies());
+        when(pluginManagerService.getPlugin(PLUGIN_ID)).thenReturn(installed);
+        doThrow(new PluginManagerService.PluginDependencyConflictException(
+            "internal missing dependency details"
+        )).when(pluginManagerService).enable(PLUGIN_ID);
+
+        BizException thrown = assertThrows(BizException.class, () -> service.enable(PLUGIN_ID));
+
+        assertEquals(HttpStatus.CONFLICT, thrown.getHttpStatus());
+        assertEquals("插件依赖未满足，不能启用", thrown.getMessage());
+        JsonNode detail = capturedAudit("PLUGIN_ENABLED", "BLOCKED");
+        assertEquals("INSTALLED", detail.get("beforeStatus").asText());
+        assertEquals("INSTALLED", detail.get("afterStatus").asText());
+        assertFalse(detail.toString().contains("internal missing dependency details"));
     }
 
     @Test
@@ -537,6 +580,13 @@ class AdminPluginManagementServiceTest {
         row.setInstalledAt(LocalDateTime.of(2026, 7, 30, 10, 0));
         row.setUpdatedAt(LocalDateTime.of(2026, 7, 30, 10, 0));
         return row;
+    }
+
+    private List<PluginDependencySpec> dependencies() {
+        return List.of(
+            new PluginDependencySpec("zeta-plugin", "2.0.0", null),
+            new PluginDependencySpec("alpha-plugin", "1.0.0", "1.9.9")
+        );
     }
 
     private MockMultipartFile jarPart() {

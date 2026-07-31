@@ -1,29 +1,40 @@
 package com.workforcehub.plugin.runtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.plugin.repository.PluginDependencySpec;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.pf4j.PluginDependency;
+import org.pf4j.PluginDescriptor;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class PluginVersionServiceTest {
 
@@ -108,6 +119,238 @@ class PluginVersionServiceTest {
         assertEquals("FUNCTIONAL", descriptor.type());
         assertEquals("Workforce Hub", descriptor.provider());
         assertNull(descriptor.frontendSha384());
+        assertEquals(List.of(), descriptor.dependencies());
+    }
+
+    @Test
+    void shouldAcceptSortAndReturnSignedDependencies() throws Exception {
+        Path jarPath = buildJar(withDependencies(
+            pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17"),
+            """
+                [
+                  {"pluginId":"z-plugin","minVersion":"1.0.0","maxVersion":"2.0.0"},
+                  {"pluginId":"a-plugin","maxVersion":"3.0.0"},
+                  {"pluginId":"m-plugin","minVersion":"0.1.0"},
+                  {"pluginId":"any-plugin"}
+                ]
+                """
+        ));
+
+        PluginVersionService.PluginVersionDescriptor descriptor = service.checkCompatibility(jarPath);
+
+        assertEquals(List.of(
+            new PluginDependencySpec("a-plugin", null, "3.0.0"),
+            new PluginDependencySpec("any-plugin", null, null),
+            new PluginDependencySpec("m-plugin", "0.1.0", null),
+            new PluginDependencySpec("z-plugin", "1.0.0", "2.0.0")
+        ), descriptor.dependencies());
+    }
+
+    @Test
+    void shouldAcceptEmptyAndExactly128Dependencies() throws Exception {
+        Path emptyJar = buildJar(withDependencies(
+            pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17"),
+            "[]"
+        ));
+        String dependencies = IntStream.range(0, 128)
+            .mapToObj(index -> "{\"pluginId\":\"dependency-" + index + "\"}")
+            .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        Path maximumJar = buildJar(withDependencies(
+            pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17"),
+            dependencies
+        ));
+
+        assertEquals(List.of(), service.checkCompatibility(emptyJar).dependencies());
+        assertEquals(128, service.checkCompatibility(maximumJar).dependencies().size());
+    }
+
+    @Test
+    void descriptorShouldDefensivelyCopyAndSortDependencies() {
+        List<PluginDependencySpec> dependencies = new ArrayList<>(List.of(
+            new PluginDependencySpec("z-plugin", null, null),
+            new PluginDependencySpec("a-plugin", null, null)
+        ));
+
+        PluginVersionService.PluginVersionDescriptor descriptor = manifest(dependencies);
+        dependencies.clear();
+
+        assertEquals(List.of(
+            new PluginDependencySpec("a-plugin", null, null),
+            new PluginDependencySpec("z-plugin", null, null)
+        ), descriptor.dependencies());
+        assertThrows(UnsupportedOperationException.class, () -> descriptor.dependencies().clear());
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidDependencies")
+    void shouldRejectInvalidDependencies(String dependencies) throws Exception {
+        Path jarPath = buildJar(withDependencies(
+            pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17"),
+            dependencies
+        ));
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    private static Stream<String> invalidDependencies() {
+        return Stream.of(
+            "null",
+            "{}",
+            "[null]",
+            "[\"base-plugin\"]",
+            "[{}]",
+            "[{\"pluginId\":null}]",
+            "[{\"pluginId\":\"Base-plugin\"}]",
+            "[{\"pluginId\":\"version-plugin\"}]",
+            "[{\"pluginId\":\"base-plugin\",\"optional\":true}]",
+            "[{\"pluginId\":\"base-plugin\",\"unknown\":\"value\"}]",
+            "[{\"pluginId\":\"base-plugin\"},{\"pluginId\":\"base-plugin\"}]",
+            "[{\"pluginId\":\"base-plugin\",\"minVersion\":null}]",
+            "[{\"pluginId\":\"base-plugin\",\"minVersion\":\"1.0\"}]",
+            "[{\"pluginId\":\"base-plugin\",\"maxVersion\":\"01.0.0\"}]",
+            "[{\"pluginId\":\"base-plugin\",\"minVersion\":\"2.0.0\",\"maxVersion\":\"1.0.0\"}]"
+        );
+    }
+
+    @Test
+    void shouldRejectMoreThan128Dependencies() throws Exception {
+        String dependencies = IntStream.range(0, 129)
+            .mapToObj(index -> "{\"pluginId\":\"dependency-" + index + "\"}")
+            .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        Path jarPath = buildJar(withDependencies(
+            pluginJson("2.0.0", "1.2.9", "1.0.0", "1.4.0", "17"),
+            dependencies
+        ));
+
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.checkCompatibility(jarPath)
+        );
+    }
+
+    @Test
+    void shouldValidatePf4jDescriptorIndependentOfDependencyOrder() {
+        PluginVersionService.PluginVersionDescriptor manifest = manifest(List.of(
+            new PluginDependencySpec("any-plugin", null, null),
+            new PluginDependencySpec("base-plugin", "1.0.0", "2.0.0"),
+            new PluginDependencySpec("minimum-plugin", "3.0.0", null),
+            new PluginDependencySpec("maximum-plugin", null, "4.0.0")
+        ));
+        PluginDescriptor descriptor = pf4jDescriptor(
+            "version-plugin",
+            "2.0.0",
+            List.of(
+                new PluginDependency("minimum-plugin@>=3.0.0"),
+                new PluginDependency("base-plugin@>=1.0.0 & <=2.0.0"),
+                new PluginDependency("maximum-plugin@<=4.0.0"),
+                new PluginDependency("any-plugin")
+            )
+        );
+
+        assertDoesNotThrow(() -> service.validatePf4jDescriptor(manifest, descriptor));
+    }
+
+    @Test
+    void shouldRejectPf4jIdentityVersionDependencyRangeAndOptionalDrift() {
+        PluginVersionService.PluginVersionDescriptor manifest = manifest(List.of(
+            new PluginDependencySpec("base-plugin", "1.0.0", "2.0.0")
+        ));
+
+        assertThrows(PluginVersionService.PluginVersionException.class, () ->
+            service.validatePf4jDescriptor(
+                manifest,
+                pf4jDescriptor("other-plugin", "2.0.0", List.of(
+                    new PluginDependency("base-plugin@>=1.0.0 & <=2.0.0")
+                ))
+            ));
+        assertThrows(PluginVersionService.PluginVersionException.class, () ->
+            service.validatePf4jDescriptor(
+                manifest,
+                pf4jDescriptor("version-plugin", "2.0.1", List.of(
+                    new PluginDependency("base-plugin@>=1.0.0 & <=2.0.0")
+                ))
+            ));
+        assertThrows(PluginVersionService.PluginVersionException.class, () ->
+            service.validatePf4jDescriptor(
+                manifest,
+                pf4jDescriptor("version-plugin", "2.0.0", List.of(
+                    new PluginDependency("base-plugin@>=1.0.0&<=2.0.0")
+                ))
+            ));
+        assertThrows(PluginVersionService.PluginVersionException.class, () ->
+            service.validatePf4jDescriptor(
+                manifest,
+                pf4jDescriptor("version-plugin", "2.0.0", List.of(
+                    new PluginDependency("base-plugin?@>=1.0.0 & <=2.0.0")
+                ))
+            ));
+        assertThrows(PluginVersionService.PluginVersionException.class, () ->
+            service.validatePf4jDescriptor(
+                manifest,
+                pf4jDescriptor("version-plugin", "2.0.0", List.of())
+            ));
+        assertThrows(PluginVersionService.PluginVersionException.class, () ->
+            service.validatePf4jDescriptor(
+                manifest(List.of(
+                    new PluginDependencySpec("base-plugin", "1.0.0", "2.0.0"),
+                    new PluginDependencySpec("other-plugin", null, null)
+                )),
+                pf4jDescriptor("version-plugin", "2.0.0", List.of(
+                    new PluginDependency("base-plugin@>=1.0.0 & <=2.0.0"),
+                    new PluginDependency("base-plugin@>=1.0.0 & <=2.0.0")
+                ))
+            ));
+    }
+
+    @Test
+    void shouldMatchDependencyVersionAtInclusiveBoundaries() {
+        PluginDependencySpec dependency = new PluginDependencySpec(
+            "base-plugin", "1.0.0", "2.0.0"
+        );
+
+        assertTrue(service.matchesVersion(dependency, "1.0.0"));
+        assertTrue(service.matchesVersion(dependency, "1.5.0"));
+        assertTrue(service.matchesVersion(dependency, "2.0.0"));
+        assertFalse(service.matchesVersion(dependency, "0.9.9"));
+        assertFalse(service.matchesVersion(dependency, "2.0.1"));
+        assertTrue(service.matchesVersion(
+            new PluginDependencySpec("any-plugin", null, null),
+            "99.0.0"
+        ));
+        assertTrue(service.matchesVersion(
+            new PluginDependencySpec("minimum-plugin", "1.0.0", null),
+            "1.0.0"
+        ));
+        assertFalse(service.matchesVersion(
+            new PluginDependencySpec("minimum-plugin", "1.0.0", null),
+            "0.9.9"
+        ));
+        assertTrue(service.matchesVersion(
+            new PluginDependencySpec("maximum-plugin", null, "2.0.0"),
+            "2.0.0"
+        ));
+        assertFalse(service.matchesVersion(
+            new PluginDependencySpec("maximum-plugin", null, "2.0.0"),
+            "2.0.1"
+        ));
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.matchesVersion(dependency, "1.0")
+        );
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.matchesVersion(dependency, null)
+        );
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.matchesVersion(
+                new PluginDependencySpec("invalid-range", "2.0.0", "1.0.0"),
+                "1.5.0"
+            )
+        );
     }
 
     @Test
@@ -517,6 +760,40 @@ class PluginVersionServiceTest {
             output.closeEntry();
         }
         return jarPath;
+    }
+
+    private String withDependencies(String pluginJson, String dependencies) {
+        int closingBrace = pluginJson.lastIndexOf('}');
+        return pluginJson.substring(0, closingBrace)
+            + ",\"dependencies\":" + dependencies
+            + pluginJson.substring(closingBrace);
+    }
+
+    private PluginVersionService.PluginVersionDescriptor manifest(
+            List<PluginDependencySpec> dependencies) {
+        return new PluginVersionService.PluginVersionDescriptor(
+            "version-plugin",
+            "2.0.0",
+            "1.2.9",
+            "1.0.0",
+            "1.4.0",
+            "17",
+            "FUNCTIONAL",
+            "Workforce Hub",
+            null,
+            dependencies
+        );
+    }
+
+    private PluginDescriptor pf4jDescriptor(
+            String pluginId,
+            String version,
+            List<PluginDependency> dependencies) {
+        PluginDescriptor descriptor = mock(PluginDescriptor.class);
+        when(descriptor.getPluginId()).thenReturn(pluginId);
+        when(descriptor.getVersion()).thenReturn(version);
+        when(descriptor.getDependencies()).thenReturn(dependencies);
+        return descriptor;
     }
 
     private Path buildJarWithDuplicatePluginJson(String pluginJson) throws Exception {

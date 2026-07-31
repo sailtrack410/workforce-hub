@@ -4,6 +4,8 @@ import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 
 public record AdminPluginResponse(
     String id,
@@ -18,9 +20,18 @@ public record AdminPluginResponse(
     PluginStatus status,
     String frontendEntry,
     String provider,
+    List<DependencyResponse> dependencies,
     LocalDateTime installedAt,
     LocalDateTime updatedAt
 ) {
+    public AdminPluginResponse {
+        dependencies = dependencies == null
+            ? List.of()
+            : dependencies.stream()
+                .sorted(Comparator.comparing(DependencyResponse::pluginId))
+                .toList();
+    }
+
     public static AdminPluginResponse from(PluginRow row) {
         return from(row, row.getStatus(), row.getUpdatedAt());
     }
@@ -42,8 +53,22 @@ public record AdminPluginResponse(
             status,
             row.getFrontendEntry(),
             row.getProvider(),
+            row.getDependencies().stream()
+                .map(dependency -> new DependencyResponse(
+                    dependency.pluginId(),
+                    dependency.minVersion(),
+                    dependency.maxVersion()
+                ))
+                .toList(),
             row.getInstalledAt(),
             updatedAt
         );
+    }
+
+    public record DependencyResponse(
+        String pluginId,
+        String minVersion,
+        String maxVersion
+    ) {
     }
 }

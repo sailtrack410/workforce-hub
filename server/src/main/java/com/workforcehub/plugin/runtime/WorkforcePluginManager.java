@@ -6,6 +6,7 @@ import com.workforcehub.plugin.sdk.WorkforcePlugin;
 import com.workforcehub.plugin.repository.PluginConfigRepository;
 import jakarta.annotation.PreDestroy;
 import org.pf4j.DefaultPluginManager;
+import org.pf4j.PluginDescriptor;
 import org.pf4j.PluginFactory;
 import org.pf4j.PluginRuntimeException;
 import org.pf4j.PluginState;
@@ -106,6 +107,10 @@ public final class WorkforcePluginManager extends DefaultPluginManager {
     @Override
     public synchronized String loadPlugin(Path pluginPath) {
         return super.loadPlugin(pluginPath);
+    }
+
+    synchronized PluginDescriptor readPluginDescriptor(Path pluginPath) {
+        return getPluginDescriptorFinder().find(pluginPath);
     }
 
     @Override
