@@ -24,6 +24,8 @@ import com.workforcehub.ragflow.repository.RagflowRepository;
 import com.workforcehub.ragflow.repository.RagflowSearchHitRow;
 import com.workforcehub.ragflow.repository.RagflowSpaceRow;
 import com.workforcehub.ragflow.repository.RagflowVectorRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,8 @@ import static com.workforcehub.common.util.TextValues.trimToNull;
 
 @Service
 public class RagflowAdminService {
+
+    private static final Logger log = LoggerFactory.getLogger(RagflowAdminService.class);
 
     // 知识库可见范围枚举：PRIVATE 仅自己、ROLE/DEPARTMENT/POSITION 按组织维度、PUBLIC 全员可见
     private static final Set<String> VISIBILITIES = Set.of("PRIVATE", "ROLE", "DEPARTMENT", "POSITION", "PUBLIC");
@@ -313,7 +317,9 @@ public class RagflowAdminService {
         ragflowRepository.softDeleteSpace(spaceId, operatorId);
         try {
             vectorRepository.deactivateSpaceVectors(spaceId);
-        } catch (Exception | LinkageError ignored) {
+        } catch (Exception | LinkageError e) {
+            // 向量清理属于删除主流程的附带动作，失败仅记日志不回滚
+            log.warn("停用空间向量失败 spaceId={}", spaceId, e);
         }
     }
 
@@ -327,7 +333,8 @@ public class RagflowAdminService {
         ragflowRepository.deactivateDocumentChunks(documentId);
         try {
             vectorRepository.deactivateDocumentVectors(documentId);
-        } catch (Exception | LinkageError ignored) {
+        } catch (Exception | LinkageError e) {
+            log.warn("停用文档向量失败 documentId={}", documentId, e);
         }
         ragflowRepository.refreshSpaceCounts(spaceId);
     }

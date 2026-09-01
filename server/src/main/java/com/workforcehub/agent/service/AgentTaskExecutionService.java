@@ -152,8 +152,10 @@ public class AgentTaskExecutionService {
             ));
             finishConversationSucceeded(command, context, modelResponse.text(), null);
         } catch (AgentModelException e) {
+            log.warn("AI会话模型调用失败 taskId={} failureType={}", context.taskId(), e.failureType(), e);
             finishConversationFailed(command, context, e.failureType(), e.getMessage());
         } catch (Exception e) {
+            log.warn("AI会话执行异常 taskId={}", context.taskId(), e);
             finishConversationFailed(command, context, "UNKNOWN", e.getMessage());
         }
     }
@@ -197,6 +199,7 @@ public class AgentTaskExecutionService {
                 notifyImAgentSucceeded(command, context.agent(), context.taskId(), replyText);
             });
         } catch (Exception e) {
+            log.warn("AI会话执行异常 taskId={}", context.taskId(), e);
             finishConversationFailed(command, context, "UNKNOWN", e.getMessage());
         }
     }

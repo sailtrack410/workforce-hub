@@ -13,6 +13,8 @@ import com.workforcehub.ragflow.repository.RagflowVectorRepository;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -29,6 +31,8 @@ import java.util.Map;
 
 @Service
 public class RagflowIngestService {
+
+    private static final Logger log = LoggerFactory.getLogger(RagflowIngestService.class);
 
     private final RagflowRepository ragflowRepository;
     private final AgentRepository agentRepository;
@@ -80,6 +84,8 @@ public class RagflowIngestService {
             ragflowRepository.refreshSpaceCounts(spaceId);
         } catch (Exception | LinkageError e) {
             String message = e instanceof BizException ? e.getMessage() : "文件解析失败";
+            // 库内只落友好 message，根因堆栈必须进日志，否则无法排查
+            log.warn("文档入库失败 spaceId={} documentId={} jobId={}", spaceId, documentId, jobId, e);
             ragflowRepository.markIngestFailed(documentId, jobId, message);
             ragflowRepository.refreshSpaceCounts(spaceId);
         }

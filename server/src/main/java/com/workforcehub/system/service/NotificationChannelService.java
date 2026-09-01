@@ -10,6 +10,8 @@ import com.workforcehub.system.dto.NotificationChannelTestRequest;
 import com.workforcehub.system.dto.NotificationChannelTestResponse;
 import com.workforcehub.system.repository.NotificationChannelRepository;
 import com.workforcehub.system.repository.NotificationChannelRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -29,6 +31,8 @@ import static com.workforcehub.common.util.JsonValues.write;
 
 @Service
 public class NotificationChannelService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationChannelService.class);
 
     private final NotificationChannelRepository repository;
     private final JdbcTemplate jdbcTemplate;
@@ -113,6 +117,7 @@ public class NotificationChannelService {
             success = true;
             message = "测试成功";
         } catch (Exception e) {
+            log.warn("通知渠道测试邮件发送失败 channelCode={}", channelCode, e);
             message = sanitizeMailError(e);
         }
         repository.updateTestResult(existing.id(), success, message);

@@ -7,6 +7,8 @@ import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.util.TextValues;
 import com.workforcehub.file.dto.CleanupJobRunResponse;
 import com.workforcehub.file.dto.RunCleanupJobRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -20,6 +22,8 @@ import java.util.Set;
 // 清理任务编排：分阶段执行（数据库清理 → 物理对象删除），支持按类型单独触发或全量执行
 @Service
 public class FileCleanupJobService {
+
+    private static final Logger log = LoggerFactory.getLogger(FileCleanupJobService.class);
 
     private static final String JOB_EXPIRED_UPLOAD_TICKET = "EXPIRED_UPLOAD_TICKET";
     private static final String JOB_EXPIRED_DOWNLOAD_TICKET = "EXPIRED_DOWNLOAD_TICKET";
@@ -68,6 +72,7 @@ public class FileCleanupJobService {
                 prepareCleanupJob(adminId, jobRunId, jobType, dryRun, now)
             );
         } catch (RuntimeException e) {
+            log.warn("清理任务执行失败 jobRunId={} jobType={}", jobRunId, jobType, e);
             stats = markJobRunFailed(jobRunId, e.getMessage());
         }
         if (stats == null) {

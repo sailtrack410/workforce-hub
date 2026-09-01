@@ -7,6 +7,8 @@ import com.workforcehub.agent.model.AgentModelRequest;
 import com.workforcehub.agent.model.AgentModelResponse;
 import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
 import com.workforcehub.agent.repository.AiProviderRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ import java.util.Set;
  */
 @Service
 public class AiModelHealthCheckService {
+
+    private static final Logger log = LoggerFactory.getLogger(AiModelHealthCheckService.class);
 
     private static final String TEST_IMAGE_BASE64 =
         "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAT0lEQVR42u3PQQkAAAgEsItqICMaxgi+hcEKLNXzWgQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQELgu7kIGlFIyTZgAAAABJRU5ErkJggg==";
@@ -61,6 +65,7 @@ public class AiModelHealthCheckService {
             request.retrieve().toBodilessEntity();
             return response(true, "供应商连通", null, start);
         } catch (Exception e) {
+            log.warn("AI供应商连通检测失败 baseUrl={}", provider.baseUrl(), e);
             return response(false, friendlyError(e, "供应商连通失败"), null, start);
         }
     }
@@ -117,6 +122,7 @@ public class AiModelHealthCheckService {
                 default -> response(false, "模型类型不支持", null, start);
             };
         } catch (Exception e) {
+            log.warn("AI模型连通检测失败 provider={} model={}", provider, modelName, e);
             return response(false, friendlyError(e, "模型调用失败"), null, start);
         }
     }

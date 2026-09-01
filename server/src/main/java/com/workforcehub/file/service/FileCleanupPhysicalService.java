@@ -3,6 +3,8 @@ package com.workforcehub.file.service;
 import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.common.util.TextValues;
 import com.workforcehub.file.storage.StorageProviderRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +13,8 @@ import java.util.List;
 
 @Service
 public class FileCleanupPhysicalService {
+
+    private static final Logger log = LoggerFactory.getLogger(FileCleanupPhysicalService.class);
 
     private static final String ITEM_DEDUPLICATED_UPLOAD_OBJECT = "DEDUPLICATED_UPLOAD_OBJECT";
     private static final int STALE_PENDING_MINUTES = 30;
@@ -97,6 +101,8 @@ public class FileCleanupPhysicalService {
                 storageProviderRegistry.require(item.storageProvider()).deleteObject(item.bucketName(), item.objectKey());
                 markCleanupDetailSuccess(item.id());
             } catch (RuntimeException e) {
+                log.warn("物理文件删除失败 jobRunId={} detailId={} bucket={} key={}",
+                    jobRunId, item.id(), item.bucketName(), item.objectKey(), e);
                 markCleanupDetailFailed(item.id(), e.getMessage());
             }
         }

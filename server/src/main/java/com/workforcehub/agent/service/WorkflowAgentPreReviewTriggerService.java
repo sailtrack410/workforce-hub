@@ -20,6 +20,8 @@ import com.workforcehub.workflow.repository.WorkflowRepository;
 import com.workforcehub.workflow.repository.WorkflowRequestRow;
 import com.workforcehub.workflow.service.WorkflowAgentPreReviewTrigger;
 import com.workforcehub.workflow.service.WorkflowAgentResultCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,8 @@ import java.util.concurrent.Executor;
 // 流程预审：查找匹配的 Agent 配置，构建 prompt 调用 LLM，事务提交后异步执行
 @Service
 public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreReviewTrigger {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkflowAgentPreReviewTriggerService.class);
 
     private static final String WF_REQUEST_CONTEXT_TYPE = "WF_REQUEST";
 
@@ -154,6 +158,8 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
             });
             notifyWorkflow(requestId, taskId, decisionJson);
         } catch (Exception e) {
+            // 失败决策只落友好 message，根因堆栈必须进日志
+            log.warn("AI预审执行失败，落库失败决策 requestId={} taskId={}", requestId, taskId, e);
             String decisionJson = failureDecisionJson(requestId, processTypeCode, bizType, bizId, applicantUserId, e);
             transactionTemplate.executeWithoutResult(status -> {
                 agentRepository.finishTask(taskId, "FAILED", compactMessage(e), applicantUserId);
@@ -401,6 +407,8 @@ public class WorkflowAgentPreReviewTriggerService implements WorkflowAgentPreRev
                 callback.onPreReviewToHuman(requestId, taskId, decisionJson);
             }
         } catch (Exception e) {
+            // 解析失败回退转人工是有意兜底，但根因需要留痕
+            log.warn("预审决策解析失败，回退转人工 requestId={} taskId={}", requestId, taskId, e);
             callback.onPreReviewToHuman(requestId, taskId, decisionJson);
         }
     }
