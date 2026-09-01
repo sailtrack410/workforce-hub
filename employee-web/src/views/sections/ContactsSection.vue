@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   ChevronLeft,
@@ -16,6 +16,7 @@ import {
   List as ListIcon,
   Network,
   GripVertical,
+  UsersRound,
 } from 'lucide-vue-next';
 import type { ContactRecord, EntityId, OrgDepartmentTreeNodeResponse } from '@/stores/shell';
 import { employeeApi } from '@/api';
@@ -56,10 +57,62 @@ const friendRequestsLoading = ref(false);
 
 // 树状图画布拖动
 const treeCanvasRef = ref<HTMLElement | null>(null);
+const treeContentRef = ref<HTMLElement | null>(null);
+const treeSvgRef = ref<SVGSVGElement | null>(null);
 const isPanning = ref(false);
 const panStart = ref({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
 const profileDialogOffset = ref({ x: 0, y: 0 });
 const profileDialogDrag = ref<{ pointerId: number; x: number; y: number; startX: number; startY: number } | null>(null);
+
+// SVG 连线：实测父子卡片位置，画直角肘形路径
+function drawTreeLinks() {
+  const content = treeContentRef.value;
+  const svg = treeSvgRef.value;
+  if (!content || !svg) return;
+  const contentRect = content.getBoundingClientRect();
+  const paths: string[] = [];
+  // 每个 node-wrap 里 branch 是父，org-tree-children 里每个子节点的 branch 是子
+  content.querySelectorAll('.org-tree-node-wrap.has-open-children').forEach((wrap) => {
+    const parentCard = wrap.querySelector(':scope > .org-tree-branch .org-tree-card');
+    const childrenBox = wrap.querySelector(':scope > .org-tree-children');
+    if (!parentCard || !childrenBox) return;
+    const pr = parentCard.getBoundingClientRect();
+    const px = pr.right - contentRect.left;
+    const py = pr.top + pr.height / 2 - contentRect.top;
+    childrenBox.querySelectorAll(':scope > .org-tree-level > .org-tree-node-wrap > .org-tree-branch .org-tree-card').forEach((childCard) => {
+      const cr = childCard.getBoundingClientRect();
+      const cx = cr.left - contentRect.left;
+      const cy = cr.top + cr.height / 2 - contentRect.top;
+      const midX = px + (cx - px) / 2;
+      // 直角肘形：父右缘 → 水平到中点 → 垂直到子高度 → 水平到子左缘
+      paths.push(`M ${px} ${py} H ${midX} V ${cy} H ${cx}`);
+    });
+  });
+  svg.setAttribute('width', String(content.scrollWidth));
+  svg.setAttribute('height', String(content.scrollHeight));
+  svg.innerHTML = paths
+    .map((d) => `<path d="${d}" fill="none" stroke="var(--primary-200)" stroke-width="2" stroke-linejoin="round" />`)
+    .join('');
+}
+
+function scheduleDrawTreeLinks() {
+  void nextTick(() => drawTreeLinks());
+}
+
+// 展开/折叠会改变内容尺寸，用 ResizeObserver 自动重画连线
+let treeResizeObserver: ResizeObserver | null = null;
+
+function attachTreeObserver() {
+  const content = treeContentRef.value;
+  if (!content) return;
+  treeResizeObserver?.disconnect();
+  treeResizeObserver = new ResizeObserver(() => drawTreeLinks());
+  treeResizeObserver.observe(content);
+}
+
+onBeforeUnmount(() => {
+  treeResizeObserver?.disconnect();
+});
 
 function onTreeCanvasPointerDown(e: PointerEvent) {
   const target = e.target as HTMLElement;
@@ -210,6 +263,7 @@ const currentMembers = computed<ContactRecord[]>(() => {
 
 const isAiCategory = computed(() => currentCategory.value?.type === 'ai');
 const canToggleTreeView = computed(() => currentCategory.value?.type === 'dept');
+const currentCategoryLabel = computed(() => currentCategory.value?.label ?? '企业通讯录');
 
 // 当前部门子部门（用于树状视图以某个部门为根显示）
 const currentDeptChildren = computed<ContactTreeNode[]>(() => {
@@ -221,6 +275,15 @@ function centerTreeCanvas() {
   void nextTick(() => {
     const canvas = treeCanvasRef.value;
     if (!canvas) return;
+    // 锚定根节点卡片：让树根出现在视口左中位置，而不是整棵树的地理中心。
+    const rootCard = canvas.querySelector('.org-tree-card');
+    if (rootCard) {
+      const canvasRect = canvas.getBoundingClientRect();
+      const cardRect = rootCard.getBoundingClientRect();
+      canvas.scrollLeft = Math.max(0, cardRect.left - canvasRect.left + canvas.scrollLeft - 24);
+      canvas.scrollTop = Math.max(0, cardRect.top - canvasRect.top + canvas.scrollTop - canvas.clientHeight / 2 + cardRect.height / 2);
+      return;
+    }
     canvas.scrollLeft = Math.max(0, (canvas.scrollWidth - canvas.clientWidth) / 2);
     canvas.scrollTop = Math.max(0, (canvas.scrollHeight - canvas.clientHeight) / 2);
   });
@@ -402,7 +465,11 @@ watch(profileContact, () => {
 });
 
 watch([() => shell.contactsViewMode, currentDeptChildren], ([mode]) => {
-  if (mode === 'tree') centerTreeCanvas();
+  if (mode === 'tree') {
+    scheduleDrawTreeLinks();
+    void nextTick(() => attachTreeObserver());
+    centerTreeCanvas();
+  }
 }, { immediate: true });
 
 watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
@@ -411,6 +478,31 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
 <template>
 <div class="workspace contacts-workspace">
   <main class="contacts-main">
+    <section class="workspace-command-bar contacts-command-bar" aria-label="通讯录摘要">
+      <div class="workspace-command-lead">
+        <span class="workspace-command-icon"><UsersRound :size="20" /></span>
+        <div>
+          <span class="workspace-command-kicker">组织关系</span>
+          <strong>{{ currentCategoryLabel }}</strong>
+          <p>按部门与协作关系定位成员，个人资料和发起消息保持就近操作。</p>
+        </div>
+      </div>
+      <dl class="workspace-command-metrics">
+        <div>
+          <dt>当前成员</dt>
+          <dd>{{ currentMembers.length }}</dd>
+        </div>
+        <div>
+          <dt>通讯录总数</dt>
+          <dd>{{ shell.filteredContacts.length }}</dd>
+        </div>
+        <div>
+          <dt>好友申请</dt>
+          <dd>{{ friendRequests.length }}</dd>
+        </div>
+      </dl>
+    </section>
+
     <header class="contacts-main-head">
       <nav class="contacts-breadcrumb" aria-label="通讯录路径">
         <span v-for="(item, index) in breadcrumbItems" :key="`${item}-${index}`">{{ item }}</span>
@@ -509,18 +601,21 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
               v-for="contact in currentMembers"
               :key="contact.id"
               type="button"
-              class="contacts-member-row"
+              class="contacts-member-card"
               :class="{ active: activeContact?.id === contact.id }"
               @click="openContactProfile(contact)"
             >
-              <AppAvatar :label="contact.name" :image="contact.avatarUrl" tone="primary" size="md" />
-              <span>
-                <strong>{{ contact.name }}</strong>
-                <small>{{ contact.role || '未设置岗位' }}</small>
-              </span>
-              <AppTag :tone="contact.relation === '好友' ? 'primary' : 'neutral'">
-                {{ contact.relation }}
-              </AppTag>
+              <AppAvatar :label="contact.name" :image="contact.avatarUrl" tone="primary" size="md" :status="contact.presenceStatus === 'ONLINE' ? 'online' : contact.presenceStatus === 'BUSY' ? 'busy' : contact.presenceStatus === 'AWAY' ? 'away' : ''" />
+              <div class="member-card-copy">
+                <div class="member-card-title">
+                  <strong>{{ contact.name }}</strong>
+                  <AppTag :tone="contact.relation === '好友' ? 'primary' : 'neutral'">
+                    {{ contact.relation }}
+                  </AppTag>
+                </div>
+                <small>{{ contact.role || '未设置岗位' }}<template v-if="contact.department"> · {{ contact.department }}</template></small>
+                <p v-if="contact.signature" class="member-card-signature">{{ contact.signature }}</p>
+              </div>
             </button>
           </div>
         </template>
@@ -537,12 +632,15 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
             @pointerup="onTreeCanvasPointerUp"
             @pointerleave="onTreeCanvasPointerUp"
           >
-            <ContactsOrgTree
-              :nodes="currentDeptChildren"
-              :active-dept-id="currentDeptNode ? String(currentDeptNode.id) : null"
-              @select="handleTreeSelect"
-              @contact="openContactProfile"
-            />
+            <div ref="treeContentRef" class="contacts-tree-content">
+              <svg ref="treeSvgRef" class="contacts-tree-links" aria-hidden="true" />
+              <ContactsOrgTree
+                :nodes="currentDeptChildren"
+                :active-dept-id="currentDeptNode ? String(currentDeptNode.id) : null"
+                @select="handleTreeSelect"
+                @contact="openContactProfile"
+              />
+            </div>
           </div>
         </div>
       </template>

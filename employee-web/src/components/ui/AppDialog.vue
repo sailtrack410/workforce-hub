@@ -23,13 +23,13 @@ const props = defineProps<{
   display: grid;
   place-items: center;
   padding: var(--space-24);
-  background: rgba(15, 20, 18, 0.42);
+  background: var(--overlay-scrim);
   overflow: auto;
 }
 
 .ui-dialog {
   width: min(36rem, 100%);
-  max-height: calc(100vh - var(--space-56));
+  max-height: calc(100dvh - var(--space-56));
   overflow: auto;
   padding: var(--space-24);
   border: 1px solid var(--border-default);

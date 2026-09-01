@@ -445,6 +445,11 @@ export function useWorkbenchState({
   async function refreshActiveWorkbench() {
     if (!session.isAuthenticated) return;
     const id = shell.active.workbench;
+    // 今日视图聚合考勤、申请、假期，全量加载
+    if (id === 'today') {
+      await Promise.all([refreshWorkbenchData(), loadWorkflowRequests(), refreshAttendancePanel()]);
+      return;
+    }
     if (id === 'oa') {
       await Promise.all([refreshWorkbenchData(), loadWorkflowRequests()]);
       return;

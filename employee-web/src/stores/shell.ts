@@ -703,6 +703,18 @@ const fileSpaces = createFileSpaces();
 
 const workbenchItems: WorkbenchRecord[] = [
   {
+    id: 'today',
+    title: '今日',
+    label: 'today',
+    subtitle: '今日考勤 / 申请 / 待办 / 假期一览',
+    note: '',
+    tone: 'blue',
+    status: '可用',
+    fields: [],
+    stats: [],
+    steps: [],
+  },
+  {
     id: 'oa',
     title: 'OA 申请',
     label: 'oa',
@@ -809,7 +821,7 @@ const WORKBENCH_ALIAS: Record<string, string> = {
   requests: 'oa',
 };
 
-const RESERVED_WORKBENCH_IDS = new Set(['oa', 'attendance', 'balance', 'agent', 'files', 'leave', 'requests']);
+const RESERVED_WORKBENCH_IDS = new Set(['today', 'oa', 'attendance', 'balance', 'agent', 'files', 'leave', 'requests']);
 
 export function normalizeWorkbenchApp(id?: string | null, list?: WorkbenchRecord[]): string {
   const items = list ?? workbenchItems;
@@ -825,13 +837,13 @@ export function resolveWorkbenchRoute(
   pluginsResolved: boolean,
   workbenchIds: string[],
 ): { id: string; replace: boolean; pending: boolean } {
-  if (!candidate) return { id: 'oa', replace: false, pending: false };
+  if (!candidate) return { id: 'today', replace: false, pending: false };
   if (!initialized) return { id: candidate, replace: false, pending: true };
-  if (!authenticated) return { id: 'oa', replace: candidate !== 'oa', pending: false };
+  if (!authenticated) return { id: 'today', replace: candidate !== 'today', pending: false };
   if (WORKBENCH_ALIAS[candidate]) return { id: 'oa', replace: true, pending: false };
   if (workbenchIds.includes(candidate)) return { id: candidate, replace: false, pending: false };
   if (!pluginsResolved) return { id: candidate, replace: false, pending: true };
-  return { id: 'oa', replace: true, pending: false };
+  return { id: 'today', replace: true, pending: false };
 }
 
 function buildWorkbenchList(manifest: { id: string; name: string }[], loadedIds: string[]): WorkbenchRecord[] {
@@ -993,7 +1005,7 @@ export const useShellStore = defineStore('employee-shell', {
       messages: '',
       todos: '',
       files: 'personal',
-      workbench: 'oa',
+      workbench: 'today',
       processes: 'requests',
       contacts: '',
       agents: '',
@@ -1442,6 +1454,21 @@ export const useShellStore = defineStore('employee-shell', {
       this.active.todos = record.id;
       writeStoredTodos(this.todos);
       return record;
+    },
+    updateTodoTask(id: string, input: Pick<TodoRecord, 'title' | 'startAt' | 'endAt' | 'note' | 'tagName' | 'tagColor'>) {
+      this.todos = this.todos.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          title: input.title,
+          note: input.note,
+          startAt: input.startAt,
+          endAt: input.endAt,
+          tagName: input.tagName,
+          tagColor: input.tagColor,
+        };
+      });
+      writeStoredTodos(this.todos);
     },
     toggleTodoTask(id: string) {
       this.todos = this.todos.map((item) => {

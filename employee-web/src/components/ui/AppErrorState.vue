@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CircleAlert } from 'lucide-vue-next';
 import AppButton from './AppButton.vue';
 
 defineProps<{
@@ -14,7 +15,9 @@ const emit = defineEmits<{
 
 <template>
   <div class="ui-error-state" role="alert">
-    <div class="error-mark">!</div>
+    <div class="error-mark" aria-hidden="true">
+      <CircleAlert :size="18" />
+    </div>
     <div class="copy">
       <h3>{{ title }}</h3>
       <p>{{ description }}</p>
@@ -33,7 +36,7 @@ const emit = defineEmits<{
   gap: var(--space-16);
   padding: var(--space-20);
   border: 1px solid color-mix(in srgb, var(--danger-300) 80%, transparent);
-  border-radius: var(--radius-16);
+  border-radius: var(--radius-8);
   background: var(--danger-50);
 }
 
@@ -43,10 +46,9 @@ const emit = defineEmits<{
   height: 2rem;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 999px;
-  background: var(--danger-500);
-  color: var(--text-inverse);
-  font-weight: 800;
+  border-radius: var(--radius-8);
+  background: var(--danger-100);
+  color: var(--danger-700);
 }
 
 .copy h3,

@@ -10,6 +10,7 @@ import { useTodosSectionContext } from '../employee-shell-context';
 import type { TodoRecord } from '@/stores/shell';
 import AppButton from '../../components/ui/AppButton.vue';
 import TodoCreateDialog from '../../components/todos/TodoCreateDialog.vue';
+import TodoTodayTimeline from '../../components/todos/TodoTodayTimeline.vue';
 
 interface CalendarDay {
   key: string;
@@ -42,6 +43,17 @@ const {
 const todayKey = toDateKey(new Date());
 const visibleMonth = ref(startOfMonth(new Date()));
 const showCreate = ref(false);
+const editingTodo = ref<TodoRecord | null>(null);
+
+function openCreate() {
+  editingTodo.value = null;
+  showCreate.value = true;
+}
+
+function openEdit(todo: TodoRecord) {
+  editingTodo.value = todo;
+  showCreate.value = true;
+}
 
 const compactMonthLabel = computed(() => `${visibleMonth.value.getMonth() + 1}月`);
 const monthYearLabel = computed(() => `${visibleMonth.value.getFullYear()}`);
@@ -56,6 +68,10 @@ const visibleTodos = computed(() => shell.filteredTodos.filter((todo) => (
 const monthTodoCount = computed(() => shell.todos.filter((todo) => (
   isTaskDated(todo) && todo.endDate >= monthStartKey.value && todo.startDate <= monthEndKey.value
 )).length);
+const todayPendingCount = computed(() => shell.todos.filter((todo) => (
+  !todo.completed && isTaskDated(todo) && todo.startDate <= todayKey && todo.endDate >= todayKey
+)).length);
+const completedTodoCount = computed(() => shell.todos.filter((todo) => todo.completed).length);
 const calendarWeeks = computed(() => {
   const weeks: CalendarWeek[] = [];
   const month = visibleMonth.value.getMonth();
@@ -187,6 +203,7 @@ function segmentTitle(todo: TodoRecord) {
 
 function selectTodo(todo: TodoRecord) {
   shell.selectItem('todos', todo.id);
+  openEdit(todo);
 }
 </script>
 
@@ -208,7 +225,34 @@ function selectTodo(todo: TodoRecord) {
   </header>
 
   <section class="todo-calendar-layout">
-    <section class="todo-calendar-card">
+    <div class="todo-split">
+      <div class="todo-main-col">
+        <section class="workspace-command-bar todo-command-bar" aria-label="待办摘要">
+          <div class="workspace-command-lead">
+            <span class="workspace-command-icon"><CalendarDays :size="20" /></span>
+            <div>
+              <span class="workspace-command-kicker">今日节奏</span>
+              <strong>{{ todayPendingCount ? `${todayPendingCount} 项待处理` : '今日已清空' }}</strong>
+              <p>围绕日期安排任务，优先处理当日未完成事项。</p>
+            </div>
+          </div>
+          <dl class="workspace-command-metrics">
+            <div>
+              <dt>全部未完成</dt>
+              <dd>{{ pendingTodoCount }}</dd>
+            </div>
+            <div>
+              <dt>本月安排</dt>
+              <dd>{{ monthTodoCount }}</dd>
+            </div>
+            <div>
+              <dt>累计完成</dt>
+              <dd>{{ completedTodoCount }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="todo-calendar-card">
       <header class="todo-month-title">
         <div>
           <h3>{{ compactMonthLabel }}</h3>
@@ -227,7 +271,7 @@ function selectTodo(todo: TodoRecord) {
             下月
             <ChevronRight :size="15" />
           </AppButton>
-          <AppButton variant="primary" size="sm" @click="showCreate = true">
+          <AppButton variant="primary" size="sm" @click="openCreate">
             <Plus :size="15" />
             添加
           </AppButton>
@@ -280,8 +324,16 @@ function selectTodo(todo: TodoRecord) {
         <p v-if="!visibleTodos.length" class="todo-calendar-empty">暂无待办</p>
       </div>
     </section>
+      </div>
+
+    <TodoTodayTimeline
+      :todos="shell.todos"
+      @select="selectTodo"
+      @create="openCreate"
+    />
+    </div>
   </section>
 
-  <TodoCreateDialog :open="showCreate" @close="showCreate = false" />
+  <TodoCreateDialog :open="showCreate" :todo="editingTodo" @close="showCreate = false; editingTodo = null" />
 </div>
 </template>

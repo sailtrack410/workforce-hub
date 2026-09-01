@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   ChevronLeft,
+  CloudUpload,
   Copy,
   Download,
   FolderPlus,
   Home,
+  LayoutGrid,
+  List,
   MoreHorizontal,
   MoveRight,
   RotateCcw,
@@ -44,6 +47,7 @@ const {
   runAction,
   showToast,
   setUploadFolderId,
+  handleFileDrop,
   refreshFileCenter,
   sendSelectedFileToConversation,
   openPersonalFilePreview,
@@ -56,9 +60,51 @@ const {
 type FileTab = 'all' | 'trash';
 type FileQuickView = 'all' | 'recentAccess' | 'recentUpload' | 'favorites' | 'shared';
 type FilePlacementMode = 'move' | 'copy';
+type FileViewMode = 'grid' | 'list';
 
 const fileTab = ref<FileTab>('all');
+const viewMode = ref<FileViewMode>('grid');
 const quickView = ref<FileQuickView>('all');
+const dropActive = ref(false);
+// 右键菜单
+const contextMenu = ref<{ x: number; y: number; kind: 'folder' | 'file'; folder?: EmployeeFileFolderResponse; file?: PersonalFileRecord } | null>(null);
+
+function openFileContextMenu(event: MouseEvent, kind: 'folder' | 'file', folder?: EmployeeFileFolderResponse, file?: PersonalFileRecord) {
+  event.preventDefault();
+  event.stopPropagation();
+  const menuWidth = 176;
+  const menuHeight = 220;
+  contextMenu.value = {
+    kind,
+    folder,
+    file,
+    x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+    y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+  };
+}
+
+function closeFileContextMenu() {
+  contextMenu.value = null;
+}
+
+function onContentDragOver(event: DragEvent) {
+  event.preventDefault();
+  dropActive.value = true;
+}
+
+function onContentDragLeave(event: DragEvent) {
+  // 仅当拖出整个内容区时才取消高亮
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) {
+    dropActive.value = false;
+  }
+}
+
+function onContentDrop(event: DragEvent) {
+  event.preventDefault();
+  dropActive.value = false;
+  const file = event.dataTransfer?.files?.[0];
+  if (file) handleFileDrop(file);
+}
 const currentFolderId = ref<EntityId | null>(null);
 const browserLoading = ref(false);
 const browserError = ref('');
@@ -131,7 +177,6 @@ const storageTotalLabel = computed(() => formatStorageLabel(activeFile.value.sum
 const storageUsedBytes = computed(() => parseStorageSizeBytes(storageUsedLabel.value));
 const storageTotalBytes = computed(() => parseStorageSizeBytes(storageTotalLabel.value));
 const storageOverview = computed(() => buildStorageOverview(activeFiles.value, storageUsedBytes.value, storageTotalBytes.value));
-const storageSegments = computed(() => storageOverview.value.segments);
 const storageUsagePercentLabel = computed(() => formatUsagePercent(storageOverview.value.usedPercent));
 
 function mapBrowserFile(file: EmployeeFileResponse): PersonalFileRecord {
@@ -416,7 +461,18 @@ watch(fileKeyword, () => {
 
 onMounted(() => {
   void loadBrowser();
+  document.addEventListener('click', closeFileContextMenu);
+  document.addEventListener('keydown', onContextMenuEsc);
 });
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeFileContextMenu);
+  document.removeEventListener('keydown', onContextMenuEsc);
+});
+
+function onContextMenuEsc(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeFileContextMenu();
+}
 </script>
 
 <template>
@@ -437,52 +493,68 @@ onMounted(() => {
     </div>
   </header>
 
-  <section class="content-stack cloud-content-stack">
-    <section class="cloud-summary-grid" aria-label="云空间概览">
-      <div class="cloud-quick-grid">
-        <button
-          v-for="card in fileQuickCards"
-          :key="card.key"
-          class="cloud-folder-card"
-          :class="{ active: fileTab === 'all' && quickView === card.key }"
-          type="button"
-          :aria-pressed="fileTab === 'all' && quickView === card.key"
-          @click="selectQuickView(card.key)"
-        >
-          <img :src="cloudFolderImage" alt="" aria-hidden="true" />
-          <div>
-            <h3>{{ card.title }}</h3>
-            <p>{{ card.count }} 个文件</p>
-          </div>
-        </button>
+  <section
+    class="content-stack cloud-content-stack"
+    :class="{ 'drop-active': dropActive }"
+    @dragover="onContentDragOver"
+    @dragleave="onContentDragLeave"
+    @drop="onContentDrop"
+  >
+    <!-- 拖拽上传提示层 -->
+    <div v-if="dropActive" class="cloud-drop-overlay" aria-hidden="true">
+      <div class="cloud-drop-hint">
+        <CloudUpload :size="28" />
+        <span>松开以上传文件</span>
+      </div>
+    </div>
+
+    <!-- 概览横幅：快捷访问 + 存储用量 -->
+    <section class="cloud-hero" aria-label="云空间概览">
+      <div class="cloud-hero-main">
+        <div class="cloud-hero-copy">
+          <h2>云空间</h2>
+          <p>{{ activeFiles.length }} 个文件 · {{ trashedFiles.length }} 个回收站</p>
+        </div>
+        <div class="cloud-quick-grid">
+          <button
+            v-for="card in fileQuickCards"
+            :key="card.key"
+            type="button"
+            class="cloud-quick-card"
+            :class="{ active: fileTab === 'all' && quickView === card.key }"
+            :aria-pressed="fileTab === 'all' && quickView === card.key"
+            @click="selectQuickView(card.key)"
+          >
+            <img :src="cloudFolderImage" alt="" aria-hidden="true" />
+            <div class="cloud-quick-copy">
+              <strong>{{ card.title }}</strong>
+              <span>{{ card.count }} 个文件</span>
+            </div>
+          </button>
+        </div>
       </div>
 
-      <article class="storage-overview-card">
-        <header>存储概览</header>
-        <div class="storage-overview-body">
-          <div class="storage-usage-line">
-            <strong>{{ storageUsedLabel }}</strong>
-            <span>/ {{ storageTotalLabel }}</span>
-          </div>
-          <div class="storage-ratio-bar" aria-hidden="true">
-            <div class="storage-used-fill" :style="{ width: `${storageOverview.usedPercent}%` }">
-              <span
-                v-for="item in storageSegments"
-                v-show="item.percent > 0"
-                :key="item.key"
-                :style="{ width: `${item.percent}%`, background: item.color }"
-              />
-            </div>
-          </div>
-          <div class="storage-legend">
-            <span v-for="item in storageSegments" :key="item.key">
-              <i :style="{ background: item.color }" />
-              {{ item.label }}
-            </span>
-          </div>
+      <div class="cloud-hero-storage">
+        <div class="storage-ring-wrap">
+          <svg viewBox="0 0 64 64" class="storage-ring" aria-hidden="true">
+            <circle cx="32" cy="32" r="26" class="storage-ring-track" />
+            <circle
+              cx="32" cy="32" r="26"
+              class="storage-ring-value"
+              :stroke-dasharray="`${(Math.min(100, storageOverview.usedPercent) / 100) * 163.4} 163.4`"
+            />
+            <text x="32" y="37" text-anchor="middle" class="storage-ring-text">{{ storageUsagePercentLabel }}%</text>
+          </svg>
         </div>
-        <footer>已使用 {{ storageUsagePercentLabel }}%</footer>
-      </article>
+        <div class="storage-copy">
+          <strong>{{ storageUsedLabel }}</strong>
+          <span>/ {{ storageTotalLabel }}</span>
+          <div class="storage-bar">
+            <div class="storage-bar-fill" :style="{ width: `${Math.min(100, storageOverview.usedPercent)}%` }" />
+          </div>
+          <small>已使用 {{ storageUsagePercentLabel }}%</small>
+        </div>
+      </div>
     </section>
 
     <section class="detail-card">
@@ -514,6 +586,26 @@ onMounted(() => {
             <option value="media">音视频</option>
             <option value="code">代码</option>
           </select>
+          <div class="file-view-toggle" role="group" aria-label="视图切换">
+            <button
+              type="button"
+              :class="{ active: viewMode === 'grid' }"
+              :aria-pressed="viewMode === 'grid'"
+              title="网格视图"
+              @click="viewMode = 'grid'"
+            >
+              <LayoutGrid :size="15" />
+            </button>
+            <button
+              type="button"
+              :class="{ active: viewMode === 'list' }"
+              :aria-pressed="viewMode === 'list'"
+              title="列表视图"
+              @click="viewMode = 'list'"
+            >
+              <List :size="15" />
+            </button>
+          </div>
           <label v-if="quickView === 'all'" class="file-folder-create">
             <input v-model="folderNameDraft" class="ui-inline-input" placeholder="新建文件夹" @input="folderActionError = ''" @keydown.enter.prevent="createFolder" />
             <AppButton variant="secondary" size="sm" :disabled="!folderNameDraft.trim()" @click="createFolder">
@@ -546,8 +638,45 @@ onMounted(() => {
           v-else-if="!visibleBrowserFolders.length && !visibleBrowserFiles.length"
           :title="emptyTitle"
           :description="emptyDescription"
+          icon="files"
         />
 
+        <!-- 网格视图 -->
+        <div v-if="viewMode === 'grid'" class="file-grid">
+          <div
+            v-for="folder in visibleBrowserFolders"
+            :key="folder.folderId"
+            class="file-grid-card folder-card"
+            role="button"
+            tabindex="0"
+            @click="openFolder(folder.folderId)"
+            @keydown.enter.prevent="openFolder(folder.folderId)"
+            @contextmenu="openFileContextMenu($event, 'folder', folder, undefined)"
+          >
+            <input v-model="selectedFileRows" type="checkbox" class="file-grid-check" :value="folderSelectionValue(folder)" :aria-label="`选择${folder.folderName}`" @click.stop />
+            <img class="file-grid-icon" :src="folderFileIcon" alt="" aria-hidden="true" />
+            <strong class="file-grid-name" :title="folder.folderName">{{ folder.folderName }}</strong>
+            <small class="file-grid-meta">{{ formatDateTime(folder.createdAt) }}</small>
+          </div>
+
+          <div
+            v-for="file in visibleBrowserFiles"
+            :key="file.id"
+            class="file-grid-card"
+            role="button"
+            tabindex="0"
+            @click="previewBrowserFile(file)"
+            @keydown.enter.prevent="previewBrowserFile(file)"
+            @contextmenu="openFileContextMenu($event, 'file', undefined, file)"
+          >
+            <input v-model="selectedFileRows" type="checkbox" class="file-grid-check" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" @click.stop />
+            <img class="file-grid-icon" :src="fileIconAssetOf(file)" alt="" aria-hidden="true" />
+            <strong class="file-grid-name" :title="file.name">{{ file.name }}</strong>
+            <small class="file-grid-meta">{{ file.size }} · {{ file.createdAt }}</small>
+          </div>
+        </div>
+
+        <!-- 列表视图 -->
         <div v-else class="file-list cloud-file-list">
           <div
             v-for="folder in visibleBrowserFolders"
@@ -557,6 +686,7 @@ onMounted(() => {
             tabindex="0"
             @click="openFolder(folder.folderId)"
             @keydown.enter.prevent="openFolder(folder.folderId)"
+            @contextmenu="openFileContextMenu($event, 'folder', folder, undefined)"
           >
             <input v-model="selectedFileRows" type="checkbox" :value="folderSelectionValue(folder)" :aria-label="`选择${folder.folderName}`" @click.stop />
             <span class="file-thumb" aria-hidden="true">
@@ -571,7 +701,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-for="file in visibleBrowserFiles" :key="file.id" class="file-row">
+          <div v-for="file in visibleBrowserFiles" :key="file.id" class="file-row" @contextmenu="openFileContextMenu($event, 'file', undefined, file)">
             <input v-model="selectedFileRows" type="checkbox" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" />
             <span class="file-thumb" aria-hidden="true">
               <img class="file-thumb-img" :src="fileIconAssetOf(file)" alt="" />
@@ -626,7 +756,7 @@ onMounted(() => {
       </template>
 
       <template v-else>
-        <AppEmptyState v-if="!visibleTrashFiles.length" :title="emptyTitle" :description="emptyDescription" />
+        <AppEmptyState v-if="!visibleTrashFiles.length" :title="emptyTitle" :description="emptyDescription" icon="files" />
         <div v-else class="file-list cloud-file-list">
           <div v-for="file in visibleTrashFiles" :key="file.id" class="file-row">
             <input v-model="selectedFileRows" type="checkbox" :value="fileSelectionValue(file)" :aria-label="`选择${file.name}`" />
@@ -688,6 +818,43 @@ onMounted(() => {
       <AppButton variant="secondary" @click="closePlacement">取消</AppButton>
       <AppButton variant="primary" @click="submitPlacement">确认</AppButton>
     </div>
-  </section>
+    </section>
 </AppDialog>
+
+<!-- 文件/文件夹右键菜单 -->
+<div
+  v-if="contextMenu"
+  class="file-context-menu"
+  :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+  @click.stop
+>
+  <template v-if="contextMenu.kind === 'file' && contextMenu.file">
+    <button type="button" :disabled="!contextMenu.file.attachmentRefId" @click="previewBrowserFile(contextMenu.file); closeFileContextMenu()">
+      <Search :size="15" />
+      <span>预览</span>
+    </button>
+    <button type="button" :disabled="!contextMenu.file.attachmentRefId" @click="downloadBrowserFile(contextMenu.file); closeFileContextMenu()">
+      <Download :size="15" />
+      <span>下载</span>
+    </button>
+    <button type="button" :disabled="!contextMenu.file.attachmentRefId" @click="toggleFavorite(contextMenu.file); closeFileContextMenu()">
+      <Star :size="15" />
+      <span>{{ isFavorite(contextMenu.file) ? '取消收藏' : '收藏' }}</span>
+    </button>
+    <button type="button" :disabled="!contextMenu.file.attachmentRefId" @click="openPlacement(contextMenu.file, 'move'); closeFileContextMenu()">
+      <MoveRight :size="15" />
+      <span>移动到</span>
+    </button>
+    <button type="button" class="danger" :disabled="!contextMenu.file.attachmentRefId" @click="trashBrowserFile(contextMenu.file); closeFileContextMenu()">
+      <Trash2 :size="15" />
+      <span>删除</span>
+    </button>
+  </template>
+  <template v-else-if="contextMenu.kind === 'folder' && contextMenu.folder">
+    <button type="button" @click="openFolder(contextMenu.folder.folderId); closeFileContextMenu()">
+      <Home :size="15" />
+      <span>打开</span>
+    </button>
+  </template>
+</div>
 </template>

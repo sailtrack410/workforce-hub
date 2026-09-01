@@ -28,6 +28,7 @@ import type {
 import type {
   ConversationAttachment,
   ConversationMessage,
+  ConversationProcessCard,
   ConversationRecord,
   ConversationTone,
 } from './shell';
@@ -703,9 +704,10 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     mimeType: attachment.mimeType,
   }));
   const recalled = message.status === 'RECALLED';
+  const processCard = knowledgeCard ? toProcessCard(content ?? {}, knowledgeCard) : undefined;
   return {
     id: String(message.messageId),
-    type: knowledgeCard ? 'knowledge-card' : (message.messageType === 'CARD' ? 'process-card' : 'text'),
+    type: processCard ? 'process-card' : (knowledgeCard ? 'knowledge-card' : (message.messageType === 'CARD' ? 'process-card' : 'text')),
     author: sentByCurrentUser ? '我' : authorOfMessage(message),
     originalAuthor: sentByCurrentUser ? '我' : authorOfMessage(message),
     role: messageRole(message, knowledgeCard),
@@ -726,6 +728,7 @@ export function mapImMessageToConversationMessage(message: ImMessageResponse, cu
     })) ?? [],
     attachments,
     knowledgeCard,
+    processCard,
   };
 }
 
@@ -908,6 +911,29 @@ function parseAgentResultFlow(value: unknown): AgentResultFlow | null {
     detailUrl: optionalString(item.detailUrl),
   };
 }
+
+// 审批类 Agent 结果 → 流程卡片（喂给 ConversationProcessCard 渲染）
+function toProcessCard(content: Record<string, unknown>, knowledgeCard: KnowledgeAnswerCard): ConversationProcessCard | undefined {
+  if (content.cardType !== 'agent_result') return undefined;
+  const data = parseAgentResultData(content.data);
+  const flow = data.flow;
+  if (!flow) return undefined;
+  const status = flow.status ?? knowledgeCard.status ?? '';
+  const statusTone: ConversationProcessCard['statusTone'] =
+    /通过|完成|成功|APPROVED|DONE/i.test(status) ? 'success'
+      : /驳回|失败|REJECT|FAIL/i.test(status) ? 'warning'
+      : /待|审批中|PENDING|APPROVAL/i.test(status) ? 'warning'
+      : 'info';
+  return {
+    title: flow.title ?? knowledgeCard.title,
+    status: status || '待处理',
+    statusTone,
+    body: knowledgeCard.answer || flow.title || '',
+    fields: data.fields?.map((f) => [f.label ?? '', f.value ?? ''] as [string, string]),
+    actionLabel: '查看详情',
+  };
+}
+
 
 function parseAgentResultRecord(value: unknown): AgentResultRecord | undefined {
   const item = objectValue(value);

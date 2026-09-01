@@ -37,7 +37,7 @@ const props = withDefaults(defineProps<{
   align-items: center;
   justify-content: center;
   gap: var(--space-8);
-  min-height: 2.5rem;
+  min-height: var(--control-height-md);
   padding: var(--space-8) var(--space-16);
   border: 1px solid transparent;
   border-radius: var(--radius-8);
@@ -45,7 +45,7 @@ const props = withDefaults(defineProps<{
   font-size: var(--text-body-sm);
   font-weight: 600;
   line-height: 1;
-  transition: all 200ms ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .ui-button:active:not(:disabled) {
@@ -54,7 +54,7 @@ const props = withDefaults(defineProps<{
 
 .ui-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--surface-panel), 0 0 0 4px color-mix(in srgb, var(--primary-500) 34%, transparent);
+  box-shadow: 0 0 0 2px var(--surface-panel), 0 0 0 4px var(--focus-ring);
 }
 
 .ui-button:disabled {
@@ -70,25 +70,25 @@ const props = withDefaults(defineProps<{
 }
 
 .ui-button.size-sm {
-  min-height: 2rem;
+  min-height: var(--control-height-sm);
   padding-inline: var(--space-12);
   font-size: var(--text-caption-md);
 }
 
 .ui-button.size-lg {
-  min-height: 2.875rem;
+  min-height: var(--control-height-lg);
   padding-inline: var(--space-20);
   font-size: var(--text-body-md);
 }
 
 .ui-button.variant-primary {
-  background: #1677ff;
+  background: var(--primary-500);
   color: var(--text-inverse);
 }
 
 .ui-button.variant-primary:hover:not(:disabled),
 .ui-button.variant-primary:focus-visible {
-  background: #0f67df;
+  background: var(--primary-600);
 }
 
 .ui-button.variant-secondary {

@@ -792,9 +792,9 @@ describe('useShellStore', () => {
       ['p-a', 'p-b'],
     );
 
-    expect(shell.workbench.map((item) => item.id)).toEqual(['oa', 'attendance', 'balance', 'p-b', 'p-a']);
-    expect(shell.workbench[3]).toMatchObject({ id: 'p-b', title: 'Beta', tone: 'gray' });
-    expect(shell.workbench[4]).toMatchObject({ id: 'p-a', title: 'Alpha', tone: 'gray' });
+    expect(shell.workbench.map((item) => item.id)).toEqual(['today', 'oa', 'attendance', 'balance', 'p-b', 'p-a']);
+    expect(shell.workbench[4]).toMatchObject({ id: 'p-b', title: 'Beta', tone: 'gray' });
+    expect(shell.workbench[5]).toMatchObject({ id: 'p-a', title: 'Alpha', tone: 'gray' });
   });
 
   it('rebuildWorkbench skips plugins that failed to load', () => {
@@ -807,7 +807,7 @@ describe('useShellStore', () => {
       ['p-ok'],
     );
 
-    expect(shell.workbench.map((item) => item.id)).toEqual(['oa', 'attendance', 'balance', 'p-ok']);
+    expect(shell.workbench.map((item) => item.id)).toEqual(['today', 'oa', 'attendance', 'balance', 'p-ok']);
   });
 
   it('rebuildWorkbench rejects plugins with reserved or legacy alias IDs', () => {
@@ -827,7 +827,7 @@ describe('useShellStore', () => {
     );
 
     const ids = shell.workbench.map((item) => item.id);
-    expect(ids).toEqual(['oa', 'attendance', 'balance', 'p-ok']);
+    expect(ids).toEqual(['today', 'oa', 'attendance', 'balance', 'p-ok']);
     expect(shell.workbench.find((item) => item.id === 'oa')?.title).toBe('OA 申请');
   });
 
@@ -852,7 +852,7 @@ describe('useShellStore', () => {
     );
 
     expect(normalizeWorkbenchApp('my-plugin', shell.workbench)).toBe('my-plugin');
-    expect(normalizeWorkbenchApp('unknown', shell.workbench)).toBe('oa');
+    expect(normalizeWorkbenchApp('unknown', shell.workbench)).toBe('today');
   });
 
   it('normalizeWorkbenchApp still maps legacy aliases to oa', () => {
@@ -876,7 +876,7 @@ describe('useShellStore', () => {
     expect(shell.active.workbench).toBe('my-plugin');
 
     shell.selectItem('workbench', 'nonexistent');
-    expect(shell.active.workbench).toBe('oa');
+    expect(shell.active.workbench).toBe('today');
   });
 
   it('rebuildWorkbench resets active workbench if current selection disappears', () => {
@@ -889,25 +889,25 @@ describe('useShellStore', () => {
     expect(shell.active.workbench).toBe('p-a');
 
     shell.rebuildWorkbench([], []);
-    expect(shell.active.workbench).toBe('oa');
+    expect(shell.active.workbench).toBe('today');
   });
 
   describe('resolveWorkbenchRoute', () => {
-    it('returns oa without replace when no candidate', () => {
-      expect(resolveWorkbenchRoute('', true, true, true, ['oa'])).toEqual({ id: 'oa', replace: false, pending: false });
-      expect(resolveWorkbenchRoute(undefined, true, true, true, ['oa'])).toEqual({ id: 'oa', replace: false, pending: false });
+    it('returns today without replace when no candidate', () => {
+      expect(resolveWorkbenchRoute('', true, true, true, ['today'])).toEqual({ id: 'today', replace: false, pending: false });
+      expect(resolveWorkbenchRoute(undefined, true, true, true, ['today'])).toEqual({ id: 'today', replace: false, pending: false });
     });
 
     it('preserves candidate as pending when session not initialized', () => {
       expect(resolveWorkbenchRoute('my-plugin', false, false, false, [])).toEqual({ id: 'my-plugin', replace: false, pending: true });
     });
 
-    it('returns oa with replace when initialized but not authenticated', () => {
-      expect(resolveWorkbenchRoute('my-plugin', true, false, false, [])).toEqual({ id: 'oa', replace: true, pending: false });
+    it('returns today with replace when initialized but not authenticated', () => {
+      expect(resolveWorkbenchRoute('my-plugin', true, false, false, [])).toEqual({ id: 'today', replace: true, pending: false });
     });
 
-    it('returns oa without replace when not authenticated and candidate is oa', () => {
-      expect(resolveWorkbenchRoute('oa', true, false, false, [])).toEqual({ id: 'oa', replace: false, pending: false });
+    it('returns today without replace when not authenticated and candidate is today', () => {
+      expect(resolveWorkbenchRoute('today', true, false, false, [])).toEqual({ id: 'today', replace: false, pending: false });
     });
 
     it('maps legacy aliases to oa with replace regardless of auth state', () => {
@@ -928,14 +928,14 @@ describe('useShellStore', () => {
         .toEqual({ id: 'my-plugin', replace: false, pending: true });
     });
 
-    it('replaces unknown ID with oa after plugins resolved', () => {
-      expect(resolveWorkbenchRoute('unknown', true, true, true, ['oa', 'attendance', 'balance']))
-        .toEqual({ id: 'oa', replace: true, pending: false });
+    it('replaces unknown ID with today after plugins resolved', () => {
+      expect(resolveWorkbenchRoute('unknown', true, true, true, ['today', 'oa', 'attendance', 'balance']))
+        .toEqual({ id: 'today', replace: true, pending: false });
     });
 
-    it('replaces failed plugin ID with oa after resolution', () => {
-      expect(resolveWorkbenchRoute('failed-plugin', true, true, true, ['oa', 'attendance', 'balance']))
-        .toEqual({ id: 'oa', replace: true, pending: false });
+    it('replaces failed plugin ID with today after resolution', () => {
+      expect(resolveWorkbenchRoute('failed-plugin', true, true, true, ['today', 'oa', 'attendance', 'balance']))
+        .toEqual({ id: 'today', replace: true, pending: false });
     });
   });
 });

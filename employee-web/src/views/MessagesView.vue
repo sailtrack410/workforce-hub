@@ -82,7 +82,13 @@ import AppListItem from '../components/ui/AppListItem.vue';
 import AppLoadingState from '../components/ui/AppLoadingState.vue';
 import AppTag from '../components/ui/AppTag.vue';
 import ShellNavButton from '../components/shell/ShellNavButton.vue';
+import ProfileMenu from '../components/shell/ProfileMenu.vue';
 import ContactsCategoryNav from '../components/ContactsCategoryNav.vue';
+import authHeroImage from '../assets/auth-hero-employee.jpg';
+import workbenchIconOa from '../assets/brand/app-icon-oa.jpg';
+import workbenchIconAttendance from '../assets/brand/app-icon-attendance.jpg';
+import workbenchIconLeave from '../assets/brand/app-icon-leave.jpg';
+import workbenchIconToday from '../assets/brand/app-icon-today.jpg';
 import { provideEmployeeShellContexts } from './employee-shell-context';
 import type { EmployeeShellContexts } from './employee-shell-context';
 
@@ -95,6 +101,8 @@ const route = useRoute();
 
 const searchOpen = ref(true);
 const resizing = ref(false);
+const logoutConfirmOpen = ref(false);
+const logoutSubmitting = ref(false);
 const toastMessage = ref('');
 const filterScroller = ref<HTMLElement | null>(null);
 const filtersOverflow = ref(false);
@@ -122,6 +130,14 @@ const workbenchIcons: Record<string, typeof MessageCircle> = {
   attendance: Clock3,
   balance: Sparkles,
   agent: Sparkles,
+};
+
+// 工作台应用入口使用 3D 品牌图标（生成的素材），替代色块+线性图标。
+const workbenchIconImages: Record<string, string> = {
+  today: workbenchIconToday,
+  oa: workbenchIconOa,
+  attendance: workbenchIconAttendance,
+  balance: workbenchIconLeave,
 };
 
 const profileIcons: Record<string, typeof MessageCircle> = {
@@ -498,6 +514,18 @@ function openProfileSettings() {
   selectSettingsItem('profile');
 }
 
+async function confirmLogout() {
+  if (logoutSubmitting.value) return;
+  logoutSubmitting.value = true;
+  try {
+    await session.logout();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '退出登录失败');
+  } finally {
+    window.location.reload();
+  }
+}
+
 async function loadAuthenticatedWorkspace() {
   if (!session.isAuthenticated) return;
   void plugins.loadAccessiblePlugins().catch(() => undefined);
@@ -818,6 +846,14 @@ function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && detailVisible.value) closeDetail();
 }
 
+// 全局右键拦截：屏蔽浏览器默认菜单，输入类元素（input/textarea/contenteditable）放行以保留系统编辑菜单。
+// 已有自定义右键菜单的元素（消息气泡、会话列表项）自带 .stop，不会传到这里。
+function handleGlobalContextMenu(event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  if (target.closest('input, textarea, [contenteditable="true"]')) return;
+  event.preventDefault();
+}
+
 async function retryMessages() {
   if (!session.isAuthenticated) return;
   await im.loadConversations();
@@ -828,6 +864,8 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
   window.addEventListener('click', closeConversationContextMenu);
   window.addEventListener('resize', updateFilterOverflow);
+  // 全局右键拦截：屏蔽浏览器默认菜单，输入类元素放行以保留系统编辑菜单
+  window.addEventListener('contextmenu', handleGlobalContextMenu);
   if (!session.initialized) {
     await session.loadCurrentUser().catch(() => undefined);
     if (!session.isAuthenticated) {
@@ -845,6 +883,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('click', closeConversationContextMenu);
   window.removeEventListener('resize', updateFilterOverflow);
+  window.removeEventListener('contextmenu', handleGlobalContextMenu);
   if (toastTimer) window.clearTimeout(toastTimer);
   if (searchAgentsTimer) window.clearTimeout(searchAgentsTimer);
   resetAuthCooldowns();
@@ -1019,6 +1058,10 @@ const employeeShellContexts = {
     setUploadFolderId: (folderId) => {
       uploadFolderId.value = folderId ?? null;
     },
+    handleFileDrop: (file: File) => {
+      uploadDraftFile.value = file;
+      openUploadPanel();
+    },
     refreshFileCenter,
     sendSelectedFileToConversation,
     openPersonalFilePreview,
@@ -1067,14 +1110,25 @@ provideEmployeeShellContexts(employeeShellContexts);
   <main v-else-if="!session.isAuthenticated" class="auth-shell" :data-theme="shell.theme">
     <section class="auth-hero" aria-label="员工端登录">
       <div class="auth-brand-row">
-        <AppAvatar label="企业" kind="org" tone="neutral" size="md" />
+        <div class="auth-brand-identity">
+          <AppAvatar label="Workforce Hub" kind="org" tone="neutral" size="md" />
+          <span>
+            <strong>Workforce Hub</strong>
+            <small>员工协同端</small>
+          </span>
+        </div>
         <button class="theme-toggle auth-theme-toggle" type="button" @click="shell.toggleTheme()">
           <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="16" />
           <span>{{ themeLabel }}</span>
         </button>
       </div>
       <div class="auth-hero-copy">
-        <h1>企业协同</h1>
+        <p class="auth-kicker">EMPLOYEE WORKSPACE</p>
+        <h1>Workforce Hub</h1>
+        <p class="auth-hero-summary">消息、待办、审批与智能助手，在同一个工作区内持续协同。</p>
+      </div>
+      <div class="auth-hero-visual" aria-label="员工协同工作流主视觉">
+        <img class="auth-hero-image" :src="authHeroImage" alt="" aria-hidden="true" />
       </div>
     </section>
 
@@ -1179,9 +1233,9 @@ provideEmployeeShellContexts(employeeShellContexts);
 
     <aside class="side-rail" aria-label="员工端功能">
       <div class="brand-block">
-        <AppAvatar label="企业" kind="org" tone="neutral" size="md" />
+        <AppAvatar label="Workforce Hub" kind="org" tone="neutral" size="md" />
         <div class="brand-copy">
-          <strong>企业协同</strong>
+          <strong>Workforce Hub</strong>
         </div>
       </div>
 
@@ -1204,13 +1258,7 @@ provideEmployeeShellContexts(employeeShellContexts);
           <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="16" />
           <span>{{ themeLabel }}</span>
         </button>
-        <button class="profile-button" type="button" @click="openProfileSettings">
-          <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="lg" status="online" />
-          <span class="profile-copy">
-            <strong>{{ currentUserName }}</strong>
-            <small>{{ session.positionName || session.departmentName }}</small>
-          </span>
-        </button>
+        <ProfileMenu @logout="logoutConfirmOpen = true" />
       </div>
     </aside>
 
@@ -1412,7 +1460,8 @@ provideEmployeeShellContexts(employeeShellContexts);
           >
             <div class="generic-row">
               <span class="list-icon" :class="`tone-${item.tone}`">
-                <component :is="workbenchIcons[item.id] ?? LayoutGrid" :size="18" />
+                <img v-if="workbenchIconImages[item.id]" :src="workbenchIconImages[item.id]" :alt="item.title" class="app-icon-img" />
+                <component v-else :is="workbenchIcons[item.id]" :size="18" />
               </span>
               <div class="generic-copy">
                 <div class="title-line">
@@ -1787,6 +1836,20 @@ provideEmployeeShellContexts(employeeShellContexts);
           </AppButton>
         </div>
       </section>
+    </AppDialog>
+
+    <AppDialog v-if="logoutConfirmOpen">
+      <section class="dialog-head">
+        <h2>退出登录？</h2>
+      </section>
+      <div class="dialog-actions settings-logout-actions">
+        <AppButton variant="secondary" :disabled="logoutSubmitting" @click="logoutConfirmOpen = false">
+          继续使用
+        </AppButton>
+        <AppButton variant="destructive" :disabled="logoutSubmitting" @click="confirmLogout">
+          {{ logoutSubmitting ? '退出中' : '退出登录' }}
+        </AppButton>
+      </div>
     </AppDialog>
   </main>
 </template>

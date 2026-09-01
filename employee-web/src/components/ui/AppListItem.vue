@@ -26,7 +26,7 @@ const emit = defineEmits<{
   background: var(--surface-panel);
   color: inherit;
   text-align: left;
-  transition: all 200ms ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .ui-list-item:hover:not(:disabled) {
@@ -36,7 +36,7 @@ const emit = defineEmits<{
 }
 
 .ui-list-item.active {
-  border-color: var(--border-accent);
+  border-color: var(--primary-300);
   background: var(--surface-accent);
   color: var(--text-primary);
 }

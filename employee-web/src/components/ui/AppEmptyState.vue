@@ -1,21 +1,40 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import emptyMessages from '../../assets/brand/empty-messages.jpg';
+import emptyTodos from '../../assets/brand/empty-todos.jpg';
+import emptyFiles from '../../assets/brand/empty-files.jpg';
+import emptyContacts from '../../assets/brand/empty-contacts.jpg';
+import emptyWorkbench from '../../assets/brand/empty-workbench.jpg';
+import emptyGeneric from '../../assets/brand/empty-generic.jpg';
+
 const props = defineProps<{
   title: string;
   description?: string;
   icon?: 'messages' | 'todos' | 'files' | 'contacts' | 'workbench' | 'default';
+  actionLabel?: string;
 }>();
+
+const emit = defineEmits<{ (event: 'action'): void }>();
+
+const emptyImage = computed(() => {
+  if (props.icon === 'messages') return emptyMessages;
+  if (props.icon === 'todos') return emptyTodos;
+  if (props.icon === 'files') return emptyFiles;
+  if (props.icon === 'contacts') return emptyContacts;
+  if (props.icon === 'workbench') return emptyWorkbench;
+  return emptyGeneric;
+});
 </script>
 
 <template>
   <div class="ui-empty-state">
-    <div class="empty-mark" :class="props.icon ?? 'default'" aria-hidden="true">
-      <span></span>
-      <span></span>
-      <i></i>
-    </div>
+    <img class="empty-illustration" :src="emptyImage" alt="" aria-hidden="true" />
     <h3>{{ title }}</h3>
     <p v-if="description">{{ description }}</p>
     <slot />
+    <button v-if="actionLabel" class="empty-action" type="button" @click="emit('action')">
+      {{ actionLabel }}
+    </button>
   </div>
 </template>
 
@@ -26,81 +45,38 @@ const props = defineProps<{
   align-items: center;
   justify-items: center;
   gap: var(--space-12);
-  padding: var(--space-32) var(--space-20);
+  min-height: 11rem;
+  padding: var(--space-24) var(--space-20);
   border: 0;
   border-radius: var(--radius-8);
-  background: var(--surface-panel);
+  background: transparent;
   text-align: center;
 }
 
-.empty-mark {
-  position: relative;
-  display: grid;
-  width: 4rem;
-  height: 3.25rem;
-  place-items: center;
-  border-radius: var(--radius-16);
-  background: var(--primary-50);
-  box-shadow: inset 0 0 0 1px var(--primary-100);
+.empty-illustration {
+  width: 8.5rem;
+  height: 8.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-16, 1rem);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
-.empty-mark span {
-  position: absolute;
-  left: 0.9rem;
-  right: 0.9rem;
-  height: 0.35rem;
-  border-radius: 999px;
-  background: var(--primary-300);
+.empty-action {
+  margin-top: var(--space-4);
+  padding: var(--space-8) var(--space-20);
+  border: 0;
+  border-radius: var(--radius-8);
+  background: var(--primary-600);
+  color: #fff;
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
 }
 
-.empty-mark span:first-child {
-  top: 1rem;
-}
-
-.empty-mark span:nth-child(2) {
-  top: 1.75rem;
-  right: 1.45rem;
-}
-
-.empty-mark i {
-  position: absolute;
-  right: -0.2rem;
-  bottom: 0.25rem;
-  width: 1.15rem;
-  height: 1.15rem;
-  border: 2px solid var(--surface-panel);
-  border-radius: 999px;
-  background: var(--primary-500);
-}
-
-.empty-mark.todos {
-  background: var(--warning-50);
-  box-shadow: inset 0 0 0 1px var(--warning-100);
-}
-
-.empty-mark.todos span,
-.empty-mark.todos i {
-  background: var(--warning-500);
-}
-
-.empty-mark.files {
-  background: var(--success-50);
-  box-shadow: inset 0 0 0 1px var(--success-100);
-}
-
-.empty-mark.files span,
-.empty-mark.files i {
-  background: var(--success-500);
-}
-
-.empty-mark.contacts {
-  background: var(--surface-panel-muted);
-  box-shadow: inset 0 0 0 1px var(--primary-100);
-}
-
-.empty-mark.contacts span,
-.empty-mark.contacts i {
-  background: var(--primary-400);
+.empty-action:hover {
+  background: var(--primary-700, var(--primary-600));
+  transform: translateY(-1px);
 }
 
 .ui-empty-state h3 {

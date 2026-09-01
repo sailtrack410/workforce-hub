@@ -1,3 +1,64 @@
+// 找到从 start 开始的配平大括号终点（跳过字符串与转义），找不到返回 -1
+function findJsonBlockEnd(value: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < value.length; i += 1) {
+    const ch = value[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') depth += 1;
+    if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function isJsonObject(text: string): boolean {
+  try {
+    const parsed = JSON.parse(text);
+    return typeof parsed === 'object' && parsed !== null;
+  } catch {
+    return false;
+  }
+}
+
+// 把正文里夹带的长 JSON 块（如工具返回原文）折叠为 :::json-fold 标记块
+function extractJsonBlocks(value: string): string {
+  let result = '';
+  let i = 0;
+  while (i < value.length) {
+    if (value[i] === '{') {
+      const end = findJsonBlockEnd(value, i);
+      if (end > i) {
+        const candidate = value.slice(i, end + 1);
+        // 足够长且是合法 JSON 对象才折叠，短的花括号片段当普通文本
+        if (candidate.length >= 60 && isJsonObject(candidate)) {
+          result += `\n:::json-fold\n${candidate}\n:::\n`;
+          i = end + 1;
+          continue;
+        }
+      }
+    }
+    result += value[i];
+    i += 1;
+  }
+  return result;
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -18,12 +79,14 @@ function renderInlineMarkdown(value: string) {
 // 轻量 Markdown 转 HTML：支持标题、列表、代码块、引用、加粗/斜体/链接
 export function renderMarkdownText(value?: string | null) {
   if (!value) return '';
-  const lines = value.replace(/\r\n/g, '\n').split('\n');
+  const lines = extractJsonBlocks(value).replace(/\r\n/g, '\n').split('\n');
   const html: string[] = [];
   let paragraph: string[] = [];
   let listType: 'ul' | 'ol' | null = null;
   let inCode = false;
   let codeLines: string[] = [];
+  let inJsonFold = false;
+  let jsonLines: string[] = [];
 
   function flushParagraph() {
     if (!paragraph.length) return;
@@ -44,8 +107,35 @@ export function renderMarkdownText(value?: string | null) {
     listType = type;
   }
 
+  function flushJsonFold() {
+    let pretty = jsonLines.join('\n');
+    try {
+      pretty = JSON.stringify(JSON.parse(pretty), null, 2);
+    } catch {
+      // 保留原文
+    }
+    html.push(`<details class="json-fold"><summary>查看原始数据</summary><pre><code>${escapeHtml(pretty)}</code></pre></details>`);
+    jsonLines = [];
+    inJsonFold = false;
+  }
+
   for (const line of lines) {
     const trimmed = line.trim();
+    if (trimmed === ':::json-fold') {
+      flushParagraph();
+      flushList();
+      inJsonFold = true;
+      jsonLines = [];
+      continue;
+    }
+    if (inJsonFold) {
+      if (trimmed === ':::') {
+        flushJsonFold();
+      } else {
+        jsonLines.push(line);
+      }
+      continue;
+    }
     if (trimmed.startsWith('```')) {
       if (inCode) {
         html.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
@@ -102,6 +192,9 @@ export function renderMarkdownText(value?: string | null) {
 
   if (inCode) {
     html.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
+  }
+  if (inJsonFold) {
+    flushJsonFold();
   }
   flushParagraph();
   flushList();

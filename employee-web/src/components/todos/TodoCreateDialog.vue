@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Plus, X } from 'lucide-vue-next';
-import type { TodoTagColor } from '@/stores/shell';
+import type { TodoRecord, TodoTagColor } from '@/stores/shell';
 import { useShellStore } from '@/stores/shell';
 import AppButton from '../ui/AppButton.vue';
 import AppDialog from '../ui/AppDialog.vue';
 
 const props = defineProps<{
   open: boolean;
+  // 传入则为编辑模式，否则为新建
+  todo?: TodoRecord | null;
 }>();
 
 const emit = defineEmits<{
@@ -24,6 +26,8 @@ const tagOptions: Array<{ name: string; color: TodoTagColor; label: string }> = 
   { name: '其他', color: 'gray', label: '灰' },
 ];
 
+const isEdit = computed(() => Boolean(props.todo?.id));
+
 const formError = ref('');
 const draft = ref({
   title: '',
@@ -32,6 +36,31 @@ const draft = ref({
   endAt: toDateTimeMinuteKey(addMinutes(new Date(), 60)),
   tagName: tagOptions[0].name,
   tagColor: tagOptions[0].color,
+});
+
+// 打开弹窗时：编辑模式回填，新建模式重置
+watch(() => props.open, (open) => {
+  if (!open) return;
+  formError.value = '';
+  if (props.todo) {
+    draft.value = {
+      title: props.todo.title,
+      note: props.todo.note || '',
+      startAt: props.todo.startAt || toDateTimeMinuteKey(new Date()),
+      endAt: props.todo.endAt || toDateTimeMinuteKey(addMinutes(new Date(), 60)),
+      tagName: props.todo.tagName || tagOptions[0].name,
+      tagColor: props.todo.tagColor || tagOptions[0].color,
+    };
+  } else {
+    draft.value = {
+      title: '',
+      note: '',
+      startAt: toDateTimeMinuteKey(new Date()),
+      endAt: toDateTimeMinuteKey(addMinutes(new Date(), 60)),
+      tagName: tagOptions[0].name,
+      tagColor: tagOptions[0].color,
+    };
+  }
 });
 
 function toDateKey(date: Date) {
@@ -87,14 +116,25 @@ function submitTodo() {
     formError.value = '标签不能为空';
     return;
   }
-  shell.addTodoTask({
-    title,
-    note,
-    startAt: draft.value.startAt,
-    endAt: draft.value.endAt,
-    tagName,
-    tagColor: draft.value.tagColor,
-  });
+  if (isEdit.value && props.todo) {
+    shell.updateTodoTask(props.todo.id, {
+      title,
+      note,
+      startAt: draft.value.startAt,
+      endAt: draft.value.endAt,
+      tagName,
+      tagColor: draft.value.tagColor,
+    });
+  } else {
+    shell.addTodoTask({
+      title,
+      note,
+      startAt: draft.value.startAt,
+      endAt: draft.value.endAt,
+      tagName,
+      tagColor: draft.value.tagColor,
+    });
+  }
   draft.value.title = '';
   draft.value.note = '';
   closeCreate();
@@ -106,7 +146,7 @@ function submitTodo() {
     <form class="conversation-dialog todo-create-dialog" @submit.prevent="submitTodo">
       <header class="dialog-head dialog-head-row">
         <div>
-          <h2>添加待办</h2>
+          <h2>{{ isEdit ? '编辑待办' : '添加待办' }}</h2>
         </div>
         <button class="field-icon-button" type="button" aria-label="关闭" @click="closeCreate">
           <X :size="15" />
@@ -157,7 +197,7 @@ function submitTodo() {
         <AppButton variant="ghost" type="button" @click="closeCreate">取消</AppButton>
         <AppButton variant="primary" type="submit">
           <Plus :size="15" />
-          添加
+          {{ isEdit ? '保存' : '添加' }}
         </AppButton>
       </div>
     </form>

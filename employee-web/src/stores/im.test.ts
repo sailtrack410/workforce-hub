@@ -211,6 +211,48 @@ describe('IM store', () => {
     expect(record.role).toBe('知识库 AI');
   });
 
+  it('maps agent result with approval flow into a process card message', () => {
+    const record = mapImMessageToConversationMessage({
+      ...message,
+      messageId: 7105,
+      senderType: 'AGENT',
+      senderId: 9001,
+      messageType: 'CARD',
+      contentText: '',
+      contentJson: JSON.stringify({
+        cardType: 'agent_result',
+        title: '张三的请假申请',
+        answer: '年假 2 天，进入审批流',
+        status: 'IN_APPROVAL',
+        data: {
+          flow: {
+            requestId: '1001',
+            requestNo: 'REQ-20260901-001',
+            title: '张三的请假申请',
+            status: 'IN_APPROVAL',
+            currentNode: '李四审批',
+          },
+          fields: [
+            { label: '假期类型', value: '年假' },
+            { label: '天数', value: '2 天' },
+          ],
+        },
+      }),
+    }, 2003);
+
+    expect(record.type).toBe('process-card');
+    expect(record.processCard).toMatchObject({
+      title: '张三的请假申请',
+      status: 'IN_APPROVAL',
+      statusTone: 'warning',
+      actionLabel: '查看详情',
+    });
+    expect(record.processCard?.fields).toEqual([
+      ['假期类型', '年假'],
+      ['天数', '2 天'],
+    ]);
+  });
+
   it('maps current user messages to the right side', () => {
     const record = mapImMessageToConversationMessage({
       ...message,

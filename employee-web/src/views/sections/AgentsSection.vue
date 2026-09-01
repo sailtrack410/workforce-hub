@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { MessageCircle, ChevronLeft, X } from 'lucide-vue-next';
+import { Bot, MessageCircle, ChevronLeft, X } from 'lucide-vue-next';
 import type { AgentResponse } from '@/api';
 import { employeeApi } from '@/api';
 import { useAgentsSectionContext } from '../employee-shell-context';
@@ -9,6 +9,8 @@ import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 import AppTag from '../../components/ui/AppTag.vue';
+import avatarQa from '../../assets/brand/avatar-qa.jpg';
+import avatarEcho from '../../assets/brand/avatar-echo.jpg';
 
 const {
   shell,
@@ -108,6 +110,18 @@ function agentVisibleType(agent: AgentResponse) {
   return agent.agentTypeName || agentTypeLabel(agent.agentType);
 }
 
+// 没有上传头像的助手，用内置品牌头像兜底（按 agentCode 稳定分配）。
+function agentAvatarImage(agent: AgentResponse): string {
+  const uploaded = agentAvatarUrls.value[String(agent.agentId)];
+  if (uploaded) return uploaded;
+  const seed = String(agent.agentCode ?? agent.agentId ?? '');
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+  return hash % 2 === 0 ? avatarQa : avatarEcho;
+}
+
 onMounted(() => {
   void loadAgents();
 });
@@ -131,6 +145,31 @@ watch(agents, (rows) => {
   </header>
 
   <section class="content-stack agents-directory">
+    <section class="workspace-command-bar agents-command-bar" aria-label="AI 助手摘要">
+      <div class="workspace-command-lead">
+        <span class="workspace-command-icon"><Bot :size="20" /></span>
+        <div>
+          <span class="workspace-command-kicker">企业智能能力</span>
+          <strong>{{ addedAgents.length ? `${addedAgents.length} 个助手已接入` : '选择一个助手开始协同' }}</strong>
+          <p>助手按岗位能力发布，发起会话后会固定到消息列表。</p>
+        </div>
+      </div>
+      <dl class="workspace-command-metrics">
+        <div>
+          <dt>可用能力</dt>
+          <dd>{{ agents.length }}</dd>
+        </div>
+        <div>
+          <dt>已添加</dt>
+          <dd>{{ addedAgents.length }}</dd>
+        </div>
+        <div>
+          <dt>待添加</dt>
+          <dd>{{ availableAgents.length }}</dd>
+        </div>
+      </dl>
+    </section>
+
     <p v-if="agentsLoading" class="form-hint">加载中…</p>
     <p v-else-if="agentsError" class="dialog-error">{{ agentsError }}</p>
     <AppEmptyState
@@ -149,12 +188,12 @@ watch(agents, (rows) => {
           v-for="agent in addedAgents"
           :key="`added-${agent.agentId}`"
           type="button"
-          class="agent-card"
+          class="agent-card agent-card-rich"
           @click="openAgentProfile(agent)"
         >
           <AppAvatar
             :label="humanizeText(agent.agentName)"
-            :image="agentAvatarUrls[String(agent.agentId)]"
+            :image="agentAvatarImage(agent)"
             kind="agent"
             tone="success"
             size="lg"
@@ -163,7 +202,12 @@ watch(agents, (rows) => {
           <div class="agent-card-copy">
             <strong>{{ humanizeText(agent.agentName) }}</strong>
             <small v-if="agentVisibleType(agent) !== humanizeText(agent.agentName)">{{ agentVisibleType(agent) }}</small>
+            <span class="agent-card-tag">{{ agentTypeLabel(agent.agentType) }}</span>
           </div>
+          <span class="agent-card-status">
+            <i />
+            已接入
+          </span>
         </button>
       </div>
     </article>
@@ -178,12 +222,12 @@ watch(agents, (rows) => {
           v-for="agent in availableAgents"
           :key="`avail-${agent.agentId}`"
           type="button"
-          class="agent-card"
+          class="agent-card agent-card-rich"
           @click="openAgentProfile(agent)"
         >
           <AppAvatar
             :label="humanizeText(agent.agentName)"
-            :image="agentAvatarUrls[String(agent.agentId)]"
+            :image="agentAvatarImage(agent)"
             kind="agent"
             tone="neutral"
             size="lg"
@@ -191,7 +235,9 @@ watch(agents, (rows) => {
           <div class="agent-card-copy">
             <strong>{{ humanizeText(agent.agentName) }}</strong>
             <small v-if="agentVisibleType(agent) !== humanizeText(agent.agentName)">{{ agentVisibleType(agent) }}</small>
+            <span class="agent-card-tag">{{ agentTypeLabel(agent.agentType) }}</span>
           </div>
+          <span class="agent-card-action">开始对话 →</span>
         </button>
       </div>
     </article>
@@ -206,7 +252,7 @@ watch(agents, (rows) => {
       <header class="agent-profile-head">
         <AppAvatar
           :label="humanizeText(profileAgent.agentName)"
-          :image="agentAvatarUrls[String(profileAgent.agentId)]"
+          :image="agentAvatarImage(profileAgent)"
           kind="agent"
           tone="success"
           size="xl"

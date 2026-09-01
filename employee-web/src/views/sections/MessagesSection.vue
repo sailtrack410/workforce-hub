@@ -203,16 +203,17 @@ function toggleGroupMember(userId?: string | number) {
 }
 
 function messageAvatarUrl(message: ConversationMessage) {
+  // 没有真实头像时返回空串，让 AppAvatar 回退到"首字+彩色底"，而不是千篇一律的占位剪影。
   if (message.side === 'system') return '';
-  if (message.side === 'right') return shell.avatarUrl || DEFAULT_CONVERSATION_AVATAR_URL;
-  if (message.senderType === 'AGENT') return activeConversation.value.avatarUrl || DEFAULT_CONVERSATION_AVATAR_URL;
+  if (message.side === 'right') return shell.avatarUrl || '';
+  if (message.senderType === 'AGENT') return activeConversation.value.avatarUrl || '';
   if (message.senderId !== undefined && message.senderId !== null) {
     const contact = shell.contacts.find((item) => (
       item.userId !== undefined && item.userId !== null && String(item.userId) === String(message.senderId)
     ));
     if (contact?.avatarUrl) return contact.avatarUrl;
   }
-  return DEFAULT_CONVERSATION_AVATAR_URL;
+  return '';
 }
 
 const mentionProfileContact = computed(() => {
@@ -353,7 +354,7 @@ async function sendMentionPrivateMessage() {
   </section>
 
   <section v-else class="content-stack">
-    <AppEmptyState title="暂无会话">
+    <AppEmptyState title="暂无会话" icon="messages">
       <div class="head-actions">
         <AppButton variant="secondary" size="sm" @click="openCreateConversation('private')">
           私聊

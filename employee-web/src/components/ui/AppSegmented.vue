@@ -32,7 +32,8 @@ const emit = defineEmits<{
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-12);
-  background: var(--surface-panel-muted);
+  background: var(--surface-sunken);
 }
 </style>

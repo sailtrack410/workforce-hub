@@ -63,6 +63,7 @@ export interface FilesSectionContext {
   runAction: RunSectionAction;
   showToast: (message: string) => void;
   setUploadFolderId: (folderId: PersonalFileRecord['folderId']) => void;
+  handleFileDrop: (file: File) => void;
   refreshFileCenter: () => Promise<void>;
   sendSelectedFileToConversation: (file: PersonalFileRecord) => Promise<void>;
   openPersonalFilePreview: (file: PersonalFileRecord) => Promise<void>;

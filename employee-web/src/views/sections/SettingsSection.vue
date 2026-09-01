@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import {
+  BadgeCheck,
+  Bell,
+  CalendarDays,
   Camera,
   ChevronLeft,
+  ChevronRight,
+  KeyRound,
   LogOut,
+  Mail,
   MoonStar,
+  Palette,
+  Phone,
+  ShieldCheck,
   SunMedium,
+  UsersRound,
+  Zap,
 } from 'lucide-vue-next';
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { employeeApi } from '@/api';
 import type {
@@ -119,6 +130,47 @@ const presenceStatusLabel = computed(() => (
   presenceOptions.find((item) => item.value === shell.presenceStatus)?.label ?? '在线'
 ));
 const messageDensityLabel = computed(() => (shell.messageDensity === 'compact' ? '紧凑' : '宽松'));
+
+// ---------- 个人中心头卡与统计卡数据 ----------
+const hireDays = computed(() => {
+  const hireDate = session.profile?.hireDate;
+  if (!hireDate) return null;
+  const hire = new Date(hireDate);
+  if (Number.isNaN(hire.getTime())) return null;
+  const days = Math.floor((Date.now() - hire.getTime()) / 86400000);
+  return days >= 0 ? days : null;
+});
+
+// 本月出勤天数（正常/异常均算出勤）
+const monthAttendanceDays = ref<number | null>(null);
+// 假期余额（可用分钟数转天）
+const leaveBalanceLabel = ref('—');
+// 待办未完成数
+const pendingTodoCount = computed(() => shell.todos.filter((t) => !t.completed).length);
+
+async function loadPersonalStats() {
+  if (!session.isAuthenticated) return;
+  try {
+    const now = new Date();
+    const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+    const [dailyResults, leaveAccounts] = await Promise.all([
+      employeeApi.attendance.dailyResults({ startDate: from, endDate: to }),
+      employeeApi.leave.accounts(),
+    ]);
+    monthAttendanceDays.value = dailyResults.filter((r) => r.resultStatus === 'NORMAL' || r.workMinutes).length;
+    const totalAvailable = leaveAccounts
+      .filter((a) => a.status === 'ACTIVE')
+      .reduce((sum, a) => sum + Math.max(0, a.availableMinutes ?? 0), 0);
+    leaveBalanceLabel.value = totalAvailable > 0 ? `${(totalAvailable / 480).toFixed(1)} 天` : '0 天';
+  } catch {
+    // 统计失败不阻塞页面，保持占位符
+  }
+}
+
+onMounted(() => {
+  void loadPersonalStats();
+});
 const bindEmailCodeButtonText = computed(() => (
   bindEmailCodeSending.value ? '发送中' : bindEmailCodeCooldown.label.value
 ));
@@ -521,14 +573,18 @@ onBeforeUnmount(() => {
     />
 
     <section v-if="selectedProfileId === 'profile'" class="personal-center">
-      <article class="personal-center-head">
-        <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="xl" status="online" />
-        <div class="personal-center-title">
-          <h3>{{ currentUserName }}</h3>
-          <p>
-            <span v-if="session.departmentName">{{ session.departmentName }}</span>
-            <span v-if="session.positionName"> · {{ session.positionName }}</span>
-          </p>
+      <!-- App 式头卡：头像 + 姓名 + 岗位 + 组织路径 + 入职天数 -->
+      <article class="personal-hero-card">
+        <div class="personal-hero-main">
+          <AppAvatar :label="currentUserShortName" :image="shell.avatarUrl" tone="primary" size="xl" status="online" />
+          <div class="personal-hero-copy">
+            <h3>{{ currentUserName }}</h3>
+            <p>
+              <span v-if="session.departmentName">{{ session.departmentName }}</span>
+              <span v-if="session.positionName"> · {{ session.positionName }}</span>
+            </p>
+            <small v-if="hireDays !== null">入职第 {{ hireDays + 1 }} 天 · {{ profileStatusLabel }}</small>
+          </div>
         </div>
         <input
           ref="avatarPickerInput"
@@ -537,7 +593,7 @@ onBeforeUnmount(() => {
           hidden
           @change="handleAvatarSelected"
         />
-        <div class="personal-center-actions">
+        <div class="personal-hero-actions">
           <AppButton variant="secondary" size="sm" :disabled="avatarUploading" @click="openAvatarPicker">
             <Camera :size="15" />
             {{ avatarUploading ? '上传中' : '更换头像' }}
@@ -546,394 +602,484 @@ onBeforeUnmount(() => {
         <p v-if="avatarUpdateError" class="dialog-error personal-center-error">{{ avatarUpdateError }}</p>
       </article>
 
-      <section class="personal-status-grid" aria-label="个人状态">
-        <article class="personal-status-card">
-          <header>
-            <span>身份状态</span>
-            <strong>{{ profileStatusLabel }}</strong>
-          </header>
-          <dl class="personal-status-list">
-            <div v-for="row in profileRows" :key="row[0]">
-              <dt>{{ row[0] }}</dt>
-              <dd>{{ row[1] }}</dd>
-            </div>
-          </dl>
+      <!-- 三张统计小卡：本月出勤 / 假期余额 / 待办 -->
+      <section class="personal-stat-strip" aria-label="个人统计">
+        <article class="personal-stat-card">
+          <small>本月出勤</small>
+          <strong>{{ monthAttendanceDays === null ? '—' : `${monthAttendanceDays} 天` }}</strong>
+          <span>工作日打卡记录</span>
         </article>
+        <article class="personal-stat-card">
+          <small>假期余额</small>
+          <strong>{{ leaveBalanceLabel }}</strong>
+          <span>可用假期</span>
+        </article>
+        <article class="personal-stat-card">
+          <small>待办</small>
+          <strong>{{ pendingTodoCount }} 项</strong>
+          <span>未完成事项</span>
+        </article>
+      </section>
 
-        <article class="personal-status-card">
-          <header>
-            <span>组织状态</span>
-            <strong>{{ displayField(session.departmentName) }}</strong>
-          </header>
-          <dl class="personal-status-list">
-            <div>
-              <dt>直属上级</dt>
-              <dd>{{ displayField(relationTree.managerName || session.profile?.managerName) }}</dd>
+      <!-- App 式分组列表 -->
+      <div class="settings-group-list">
+        <!-- 身份信息组 -->
+        <section class="settings-group">
+          <header class="settings-group-title">身份信息</header>
+          <div class="settings-group-body">
+            <div class="settings-row">
+              <span class="settings-row-icon tone-primary"><BadgeCheck :size="16" /></span>
+              <span class="settings-row-label">任职状态</span>
+              <span class="settings-row-value">{{ profileStatusLabel }}</span>
             </div>
-            <div>
-              <dt>直属下级</dt>
-              <dd>{{ relationTree.subordinates.length }} 人</dd>
+            <div class="settings-row">
+              <span class="settings-row-icon tone-info"><CalendarDays :size="16" /></span>
+              <span class="settings-row-label">入职日期</span>
+              <span class="settings-row-value">{{ displayField(session.profile?.hireDate) }}</span>
             </div>
-          </dl>
-          <footer>
-            <button type="button" @click="selectSettingsItem('organization')">查看组织关系</button>
-          </footer>
-        </article>
+            <div class="settings-row">
+              <span class="settings-row-icon tone-warning"><BadgeCheck :size="16" /></span>
+              <span class="settings-row-label">岗位</span>
+              <span class="settings-row-value">{{ displayField(session.profile?.positionName) }}</span>
+            </div>
+          </div>
+        </section>
 
-        <article class="personal-status-card">
-          <header>
-            <span>账号状态</span>
-            <strong>{{ session.user ? '正常' : '未登录' }}</strong>
-          </header>
-          <dl class="personal-status-list">
-            <div>
-              <dt>手机号</dt>
-              <dd>{{ displayField(session.profile?.mobile) }}</dd>
+        <!-- 组织归属组 -->
+        <section class="settings-group">
+          <header class="settings-group-title">组织归属</header>
+          <div class="settings-group-body">
+            <div class="settings-row">
+              <span class="settings-row-icon tone-success"><UsersRound :size="16" /></span>
+              <span class="settings-row-label">所属部门</span>
+              <span class="settings-row-value">{{ displayField(session.departmentName) }}</span>
             </div>
-            <div>
-              <dt>邮箱</dt>
-              <dd>{{ currentEmail ? '已绑定' : '未绑定' }}</dd>
+            <div class="settings-row">
+              <span class="settings-row-icon tone-primary"><UsersRound :size="16" /></span>
+              <span class="settings-row-label">直属上级</span>
+              <span class="settings-row-value">{{ displayField(relationTree.managerName || session.profile?.managerName) }}</span>
             </div>
-          </dl>
-          <footer>
-            <button type="button" @click="openMobileReset">修改手机号</button>
-            <button type="button" @click="openEmailBinding">{{ currentEmail ? '换绑邮箱' : '绑定邮箱' }}</button>
-            <button type="button" @click="openPasswordChange">修改密码</button>
-          </footer>
-        </article>
+            <button type="button" class="settings-row settings-row-link" @click="selectSettingsItem('organization')">
+              <span class="settings-row-icon tone-info"><UsersRound :size="16" /></span>
+              <span class="settings-row-label">组织关系</span>
+              <span class="settings-row-value">{{ relationTree.subordinates.length }} 名下级</span>
+              <span class="settings-row-chevron">›</span>
+            </button>
+          </div>
+        </section>
 
-        <article class="personal-status-card">
-          <header>
-            <span>偏好状态</span>
-            <strong>{{ presenceStatusLabel }}</strong>
-          </header>
-          <dl class="personal-status-list">
-            <div>
-              <dt>主题</dt>
-              <dd>{{ themeLabel }}</dd>
+        <!-- 账号安全组 -->
+        <section class="settings-group">
+          <header class="settings-group-title">账号安全</header>
+          <div class="settings-group-body">
+            <button type="button" class="settings-row settings-row-link" @click="openMobileReset">
+              <span class="settings-row-icon tone-primary"><Phone :size="16" /></span>
+              <span class="settings-row-label">手机号</span>
+              <span class="settings-row-value">{{ displayField(session.profile?.mobile) }}</span>
+              <span class="settings-row-chevron">›</span>
+            </button>
+            <button type="button" class="settings-row settings-row-link" @click="openEmailBinding">
+              <span class="settings-row-icon tone-success"><Mail :size="16" /></span>
+              <span class="settings-row-label">邮箱</span>
+              <span class="settings-row-value">{{ currentEmail ? '已绑定' : '未绑定' }}</span>
+              <span class="settings-row-chevron">›</span>
+            </button>
+            <button type="button" class="settings-row settings-row-link" @click="openPasswordChange">
+              <span class="settings-row-icon tone-warning"><KeyRound :size="16" /></span>
+              <span class="settings-row-label">修改密码</span>
+              <span class="settings-row-value"></span>
+              <span class="settings-row-chevron">›</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 偏好设置组 -->
+        <section class="settings-group">
+          <header class="settings-group-title">偏好设置</header>
+          <div class="settings-group-body">
+            <button type="button" class="settings-row settings-row-link" @click="selectSettingsItem('preferences')">
+              <span class="settings-row-icon tone-primary"><Palette :size="16" /></span>
+              <span class="settings-row-label">主题</span>
+              <span class="settings-row-value">{{ themeLabel }}</span>
+              <span class="settings-row-chevron">›</span>
+            </button>
+            <button type="button" class="settings-row settings-row-link" @click="selectSettingsItem('preferences')">
+              <span class="settings-row-icon tone-info"><Bell :size="16" /></span>
+              <span class="settings-row-label">消息密度</span>
+              <span class="settings-row-value">{{ messageDensityLabel }}</span>
+              <span class="settings-row-chevron">›</span>
+            </button>
+            <button type="button" class="settings-row settings-row-link" @click="selectSettingsItem('preferences')">
+              <span class="settings-row-icon tone-success"><Zap :size="16" /></span>
+              <span class="settings-row-label">在线状态</span>
+              <span class="settings-row-value">{{ presenceStatusLabel }}</span>
+              <span class="settings-row-chevron">›</span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section v-else-if="selectedProfileId === 'organization'" class="settings-group-list">
+      <section class="settings-group">
+        <header class="settings-group-title">组织信息</header>
+        <div class="settings-group-body">
+          <div class="settings-row" v-for="row in organizationRows" :key="row[0]">
+            <span class="settings-row-icon tone-primary"><UsersRound :size="16" /></span>
+            <span class="settings-row-label">{{ row[0] }}</span>
+            <span class="settings-row-value">{{ row[1] }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-group">
+        <header class="settings-group-title">组织链路</header>
+        <div class="settings-group-body settings-group-padded">
+          <div class="settings-org-chart compact-org-chart">
+            <div class="settings-org-level">
+              <span class="settings-org-node department-node">{{ relationTree.department }}</span>
             </div>
-            <div>
-              <dt>消息密度</dt>
-              <dd>{{ messageDensityLabel }}</dd>
+            <div class="settings-org-level">
+              <span class="settings-org-node">{{ relationTree.managerName || '暂无上级' }}</span>
+              <span class="settings-org-node current-user-node">{{ relationTree.ownName }}</span>
             </div>
-          </dl>
-          <footer>
-            <button type="button" @click="selectSettingsItem('preferences')">设置偏好</button>
-          </footer>
-        </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-group">
+        <header class="settings-group-title">直属下级</header>
+        <div class="settings-group-body settings-group-padded">
+          <p v-if="colleaguesError" class="dialog-error">{{ colleaguesError }}</p>
+          <p v-else-if="colleaguesLoading" class="form-hint">加载中</p>
+          <div v-else-if="relationTree.subordinates.length" class="settings-member-list compact-member-list">
+            <span v-for="user in relationTree.subordinates" :key="user.userId">
+              {{ user.realName }}
+            </span>
+          </div>
+          <p v-else class="empty-inline">暂无下属</p>
+        </div>
       </section>
     </section>
 
-    <section v-else-if="selectedProfileId === 'organization'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
-        <dl class="settings-list">
-          <div v-for="row in organizationRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
+    <section v-else-if="selectedProfileId === 'security'" class="settings-group-list">
+      <!-- 账号信息组 -->
+      <section class="settings-group">
+        <header class="settings-group-title">账号信息</header>
+        <div class="settings-group-body">
+          <div class="settings-row">
+            <span class="settings-row-icon tone-primary"><BadgeCheck :size="16" /></span>
+            <span class="settings-row-label">登录名</span>
+            <span class="settings-row-value">{{ displayField(session.user?.loginName) }}</span>
           </div>
-        </dl>
-      </article>
-
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>组织链路</h3>
-        </header>
-        <div class="settings-org-chart compact-org-chart">
-          <div class="settings-org-level">
-            <span class="settings-org-node department-node">{{ relationTree.department }}</span>
+          <div class="settings-row">
+            <span class="settings-row-icon tone-info"><Phone :size="16" /></span>
+            <span class="settings-row-label">手机号</span>
+            <span class="settings-row-value">{{ displayField(session.profile?.mobile) }}</span>
           </div>
-          <div class="settings-org-level">
-            <span class="settings-org-node">{{ relationTree.managerName || '暂无上级' }}</span>
-            <span class="settings-org-node current-user-node">{{ relationTree.ownName }}</span>
+          <div class="settings-row">
+            <span class="settings-row-icon tone-success"><Mail :size="16" /></span>
+            <span class="settings-row-label">绑定邮箱</span>
+            <span class="settings-row-value">{{ currentEmail || '未绑定' }}</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-row-icon tone-warning"><ShieldCheck :size="16" /></span>
+            <span class="settings-row-label">账号状态</span>
+            <span class="settings-row-value">{{ session.user ? '正常' : '未登录' }}</span>
           </div>
         </div>
-      </article>
+      </section>
 
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>直属下级</h3>
-        </header>
-        <p v-if="colleaguesError" class="dialog-error">{{ colleaguesError }}</p>
-        <p v-else-if="colleaguesLoading" class="form-hint">加载中</p>
-        <div v-else-if="relationTree.subordinates.length" class="settings-member-list compact-member-list">
-          <span v-for="user in relationTree.subordinates" :key="user.userId">
-            {{ user.realName }}
-          </span>
-        </div>
-        <p v-else class="empty-inline">暂无下属</p>
-      </article>
-    </section>
-
-    <section v-else-if="selectedProfileId === 'security'" class="settings-card-grid">
-      <article class="settings-card settings-wide-card">
-        <dl class="settings-list two-column">
-          <div v-for="row in accountRows" :key="row[0]">
-            <dt>{{ row[0] }}</dt>
-            <dd>{{ row[1] }}</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>手机号</h3>
-        </header>
-        <div class="security-form">
-          <label class="security-field">
-            <span>手机号</span>
-            <input
-              ref="mobileInput"
-              v-model="mobileDraft"
-              class="ui-inline-input"
-              type="tel"
-              inputmode="tel"
-              autocomplete="tel"
-            />
-          </label>
-          <div class="form-actions">
-            <AppButton variant="primary" size="sm" :disabled="mobileSubmitting" @click="submitMobileUpdate">
-              {{ mobileSubmitting ? '保存中' : '保存手机号' }}
-            </AppButton>
-          </div>
-          <p v-if="mobileUpdateNotice" class="form-result">{{ mobileUpdateNotice }}</p>
-          <p v-if="mobileUpdateError" class="dialog-error">{{ mobileUpdateError }}</p>
-        </div>
-      </article>
-
-      <article ref="emailCard" class="settings-card">
-        <header class="settings-card-head">
-          <h3>邮箱绑定</h3>
-        </header>
-        <div class="security-form">
-          <div v-if="currentEmail && !bindEmailEditing" class="bound-email-row">
-            <div>
-              <span>当前邮箱</span>
-              <strong>{{ currentEmail }}</strong>
+      <!-- 手机号组 -->
+      <section class="settings-group">
+        <header class="settings-group-title">手机号</header>
+        <div class="settings-group-body settings-group-padded">
+          <div class="security-form">
+            <label class="security-field">
+              <span>手机号</span>
+              <input
+                ref="mobileInput"
+                v-model="mobileDraft"
+                class="ui-inline-input"
+                type="tel"
+                inputmode="tel"
+                autocomplete="tel"
+              />
+            </label>
+            <div class="form-actions">
+              <AppButton variant="primary" size="sm" :disabled="mobileSubmitting" @click="submitMobileUpdate">
+                {{ mobileSubmitting ? '保存中' : '保存手机号' }}
+              </AppButton>
             </div>
-            <AppButton variant="secondary" size="sm" @click="startBindEmailEditing">
-              换绑
-            </AppButton>
+            <p v-if="mobileUpdateNotice" class="form-result">{{ mobileUpdateNotice }}</p>
+            <p v-if="mobileUpdateError" class="dialog-error">{{ mobileUpdateError }}</p>
           </div>
-          <label v-if="!currentEmail || bindEmailEditing" class="security-field">
-            <span>{{ currentEmail ? '新邮箱' : '邮箱地址' }}</span>
-            <AppInput v-model="bindEmail" type="email" autocomplete="email" placeholder="邮箱地址" />
-          </label>
-          <label v-if="!currentEmail || bindEmailEditing" class="security-field">
-            <span>验证码</span>
-            <AppInput v-model="bindEmailCode" autocomplete="one-time-code" placeholder="验证码" />
-          </label>
-          <div v-if="!currentEmail || bindEmailEditing" class="form-actions">
-            <AppButton v-if="currentEmail" variant="ghost" size="sm" @click="cancelBindEmailEditing">
-              取消
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              size="sm"
-              :disabled="bindEmailCodeSending || bindEmailCodeCooldown.isActive.value || !bindEmail.trim()"
-              @click="sendBindEmailCode"
-            >
-              {{ bindEmailCodeButtonText }}
-            </AppButton>
-            <AppButton variant="primary" size="sm" :disabled="bindEmailSubmitting || !bindEmail.trim() || !bindEmailCode.trim()" @click="submitBindEmail">
-              {{ bindEmailSubmitting ? '提交中' : currentEmail ? '确认换绑' : '绑定邮箱' }}
-            </AppButton>
-          </div>
-          <p v-if="bindEmailNotice" class="form-result">{{ bindEmailNotice }}</p>
-          <p v-if="bindEmailError" class="dialog-error">{{ bindEmailError }}</p>
         </div>
-      </article>
+      </section>
 
-      <article ref="passwordCard" class="settings-card">
-        <header class="settings-card-head">
-          <h3>修改密码</h3>
-        </header>
-        <div class="security-form">
-          <div v-if="!currentEmail" class="bound-email-row">
-            <div>
+      <!-- 邮箱绑定组 -->
+      <section class="settings-group">
+        <header class="settings-group-title">邮箱绑定</header>
+        <div class="settings-group-body settings-group-padded">
+          <div class="security-form">
+            <div v-if="currentEmail && !bindEmailEditing" class="bound-email-row">
+              <div>
+                <span>当前邮箱</span>
+                <strong>{{ currentEmail }}</strong>
+              </div>
+              <AppButton variant="secondary" size="sm" @click="startBindEmailEditing">
+                换绑
+              </AppButton>
+            </div>
+            <label v-if="!currentEmail || bindEmailEditing" class="security-field">
+              <span>{{ currentEmail ? '新邮箱' : '邮箱地址' }}</span>
+              <AppInput v-model="bindEmail" type="email" autocomplete="email" placeholder="邮箱地址" />
+            </label>
+            <label v-if="!currentEmail || bindEmailEditing" class="security-field">
+              <span>验证码</span>
+              <AppInput v-model="bindEmailCode" autocomplete="one-time-code" placeholder="验证码" />
+            </label>
+            <div v-if="!currentEmail || bindEmailEditing" class="form-actions">
+              <AppButton v-if="currentEmail" variant="ghost" size="sm" @click="cancelBindEmailEditing">
+                取消
+              </AppButton>
+              <AppButton
+                variant="secondary"
+                size="sm"
+                :disabled="bindEmailCodeSending || bindEmailCodeCooldown.isActive.value || !bindEmail.trim()"
+                @click="sendBindEmailCode"
+              >
+                {{ bindEmailCodeButtonText }}
+              </AppButton>
+              <AppButton variant="primary" size="sm" :disabled="bindEmailSubmitting || !bindEmail.trim() || !bindEmailCode.trim()" @click="submitBindEmail">
+                {{ bindEmailSubmitting ? '提交中' : currentEmail ? '确认换绑' : '绑定邮箱' }}
+              </AppButton>
+            </div>
+            <p v-if="bindEmailNotice" class="form-result">{{ bindEmailNotice }}</p>
+            <p v-if="bindEmailError" class="dialog-error">{{ bindEmailError }}</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 修改密码组 -->
+      <section ref="passwordCard" class="settings-group">
+        <header class="settings-group-title">修改密码</header>
+        <div class="settings-group-body settings-group-padded">
+          <div class="security-form">
+            <div v-if="!currentEmail" class="bound-email-row">
+              <div>
+                <span>邮箱</span>
+                <strong>未绑定</strong>
+              </div>
+              <AppButton variant="secondary" size="sm" @click="openEmailBinding">
+                绑定邮箱
+              </AppButton>
+            </div>
+            <label class="security-field">
               <span>邮箱</span>
-              <strong>未绑定</strong>
+              <AppInput :model-value="currentEmail" autocomplete="email" disabled placeholder="未绑定邮箱" />
+            </label>
+            <label class="security-field">
+              <span>验证码</span>
+              <AppInput v-model="passwordChangeForm.code" autocomplete="one-time-code" placeholder="邮箱验证码" />
+            </label>
+            <label class="security-field">
+              <span>新密码</span>
+              <AppInput v-model="passwordChangeForm.newPassword" type="password" autocomplete="new-password" placeholder="8-64 位新密码" />
+            </label>
+            <div class="form-actions">
+              <AppButton
+                variant="secondary"
+                size="sm"
+                :disabled="!currentEmail || passwordChangeCodeSending || passwordChangeCodeCooldown.isActive.value"
+                @click="sendPasswordChangeCode"
+              >
+                {{ passwordChangeCodeButtonText }}
+              </AppButton>
+              <AppButton variant="primary" size="sm" :disabled="!currentEmail || passwordChangeSubmitting || !passwordChangeForm.code.trim() || passwordChangeForm.newPassword.length < 8" @click="submitPasswordChange">
+                {{ passwordChangeSubmitting ? '提交中' : '修改密码' }}
+              </AppButton>
             </div>
-            <AppButton variant="secondary" size="sm" @click="openEmailBinding">
-              绑定邮箱
-            </AppButton>
+            <p v-if="passwordChangeNotice" class="form-result">{{ passwordChangeNotice }}</p>
+            <p v-if="passwordChangeError" class="dialog-error">{{ passwordChangeError }}</p>
           </div>
-          <label class="security-field">
-            <span>邮箱</span>
-            <AppInput :model-value="currentEmail" autocomplete="email" disabled placeholder="未绑定邮箱" />
-          </label>
-          <label class="security-field">
-            <span>验证码</span>
-            <AppInput v-model="passwordChangeForm.code" autocomplete="one-time-code" placeholder="邮箱验证码" />
-          </label>
-          <label class="security-field">
-            <span>新密码</span>
-            <AppInput v-model="passwordChangeForm.newPassword" type="password" autocomplete="new-password" placeholder="8-64 位新密码" />
-          </label>
-          <div class="form-actions">
-            <AppButton
-              variant="secondary"
-              size="sm"
-              :disabled="!currentEmail || passwordChangeCodeSending || passwordChangeCodeCooldown.isActive.value"
-              @click="sendPasswordChangeCode"
-            >
-              {{ passwordChangeCodeButtonText }}
-            </AppButton>
-            <AppButton variant="primary" size="sm" :disabled="!currentEmail || passwordChangeSubmitting || !passwordChangeForm.code.trim() || passwordChangeForm.newPassword.length < 8" @click="submitPasswordChange">
-              {{ passwordChangeSubmitting ? '提交中' : '修改密码' }}
-            </AppButton>
-          </div>
-          <p v-if="passwordChangeNotice" class="form-result">{{ passwordChangeNotice }}</p>
-          <p v-if="passwordChangeError" class="dialog-error">{{ passwordChangeError }}</p>
         </div>
-      </article>
+      </section>
 
-      <article class="settings-card settings-wide-card settings-danger-card">
-        <header class="settings-card-head">
-          <h3>退出登录</h3>
-          <AppButton variant="destructive" size="sm" :disabled="logoutSubmitting" @click="handleLogout">
-            <LogOut :size="15" />
-            {{ logoutSubmitting ? '退出中' : '退出登录' }}
-          </AppButton>
-        </header>
-      </article>
+      <!-- 退出登录组 -->
+      <section class="settings-group">
+        <div class="settings-group-body">
+          <button type="button" class="settings-row settings-row-link settings-row-danger" :disabled="logoutSubmitting" @click="handleLogout">
+            <span class="settings-row-icon tone-danger"><LogOut :size="16" /></span>
+            <span class="settings-row-label">{{ logoutSubmitting ? '退出中' : '退出登录' }}</span>
+            <span class="settings-row-chevron">›</span>
+          </button>
+        </div>
+      </section>
     </section>
 
-    <section v-else-if="selectedProfileId === 'preferences'" class="settings-card-grid">
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>工作状态</h3>
-        </header>
-        <div class="settings-density-row">
-          <button
-            v-for="item in presenceOptions"
-            :key="item.value"
-            type="button"
-            :class="{ active: shell.presenceStatus === item.value }"
-            :disabled="preferenceDisabled"
-            @click="updatePresenceStatus(item.value)"
-          >
-            {{ item.label }}
-          </button>
+    <section v-else-if="selectedProfileId === 'preferences'" class="settings-group-list">
+      <!-- 工作状态组 -->
+      <section class="settings-group">
+        <header class="settings-group-title">工作状态</header>
+        <div class="settings-group-body settings-group-padded">
+          <div class="settings-density-row">
+            <button
+              v-for="item in presenceOptions"
+              :key="item.value"
+              type="button"
+              :class="{ active: shell.presenceStatus === item.value }"
+              :disabled="preferenceDisabled"
+              @click="updatePresenceStatus(item.value)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
         </div>
-      </article>
+      </section>
 
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>界面设置</h3>
-        </header>
-        <div class="settings-control-row">
-          <AppButton variant="secondary" size="sm" :disabled="preferenceDisabled" @click="shell.toggleTheme()">
-            <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="14" />
-            {{ themeLabel }}
-          </AppButton>
+      <!-- 界面设置组 -->
+      <section class="settings-group">
+        <header class="settings-group-title">界面设置</header>
+        <div class="settings-group-body">
+          <div class="settings-row">
+            <span class="settings-row-icon tone-primary"><Palette :size="16" /></span>
+            <span class="settings-row-label">主题</span>
+            <span class="settings-row-value">
+              <AppButton variant="secondary" size="sm" :disabled="preferenceDisabled" @click="shell.toggleTheme()">
+                <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="14" />
+                {{ themeLabel }}
+              </AppButton>
+            </span>
+          </div>
+          <div class="settings-row settings-row-stacked">
+            <span class="settings-row-icon tone-info"><Bell :size="16" /></span>
+            <span class="settings-row-label">消息密度</span>
+            <div class="settings-density-row">
+              <button
+                type="button"
+                :class="{ active: shell.messageDensity === 'cozy' }"
+                :disabled="preferenceDisabled"
+                @click="shell.setMessageDensity('cozy')"
+              >
+                宽松
+              </button>
+              <button
+                type="button"
+                :class="{ active: shell.messageDensity === 'compact' }"
+                :disabled="preferenceDisabled"
+                @click="shell.setMessageDensity('compact')"
+              >
+                紧凑
+              </button>
+            </div>
+          </div>
+          <div class="settings-row settings-row-stacked">
+            <span class="settings-row-icon tone-warning"><Zap :size="16" /></span>
+            <span class="settings-row-label">字号</span>
+            <div class="settings-density-row">
+              <button
+                v-for="item in fontScaleOptions"
+                :key="item.value"
+                type="button"
+                :class="{ active: shell.fontScale === item.value }"
+                :disabled="preferenceDisabled"
+                @click="updateFontScale(item.value)"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="settings-density-row">
-          <button
-            type="button"
-            :class="{ active: shell.messageDensity === 'cozy' }"
-            :disabled="preferenceDisabled"
-            @click="shell.setMessageDensity('cozy')"
-          >
-            宽松
-          </button>
-          <button
-            type="button"
-            :class="{ active: shell.messageDensity === 'compact' }"
-            :disabled="preferenceDisabled"
-            @click="shell.setMessageDensity('compact')"
-          >
-            紧凑
-          </button>
-        </div>
-        <div class="settings-density-row">
-          <button
-            v-for="item in fontScaleOptions"
-            :key="item.value"
-            type="button"
-            :class="{ active: shell.fontScale === item.value }"
-            :disabled="preferenceDisabled"
-            @click="updateFontScale(item.value)"
-          >
-            {{ item.label }}
-          </button>
-        </div>
-      </article>
+      </section>
 
-      <article class="settings-card">
-        <header class="settings-card-head">
-          <h3>消息样式</h3>
-        </header>
-        <div class="settings-density-row">
-          <button
-            v-for="item in bubbleStyleOptions"
-            :key="item.value"
-            type="button"
-            :class="{ active: shell.bubbleStyle === item.value }"
-            :disabled="preferenceDisabled"
-            @click="updateBubbleStyle(item.value)"
-          >
-            {{ item.label }}
-          </button>
+      <!-- 消息样式组 -->
+      <section class="settings-group">
+        <header class="settings-group-title">消息样式</header>
+        <div class="settings-group-body">
+          <div class="settings-row settings-row-stacked">
+            <span class="settings-row-icon tone-success"><Mail :size="16" /></span>
+            <span class="settings-row-label">气泡样式</span>
+            <div class="settings-density-row">
+              <button
+                v-for="item in bubbleStyleOptions"
+                :key="item.value"
+                type="button"
+                :class="{ active: shell.bubbleStyle === item.value }"
+                :disabled="preferenceDisabled"
+                @click="updateBubbleStyle(item.value)"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+          </div>
+          <div class="settings-row settings-row-stacked">
+            <span class="settings-row-icon tone-primary"><Palette :size="16" /></span>
+            <span class="settings-row-label">主题色</span>
+            <div class="accent-swatch-grid compact-swatch-grid">
+              <button
+                v-for="item in accentColorOptions"
+                :key="item.value"
+                type="button"
+                :class="['accent-swatch', `accent-${item.value}`, { active: shell.accentColor === item.value }]"
+                :aria-label="item.label"
+                :disabled="preferenceDisabled"
+                @click="updateAccentColor(item.value)"
+              >
+                <span />
+                <strong>{{ item.label }}</strong>
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="accent-swatch-grid compact-swatch-grid">
-          <button
-            v-for="item in accentColorOptions"
-            :key="item.value"
-            type="button"
-            :class="['accent-swatch', `accent-${item.value}`, { active: shell.accentColor === item.value }]"
-            :aria-label="item.label"
-            :disabled="preferenceDisabled"
-            @click="updateAccentColor(item.value)"
-          >
-            <span />
-            <strong>{{ item.label }}</strong>
-          </button>
-        </div>
-      </article>
+      </section>
 
-      <article class="settings-card settings-wide-card">
-        <header class="settings-card-head">
-          <h3>通知设置</h3>
-        </header>
-        <div class="settings-toggle-list">
-          <label>
+      <!-- 通知设置组 -->
+      <section class="settings-group">
+        <header class="settings-group-title">通知设置</header>
+        <div class="settings-group-body">
+          <label class="settings-row settings-row-toggle">
+            <span class="settings-row-icon tone-primary"><Bell :size="16" /></span>
+            <span class="settings-row-label">声音提醒</span>
             <input
               type="checkbox"
               :checked="shell.notifSound"
               :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifSound', ($event.target as HTMLInputElement).checked)"
             />
-            <span>声音提醒</span>
           </label>
-          <label>
+          <label class="settings-row settings-row-toggle">
+            <span class="settings-row-icon tone-info"><Bell :size="16" /></span>
+            <span class="settings-row-label">桌面通知</span>
             <input
               type="checkbox"
               :checked="shell.notifDesktop"
               :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifDesktop', ($event.target as HTMLInputElement).checked)"
             />
-            <span>桌面通知</span>
           </label>
-          <label>
+          <label class="settings-row settings-row-toggle">
+            <span class="settings-row-icon tone-warning"><Bell :size="16" /></span>
+            <span class="settings-row-label">仅 @ 我提醒</span>
             <input
               type="checkbox"
               :checked="shell.notifMentionOnly"
               :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifMentionOnly', ($event.target as HTMLInputElement).checked)"
             />
-            <span>仅 @ 我提醒</span>
           </label>
-          <label>
+          <label class="settings-row settings-row-toggle">
+            <span class="settings-row-icon tone-success"><Bell :size="16" /></span>
+            <span class="settings-row-label">未读角标</span>
             <input
               type="checkbox"
               :checked="shell.notifUnreadBadge"
               :disabled="preferenceDisabled"
               @change="updateNotificationPreference('notifUnreadBadge', ($event.target as HTMLInputElement).checked)"
             />
-            <span>未读角标</span>
           </label>
         </div>
-      </article>
+      </section>
     </section>
 
   </section>

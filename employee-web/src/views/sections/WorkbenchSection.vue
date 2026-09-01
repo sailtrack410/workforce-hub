@@ -52,6 +52,7 @@ import AppErrorState from '../../components/ui/AppErrorState.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppLoadingState from '../../components/ui/AppLoadingState.vue';
 import AppTag from '../../components/ui/AppTag.vue';
+import WorkbenchToday from '../../components/WorkbenchToday.vue';
 import PluginWorkbenchHost from '../../components/plugins/PluginWorkbenchHost.vue';
 
 const {
@@ -871,6 +872,20 @@ watch(workflowRequests, () => {
 
   <section class="content-stack">
     <PluginWorkbenchHost v-if="activePlugin" :plugin-id="activePlugin.id" />
+    <template v-else-if="activeWorkbench.id === 'today'">
+      <WorkbenchToday
+        :display-name="session.displayName"
+        :hire-date="session.profile?.hireDate"
+        :today-result="todayResult"
+        :attendance-daily-results="attendanceDailyResults"
+        :workflow-requests="workflowRequests"
+        :leave-accounts="leaveAccounts"
+        :todos="shell.todos"
+        :conversations="shell.conversations"
+        @open-workbench="(id) => shell.selectItem('workbench', id)"
+        @open-section="(id) => shell.setSection(id as any)"
+      />
+    </template>
     <template v-else-if="activeWorkbench.id === 'oa'">
       <AppErrorState
         v-if="workbenchError"
@@ -913,8 +928,8 @@ watch(workflowRequests, () => {
               @retry="loadWorkflowRequests"
             />
             <AppLoadingState v-else-if="workflowRequestsLoading" />
-            <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" />
-            <AppEmptyState v-else-if="!filteredWorkflowRequests.length" :title="`暂无${activeWorkflowBucket.label}申请`" />
+            <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" description="发起你的第一个申请，审批进度会实时同步到这里。" icon="workbench" action-label="发起申请" @action="openProcessCatalog" />
+            <AppEmptyState v-else-if="!filteredWorkflowRequests.length" :title="`暂无${activeWorkflowBucket.label}申请`" icon="workbench" />
             <div v-else class="oa-request-list">
               <button
                 v-for="request in filteredWorkflowRequests"
@@ -950,7 +965,7 @@ watch(workflowRequests, () => {
               </div>
             </header>
             <AppLoadingState v-if="workflowDetailLoading" />
-            <AppEmptyState v-else-if="!activeWorkflowDetail" title="选择一条申请查看详情" />
+            <AppEmptyState v-else-if="!activeWorkflowDetail" title="选择一条申请查看详情" icon="workbench" />
             <div v-else class="request-detail-stack oa-detail-body">
               <div class="workflow-node-map" aria-label="流程进度">
                 <span
@@ -1065,7 +1080,7 @@ watch(workflowRequests, () => {
               补卡
             </AppButton>
           </div>
-          <AppEmptyState v-if="!attendanceExceptions.length" title="今日无考勤异常" />
+          <AppEmptyState v-if="!attendanceExceptions.length" title="今日无考勤异常" icon="workbench" />
           <div v-else class="attendance-action-list">
             <div v-for="item in attendanceExceptions.slice(0, 5)" :key="item.exceptionId" class="attendance-action-row">
               <div>
@@ -1095,7 +1110,7 @@ watch(workflowRequests, () => {
             </div>
           </div>
           <AppLoadingState v-if="attendanceLoading" />
-          <AppEmptyState v-else-if="!teamAttendanceRows.length" title="团队考勤正常" />
+          <AppEmptyState v-else-if="!teamAttendanceRows.length" title="团队考勤正常" icon="workbench" />
           <div v-else class="attendance-action-list">
             <div v-for="item in teamAttendanceRows" :key="`team-${item.userId}-${item.workDate}`" class="attendance-action-row">
               <div>
@@ -1110,7 +1125,7 @@ watch(workflowRequests, () => {
         <article class="detail-card attendance-history-card">
           <h3>月度记录</h3>
           <AppLoadingState v-if="attendanceLoading" />
-          <AppEmptyState v-else-if="!attendanceDailyResults.length" title="暂无月度记录" />
+          <AppEmptyState v-else-if="!attendanceDailyResults.length" title="暂无月度记录" icon="workbench" />
           <div v-else class="compact-table">
             <div v-for="item in attendanceDailyResults" :key="item.dailyResultId">
               <strong>{{ item.workDate }}</strong>
@@ -1190,7 +1205,7 @@ watch(workflowRequests, () => {
                     </div>
                   </dl>
                 </article>
-                <AppEmptyState v-if="!leaveAccounts.length" class="leave-account-empty" title="暂无假期账户" />
+                <AppEmptyState v-if="!leaveAccounts.length" class="leave-account-empty" title="暂无假期账户" icon="workbench" />
               </section>
             </section>
 
@@ -1211,7 +1226,7 @@ watch(workflowRequests, () => {
                   </em>
                 </div>
               </div>
-              <AppEmptyState v-else title="暂无近期变动" />
+              <AppEmptyState v-else title="暂无近期变动" icon="workbench" />
             </aside>
           </div>
         </template>
@@ -1501,6 +1516,7 @@ watch(workflowRequests, () => {
     <AppEmptyState
       v-else-if="!attachmentPickerFolders.length && !attachmentPickerFiles.length"
       title="暂无附件"
+      icon="files"
     />
     <div v-else class="attachment-picker-list">
       <button

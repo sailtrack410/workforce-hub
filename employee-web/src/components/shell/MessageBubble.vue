@@ -83,6 +83,7 @@ function openMessageAction(event: MouseEvent) {
     <AppAvatar
       :label="message.author"
       :image="avatarUrl"
+      :kind="agent ? 'agent' : 'user'"
       :tone="agent ? 'success' : message.side === 'right' ? 'primary' : 'neutral'"
       :status="agent ? 'online' : ''"
     />
@@ -191,21 +192,21 @@ function openMessageAction(event: MouseEvent) {
   max-width: 100%;
   padding: var(--space-10, 0.625rem) var(--space-14, 0.875rem);
   border: 1px solid var(--border-subtle);
-  border-radius: 1rem 1rem 1rem 0.375rem;
+  border-radius: var(--radius-8) var(--radius-8) var(--radius-8) var(--radius-4);
   background: var(--surface-panel);
-  box-shadow: 0 1px 1px rgba(16, 24, 40, 0.04);
+  box-shadow: var(--shadow-xs);
   overflow-wrap: anywhere;
 }
 
 .message-bubble.right .bubble-content {
   border-color: color-mix(in srgb, var(--success-300) 48%, var(--border-subtle));
-  border-radius: 1rem 1rem 0.375rem 1rem;
+  border-radius: var(--radius-8) var(--radius-8) var(--radius-4) var(--radius-8);
   background: color-mix(in srgb, var(--success-100) 46%, var(--surface-panel));
 }
 
 :global([data-theme='dark']) .message-bubble.right .bubble-content {
   border-color: color-mix(in srgb, var(--success-500) 42%, var(--border-subtle));
-  background: color-mix(in srgb, var(--success-900, #14532d) 38%, var(--surface-panel));
+  background: color-mix(in srgb, var(--success-900) 38%, var(--surface-panel));
 }
 
 .message-bubble.agent .bubble-content {
@@ -370,7 +371,7 @@ function openMessageAction(event: MouseEvent) {
 
 .bubble-translation {
   padding-top: var(--space-2, 0.125rem);
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  border-top: 1px solid var(--border-subtle);
   color: var(--text-secondary) !important;
 }
 
@@ -418,7 +419,7 @@ function openMessageAction(event: MouseEvent) {
 
 .bubble-markdown :deep(blockquote) {
   padding-left: var(--space-10, 0.625rem);
-  border-left: 3px solid #9ec5fe;
+  border-left: 3px solid var(--primary-300);
   color: var(--text-secondary);
 }
 
@@ -436,14 +437,54 @@ function openMessageAction(event: MouseEvent) {
   overflow: auto;
   padding: var(--space-10, 0.625rem);
   border-radius: var(--radius-8);
-  background: #102033;
-  color: #e8f2ff;
+  background: var(--surface-rail);
+  color: var(--text-rail);
 }
 
 .bubble-markdown :deep(pre code) {
   padding: 0;
   background: transparent;
   color: inherit;
+}
+
+.bubble-markdown :deep(.json-fold) {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--surface-sunken, var(--surface-accent));
+  overflow: hidden;
+}
+
+.bubble-markdown :deep(.json-fold summary) {
+  padding: var(--space-8) var(--space-12);
+  color: var(--text-tertiary);
+  font-size: var(--text-caption-md);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.bubble-markdown :deep(.json-fold summary)::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform var(--transition-fast, 0.15s ease);
+}
+
+.bubble-markdown :deep(.json-fold[open] summary)::before {
+  transform: rotate(90deg);
+}
+
+.bubble-markdown :deep(.json-fold summary:hover) {
+  color: var(--text-secondary);
+}
+
+.bubble-markdown :deep(.json-fold pre) {
+  margin: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--border-subtle);
+  max-height: 16rem;
 }
 
 .bubble-markdown :deep(a) {
