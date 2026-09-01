@@ -88,8 +88,8 @@
     </select>
 
     <insert id="insertFriend">
-        INSERT INTO ct_friend (user_id, friend_user_id, remark, status, created_by, updated_by)
-        VALUES (#{row.userId}, #{row.friendUserId}, #{row.remark}, #{row.status}, #{row.createdBy}, #{row.updatedBy})
+        INSERT INTO ct_friend (id, user_id, friend_user_id, remark, status, created_by, updated_by)
+        VALUES (#{row.id}, #{row.userId}, #{row.friendUserId}, #{row.remark}, #{row.status}, #{row.createdBy}, #{row.updatedBy})
     </insert>
 
     <delete id="deleteFriend">

@@ -78,37 +78,43 @@ public class AdminAlertService {
 
     @Transactional
     public Map<String, Object> createChannel(AlertChannelSaveRequest request) {
+        Long operatorId = CurrentUserHolder.requireUserId();
         String channelCode = request.channelCode().trim();
         jdbcTemplate.update("""
             INSERT INTO ops_alert_channel
-                (id, channel_code, channel_name, channel_type, target_ref, enabled)
+                (id, channel_code, channel_name, channel_type, target_ref, enabled, created_by, updated_by)
             VALUES
-                (?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             IdGenerator.nextId(),
             channelCode,
             request.channelName().trim(),
             request.channelType().trim(),
             trimToNull(request.targetRef()),
-            request.enabled() ? 1 : 0
+            request.enabled() ? 1 : 0,
+            operatorId,
+            operatorId
         );
         return getChannel(channelCode);
     }
 
     @Transactional
     public Map<String, Object> updateRule(String alertCode, AlertRuleUpdateRequest request) {
+        Long operatorId = CurrentUserHolder.requireUserId();
         int updated = jdbcTemplate.update("""
             UPDATE ops_alert_rule
             SET enabled = ?,
                 notify_enabled = ?,
                 channel_id = ?,
-                cooldown_minutes = ?
+                cooldown_minutes = ?,
+                updated_by = ?
             WHERE alert_code = ?
             """,
             request.enabled() ? 1 : 0,
             request.notifyEnabled() ? 1 : 0,
             request.channelId(),
             request.cooldownMinutes(),
+            operatorId,
             alertCode
         );
         if (updated == 0) {

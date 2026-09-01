@@ -2,6 +2,7 @@ package com.workforcehub.contact.service;
 
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
+import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.contact.domain.ContactFriend;
 import com.workforcehub.contact.mapper.ContactFriendMapper;
 import com.workforcehub.org.dto.OrgUserSummaryResponse;
@@ -63,6 +64,7 @@ public class ContactFriendService {
             return acceptFriendRequest(friendUserId);
         }
         ContactFriend row = new ContactFriend();
+        row.setId(IdGenerator.nextId());
         row.setUserId(userId);
         row.setFriendUserId(friendUserId);
         row.setRemark(trimToNull(remark));
@@ -88,6 +90,7 @@ public class ContactFriendService {
         ContactFriend existing = contactFriendMapper.selectFriend(userId, requesterUserId);
         if (existing == null) {
             ContactFriend row = new ContactFriend();
+            row.setId(IdGenerator.nextId());
             row.setUserId(userId);
             row.setFriendUserId(requesterUserId);
             row.setStatus(STATUS_ACTIVE);
