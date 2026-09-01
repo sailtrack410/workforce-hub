@@ -52,6 +52,11 @@ export interface LoginResponse {
   requiresEmailBinding?: boolean;
 }
 
+// 公开品牌化配置（登录页轮播标语）
+export interface BrandingResponse {
+  taglines: string[];
+}
+
 export interface CurrentUserResponse extends LoginResponse {
   email?: string | null;
   primaryDeptId?: EntityId | null;

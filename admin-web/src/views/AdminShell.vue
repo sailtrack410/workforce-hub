@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   BarChart3,
   Bot,
+  Building2,
   Blocks,
   CalendarCheck,
   FileArchive,
@@ -69,6 +70,7 @@ const navGroups = [
       { path: '/plugins', label: '插件管理', icon: Blocks, permission: 'ADMIN_PLUGIN_MANAGE' },
       { path: '/message-delivery', label: '消息投递', icon: MessageSquareWarning },
       { path: '/audit-logs', label: '审计日志', icon: ShieldCheck },
+      { path: '/enterprise', label: '企业设置', icon: Building2, permission: 'ADMIN_DICT_MANAGE' },
       { path: '/dicts', label: '数据字典', icon: ListTree, permission: 'ADMIN_DICT_MANAGE' },
       { path: '/settings', label: '设置', icon: Settings, permission: 'ADMIN_NOTIFICATION_CHANNEL_MANAGE' },
     ],

@@ -129,6 +129,34 @@
   line-height: 1.7;
 }
 
+/* 标语轮播：固定最小行高避免切换时布局抖动 */
+.auth-tagline {
+  display: inline-block;
+  min-height: 1.7em;
+}
+
+.tagline-fade-enter-active,
+.tagline-fade-leave-active {
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.tagline-fade-enter-from {
+  opacity: 0;
+  transform: translateY(0.5rem);
+}
+
+.tagline-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-0.5rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tagline-fade-enter-active,
+  .tagline-fade-leave-active {
+    transition: none;
+  }
+}
+
 .auth-hero-visual {
   align-self: end;
   display: grid;

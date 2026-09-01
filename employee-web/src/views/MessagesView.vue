@@ -166,6 +166,12 @@ const fileUsageCircumference = 2 * Math.PI * 52;
 const activeFileUsage = computed(() => Math.max(0, Math.min(100, Number(activeFile.value.usage || 0))));
 const activeFileUsageOffset = computed(() => fileUsageCircumference * (1 - activeFileUsage.value / 100));
 const themeLabel = computed(() => (shell.theme === 'light' ? '浅色' : '深色'));
+// 登录页品牌标语轮播：来自公开品牌配置（管理端企业设置维护），失败时回退内置文案
+const DEFAULT_TAGLINE = '消息、待办、审批与智能助手，在同一个工作区内持续协同。';
+const brandTaglines = ref<string[]>([DEFAULT_TAGLINE]);
+const taglineIndex = ref(0);
+const activeTagline = computed(() => brandTaglines.value[taglineIndex.value % brandTaglines.value.length] || DEFAULT_TAGLINE);
+let taglineTimer: number | undefined;
 const searchModel = computed({
   get: () => shell.search[activeSection.value],
   set: (value: string) => shell.setSearch(activeSection.value, value),
@@ -867,6 +873,14 @@ onMounted(async () => {
   window.addEventListener('resize', updateFilterOverflow);
   // 全局右键拦截：屏蔽浏览器默认菜单，输入类元素放行以保留系统编辑菜单
   window.addEventListener('contextmenu', handleGlobalContextMenu);
+  employeeApi.auth.branding()
+    .then((res) => {
+      if (res.taglines?.length) brandTaglines.value = res.taglines;
+    })
+    .catch(() => undefined);
+  taglineTimer = window.setInterval(() => {
+    taglineIndex.value = (taglineIndex.value + 1) % Math.max(1, brandTaglines.value.length);
+  }, 4500);
   if (!session.initialized) {
     await session.loadCurrentUser().catch(() => undefined);
     if (!session.isAuthenticated) {
@@ -887,6 +901,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('contextmenu', handleGlobalContextMenu);
   if (toastTimer) window.clearTimeout(toastTimer);
   if (searchAgentsTimer) window.clearTimeout(searchAgentsTimer);
+  if (taglineTimer) window.clearInterval(taglineTimer);
   resetAuthCooldowns();
   closeImSocket();
 });
@@ -1126,7 +1141,11 @@ provideEmployeeShellContexts(employeeShellContexts);
       <div class="auth-hero-copy">
         <p class="auth-kicker">EMPLOYEE WORKSPACE</p>
         <h1>Workforce Hub</h1>
-        <p class="auth-hero-summary">消息、待办、审批与智能助手，在同一个工作区内持续协同。</p>
+        <p class="auth-hero-summary">
+          <Transition name="tagline-fade" mode="out-in">
+            <span :key="activeTagline" class="auth-tagline">{{ activeTagline }}</span>
+          </Transition>
+        </p>
       </div>
       <div class="auth-hero-visual" aria-label="员工协同工作流主视觉">
         <img class="auth-hero-image" :src="authHeroImage" alt="" aria-hidden="true" />

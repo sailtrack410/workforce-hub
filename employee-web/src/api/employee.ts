@@ -5,6 +5,7 @@ import type {
   AttendanceExceptionResponse,
   AgentResponse,
   AttachmentRefResponse,
+  BrandingResponse,
   ClockCorrectionRequestCreateRequest,
   ConfirmUploadRequest,
   CopyEmployeeFileRequest,
@@ -92,6 +93,8 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
       sendEmailCode: (request: SendEmailCodeRequest) => client.post<void>('/api/employee/auth/email/send-code', request),
       bindEmail: (request: { email: string; code: string }) => client.post<void>('/api/employee/auth/email/bind', request),
       resetPassword: (request: ResetPasswordRequest) => client.post<void>('/api/employee/auth/password/reset', request),
+      // 公开接口：登录页品牌标语，无需登录态
+      branding: () => client.get<BrandingResponse>('/api/public/branding'),
     },
     me: {
       profile: () => client.get<OrgUserDetailResponse>('/api/employee/me/profile'),
