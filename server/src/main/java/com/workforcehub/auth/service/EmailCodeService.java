@@ -77,11 +77,11 @@ public class EmailCodeService {
             // 发送失败要清掉锁，让用户能重试
             redisTemplate.delete(sendLockKey);
             redisTemplate.delete(codeKey);
-            log.error("邮件发送失败 email={} purpose={}", email, purpose, e);
+            log.error("邮件发送失败 email={} purpose={}", LoginService.maskEmail(email), purpose, e);
             throw new BizException(500, "邮件发送失败，请稍后重试");
         }
 
-        log.info("验证码已发送 email={} purpose={}", email, purpose);
+        log.info("验证码已发送 email={} purpose={}", LoginService.maskEmail(email), purpose);
     }
 
     /**

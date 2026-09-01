@@ -112,7 +112,7 @@ public class AccountService {
         account.setEmailVerifiedAt(LocalDateTime.now());
         accountMapper.updateById(account);
 
-        log.info("邮箱绑定成功 userId={} email={}", currentUserId, request.getEmail());
+        log.info("邮箱绑定成功 userId={} email={}", currentUserId, LoginService.maskEmail(request.getEmail()));
     }
 
     /**
@@ -132,6 +132,6 @@ public class AccountService {
         account.setPasswordUpdatedAt(LocalDateTime.now());
         accountMapper.updateById(account);
 
-        log.info("密码重置成功 userId={} email={}", account.getUserId(), request.getEmail());
+        log.info("密码重置成功 userId={} email={}", account.getUserId(), LoginService.maskEmail(request.getEmail()));
     }
 }

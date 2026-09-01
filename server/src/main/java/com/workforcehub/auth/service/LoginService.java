@@ -127,31 +127,31 @@ public class LoginService {
             int failCount = authLockService.recordFailure(userType, loginName);
             int remaining = authLockService.getRemainingAttempts(userType, loginName);
             log.warn("登录失败 userType={} loginName={} failCount={} remaining={}",
-                userType, loginName, failCount, remaining);
+                userType, maskLoginName(loginName), failCount, remaining);
             throw new BizException(401, "用户名或密码错误，剩余尝试次数 " + remaining);
         } catch (InternalAuthenticationServiceException e) {
             if (e.getCause() instanceof EmploymentLoginBlockedException blocked) {
                 log.warn("员工生命周期状态不允许登录 userType={} loginName={} message={}",
-                    userType, loginName, blocked.getMessage());
+                    userType, maskLoginName(loginName), blocked.getMessage());
                 throw new BizException(403, blocked.getMessage());
             }
             throw e;
         } catch (EmploymentLoginBlockedException e) {
             log.warn("员工生命周期状态不允许登录 userType={} loginName={} message={}",
-                userType, loginName, e.getMessage());
+                userType, maskLoginName(loginName), e.getMessage());
             throw new BizException(403, e.getMessage());
         } catch (LockedException e) {
             // 账号在数据库层面已被标记为锁定
-            log.warn("账号已锁定 userType={} loginName={}", userType, loginName);
+            log.warn("账号已锁定 userType={} loginName={}", userType, maskLoginName(loginName));
             throw new BizException(423, "账号已锁定，请联系管理员");
         } catch (DisabledException e) {
-            log.warn("账号已禁用 userType={} loginName={}", userType, loginName);
+            log.warn("账号已禁用 userType={} loginName={}", userType, maskLoginName(loginName));
             throw new BizException(403, "账号已被禁用，请联系管理员");
         } catch (AccountExpiredException e) {
-            log.warn("账号已过期 userType={} loginName={}", userType, loginName);
+            log.warn("账号已过期 userType={} loginName={}", userType, maskLoginName(loginName));
             throw new BizException(403, "账号已过期，请联系管理员");
         } catch (CredentialsExpiredException e) {
-            log.warn("凭证已过期 userType={} loginName={}", userType, loginName);
+            log.warn("凭证已过期 userType={} loginName={}", userType, maskLoginName(loginName));
             throw new BizException(403, "登录凭证已过期，请重置密码");
         }
 
@@ -173,12 +173,12 @@ public class LoginService {
                     pending.setRequiresEmailCode(true);
                     pending.setMaskedEmail(maskEmail(boundEmail));
                     log.info("登录二验待提交 userType={} userId={} loginName={}",
-                        userType, user.getUserId(), loginName);
+                        userType, user.getUserId(), maskLoginName(loginName));
                     return pending;
                 }
                 if (!emailCodeService.verifyCode(boundEmail, LOGIN_CODE_PURPOSE, request.getEmailCode().trim())) {
                     log.warn("登录二验失败 userType={} userId={} loginName={}",
-                        userType, user.getUserId(), loginName);
+                        userType, user.getUserId(), maskLoginName(loginName));
                     throw new BizException(401, "邮箱验证码错误或已过期");
                 }
             } else {
@@ -192,7 +192,7 @@ public class LoginService {
                     pending.setLoginName(user.getUsername());
                     pending.setRequiresEmailBinding(true);
                     log.info("登录前需绑定邮箱 userType={} userId={} loginName={}",
-                        userType, user.getUserId(), loginName);
+                        userType, user.getUserId(), maskLoginName(loginName));
                     return pending;
                 }
                 bindEmailForLogin(account, user.getUserId(), bindEmail, bindCode);
@@ -220,7 +220,7 @@ public class LoginService {
         updateLastLogin(userType, user.getUserId());
 
         log.info("登录成功 userType={} userId={} loginName={} sessionId={}",
-            userType, user.getUserId(), loginName, newSession.getId());
+            userType, user.getUserId(), maskLoginName(loginName), newSession.getId());
 
         // 7. 构造响应
         LoginResponse response = new LoginResponse();
@@ -245,7 +245,7 @@ public class LoginService {
         account.setEmail(email);
         account.setEmailVerifiedAt(LocalDateTime.now());
         accountMapper.updateById(account);
-        log.info("登录前邮箱绑定成功 userId={} email={}", userId, email);
+        log.info("登录前邮箱绑定成功 userId={} email={}", userId, maskEmail(email));
     }
 
     /**
@@ -287,6 +287,16 @@ public class LoginService {
             maskedDomain = maskedHead + dTail;
         }
         return maskedName + "@" + maskedDomain;
+    }
+
+    /**
+     * 登录名脱敏：邮箱走 maskEmail；11 位纯数字按手机号打码中间四位；普通登录名非敏感，保留原样便于登录问题排查
+     */
+    static String maskLoginName(String loginName) {
+        if (loginName == null) return null;
+        if (loginName.contains("@")) return maskEmail(loginName);
+        if (loginName.matches("\\d{11}")) return loginName.substring(0, 3) + "****" + loginName.substring(7);
+        return loginName;
     }
 
     private void updateLastLogin(UserType userType, Long userId) {
