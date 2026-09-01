@@ -5,6 +5,7 @@ import com.workforcehub.agent.dto.CancelAgentTaskRequest;
 import com.workforcehub.agent.dto.ConfirmAgentTaskRequest;
 import com.workforcehub.agent.service.AgentService;
 import com.workforcehub.common.response.R;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,12 +27,14 @@ public class EmployeeAgentTaskController {
         this.agentService = agentService;
     }
 
+    @Operation(summary = "确认 Agent 任务", operationId = "confirmEmployeeAgentTask")
     @PostMapping("/{taskId}/confirm")
     public R<AgentTaskResponse> confirmTask(@PathVariable Long taskId,
                                             @Valid @RequestBody ConfirmAgentTaskRequest request) {
         return R.ok(agentService.confirmCurrentEmployeeTask(taskId, request));
     }
 
+    @Operation(summary = "取消 Agent 任务", operationId = "cancelEmployeeAgentTask")
     @PostMapping("/{taskId}/cancel")
     public R<AgentTaskResponse> cancelTask(@PathVariable Long taskId,
                                            @Valid @RequestBody CancelAgentTaskRequest request) {

@@ -1,6 +1,7 @@
 package com.workforcehub.plugin.controller.employee;
 
 import com.workforcehub.common.response.R;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +21,7 @@ public class EmployeePluginController {
         this.employeePluginService = employeePluginService;
     }
 
+    @Operation(summary = "查询我的可见插件", operationId = "listMyPlugins")
     @GetMapping("/mine")
     public R<List<EmployeePluginResponse>> mine() {
         return R.ok(employeePluginService.listVisiblePlugins());

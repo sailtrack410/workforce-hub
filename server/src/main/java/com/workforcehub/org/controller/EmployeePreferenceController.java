@@ -4,6 +4,7 @@ import com.workforcehub.common.response.R;
 import com.workforcehub.org.dto.EmployeePreferenceResponse;
 import com.workforcehub.org.dto.UpdateEmployeePreferenceRequest;
 import com.workforcehub.org.service.EmployeePreferenceService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -25,11 +26,13 @@ public class EmployeePreferenceController {
         this.preferenceService = preferenceService;
     }
 
+    @Operation(summary = "查询员工偏好设置", operationId = "getEmployeePreference")
     @GetMapping
     public R<EmployeePreferenceResponse> getPreferences() {
         return R.ok(preferenceService.getCurrent());
     }
 
+    @Operation(summary = "更新员工偏好设置", operationId = "updateEmployeePreference")
     @PutMapping
     public R<EmployeePreferenceResponse> updatePreferences(@Valid @RequestBody UpdateEmployeePreferenceRequest request) {
         return R.ok(preferenceService.updateCurrent(request));

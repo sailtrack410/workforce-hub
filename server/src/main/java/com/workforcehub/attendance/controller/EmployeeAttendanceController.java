@@ -8,6 +8,7 @@ import com.workforcehub.attendance.dto.PunchRecordResponse;
 import com.workforcehub.attendance.dto.TeamAttendanceDateRangeQuery;
 import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.response.R;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,21 +32,25 @@ public class EmployeeAttendanceController {
         this.attendanceService = attendanceService;
     }
 
+    @Operation(summary = "员工打卡", operationId = "createAttendancePunch")
     @PostMapping("/punch")
     public R<PunchRecordResponse> punch(@Valid @RequestBody CreatePunchRecordRequest request) {
         return R.ok(attendanceService.punch(request));
     }
 
+    @Operation(summary = "查询个人每日考勤结果", operationId = "listEmployeeAttendanceDailyResults")
     @GetMapping("/daily-results")
     public R<List<AttendanceDailyResultResponse>> dailyResults(@Valid AttendanceDateRangeQuery query) {
         return R.ok(attendanceService.listCurrentEmployeeDailyResults(query.getStartDate(), query.getEndDate()));
     }
 
+    @Operation(summary = "查询个人考勤异常", operationId = "listEmployeeAttendanceExceptions")
     @GetMapping("/exceptions")
     public R<List<AttendanceExceptionResponse>> exceptions(@Valid AttendanceDateRangeQuery query) {
         return R.ok(attendanceService.listCurrentEmployeeExceptions(query.getStartDate(), query.getEndDate()));
     }
 
+    @Operation(summary = "查询团队每日考勤结果", operationId = "listTeamAttendanceDailyResults")
     @GetMapping("/team/daily-results")
     public R<List<AttendanceDailyResultResponse>> teamDailyResults(@Valid TeamAttendanceDateRangeQuery query) {
         return R.ok(attendanceService.listTeamDailyResults(

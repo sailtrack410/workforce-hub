@@ -8,6 +8,7 @@ import com.workforcehub.auth.dto.RbacDtos.RoleResponse;
 import com.workforcehub.auth.dto.RbacDtos.RoleSaveRequest;
 import com.workforcehub.auth.service.RbacService;
 import com.workforcehub.common.response.R;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,54 +36,64 @@ public class AdminRbacController {
         this.rbacService = rbacService;
     }
 
+    @Operation(summary = "查询权限列表", operationId = "listRbacPermissions")
     @GetMapping("/permissions")
     public R<List<PermissionResponse>> permissions() {
         return R.ok(rbacService.listPermissions());
     }
 
+    @Operation(summary = "查询角色列表", operationId = "listRbacRoles")
     @GetMapping("/roles")
     public R<List<RoleResponse>> roles(@RequestParam(required = false) String keyword) {
         return R.ok(rbacService.listRoles(keyword));
     }
 
+    @Operation(summary = "创建角色", operationId = "createRbacRole")
     @PostMapping("/roles")
     public R<RoleResponse> createRole(@Valid @RequestBody RoleSaveRequest request) {
         return R.ok(rbacService.createRole(request));
     }
 
+    @Operation(summary = "查询角色详情", operationId = "getRbacRole")
     @GetMapping("/roles/{roleId}")
     public R<RoleResponse> role(@PathVariable Long roleId) {
         return R.ok(rbacService.getRole(roleId));
     }
 
+    @Operation(summary = "更新角色", operationId = "updateRbacRole")
     @PutMapping("/roles/{roleId}")
     public R<RoleResponse> updateRole(@PathVariable Long roleId,
                                       @Valid @RequestBody RoleSaveRequest request) {
         return R.ok(rbacService.updateRole(roleId, request));
     }
 
+    @Operation(summary = "删除角色", operationId = "deleteRbacRole")
     @DeleteMapping("/roles/{roleId}")
     public R<Void> deleteRole(@PathVariable Long roleId) {
         rbacService.deleteRole(roleId);
         return R.ok();
     }
 
+    @Operation(summary = "分配角色权限", operationId = "assignRbacRolePermissions")
     @PutMapping("/roles/{roleId}/permissions")
     public R<RoleResponse> assignRolePermissions(@PathVariable Long roleId,
                                                  @Valid @RequestBody AssignRolePermissionsRequest request) {
         return R.ok(rbacService.assignRolePermissions(roleId, request));
     }
 
+    @Operation(summary = "查询管理员用户列表", operationId = "listRbacAdminUsers")
     @GetMapping("/admin-users")
     public R<List<AdminUserRoleResponse>> adminUsers() {
         return R.ok(rbacService.listAdminUsers());
     }
 
+    @Operation(summary = "查询管理员用户角色", operationId = "getRbacAdminUserRoles")
     @GetMapping("/admin-users/{adminUserId}/roles")
     public R<AdminUserRoleResponse> adminUserRoles(@PathVariable Long adminUserId) {
         return R.ok(rbacService.getAdminUserRoles(adminUserId));
     }
 
+    @Operation(summary = "分配管理员用户角色", operationId = "assignRbacAdminUserRoles")
     @PutMapping("/admin-users/{adminUserId}/roles")
     public R<AdminUserRoleResponse> assignAdminRoles(@PathVariable Long adminUserId,
                                                     @Valid @RequestBody AssignAdminRolesRequest request) {

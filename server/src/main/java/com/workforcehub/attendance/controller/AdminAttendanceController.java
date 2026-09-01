@@ -14,6 +14,7 @@ import com.workforcehub.attendance.dto.CreateAttendanceShiftRequest;
 import com.workforcehub.attendance.dto.UpdateAttendanceScheduleRequest;
 import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.response.R;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,56 +42,66 @@ public class AdminAttendanceController {
         this.attendanceService = attendanceService;
     }
 
+    @Operation(summary = "创建考勤日历", operationId = "createAttendanceCalendar")
     @PostMapping("/calendars")
     public R<AttendanceCalendarResponse> createCalendar(
             @Valid @RequestBody CreateAttendanceCalendarRequest request) {
         return R.ok(attendanceService.createCalendar(request));
     }
 
+    @Operation(summary = "查询考勤日历列表", operationId = "listAttendanceCalendars")
     @GetMapping("/calendars")
     public R<List<AttendanceCalendarResponse>> calendars() {
         return R.ok(attendanceService.listCalendars());
     }
 
+    @Operation(summary = "创建考勤班次", operationId = "createAttendanceShift")
     @PostMapping("/shifts")
     public R<AttendanceShiftResponse> createShift(
             @Valid @RequestBody CreateAttendanceShiftRequest request) {
         return R.ok(attendanceService.createShift(request));
     }
 
+    @Operation(summary = "查询考勤班次列表", operationId = "listAttendanceShifts")
     @GetMapping("/shifts")
     public R<List<AttendanceShiftResponse>> shifts() {
         return R.ok(attendanceService.listShifts());
     }
 
+    @Operation(summary = "创建考勤组", operationId = "createAttendanceGroup")
     @PostMapping("/groups")
     public R<AttendanceGroupResponse> createGroup(
             @Valid @RequestBody CreateAttendanceGroupRequest request) {
         return R.ok(attendanceService.createGroup(request));
     }
 
+    @Operation(summary = "查询考勤组列表", operationId = "listAttendanceGroups")
     @GetMapping("/groups")
     public R<List<AttendanceGroupResponse>> groups() {
         return R.ok(attendanceService.listGroups());
     }
 
+    @Operation(summary = "添加考勤组成员", operationId = "addAttendanceGroupMember")
     @PostMapping("/groups/{groupId}/members")
     public R<AttendanceGroupMemberResponse> addGroupMember(@PathVariable Long groupId,
                                                            @Valid @RequestBody AddAttendanceGroupMemberRequest request) {
         return R.ok(attendanceService.addGroupMember(groupId, request));
     }
 
+    @Operation(summary = "查询考勤组成员列表", operationId = "listAttendanceGroupMembers")
     @GetMapping("/groups/{groupId}/members")
     public R<List<AttendanceGroupMemberResponse>> groupMembers(@PathVariable Long groupId) {
         return R.ok(attendanceService.listGroupMembers(groupId));
     }
 
+    @Operation(summary = "创建考勤排班", operationId = "createAttendanceSchedule")
     @PostMapping("/schedules")
     public R<AttendanceScheduleResponse> createSchedule(
             @Valid @RequestBody CreateAttendanceScheduleRequest request) {
         return R.ok(attendanceService.createSchedule(request));
     }
 
+    @Operation(summary = "查询考勤排班列表", operationId = "listAttendanceSchedules")
     @GetMapping("/schedules")
     public R<List<AttendanceScheduleResponse>> schedules(@RequestParam(required = false) Long userId,
                                                          @RequestParam LocalDate startDate,
@@ -98,12 +109,14 @@ public class AdminAttendanceController {
         return R.ok(attendanceService.listSchedules(userId, startDate, endDate));
     }
 
+    @Operation(summary = "更新考勤排班", operationId = "updateAttendanceSchedule")
     @PutMapping("/schedules/{scheduleId}")
     public R<AttendanceScheduleResponse> updateSchedule(@PathVariable Long scheduleId,
                                                         @Valid @RequestBody UpdateAttendanceScheduleRequest request) {
         return R.ok(attendanceService.updateSchedule(scheduleId, request));
     }
 
+    @Operation(summary = "查询每日考勤结果", operationId = "listAdminAttendanceDailyResults")
     @GetMapping("/daily-results")
     public R<List<AttendanceDailyResultResponse>> dailyResults(@RequestParam(required = false) Long userId,
                                                                @RequestParam LocalDate startDate,

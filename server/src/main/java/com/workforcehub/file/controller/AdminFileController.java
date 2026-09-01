@@ -27,6 +27,7 @@ import com.workforcehub.file.service.FileQueryService;
 import com.workforcehub.file.service.FileQuotaPolicyService;
 import com.workforcehub.file.service.FileUploadConfirmService;
 import com.workforcehub.file.service.FileUploadTicketService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +78,7 @@ public class AdminFileController {
         this.downloadResponseFactory = downloadResponseFactory;
     }
 
+    @Operation(summary = "分页查询企业文件", operationId = "pageAdminFiles")
     @GetMapping
     public R<PageResult<AdminFileResponse>> listFiles(@RequestParam(defaultValue = "1") long pageNo,
                                                       @RequestParam(defaultValue = "20") long pageSize,
@@ -91,71 +93,84 @@ public class AdminFileController {
         ));
     }
 
+    @Operation(summary = "分页查询回收站文件", operationId = "pageAdminRecycleFiles")
     @GetMapping("/recycle-bin")
     public R<PageResult<AdminFileResponse>> listRecycleBin(@RequestParam(defaultValue = "1") long pageNo,
                                                            @RequestParam(defaultValue = "20") long pageSize) {
         return R.ok(fileQueryService.listAdminFiles(pageNo, pageSize, true));
     }
 
+    @Operation(summary = "创建上传凭证", operationId = "createAdminUploadTicket")
     @PostMapping("/upload-tickets")
     public R<UploadTicketResponse> createUploadTicket(@Valid @RequestBody CreateUploadTicketRequest request) {
         return R.ok(fileUploadTicketService.createAdminUploadTicket(request));
     }
 
+    @Operation(summary = "确认文件上传", operationId = "confirmAdminUpload")
     @PostMapping("/confirm-upload")
     public R<AttachmentRefResponse> confirmUpload(@Valid @RequestBody ConfirmUploadRequest request) {
         return R.ok(fileUploadConfirmService.confirmAdminUpload(request));
     }
 
+    @Operation(summary = "查询存储摘要", operationId = "getAdminStorageSummary")
     @GetMapping("/storage-summary")
     public R<StorageSummaryResponse> storageSummary() {
         return R.ok(fileQuotaPolicyService.getStorageSummary());
     }
 
+    @Operation(summary = "创建下载凭证", operationId = "createAdminDownloadTicket")
     @PostMapping("/{attachmentRefId}/download-tickets")
     public R<DownloadTicketResponse> createDownloadTicket(@PathVariable Long attachmentRefId,
                                                           @Valid @RequestBody CreateDownloadTicketRequest request) {
         return R.ok(fileDownloadService.createAdminDownloadTicket(attachmentRefId, request));
     }
 
+    @Operation(summary = "下载文件", operationId = "downloadAdminFile")
     @GetMapping("/download/{ticketNo}")
     public ResponseEntity<Resource> download(@PathVariable String ticketNo) {
         DownloadFileResult result = fileDownloadService.downloadAdminFile(ticketNo);
         return downloadResponseFactory.attachment(result);
     }
 
+    @Operation(summary = "文件移入回收站", operationId = "trashAdminFile")
     @PostMapping("/{attachmentRefId}/trash")
     public R<FileTrashResponse> trash(@PathVariable Long attachmentRefId,
                                       @Valid @RequestBody FileTrashRequest request) {
         return R.ok(fileLifecycleService.trashAdminFile(attachmentRefId, request));
     }
 
+    @Operation(summary = "恢复回收站文件", operationId = "restoreAdminFile")
     @PostMapping("/{attachmentRefId}/restore")
     public R<FileRestoreResponse> restore(@PathVariable Long attachmentRefId,
                                           @Valid @RequestBody FileTrashRequest request) {
         return R.ok(fileLifecycleService.restoreAdminFile(attachmentRefId, request));
     }
 
+    @Operation(summary = "彻底删除文件", operationId = "purgeAdminFile")
     @DeleteMapping("/{attachmentRefId}")
     public R<FilePurgeResponse> purge(@PathVariable Long attachmentRefId) {
         return R.ok(fileLifecycleService.purgeAdminFile(attachmentRefId));
     }
 
+    @Operation(summary = "执行文件清理任务", operationId = "runCleanupJob")
     @PostMapping("/cleanup-jobs/run")
     public R<CleanupJobRunResponse> runCleanupJob(@Valid @RequestBody RunCleanupJobRequest request) {
         return R.ok(fileCleanupJobService.runCleanupJob(request));
     }
 
+    @Operation(summary = "查询配额策略列表", operationId = "listQuotaPolicies")
     @GetMapping("/quota-policies")
     public R<List<QuotaPolicyResponse>> listQuotaPolicies(@RequestParam(required = false) String scopeType) {
         return R.ok(fileQuotaPolicyService.listQuotaPolicies(scopeType));
     }
 
+    @Operation(summary = "创建配额策略", operationId = "createQuotaPolicy")
     @PostMapping("/quota-policies")
     public R<QuotaPolicyResponse> createQuotaPolicy(@Valid @RequestBody CreateQuotaPolicyRequest request) {
         return R.ok(fileQuotaPolicyService.createQuotaPolicy(request));
     }
 
+    @Operation(summary = "更新配额策略", operationId = "updateQuotaPolicy")
     @PutMapping("/quota-policies/{policyId}")
     public R<QuotaPolicyResponse> updateQuotaPolicy(@PathVariable Long policyId,
                                                     @Valid @RequestBody UpdateQuotaPolicyRequest request) {

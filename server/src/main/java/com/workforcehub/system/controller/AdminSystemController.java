@@ -7,6 +7,7 @@ import com.workforcehub.system.dto.AdminAuditLogResponse;
 import com.workforcehub.system.dto.AdminPermissionResponse;
 import com.workforcehub.system.dto.AdminRoleResponse;
 import com.workforcehub.system.service.AdminSystemService;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,16 +29,19 @@ public class AdminSystemController {
         this.adminSystemService = adminSystemService;
     }
 
+    @Operation(summary = "查询角色列表", operationId = "listAdminRoles")
     @GetMapping("/roles")
     public R<List<AdminRoleResponse>> roles() {
         return R.ok(adminSystemService.listRoles());
     }
 
+    @Operation(summary = "查询权限列表", operationId = "listAdminPermissions")
     @GetMapping("/permissions")
     public R<List<AdminPermissionResponse>> permissions() {
         return R.ok(adminSystemService.listPermissions());
     }
 
+    @Operation(summary = "分页查询审计日志", operationId = "pageAuditLogs")
     @GetMapping("/audit-logs")
     public R<PageResult<AdminAuditLogResponse>> auditLogs(@ModelAttribute AdminAuditLogQuery query) {
         return R.ok(adminSystemService.pageAuditLogs(query));

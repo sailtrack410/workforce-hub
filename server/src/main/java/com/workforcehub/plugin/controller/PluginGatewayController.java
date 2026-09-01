@@ -10,6 +10,7 @@ import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.plugin.sdk.ServiceResult;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,7 @@ public class PluginGatewayController {
     /**
      * 执行插件动作。
      */
+    @Operation(summary = "调用插件动作", operationId = "invokePluginAction")
     @PostMapping("/{pluginId}/actions/{actionCode}")
     public ResponseEntity<ServiceResult<Object>> executeAction(
             @PathVariable String pluginId,

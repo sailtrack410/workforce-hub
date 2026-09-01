@@ -5,6 +5,7 @@ import com.workforcehub.agent.dto.AgentTaskResponse;
 import com.workforcehub.agent.dto.CreateAgentTaskRequest;
 import com.workforcehub.agent.service.AgentService;
 import com.workforcehub.common.response.R;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,11 +31,13 @@ public class EmployeeAgentController {
         this.agentService = agentService;
     }
 
+    @Operation(summary = "查询员工可用 Agent", operationId = "listEmployeeAgents")
     @GetMapping
     public R<List<AgentResponse>> listAgents(@RequestParam(required = false) String keyword) {
         return R.ok(agentService.listCurrentEmployeeAgents(keyword));
     }
 
+    @Operation(summary = "创建 Agent 任务", operationId = "createEmployeeAgentTask")
     @PostMapping("/{agentId}/tasks")
     public R<AgentTaskResponse> createTask(@PathVariable Long agentId,
                                            @Valid @RequestBody CreateAgentTaskRequest request) {

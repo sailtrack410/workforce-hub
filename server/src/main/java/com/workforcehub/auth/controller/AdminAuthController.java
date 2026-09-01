@@ -6,6 +6,7 @@ import com.workforcehub.auth.dto.LoginResponse;
 import com.workforcehub.auth.service.AccountService;
 import com.workforcehub.auth.service.LoginService;
 import com.workforcehub.common.response.R;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -26,18 +27,21 @@ public class AdminAuthController {
         this.accountService = accountService;
     }
 
+    @Operation(summary = "管理员登录", operationId = "loginAdmin")
     @PostMapping("/login")
     public R<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                   HttpServletRequest httpRequest) {
         return R.ok(loginService.loginAdmin(request, httpRequest));
     }
 
+    @Operation(summary = "管理员登出", operationId = "logoutAdmin")
     @PostMapping("/logout")
     public R<Void> logout(HttpServletRequest httpRequest) {
         loginService.logout(httpRequest);
         return R.ok();
     }
 
+    @Operation(summary = "查询当前管理员信息", operationId = "getCurrentAdmin")
     @GetMapping("/me")
     public R<CurrentUserResponse> me() {
         return R.ok(accountService.getCurrentUser());
