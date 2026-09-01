@@ -285,6 +285,36 @@ describe('adminApi', () => {
     expect(fetcher.mock.calls[0][1]?.method).toBe('DELETE');
   });
 
+  it('maps dict management endpoints', async () => {
+    const fetcher: FetcherMock = vi.fn(async () => jsonResponse([]));
+    const api = createAdminApi(createApiClient({ fetcher: fetcher as unknown as typeof fetch }));
+
+    await api.dicts.types();
+    await api.dicts.items('WORKFLOW_BIZ');
+    await api.dicts.create({ dictType: 'WORKFLOW_BIZ', itemCode: 'LEAVE', itemLabel: '请假', sortNo: 1, status: 1, remark: null });
+    await api.dicts.update('9001', { dictType: 'WORKFLOW_BIZ', itemCode: 'LEAVE', itemLabel: '请假', sortNo: 2, status: 0, remark: null });
+    await api.dicts.remove('9001');
+
+    expect(fetcher.mock.calls.map((call) => call[0])).toEqual([
+      '/api/admin/dicts/types',
+      '/api/admin/dicts?dictType=WORKFLOW_BIZ',
+      '/api/admin/dicts',
+      '/api/admin/dicts/9001',
+      '/api/admin/dicts/9001',
+    ]);
+    expect(fetcher.mock.calls[2][1]?.method).toBe('POST');
+    expect(fetcher.mock.calls[3][1]?.method).toBe('PUT');
+    expect(fetcher.mock.calls[4][1]?.method).toBe('DELETE');
+    expect(JSON.parse(String(fetcher.mock.calls[2][1]?.body))).toEqual({
+      dictType: 'WORKFLOW_BIZ',
+      itemCode: 'LEAVE',
+      itemLabel: '请假',
+      sortNo: 1,
+      status: 1,
+      remark: null,
+    });
+  });
+
   it('preserves unsafe integer identifiers', () => {
     const payload = parseJsonPreservingUnsafeIntegers('{"taskId":9223372036854775807,"publishedVersionId":2057829816590286850,"count":9223372036854775807}');
 

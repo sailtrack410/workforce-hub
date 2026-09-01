@@ -1350,3 +1350,34 @@ export interface NotificationChannelTestResponse {
   message: string;
   testedAt?: string | null;
 }
+
+/* =========================================================
+   数据字典
+   ========================================================= */
+
+export interface DictTypeResponse {
+  dictType: string;
+  itemCount: number;
+}
+
+export interface DictItemResponse {
+  id: EntityId;
+  dictType: string;
+  itemCode: string;
+  itemLabel: string;
+  sortNo: number;
+  status: number;
+  statusName?: string | null;
+  remark?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface DictItemSaveRequest {
+  dictType: string;
+  itemCode: string;
+  itemLabel: string;
+  sortNo?: number | null;
+  status?: number | null;
+  remark?: string | null;
+}

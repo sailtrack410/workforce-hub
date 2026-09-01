@@ -22,6 +22,7 @@ describe('admin router', () => {
     expect(findRoute(routes, '/ai-models')?.name).toBe('admin-ai-models');
     expect(findRoute(routes, '/system')?.name).toBe('admin-system');
     expect(findRoute(routes, '/settings')?.name).toBe('admin-settings');
+    expect(findRoute(routes, '/dicts')?.name).toBe('admin-dicts');
     expect(findRoute(routes, '/roles')?.name).toBe('admin-roles');
     expect(findRoute(routes, '/attendance')?.name).toBe('admin-attendance');
     expect(findRoute(routes, '/agent-config')?.name).toBe('admin-agent-config');

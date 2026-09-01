@@ -44,11 +44,16 @@ public class AdminAlertService {
     private final JdbcTemplate jdbcTemplate;
     private final AuditLogWriter auditLogWriter;
     private final ObjectMapper objectMapper;
+    private final AdminDictService adminDictService;
 
-    public AdminAlertService(JdbcTemplate jdbcTemplate, AuditLogWriter auditLogWriter, ObjectMapper objectMapper) {
+    public AdminAlertService(JdbcTemplate jdbcTemplate,
+                             AuditLogWriter auditLogWriter,
+                             ObjectMapper objectMapper,
+                             AdminDictService adminDictService) {
         this.jdbcTemplate = jdbcTemplate;
         this.auditLogWriter = auditLogWriter;
         this.objectMapper = objectMapper;
+        this.adminDictService = adminDictService;
     }
 
     public List<Map<String, Object>> listActiveAlerts() {
@@ -243,7 +248,10 @@ public class AdminAlertService {
         return row;
     }
 
+    // 名称翻译优先读数据字典，未配置时回退内置映射
     private String severityName(String value) {
+        String label = adminDictService.label("alert_severity", value);
+        if (label != null) return label;
         if ("CRITICAL".equals(value)) return "严重";
         if ("WARNING".equals(value)) return "警告";
         if ("INFO".equals(value)) return "提示";
@@ -251,6 +259,8 @@ public class AdminAlertService {
     }
 
     private String sourceModuleName(String value) {
+        String label = adminDictService.label("alert_source", value);
+        if (label != null) return label;
         if ("AGENT".equals(value)) return "AI 任务";
         if ("IM".equals(value)) return "消息";
         if ("RAGFLOW".equals(value)) return "知识库";
@@ -259,6 +269,8 @@ public class AdminAlertService {
     }
 
     private String channelTypeName(String value) {
+        String label = adminDictService.label("alert_channel_type", value);
+        if (label != null) return label;
         if ("WEBHOOK".equals(value)) return "Webhook";
         if ("EMAIL".equals(value)) return "邮件";
         if ("IM".equals(value)) return "站内消息";
@@ -266,6 +278,8 @@ public class AdminAlertService {
     }
 
     private String actionTypeName(String value) {
+        String label = adminDictService.label("alert_action", value);
+        if (label != null) return label;
         if ("IGNORE".equals(value)) return "忽略";
         if ("RESOLVE".equals(value)) return "已处理";
         if ("RETRY".equals(value)) return "重试";

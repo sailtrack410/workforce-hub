@@ -40,7 +40,8 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
         new PathPermission("/api/admin/agents/", "ADMIN_AGENT_MANAGE"),
         new PathPermission("/api/admin/files/", "ADMIN_FILE_MANAGE"),
         new PathPermission("/api/admin/ragflow/", "ADMIN_RAGFLOW_MANAGE"),
-        new PathPermission("/api/admin/notification-channels", "ADMIN_NOTIFICATION_CHANNEL_MANAGE")
+        new PathPermission("/api/admin/notification-channels", "ADMIN_NOTIFICATION_CHANNEL_MANAGE"),
+        new PathPermission("/api/admin/dicts", "ADMIN_DICT_MANAGE")
     );
 
     private final ObjectMapper objectMapper;

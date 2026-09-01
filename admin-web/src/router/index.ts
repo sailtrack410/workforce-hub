@@ -19,6 +19,7 @@ const UserView = () => import('@/views/UserView.vue');
 const FileCleanupView = () => import('@/views/FileCleanupView.vue');
 const RagflowView = () => import('@/views/RagflowView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
+const DictView = () => import('@/views/DictView.vue');
 const ImOutboxGovernanceView = () => import('@/views/ImOutboxGovernanceView.vue');
 const PermissionView = () => import('@/views/PermissionView.vue');
 const AuditLogView = () => import('@/views/AuditLogView.vue');
@@ -59,6 +60,7 @@ export const adminRoutes = [
       { path: 'audit-logs', name: 'admin-audit-logs', component: AuditLogView },
       { path: 'message-delivery', name: 'admin-message-delivery', component: ImOutboxGovernanceView },
       { path: 'settings', name: 'admin-settings', component: SettingsView, meta: { permission: 'ADMIN_NOTIFICATION_CHANNEL_MANAGE' } },
+      { path: 'dicts', name: 'admin-dicts', component: DictView, meta: { permission: 'ADMIN_DICT_MANAGE' } },
     ],
   },
   {

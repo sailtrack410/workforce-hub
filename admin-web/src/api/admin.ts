@@ -51,6 +51,9 @@ import type {
   CreateLlmModelRequest,
   CreateUploadTicketRequest,
   CurrentUserResponse,
+  DictItemResponse,
+  DictItemSaveRequest,
+  DictTypeResponse,
   DownloadTicketResponse,
   EntityId,
   GrantAgentAclRequest,
@@ -161,6 +164,13 @@ export function createAdminApi(client: ApiClient = defaultApiClient) {
       roles: () => client.get<AdminRoleResponse[]>('/api/admin/system/roles'),
       permissions: () => client.get<AdminPermissionResponse[]>('/api/admin/system/permissions'),
       auditLogs: (query: AdminAuditLogQuery = {}) => client.get<PageResult<AdminAuditLogResponse>>('/api/admin/system/audit-logs', { query }),
+    },
+    dicts: {
+      types: () => client.get<DictTypeResponse[]>('/api/admin/dicts/types'),
+      items: (dictType: string) => client.get<DictItemResponse[]>('/api/admin/dicts', { query: { dictType } }),
+      create: (request: DictItemSaveRequest) => client.post<void>('/api/admin/dicts', request),
+      update: (id: EntityId, request: DictItemSaveRequest) => client.put<void>(`/api/admin/dicts/${pathId(id)}`, request),
+      remove: (id: EntityId) => client.delete<void>(`/api/admin/dicts/${pathId(id)}`),
     },
     rbac: {
       permissions: () => client.get<RbacPermissionResponse[]>('/api/admin/rbac/permissions'),
