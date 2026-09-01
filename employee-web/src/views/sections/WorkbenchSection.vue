@@ -20,6 +20,8 @@ import {
   ShoppingCart,
   Stamp,
   Timer,
+  TrendingDown,
+  TrendingUp,
   Upload,
   X,
 } from 'lucide-vue-next';
@@ -423,7 +425,6 @@ const genericOaSubmitDisabled = computed(() => genericOaSubmitting.value || !act
 const leaveAvailableMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.availableMinutes ?? 0), 0));
 const leaveFrozenMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.frozenMinutes ?? 0), 0));
 const activeLeaveAccountCount = computed(() => leaveAccounts.value.filter((account) => account.status === 'ACTIVE').length);
-const frozenLeaveAccountCount = computed(() => leaveAccounts.value.filter((account) => (account.frozenMinutes ?? 0) > 0).length);
 const recentLeaveAccounts = computed(() => leaveAccounts.value.filter((account) => account.lastChangeMinutes !== undefined && account.lastChangeMinutes !== null));
 const workflowBuckets = computed(() => [
   { key: 'pending' as const, label: '待处理', count: workflowRequests.value.filter((request) => workflowBucketOf(request.status) === 'pending').length },
@@ -444,20 +445,32 @@ function leaveAccountTone(account: LeaveAccountResponse) {
   return 'success';
 }
 
-function leaveAccountToneClass(index: number) {
-  return ['blue', 'green', 'amber', 'gray'][index % 4];
-}
-
 function leaveAccountApplyText(account: LeaveAccountResponse) {
   if (account.status !== 'ACTIVE') return statusText(account.status);
   if (account.balanceMode === 'NO_DEDUCT') return '可申请';
   return (account.availableMinutes ?? 0) > 0 ? '可申请' : '余额不足';
 }
 
-function leaveAccountChangeTone(account: LeaveAccountResponse) {
-  if ((account.lastChangeMinutes ?? 0) > 0) return 'positive';
-  if ((account.lastChangeMinutes ?? 0) < 0) return 'negative';
-  return 'neutral';
+function leaveAvailablePercent(account: LeaveAccountResponse) {
+  const total = Math.max(0, account.availableMinutes ?? 0) + Math.max(0, account.frozenMinutes ?? 0);
+  if (!total) return 100;
+  return Math.round((Math.max(0, account.availableMinutes ?? 0) / total) * 100);
+}
+
+function leaveChangeDirection(account: LeaveAccountResponse) {
+  return (account.lastChangeMinutes ?? 0) >= 0 ? 'in' : 'out';
+}
+
+function leaveTxnTypeText(txnType?: string | null) {
+  const labels: Record<string, string> = {
+    GRANT: '额度入账',
+    DEDUCT: '请假扣减',
+    CARRY: '年度结转',
+    CARRY_EXPIRE: '结转过期清零',
+    ADJUST: '人工调整',
+    REFUND: '撤销退回',
+  };
+  return labels[txnType ?? ''] ?? '余额变动';
 }
 
 function leaveBalanceModeText(account: LeaveAccountResponse) {
@@ -468,6 +481,11 @@ async function openLeaveInOa() {
   shell.selectItem('workbench', 'oa');
   await router.push({ name: 'employee-workbench-detail', params: { app: 'oa' } });
   await openLeaveDialog();
+}
+
+async function openOaRecords() {
+  shell.selectItem('workbench', 'oa');
+  await router.push({ name: 'employee-workbench-detail', params: { app: 'oa' } });
 }
 
 function openProcessCatalog() {
@@ -1149,87 +1167,79 @@ watch(workflowRequests, () => {
         />
         <AppSkeleton v-else-if="workbenchLoading" variant="block" :count="2" block-height="7rem" />
         <template v-else>
-          <article class="leave-balance-hero">
-            <div class="leave-balance-primary">
-              <span>假期账户</span>
-              <strong>{{ minutesToDayLabel(leaveAvailableMinutes) }}</strong>
-              <small>可用余额</small>
+          <!-- 主账户卡：核心余额 + 主操作，品牌渐变底 -->
+          <article class="leave-hero">
+            <i class="leave-hero-glow" aria-hidden="true" />
+            <div class="leave-hero-main">
+              <span class="leave-hero-label">可用假期余额</span>
+              <strong class="leave-hero-value">{{ minutesToDayLabel(leaveAvailableMinutes) }}</strong>
+              <p class="leave-hero-sub">
+                冻结 {{ minutesToDayLabel(leaveFrozenMinutes) }} · {{ activeLeaveAccountCount }} 个假种可申请
+              </p>
             </div>
-            <div class="leave-balance-side">
-              <div class="leave-hero-metrics">
-                <span>
-                  <strong>{{ minutesToDayLabel(leaveFrozenMinutes) }}</strong>
-                  <small>冻结余额</small>
-                </span>
-                <span>
-                  <strong>{{ activeLeaveAccountCount }}</strong>
-                  <small>可申请假种</small>
-                </span>
-                <span>
-                  <strong>{{ leaveAccounts.length }}</strong>
-                  <small>账户数</small>
-                </span>
-              </div>
-              <AppButton variant="primary" size="sm" type="button" @click="openLeaveInOa">
-                请假
-              </AppButton>
+            <div class="leave-hero-actions">
+              <button class="leave-hero-cta" type="button" @click="openLeaveInOa">申请请假</button>
+              <button class="leave-hero-link" type="button" @click="openOaRecords">申请记录 ›</button>
             </div>
           </article>
 
-          <div class="leave-balance-layout">
-            <section class="leave-account-panel">
-              <header class="leave-panel-head">
-                <div>
-                  <h3>假种账户</h3>
-                  <span>{{ activeLeaveAccountCount }} 个可申请 · {{ frozenLeaveAccountCount }} 个冻结中</span>
-                </div>
-              </header>
-              <section class="leave-account-grid refined">
-                <article
-                  v-for="(account, index) in leaveAccounts"
-                  :key="account.accountId"
-                  class="leave-balance-card"
-                  :class="`leave-tone-${leaveAccountToneClass(index)}`"
+          <!-- 假种卡包：横向滑动 -->
+          <section class="leave-wallet">
+            <header class="leave-section-head">
+              <h3>假种卡包</h3>
+              <span>{{ leaveAccounts.length }} 个账户</span>
+            </header>
+            <div v-if="leaveAccounts.length" class="leave-wallet-track">
+              <article
+                v-for="account in leaveAccounts"
+                :key="account.accountId"
+                class="leave-wallet-card"
+              >
+                <header class="leave-wallet-head">
+                  <strong>{{ account.leaveName }}</strong>
+                  <AppTag :tone="leaveAccountTone(account)">{{ leaveAccountApplyText(account) }}</AppTag>
+                </header>
+                <small class="leave-wallet-mode">{{ leaveBalanceModeText(account) }}</small>
+                <strong class="leave-wallet-value">{{ minutesToDayLabel(account.availableMinutes) }}</strong>
+                <div
+                  v-if="(account.availableMinutes ?? 0) + (account.frozenMinutes ?? 0) > 0"
+                  class="leave-wallet-bar"
+                  role="img"
+                  :aria-label="`可用 ${minutesToDayLabel(account.availableMinutes)}，冻结 ${minutesToDayLabel(account.frozenMinutes)}`"
                 >
-                  <div class="leave-card-head">
-                    <div>
-                      <small>{{ leaveBalanceModeText(account) }}</small>
-                      <h3>{{ account.leaveName }}</h3>
-                    </div>
-                    <AppTag :tone="leaveAccountTone(account)">{{ leaveAccountApplyText(account) }}</AppTag>
-                  </div>
-                  <strong>{{ minutesToDayLabel(account.availableMinutes) }}</strong>
-                  <dl>
-                    <div>
-                      <dt>冻结</dt>
-                      <dd>{{ minutesToDayLabel(account.frozenMinutes) }}</dd>
-                    </div>
-                  </dl>
-                </article>
-                <AppEmptyState v-if="!leaveAccounts.length" class="leave-account-empty" title="暂无假期账户" icon="workbench" />
-              </section>
-            </section>
+                  <i :style="{ width: `${leaveAvailablePercent(account)}%` }" />
+                </div>
+                <footer class="leave-wallet-foot">
+                  <span>可用 {{ minutesToDayLabel(account.availableMinutes) }}</span>
+                  <span v-if="(account.frozenMinutes ?? 0) > 0">冻结 {{ minutesToDayLabel(account.frozenMinutes) }}</span>
+                </footer>
+              </article>
+            </div>
+            <AppEmptyState v-else title="暂无假期账户" description="假期账户由企业按制度发放，发放后会显示在这里。" icon="workbench" />
+          </section>
 
-            <aside class="leave-change-panel">
-              <header class="leave-panel-head">
-                <div>
-                  <h3>近期变动</h3>
-                </div>
-              </header>
-              <div v-if="recentLeaveAccounts.length" class="leave-change-list">
-                <div v-for="account in recentLeaveAccounts" :key="`change-${account.accountId}`">
-                  <span>
-                    <strong>{{ account.leaveName }}</strong>
-                    <small>{{ account.lastTxnType ?? '最近变动' }}</small>
-                  </span>
-                  <em :class="`change-${leaveAccountChangeTone(account)}`">
-                    {{ (account.lastChangeMinutes ?? 0) > 0 ? '+' : '' }}{{ minutesToDayLabel(Math.abs(account.lastChangeMinutes ?? 0)) }}
-                  </em>
-                </div>
+          <!-- 近期变动：账单式流水 -->
+          <section class="leave-activity">
+            <header class="leave-section-head">
+              <h3>近期变动</h3>
+            </header>
+            <div v-if="recentLeaveAccounts.length" class="leave-activity-list">
+              <div v-for="account in recentLeaveAccounts" :key="`change-${account.accountId}`" class="leave-activity-row">
+                <span class="leave-activity-icon" :class="leaveChangeDirection(account)">
+                  <TrendingUp v-if="leaveChangeDirection(account) === 'in'" :size="15" />
+                  <TrendingDown v-else :size="15" />
+                </span>
+                <span class="leave-activity-copy">
+                  <strong>{{ account.leaveName }}</strong>
+                  <small>{{ leaveTxnTypeText(account.lastTxnType) }}</small>
+                </span>
+                <em class="leave-activity-amount" :class="leaveChangeDirection(account)">
+                  {{ (account.lastChangeMinutes ?? 0) >= 0 ? '+' : '−' }}{{ minutesToDayLabel(Math.abs(account.lastChangeMinutes ?? 0)) }}
+                </em>
               </div>
-              <AppEmptyState v-else title="暂无近期变动" icon="workbench" />
-            </aside>
-          </div>
+            </div>
+            <AppEmptyState v-else title="暂无近期变动" icon="workbench" />
+          </section>
         </template>
       </section>
     </template>
