@@ -29,6 +29,7 @@ export type {
 } from '../api';
 import type { ContactCategoryItem } from '../components/contact-category';
 import type { KnowledgeAnswerCard } from '@/types/knowledge';
+import { employeeApi } from '../api';
 import { fileSizeLabel, fileTypeLabelFromName } from '@/utils/file-format';
 import { createClientId } from '@/utils/request-id';
 
@@ -1206,10 +1207,20 @@ export const useShellStore = defineStore('employee-shell', {
     setTheme(theme: ThemeMode) {
       this.theme = theme;
       this.persistPreferences();
+      void this.syncPreferencesToServer();
     },
     toggleTheme() {
       this.theme = this.theme === 'light' ? 'dark' : 'light';
       this.persistPreferences();
+      void this.syncPreferencesToServer();
+    },
+    // 主题等快捷开关只改本地时，进入个人中心会被服务端偏好覆盖回弹；这里即时回写保持一致。
+    async syncPreferencesToServer() {
+      try {
+        await employeeApi.me.updatePreferences(this.currentPreferencePayload());
+      } catch {
+        // 偏好回写失败不影响本地即时生效
+      }
     },
     setMessageDensity(density: MessageDensity) {
       this.messageDensity = density;

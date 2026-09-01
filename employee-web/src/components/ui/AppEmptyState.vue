@@ -61,13 +61,19 @@ const emptyImage = computed(() => {
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
+/* 插画为浅色底，深色模式下降亮度并加重投影以融入暗色面板 */
+[data-theme='dark'] .empty-illustration {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  filter: brightness(0.88) saturate(0.9);
+}
+
 .empty-action {
   margin-top: var(--space-4);
   padding: var(--space-8) var(--space-20);
   border: 0;
   border-radius: var(--radius-8);
   background: var(--primary-600);
-  color: #fff;
+  color: var(--neutral-0);
   font-size: var(--text-body-sm);
   font-weight: 600;
   cursor: pointer;

@@ -160,7 +160,7 @@ const todayDoneCount = computed(() => todayTodos.value.filter((t) => t.completed
   border: 0;
   border-radius: var(--radius-8);
   background: var(--primary-600);
-  color: #fff;
+  color: var(--neutral-0);
   font-size: var(--text-caption-md);
   font-weight: 600;
   cursor: pointer;

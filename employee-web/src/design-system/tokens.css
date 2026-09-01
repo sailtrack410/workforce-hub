@@ -197,6 +197,7 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --surface-canvas: var(--neutral-900);
+  --surface-muted: #1c2530;
   --surface-panel: #202832;
   --surface-panel-muted: #26313d;
   --surface-panel-strong: #303b49;

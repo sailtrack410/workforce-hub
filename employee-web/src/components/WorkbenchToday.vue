@@ -293,8 +293,8 @@ const ringCircumference = 2 * Math.PI * 26;
   gap: var(--space-16);
   padding: var(--space-20) var(--space-24);
   border-radius: var(--radius-12, 0.75rem);
-  background: linear-gradient(120deg, var(--primary-600, #4f46e5), var(--primary-500, #6366f1) 60%, var(--info-500, #0ea5e9));
-  color: #fff;
+  background: linear-gradient(120deg, var(--primary-600), var(--primary-500) 60%, var(--info-500));
+  color: var(--neutral-0);
   overflow: hidden;
 }
 
@@ -343,11 +343,11 @@ const ringCircumference = 2 * Math.PI * 26;
   box-shadow: var(--shadow-md);
 }
 
-/* 淡色渐变底 */
-.strip-card.tone-success { background: linear-gradient(135deg, var(--success-50, #ecfdf5), var(--surface-panel) 80%); border-color: var(--success-200, #a7f3d0); }
-.strip-card.tone-primary { background: linear-gradient(135deg, var(--primary-50, #eef2ff), var(--surface-panel) 80%); border-color: var(--primary-200); }
-.strip-card.tone-warning { background: linear-gradient(135deg, var(--warning-50, #fffbeb), var(--surface-panel) 80%); border-color: var(--warning-200, #fde68a); }
-.strip-card.tone-info { background: linear-gradient(135deg, var(--info-50, #f0f9ff), var(--surface-panel) 80%); border-color: var(--info-200, #bae6fd); }
+/* 淡色渐变底，深浅色共用语义表面 token，深色模式自动转深 */
+.strip-card.tone-success { background: linear-gradient(135deg, var(--surface-positive), var(--surface-panel) 80%); border-color: color-mix(in srgb, var(--success-500) 32%, var(--border-default)); }
+.strip-card.tone-primary { background: linear-gradient(135deg, var(--surface-accent), var(--surface-panel) 80%); border-color: color-mix(in srgb, var(--primary-500) 32%, var(--border-default)); }
+.strip-card.tone-warning { background: linear-gradient(135deg, var(--surface-warning), var(--surface-panel) 80%); border-color: color-mix(in srgb, var(--warning-500) 35%, var(--border-default)); }
+.strip-card.tone-info { background: linear-gradient(135deg, var(--surface-info), var(--surface-panel) 80%); border-color: color-mix(in srgb, var(--info-500) 32%, var(--border-default)); }
 
 .strip-icon {
   display: grid;
@@ -359,10 +359,10 @@ const ringCircumference = 2 * Math.PI * 26;
   box-shadow: var(--shadow-xs);
 }
 
-.strip-icon.tone-success { background: var(--success-500, #22c55e); color: #fff; }
-.strip-icon.tone-primary { background: var(--primary-500); color: #fff; }
-.strip-icon.tone-warning { background: var(--warning-500, #f59e0b); color: #fff; }
-.strip-icon.tone-info { background: var(--info-500, #0ea5e9); color: #fff; }
+.strip-icon.tone-success { background: var(--success-500); color: var(--neutral-0); }
+.strip-icon.tone-primary { background: var(--primary-500); color: var(--neutral-0); }
+.strip-icon.tone-warning { background: var(--warning-500); color: var(--neutral-0); }
+.strip-icon.tone-info { background: var(--info-500); color: var(--neutral-0); }
 
 .strip-copy {
   display: grid;
@@ -508,8 +508,8 @@ const ringCircumference = 2 * Math.PI * 26;
 .heat-normal { background: var(--success-500, #22c55e); }
 .heat-late { background: var(--warning-500, #f59e0b); }
 .heat-absent { background: var(--danger-500, #ef4444); }
-.heat-weekend { background: var(--neutral-200, #e2e8f0); }
-.heat-none { background: var(--neutral-100, #f1f5f9); outline: 1px dashed var(--border-subtle); }
+.heat-weekend { background: var(--surface-panel-strong); }
+.heat-none { background: var(--surface-panel-muted); outline: 1px dashed var(--border-default); }
 .heat-future { background: transparent; outline: 1px dashed var(--border-subtle); }
 
 .heatmap-legend {
@@ -554,7 +554,7 @@ const ringCircumference = 2 * Math.PI * 26;
 
 .ring-track {
   fill: none;
-  stroke: var(--neutral-200, #e2e8f0);
+  stroke: var(--surface-panel-strong);
   stroke-width: 7;
 }
 

@@ -18,16 +18,8 @@ const props = withDefaults(defineProps<{
 });
 
 // 用户头像用 label 首字 + 稳定哈希取色，避免所有人共用同一个剪影图标。
-const PALETTES = [
-  ['#eef2ff', '#4f46e5'],
-  ['#ecfeff', '#0891b2'],
-  ['#f0fdf4', '#16a34a'],
-  ['#fff7ed', '#ea580c'],
-  ['#fdf2f8', '#db2777'],
-  ['#fefce8', '#a16207'],
-  ['#f5f3ff', '#7c3aed'],
-  ['#eff6ff', '#2563eb'],
-] as const;
+// 色板走 token 色调类（avatar-hue-*），深色模式下自动切换为深底浅字。
+const HUE_COUNT = 8;
 
 function hashLabel(value: string): number {
   let hash = 0;
@@ -42,7 +34,7 @@ const initial = computed(() => {
   return text ? Array.from(text)[0].toUpperCase() : '?';
 });
 
-const palette = computed(() => PALETTES[hashLabel(props.label) % PALETTES.length]);
+const hueClass = computed(() => `avatar-hue-${hashLabel(props.label) % HUE_COUNT}`);
 
 const isGlyphKind = computed(() => props.kind !== 'user');
 const fallbackIcon = computed(() => (props.kind === 'agent' ? Bot : Building2));
@@ -66,10 +58,7 @@ watch(() => props.image, () => {
   <span class="ui-avatar-wrap">
     <span
       class="ui-avatar"
-      :class="[props.tone, props.size, { 'has-image': showImage, 'is-initial': !isGlyphKind && !showImage }]"
-      :style="!isGlyphKind && !showImage
-        ? { background: palette[0], color: palette[1] }
-        : undefined"
+      :class="[props.tone, props.size, { 'has-image': showImage, 'is-initial': !isGlyphKind && !showImage }, !isGlyphKind && !showImage ? hueClass : '']"
     >
       <img v-if="showImage" :src="props.image" :alt="props.label" @error="imageFailed = true" />
       <span v-else-if="!isGlyphKind" class="ui-avatar-initial" aria-hidden="true">{{ initial }}</span>
@@ -177,6 +166,30 @@ watch(() => props.image, () => {
   background: var(--surface-panel-strong);
   color: var(--text-secondary);
 }
+
+/* 哈希色调：浅底深字；深色模式反转为深底浅字 */
+.ui-avatar.avatar-hue-0 { background: var(--primary-50); color: var(--primary-600); }
+.ui-avatar.avatar-hue-1 { background: var(--info-50); color: var(--info-600); }
+.ui-avatar.avatar-hue-2 { background: var(--success-50); color: var(--success-600); }
+.ui-avatar.avatar-hue-3 { background: var(--warning-50); color: var(--warning-700); }
+.ui-avatar.avatar-hue-4 { background: var(--danger-50); color: var(--danger-600); }
+.ui-avatar.avatar-hue-5 { background: var(--neutral-100); color: var(--neutral-600); }
+.ui-avatar.avatar-hue-6 { background: var(--primary-100); color: var(--primary-700); }
+.ui-avatar.avatar-hue-7 { background: var(--success-100); color: var(--success-700); }
+
+[data-theme='dark'] .ui-avatar.avatar-hue-0 { background: var(--primary-900); color: var(--primary-200); }
+[data-theme='dark'] .ui-avatar.avatar-hue-1 { background: var(--info-900); color: var(--info-200); }
+[data-theme='dark'] .ui-avatar.avatar-hue-2 { background: var(--success-900); color: var(--success-200); }
+[data-theme='dark'] .ui-avatar.avatar-hue-3 { background: var(--warning-900); color: var(--warning-200); }
+[data-theme='dark'] .ui-avatar.avatar-hue-4 { background: var(--danger-900); color: var(--danger-200); }
+[data-theme='dark'] .ui-avatar.avatar-hue-5 { background: var(--neutral-700); color: var(--neutral-200); }
+[data-theme='dark'] .ui-avatar.avatar-hue-6 { background: var(--primary-800); color: var(--primary-100); }
+[data-theme='dark'] .ui-avatar.avatar-hue-7 { background: var(--success-800); color: var(--success-100); }
+
+[data-theme='dark'] .ui-avatar.primary { background: var(--primary-900); color: var(--primary-200); }
+[data-theme='dark'] .ui-avatar.success { background: var(--success-900); color: var(--success-200); }
+[data-theme='dark'] .ui-avatar.warning { background: var(--warning-900); color: var(--warning-200); }
+[data-theme='dark'] .ui-avatar.danger { background: var(--danger-900); color: var(--danger-200); }
 
 .ui-avatar-status {
   position: absolute;
