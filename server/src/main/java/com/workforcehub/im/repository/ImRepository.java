@@ -358,9 +358,9 @@ public class ImRepository {
         jdbcTemplate.update("""
             INSERT INTO sys_attachment_ref
                 (id, owner_type, owner_id, file_object_id, original_file_name,
-                 display_name, uploader_type, uploader_id, visibility_scope, sort_order, created_by)
+                 display_name, uploader_type, uploader_id, visibility_scope, sort_order, created_by, updated_by)
             VALUES
-                (?, 'IM_MESSAGE', ?, ?, ?, ?, 'USER', ?, 'CONVERSATION_MEMBER', ?, ?)
+                (?, 'IM_MESSAGE', ?, ?, ?, ?, 'USER', ?, 'CONVERSATION_MEMBER', ?, ?, ?)
             """,
             attachmentRefId,
             messageId,
@@ -369,6 +369,7 @@ public class ImRepository {
             sourceAttachment.displayName(),
             uploaderId,
             sortOrder,
+            uploaderId,
             uploaderId
         );
         jdbcTemplate.update("""

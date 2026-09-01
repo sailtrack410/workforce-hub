@@ -91,6 +91,7 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  # INSERT 自动补 created_by/updated_by 的 AuditFillInterceptor 以 @Component 注册，由 starter 自动挂载
 
 # ==================== Flowable ====================
 # Flowable BPMN 引擎表（ACT_* / FLW_*）已通过 Flyway V11 纳入主库迁移。
@@ -160,7 +161,17 @@ knife4j:
   setting:
     language: zh_cn
 
-# ==================== Logging ====================
+# ==================== OpenAPI 分组（Knife4j 下拉切换） ====================
+springdoc:
+  group-configs:
+    - group: 管理端接口
+      paths-to-match: /api/admin/**
+    - group: 员工端接口
+      paths-to-match: /api/employee/**
+    - group: 开放与插件
+      paths-to-match: /api/csrf,/api/plugin-gateway/**
+
+# ==================== Monitoring ====================
 management:
   endpoints:
     web:
@@ -177,11 +188,8 @@ management:
     mail:
       enabled: ${MAIL_HEALTH_ENABLED:false}
 
+# 日志 pattern（含 requestId）统一由 logback-spring.xml 管理
 logging:
-  pattern:
-    # 把 RequestIdFilter 写入 MDC 的 requestId 打进每行日志，与响应头 X-Request-Id 对应，便于链路检索
-    # 注意 logback 的 %X 不支持 ":-" 默认值语法，key 必须写纯的 requestId
-    level: "%5p [%X{requestId}]"
   level:
     com.workforcehub: debug
     org.flowable: info

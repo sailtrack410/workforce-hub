@@ -204,7 +204,7 @@ public class OrgManagementService {
         }
         department.setUpdatedBy(operatorId);
         departmentMapper.updateById(department);
-        departmentMapper.deleteById(deptId);
+        departmentMapper.deleteById(deptId, operatorId);
         publishDepartmentStructureChangedEvent(
             "DELETED",
             department,

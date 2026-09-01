@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  日志配置：控制台 + 按天滚动文件（对齐 bangle-boot 的落盘能力）
+  - pattern 内嵌 MDC requestId，与 RequestIdFilter / 响应头 X-Request-Id 对应，链路可检索
+  - ASYNC_FILE 异步写不阻塞业务线程
+  - 文件落 target/logs（可用 LOG_HOME 覆盖），按天 + 100MB 切分，保留 30 天 / 总量 10GB
+-->
+<configuration>
+
+    <property name="LOG_HOME" value="${LOG_HOME:-target/logs}"/>
+    <!-- 与 application.yml 的 logging.pattern.level 对齐：日志行携带 requestId -->
+    <property name="COMMON_PATTERN" value="%d{yyyy-MM-dd'T'HH:mm:ss.SSS+08:00} %5p [%X{requestId}] ${PID:- } --- [%t] %-40.40logger{39} : %m%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${COMMON_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/workforce-hub.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/workforce-hub.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>10GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${COMMON_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="FILE"/>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+    </root>
+
+</configuration>

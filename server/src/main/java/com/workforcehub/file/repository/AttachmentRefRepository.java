@@ -38,9 +38,9 @@ public class AttachmentRefRepository {
         jdbcTemplate.update("""
             INSERT INTO sys_attachment_ref
                 (id, owner_type, owner_id, file_object_id, source_upload_ticket_id, original_file_name,
-                 display_name, uploader_type, uploader_id, visibility_scope, folder_id, created_by)
+                 display_name, uploader_type, uploader_id, visibility_scope, folder_id, created_by, updated_by)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             attachmentRefId,
             ownerType,
@@ -53,6 +53,7 @@ public class AttachmentRefRepository {
             uploaderId,
             visibilityScope(ownerType),
             folderId,
+            uploaderId,
             uploaderId
         );
     }

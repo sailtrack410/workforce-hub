@@ -1,5 +1,6 @@
 package com.workforcehub.system.repository;
 
+import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.common.util.IdGenerator;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -36,12 +37,13 @@ public class NotificationChannelRepository {
         if (existing != null) {
             return existing;
         }
+        Long operatorId = CurrentUserHolder.requireUserId();
         jdbcTemplate.update("""
             INSERT INTO notify_channel_config
-                (id, channel_code, channel_type, channel_name, enabled, timeout_millis)
+                (id, channel_code, channel_type, channel_name, enabled, timeout_millis, created_by, updated_by)
             VALUES
-                (?, 'EMAIL_DEFAULT', 'EMAIL', '邮件', 0, 5000)
-            """, IdGenerator.nextId());
+                (?, 'EMAIL_DEFAULT', 'EMAIL', '邮件', 0, 5000, ?, ?)
+            """, IdGenerator.nextId(), operatorId, operatorId);
         return findByCode("EMAIL_DEFAULT");
     }
 
@@ -87,14 +89,15 @@ public class NotificationChannelRepository {
         );
     }
 
-    public void updateTestResult(Long channelId, boolean success, String message) {
+    public void updateTestResult(Long channelId, boolean success, String message, Long operatorId) {
         jdbcTemplate.update("""
             UPDATE notify_channel_config
             SET last_test_success = ?,
                 last_test_message = ?,
-                last_tested_at = NOW()
+                last_tested_at = NOW(),
+                updated_by = ?
             WHERE id = ?
-            """, success ? 1 : 0, message, channelId);
+            """, success ? 1 : 0, message, operatorId, channelId);
     }
 
     private String selectSql() {

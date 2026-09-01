@@ -15,7 +15,7 @@ public interface OrgDepartmentMapper {
 
     int updateById(OrgDepartment department);
 
-    int deleteById(@Param("id") Long id);
+    int deleteById(@Param("id") Long id, @Param("updatedBy") Long updatedBy);
 
     long countByParentId(@Param("parentId") Long parentId);
 

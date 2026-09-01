@@ -176,15 +176,16 @@ public class WorkflowRepository {
         jdbcTemplate.update("""
             INSERT INTO sys_attachment_ref
                 (id, owner_type, owner_id, file_object_id, original_file_name,
-                 display_name, uploader_type, uploader_id, visibility_scope, created_by)
+                 display_name, uploader_type, uploader_id, visibility_scope, created_by, updated_by)
             VALUES
-                (?, 'WF_REQUEST', ?, ?, ?, ?, 'USER', ?, 'WORKFLOW_PARTICIPANT', ?)
+                (?, 'WF_REQUEST', ?, ?, ?, ?, 'USER', ?, 'WORKFLOW_PARTICIPANT', ?, ?)
             """,
             workflowAttachmentRefId,
             requestId,
             sourceAttachment.fileObjectId(),
             sourceAttachment.displayName(),
             sourceAttachment.displayName(),
+            uploaderId,
             uploaderId,
             uploaderId
         );

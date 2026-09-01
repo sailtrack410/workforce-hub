@@ -120,7 +120,7 @@ public class NotificationChannelService {
             log.warn("通知渠道测试邮件发送失败 channelCode={}", channelCode, e);
             message = sanitizeMailError(e);
         }
-        repository.updateTestResult(existing.id(), success, message);
+        repository.updateTestResult(existing.id(), success, message, operatorId);
         auditLogWriter.write(
             "ADMIN",
             operatorId,

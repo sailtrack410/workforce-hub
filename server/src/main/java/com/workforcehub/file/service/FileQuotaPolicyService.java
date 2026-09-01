@@ -134,9 +134,9 @@ public class FileQuotaPolicyService {
         jdbcTemplate.update("""
             INSERT INTO sys_storage_quota_policy
                 (id, policy_code, policy_name, scope_type, scope_id, quota_bytes,
-                 cache_quota_bytes, warning_threshold, block_threshold, status, created_by)
+                 cache_quota_bytes, warning_threshold, block_threshold, status, created_by, updated_by)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             policyId,
             request.getPolicyCode(),
@@ -148,6 +148,7 @@ public class FileQuotaPolicyService {
             request.getWarningThreshold(),
             request.getBlockThreshold(),
             request.getStatus(),
+            adminId,
             adminId
         );
         auditLogWriter.write("ADMIN", adminId, "FILE_QUOTA_POLICY_CREATED", "STORAGE_QUOTA_POLICY", policyId, "SUCCESS",
