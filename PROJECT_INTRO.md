@@ -271,7 +271,7 @@ services:
 
 ## 许可证
 
-（待定）
+本项目基于 [PolyForm Noncommercial 1.0.0](LICENSE.md) 许可证开源：个人学习、课程作业、研究与非营利用途可自由使用、修改、分发；商业使用需另行获得作者授权。详见根目录 [README.md](README.md)。
 
 ---
 
