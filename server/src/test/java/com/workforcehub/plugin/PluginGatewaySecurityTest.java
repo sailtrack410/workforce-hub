@@ -192,7 +192,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
 
         verifyGatewayNotEntered();
     }
@@ -214,7 +214,7 @@ class PluginGatewaySecurityTest {
 
         mockMvc.perform(request)
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
 
         verifyGatewayNotEntered();
     }
@@ -230,7 +230,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
     }
 
     @Test
@@ -243,7 +243,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value(4004));
+            .andExpect(jsonPath("$.code").value(100404));
     }
 
     @ParameterizedTest
@@ -261,7 +261,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value(4009));
+            .andExpect(jsonPath("$.code").value(100409));
     }
 
     @Test
@@ -276,7 +276,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value(4004));
+            .andExpect(jsonPath("$.code").value(100404));
 
         verify(permissionService).checkPermission(any(), eq(PLUGIN_ID), eq("missing.action"));
         verify(pluginManagerService).findActionHandler(PLUGIN_ID, "missing.action");
@@ -292,7 +292,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
 
         verify(pluginManagerService, org.mockito.Mockito.never())
             .findActionHandler(PLUGIN_ID, ACTION_CODE);
@@ -305,7 +305,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value(1000));
+            .andExpect(jsonPath("$.code").value(100400));
 
         verify(permissionService).checkPermission(any(), eq(PLUGIN_ID), eq(ACTION_CODE));
     }
@@ -317,7 +317,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value(1000))
+            .andExpect(jsonPath("$.code").value(100400))
             .andExpect(jsonPath("$.message").value("请求参数格式错误"));
     }
 
@@ -331,7 +331,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isInternalServerError())
-            .andExpect(jsonPath("$.code").value(5000))
+            .andExpect(jsonPath("$.code").value(100500))
             .andExpect(jsonPath("$.message").value("服务内部错误"));
     }
 
@@ -364,7 +364,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value(4009));
+            .andExpect(jsonPath("$.code").value(100409));
 
         // handler 不应被调用
         verify(handler, org.mockito.Mockito.never()).execute(any(), anyMap());
@@ -380,7 +380,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isInternalServerError())
-            .andExpect(jsonPath("$.code").value(5000));
+            .andExpect(jsonPath("$.code").value(100500));
 
         // guard 应释放，activeCount 回到 0
         assertEquals(0, lifecycleGuard.getActiveCount(PLUGIN_ID));
@@ -422,7 +422,7 @@ class PluginGatewaySecurityTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"test\"}"))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value(4009));
+            .andExpect(jsonPath("$.code").value(100409));
 
         handlerFinish.countDown();
 

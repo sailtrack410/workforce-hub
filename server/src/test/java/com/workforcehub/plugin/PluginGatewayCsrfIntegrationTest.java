@@ -52,7 +52,7 @@ class PluginGatewayCsrfIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(session)
                 .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value(4004));
+            .andExpect(jsonPath("$.code").value(100404));
     }
 
     @Test
@@ -63,11 +63,11 @@ class PluginGatewayCsrfIntegrationTest extends LocalIntegrationTestSupport {
                 .cookie(session)
                 .header(HttpHeaders.ORIGIN, "https://attacker.example"))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
 
         mockMvc.perform(gatewayRequest().cookie(session))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
     }
 
     @Test

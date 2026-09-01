@@ -1,5 +1,7 @@
 package com.workforcehub.plugin.controller;
 
+import com.workforcehub.common.exception.BusinessErrorCode;
+import com.workforcehub.common.response.R;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
@@ -36,6 +38,7 @@ import java.util.Set;
 /**
  * 插件动作调用网关。
  * 统一入口，校验插件状态、动作、权限，绑定 InvocationContext。
+ * 响应与全站一致使用 R 包装：code=0 成功；插件动作自身失败码原样透传；网关校验失败用 BusinessErrorCode。
  */
 @RestController
 @RequestMapping("/api/plugin-gateway")
@@ -70,7 +73,7 @@ public class PluginGatewayController {
      */
     @Operation(summary = "调用插件动作", operationId = "invokePluginAction")
     @PostMapping("/{pluginId}/actions/{actionCode}")
-    public ResponseEntity<ServiceResult<Object>> executeAction(
+    public ResponseEntity<R<Object>> executeAction(
             @PathVariable String pluginId,
             @PathVariable String actionCode,
             @RequestBody(required = false) Map<String, Object> params,
@@ -78,7 +81,7 @@ public class PluginGatewayController {
 
         if (!isTrustedRequestSource(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ServiceResult.fail(4003, "请求来源不受信任"));
+                .body(R.fail(BusinessErrorCode.FORBIDDEN.code(), "请求来源不受信任"));
         }
 
         if (params == null) {
@@ -91,19 +94,19 @@ public class PluginGatewayController {
             plugin = pluginManagerService.getPlugin(pluginId);
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ServiceResult.fail(4004, "插件不存在"));
+                .body(R.fail(BusinessErrorCode.NOT_FOUND.code(), "插件不存在"));
         }
 
         // 2. 检查插件状态
         if (plugin.getStatus() != PluginStatus.ACTIVE) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ServiceResult.fail(4009, "插件未启用"));
+                .body(R.fail(BusinessErrorCode.CONFLICT.code(), "插件未启用"));
         }
 
         // 并发守卫：原子检查门开 + 计数（在状态确认之后）
         if (!lifecycleGuard.tryAcquire(pluginId)) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ServiceResult.fail(4009, "插件正在停用"));
+                .body(R.fail(BusinessErrorCode.CONFLICT.code(), "插件正在停用"));
         }
         try {
             return doExecute(pluginId, actionCode, params, request);
@@ -112,7 +115,7 @@ public class PluginGatewayController {
         }
     }
 
-    private ResponseEntity<ServiceResult<Object>> doExecute(
+    private ResponseEntity<R<Object>> doExecute(
             String pluginId, String actionCode, Map<String, Object> params, HttpServletRequest request) {
 
         // 4. 绑定调用上下文
@@ -124,7 +127,7 @@ public class PluginGatewayController {
         } catch (PluginPermissionService.PermissionDeniedException | AccessDeniedException e) {
             log.debug("权限校验失败: pluginId={}, actionCode={}, reason={}", pluginId, actionCode, e.getMessage());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ServiceResult.fail(4003, "权限不足"));
+                .body(R.fail(BusinessErrorCode.FORBIDDEN.code(), "权限不足"));
         }
 
         // 3. 发现动作处理器
@@ -133,11 +136,11 @@ public class PluginGatewayController {
             handlerOpt = pluginManagerService.findActionHandler(pluginId, actionCode);
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ServiceResult.fail(4004, "插件不存在"));
+                .body(R.fail(BusinessErrorCode.NOT_FOUND.code(), "插件不存在"));
         }
         if (handlerOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ServiceResult.fail(4004, "动作不存在"));
+                .body(R.fail(BusinessErrorCode.NOT_FOUND.code(), "动作不存在"));
         }
 
         PluginActionHandler handler = handlerOpt.get();
@@ -146,35 +149,39 @@ public class PluginGatewayController {
         List<String> paramErrors = paramValidator.validate(handler.getDescriptor(), params);
         if (!paramErrors.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ServiceResult.fail(1000, String.join("; ", paramErrors)));
+                .body(R.fail(BusinessErrorCode.BAD_REQUEST.code(), String.join("; ", paramErrors)));
         }
 
         // 7. 执行动作
         try {
             ServiceResult<Object> result = handler.execute(ctx, params);
-            return ResponseEntity.ok(result);
+            if (result.getCode() != 0) {
+                // 插件动作的业务失败：保留插件自身错误码，仅换成统一响应包装
+                return ResponseEntity.ok(R.fail(result.getCode(), result.getMessage()));
+            }
+            return ResponseEntity.ok(R.ok(result.getData()));
         } catch (Exception e) {
             log.error("插件动作执行失败: pluginId={}, actionCode={}", pluginId, actionCode, e);
             // 不泄露内部信息
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ServiceResult.fail(5000, "动作执行失败"));
+                .body(R.fail(BusinessErrorCode.INTERNAL_ERROR.code(), "动作执行失败"));
         }
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ServiceResult<Object>> handleInvalidJson(HttpMessageNotReadableException e) {
+    public ResponseEntity<R<Object>> handleInvalidJson(HttpMessageNotReadableException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ServiceResult.fail(1000, "请求参数格式错误"));
+            .body(R.fail(BusinessErrorCode.BAD_REQUEST.code(), "请求参数格式错误"));
     }
 
     /**
      * 全局错误处理 - 不泄露内部信息。
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ServiceResult<Object>> handleException(Exception e) {
+    public ResponseEntity<R<Object>> handleException(Exception e) {
         log.error("网关异常", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ServiceResult.fail(5000, "服务内部错误"));
+            .body(R.fail(BusinessErrorCode.INTERNAL_ERROR.code(), "服务内部错误"));
     }
 
     private boolean isTrustedRequestSource(HttpServletRequest request) {

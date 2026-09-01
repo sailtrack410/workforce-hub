@@ -178,7 +178,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
                 .header("X-User-Id", "8001")
                 .header("X-User-Type", "ADMIN"))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
 
         verify(handler, never()).execute(any(), anyMap());
     }
@@ -199,7 +199,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
 
         invokeGateway(adminSession)
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
 
         verify(handler, times(1)).execute(any(), anyMap());
     }
@@ -294,7 +294,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
     private void assertGatewayForbidden(Cookie session) throws Exception {
         invokeGateway(session)
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(4003));
+            .andExpect(jsonPath("$.code").value(100403));
     }
 
     private MockHttpServletRequestBuilder gatewayRequest(Cookie session) {
