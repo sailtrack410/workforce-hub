@@ -47,7 +47,7 @@ python3 server/scripts/dev/start_agent_stub_server.py
 
 更完整的后端联调前置、演示账号和非空数据初始化说明见：
 
-- [employee-web后端联调基线.md](/Users/sailtrack/工程文件/java_web/workforce-hub/docs/本地联调/employee-web后端联调基线.md)
+- [employee-web后端联调基线.md](<repo-root>/docs/本地联调/employee-web后端联调基线.md)
 
 消息和待办运行态不再混入静态样例数据；接口加载失败或未登录时会显示空态/错误态。真实接口统一收口在 `src/api/employee.ts`，禁止在 Vue 组件里直接散写 `fetch`。
 

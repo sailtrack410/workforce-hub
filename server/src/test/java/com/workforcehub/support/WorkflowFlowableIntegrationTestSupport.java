@@ -69,7 +69,8 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
             env("TEST_DB_NAME", "workforce_hub_test")
         ));
         registry.add("spring.datasource.username", () -> envOrFallback("TEST_DB_USER", "DB_USER", "root"));
-        registry.add("spring.datasource.password", () -> envOrFallback("TEST_DB_PASSWORD", "DB_PASSWORD", "REDACTED_DB_PASSWORD"));
+        // 数据库口令只从环境变量/.env 读取，无兜底：缺失即失败，避免真实凭证入库
+        registry.add("spring.datasource.password", () -> TestEnv.require("TEST_DB_PASSWORD", "DB_PASSWORD"));
         registry.add("spring.data.redis.host", () -> env("REDIS_HOST", "localhost"));
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
         registry.add("spring.datasource.hikari.minimum-idle", () -> "0");

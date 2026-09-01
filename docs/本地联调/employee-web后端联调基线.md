@@ -163,7 +163,7 @@ python3 server/scripts/dev/bootstrap_demo_data.py
 ```bash
 cd server
 DB_USER=root \
-DB_PASSWORD=REDACTED_DB_PASSWORD \
+DB_PASSWORD=$$your-db-password \
 AGENT_MODEL_ENABLED=true \
 AGENT_MODEL_BASE_URL=http://127.0.0.1:18080/v1 \
 AGENT_MODEL_API_KEY=demo-key \

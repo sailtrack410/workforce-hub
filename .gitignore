@@ -41,3 +41,10 @@ docs/申报材料/
 *.log
 server-8080.log
 docs/.obsidian/
+
+# 本机运行产物与私人材料（勿公开）
+*.pid
+*.err
+server-8080.pid
+docs/毕业设计/
+.playwright-cli/

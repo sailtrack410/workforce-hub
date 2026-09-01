@@ -205,10 +205,10 @@
 
 | 项目 | 路径 |
 |---|---|
-| admin-web | `/Users/sailtrack/工程文件/java_web/workforce-hub/admin-web/` |
-| employee-web | `/Users/sailtrack/工程文件/java_web/workforce-hub/employee-web/` |
-| 后端 | `/Users/sailtrack/工程文件/java_web/workforce-hub/server/` |
-| 文档 | `/Users/sailtrack/工程文件/java_web/workforce-hub/docs/` |
+| admin-web | `<repo-root>/admin-web/` |
+| employee-web | `<repo-root>/employee-web/` |
+| 后端 | `<repo-root>/server/` |
+| 文档 | `<repo-root>/docs/` |
 
 ---
 
