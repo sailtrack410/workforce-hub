@@ -178,6 +178,10 @@ management:
       enabled: ${MAIL_HEALTH_ENABLED:false}
 
 logging:
+  pattern:
+    # 把 RequestIdFilter 写入 MDC 的 requestId 打进每行日志，与响应头 X-Request-Id 对应，便于链路检索
+    # 注意 logback 的 %X 不支持 ":-" 默认值语法，key 必须写纯的 requestId
+    level: "%5p [%X{requestId}]"
   level:
     com.workforcehub: debug
     org.flowable: info
