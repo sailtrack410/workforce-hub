@@ -238,7 +238,7 @@ public class EmployeeImController {
     @PostMapping("/conversations/{conversationId}/messages/{messageId}/reminder")
     public R<ImMessageActionResponse> remindMessage(@PathVariable Long conversationId,
                                                     @PathVariable Long messageId,
-                                                    @RequestBody(required = false) RemindImMessageRequest request) {
+                                                    @Valid @RequestBody(required = false) RemindImMessageRequest request) {
         return R.ok(imService.remindCurrentEmployeeMessage(
             conversationId,
             messageId,

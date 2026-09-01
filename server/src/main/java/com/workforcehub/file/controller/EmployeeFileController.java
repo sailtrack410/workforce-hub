@@ -103,7 +103,7 @@ public class EmployeeFileController {
 
     @Operation(summary = "创建文件夹", operationId = "createEmployeeFolder")
     @PostMapping("/folders")
-    public R<EmployeeFileFolderResponse> createFolder(@RequestBody CreateEmployeeFileFolderRequest request) {
+    public R<EmployeeFileFolderResponse> createFolder(@Valid @RequestBody CreateEmployeeFileFolderRequest request) {
         return R.ok(fileQueryService.createEmployeeFolder(request));
     }
 
@@ -135,14 +135,14 @@ public class EmployeeFileController {
     @Operation(summary = "移动文件", operationId = "moveEmployeeFile")
     @PostMapping("/{attachmentRefId}/move")
     public R<EmployeeFileResponse> move(@PathVariable Long attachmentRefId,
-                                        @RequestBody MoveEmployeeFileRequest request) {
+                                        @Valid @RequestBody MoveEmployeeFileRequest request) {
         return R.ok(fileQueryService.moveEmployeeFile(attachmentRefId, request));
     }
 
     @Operation(summary = "复制文件", operationId = "copyEmployeeFile")
     @PostMapping("/{attachmentRefId}/copy")
     public R<EmployeeFileResponse> copy(@PathVariable Long attachmentRefId,
-                                        @RequestBody CopyEmployeeFileRequest request) {
+                                        @Valid @RequestBody CopyEmployeeFileRequest request) {
         return R.ok(fileQueryService.copyEmployeeFile(attachmentRefId, request));
     }
 

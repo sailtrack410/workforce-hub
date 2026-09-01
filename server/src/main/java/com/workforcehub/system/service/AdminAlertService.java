@@ -6,6 +6,9 @@ import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.common.util.IdGenerator;
+import com.workforcehub.system.dto.AlertChannelSaveRequest;
+import com.workforcehub.system.dto.AlertResolutionCreateRequest;
+import com.workforcehub.system.dto.AlertRuleUpdateRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.trimToNull;
 
 @Service
 public class AdminAlertService {
@@ -73,8 +77,8 @@ public class AdminAlertService {
     }
 
     @Transactional
-    public Map<String, Object> createChannel(Map<String, Object> request) {
-        String channelCode = requiredText(request, "channelCode");
+    public Map<String, Object> createChannel(AlertChannelSaveRequest request) {
+        String channelCode = request.channelCode().trim();
         jdbcTemplate.update("""
             INSERT INTO ops_alert_channel
                 (id, channel_code, channel_name, channel_type, target_ref, enabled)
@@ -83,16 +87,16 @@ public class AdminAlertService {
             """,
             IdGenerator.nextId(),
             channelCode,
-            requiredText(request, "channelName"),
-            requiredText(request, "channelType"),
-            optionalText(request, "targetRef"),
-            booleanValue(request.get("enabled")) ? 1 : 0
+            request.channelName().trim(),
+            request.channelType().trim(),
+            trimToNull(request.targetRef()),
+            request.enabled() ? 1 : 0
         );
         return getChannel(channelCode);
     }
 
     @Transactional
-    public Map<String, Object> updateRule(String alertCode, Map<String, Object> request) {
+    public Map<String, Object> updateRule(String alertCode, AlertRuleUpdateRequest request) {
         int updated = jdbcTemplate.update("""
             UPDATE ops_alert_rule
             SET enabled = ?,
@@ -101,10 +105,10 @@ public class AdminAlertService {
                 cooldown_minutes = ?
             WHERE alert_code = ?
             """,
-            booleanValue(request.get("enabled")) ? 1 : 0,
-            booleanValue(request.get("notifyEnabled")) ? 1 : 0,
-            longValue(request.get("channelId")),
-            intValue(request.get("cooldownMinutes")),
+            request.enabled() ? 1 : 0,
+            request.notifyEnabled() ? 1 : 0,
+            request.channelId(),
+            request.cooldownMinutes(),
             alertCode
         );
         if (updated == 0) {
@@ -114,9 +118,9 @@ public class AdminAlertService {
     }
 
     @Transactional
-    public Map<String, Object> createResolution(String alertCode, Map<String, Object> request) {
+    public Map<String, Object> createResolution(String alertCode, AlertResolutionCreateRequest request) {
         Long operatorId = CurrentUserHolder.requireUserId();
-        String actionType = requiredText(request, "actionType");
+        String actionType = request.actionType().trim();
         Long id = IdGenerator.nextId();
         jdbcTemplate.update("""
             INSERT INTO ops_alert_resolution
@@ -127,7 +131,7 @@ public class AdminAlertService {
             id,
             alertCode,
             actionType,
-            optionalText(request, "comment"),
+            trimToNull(request.comment()),
             operatorId
         );
         auditLogWriter.write(
@@ -262,36 +266,6 @@ public class AdminAlertService {
         return value == null ? null : "处理";
     }
 
-    private String requiredText(Map<String, Object> request, String key) {
-        String value = optionalText(request, key);
-        if (!StringUtils.hasText(value)) {
-            throw new BizException(400, key + "不能为空");
-        }
-        return value;
-    }
-
-    private String optionalText(Map<String, Object> request, String key) {
-        Object value = request.get(key);
-        return value == null ? null : value.toString().trim();
-    }
-
-    private boolean booleanValue(Object value) {
-        return value instanceof Boolean bool ? bool : Boolean.parseBoolean(String.valueOf(value));
-    }
-
-    private Long longValue(Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        return Long.parseLong(String.valueOf(value));
-    }
-
-    private int intValue(Object value) {
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        return Integer.parseInt(String.valueOf(value));
-    }
 
     private record AlertSource(String alertCode, String countSql) {}
 }

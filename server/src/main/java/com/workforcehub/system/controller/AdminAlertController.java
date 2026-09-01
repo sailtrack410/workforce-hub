@@ -2,8 +2,12 @@ package com.workforcehub.system.controller;
 
 import com.workforcehub.common.response.PageResult;
 import com.workforcehub.common.response.R;
+import com.workforcehub.system.dto.AlertChannelSaveRequest;
+import com.workforcehub.system.dto.AlertResolutionCreateRequest;
+import com.workforcehub.system.dto.AlertRuleUpdateRequest;
 import com.workforcehub.system.service.AdminAlertService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,19 +44,19 @@ public class AdminAlertController {
 
     @Operation(summary = "创建告警渠道", operationId = "createAlertChannel")
     @PostMapping("/channels")
-    public R<Map<String, Object>> createChannel(@RequestBody Map<String, Object> request) {
+    public R<Map<String, Object>> createChannel(@Valid @RequestBody AlertChannelSaveRequest request) {
         return R.ok(adminAlertService.createChannel(request));
     }
 
     @Operation(summary = "更新告警规则", operationId = "updateAlertRule")
     @PutMapping("/rules/{alertCode}")
-    public R<Map<String, Object>> updateRule(@PathVariable String alertCode, @RequestBody Map<String, Object> request) {
+    public R<Map<String, Object>> updateRule(@PathVariable String alertCode, @Valid @RequestBody AlertRuleUpdateRequest request) {
         return R.ok(adminAlertService.updateRule(alertCode, request));
     }
 
     @Operation(summary = "创建告警处理记录", operationId = "createAlertResolution")
     @PostMapping("/{alertCode}/resolutions")
-    public R<Map<String, Object>> createResolution(@PathVariable String alertCode, @RequestBody Map<String, Object> request) {
+    public R<Map<String, Object>> createResolution(@PathVariable String alertCode, @Valid @RequestBody AlertResolutionCreateRequest request) {
         return R.ok(adminAlertService.createResolution(alertCode, request));
     }
 
