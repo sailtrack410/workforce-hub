@@ -8,13 +8,16 @@ import com.workforcehub.auth.security.WfhUserDetails;
 import com.workforcehub.common.config.SecurityConfig;
 import com.workforcehub.common.enums.UserType;
 import com.workforcehub.plugin.controller.PluginGatewayController;
+import com.workforcehub.plugin.controller.PluginGatewayRequestSizeFilter;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
+import com.workforcehub.plugin.runtime.PluginActionIdempotencyService;
 import com.workforcehub.plugin.runtime.PluginManagerService;
 import com.workforcehub.plugin.runtime.PluginParamValidator;
 import com.workforcehub.plugin.runtime.PluginPermissionService;
 import com.workforcehub.plugin.sdk.ActionDescriptor;
+import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.ParamSchema;
@@ -52,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -84,7 +89,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     AdminPermissionFilter.class,
     InvocationContextBinder.class,
     PluginParamValidator.class,
-    PluginLifecycleGuard.class
+    PluginLifecycleGuard.class,
+    PluginGatewayRequestSizeFilter.class
 })
 class PluginGatewaySecurityTest {
 
@@ -100,6 +106,9 @@ class PluginGatewaySecurityTest {
 
     @MockBean
     private PluginPermissionService permissionService;
+
+    @MockBean
+    private PluginActionIdempotencyService idempotencyService;
 
     @MockBean(name = "employeeUserDetailsService")
     private EmployeeUserDetailsService employeeUserDetailsService;
@@ -138,6 +147,17 @@ class PluginGatewaySecurityTest {
         when(handler.getDescriptor()).thenReturn(descriptor);
         when(handler.execute(any(InvocationContext.class), anyMap()))
             .thenReturn(ServiceResult.ok(Map.of("message", "Hello")));
+        when(idempotencyService.execute(
+                anyString(),
+                anyString(),
+                anyString(),
+                any(InvocationContext.class),
+                anyMap(),
+                any(PluginActionHandler.class)))
+            .thenAnswer(invocation -> invocation.<PluginActionHandler>getArgument(5).execute(
+                invocation.getArgument(3),
+                invocation.getArgument(4)
+            ));
     }
 
     @Test
@@ -294,8 +314,22 @@ class PluginGatewaySecurityTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value(100403));
 
+        verify(pluginManagerService, never()).getPlugin(PLUGIN_ID);
         verify(pluginManagerService, org.mockito.Mockito.never())
             .findActionHandler(PLUGIN_ID, ACTION_CODE);
+        verify(idempotencyService, never()).execute(anyString(), anyString(), anyString(), any(), anyMap(), any());
+    }
+
+    @Test
+    void shouldRejectOversizedRequestInRealFilterChain() throws Exception {
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + "x".repeat(256 * 1024) + "\"}"))
+            .andExpect(status().isPayloadTooLarge())
+            .andExpect(jsonPath("$.code").value(1000));
+
+        verifyGatewayNotEntered();
     }
 
     @Test
@@ -308,6 +342,132 @@ class PluginGatewaySecurityTest {
             .andExpect(jsonPath("$.code").value(100400));
 
         verify(permissionService).checkPermission(any(), eq(PLUGIN_ID), eq(ACTION_CODE));
+        verify(idempotencyService, never()).execute(anyString(), anyString(), anyString(), any(), anyMap(), any());
+    }
+
+    @Test
+    void shouldValidateSchemaBeforeMissingIdempotencyKey() throws Exception {
+        mockMvc.perform(gatewayRequestWithoutIdempotencyKey(PLUGIN_ID, ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("缺少必填参数: name"));
+
+        verify(idempotencyService, never()).execute(anyString(), anyString(), anyString(), any(), anyMap(), any());
+    }
+
+    @Test
+    void shouldRequireIdempotencyKeyForValidAction() throws Exception {
+        mockMvc.perform(gatewayRequestWithoutIdempotencyKey(PLUGIN_ID, ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(1000));
+
+        verify(idempotencyService, never()).execute(anyString(), anyString(), anyString(), any(), anyMap(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"contains space", "slash/value", "comma,value"})
+    void shouldRejectUnsafeIdempotencyKey(String key) throws Exception {
+        mockMvc.perform(gatewayRequestWithoutIdempotencyKey(PLUGIN_ID, ACTION_CODE)
+                .header("Idempotency-Key", key)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(1000));
+
+        verify(idempotencyService, never()).execute(anyString(), anyString(), anyString(), any(), anyMap(), any());
+    }
+
+    @Test
+    void shouldRejectDuplicateIdempotencyHeaders() throws Exception {
+        mockMvc.perform(gatewayRequestWithoutIdempotencyKey(PLUGIN_ID, ACTION_CODE)
+                .header("Idempotency-Key", "key-a", "key-b")
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(1000));
+    }
+
+    @Test
+    void shouldRejectTooLongIdempotencyKey() throws Exception {
+        mockMvc.perform(gatewayRequestWithoutIdempotencyKey(PLUGIN_ID, ACTION_CODE)
+                .header("Idempotency-Key", "k".repeat(129))
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(1000));
+    }
+
+    @Test
+    void shouldAccept128CharacterIdempotencyKey() throws Exception {
+        mockMvc.perform(gatewayRequestWithoutIdempotencyKey(PLUGIN_ID, ACTION_CODE)
+                .header("Idempotency-Key", "k".repeat(128))
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+    }
+
+    @Test
+    void shouldRejectNonIdempotentHttpAction() throws Exception {
+        when(handler.getDescriptor()).thenReturn(new ActionDescriptor(
+            ACTION_CODE,
+            "问候",
+            "返回问候语",
+            Map.of("name", ParamSchema.string("姓名", true)),
+            Map.of(),
+            "PLUGIN_HELLO",
+            Duration.ofSeconds(5),
+            false
+        ));
+
+        mockMvc.perform(gatewayRequestWithoutIdempotencyKey(PLUGIN_ID, ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(3002));
+
+        verify(handler, never()).execute(any(), anyMap());
+        verify(idempotencyService, never()).execute(anyString(), anyString(), anyString(), any(), anyMap(), any());
+    }
+
+    @Test
+    void shouldReturnRetryable409WhenSameRequestIsInProgress() throws Exception {
+        doThrow(new PluginActionIdempotencyService.ActionInProgressException())
+            .when(idempotencyService).execute(
+                anyString(), anyString(), anyString(), any(), anyMap(), any());
+
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(HttpHeaders.RETRY_AFTER, "1"))
+            .andExpect(jsonPath("$.code").value(3002));
+    }
+
+    @Test
+    void shouldReturn409WhenIdempotencyKeyHasDifferentRequest() throws Exception {
+        doThrow(new PluginActionIdempotencyService.IdempotencyConflictException())
+            .when(idempotencyService).execute(
+                anyString(), anyString(), anyString(), any(), anyMap(), any());
+
+        mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
+                .with(authenticated(UserType.ADMIN, 1L))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"test\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(3001));
     }
 
     @Test
@@ -333,6 +493,35 @@ class PluginGatewaySecurityTest {
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.code").value(100500))
             .andExpect(jsonPath("$.message").value("服务内部错误"));
+    }
+
+    @Test
+    void shouldReturn500AndRestoreThreadStateWhenDescriptorThrowsError() throws Exception {
+        Thread requestThread = Thread.currentThread();
+        ClassLoader original = requestThread.getContextClassLoader();
+        ClassLoader pluginClassLoader = new ClassLoader(original) { };
+        when(handler.getDescriptor()).thenAnswer(invocation -> {
+            requestThread.setContextClassLoader(pluginClassLoader);
+            requestThread.interrupt();
+            throw new AssertionError("descriptor failure");
+        });
+
+        try {
+            mockMvc.perform(gatewayRequest(PLUGIN_ID, ACTION_CODE)
+                    .with(authenticated(UserType.ADMIN, 1L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"test\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value(100500))
+                .andExpect(jsonPath("$.message").value("动作执行失败"));
+
+            assertSame(original, requestThread.getContextClassLoader());
+            assertFalse(requestThread.isInterrupted());
+            assertEquals(0, lifecycleGuard.getActiveCount(PLUGIN_ID));
+        } finally {
+            requestThread.setContextClassLoader(original);
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -431,6 +620,11 @@ class PluginGatewaySecurityTest {
     }
 
     private MockHttpServletRequestBuilder gatewayRequest(String pluginId, String actionCode) {
+        return gatewayRequestWithoutIdempotencyKey(pluginId, actionCode)
+            .header("Idempotency-Key", "gateway-test-key");
+    }
+
+    private MockHttpServletRequestBuilder gatewayRequestWithoutIdempotencyKey(String pluginId, String actionCode) {
         return post("/api/plugin-gateway/" + pluginId + "/actions/" + actionCode)
             .with(csrf().asHeader());
     }
@@ -456,6 +650,7 @@ class PluginGatewaySecurityTest {
         verify(pluginManagerService, never()).getPlugin(anyString());
         verify(pluginManagerService, never()).findActionHandler(anyString(), anyString());
         verify(permissionService, never()).checkPermission(any(), anyString(), anyString());
+        verify(idempotencyService, never()).execute(anyString(), anyString(), anyString(), any(), anyMap(), any());
         verify(handler, never()).execute(any(), anyMap());
         assertEquals(0, lifecycleGuard.getActiveCount(PLUGIN_ID));
     }

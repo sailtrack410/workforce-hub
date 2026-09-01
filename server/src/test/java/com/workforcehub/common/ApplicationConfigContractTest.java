@@ -36,6 +36,17 @@ class ApplicationConfigContractTest {
     }
 
     @Test
+    @DisplayName("Flowable 默认禁用未使用的 IDM 和 EventRegistry 引擎")
+    void flowableShouldDisableUnusedEngines() {
+        YamlPropertiesFactoryBean factory = new YamlPropertiesFactoryBean();
+        factory.setResources(new ClassPathResource("application.yml"));
+        Properties properties = factory.getObject();
+
+        assertEquals("false", properties.getProperty("flowable.idm.enabled"));
+        assertEquals("false", properties.getProperty("flowable.eventregistry.enabled"));
+    }
+
+    @Test
     @DisplayName("后端不应保留跨模块 spi 包")
     void backendShouldNotKeepSpiPackage() {
         assertFalse(Files.exists(Path.of("src/main/java/com/workforcehub/spi")),

@@ -15,6 +15,8 @@ describe('admin router', () => {
     expect(findRoute(routes, '/positions')?.name).toBe('admin-positions');
     expect(findRoute(routes, '/users')?.name).toBe('admin-users');
     expect(findRoute(routes, '/files')?.name).toBe('admin-files');
+    expect(findRoute(routes, '/plugins')?.name).toBe('admin-plugins');
+    expect(findRoute(routes, '/plugins')?.meta?.permission).toBe('ADMIN_PLUGIN_MANAGE');
     expect(findRoute(routes, '/message-delivery')?.name).toBe('admin-message-delivery');
     expect(findRoute(routes, '/permissions')?.name).toBe('admin-permissions');
     expect(findRoute(routes, '/audit-logs')?.name).toBe('admin-audit-logs');

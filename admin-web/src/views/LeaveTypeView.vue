@@ -11,6 +11,7 @@ import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
+import AdminMetricStrip from '@/components/AdminMetricStrip.vue';
 
 const store = useLeaveTypeStore();
 const toast = useToast();
@@ -36,6 +37,12 @@ const saving = ref(false);
 const deleting = ref(false);
 const deleteVisible = ref(false);
 const createError = computed(() => items.value.some((item) => item.leaveCode === createForm.leaveCode) ? '该假种已存在，请直接编辑现有假种' : '');
+const policyMetrics = computed(() => [
+  { label: '政策总数', value: items.value.length },
+  { label: '已启用', value: items.value.filter((item) => item.status === 'ACTIVE').length },
+  { label: '扣减余额', value: items.value.filter((item) => item.balanceMode === 'DEDUCT').length },
+  { label: '不扣余额', value: items.value.filter((item) => item.balanceMode === 'NO_DEDUCT').length },
+]);
 
 const selected = computed(() =>
   store.selectedLeaveTypeId ? items.value.find((i) => i.leaveTypeId === store.selectedLeaveTypeId) ?? null : null,
@@ -161,12 +168,44 @@ onMounted(loadList);
 </script>
 
 <template>
-  <div class="page-grid">
-    <AdminPanel :span="selected ? 7 : 12" title="假种列表">
+  <div class="page-grid leave-type-page">
+    <AdminPanel :span="12" title="假期政策目录" subtitle="政策状态直接影响员工可申请范围，余额模式决定账户是否扣减">
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
-      <AdminFilterBar :show-search="false">
+      <AdminMetricStrip :cards="policyMetrics" />
+    </AdminPanel>
+
+    <AdminPanel :span="7" :title="`假种清单 (${items.length})`" subtitle="选择一行后在右侧维护规则">
+      <AdminTable
+        interactive
+        :columns="columns"
+        :rows="items"
+        :loading="loading"
+        :selected-id="store.selectedLeaveTypeId"
+        row-key="leaveTypeId"
+        @row-click="onRowClick"
+      >
+        <template #cell-leaveName="{ row }">
+          <strong>{{ row.leaveName }}</strong>
+          <span>{{ row.leaveCode }}</span>
+        </template>
+        <template #cell-balanceMode="{ row }">
+          <span class="status-pill">{{ leaveBalanceModeLabel(row.balanceMode) }}</span>
+        </template>
+        <template #cell-status="{ row }">
+          <span class="status-pill" :class="{ 'risk-status': row.status !== 'ACTIVE' }">{{ statusLabel(row.status) }}</span>
+        </template>
+      </AdminTable>
+    </AdminPanel>
+
+    <AdminPanel :span="5" :title="selected ? '政策维护' : '新增政策'" :subtitle="selected ? `正在维护 ${selected.leaveName}` : '选择标准假种并配置余额规则'">
+      <section class="policy-operation">
+        <div class="operation-heading">
+          <strong>新增假种</strong>
+          <span>标准政策模板</span>
+        </div>
+        <AdminFilterBar :show-search="false">
         <select v-model="createForm.leaveCode">
           <option v-for="type in leaveTypeOptions" :key="type.leaveCode" :value="type.leaveCode">
             {{ type.leaveName }}
@@ -179,29 +218,17 @@ onMounted(loadList);
         <button class="primary-button" :disabled="creating || !createForm.leaveCode || Boolean(createError)" @click="handleCreate">
           <Plus :size="16" /> 新建假种
         </button>
-      </AdminFilterBar>
-      <p v-if="createError" class="field-error create-error">{{ createError }}</p>
-      <AdminTable
-        interactive
-        :columns="columns"
-        :rows="items"
-        :loading="loading"
-        :selected-id="store.selectedLeaveTypeId"
-        row-key="leaveTypeId"
-        @row-click="onRowClick"
-      >
-        <template #cell-balanceMode="{ row }">
-          <span class="status-pill">{{ leaveBalanceModeLabel(row.balanceMode) }}</span>
-        </template>
-        <template #cell-status="{ row }">
-          <span class="status-pill">{{ statusLabel(row.status) }}</span>
-        </template>
-      </AdminTable>
-    </AdminPanel>
+        </AdminFilterBar>
+        <p v-if="createError" class="field-error create-error">{{ createError }}</p>
+      </section>
 
-    <AdminPanel v-if="selected" :span="5" title="假种详情">
-      <AdminDetailList :rows="detailRows" />
-      <div class="detail-edit-form">
+      <section v-if="selected" class="policy-operation selected-policy">
+        <div class="operation-heading">
+          <strong>当前政策</strong>
+          <span :class="{ 'risk-text': selected.status !== 'ACTIVE' }">{{ statusLabel(selected.status) }}</span>
+        </div>
+        <AdminDetailList :rows="detailRows" />
+        <div class="detail-edit-form">
         <select v-model="editForm.leaveCode">
           <option value="">请选择假种</option>
           <option v-for="type in leaveTypeOptions" :key="type.leaveCode" :value="type.leaveCode">
@@ -224,7 +251,9 @@ onMounted(loadList);
             <Trash2 :size="16" /> 删除
           </button>
         </div>
-      </div>
+        </div>
+      </section>
+      <div v-else class="policy-empty">从左侧选择假种后可编辑、停用或删除</div>
     </AdminPanel>
 
     <AdminConfirmDialog
@@ -239,6 +268,53 @@ onMounted(loadList);
 </template>
 
 <style scoped>
+.leave-type-page { letter-spacing: 0; }
+
+.policy-operation {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.selected-policy {
+  margin-top: var(--space-base);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--line);
+}
+
+.operation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.operation-heading span,
+.policy-empty {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.policy-empty {
+  margin-top: var(--space-base);
+  padding: var(--space-base);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  text-align: center;
+}
+
+.policy-operation :deep(.filter-row) {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-bottom: 0;
+}
+
+.policy-operation :deep(.filter-row select),
+.policy-operation :deep(.filter-row button) {
+  width: 100%;
+  max-width: none;
+}
+
 .detail-edit-form {
   display: grid;
   gap: var(--space-md);
@@ -252,5 +328,8 @@ onMounted(loadList);
 }
 
 .create-error { margin: calc(var(--space-sm) * -1) 0 var(--space-md); }
+
+.risk-status,
+.risk-text { color: var(--red-dark) !important; }
 
 </style>

@@ -10,6 +10,7 @@ import AdminDialog from '@/components/AdminDialog.vue';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminSkeleton from '@/components/AdminSkeleton.vue';
+import AdminMetricStrip from '@/components/AdminMetricStrip.vue';
 
 const toast = useToast();
 
@@ -63,6 +64,13 @@ const addedAdminRoles = computed(() => roles.value.filter((role) => (
 const removedAdminRoles = computed(() => roles.value.filter((role) => (
   !selectedRoleIdsForAdmin.value.has(String(role.roleId)) && currentAdminRoleIds.value.has(String(role.roleId))
 )));
+const unassignedAdminCount = computed(() => adminUsers.value.filter((user) => user.roles.length === 0).length);
+const authorizationMetrics = computed(() => [
+  { label: '角色总数', value: roles.value.length },
+  { label: '启用角色', value: roles.value.filter((role) => role.status === 'ACTIVE').length },
+  { label: '管理员账号', value: adminUsers.value.length },
+  { label: '未分配角色', value: unassignedAdminCount.value },
+]);
 
 async function loadPage() {
   loading.value = true;
@@ -213,6 +221,17 @@ onMounted(loadPage);
 
 <template>
   <main class="role-page">
+    <AdminPanel :span="12" title="授权治理态势" subtitle="角色定义权限边界，人员授权决定实际访问面；高风险变更均需二次确认">
+      <AdminMetricStrip :cards="authorizationMetrics" />
+      <div class="authorization-posture" :class="{ risk: unassignedAdminCount }">
+        <ShieldCheck :size="18" />
+        <div>
+          <strong>{{ unassignedAdminCount ? `${unassignedAdminCount} 个管理员账号未分配角色` : '管理员角色覆盖完整' }}</strong>
+          <span>{{ unassignedAdminCount ? '请进入人员授权补齐最小权限范围' : '继续遵循最小权限原则定期复核' }}</span>
+        </div>
+      </div>
+    </AdminPanel>
+
     <div class="role-tabs" role="tablist" aria-label="角色权限任务">
       <button type="button" role="tab" :aria-selected="activeTab === 'roles'" :class="{ active: activeTab === 'roles' }" @click="activeTab = 'roles'">
         <ShieldCheck :size="16" />角色配置
@@ -222,7 +241,7 @@ onMounted(loadPage);
       </button>
     </div>
 
-    <AdminPanel v-if="activeTab === 'roles'" :span="12" :title="`角色配置 (${roles.length})`">
+    <AdminPanel v-if="activeTab === 'roles'" :span="12" :title="`角色配置 (${roles.length})`" subtitle="查看权限范围与人员覆盖，点击角色进入配置">
       <template #actions>
         <button class="secondary-button" title="刷新" :disabled="loading" @click="loadPage"><RefreshCcw :size="16" />刷新</button>
         <button class="primary-button" @click="newRole"><Plus :size="16" />新建角色</button>
@@ -235,15 +254,15 @@ onMounted(loadPage);
         row-key="roleId"
         @row-click="openRole"
       >
-        <template #cell-roleName="{ row }"><strong>{{ row.roleName }}</strong></template>
+        <template #cell-roleName="{ row }"><strong>{{ row.roleName }}</strong><span>{{ row.roleCode === 'SUPER_ADMIN' ? '系统保护角色' : row.roleCode }}</span></template>
         <template #cell-roleCode="{ row }">{{ roleTypeLabel(row) }}</template>
         <template #cell-adminCount="{ row }">{{ roleAdminCount(row) }}</template>
-        <template #cell-permissionCount="{ row }">{{ row.permissions?.length ?? 0 }}</template>
-        <template #cell-status="{ row }"><span class="status-pill">{{ statusLabel(row.status) }}</span></template>
+        <template #cell-permissionCount="{ row }"><strong :class="{ 'risk-text': permissions.length > 0 && (row.permissions?.length ?? 0) === permissions.length }">{{ row.permissions?.length ?? 0 }} / {{ permissions.length }}</strong></template>
+        <template #cell-status="{ row }"><span class="status-pill" :class="{ 'risk-status': row.status !== 'ACTIVE' }">{{ statusLabel(row.status) }}</span></template>
       </AdminTable>
     </AdminPanel>
 
-    <AdminPanel v-else :span="12" :title="`人员授权 (${adminUsers.length})`">
+    <AdminPanel v-else :span="12" :title="`人员授权 (${adminUsers.length})`" subtitle="点击管理员账号维护角色，保存前展示新增与移除影响">
       <template #actions>
         <button class="secondary-button" title="刷新" :disabled="loading" @click="loadPage"><RefreshCcw :size="16" />刷新</button>
       </template>
@@ -257,7 +276,7 @@ onMounted(loadPage);
       >
         <template #cell-username="{ row }"><strong>{{ row.username }}</strong></template>
         <template #cell-displayName="{ row }">{{ row.displayName || '-' }}</template>
-        <template #cell-roles="{ row }">{{ adminRoleNames(row) }}</template>
+        <template #cell-roles="{ row }"><span :class="{ 'risk-text': row.roles.length === 0 }">{{ adminRoleNames(row) }}</span></template>
       </AdminTable>
     </AdminPanel>
 
@@ -305,7 +324,7 @@ onMounted(loadPage);
               :disabled="isBuiltInRole"
               @change="togglePermission(permission.permissionId, ($event.target as HTMLInputElement).checked)"
             />
-            <span>{{ permissionDisplayName(permission.permName) }}</span>
+            <span><strong>{{ permissionDisplayName(permission.permName) }}</strong><small>{{ permission.permCode }}</small></span>
           </label>
         </div>
         <div class="dialog-button-row">
@@ -392,7 +411,29 @@ onMounted(loadPage);
 .role-page {
   display: grid;
   gap: var(--space-base);
+  letter-spacing: 0;
 }
+
+.authorization-posture {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-base);
+  padding: var(--space-md);
+  border-left: 3px solid var(--success);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.authorization-posture.risk {
+  border-left-color: var(--amber);
+  background: var(--surface-subtle);
+  color: var(--red-dark);
+}
+
+.authorization-posture div { display: grid; gap: var(--space-xs); }
+.authorization-posture span { color: var(--muted); font-size: var(--text-xs); }
+.authorization-posture svg { flex: 0 0 auto; }
 
 .role-tabs {
   display: inline-flex;
@@ -438,7 +479,7 @@ onMounted(loadPage);
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
   color: var(--ink);
-  transition: all 200ms ease;
+  transition: border-color 200ms ease, background-color 200ms ease;
 }
 
 .check-row:hover {
@@ -451,6 +492,14 @@ onMounted(loadPage);
   min-height: auto;
   padding: 0;
 }
+
+.check-row > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.check-row small { color: var(--muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
 
 .permission-heading,
 .dialog-button-row {
@@ -518,7 +567,9 @@ onMounted(loadPage);
 }
 
 .danger,
-.danger-text {
+.danger-text,
+.risk-status,
+.risk-text {
   color: var(--red) !important;
 }
 

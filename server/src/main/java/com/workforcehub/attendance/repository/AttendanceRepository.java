@@ -876,11 +876,41 @@ public class AttendanceRepository {
         );
     }
 
-    public void deleteExceptionsByDailyResultId(Long dailyResultId) {
+    public List<AttendanceExceptionRow> listExceptionsByDailyResultId(Long dailyResultId) {
+        return jdbcTemplate.query("""
+            SELECT ae.id,
+                   ae.daily_result_id,
+                   adr.user_id,
+                   adr.work_date,
+                   ae.exception_type,
+                   ae.exception_desc,
+                   ae.status
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE ae.daily_result_id = ?
+            ORDER BY ae.id ASC
+            """,
+            this::mapException,
+            dailyResultId
+        );
+    }
+
+    public void deleteException(Long exceptionId) {
         jdbcTemplate.update("""
             DELETE FROM att_exception
-            WHERE daily_result_id = ?
-            """, dailyResultId);
+            WHERE id = ?
+            """, exceptionId);
+    }
+
+    public void updateExceptionDescription(Long exceptionId, String exceptionDesc) {
+        jdbcTemplate.update("""
+            UPDATE att_exception
+            SET exception_desc = ?
+            WHERE id = ?
+            """,
+            exceptionDesc,
+            exceptionId
+        );
     }
 
     public void insertException(Long exceptionId,

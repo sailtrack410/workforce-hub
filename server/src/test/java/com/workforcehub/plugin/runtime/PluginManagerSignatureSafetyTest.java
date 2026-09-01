@@ -1,6 +1,7 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.repository.PluginRepository;
+import com.workforcehub.plugin.repository.PluginDependencySpec;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,9 +18,13 @@ import org.pf4j.PluginDescriptor;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -28,11 +33,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -250,14 +257,40 @@ class PluginManagerSignatureSafetyTest {
     }
 
     @Test
-    void installShouldRejectExistingPluginBeforePf4jLoadAndMigration() throws Exception {
+    void installShouldRejectOversizedJarBeforeVerification() throws Exception {
+        Path jarPath = tempDir.resolve("oversized-plugin.jar");
+        try (FileChannel channel = FileChannel.open(
+                jarPath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE)) {
+            channel.position(PluginManagerService.MAX_JAR_BYTES);
+            channel.write(ByteBuffer.wrap(new byte[] {1}));
+        }
+
+        assertThrows(
+            PluginManagerService.PluginPackageTooLargeException.class,
+            () -> service.install(jarPath, metadata(new byte[] {1}))
+        );
+
+        verify(signatureVerifier, never()).verify(any(Path.class), anyString(), any(byte[].class));
+        verify(pf4jManager, never()).loadPlugin(any(Path.class));
+        assertSnapshotDirectoryEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PluginStatus.class, names = "UNINSTALLED", mode = EnumSource.Mode.EXCLUDE)
+    void installShouldRejectExistingPluginBeforePf4jLoadAndMigration(
+            PluginStatus existingStatus) throws Exception {
         Path jarPath = Files.writeString(tempDir.resolve("existing-plugin.jar"), "signed-content");
+        Path previousJarPath = Files.writeString(tempDir.resolve("previous-plugin.jar"), "previous");
         PluginRow metadata = metadata(new byte[]{1, 2, 3});
+        PluginRow existing = storedPlugin(previousJarPath, "b".repeat(64));
+        existing.setStatus(existingStatus);
 
         when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
             .thenReturn(VERIFIED_SHA256);
         when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
-        when(pluginRepository.exists(PLUGIN_ID)).thenReturn(true);
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
 
         IllegalStateException thrown = assertThrows(
             IllegalStateException.class,
@@ -265,11 +298,440 @@ class PluginManagerSignatureSafetyTest {
         );
 
         assertEquals("插件已存在: " + PLUGIN_ID, thrown.getMessage());
-        verify(pluginRepository).exists(PLUGIN_ID);
+        verify(pluginRepository).findById(PLUGIN_ID);
+        verify(pf4jManager, never()).getPlugin(PLUGIN_ID);
         verify(pf4jManager, never()).loadPlugin(any(Path.class));
         verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
         verify(pluginRepository, never()).insert(any(PluginRow.class));
         assertSnapshotDirectoryEmpty();
+    }
+
+    @Test
+    void installNewShouldRejectUninstalledExistingIdBeforePf4jLoadAndMigration()
+            throws Exception {
+        Path jarPath = Files.writeString(tempDir.resolve("upload-existing.jar"), "signed-content");
+        Path previousJarPath = Files.writeString(tempDir.resolve("previous-upload.jar"), "previous");
+        PluginRow existing = storedPlugin(previousJarPath, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+
+        PluginManagerService.PluginAlreadyExistsException thrown = assertThrows(
+            PluginManagerService.PluginAlreadyExistsException.class,
+            () -> service.installNew(jarPath, metadata(new byte[] {1, 2, 3}))
+        );
+
+        assertEquals(PLUGIN_ID, thrown.getPluginId());
+        verify(pf4jManager, never()).getPlugin(PLUGIN_ID);
+        verify(pf4jManager, never()).loadPlugin(any(Path.class));
+        verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
+        verify(pluginRepository, never()).replaceUninstalled(
+            any(PluginRow.class), anyString(), anyString());
+        assertSnapshotDirectoryEmpty();
+    }
+
+    @Test
+    void reinstallShouldRejectDifferentSignerBeforePf4jLoadAndMigration() throws Exception {
+        Path jarPath = Files.writeString(tempDir.resolve("different-signer.jar"), "signed-content");
+        Path previousJarPath = Files.writeString(tempDir.resolve("previous-signer.jar"), "previous");
+        PluginRow existing = storedPlugin(previousJarPath, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        existing.setSignerId("another-trusted-signer");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
+            () -> service.install(jarPath, metadata(new byte[]{1, 2, 3}))
+        );
+
+        assertEquals("插件签名者与原安装记录不一致: " + PLUGIN_ID, thrown.getMessage());
+        verify(pf4jManager, never()).getPlugin(PLUGIN_ID);
+        verify(pf4jManager, never()).loadPlugin(any(Path.class));
+        verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
+        verify(pluginRepository, never()).replaceUninstalled(
+            any(PluginRow.class), anyString(), anyString());
+        assertSnapshotDirectoryEmpty();
+    }
+
+    @Test
+    void reinstallShouldRejectUninstalledRecordWithLoadedWrapper() throws Exception {
+        Path jarPath = Files.writeString(tempDir.resolve("loaded-wrapper.jar"), "signed-content");
+        Path previousJarPath = Files.writeString(tempDir.resolve("previous-wrapper.jar"), "previous");
+        PluginRow existing = storedPlugin(previousJarPath, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper loadedWrapper = org.mockito.Mockito.mock(PluginWrapper.class);
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(loadedWrapper);
+
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
+            () -> service.install(jarPath, metadata(new byte[]{1, 2, 3}))
+        );
+
+        assertEquals("已卸载插件仍存在运行时实例: " + PLUGIN_ID, thrown.getMessage());
+        verify(pf4jManager, never()).loadPlugin(any(Path.class));
+        verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
+        verify(pluginRepository, never()).replaceUninstalled(
+            any(PluginRow.class), anyString(), anyString());
+        assertSnapshotDirectoryEmpty();
+    }
+
+    @Test
+    void reinstallShouldReplaceRecordAndDeleteManagedPreviousSnapshot() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(snapshotDirectory.resolve("plugin-previous.jar"), "previous");
+        Path jarPath = Files.writeString(tempDir.resolve("replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID)
+        )).thenReturn(true);
+
+        PluginRow installed = service.install(jarPath, metadata(new byte[]{1, 2, 3}));
+
+        assertFalse(Files.exists(previousSnapshot));
+        assertTrue(Files.isRegularFile(Path.of(installed.getJarPath())));
+        verify(pluginRepository).replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID));
+        verify(pluginRepository, never()).insert(any(PluginRow.class));
+    }
+
+    @Test
+    void reinstallShouldKeepExternalPreviousJar() throws Exception {
+        Path previousJar = Files.writeString(tempDir.resolve("external-previous.jar"), "previous");
+        Path jarPath = Files.writeString(tempDir.resolve("external-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousJar, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousJar.toString()), eq(SIGNER_ID)
+        )).thenReturn(true);
+
+        service.install(jarPath, metadata(new byte[]{1, 2, 3}));
+
+        assertTrue(Files.isRegularFile(previousJar));
+    }
+
+    @Test
+    void reinstallShouldKeepPreviousSnapshotReferencedByAnotherPlugin() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(
+            snapshotDirectory.resolve("plugin-shared.jar"),
+            "previous"
+        );
+        Path jarPath = Files.writeString(tempDir.resolve("shared-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID)
+        )).thenReturn(true);
+        when(pluginRepository.isJarPathReferencedByAnotherPlugin(
+            previousSnapshot.toString(),
+            PLUGIN_ID
+        )).thenReturn(true);
+
+        service.install(jarPath, metadata(new byte[]{1, 2, 3}));
+
+        assertTrue(Files.isRegularFile(previousSnapshot));
+    }
+
+    @Test
+    void reinstallShouldCleanupCandidateWhenConditionalReplaceLosesRace() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(snapshotDirectory.resolve("race-previous.jar"), "previous");
+        Path jarPath = Files.writeString(tempDir.resolve("race-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+        AtomicReference<Path> candidateSnapshot = new AtomicReference<>();
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenAnswer(invocation -> {
+                candidateSnapshot.set(invocation.getArgument(0));
+                return VERIFIED_SHA256;
+            });
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID)
+        )).thenReturn(false);
+        when(pf4jManager.unloadPluginWithoutDependents(PLUGIN_ID)).thenReturn(true);
+
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
+            () -> service.install(jarPath, metadata(new byte[]{1, 2, 3}))
+        );
+
+        assertEquals("插件状态已变化，替换安装失败: " + PLUGIN_ID, thrown.getMessage());
+        assertTrue(Files.isRegularFile(previousSnapshot));
+        assertNotNull(candidateSnapshot.get());
+        assertFalse(Files.exists(candidateSnapshot.get()));
+        verify(pf4jManager).unloadPluginWithoutDependents(PLUGIN_ID);
+        verify(pluginRepository, never()).insert(any(PluginRow.class));
+    }
+
+    @Test
+    void reinstallShouldPreservePreviousSnapshotWhenMigrationFails() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(snapshotDirectory.resolve("migration-previous.jar"), "previous");
+        Path jarPath = Files.writeString(tempDir.resolve("migration-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+        AtomicReference<Path> candidateSnapshot = new AtomicReference<>();
+        PluginFlywayMigrator.PluginMigrationException migrationError =
+            new PluginFlywayMigrator.PluginMigrationException("migration failed", null);
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenAnswer(invocation -> {
+                candidateSnapshot.set(invocation.getArgument(0));
+                return VERIFIED_SHA256;
+            });
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenReturn(Optional.of(existing));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        doThrow(migrationError).when(flywayMigrator).migrate(eq(PLUGIN_ID), any(Path.class));
+        when(pf4jManager.unloadPluginWithoutDependents(PLUGIN_ID)).thenReturn(true);
+
+        assertThrows(
+            PluginFlywayMigrator.PluginMigrationException.class,
+            () -> service.install(jarPath, metadata(new byte[]{1, 2, 3}))
+        );
+
+        assertTrue(Files.isRegularFile(previousSnapshot));
+        assertNotNull(candidateSnapshot.get());
+        assertFalse(Files.exists(candidateSnapshot.get()));
+        assertEquals(PluginStatus.UNINSTALLED, existing.getStatus());
+        verify(pluginRepository, never()).replaceUninstalled(
+            any(PluginRow.class), anyString(), anyString());
+    }
+
+    @Test
+    void reinstallShouldReturnPersistedRecordWhenCommitAcknowledgementIsLost() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(
+            snapshotDirectory.resolve("plugin-commit-previous.jar"),
+            "previous"
+        );
+        Path jarPath = Files.writeString(tempDir.resolve("commit-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+        AtomicReference<PluginRow> persisted = new AtomicReference<>();
+        RuntimeException commitError = new RuntimeException("commit acknowledgement lost");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenAnswer(invocation ->
+            persisted.get() == null ? Optional.of(existing) : Optional.of(persisted.get()));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID)
+        )).thenAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            throw commitError;
+        });
+
+        PluginRow installed = service.install(jarPath, metadata(new byte[]{1, 2, 3}));
+
+        assertEquals(persisted.get().getJarPath(), installed.getJarPath());
+        assertTrue(Files.isRegularFile(Path.of(installed.getJarPath())));
+        assertFalse(Files.exists(previousSnapshot));
+        verify(pf4jManager, never()).unloadPluginWithoutDependents(PLUGIN_ID);
+    }
+
+    @Test
+    void reinstallShouldNotConfirmUnknownCommitWhenDependenciesDiffer() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(
+            snapshotDirectory.resolve("plugin-dependency-previous.jar"),
+            "previous"
+        );
+        Path jarPath = Files.writeString(tempDir.resolve("dependency-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginDependencySpec dependency = new PluginDependencySpec("base-plugin", "1.0.0", null);
+        PluginVersionService.PluginVersionDescriptor descriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                PLUGIN_ID, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of(dependency)
+            );
+        PluginWrapper wrapper = wrapper("1.0.0");
+        AtomicReference<PluginRow> readback = new AtomicReference<>();
+        RuntimeException commitError = new RuntimeException("commit acknowledgement lost");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(descriptor);
+        when(pluginRepository.findById(PLUGIN_ID)).thenAnswer(invocation ->
+            readback.get() == null ? Optional.of(existing) : Optional.of(readback.get()));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID)
+        )).thenAnswer(invocation -> {
+            PluginRow candidate = invocation.getArgument(0);
+            PluginRow stored = new PluginRow();
+            stored.setPluginId(candidate.getPluginId());
+            stored.setVersion(candidate.getVersion());
+            stored.setStatus(PluginStatus.INSTALLED);
+            stored.setJarPath(candidate.getJarPath());
+            stored.setJarSha256(candidate.getJarSha256());
+            stored.setSignerId(candidate.getSignerId());
+            stored.setDependencies(List.of());
+            readback.set(stored);
+            throw commitError;
+        });
+        when(pf4jManager.unloadPluginWithoutDependents(PLUGIN_ID)).thenReturn(true);
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> service.install(jarPath, metadata(new byte[]{1, 2, 3}))
+        );
+
+        assertSame(commitError, thrown);
+        assertTrue(Files.isRegularFile(previousSnapshot));
+        assertFalse(Files.exists(Path.of(readback.get().getJarPath())));
+        verify(pf4jManager).unloadPluginWithoutDependents(PLUGIN_ID);
+    }
+
+    @Test
+    void reinstallShouldRetainCandidateWhenPersistedStatusChangedAfterCommit() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(
+            snapshotDirectory.resolve("plugin-changed-previous.jar"),
+            "previous"
+        );
+        Path jarPath = Files.writeString(tempDir.resolve("changed-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+        AtomicReference<PluginRow> persisted = new AtomicReference<>();
+        RuntimeException commitError = new RuntimeException("commit acknowledgement lost");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID)).thenAnswer(invocation ->
+            persisted.get() == null ? Optional.of(existing) : Optional.of(persisted.get()));
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID)
+        )).thenAnswer(invocation -> {
+            PluginRow candidate = invocation.getArgument(0);
+            PluginRow changed = storedPlugin(
+                Path.of(candidate.getJarPath()),
+                candidate.getJarSha256()
+            );
+            changed.setStatus(PluginStatus.UNINSTALLED);
+            changed.setVersion(candidate.getVersion());
+            persisted.set(changed);
+            throw commitError;
+        });
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> service.install(jarPath, metadata(new byte[]{1, 2, 3}))
+        );
+
+        assertEquals(commitError, thrown);
+        assertEquals(1, thrown.getSuppressed().length);
+        assertEquals("插件安装提交后状态已再次变化，需重启", thrown.getSuppressed()[0].getMessage());
+        assertTrue(Files.isRegularFile(Path.of(persisted.get().getJarPath())));
+        assertTrue(Files.isRegularFile(previousSnapshot));
+        verify(pf4jManager, never()).unloadPluginWithoutDependents(PLUGIN_ID);
+    }
+
+    @Test
+    void reinstallShouldRetainCandidateWhenCommitResultCannotBeReadBack() throws Exception {
+        Path snapshotDirectory = tempDir.resolve("plugins").resolve(".snapshots").toAbsolutePath();
+        Files.createDirectories(snapshotDirectory);
+        Path previousSnapshot = Files.writeString(
+            snapshotDirectory.resolve("plugin-unknown-previous.jar"),
+            "previous"
+        );
+        Path jarPath = Files.writeString(tempDir.resolve("unknown-replacement.jar"), "replacement");
+        PluginRow existing = storedPlugin(previousSnapshot, "b".repeat(64));
+        existing.setStatus(PluginStatus.UNINSTALLED);
+        PluginWrapper wrapper = wrapper("1.0.0");
+        AtomicReference<Path> candidateSnapshot = new AtomicReference<>();
+        RuntimeException commitError = new RuntimeException("commit acknowledgement lost");
+        RuntimeException readbackError = new RuntimeException("readback unavailable");
+
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenAnswer(invocation -> {
+                candidateSnapshot.set(invocation.getArgument(0));
+                return VERIFIED_SHA256;
+            });
+        when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
+        when(pluginRepository.findById(PLUGIN_ID))
+            .thenReturn(Optional.of(existing))
+            .thenThrow(readbackError);
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(null, wrapper);
+        when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
+        when(pluginRepository.replaceUninstalled(
+            any(PluginRow.class), eq(previousSnapshot.toString()), eq(SIGNER_ID)
+        )).thenThrow(commitError);
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> service.install(jarPath, metadata(new byte[]{1, 2, 3}))
+        );
+
+        assertEquals(commitError, thrown);
+        assertEquals(1, thrown.getSuppressed().length);
+        assertEquals(readbackError, thrown.getSuppressed()[0].getCause());
+        assertNotNull(candidateSnapshot.get());
+        assertTrue(Files.isRegularFile(candidateSnapshot.get()));
+        assertTrue(Files.isRegularFile(previousSnapshot));
+        verify(pf4jManager, never()).unloadPluginWithoutDependents(PLUGIN_ID);
     }
 
     @Test
@@ -345,7 +807,8 @@ class PluginManagerSignatureSafetyTest {
             "17",
             "FUNCTIONAL",
             "Workforce Hub",
-            null
+            null,
+            List.of()
         );
         PluginWrapper wrapper = org.mockito.Mockito.mock(PluginWrapper.class);
         when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
@@ -355,7 +818,10 @@ class PluginManagerSignatureSafetyTest {
         when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(wrapper);
         when(pf4jManager.unloadPluginWithoutDependents(PLUGIN_ID)).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> service.install(jarPath, metadata));
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.install(jarPath, metadata)
+        );
 
         verify(pf4jManager).unloadPluginWithoutDependents(PLUGIN_ID);
         verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
@@ -372,9 +838,23 @@ class PluginManagerSignatureSafetyTest {
         when(versionService.checkCompatibility(any(Path.class))).thenReturn(versionDescriptor());
         when(pf4jManager.loadPlugin(any(Path.class))).thenReturn(PLUGIN_ID);
         when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(wrapper);
+        PluginDescriptor pf4jDescriptor = wrapper.getDescriptor();
+        PluginDescriptor signedPf4jDescriptor = org.mockito.Mockito.mock(PluginDescriptor.class);
+        when(pf4jManager.readPluginDescriptor(any(Path.class))).thenReturn(signedPf4jDescriptor);
+        doAnswer(invocation -> {
+            if (invocation.getArgument(1) == pf4jDescriptor) {
+                throw new PluginVersionService.PluginVersionException(
+                    "PF4J 插件描述与 plugin.json 不一致"
+                );
+            }
+            return null;
+        }).when(versionService).validatePf4jDescriptor(any(), any());
         when(pf4jManager.unloadPluginWithoutDependents(PLUGIN_ID)).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> service.install(jarPath, metadata));
+        assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> service.install(jarPath, metadata)
+        );
 
         verify(pf4jManager).unloadPluginWithoutDependents(PLUGIN_ID);
         verify(flywayMigrator, never()).migrate(anyString(), any(Path.class));
@@ -490,6 +970,273 @@ class PluginManagerSignatureSafetyTest {
         verify(pluginRepository, never()).updateStatus(eq(PLUGIN_ID), eq(PluginStatus.ERROR), anyString());
     }
 
+    @Test
+    void restoreShouldRejectTrustedDependencyCycleBeforeLoadingAnyPlugin() throws Exception {
+        String firstId = "cycle-first";
+        String secondId = "cycle-second";
+        Path firstJar = Files.writeString(tempDir.resolve("cycle-first.jar"), "first");
+        Path secondJar = Files.writeString(tempDir.resolve("cycle-second.jar"), "second");
+        PluginDependencySpec firstDependency = new PluginDependencySpec(secondId, null, null);
+        PluginDependencySpec secondDependency = new PluginDependencySpec(firstId, null, null);
+        PluginRow first = storedPlugin(firstJar, VERIFIED_SHA256);
+        first.setPluginId(firstId);
+        first.setDependencies(List.of(firstDependency));
+        PluginRow second = storedPlugin(secondJar, VERIFIED_SHA256);
+        second.setPluginId(secondId);
+        second.setDependencies(List.of(secondDependency));
+        PluginVersionService.PluginVersionDescriptor firstDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                firstId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of(firstDependency)
+            );
+        PluginVersionService.PluginVersionDescriptor secondDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                secondId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of(secondDependency)
+            );
+        when(pluginRepository.findAll()).thenReturn(List.of(first, second));
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(firstJar)).thenReturn(firstDescriptor);
+        when(versionService.checkCompatibility(secondJar)).thenReturn(secondDescriptor);
+        when(versionService.matchesVersion(any(PluginDependencySpec.class), eq("1.0.0")))
+            .thenReturn(true);
+
+        service.restorePlugins();
+
+        verify(pf4jManager, never()).loadPlugin(any(Path.class));
+        verify(pluginRepository).updateStatus(firstId, PluginStatus.ERROR, "插件依赖存在循环");
+        verify(pluginRepository).updateStatus(secondId, PluginStatus.ERROR, "插件依赖存在循环");
+        verify(lifecycleGuard, never()).enable(anyString());
+    }
+
+    @Test
+    void restoreShouldIsolateInvalidStoredDependencyVersion() throws Exception {
+        String dependencyId = "invalid-version-dependency";
+        String consumerId = "invalid-version-consumer";
+        Path dependencyJar = Files.writeString(tempDir.resolve("invalid-version-dependency.jar"), "dependency");
+        Path consumerJar = Files.writeString(tempDir.resolve("invalid-version-consumer.jar"), "consumer");
+        Path healthyJar = Files.writeString(tempDir.resolve("healthy-plugin.jar"), "healthy");
+        PluginDependencySpec dependencySpec = new PluginDependencySpec(dependencyId, "1.0.0", null);
+        PluginRow dependency = storedPlugin(dependencyJar, VERIFIED_SHA256);
+        dependency.setPluginId(dependencyId);
+        PluginRow consumer = storedPlugin(consumerJar, VERIFIED_SHA256);
+        consumer.setPluginId(consumerId);
+        consumer.setDependencies(List.of(dependencySpec));
+        PluginRow healthy = storedPlugin(healthyJar, VERIFIED_SHA256);
+        PluginVersionService.PluginVersionDescriptor dependencyDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                dependencyId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of()
+            );
+        PluginVersionService.PluginVersionDescriptor consumerDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                consumerId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of(dependencySpec)
+            );
+        PluginWrapper dependencyWrapper = wrapper("1.0.0");
+        PluginWrapper healthyWrapper = wrapper("1.0.0");
+
+        when(pluginRepository.findAll()).thenReturn(List.of(dependency, consumer, healthy));
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(dependencyJar)).thenReturn(dependencyDescriptor);
+        when(versionService.checkCompatibility(consumerJar)).thenReturn(consumerDescriptor);
+        when(versionService.checkCompatibility(healthyJar)).thenReturn(versionDescriptor());
+        when(versionService.matchesVersion(dependencySpec, "1.0.0"))
+            .thenThrow(new PluginVersionService.PluginVersionException("依赖插件版本必须是严格 SemVer"));
+        when(pf4jManager.loadPlugin(dependencyJar)).thenReturn(dependencyId);
+        when(pf4jManager.loadPlugin(healthyJar)).thenReturn(PLUGIN_ID);
+        when(pf4jManager.getPlugin(dependencyId)).thenReturn(dependencyWrapper);
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(healthyWrapper);
+        when(pf4jManager.startPlugin(dependencyId)).thenReturn(PluginState.STARTED);
+        when(pf4jManager.startPlugin(PLUGIN_ID)).thenReturn(PluginState.STARTED);
+
+        assertDoesNotThrow(service::restorePlugins);
+
+        verify(pluginRepository).updateStatus(
+            consumerId,
+            PluginStatus.ERROR,
+            "插件依赖版本记录无效: " + dependencyId
+        );
+        verify(pf4jManager, never()).loadPlugin(consumerJar);
+        verify(pf4jManager).loadPlugin(dependencyJar);
+        verify(pf4jManager).loadPlugin(healthyJar);
+    }
+
+    @Test
+    void restoreShouldRejectIncompatibleDependencyVersionBeforeLoadingConsumer() throws Exception {
+        String dependencyId = "version-conflict-dependency";
+        String consumerId = "version-conflict-consumer";
+        Path dependencyJar = Files.writeString(
+            tempDir.resolve("version-conflict-dependency.jar"),
+            "dependency"
+        );
+        Path consumerJar = Files.writeString(
+            tempDir.resolve("version-conflict-consumer.jar"),
+            "consumer"
+        );
+        PluginDependencySpec dependencySpec =
+            new PluginDependencySpec(dependencyId, "2.0.0", null);
+        PluginRow dependency = storedPlugin(dependencyJar, VERIFIED_SHA256);
+        dependency.setPluginId(dependencyId);
+        PluginRow consumer = storedPlugin(consumerJar, VERIFIED_SHA256);
+        consumer.setPluginId(consumerId);
+        consumer.setDependencies(List.of(dependencySpec));
+        PluginVersionService.PluginVersionDescriptor dependencyDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                dependencyId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of()
+            );
+        PluginVersionService.PluginVersionDescriptor consumerDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                consumerId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of(dependencySpec)
+            );
+        PluginWrapper dependencyWrapper = wrapper("1.0.0");
+
+        when(pluginRepository.findAll()).thenReturn(List.of(dependency, consumer));
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(dependencyJar)).thenReturn(dependencyDescriptor);
+        when(versionService.checkCompatibility(consumerJar)).thenReturn(consumerDescriptor);
+        when(versionService.matchesVersion(dependencySpec, "1.0.0")).thenReturn(false);
+        when(pf4jManager.loadPlugin(dependencyJar)).thenReturn(dependencyId);
+        when(pf4jManager.getPlugin(dependencyId)).thenReturn(dependencyWrapper);
+        when(pf4jManager.startPlugin(dependencyId)).thenReturn(PluginState.STARTED);
+
+        service.restorePlugins();
+
+        verify(pluginRepository).updateStatus(
+            consumerId,
+            PluginStatus.ERROR,
+            "插件依赖版本不兼容: " + dependencyId
+        );
+        verify(pf4jManager, never()).loadPlugin(consumerJar);
+        verify(pf4jManager).loadPlugin(dependencyJar);
+        verify(lifecycleGuard).enable(dependencyId);
+    }
+
+    @Test
+    void restoreShouldRejectActiveConsumerWhenDependencyIsNotActive() throws Exception {
+        String dependencyId = "stopped-dependency";
+        String consumerId = "active-consumer";
+        Path dependencyJar = Files.writeString(
+            tempDir.resolve("stopped-dependency.jar"),
+            "dependency"
+        );
+        Path consumerJar = Files.writeString(
+            tempDir.resolve("active-consumer.jar"),
+            "consumer"
+        );
+        PluginDependencySpec dependencySpec =
+            new PluginDependencySpec(dependencyId, null, null);
+        PluginRow dependency = storedPlugin(dependencyJar, VERIFIED_SHA256);
+        dependency.setPluginId(dependencyId);
+        dependency.setStatus(PluginStatus.STOPPED);
+        PluginRow consumer = storedPlugin(consumerJar, VERIFIED_SHA256);
+        consumer.setPluginId(consumerId);
+        consumer.setDependencies(List.of(dependencySpec));
+        PluginVersionService.PluginVersionDescriptor dependencyDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                dependencyId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of()
+            );
+        PluginVersionService.PluginVersionDescriptor consumerDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                consumerId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of(dependencySpec)
+            );
+        PluginWrapper dependencyWrapper = wrapper("1.0.0");
+
+        when(pluginRepository.findAll()).thenReturn(List.of(dependency, consumer));
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(dependencyJar)).thenReturn(dependencyDescriptor);
+        when(versionService.checkCompatibility(consumerJar)).thenReturn(consumerDescriptor);
+        when(versionService.matchesVersion(dependencySpec, "1.0.0")).thenReturn(true);
+        when(pf4jManager.loadPlugin(dependencyJar)).thenReturn(dependencyId);
+        when(pf4jManager.getPlugin(dependencyId)).thenReturn(dependencyWrapper);
+
+        service.restorePlugins();
+
+        verify(pluginRepository).updateStatus(
+            consumerId,
+            PluginStatus.ERROR,
+            "已启用插件依赖未启用: " + dependencyId
+        );
+        verify(pf4jManager, never()).loadPlugin(consumerJar);
+        verify(pf4jManager).loadPlugin(dependencyJar);
+        verify(pf4jManager, never()).startPlugin(anyString());
+        verify(lifecycleGuard, never()).enable(anyString());
+    }
+
+    @Test
+    void restoreShouldSkipDependentAfterRuntimeFailureAndContinueUnrelatedPlugin() throws Exception {
+        String dependencyId = "runtime-failure-dependency";
+        String consumerId = "runtime-failure-consumer";
+        Path dependencyJar = Files.writeString(
+            tempDir.resolve("runtime-failure-dependency.jar"),
+            "dependency"
+        );
+        Path consumerJar = Files.writeString(
+            tempDir.resolve("runtime-failure-consumer.jar"),
+            "consumer"
+        );
+        Path healthyJar = Files.writeString(tempDir.resolve("runtime-healthy.jar"), "healthy");
+        PluginDependencySpec dependencySpec =
+            new PluginDependencySpec(dependencyId, null, null);
+        PluginRow dependency = storedPlugin(dependencyJar, VERIFIED_SHA256);
+        dependency.setPluginId(dependencyId);
+        PluginRow consumer = storedPlugin(consumerJar, VERIFIED_SHA256);
+        consumer.setPluginId(consumerId);
+        consumer.setDependencies(List.of(dependencySpec));
+        PluginRow healthy = storedPlugin(healthyJar, VERIFIED_SHA256);
+        PluginVersionService.PluginVersionDescriptor dependencyDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                dependencyId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of()
+            );
+        PluginVersionService.PluginVersionDescriptor consumerDescriptor =
+            new PluginVersionService.PluginVersionDescriptor(
+                consumerId, "1.0.0", "0.1.0", "0.1.0", "0.2.0", "17",
+                "FUNCTIONAL", "Workforce Hub", null, List.of(dependencySpec)
+            );
+        PluginWrapper dependencyWrapper = wrapper("1.0.0");
+        PluginWrapper healthyWrapper = wrapper("1.0.0");
+
+        when(pluginRepository.findAll()).thenReturn(List.of(dependency, consumer, healthy));
+        when(signatureVerifier.verify(any(Path.class), eq(SIGNER_ID), any(byte[].class)))
+            .thenReturn(VERIFIED_SHA256);
+        when(versionService.checkCompatibility(dependencyJar)).thenReturn(dependencyDescriptor);
+        when(versionService.checkCompatibility(consumerJar)).thenReturn(consumerDescriptor);
+        when(versionService.checkCompatibility(healthyJar)).thenReturn(versionDescriptor());
+        when(versionService.matchesVersion(dependencySpec, "1.0.0")).thenReturn(true);
+        when(pf4jManager.loadPlugin(dependencyJar)).thenReturn(dependencyId);
+        when(pf4jManager.loadPlugin(healthyJar)).thenReturn(PLUGIN_ID);
+        when(pf4jManager.getPlugin(dependencyId)).thenReturn(dependencyWrapper);
+        when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(healthyWrapper);
+        when(pf4jManager.startPlugin(dependencyId)).thenReturn(PluginState.FAILED);
+        when(pf4jManager.startPlugin(PLUGIN_ID)).thenReturn(PluginState.STARTED);
+        when(pf4jManager.unloadPluginWithoutDependents(dependencyId)).thenReturn(true);
+
+        service.restorePlugins();
+
+        verify(pluginRepository).updateStatus(
+            dependencyId,
+            PluginStatus.ERROR,
+            "启动失败: FAILED"
+        );
+        verify(pluginRepository).updateStatus(
+            consumerId,
+            PluginStatus.ERROR,
+            "插件依赖恢复失败: " + dependencyId
+        );
+        verify(pf4jManager, never()).loadPlugin(consumerJar);
+        verify(pf4jManager).loadPlugin(healthyJar);
+        verify(lifecycleGuard).enable(PLUGIN_ID);
+    }
+
     @ParameterizedTest
     @EnumSource(SignedUiField.class)
     void restoreShouldRejectSignedUiFieldDriftBeforeLoad(SignedUiField field) throws Exception {
@@ -567,7 +1314,7 @@ class PluginManagerSignatureSafetyTest {
         verify(pluginRepository).updateStatus(
             PLUGIN_ID,
             PluginStatus.ERROR,
-            "PF4J 插件标识与 plugin.json 不一致"
+            "PF4J 插件描述符与 plugin.json 不一致"
         );
         verify(lifecycleGuard, never()).enable(anyString());
     }
@@ -583,6 +1330,17 @@ class PluginManagerSignatureSafetyTest {
         when(versionService.checkCompatibility(jarPath)).thenReturn(versionDescriptor());
         when(pf4jManager.loadPlugin(jarPath)).thenReturn(PLUGIN_ID);
         when(pf4jManager.getPlugin(PLUGIN_ID)).thenReturn(wrapper);
+        PluginDescriptor pf4jDescriptor = wrapper.getDescriptor();
+        PluginDescriptor signedPf4jDescriptor = org.mockito.Mockito.mock(PluginDescriptor.class);
+        when(pf4jManager.readPluginDescriptor(jarPath)).thenReturn(signedPf4jDescriptor);
+        doAnswer(invocation -> {
+            if (invocation.getArgument(1) == pf4jDescriptor) {
+                throw new PluginVersionService.PluginVersionException(
+                    "PF4J 插件描述与 plugin.json 不一致"
+                );
+            }
+            return null;
+        }).when(versionService).validatePf4jDescriptor(any(), any());
         when(pf4jManager.unloadPluginWithoutDependents(PLUGIN_ID)).thenReturn(true);
 
         service.restorePlugins();
@@ -592,7 +1350,7 @@ class PluginManagerSignatureSafetyTest {
         verify(pluginRepository).updateStatus(
             PLUGIN_ID,
             PluginStatus.ERROR,
-            "PF4J 插件标识与 plugin.json 不一致"
+            "PF4J 插件描述与 plugin.json 不一致"
         );
         verify(lifecycleGuard, never()).enable(anyString());
     }
@@ -635,7 +1393,7 @@ class PluginManagerSignatureSafetyTest {
         verify(pluginRepository).updateStatus(
             PLUGIN_ID,
             PluginStatus.ERROR,
-            "PF4J 插件标识与 plugin.json 不一致；插件清理失败，需重启"
+            "PF4J 插件描述符与 plugin.json 不一致；插件清理失败，需重启"
         );
         verify(lifecycleGuard, never()).enable(anyString());
     }
@@ -688,7 +1446,8 @@ class PluginManagerSignatureSafetyTest {
             "17",
             "FUNCTIONAL",
             "Workforce Hub",
-            null
+            null,
+            List.of()
         );
         when(pluginRepository.findAll()).thenReturn(List.of(stored));
         when(signatureVerifier.verify(eq(jarPath), eq(SIGNER_ID), any(byte[].class)))
@@ -753,7 +1512,8 @@ class PluginManagerSignatureSafetyTest {
             "17",
             "FUNCTIONAL",
             "Workforce Hub",
-            null
+            null,
+            List.of()
         );
     }
 
@@ -767,7 +1527,8 @@ class PluginManagerSignatureSafetyTest {
             "17",
             "UI",
             "Workforce Hub",
-            SIGNED_FRONTEND_SRI
+            SIGNED_FRONTEND_SRI,
+            List.of()
         );
     }
 
@@ -775,7 +1536,6 @@ class PluginManagerSignatureSafetyTest {
         PluginWrapper wrapper = org.mockito.Mockito.mock(PluginWrapper.class);
         PluginDescriptor descriptor = org.mockito.Mockito.mock(PluginDescriptor.class);
         when(wrapper.getDescriptor()).thenReturn(descriptor);
-        when(descriptor.getVersion()).thenReturn(version);
         return wrapper;
     }
 }

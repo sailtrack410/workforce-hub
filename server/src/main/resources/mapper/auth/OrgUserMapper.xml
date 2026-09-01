@@ -34,6 +34,14 @@
         LIMIT 1
     </select>
 
+    <select id="selectByIdForUpdate" resultMap="BaseResultMap">
+        SELECT * FROM org_user
+        WHERE id = #{id}
+          AND is_deleted = 0
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
     <insert id="insert">
         INSERT INTO org_user
             (id, employee_no, real_name, gender, mobile, avatar_attachment_ref_id,

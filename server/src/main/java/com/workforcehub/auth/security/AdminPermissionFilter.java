@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
+import static com.workforcehub.common.config.RequestPathResolver.resolve;
+
 /**
  * 后台接口权限校验。
  */
@@ -41,7 +43,8 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
         new PathPermission("/api/admin/files/", "ADMIN_FILE_MANAGE"),
         new PathPermission("/api/admin/ragflow/", "ADMIN_RAGFLOW_MANAGE"),
         new PathPermission("/api/admin/notification-channels", "ADMIN_NOTIFICATION_CHANNEL_MANAGE"),
-        new PathPermission("/api/admin/dicts", "ADMIN_DICT_MANAGE")
+        new PathPermission("/api/admin/dicts", "ADMIN_DICT_MANAGE"),
+        new PathPermission("/api/admin/plugins", "ADMIN_PLUGIN_MANAGE")
     );
 
     private final ObjectMapper objectMapper;
@@ -54,7 +57,7 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String uri = request.getRequestURI();
+        String uri = resolve(request);
         if (!uri.startsWith(ADMIN_PREFIX) || uri.startsWith("/api/admin/auth/")) {
             filterChain.doFilter(request, response);
             return;
@@ -91,10 +94,17 @@ public class AdminPermissionFilter extends OncePerRequestFilter {
 
     private String requiredPermission(String uri) {
         return PATH_PERMISSIONS.stream()
-            .filter(item -> uri.startsWith(item.pathPrefix()))
+            .filter(item -> matchesPath(uri, item.pathPrefix()))
             .map(PathPermission::permissionCode)
             .findFirst()
             .orElse(null);
+    }
+
+    private boolean matchesPath(String uri, String prefix) {
+        String normalized = prefix.endsWith("/")
+            ? prefix.substring(0, prefix.length() - 1)
+            : prefix;
+        return uri.equals(normalized) || uri.startsWith(normalized + "/");
     }
 
     private record PathPermission(String pathPrefix, String permissionCode) {}

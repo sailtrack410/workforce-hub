@@ -131,6 +131,12 @@ const providerStatus = computed(() => {
   if (selectedProvider.value.lastTestSuccess === false) return '异常';
   return '未测试';
 });
+const enabledProviderCount = computed(() => providers.value.filter((item) => item.enabled !== false).length);
+const providerRiskCount = computed(() => providers.value.filter((item) => item.enabled !== false && item.lastTestSuccess === false).length);
+const activeModelCount = computed(() => models.value.filter((item) => item.status === 'ACTIVE').length);
+const modelRiskCount = computed(() => models.value.filter((item) => item.status === 'ACTIVE' && item.lastTestSuccess === false).length);
+const defaultTypeCount = computed(() => new Set(defaultModels.value.filter((item) => item.status === 'ACTIVE').map((item) => item.modelType)).size);
+const modelGovernanceRiskCount = computed(() => providerRiskCount.value + modelRiskCount.value + Math.max(0, modelTypeOptions.length - defaultTypeCount.value));
 
 function providerTypeLabel(value?: string | null) {
   return providerOptions.find((item) => item.value === value)?.label || '供应商';
@@ -644,6 +650,32 @@ onMounted(async () => {
 
 <template>
   <main v-if="activeTab === 'models'" class="ai-base-page">
+    <AdminPanel title="模型运行态" subtitle="从供应商连通性、可用模型和默认类型覆盖检查 AI 基座">
+      <template #actions>
+        <button class="secondary-button" type="button" :disabled="loading" @click="loadAiBase">
+          <RefreshCcw :size="16" />
+          <span>刷新运行态</span>
+        </button>
+        <button class="primary-button" type="button" @click="openProviderCreate">
+          <Plus :size="16" />
+          <span>添加供应商</span>
+        </button>
+      </template>
+      <div class="model-governance-grid">
+        <article :class="['model-governance-primary', { attention: modelGovernanceRiskCount }]">
+          <span>AI 基座健康</span>
+          <strong>{{ modelGovernanceRiskCount ? '需要处置' : '运行正常' }}</strong>
+          <p>{{ modelGovernanceRiskCount ? `${modelGovernanceRiskCount} 项连通性或默认配置待完善` : '供应商、模型与默认路由均已就绪' }}</p>
+        </article>
+        <div class="model-governance-metrics">
+          <article><span>可用供应商</span><strong>{{ enabledProviderCount }} / {{ providers.length }}</strong><small>{{ providerRiskCount }} 个连通异常</small></article>
+          <article><span>启用模型</span><strong>{{ activeModelCount }} / {{ models.length }}</strong><small>{{ modelRiskCount }} 个模型不可用</small></article>
+          <article :class="{ attention: defaultTypeCount < modelTypeOptions.length }"><span>默认类型覆盖</span><strong>{{ defaultTypeCount }} / {{ modelTypeOptions.length }}</strong><small>文本、嵌入、重排等类型</small></article>
+          <article><span>当前供应商</span><strong>{{ selectedProvider?.displayName || '未选择' }}</strong><small>{{ providerStatus }}</small></article>
+        </div>
+      </div>
+    </AdminPanel>
+
     <div class="ai-page-tabs">
       <button
         v-for="tab in aiTabs"
@@ -839,7 +871,19 @@ onMounted(async () => {
   </main>
 
   <div v-else class="page-grid">
-    <AdminPanel :span="12" title="通知渠道">
+    <AdminPanel :span="12" title="通知运行态" subtitle="邮件渠道的启用、凭据与最近测试状态">
+      <template #actions>
+        <button class="secondary-button" title="刷新" :disabled="emailLoading" @click="loadEmailChannel"><RefreshCcw :size="16" />刷新</button>
+      </template>
+      <div class="notification-governance-grid">
+        <article :class="{ attention: emailStatus === '测试失败' || emailStatus === '未配置' }"><span>渠道状态</span><strong>{{ emailStatus }}</strong><small>{{ emailForm.enabled ? '已启用' : '未启用' }}</small></article>
+        <article><span>发件服务</span><strong>{{ emailForm.host || '未配置' }}</strong><small>端口 {{ emailForm.port || '-' }}</small></article>
+        <article :class="{ attention: !emailChannel?.hasSecret }"><span>认证凭据</span><strong>{{ emailChannel?.hasSecret ? '已配置' : '未配置' }}</strong><small>留空密码可保持现有凭据</small></article>
+        <article><span>最近测试</span><strong>{{ emailChannel?.lastTestSuccess === true ? '通过' : emailChannel?.lastTestSuccess === false ? '失败' : '未测试' }}</strong><small>{{ formatDateTime(emailChannel?.lastTestedAt) || '暂无记录' }}</small></article>
+      </div>
+    </AdminPanel>
+
+    <AdminPanel :span="12" title="邮件渠道配置">
       <template #actions>
         <button class="secondary-button" title="刷新" :disabled="emailLoading" @click="loadEmailChannel"><RefreshCcw :size="16" />刷新</button>
       </template>
@@ -960,11 +1004,94 @@ onMounted(async () => {
   gap: var(--space-base);
 }
 
+.model-governance-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(0, 2.2fr);
+  gap: var(--space-md);
+}
+
+.model-governance-primary,
+.model-governance-metrics article,
+.notification-governance-grid article {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-strong);
+  letter-spacing: 0;
+}
+
+.model-governance-primary {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 128px;
+  padding: var(--space-lg);
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
+.model-governance-primary.attention,
+.model-governance-metrics article.attention,
+.notification-governance-grid article.attention {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+.model-governance-primary > span,
+.model-governance-metrics span,
+.model-governance-metrics small,
+.notification-governance-grid span,
+.notification-governance-grid small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.model-governance-primary strong {
+  color: var(--success);
+  font-size: var(--text-xl);
+}
+
+.model-governance-primary.attention strong,
+.model-governance-metrics article.attention strong,
+.notification-governance-grid article.attention strong {
+  color: var(--red-dark);
+}
+
+.model-governance-primary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.model-governance-metrics,
+.notification-governance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.model-governance-metrics article,
+.notification-governance-grid article {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 128px;
+  padding: var(--space-base);
+  overflow-wrap: anywhere;
+}
+
+.model-governance-metrics strong,
+.notification-governance-grid strong {
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
 .ai-base-layout :deep(.model-workspace > .panel:first-child .panel-title) {
   align-items: flex-start;
 }
 
-.ai-base-layout :deep(.model-workspace > .panel:first-child .panel-title > div) {
+.ai-base-layout :deep(.model-workspace > .panel:first-child .panel-title > div:first-child) {
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -1477,6 +1604,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
+  .model-governance-grid { grid-template-columns: 1fr; }
+  .model-governance-metrics,
+  .notification-governance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-base-layout,
   .provider-dialog,
   .model-dialog,
@@ -1511,5 +1641,13 @@ onMounted(async () => {
     width: 100%;
     flex-wrap: wrap;
   }
+}
+
+@media (max-width: 560px) {
+  .model-governance-metrics,
+  .notification-governance-grid { grid-template-columns: 1fr; }
+  .model-governance-primary,
+  .model-governance-metrics article,
+  .notification-governance-grid article { min-height: 100px; }
 }
 </style>

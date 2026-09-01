@@ -1,5 +1,8 @@
 package com.workforcehub.plugin;
 
+import com.jayway.jsonpath.JsonPath;
+import com.workforcehub.auth.security.AdminUserDetails;
+import com.workforcehub.plugin.repository.PluginDependencySpec;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginRepository;
 import com.workforcehub.plugin.repository.PluginStatus;
@@ -19,18 +22,28 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.pf4j.PluginClassLoader;
 import org.pf4j.PluginState;
 import org.pf4j.PluginWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
@@ -43,12 +56,14 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.Signature;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.jar.JarEntry;
@@ -67,11 +82,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 @SpringBootTest(properties = "workforce.plugin.root=target/test-plugins")
+@AutoConfigureMockMvc
 @ActiveProfiles("api")
 class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
@@ -81,10 +108,19 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
     private static final String UNRESOLVED_DEPENDENT_PLUGIN_ID = "existing-unresolved-dependent";
     private static final String PERSISTENCE_FAILURE_PLUGIN_ID = "migration-plugin-persistence-failure";
     private static final String TAMPERED_PLUGIN_ID = "migration-plugin-tampered";
+    private static final String REINSTALL_PLUGIN_ID = "plugin-reinstall";
+    private static final String UPLOAD_PLUGIN_ID = "plugin-upload-http";
     private static final String HELLO_PLUGIN_ID = "hello-plugin";
+    private static final String DEPENDENCY_BASE_PLUGIN_ID = "dependency-base";
+    private static final String DEPENDENCY_CONSUMER_PLUGIN_ID = "dependency-consumer";
     private static final String HELLO_PLUGIN_FRONTEND_SRI =
         "sha384-c527zMMh7jwa0gTNl9fI1Mg5xEqGXyEFnTFCcjr7fokaoyPHzkIY7kC9f13c4zUQ";
     private static final String PERSISTENCE_GUARD_TABLE = "plugin_migration_persistence_guard";
+    private static final String DEPENDENCY_MANIFEST_GUARD_TABLE =
+        "plugin_dependency_manifest_guard";
+    private static final String REINSTALL_DATA_TABLE = "plugin_reinstall_data";
+    private static final String REINSTALL_TRANSACTION_GUARD_TABLE =
+        "plugin_reinstall_transaction_guard";
     private static final String TEST_SIGNER_ID = "plugin-integration-test";
     private static final KeyPair SIGNING_KEY = createSigningKey();
 
@@ -133,6 +169,9 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
     @Autowired
     private Environment environment;
 
+    @Autowired
+    private MockMvc mockMvc;
+
     @BeforeEach
     void resetPluginState() {
         unloadIfPresent(SUCCESS_PLUGIN_ID);
@@ -141,7 +180,62 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         unloadIfPresent(UNRESOLVED_DEPENDENT_PLUGIN_ID);
         unloadIfPresent(PERSISTENCE_FAILURE_PLUGIN_ID);
         unloadIfPresent(TAMPERED_PLUGIN_ID);
+        unloadIfPresent(REINSTALL_PLUGIN_ID);
+        unloadIfPresent(UPLOAD_PLUGIN_ID);
         unloadIfPresent(HELLO_PLUGIN_ID);
+        unloadIfPresent(DEPENDENCY_CONSUMER_PLUGIN_ID);
+        unloadIfPresent(DEPENDENCY_BASE_PLUGIN_ID);
+        dropTable(REINSTALL_TRANSACTION_GUARD_TABLE);
+        jdbcTemplate.update("""
+            DELETE FROM sys_plugin_dependency
+            WHERE plugin_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               OR depends_on IN (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            SUCCESS_PLUGIN_ID,
+            FAILURE_PLUGIN_ID,
+            DEPENDENCY_FAILURE_PLUGIN_ID,
+            UNRESOLVED_DEPENDENT_PLUGIN_ID,
+            PERSISTENCE_FAILURE_PLUGIN_ID,
+            TAMPERED_PLUGIN_ID,
+            REINSTALL_PLUGIN_ID,
+            UPLOAD_PLUGIN_ID,
+            HELLO_PLUGIN_ID,
+            SUCCESS_PLUGIN_ID,
+            FAILURE_PLUGIN_ID,
+            DEPENDENCY_FAILURE_PLUGIN_ID,
+            UNRESOLVED_DEPENDENT_PLUGIN_ID,
+            PERSISTENCE_FAILURE_PLUGIN_ID,
+            TAMPERED_PLUGIN_ID,
+            REINSTALL_PLUGIN_ID,
+            UPLOAD_PLUGIN_ID,
+            HELLO_PLUGIN_ID
+        );
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_action_idempotency WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_operation_idempotency WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_event_subscription WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_dependency WHERE plugin_id = ? OR depends_on = ?",
+            REINSTALL_PLUGIN_ID,
+            REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_visibility WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_action_permission WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_capability WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_config WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_action_idempotency WHERE plugin_id = ?", HELLO_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_action_permission WHERE plugin_id = ?", HELLO_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_capability WHERE plugin_id = ?", HELLO_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_config WHERE plugin_id = ?", HELLO_PLUGIN_ID);
         jdbcTemplate.update(
             "DELETE FROM sys_plugin WHERE plugin_id IN (?, ?, ?, ?, ?, ?)",
             SUCCESS_PLUGIN_ID,
@@ -151,13 +245,38 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             TAMPERED_PLUGIN_ID,
             HELLO_PLUGIN_ID
         );
+        jdbcTemplate.update("DELETE FROM sys_plugin WHERE plugin_id = ?", REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("DELETE FROM sys_plugin WHERE plugin_id = ?", UPLOAD_PLUGIN_ID);
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_dependency WHERE plugin_id IN (?, ?) OR depends_on IN (?, ?)",
+            DEPENDENCY_BASE_PLUGIN_ID,
+            DEPENDENCY_CONSUMER_PLUGIN_ID,
+            DEPENDENCY_BASE_PLUGIN_ID,
+            DEPENDENCY_CONSUMER_PLUGIN_ID
+        );
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin WHERE plugin_id IN (?, ?)",
+            DEPENDENCY_BASE_PLUGIN_ID,
+            DEPENDENCY_CONSUMER_PLUGIN_ID
+        );
+        jdbcTemplate.update("""
+            DELETE FROM sys_audit_log
+            WHERE target_type = 'PLUGIN'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, UPLOAD_PLUGIN_ID);
         dropTable("plugin_migration_success");
         dropTable(PERSISTENCE_GUARD_TABLE);
+        dropTable(DEPENDENCY_MANIFEST_GUARD_TABLE);
+        dropTable(REINSTALL_DATA_TABLE);
         dropTable(flywayMigrator.getHistoryTable(SUCCESS_PLUGIN_ID));
         dropTable(flywayMigrator.getHistoryTable(FAILURE_PLUGIN_ID));
         dropTable(flywayMigrator.getHistoryTable(DEPENDENCY_FAILURE_PLUGIN_ID));
         dropTable(flywayMigrator.getHistoryTable(PERSISTENCE_FAILURE_PLUGIN_ID));
         dropTable(flywayMigrator.getHistoryTable(TAMPERED_PLUGIN_ID));
+        dropTable(flywayMigrator.getHistoryTable(REINSTALL_PLUGIN_ID));
+        dropTable(flywayMigrator.getHistoryTable(UPLOAD_PLUGIN_ID));
+        dropTable(flywayMigrator.getHistoryTable(DEPENDENCY_BASE_PLUGIN_ID));
+        dropTable(flywayMigrator.getHistoryTable(DEPENDENCY_CONSUMER_PLUGIN_ID));
         clearTestSnapshots();
     }
 
@@ -213,6 +332,469 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         assertNull(pluginManager.getPlugin(SUCCESS_PLUGIN_ID));
         assertTrue(Files.isRegularFile(snapshotPath));
         assertFalse(hasMigrationTempDirectory(SUCCESS_PLUGIN_ID));
+    }
+
+    @Test
+    void shouldPersistExposeAndRestoreTrustedDependencyGraph() throws Exception {
+        PluginDependencySpec dependency = new PluginDependencySpec(
+            DEPENDENCY_BASE_PLUGIN_ID,
+            "1.0.0",
+            "2.0.0"
+        );
+        Path baseJar = buildPluginJar(
+            DEPENDENCY_BASE_PLUGIN_ID,
+            "1.5.0",
+            "SELECT 1;",
+            null,
+            null
+        );
+        Path consumerJar = buildPluginJar(
+            DEPENDENCY_CONSUMER_PLUGIN_ID,
+            "0.1.0",
+            "SELECT 1;",
+            null,
+            DEPENDENCY_BASE_PLUGIN_ID + "@>=1.0.0 & <=2.0.0",
+            "[{\"pluginId\":\"" + DEPENDENCY_BASE_PLUGIN_ID
+                + "\",\"minVersion\":\"1.0.0\",\"maxVersion\":\"2.0.0\"}]"
+        );
+
+        PluginRow base = pluginManagerService.install(
+            baseJar,
+            metadata("Dependency Base", baseJar)
+        );
+        PluginRow consumer = pluginManagerService.install(
+            consumerJar,
+            metadata("Dependency Consumer", consumerJar)
+        );
+
+        assertEquals(List.of(dependency), consumer.getDependencies());
+        assertEquals(List.of(dependency),
+            pluginManagerService.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID).getDependencies());
+        assertEquals(1, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_plugin_dependency
+            WHERE plugin_id = ? AND depends_on = ?
+              AND min_version = '1.0.0' AND max_version = '2.0.0'
+            """, Integer.class, DEPENDENCY_CONSUMER_PLUGIN_ID, DEPENDENCY_BASE_PLUGIN_ID));
+
+        MvcResult listResult = mockMvc.perform(get("/api/admin/plugins")
+                .with(adminPluginManager()))
+            .andReturn();
+        assertEquals(200, listResult.getResponse().getStatus());
+        String responseBody = listResult.getResponse().getContentAsString();
+        assertEquals(List.of(DEPENDENCY_BASE_PLUGIN_ID), JsonPath.read(
+            responseBody,
+            "$.data[?(@.id == '" + DEPENDENCY_CONSUMER_PLUGIN_ID
+                + "')].dependencies[0].pluginId"
+        ));
+        assertEquals(List.of("1.0.0"), JsonPath.read(
+            responseBody,
+            "$.data[?(@.id == '" + DEPENDENCY_CONSUMER_PLUGIN_ID
+                + "')].dependencies[0].minVersion"
+        ));
+        assertEquals(List.of("2.0.0"), JsonPath.read(
+            responseBody,
+            "$.data[?(@.id == '" + DEPENDENCY_CONSUMER_PLUGIN_ID
+                + "')].dependencies[0].maxVersion"
+        ));
+
+        assertThrows(
+            IllegalStateException.class,
+            () -> pluginManagerService.enable(DEPENDENCY_CONSUMER_PLUGIN_ID)
+        );
+        assertEquals(PluginState.RESOLVED,
+            pluginManager.getPlugin(DEPENDENCY_BASE_PLUGIN_ID).getPluginState());
+        assertEquals(PluginState.RESOLVED,
+            pluginManager.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID).getPluginState());
+
+        pluginManagerService.enable(DEPENDENCY_BASE_PLUGIN_ID);
+        pluginManagerService.enable(DEPENDENCY_CONSUMER_PLUGIN_ID);
+        assertEquals(PluginStatus.ACTIVE,
+            pluginManagerService.getPlugin(DEPENDENCY_BASE_PLUGIN_ID).getStatus());
+        assertEquals(PluginStatus.ACTIVE,
+            pluginManagerService.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID).getStatus());
+        assertThrows(
+            IllegalStateException.class,
+            () -> pluginManagerService.disable(DEPENDENCY_BASE_PLUGIN_ID)
+        );
+
+        assertTrue(pluginManager.unloadPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID));
+        assertTrue(pluginManager.unloadPlugin(DEPENDENCY_BASE_PLUGIN_ID));
+        jdbcTemplate.update("""
+            UPDATE sys_plugin
+            SET installed_at = CASE plugin_id
+                WHEN ? THEN '2026-01-01 00:00:00'
+                ELSE '2026-01-02 00:00:00'
+            END
+            WHERE plugin_id IN (?, ?)
+            """,
+            DEPENDENCY_CONSUMER_PLUGIN_ID,
+            DEPENDENCY_BASE_PLUGIN_ID,
+            DEPENDENCY_CONSUMER_PLUGIN_ID
+        );
+        clearInvocations(pluginManager);
+
+        pluginManagerService.restorePlugins();
+
+        InOrder restoreOrder = inOrder(pluginManager);
+        restoreOrder.verify(pluginManager).loadPlugin(Path.of(base.getJarPath()));
+        restoreOrder.verify(pluginManager).startPlugin(DEPENDENCY_BASE_PLUGIN_ID);
+        restoreOrder.verify(pluginManager).loadPlugin(Path.of(consumer.getJarPath()));
+        restoreOrder.verify(pluginManager).startPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID);
+        assertEquals(PluginState.STARTED,
+            pluginManager.getPlugin(DEPENDENCY_BASE_PLUGIN_ID).getPluginState());
+        assertEquals(PluginState.STARTED,
+            pluginManager.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID).getPluginState());
+        assertThrows(
+            IllegalStateException.class,
+            () -> pluginManagerService.uninstall(DEPENDENCY_BASE_PLUGIN_ID)
+        );
+
+        pluginManagerService.uninstall(DEPENDENCY_CONSUMER_PLUGIN_ID);
+        pluginManagerService.disable(DEPENDENCY_BASE_PLUGIN_ID);
+        pluginManagerService.uninstall(DEPENDENCY_BASE_PLUGIN_ID);
+        assertEquals(PluginStatus.UNINSTALLED,
+            pluginManagerService.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID).getStatus());
+        assertEquals(PluginStatus.UNINSTALLED,
+            pluginManagerService.getPlugin(DEPENDENCY_BASE_PLUGIN_ID).getStatus());
+    }
+
+    @Test
+    void shouldRejectPersistedDependencyDriftBeforeRestoreLoad() throws Exception {
+        Path baseJar = buildPluginJar(
+            DEPENDENCY_BASE_PLUGIN_ID,
+            "1.5.0",
+            "SELECT 1;",
+            null,
+            null
+        );
+        Path consumerJar = buildPluginJar(
+            DEPENDENCY_CONSUMER_PLUGIN_ID,
+            "0.1.0",
+            "SELECT 1;",
+            null,
+            DEPENDENCY_BASE_PLUGIN_ID + "@>=1.0.0 & <=2.0.0",
+            "[{\"pluginId\":\"" + DEPENDENCY_BASE_PLUGIN_ID
+                + "\",\"minVersion\":\"1.0.0\",\"maxVersion\":\"2.0.0\"}]"
+        );
+        PluginRow base = pluginManagerService.install(
+            baseJar,
+            metadata("Dependency Base", baseJar)
+        );
+        PluginRow consumer = pluginManagerService.install(
+            consumerJar,
+            metadata("Dependency Consumer", consumerJar)
+        );
+        assertTrue(pluginManager.unloadPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID));
+        assertTrue(pluginManager.unloadPlugin(DEPENDENCY_BASE_PLUGIN_ID));
+        jdbcTemplate.update(
+            "DELETE FROM sys_plugin_dependency WHERE plugin_id = ?",
+            DEPENDENCY_CONSUMER_PLUGIN_ID
+        );
+        clearInvocations(pluginManager);
+
+        pluginManagerService.restorePlugins();
+
+        assertNotNull(pluginManager.getPlugin(DEPENDENCY_BASE_PLUGIN_ID));
+        assertNull(pluginManager.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID));
+        assertEquals(PluginStatus.ERROR,
+            pluginManagerService.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID).getStatus());
+        assertEquals("插件清单与安装记录不一致",
+            pluginManagerService.getPlugin(DEPENDENCY_CONSUMER_PLUGIN_ID).getErrorMessage());
+        verify(pluginManager).loadPlugin(Path.of(base.getJarPath()));
+        verify(pluginManager, never()).loadPlugin(Path.of(consumer.getJarPath()));
+    }
+
+    @Test
+    void shouldReplaceUninstalledSameIdAndPreserveDurableState() throws Exception {
+        String firstMigration = """
+            CREATE TABLE plugin_reinstall_data (
+                id INT PRIMARY KEY,
+                business_value VARCHAR(64) NOT NULL
+            );
+            """;
+        Path firstJar = buildPluginJar(
+            REINSTALL_PLUGIN_ID,
+            "0.1.0",
+            firstMigration,
+            null,
+            null
+        );
+        PluginRow firstInstall = pluginManagerService.install(
+            firstJar,
+            metadata("Reinstall Plugin v1", firstJar)
+        );
+        Path previousSnapshot = Path.of(firstInstall.getJarPath());
+        PluginClassLoader previousClassLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(REINSTALL_PLUGIN_ID)
+        );
+
+        jdbcTemplate.update(
+            "INSERT INTO " + REINSTALL_DATA_TABLE + " (id, business_value) VALUES (1, 'preserved')");
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_config
+                (plugin_id, config_key, config_value, value_type, default_value,
+                 description, requires_restart, is_secret)
+            VALUES (?, 'secret.key', 'encrypted-placeholder', 'STRING', 'default-value',
+                    'preserved config', 1, 1)
+            """, REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update(
+            "INSERT INTO sys_plugin_capability (plugin_id, capability_code) VALUES (?, 'employee:read')",
+            REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_visibility (plugin_id, scope_type, scope_value)
+            VALUES (?, 'DEPT', 'dept-1')
+            """, REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_action_permission (plugin_id, action_code, capability_code)
+            VALUES (?, 'legacy.action', 'employee:read')
+            """, REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_action_idempotency
+                (plugin_id, action_code, caller_type, caller_id, idempotency_key,
+                 request_hash, status, claim_token)
+            VALUES (?, 'legacy.action', 'ADMIN', 1, 'legacy-action-key', ?, 'IN_PROGRESS',
+                    '00000000-0000-0000-0000-000000000001')
+            """, REINSTALL_PLUGIN_ID, "a".repeat(64));
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_operation_idempotency
+                (plugin_id, operation_code, idempotency_key, request_hash)
+            VALUES (?, 'event.subscribe', 'legacy-operation-key', ?)
+            """, REINSTALL_PLUGIN_ID, "b".repeat(64));
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_event_subscription (plugin_id, event_type, action_code)
+            VALUES (?, 'employee.updated', 'legacy.action')
+            """, REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_dependency (plugin_id, depends_on, min_version)
+            VALUES (?, 'legacy-dependency', '0.1.0')
+            """, REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_dependency (plugin_id, depends_on, min_version)
+            VALUES ('dependent-plugin', ?, '0.1.0')
+            """, REINSTALL_PLUGIN_ID);
+
+        pluginManagerService.uninstall(REINSTALL_PLUGIN_ID);
+
+        assertTrue(previousClassLoader.isClosed());
+        assertTrue(Files.isRegularFile(previousSnapshot));
+        Path replacementJar = buildPluginJar(
+            REINSTALL_PLUGIN_ID,
+            "0.2.0",
+            firstMigration,
+            "ALTER TABLE plugin_reinstall_data ADD COLUMN version_marker VARCHAR(32);",
+            null
+        );
+
+        PluginRow replacement = pluginManagerService.install(
+            replacementJar,
+            metadata("Reinstall Plugin v2", replacementJar)
+        );
+
+        Path replacementSnapshot = Path.of(replacement.getJarPath());
+        PluginRow persisted = pluginManagerService.getPlugin(REINSTALL_PLUGIN_ID);
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(PluginStatus.INSTALLED, persisted.getStatus());
+        assertEquals("0.2.0", persisted.getVersion());
+        assertEquals(TEST_SIGNER_ID, persisted.getSignerId());
+        assertEquals(sha256(replacementJar), persisted.getJarSha256());
+        assertEquals(replacementSnapshot.toString(), persisted.getJarPath());
+        assertNull(persisted.getErrorMessage());
+        assertFalse(Files.exists(previousSnapshot));
+        assertTrue(Files.isRegularFile(replacementSnapshot));
+        assertEquals(persisted.getJarSha256(), sha256(replacementSnapshot));
+        assertNotSame(previousClassLoader, pluginManager.getPluginClassLoader(REINSTALL_PLUGIN_ID));
+        assertEquals("0.2.0",
+            pluginManager.getPlugin(REINSTALL_PLUGIN_ID).getDescriptor().getVersion());
+        assertEquals(1L, pluginManager.getPlugins().stream()
+            .filter(wrapper -> REINSTALL_PLUGIN_ID.equals(wrapper.getPluginId()))
+            .count());
+        assertFalse(lifecycleGuard.tryAcquire(REINSTALL_PLUGIN_ID));
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM " + REINSTALL_DATA_TABLE
+                + " WHERE id = 1 AND business_value = 'preserved'",
+            Integer.class
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+              AND COLUMN_NAME = 'version_marker'
+            """, Integer.class, REINSTALL_DATA_TABLE));
+        assertEquals(2, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM " + flywayMigrator.getHistoryTable(REINSTALL_PLUGIN_ID)
+                + " WHERE version IN ('1', '2') AND type = 'SQL' AND success = 1",
+            Integer.class
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM sys_plugin_config
+            WHERE plugin_id = ? AND config_key = 'secret.key'
+              AND config_value = 'encrypted-placeholder' AND value_type = 'STRING'
+              AND default_value = 'default-value' AND description = 'preserved config'
+              AND requires_restart = 1 AND is_secret = 1
+            """, Integer.class, REINSTALL_PLUGIN_ID));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_capability WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_visibility WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_action_permission WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM sys_plugin_action_idempotency
+            WHERE plugin_id = ? AND status = 'IN_PROGRESS'
+              AND claim_token = '00000000-0000-0000-0000-000000000001'
+            """, Integer.class, REINSTALL_PLUGIN_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_operation_idempotency WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_event_subscription WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_dependency WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM sys_plugin_dependency
+            WHERE plugin_id = 'dependent-plugin' AND depends_on = ?
+            """, Integer.class, REINSTALL_PLUGIN_ID));
+    }
+
+    @Test
+    void replaceUninstalledShouldRollbackRecordAndCleanupWhenRuntimeResetFails() {
+        String previousJarPath = tempDir.resolve("previous-plugin.jar").toString();
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin
+                (plugin_id, name, version, sdk_version, java_version, type,
+                 status, jar_path, signer_id)
+            VALUES (?, 'Reinstall Plugin v1', '0.1.0', '0.1.0', '17', 'FUNCTIONAL',
+                    'UNINSTALLED', ?, ?)
+            """, REINSTALL_PLUGIN_ID, previousJarPath, TEST_SIGNER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_operation_idempotency
+                (plugin_id, operation_code, idempotency_key, request_hash)
+            VALUES (?, 'event.subscribe', 'rollback-operation-key', ?)
+            """, REINSTALL_PLUGIN_ID, "b".repeat(64));
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_event_subscription (plugin_id, event_type, action_code)
+            VALUES (?, 'employee.updated', 'legacy.action')
+            """, REINSTALL_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_dependency (plugin_id, depends_on, min_version)
+            VALUES (?, 'legacy-dependency', '0.1.0')
+            """, REINSTALL_PLUGIN_ID);
+        jdbcTemplate.execute("""
+            CREATE TABLE plugin_reinstall_transaction_guard (
+                plugin_id VARCHAR(64) NOT NULL,
+                depends_on VARCHAR(64) NOT NULL,
+                PRIMARY KEY (plugin_id, depends_on),
+                CONSTRAINT fk_plugin_reinstall_transaction_guard
+                    FOREIGN KEY (plugin_id, depends_on)
+                    REFERENCES sys_plugin_dependency (plugin_id, depends_on)
+            ) ENGINE=InnoDB
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO plugin_reinstall_transaction_guard (plugin_id, depends_on)
+            VALUES (?, 'legacy-dependency')
+            """, REINSTALL_PLUGIN_ID);
+
+        PluginRow replacement = new PluginRow();
+        replacement.setPluginId(REINSTALL_PLUGIN_ID);
+        replacement.setName("Reinstall Plugin v2");
+        replacement.setVersion("0.2.0");
+        replacement.setSdkVersion("0.1.0");
+        replacement.setJavaVersion("17");
+        replacement.setType("FUNCTIONAL");
+        replacement.setStatus(PluginStatus.INSTALLED);
+        replacement.setJarPath(tempDir.resolve("replacement-plugin.jar").toString());
+        replacement.setJarSha256("c".repeat(64));
+        replacement.setSignature(new byte[]{1, 2, 3});
+        replacement.setSignerId(TEST_SIGNER_ID);
+        replacement.setProvider("Workforce Hub");
+        replacement.setInstalledAt(LocalDateTime.now());
+        replacement.setUpdatedAt(LocalDateTime.now());
+
+        try {
+            assertThrows(
+                DataAccessException.class,
+                () -> pluginRepository.replaceUninstalled(
+                    replacement,
+                    previousJarPath,
+                    TEST_SIGNER_ID
+                )
+            );
+        } finally {
+            dropTable(REINSTALL_TRANSACTION_GUARD_TABLE);
+        }
+
+        PluginRow persisted = pluginRepository.findById(REINSTALL_PLUGIN_ID).orElseThrow();
+        assertEquals(PluginStatus.UNINSTALLED, persisted.getStatus());
+        assertEquals("0.1.0", persisted.getVersion());
+        assertEquals(previousJarPath, persisted.getJarPath());
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_operation_idempotency WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_event_subscription WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin_dependency WHERE plugin_id = ?",
+            Integer.class,
+            REINSTALL_PLUGIN_ID
+        ));
+    }
+
+    @Test
+    void realPf4jPluginShouldReadBoundConfigAndUninstallShouldPreserveIt() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_config
+                (plugin_id, config_key, config_value, value_type)
+            VALUES (?, 'shared.key', 'configured-value', 'STRING')
+            """, HELLO_PLUGIN_ID);
+        pluginManagerService.enable(HELLO_PLUGIN_ID);
+
+        Object plugin = pluginManager.getPlugin(HELLO_PLUGIN_ID).getPlugin();
+        assertEquals(
+            "configured-value",
+            plugin.getClass().getMethod("getConfigValue", String.class)
+                .invoke(plugin, "shared.key")
+        );
+        assertNull(plugin.getClass().getMethod("getConfigValue", String.class)
+            .invoke(plugin, "missing.key"));
+
+        pluginManagerService.uninstall(HELLO_PLUGIN_ID);
+
+        assertEquals(1, jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_plugin_config
+            WHERE plugin_id = ? AND config_key = 'shared.key'
+            """, Integer.class, HELLO_PLUGIN_ID));
     }
 
     @Test
@@ -446,18 +1028,41 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             "missing-required-plugin"
         );
 
-        RuntimeException thrown = assertThrows(
-            RuntimeException.class,
+        PluginVersionService.PluginVersionException thrown = assertThrows(
+            PluginVersionService.PluginVersionException.class,
             () -> pluginManagerService.install(jarPath, metadata("Dependency Failure", jarPath))
         );
 
-        assertFalse(thrown instanceof PluginVersionService.PluginVersionException);
-        assertNotNull(thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("missing-required-plugin"));
+        assertEquals("插件依赖或描述符校验失败", thrown.getMessage());
         assertNull(pluginManager.getPlugin(DEPENDENCY_FAILURE_PLUGIN_ID));
         assertNull(pluginManager.getPluginClassLoader(DEPENDENCY_FAILURE_PLUGIN_ID));
         assertFalse(pluginManagerService.listPlugins().stream()
             .anyMatch(plugin -> DEPENDENCY_FAILURE_PLUGIN_ID.equals(plugin.getPluginId())));
+        assertSnapshotDirectoryEmpty();
+    }
+
+    @Test
+    void shouldRejectPf4jDependencyMissingFromSignedManifestBeforeMigration() throws Exception {
+        Path jarPath = buildPluginJar(
+            DEPENDENCY_FAILURE_PLUGIN_ID,
+            "0.1.0",
+            "CREATE TABLE " + DEPENDENCY_MANIFEST_GUARD_TABLE + " (id INT PRIMARY KEY);",
+            null,
+            "missing-required-plugin",
+            null
+        );
+
+        PluginVersionService.PluginVersionException thrown = assertThrows(
+            PluginVersionService.PluginVersionException.class,
+            () -> pluginManagerService.install(jarPath, metadata("Dependency Mismatch", jarPath))
+        );
+
+        assertEquals("PF4J 插件描述符与 plugin.json 不一致", thrown.getMessage());
+        assertNull(pluginManager.getPlugin(DEPENDENCY_FAILURE_PLUGIN_ID));
+        assertFalse(pluginManagerService.listPlugins().stream()
+            .anyMatch(plugin -> DEPENDENCY_FAILURE_PLUGIN_ID.equals(plugin.getPluginId())));
+        assertEquals(0, tableExists(DEPENDENCY_MANIFEST_GUARD_TABLE));
+        assertEquals(0, tableExists(flywayMigrator.getHistoryTable(DEPENDENCY_FAILURE_PLUGIN_ID)));
         assertSnapshotDirectoryEmpty();
     }
 
@@ -490,6 +1095,10 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             TEST_SIGNER_ID,
             "Workforce Hub"
         );
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_dependency (plugin_id, depends_on)
+            VALUES (?, 'missing-required-plugin')
+            """, DEPENDENCY_FAILURE_PLUGIN_ID);
 
         pluginManagerService.restorePlugins();
 
@@ -498,7 +1107,7 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         PluginRow failed = pluginManagerService.getPlugin(DEPENDENCY_FAILURE_PLUGIN_ID);
         assertEquals(PluginStatus.ERROR, failed.getStatus());
         assertNotEquals("插件清单与安装记录不一致", failed.getErrorMessage());
-        assertTrue(failed.getErrorMessage().contains("missing-required-plugin"));
+        assertEquals("插件依赖不可用: missing-required-plugin", failed.getErrorMessage());
     }
 
     @Test
@@ -516,14 +1125,12 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             "SELECT 1;",
             "missing-required-plugin"
         );
-        RuntimeException thrown = assertThrows(
-            RuntimeException.class,
+        PluginVersionService.PluginVersionException thrown = assertThrows(
+            PluginVersionService.PluginVersionException.class,
             () -> pluginManagerService.install(failedJar, metadata("Dependency Failure", failedJar))
         );
 
-        assertFalse(thrown instanceof PluginVersionService.PluginVersionException);
-        assertNotNull(thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("missing-required-plugin"));
+        assertEquals("插件依赖或描述符校验失败", thrown.getMessage());
         assertEquals(0, thrown.getSuppressed().length);
         assertNotNull(pluginManager.getPlugin(UNRESOLVED_DEPENDENT_PLUGIN_ID));
         assertNotNull(pluginManager.getPluginClassLoader(UNRESOLVED_DEPENDENT_PLUGIN_ID));
@@ -645,6 +1252,307 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
     }
 
+    @Test
+    void adminHttpUploadShouldInstallSignedJarAndRejectSameIdReplacement() throws Exception {
+        Path jarPath = buildPluginJar(UPLOAD_PLUGIN_ID, "SELECT 1;");
+        byte[] jarBytes = Files.readAllBytes(jarPath);
+        byte[] signature = sign(jarPath);
+
+        MvcResult installedResult = mockMvc.perform(multipart("/api/admin/plugins/upload")
+                .file(new MockMultipartFile(
+                    "jar", "plugin.jar", "application/java-archive", jarBytes))
+                .file(new MockMultipartFile(
+                    "signature", "plugin.sig", "application/octet-stream", signature))
+                .param("signerId", TEST_SIGNER_ID)
+                .param("name", "HTTP Upload Plugin")
+                .param("description", "HTTP upload integration test")
+                .with(adminPluginManager())
+                .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, installedResult.getResponse().getStatus());
+        assertEquals(UPLOAD_PLUGIN_ID, JsonPath.read(
+            installedResult.getResponse().getContentAsString(), "$.data.id"));
+        assertEquals("INSTALLED", JsonPath.read(
+            installedResult.getResponse().getContentAsString(), "$.data.status"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("jarPath"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("jarSha256"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("signerId"));
+        assertFalse(installedResult.getResponse().getContentAsString().contains("signature"));
+
+        PluginRow installed = pluginManagerService.getPlugin(UPLOAD_PLUGIN_ID);
+        assertEquals(PluginStatus.INSTALLED, installed.getStatus());
+        assertEquals(TEST_SIGNER_ID, installed.getSignerId());
+        assertEquals(sha256(jarPath), installed.getJarSha256());
+        assertNotNull(pluginManager.getPlugin(UPLOAD_PLUGIN_ID));
+        assertEquals(1, tableExists(flywayMigrator.getHistoryTable(UPLOAD_PLUGIN_ID)));
+        assertEquals(1L, snapshotCount());
+
+        MvcResult duplicateResult = mockMvc.perform(multipart("/api/admin/plugins/upload")
+                .file(new MockMultipartFile(
+                    "jar", "plugin.jar", "application/java-archive", jarBytes))
+                .file(new MockMultipartFile(
+                    "signature", "plugin.sig", "application/octet-stream", signature))
+                .param("signerId", TEST_SIGNER_ID)
+                .with(adminPluginManager())
+                .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(409, duplicateResult.getResponse().getStatus());
+        assertEquals("插件 ID 已存在，上传接口不支持替换安装", JsonPath.read(
+            duplicateResult.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.message"));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin WHERE plugin_id = ?",
+            Integer.class,
+            UPLOAD_PLUGIN_ID
+        ));
+        assertEquals(1L, snapshotCount());
+        assertEquals(
+            List.of("PLUGIN_UPLOADED:SUCCESS", "PLUGIN_UPLOADED:BLOCKED"),
+            jdbcTemplate.query("""
+                SELECT action_type, result
+                FROM sys_audit_log
+                WHERE target_type = 'PLUGIN'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+                ORDER BY occurred_at, id
+                """, (rs, rowNum) -> rs.getString("action_type") + ":" + rs.getString("result"),
+                UPLOAD_PLUGIN_ID)
+        );
+    }
+
+    @Test
+    void adminHttpUploadShouldRejectInvalidSignatureWithoutResidue() throws Exception {
+        Path jarPath = buildPluginJar(UPLOAD_PLUGIN_ID, "SELECT 1;");
+        byte[] invalidSignature = sign(jarPath);
+        invalidSignature[0] ^= 1;
+
+        MvcResult result = mockMvc.perform(multipart("/api/admin/plugins/upload")
+                .file(new MockMultipartFile(
+                    "jar", "plugin.jar", "application/java-archive", Files.readAllBytes(jarPath)))
+                .file(new MockMultipartFile(
+                    "signature", "plugin.sig", "application/octet-stream", invalidSignature))
+                .param("signerId", TEST_SIGNER_ID)
+                .with(adminPluginManager())
+                .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(422, result.getResponse().getStatus());
+        assertEquals("插件签名校验失败", JsonPath.read(
+            result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.message"));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_plugin WHERE plugin_id = ?",
+            Integer.class,
+            UPLOAD_PLUGIN_ID
+        ));
+        assertNull(pluginManager.getPlugin(UPLOAD_PLUGIN_ID));
+        assertEquals(0, tableExists(flywayMigrator.getHistoryTable(UPLOAD_PLUGIN_ID)));
+        assertEquals(0L, snapshotCount());
+    }
+
+    @Test
+    void adminHttpShouldUninstallInstalledPluginWithoutStartingIt() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+
+        PluginWrapper wrapper = pluginManager.getPlugin(HELLO_PLUGIN_ID);
+        assertNotNull(wrapper);
+        assertEquals(PluginState.RESOLVED, wrapper.getPluginState());
+        PluginClassLoader classLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+        clearInvocations(pluginManager);
+
+        MvcResult uninstallResult = mockMvc.perform(
+                delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, uninstallResult.getResponse().getStatus());
+        assertEquals("UNINSTALLED", JsonPath.read(
+            uninstallResult.getResponse().getContentAsString(), "$.data.status"));
+        LocalDateTime responseUpdatedAt = LocalDateTime.parse(JsonPath.read(
+            uninstallResult.getResponse().getContentAsString(), "$.data.updatedAt"));
+        PluginRow persisted = pluginManagerService.getPlugin(HELLO_PLUGIN_ID);
+        assertEquals(PluginStatus.UNINSTALLED, persisted.getStatus());
+        assertEquals(persisted.getUpdatedAt(), responseUpdatedAt);
+        verify(pluginManager, never()).stopPlugin(HELLO_PLUGIN_ID);
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertTrue(classLoader.isClosed());
+        assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+    }
+
+    @Test
+    void adminHttpShouldKeepPluginRecoverableWhenClassLoaderCloseFails() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+
+        PluginClassLoader originalClassLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+        PluginClassLoader failingClassLoader = mock(PluginClassLoader.class);
+        doThrow(new IOException("close failed")).when(failingClassLoader).close();
+
+        MvcResult failedResult;
+        try {
+            doReturn(failingClassLoader)
+                .when(pluginManager)
+                .getPluginClassLoader(HELLO_PLUGIN_ID);
+            failedResult = mockMvc.perform(
+                    delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                        .with(adminPluginManager())
+                        .with(csrf().asHeader()))
+                .andReturn();
+        } finally {
+            doCallRealMethod()
+                .when(pluginManager)
+                .getPluginClassLoader(HELLO_PLUGIN_ID);
+        }
+
+        assertEquals(500, failedResult.getResponse().getStatus());
+        assertEquals(PluginStatus.ERROR, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNotNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertSame(originalClassLoader, pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertFalse(originalClassLoader.isClosed());
+
+        MvcResult retryResult = mockMvc.perform(
+                delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, retryResult.getResponse().getStatus());
+        assertEquals(PluginStatus.UNINSTALLED, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertTrue(originalClassLoader.isClosed());
+    }
+
+    @Test
+    void adminHttpLifecycleShouldDrainAndUnloadRealPlugin() throws Exception {
+        Path jarPath = buildRealHelloPluginJar();
+        pluginManagerService.install(jarPath, metadata("Hello Plugin", jarPath));
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_capability (plugin_id, capability_code)
+            VALUES (?, 'HELLO_GREET')
+            """, HELLO_PLUGIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO sys_plugin_action_permission (plugin_id, action_code, capability_code)
+            VALUES (?, 'hello.greet', 'HELLO_GREET')
+            """, HELLO_PLUGIN_ID);
+
+        MvcResult enableResult = mockMvc.perform(
+                put("/api/admin/plugins/{pluginId}/enable", HELLO_PLUGIN_ID)
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader()))
+            .andReturn();
+
+        assertEquals(200, enableResult.getResponse().getStatus());
+        assertEquals("ACTIVE", JsonPath.read(
+            enableResult.getResponse().getContentAsString(), "$.data.status"));
+        assertEquals(PluginStatus.ACTIVE, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        PluginWrapper wrapper = pluginManager.getPlugin(HELLO_PLUGIN_ID);
+        assertNotNull(wrapper);
+        assertEquals(PluginState.STARTED, wrapper.getPluginState());
+        PluginClassLoader classLoader = assertInstanceOf(
+            PluginClassLoader.class,
+            pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID)
+        );
+        assertFalse(classLoader.isClosed());
+        assertEquals(1, pluginManager.getExtensions(PluginActionHandler.class, HELLO_PLUGIN_ID).size());
+
+        // 模拟已经越过网关 acquire 的在途请求，后续新请求仍通过真实 MockMvc 网关验证拒绝。
+        assertTrue(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+        CompletableFuture<MvcResult> uninstallFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                return mockMvc.perform(delete("/api/admin/plugins/{pluginId}", HELLO_PLUGIN_ID)
+                        .with(adminPluginManager())
+                        .with(csrf().asHeader()))
+                    .andReturn();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        PluginStatus statusWhileDraining;
+        boolean uninstallCompletedWhileHeld;
+        MvcResult rejectedResult;
+        try {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus() != PluginStatus.DISABLING
+                    && System.nanoTime() < deadline) {
+                TimeUnit.MILLISECONDS.sleep(10);
+            }
+            statusWhileDraining = pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus();
+            uninstallCompletedWhileHeld = uninstallFuture.isDone();
+            rejectedResult = mockMvc.perform(post(
+                    "/api/plugin-gateway/{pluginId}/actions/{actionCode}",
+                    HELLO_PLUGIN_ID,
+                    "hello.greet")
+                    .with(adminPluginManager())
+                    .with(csrf().asHeader())
+                    .header(HttpHeaders.ORIGIN, "http://localhost")
+                    .header("Idempotency-Key", "lifecycle-drain-key")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"test\"}"))
+                .andReturn();
+        } finally {
+            lifecycleGuard.release(HELLO_PLUGIN_ID);
+        }
+
+        MvcResult uninstallResult = uninstallFuture.get(10, TimeUnit.SECONDS);
+        assertEquals(PluginStatus.DISABLING, statusWhileDraining);
+        assertFalse(uninstallCompletedWhileHeld);
+        assertEquals(409, rejectedResult.getResponse().getStatus());
+        assertEquals(100409, ((Number) JsonPath.read(
+            rejectedResult.getResponse().getContentAsString(), "$.code")).intValue());
+        assertEquals(200, uninstallResult.getResponse().getStatus());
+        assertEquals("UNINSTALLED", JsonPath.read(
+            uninstallResult.getResponse().getContentAsString(), "$.data.status"));
+        assertEquals(PluginStatus.UNINSTALLED, pluginManagerService.getPlugin(HELLO_PLUGIN_ID).getStatus());
+        assertNull(pluginManager.getPlugin(HELLO_PLUGIN_ID));
+        assertNull(pluginManager.getPluginClassLoader(HELLO_PLUGIN_ID));
+        assertTrue(classLoader.isClosed());
+        assertTrue(pluginManager.getExtensions(PluginActionHandler.class).stream()
+            .noneMatch(handler -> {
+                PluginWrapper owner = pluginManager.whichPlugin(handler.getClass());
+                return owner != null && HELLO_PLUGIN_ID.equals(owner.getPluginId());
+            }));
+        assertFalse(lifecycleGuard.tryAcquire(HELLO_PLUGIN_ID));
+        assertEquals(0, lifecycleGuard.getActiveCount(HELLO_PLUGIN_ID));
+        assertEquals(
+            List.of("PLUGIN_ENABLED:SUCCESS", "PLUGIN_UNINSTALLED:SUCCESS"),
+            jdbcTemplate.query("""
+                SELECT action_type, result
+                FROM sys_audit_log
+                WHERE target_type = 'PLUGIN'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+                ORDER BY occurred_at, id
+                """, (rs, rowNum) -> rs.getString("action_type") + ":" + rs.getString("result"),
+                HELLO_PLUGIN_ID)
+        );
+    }
+
+    private RequestPostProcessor adminPluginManager() {
+        AdminUserDetails principal = new AdminUserDetails(
+            8_001L,
+            "admin.demo",
+            "unused",
+            "插件生命周期管理员",
+            "ACTIVE",
+            List.of(),
+            List.of("ADMIN_PLUGIN_MANAGE")
+        );
+        return authentication(UsernamePasswordAuthenticationToken.authenticated(
+            principal,
+            null,
+            principal.getAuthorities()
+        ));
+    }
+
     private PluginRow metadata(String name, Path jarPath) throws Exception {
         PluginRow row = new PluginRow();
         row.setName(name);
@@ -681,9 +1589,38 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private Path buildPluginJar(String pluginId, String migrationSql, String dependencies) throws IOException {
+        return buildPluginJar(pluginId, "0.1.0", migrationSql, null, dependencies);
+    }
+
+    private Path buildPluginJar(
+            String pluginId,
+            String version,
+            String migrationSql,
+            String secondMigrationSql,
+            String dependencies) throws IOException {
+        String manifestDependencies = dependencies == null || dependencies.isBlank()
+            ? null
+            : "[{\"pluginId\":\"" + dependencies + "\"}]";
+        return buildPluginJar(
+            pluginId,
+            version,
+            migrationSql,
+            secondMigrationSql,
+            dependencies,
+            manifestDependencies
+        );
+    }
+
+    private Path buildPluginJar(
+            String pluginId,
+            String version,
+            String migrationSql,
+            String secondMigrationSql,
+            String dependencies,
+            String manifestDependencies) throws IOException {
         Path source = Path.of("..", "plugins", "hello-plugin", "src", "main", "java",
             "com", "workforcehub", "plugin", "hello", "HelloPlugin.java").toAbsolutePath().normalize();
-        Path classes = tempDir.resolve(pluginId + "-classes");
+        Path classes = tempDir.resolve(pluginId + "-" + version + "-classes");
         Files.createDirectories(classes);
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
@@ -700,13 +1637,13 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
         Files.writeString(properties, """
             plugin.id=%s
             plugin.class=com.workforcehub.plugin.hello.HelloPlugin
-            plugin.version=0.1.0
+            plugin.version=%s
             plugin.provider=Workforce Hub
             plugin.description=Plugin migration integration test
             plugin.dependencies=%s
-            """.formatted(pluginId, dependencies == null ? "" : dependencies));
+            """.formatted(pluginId, version, dependencies == null ? "" : dependencies));
 
-        Path jar = tempDir.resolve(pluginId + ".jar");
+        Path jar = tempDir.resolve(pluginId + "-" + version + ".jar");
         try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
             try (var files = Files.walk(classes)) {
                 for (Path file : files.filter(Files::isRegularFile).sorted(Comparator.naturalOrder()).toList()) {
@@ -719,19 +1656,28 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             output.putNextEntry(new JarEntry("db/migration/V1__init.sql"));
             output.write(migrationSql.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             output.closeEntry();
+            if (secondMigrationSql != null) {
+                output.putNextEntry(new JarEntry("db/migration/V2__replace.sql"));
+                output.write(secondMigrationSql.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                output.closeEntry();
+            }
             output.putNextEntry(new JarEntry("plugin.json"));
+            String manifestDependencyField = manifestDependencies == null
+                ? ""
+                : ",\n  \"dependencies\":" + manifestDependencies;
             output.write("""
                 {
                   "id":"%s",
-                  "version":"0.1.0",
+                  "version":"%s",
                   "sdkVersion":"0.1.0",
                   "minHostVersion":"0.1.0",
                   "maxHostVersion":"0.2.0",
                   "javaVersion":"17",
                   "type":"FUNCTIONAL",
-                  "provider":"Workforce Hub"
+                  "provider":"Workforce Hub"%s
                 }
-                """.formatted(pluginId).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                """.formatted(pluginId, version, manifestDependencyField)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
             output.closeEntry();
         }
         return jar;
@@ -1013,6 +1959,19 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
             .substring("flyway_plugin_".length()) + "_";
         try (var paths = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
             return paths.anyMatch(path -> path.getFileName().toString().startsWith(prefix));
+        }
+    }
+
+    private long snapshotCount() throws IOException {
+        Path snapshotDirectory = pluginManager.getPluginsRoot()
+            .toAbsolutePath()
+            .normalize()
+            .resolve(".snapshots");
+        if (!Files.isDirectory(snapshotDirectory)) {
+            return 0;
+        }
+        try (var snapshots = Files.list(snapshotDirectory)) {
+            return snapshots.filter(Files::isRegularFile).count();
         }
     }
 

@@ -11,6 +11,7 @@ import AdminCompactList from '@/components/AdminCompactList.vue';
 import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
 import AdminFilterBar from '@/components/AdminFilterBar.vue';
 import AdminSkeleton from '@/components/AdminSkeleton.vue';
+import AdminMetricStrip from '@/components/AdminMetricStrip.vue';
 import { maxLength, requiredText } from '@/utils/validation';
 
 const store = useDepartmentStore();
@@ -90,6 +91,12 @@ function flatten(nodes: OrgDepartmentTreeNodeResponse[], depth = 0): { node: Org
 }
 
 const flatList = computed(() => flatten(tree.value));
+const departmentMetrics = computed(() => [
+  { label: '组织单元', value: flatList.value.length },
+  { label: '已启用', value: flatList.value.filter((item) => item.node.status === 'ACTIVE').length },
+  { label: '未设负责人', value: flatList.value.filter((item) => !item.node.leaderUserId).length },
+  { label: '最大层级', value: flatList.value.length ? Math.max(...flatList.value.map((item) => item.depth + 1)) : 0 },
+]);
 
 const detailRows = computed<DetailRow[]>(() => {
   const s = selected.value;
@@ -107,8 +114,12 @@ onMounted(loadTree);
 </script>
 
 <template>
-  <div class="page-grid">
-    <AdminPanel :span="selected ? 7 : 12" title="部门树">
+  <div class="page-grid department-page">
+    <AdminPanel :span="12" title="组织结构健康度" subtitle="负责人缺口与停用节点会影响审批归属和组织协同">
+      <AdminMetricStrip :cards="departmentMetrics" />
+    </AdminPanel>
+
+    <AdminPanel :span="7" :title="`组织单元目录 (${flatList.length})`" subtitle="按层级维护部门，选择节点后在右侧核对主数据">
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadTree"><RefreshCcw :size="16" />刷新</button>
       </template>
@@ -141,26 +152,82 @@ onMounted(loadTree);
           @keydown.enter.prevent="selectNode(f.node)"
           @keydown.space.prevent="selectNode(f.node)"
         >
-          <strong>{{ f.node.deptName }}</strong>
-          <span>{{ statusLabel(f.node.status) }}</span>
+          <div class="department-identity">
+            <strong>{{ f.node.deptName }}</strong>
+            <span>{{ departmentTypeLabel(f.node.deptType) }} · L{{ f.depth + 1 }}</span>
+          </div>
+          <div class="department-state">
+            <span :class="{ 'risk-text': !f.node.leaderUserId }">{{ f.node.leaderName || '未设负责人' }}</span>
+            <span class="status-pill" :class="{ 'risk-status': f.node.status !== 'ACTIVE' }">{{ statusLabel(f.node.status) }}</span>
+          </div>
         </article>
       </AdminCompactList>
     </AdminPanel>
 
-    <AdminPanel v-if="selected" :span="5" title="部门详情">
-      <AdminDetailList :rows="detailRows" />
-      <div class="detail-actions">
-        <button class="secondary-button" @click="handleUpdate">保存修改</button>
-      </div>
+    <AdminPanel :span="5" title="组织单元详情" :subtitle="selected ? `当前节点：${selected.deptName}` : '从左侧选择组织单元'">
+      <template v-if="selected">
+        <div v-if="!selected.leaderUserId || selected.status !== 'ACTIVE'" class="governance-notice">
+          <strong>治理提示</strong>
+          <span>{{ !selected.leaderUserId ? '当前节点未设置负责人' : '当前节点处于停用状态' }}</span>
+        </div>
+        <AdminDetailList :rows="detailRows" />
+        <div class="detail-actions">
+          <button class="primary-button" @click="handleUpdate">保存修改</button>
+        </div>
+      </template>
+      <div v-else class="empty-state">选择节点后查看层级、负责人和状态</div>
     </AdminPanel>
   </div>
 </template>
 
 <style scoped>
+.department-page { letter-spacing: 0; }
+
+.department-page :deep(.compact-list article) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.department-identity,
+.department-state {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.department-identity span,
+.department-state > span:first-child {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.department-state { justify-items: end; text-align: right; }
+
+.governance-notice {
+  display: grid;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-base);
+  padding: var(--space-md);
+  border-left: 3px solid var(--amber);
+  background: var(--surface-subtle);
+}
+
+.governance-notice span { color: var(--muted); font-size: var(--text-xs); }
+
 .detail-actions {
   display: flex;
+  justify-content: flex-end;
   margin-top: var(--space-base);
 }
 
 .filter-field { display: grid; gap: var(--space-xs); }
+
+.risk-status,
+.risk-text { color: var(--red-dark) !important; }
+
+@media (max-width: 520px) {
+  .department-page :deep(.compact-list article) { grid-template-columns: 1fr; }
+  .department-state { justify-items: start; text-align: left; }
+}
 </style>

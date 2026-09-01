@@ -37,7 +37,7 @@ public class PluginSignatureVerifier {
 
     public String verify(Path jarPath, String signerId, byte[] signatureBytes) {
         if (!Files.isRegularFile(jarPath)) {
-            throw new PluginSignatureException("插件 JAR 不存在或不是普通文件");
+            throw new IllegalStateException("插件 JAR 不存在或不是普通文件");
         }
         if (signerId == null || signerId.isBlank()) {
             throw new PluginSignatureException("插件签名者不能为空");
@@ -52,6 +52,10 @@ public class PluginSignatureVerifier {
         }
 
         byte[] signatureSnapshot = signatureBytes.clone();
+        int expectedSignatureBytes = (((RSAPublicKey) publicKey).getModulus().bitLength() + 7) / 8;
+        if (signatureSnapshot.length != expectedSignatureBytes) {
+            throw new PluginSignatureException("插件签名长度与可信公钥不匹配");
+        }
         try {
             Signature verifier = Signature.getInstance(SIGNATURE_ALGORITHM);
             verifier.initVerify(publicKey);
@@ -66,12 +70,18 @@ public class PluginSignatureVerifier {
                 }
             }
 
-            if (!verifier.verify(signatureSnapshot)) {
+            boolean validSignature;
+            try {
+                validSignature = verifier.verify(signatureSnapshot);
+            } catch (java.security.SignatureException e) {
+                throw new PluginSignatureException("插件签名验证失败", e);
+            }
+            if (!validSignature) {
                 throw new PluginSignatureException("插件签名验证失败");
             }
             return HexFormat.of().formatHex(digest.digest());
         } catch (IOException | GeneralSecurityException e) {
-            throw new PluginSignatureException("插件签名验证失败", e);
+            throw new IllegalStateException("读取或验证插件签名失败", e);
         }
     }
 

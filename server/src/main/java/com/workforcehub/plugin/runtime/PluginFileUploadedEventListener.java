@@ -49,7 +49,13 @@ public class PluginFileUploadedEventListener {
                 payload
             );
             eventDispatcher.dispatch(pluginEvent);
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
+            if (e instanceof VirtualMachineError error) {
+                throw error;
+            }
+            if (e instanceof ThreadDeath threadDeath) {
+                throw threadDeath;
+            }
             log.warn(
                 "文件上传插件事件分发失败: attachmentRefId={}",
                 event.attachmentRefId(),

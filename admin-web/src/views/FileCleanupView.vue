@@ -62,6 +62,8 @@ const resultTone = computed(() => {
   if (Number(result.value.failedPhysicalObjects ?? 0) > 0) return 'warning';
   return result.value.jobStatus === 'FAILED' ? 'danger' : 'success';
 });
+const catalogFailureCount = computed(() => files.value.filter((item) => item.scanStatus === 'FAILED').length);
+const catalogPendingCount = computed(() => files.value.filter((item) => item.scanStatus === 'PENDING').length);
 const confirmationMessage = computed(() => {
   if (cleanupForm.dryRun) return '系统只统计符合条件的内容，不会删除文件。';
   const impact = result.value?.dryRun && result.value.jobType === cleanupForm.jobType
@@ -173,6 +175,33 @@ async function runCleanupJob() {
 
 <template>
   <main class="page-grid">
+    <AdminPanel :span="12" title="文件空间态势" subtitle="容量、检测风险与清理队列的统一入口">
+      <template #actions>
+        <button class="secondary-button" type="button" :disabled="loading || filesLoading" @click="loadSummary(); loadFiles()">
+          <RefreshCcw :size="16" />
+          <span>刷新态势</span>
+        </button>
+        <button class="primary-button" type="button" :disabled="running" @click="activeTab = 'storage'; openCleanupSetup()">
+          <Play :size="16" />
+          <span>预览清理</span>
+        </button>
+      </template>
+      <div class="file-command-grid">
+        <button class="capacity-command" type="button" data-capacity="容量" @click="activeTab = 'storage'">
+          <div><span>长期池使用率</span><strong>{{ quotaRatio }}%</strong></div>
+          <div class="usage-track" role="progressbar" aria-label="长期池使用率" :aria-valuenow="quotaRatio" aria-valuemin="0" aria-valuemax="100"><span :class="`tone-${storageState.tone}`" :style="{ width: `${quotaRatio}%` }" /></div>
+          <p>{{ summary ? `${formatBytes(summary.orgPoolUsedBytes)} / ${formatBytes(summary.orgPoolQuotaBytes)}` : '正在读取容量' }}</p>
+          <b :class="`tone-${storageState.tone}`">{{ storageState.label }}</b>
+        </button>
+        <div class="file-metric-grid">
+          <article><span>附件引用</span><strong>{{ summary?.attachmentRefCount ?? fileTotal }}</strong><small>全组织文件索引</small></article>
+          <button type="button" @click="activeTab = 'storage'"><span>待清理对象</span><strong>{{ summary?.pendingCleanupObjectCount ?? 0 }}</strong><small>进入空间与清理</small></button>
+          <button type="button" @click="activeTab = 'catalog'; fileFilters.scanStatus = 'FAILED'; loadFiles(true)"><span>本页检测失败</span><strong>{{ catalogFailureCount }}</strong><small>聚焦安全检测异常</small></button>
+          <button type="button" @click="activeTab = 'catalog'; fileFilters.scanStatus = 'PENDING'; loadFiles(true)"><span>本页检测中</span><strong>{{ catalogPendingCount }}</strong><small>追踪未完成检测</small></button>
+        </div>
+      </div>
+    </AdminPanel>
+
     <nav class="file-tabs span-12" role="tablist" aria-label="文件空间功能">
       <button :class="{ active: activeTab === 'catalog' }" type="button" role="tab" :aria-selected="activeTab === 'catalog'" @click="activeTab = 'catalog'">文件目录</button>
       <button :class="{ active: activeTab === 'storage' }" type="button" role="tab" :aria-selected="activeTab === 'storage'" @click="activeTab = 'storage'">空间与清理</button>
@@ -284,6 +313,20 @@ async function runCleanupJob() {
 </template>
 
 <style scoped>
+.file-command-grid { display: grid; grid-template-columns: minmax(280px, 1.15fr) minmax(0, 2fr); gap: var(--space-md); }
+.capacity-command, .file-metric-grid > * { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel-strong); color: var(--ink); letter-spacing: 0; text-align: left; }
+.capacity-command { position: relative; display: grid; align-content: center; gap: var(--space-sm); min-height: 142px; padding: var(--space-lg); border-color: var(--success-border); }
+.capacity-command::after { content: attr(data-capacity); position: absolute; top: -8px; right: var(--space-base); padding: 4px 9px; border: 1px solid var(--success-border); border-radius: var(--radius-sm); background: var(--panel-strong); color: var(--success); font-size: var(--text-xs); font-weight: 800; letter-spacing: 0; }
+.capacity-command:hover, .file-metric-grid button:hover { border-color: var(--green); background: var(--hover-bg); }
+.capacity-command > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+.capacity-command span, .file-metric-grid span, .file-metric-grid small { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+.capacity-command strong { font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.capacity-command p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+.capacity-command b { width: fit-content; color: var(--success); font-size: var(--text-xs); }
+.capacity-command b.tone-warning, .capacity-command b.tone-danger { color: var(--red-dark); }
+.file-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-md); }
+.file-metric-grid > * { display: grid; align-content: center; gap: var(--space-sm); min-height: 142px; padding: var(--space-base); }
+.file-metric-grid strong { font-size: 25px; line-height: 1; font-variant-numeric: tabular-nums; }
 .file-tabs { display: flex; align-items: center; gap: var(--space-xl); min-height: 44px; border-bottom: 1px solid var(--line); }
 .file-tabs button { align-self: stretch; min-height: 44px; padding: 0 var(--space-xs); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-weight: 700; }
 .file-tabs button:hover { color: var(--green-dark); }
@@ -347,13 +390,16 @@ async function runCleanupJob() {
   .catalog-filters > :first-child { grid-column: span 2; }
 }
 @media (max-width: 980px) {
+  .file-command-grid { grid-template-columns: 1fr; }
+  .file-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalog-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalog-filters > :first-child { grid-column: 1 / -1; }
   .space-overview, .capacity-grid { grid-template-columns: 1fr; }
   .object-grid, .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
-  .catalog-filters, .cleanup-form fieldset, .object-grid, .result-grid { grid-template-columns: 1fr; }
+  .file-metric-grid, .catalog-filters, .cleanup-form fieldset, .object-grid, .result-grid { grid-template-columns: 1fr; }
+  .capacity-command, .file-metric-grid > * { min-height: 106px; }
   .catalog-filters > :first-child { grid-column: auto; }
   .result-header, .result-header > div { align-items: flex-start; flex-direction: column; }
 }

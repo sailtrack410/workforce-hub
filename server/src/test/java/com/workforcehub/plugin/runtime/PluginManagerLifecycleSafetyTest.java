@@ -1,6 +1,7 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.repository.PluginRepository;
+import com.workforcehub.plugin.repository.PluginDependencySpec;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.sdk.ActionDescriptor;
@@ -17,8 +18,10 @@ import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -61,7 +64,9 @@ class PluginManagerLifecycleSafetyTest {
         row.setPluginId(PID);
         row.setStatus(PluginStatus.ACTIVE);
         lenient().when(pluginRepository.findById(PID)).thenReturn(Optional.of(row));
-        lenient().when(pf4jManager.getPlugin(PID)).thenReturn(mock(PluginWrapper.class));
+        PluginWrapper wrapper = mock(PluginWrapper.class);
+        lenient().when(wrapper.getPluginState()).thenReturn(PluginState.STARTED);
+        lenient().when(pf4jManager.getPlugin(PID)).thenReturn(wrapper);
     }
 
     @Test
@@ -75,6 +80,38 @@ class PluginManagerLifecycleSafetyTest {
     }
 
     // ---- disable ----
+
+    @Test
+    void disable_shouldRejectLoadedDependentsBeforeClosingGate() {
+        when(pf4jManager.getDependentPluginIds(PID)).thenReturn(List.of("dependent-plugin"));
+
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
+            () -> service.disable(PID)
+        );
+
+        assertTrue(thrown.getMessage().contains("dependent-plugin"));
+        verifyNoInteractions(lifecycleGuard);
+        verify(pluginRepository, never()).updateStatus(anyString(), any(), anyString());
+        verify(pluginRepository, never()).updateStatus(anyString(), any());
+        verify(pf4jManager, never()).stopPlugin(anyString());
+    }
+
+    @Test
+    void disable_shouldRejectPersistedDependentBeforeClosingGate() {
+        when(pluginRepository.findDependentPluginIds(PID)).thenReturn(List.of("persisted-dependent"));
+
+        PluginManagerService.PluginDependencyConflictException thrown = assertThrows(
+            PluginManagerService.PluginDependencyConflictException.class,
+            () -> service.disable(PID)
+        );
+
+        assertTrue(thrown.getMessage().contains("persisted-dependent"));
+        verifyNoInteractions(lifecycleGuard);
+        verify(pluginRepository, never()).updateStatus(anyString(), any(), anyString());
+        verify(pluginRepository, never()).updateStatus(anyString(), any());
+        verify(pf4jManager, never()).stopPlugin(anyString());
+    }
 
     @Test
     void disable_shouldNotCallStopPlugin_whenDrainReturnsFalse() {
@@ -163,6 +200,57 @@ class PluginManagerLifecycleSafetyTest {
     }
 
     // ---- uninstall ----
+
+    @Test
+    void uninstall_shouldRejectLoadedDependentsBeforeClosingGate() {
+        when(pf4jManager.getDependentPluginIds(PID)).thenReturn(List.of("dependent-plugin"));
+
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
+            () -> service.uninstall(PID)
+        );
+
+        assertTrue(thrown.getMessage().contains("dependent-plugin"));
+        verifyNoInteractions(lifecycleGuard);
+        verify(pluginRepository, never()).updateStatus(anyString(), any(), anyString());
+        verify(pluginRepository, never()).updateStatus(anyString(), any());
+        verify(pf4jManager, never()).stopPlugin(anyString());
+        verify(pf4jManager, never()).unloadPlugin(anyString());
+    }
+
+    @Test
+    void uninstall_shouldRejectPersistedDependentWhenTargetWrapperIsMissing() {
+        when(pf4jManager.getPlugin(PID)).thenReturn(null);
+        when(pluginRepository.findDependentPluginIds(PID)).thenReturn(List.of("persisted-dependent"));
+
+        PluginManagerService.PluginDependencyConflictException thrown = assertThrows(
+            PluginManagerService.PluginDependencyConflictException.class,
+            () -> service.uninstall(PID)
+        );
+
+        assertTrue(thrown.getMessage().contains("persisted-dependent"));
+        verifyNoInteractions(lifecycleGuard);
+        verify(pluginRepository, never()).updateStatus(anyString(), any(), anyString());
+        verify(pluginRepository, never()).updateStatus(anyString(), any());
+        verify(pf4jManager, never()).getDependentPluginIds(PID);
+        verify(pf4jManager, never()).stopPlugin(anyString());
+        verify(pf4jManager, never()).unloadPlugin(anyString());
+    }
+
+    @Test
+    void uninstall_shouldSkipUnresolvedPf4jGraphWhenTargetWrapperIsMissing() {
+        when(pf4jManager.getPlugin(PID)).thenReturn(null);
+        LocalDateTime uninstalledAt = LocalDateTime.now();
+        when(pluginRepository.updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载"))
+            .thenReturn(uninstalledAt);
+
+        assertEquals(uninstalledAt, service.uninstall(PID));
+
+        verify(pf4jManager, never()).getDependentPluginIds(PID);
+        verify(pluginRepository).findDependentPluginIds(PID);
+        verify(lifecycleGuard).remove(PID);
+        verify(pluginRepository).updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
+    }
 
     @Test
     void uninstall_shouldNotCallStopUnload_whenDrainReturnsFalse() {
@@ -282,7 +370,154 @@ class PluginManagerLifecycleSafetyTest {
         order.verify(pluginRepository).updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
     }
 
+    @Test
+    void uninstall_shouldUnloadWithoutStop_whenPluginWasNeverStarted() {
+        PluginWrapper wrapper = pf4jManager.getPlugin(PID);
+        when(wrapper.getPluginState()).thenReturn(PluginState.RESOLVED);
+        when(lifecycleGuard.awaitDrain(PID)).thenReturn(true);
+        when(pf4jManager.unloadPlugin(PID)).thenReturn(true);
+
+        assertDoesNotThrow(() -> service.uninstall(PID));
+
+        verify(pf4jManager, never()).stopPlugin(PID);
+        verify(pf4jManager).unloadPlugin(PID);
+        verify(pluginRepository).updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
+    }
+
+    @Test
+    void uninstall_shouldRetryFinalStatusWriteWithoutRepeatingPf4jUnload() {
+        PluginWrapper wrapper = mock(PluginWrapper.class);
+        when(wrapper.getPluginState()).thenReturn(PluginState.STARTED);
+        when(pf4jManager.getPlugin(PID))
+            .thenReturn(wrapper)
+            .thenReturn((PluginWrapper) null);
+        when(lifecycleGuard.awaitDrain(PID)).thenReturn(true);
+        when(pf4jManager.stopPlugin(PID)).thenReturn(PluginState.STOPPED);
+        when(pf4jManager.unloadPlugin(PID)).thenReturn(true);
+        doReturn(LocalDateTime.of(2026, 7, 30, 10, 0))
+            .when(pluginRepository)
+            .updateStatus(PID, PluginStatus.DISABLING);
+        RuntimeException dbError = new RuntimeException("uninstalled status write failed");
+        doThrow(dbError)
+            .doReturn(LocalDateTime.of(2026, 7, 30, 10, 1))
+            .when(pluginRepository)
+            .updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
+
+        assertSame(dbError, assertThrows(RuntimeException.class, () -> service.uninstall(PID)));
+        assertDoesNotThrow(() -> service.uninstall(PID));
+
+        verify(lifecycleGuard).beginDisable(PID);
+        verify(lifecycleGuard).awaitDrain(PID);
+        verify(pf4jManager).stopPlugin(PID);
+        verify(pf4jManager).unloadPlugin(PID);
+        verify(lifecycleGuard, times(2)).remove(PID);
+        verify(pluginRepository, times(2))
+            .updateStatus(PID, PluginStatus.UNINSTALLED, "已卸载");
+    }
+
     // ---- enable ----
+
+    @Test
+    void enable_shouldRejectMissingPersistenceBeforeStartingPlugin() {
+        when(pluginRepository.findById(PID)).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> service.enable(PID));
+
+        verify(pf4jManager, never()).startPlugin(anyString());
+        verify(pluginRepository, never()).updateStatus(PID, PluginStatus.ACTIVE);
+        verifyNoInteractions(lifecycleGuard);
+    }
+
+    @Test
+    void enable_shouldRejectInactiveDependencyBeforePf4jCanStartItImplicitly() {
+        String dependencyId = "base-plugin";
+        PluginRow plugin = new PluginRow();
+        plugin.setPluginId(PID);
+        plugin.setStatus(PluginStatus.INSTALLED);
+        plugin.setDependencies(List.of(
+            new PluginDependencySpec(dependencyId, "1.0.0", "2.0.0")
+        ));
+        PluginRow dependency = new PluginRow();
+        dependency.setPluginId(dependencyId);
+        dependency.setVersion("1.5.0");
+        dependency.setStatus(PluginStatus.STOPPED);
+        PluginWrapper dependencyWrapper = mock(PluginWrapper.class);
+        when(pluginRepository.findById(PID)).thenReturn(Optional.of(plugin));
+        when(pluginRepository.findById(dependencyId)).thenReturn(Optional.of(dependency));
+        when(pf4jManager.getPlugin(dependencyId)).thenReturn(dependencyWrapper);
+
+        assertThrows(
+            PluginManagerService.PluginDependencyConflictException.class,
+            () -> service.enable(PID)
+        );
+
+        verify(pf4jManager, never()).startPlugin(dependencyId);
+        verify(pf4jManager, never()).startPlugin(PID);
+        verify(pluginRepository, never()).updateStatus(PID, PluginStatus.ACTIVE);
+        verifyNoInteractions(lifecycleGuard);
+    }
+
+    @Test
+    void enable_shouldStartDependentWhenTrustedDependencyIsActiveAndCompatible() {
+        String dependencyId = "base-plugin";
+        PluginDependencySpec dependencySpec =
+            new PluginDependencySpec(dependencyId, "1.0.0", "2.0.0");
+        PluginRow plugin = new PluginRow();
+        plugin.setPluginId(PID);
+        plugin.setStatus(PluginStatus.INSTALLED);
+        plugin.setDependencies(List.of(dependencySpec));
+        PluginRow dependency = new PluginRow();
+        dependency.setPluginId(dependencyId);
+        dependency.setVersion("1.5.0");
+        dependency.setStatus(PluginStatus.ACTIVE);
+        PluginWrapper dependencyWrapper = mock(PluginWrapper.class);
+        when(dependencyWrapper.getPluginState()).thenReturn(PluginState.STARTED);
+        when(pluginRepository.findById(PID)).thenReturn(Optional.of(plugin));
+        when(pluginRepository.findById(dependencyId)).thenReturn(Optional.of(dependency));
+        when(pf4jManager.getPlugin(dependencyId)).thenReturn(dependencyWrapper);
+        when(versionService.matchesVersion(dependencySpec, "1.5.0")).thenReturn(true);
+        when(pf4jManager.startPlugin(PID)).thenReturn(PluginState.STARTED);
+
+        assertDoesNotThrow(() -> service.enable(PID));
+
+        verify(pf4jManager, never()).startPlugin(dependencyId);
+        InOrder order = inOrder(pf4jManager, pluginRepository, lifecycleGuard);
+        order.verify(pf4jManager).startPlugin(PID);
+        order.verify(pluginRepository).updateStatus(PID, PluginStatus.ACTIVE);
+        order.verify(lifecycleGuard).enable(PID);
+    }
+
+    @Test
+    void enable_shouldRejectInvalidStoredDependencyVersionAsConflict() {
+        String dependencyId = "base-plugin";
+        PluginDependencySpec dependencySpec =
+            new PluginDependencySpec(dependencyId, "1.0.0", "2.0.0");
+        PluginRow plugin = new PluginRow();
+        plugin.setPluginId(PID);
+        plugin.setStatus(PluginStatus.INSTALLED);
+        plugin.setDependencies(List.of(dependencySpec));
+        PluginRow dependency = new PluginRow();
+        dependency.setPluginId(dependencyId);
+        dependency.setVersion(null);
+        dependency.setStatus(PluginStatus.ACTIVE);
+        PluginWrapper dependencyWrapper = mock(PluginWrapper.class);
+        when(pluginRepository.findById(PID)).thenReturn(Optional.of(plugin));
+        when(pluginRepository.findById(dependencyId)).thenReturn(Optional.of(dependency));
+        when(pf4jManager.getPlugin(dependencyId)).thenReturn(dependencyWrapper);
+        when(versionService.matchesVersion(dependencySpec, null)).thenThrow(
+            new PluginVersionService.PluginVersionException("依赖插件版本格式无效")
+        );
+
+        PluginManagerService.PluginDependencyConflictException thrown = assertThrows(
+            PluginManagerService.PluginDependencyConflictException.class,
+            () -> service.enable(PID)
+        );
+
+        assertEquals("插件依赖版本记录无效: " + dependencyId, thrown.getMessage());
+        verify(pf4jManager, never()).startPlugin(anyString());
+        verify(pluginRepository, never()).updateStatus(PID, PluginStatus.ACTIVE);
+        verifyNoInteractions(lifecycleGuard);
+    }
 
     @Test
     void enable_shouldNotOpenGuard_whenStartFails() {
@@ -290,7 +525,22 @@ class PluginManagerLifecycleSafetyTest {
 
         assertThrows(RuntimeException.class, () -> service.enable(PID));
 
+        verify(pluginRepository).updateStatus(PID, PluginStatus.ERROR, "插件启动失败: FAILED");
         verify(pluginRepository, never()).updateStatus(PID, PluginStatus.ACTIVE);
+        verify(lifecycleGuard, never()).enable(PID);
+    }
+
+    @Test
+    void enable_shouldPreserveStartFailure_whenErrorStatusWriteFails() {
+        RuntimeException dbError = new RuntimeException("error status write failed");
+        when(pf4jManager.startPlugin(PID)).thenReturn(PluginState.FAILED);
+        doThrow(dbError).when(pluginRepository)
+            .updateStatus(PID, PluginStatus.ERROR, "插件启动失败: FAILED");
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service.enable(PID));
+
+        assertEquals("插件启动失败: FAILED", thrown.getMessage());
+        assertEquals(List.of(dbError), List.of(thrown.getSuppressed()));
         verify(lifecycleGuard, never()).enable(PID);
     }
 

@@ -89,12 +89,20 @@ const exceptionActions = computed(() => [
   <main v-else class="page-grid">
     <AdminPanel :span="12" title="待处理异常" subtitle="从异常指标直接进入对应处置页面">
       <div class="action-grid">
-        <RouterLink v-for="action in exceptionActions" :key="action.label" :to="action.to" class="action-card">
-          <component :is="action.icon" :size="20" />
+        <RouterLink
+          v-for="(action, index) in exceptionActions"
+          :key="action.label"
+          :to="action.to"
+          :class="['action-card', { featured: index === 0 }]"
+        >
+          <span class="action-icon"><component :is="action.icon" :size="18" /></span>
           <span>{{ action.label }}</span>
           <strong>{{ action.value }}</strong>
           <small>{{ action.hint }}</small>
           <ArrowRight class="action-arrow" :size="18" />
+          <span v-if="index === 0" class="action-breakout" aria-hidden="true">
+            <component :is="action.icon" :size="22" />
+          </span>
         </RouterLink>
       </div>
     </AdminPanel>
@@ -133,31 +141,60 @@ const exceptionActions = computed(() => [
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-base);
+  padding-top: var(--space-lg);
 }
 
 .action-card {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-sm) var(--space-md);
-  min-height: 112px;
+  min-height: 104px;
   padding: var(--space-base);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel-strong);
   color: var(--ink);
   text-decoration: none;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  isolation: isolate;
+  overflow: visible;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.action-card:hover { border-color: var(--green-light); box-shadow: var(--shadow); }
+.action-card:hover { border-color: var(--green-light); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 .action-card:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-ring); }
-.action-card > svg:first-child { color: var(--green-dark); }
+.action-card.featured { border-top-color: var(--green); background: var(--surface-subtle); }
+.action-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--pill-border);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--green-dark);
+}
 .action-card span { font-size: var(--text-sm); font-weight: 700; }
-.action-card strong { font-size: var(--text-xl); }
+.action-card strong { font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
 .action-card small { grid-column: 2 / 4; color: var(--muted); font-size: var(--text-xs); }
 .action-arrow { color: var(--muted); }
+
+.action-breakout {
+  position: absolute;
+  top: calc(var(--space-lg) * -1);
+  right: var(--space-base);
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 4px solid var(--panel);
+  border-radius: var(--radius-lg);
+  background: var(--green);
+  color: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
+}
 
 .summary-link {
   display: grid;
@@ -168,6 +205,7 @@ const exceptionActions = computed(() => [
   padding: 0 var(--space-base);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
+  background: var(--surface-subtle);
   color: var(--ink);
   text-decoration: none;
 }
@@ -191,5 +229,15 @@ const exceptionActions = computed(() => [
 
 @media (max-width: 820px) {
   .action-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .action-grid { padding-top: var(--space-base); }
+  .action-breakout {
+    top: calc(var(--space-base) * -1);
+    right: var(--space-md);
+    width: 38px;
+    height: 38px;
+  }
 }
 </style>

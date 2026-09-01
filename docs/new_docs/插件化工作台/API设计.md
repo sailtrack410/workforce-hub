@@ -6,6 +6,16 @@
 |------|------|------|
 | GET | `/api/employee/plugins/mine` | 当前员工可见且可加载的 UI 插件清单 |
 | POST | `/api/plugin-gateway/{pluginId}/actions/{actionCode}` | 执行已启用插件的动作 |
+| GET | `/api/admin/plugins` | 管理员插件列表 |
+| POST | `/api/admin/plugins/upload` | 上传 JAR 和 RSA 分离签名，仅首次安装 |
+| PUT | `/api/admin/plugins/{pluginId}/enable` | 启用插件 |
+| PUT | `/api/admin/plugins/{pluginId}/disable` | 停用插件 |
+| DELETE | `/api/admin/plugins/{pluginId}` | 卸载插件并保留注册记录与配置 |
+| GET | `/api/admin/plugins/{pluginId}/config[?includeDeleted=true]` | 查询指定插件配置；可选返回已清空墓碑元数据 |
+| PUT | `/api/admin/plugins/{pluginId}/config/{configKey}` | 创建或按版本更新单个配置 |
+| DELETE | `/api/admin/plugins/{pluginId}/config/{configKey}?expectedVersion={version}` | 按版本删除单个配置，返回墓碑版本 |
+
+可信依赖的解析、持久化、管理 API 视图和 Vue 管理端页面已实现。宿主内部 `PluginManagerService.install(Path, PluginRow)` 继续支持符合条件的 `UNINSTALLED` 同 ID 替换；HTTP 上传使用独立的首次安装入口，不是在线升级或回滚 API。
 
 ### 员工插件清单
 
@@ -24,25 +34,87 @@
 
 ### 插件动作网关
 
-请求体是可选 JSON 对象。网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。该校验是插件动作 `POST` 的附加来源防线；宿主 SecurityFilterChain 已用 `CookieCsrfTokenRepository` 覆盖 Session 写请求，不能用来源白名单替代 CSRF。
+请求体是可选 JSON 对象，Nginx 与应用反序列化前均限制为 256 KiB。网关首项是来源校验：优先精确校验 `Origin`，仅在 `Origin` 缺失时回退 `Referer`；`Origin` 不得带路径或查询，`Referer` 可带页面路径但不得带 query/fragment，来源必须命中白名单。拒绝返回 HTTP `403`、业务码 `4003`；匿名请求仍由 Spring Security 返回 `401`。该校验是插件动作 `POST` 的附加来源防线；宿主 SecurityFilterChain 已用 `CookieCsrfTokenRepository` 覆盖 Session 写请求，不能用来源白名单替代 CSRF。
 
-来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后，网关再校验插件状态和生命周期入口，绑定当前登录会话并完成插件/动作/用户权限校验；权限通过后才发现 PF4J 动作并校验输入 Schema，最后返回 `ServiceResult<Object>`。拿到员工清单不代表拥有动作调用权限，每次调用都会重新鉴权。
+来源白名单配置为 `workforce.plugin.gateway.csrf.allowed-origins`，环境变量为 `WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS`；`application` 默认仅本机来源，非本地部署必须显式设置。来源通过后，宿主先绑定当前登录会话并完成插件/动作/用户权限校验；未授权请求统一返回 `403`，不会通过 `404/409` 枚举插件存在性或状态。权限通过后才校验插件状态和生命周期入口、发现 PF4J 动作并校验输入 Schema。幂等查询和响应回放位于这些检查之后，因此权限撤销、插件停用或参数非法时不会读取旧响应，也不会写入幂等记录。拿到员工清单不代表拥有动作调用权限，每次调用都会重新鉴权。
 
-`ActionDescriptor.defaultTimeout` 尚未在网关层执行，`idempotent` 仍只是描述字段，不构成自动幂等保证。事件订阅与分发契约也不代表真实业务链路已完成，六类真实业务发布点尚未接线。
+HTTP 动作必须声明 `ActionDescriptor.idempotent=true`，并提交恰好一个 `Idempotency-Key` Header；键只允许 `[A-Za-z0-9._:-]`，长度 1–128，大小写敏感。唯一作用域为插件、动作、宿主绑定的调用者类型与 ID、幂等键；请求摘要使用递归排序对象键后的 JSON 参数，数组顺序和数值类型保留，空请求体与 `{}` 等价。客户端身份 Header 和 `X-Request-Id` 不参与幂等身份。
 
-## 规划中的管理端 API（尚未实现）
+首次请求用短事务写入 `IN_PROGRESS` claim，插件 handler 在事务外执行。相同作用域、相同参数的并发请求在执行记录存在时返回 HTTP `409`、业务码 `3002`、`retryable=true` 和 `Retry-After: 1`；相同键但不同参数返回 HTTP `409`、业务码 `3001`。成功及 `retryable=false` 的业务失败通过有界输出流缓存不超过 256 KiB 的 JSON `ServiceResult`，后续请求严格校验结构后回放；`ServiceResult.fail(...)` 拒绝使用成功码 `0`，只有显式 `retryable=true` 的失败结果释放 claim。handler 抛出的普通异常或非致命 `Error`、返回 `null`、响应序列化、大小校验或最终写库失败均保留 claim，避免重跑可能已经产生副作用的动作。
 
-| 方法 | 路径 | 说明 |
+`PLUGIN_ACTION_EXECUTED` 是正常进程内的结果审计，不是强一致合规审计：handler 返回、普通异常或非致命 `Error` 均尝试写脱敏审计；HTTP 调用者记录为宿主绑定的 `USER / ADMIN + userId`。明细只包含 `pluginId / actionCode / triggerSource / serviceCode / retryable`，不包含参数、请求 ID、幂等键、摘要、响应、异常或路径。完成响应回放、执行中冲突、同键不同参数冲突及所有 handler 执行前阻断都不新增“已执行”审计。成功/不可重试结果的完成更新与审计同事务，显式可重试结果的 claim 释放与审计同事务；抛出异常、非致命 `Error`、`null` 和响应处理失败会另写失败审计并保留 `IN_PROGRESS`。当前不预写 `PENDING`；JVM 崩溃、致命错误或最终写库失败仍可能留下真实副作用和 `IN_PROGRESS`，但没有审计行。
+
+`IN_PROGRESS` 不设置租期，不自动重领或清理；进程崩溃、响应序列化失败或最终写库状态不确定时，幂等键保持 fail closed，必须由运维确认外部副作用后人工恢复。完成响应用数据库时间计算 24 小时重放期，过期后可安全复用该键，定时任务每轮最多分 100 批清理过期完成记录。HTTP `defaultTimeout` 当前不强制中断 handler，也不改变 claim 所有权；Nginx 网关等待上限为 330 秒。自动幂等只承诺持久化去重与响应回放，不承诺外部系统副作用的 exactly-once。六类事件均已接入真实业务事务提交后发布，其中 `EMPLOYEE_HIRED` 已通过真实签名 PF4J 订阅处理器完成端到端验证；事件 handler 只接受 `idempotent=true`，由分发器执行有界异步回调和协作式超时中断。
+
+### 管理员插件列表与生命周期
+
+四个接口都要求管理员登录并拥有 `ADMIN_PLUGIN_MANAGE`；`SUPER_ADMIN` 按现有后台权限契约放行。`PUT`、`DELETE` 继承全站 Cookie/Header CSRF，员工身份、匿名请求、缺少权限或 CSRF 不合法都会在进入管理服务前拒绝。
+
+列表和生命周期操作返回 `AdminPluginResponse`，包含插件 ID、名称、描述、版本兼容字段、类型、状态、固定前端入口、发布方、按 ID 排序的 `dependencies` 和安装/更新时间。每项依赖只返回 `pluginId / minVersion / maxVersion`；不会返回宿主 JAR 路径、JAR/SRI 摘要、签名者 ID、签名字节或内部错误信息。
+
+状态语义：
+
+- `enable` 只允许 `INSTALLED / STOPPED`；已经 `ACTIVE` 时直接返回成功，不重复调用底层启用。每个必需依赖必须同时为数据库 `ACTIVE`、PF4J `STARTED` 且版本兼容，否则返回脱敏 `409`。
+- `disable` 只允许 `ACTIVE`；已经 `STOPPED` 时直接返回成功，不重复调用底层停用。存在 PF4J 或持久化 dependent 时不级联，直接返回脱敏 `409`。
+- `uninstall` 允许所有已存在的非终态进入底层恢复流程；`DISABLING` 可用于插件已卸载但最终状态写库失败后的安全重试，已经 `UNINSTALLED` 时直接返回成功，不重复调用底层卸载。
+- 插件 ID 格式错误返回 HTTP `400`，不存在返回 `404`，非法状态、依赖未满足、损坏依赖版本或 dependent 阻断返回脱敏的 `409`；未分类的数据库或程序异常由全局异常处理返回脱敏的 `500`。
+
+上述是基于持久化终态的重试幂等，不接受幂等键，也不提供跨请求、跨进程的持久化去重。管理服务使用与 `PluginManagerService` 相同的单 JVM 监视器包住“读取状态—判断—执行”，避免并发停用/卸载覆盖终态；底层成功后返回终态写库时间，响应不再依赖二次查询，也不会携带操作前的旧 `updatedAt`。每次成功、阻止或失败操作分别写入 `SUCCESS / BLOCKED / FAIL` 脱敏审计，记录管理员 ID、插件 ID、前后状态和动作类型，不记录路径、摘要或签名；PF4J 生命周期与审计无法组成单一事务，审计写入失败只记录错误，不回滚已经成功的生命周期操作。
+
+HTTP 控制器复用 `PluginManagerService` 的入口关闭、最长 30 秒排空、PF4J stop/unload 和 ClassLoader 关闭协议。真实签名 hello-plugin 的 MockMvc 链路已验证未启用插件直接卸载、ClassLoader 关闭失败保留并重试，以及管理 API 启用、守卫存在在途计数时卸载等待、新网关请求拒绝、排空后 `UNINSTALLED`、wrapper/扩展/守卫清理、`PluginClassLoader.isClosed()` 和审计落库；在途请求通过直接占用真实守卫模拟，未构造阻塞型插件 handler。
+
+### 插件配置管理
+
+三个接口都要求管理员登录并拥有 `ADMIN_PLUGIN_MANAGE`；`SUPER_ADMIN` 继续按现有后台权限契约放行。身份、权限和请求体大小过滤统一使用 Spring MVC 解码后的规范路径，百分号编码或矩阵参数不能绕过 `/api/admin/plugins` 边界。`PUT`、`DELETE` 继承全站 Cookie/Header CSRF，不使用插件动作网关的 Origin/Referer 白名单。员工身份、匿名请求、缺少权限或 CSRF 不合法都会在进入配置服务前拒绝。
+
+`pluginId` 只来自路径并作为数据库命名空间；请求体不能指定其他插件 ID。`configKey` 必须匹配 `^[a-z0-9][a-z0-9._-]{0,127}$`。单个插件最多 128 个配置键命名空间，删除墓碑仍占用原命名空间但可原键重建；单个值或默认值按 UTF-8 计算最多 16 KiB。配置 PUT 请求体在 Nginx 入口和应用 JSON 反序列化前均限制为 256 KiB，避免沿用全站大文件入口的 100 MiB 上限。
+
+`PUT` 请求示例：
+
+```json
+{
+  "expectedVersion": 0,
+  "valueType": "STRING",
+  "value": "https://example.internal",
+  "defaultValue": null,
+  "description": "服务地址",
+  "requiresRestart": false
+}
+```
+
+- `expectedVersion=0` 只用于从未存在过的键；更新必须提交当前正版本，删除后同键重建必须提交 DELETE 返回或 `includeDeleted=true` 列表恢复的墓碑版本。并发请求使用同一版本时只允许一个成功，其余返回 HTTP `409`。删除会保留只含命名空间、键和递增版本的内部墓碑并清空配置内容；DELETE 响应丢失时，用原删除版本重复请求会幂等返回同一墓碑版本且不重复审计。重建沿用下一代版本，因此旧创建、更新和删除请求都不能命中新记录。
+- 类型只支持 `STRING / INT / BOOL / SECRET`。`INT` 规范化为 64 位十进制，`BOOL` 只接受 `true` 或 `false`；创建后修改类型必须先删除再重建。
+- 非敏感配置的 `value` 与 `defaultValue` 不能同时为 `null`，两者都会按同一类型校验并持久化。允许 `value=null + defaultValue`；此时插件侧读取会回退到默认值，更新时也可用该组合切换为默认值生效。
+- `SECRET` 不允许默认值。首次创建和删除后重建必须提交非空值；更新时 `value=null` 只在当前主密钥可用且能解密原密文时保留原密文，缺钥、错钥、损坏或历史明文均返回 HTTP `422`。提交新 `value` 可使用当前主密钥重新设置。
+- `requiresRestart` 当前只是插件配置元数据；更新 `ACTIVE` 插件不会自动停用、重启或持久化“待重启”状态。
+
+响应中的敏感配置始终返回 `value=null`、`defaultValue=null`，只通过 `secret=true` 和 `hasValue` 表示状态。`includeDeleted=true` 返回的墓碑沿用同一 DTO：`value/defaultValue/description=null`、`valueType=STRING`、`requiresRestart/secret/hasValue=false`、`deleted=true`；管理页只使用其 `key / deleted / version` 支持跨刷新重建和统计命名空间占用。`version` 超出 JavaScript 安全整数范围时由宿主全局 Jackson 配置序列化为十进制字符串，管理端同时接受数字与字符串令牌。数据库使用 AES-256-GCM 随机 nonce 加密，AAD 绑定 `pluginId + NUL + configKey`；部署必须通过 `WORKFORCE_PLUGIN_CONFIG_ENCRYPTION_KEY_BASE64` 提供 Base64 编码的 32 字节主密钥。缺少密钥时普通配置仍可用，所有 `SECRET` PUT 均返回 HTTP `422`；密钥格式非法会使应用启动失败。已有明文或无法解密的敏感行不会回退明文，必须提交新值重新设置或删除。
+
+当前密文没有 key ID 或多密钥能力，也没有自动轮换、重加密或 KMS 集成。数据库备份必须与原主密钥分开备份并成对恢复；直接更换或丢失主密钥会使既有敏感配置不可解密。
+
+`GET` 允许查看包括 `UNINSTALLED` 在内的保留配置；默认不返回墓碑，只有显式 `includeDeleted=true` 的管理员请求会收到已清空墓碑元数据，插件读取始终排除墓碑。`PUT` 拒绝 `DISABLING` 和 `UNINSTALLED`，允许 `INSTALLED / ACTIVE / STOPPED / ERROR`；`DELETE` 拒绝 `DISABLING`，允许管理员显式清理 `UNINSTALLED` 遗留配置。墓碑计入 128 个键命名空间上限，防止循环创建/删除不同键导致表无限增长。成功创建、更新和删除会在同一事务写入脱敏审计，只记录插件 ID、配置键、类型、版本和重启标记，不记录值、密文或值哈希。
+
+### 管理员插件上传
+
+`POST /api/admin/plugins/upload` 使用 `multipart/form-data`：
+
+| 字段 | 类型 | 约束 |
 |------|------|------|
-| GET | `/api/admin/plugins` | 插件列表 |
-| POST | `/api/admin/plugins/upload` | 上传 JAR 和分离签名 |
-| PUT | `/api/admin/plugins/{id}/enable` | 启用 |
-| PUT | `/api/admin/plugins/{id}/disable` | 停用 |
-| DELETE | `/api/admin/plugins/{id}` | 卸载 |
-| GET | `/api/admin/plugins/{id}/config` | 获取配置 |
-| PUT | `/api/admin/plugins/{id}/config` | 更新配置 |
+| `jar` | 文件 | 必填，完整 JAR 原始字节，最多 32 MiB |
+| `signature` | 文件 | 必填，`SHA256withRSA` 原始签名字节，最多 65535 字节且长度必须等于可信 RSA 模数字节数 |
+| `signerId` | 文本 | 必填，去除首尾空白后 1–128 字符，必须命中宿主可信公钥白名单 |
+| `name` | 文本 | 可选，去除首尾空白后最多 128 字符；空值回退为已签名插件 ID |
+| `description` | 文本 | 可选，去除首尾空白后最多 512 字符 |
 
-`ADMIN_PLUGIN_MANAGE` 权限码及上述路由当前均未落地，不能作为现有 API 调用。
+请求即使额外提交 `pluginId`、版本、摘要、类型、发布方、前端入口或 SRI，也不会被控制器绑定或被安装逻辑信任；这些字段只来自宿主计算或已签名 `plugin.json`。路由要求管理员身份、`ADMIN_PLUGIN_MANAGE` 和全站 Cookie/Header CSRF。Nginx 请求上限为 33 MiB，Spring multipart 单文件/请求上限为 32/33 MiB，核心安装快照复制还会再次执行 32 MiB 有界检查。
+
+成功返回安全 `AdminPluginResponse`，状态为 `INSTALLED`，包含已签名依赖范围，不会自动启用，也不返回路径、摘要、签名者、签名或内部错误。任何已存在插件 ID，包括 `UNINSTALLED`，统一返回 HTTP `409`；内部同 ID 替换仍只允许宿主显式调用 `install(...)`。缺失字段、签名/签名者或展示 metadata 超限及非法格式返回 `400`，JAR 或 multipart 请求总量超限返回 `413`，非 multipart 返回 `415`，无效签名、清单内容、PF4J 依赖描述漂移或兼容性失败返回脱敏 `422`；快照读取、JCA、存储或未分类安装故障返回脱敏 `500`。
+
+控制器先把 multipart JAR 移入随机 OS 临时文件，`PluginManagerService.installNew(...)` 再复制到宿主 `.snapshots` 并串行完成验签、清单校验、PF4J、Flyway 和持久化。请求临时文件始终 best-effort 删除；候选 wrapper/快照的失败补偿沿用核心安装契约。`PLUGIN_UPLOADED` 审计只记录可信插件 ID、前后状态和 `SUCCESS / BLOCKED / FAIL`，不记录文件名、路径、摘要、签名或异常。当前没有上传幂等键、多实例安装锁、升级、降级或回滚 API。
+
+## 管理端页面
+
+`admin-web` 的 `/plugins` 页面已接入本节 API，支持签名 JAR 安装、列表筛选、可信依赖、启停/卸载、配置 CRUD 和固定脱敏诊断。页面不读取路径、摘要、签名者、签名字节或内部错误，也不通过通用审计接口在客户端拼装插件历史。
 
 ---
 

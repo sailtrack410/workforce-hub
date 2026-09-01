@@ -6,6 +6,9 @@ const roleSource = readSource('./RoleView.vue');
 const workflowSource = readSource('./WorkflowGovernanceView.vue');
 const tableSource = readSource('../components/AdminTable.vue');
 const dialogSource = readSource('../components/AdminDialog.vue');
+const confirmDialogSource = readSource('../components/AdminConfirmDialog.vue');
+const toastSource = readSource('../components/AdminToast.vue');
+const appSource = readSource('../App.vue');
 
 describe('admin P0 interactions', () => {
   it('protects the built-in super admin role and confirms destructive changes', () => {
@@ -36,6 +39,11 @@ describe('admin P0 interactions', () => {
     expect(dialogSource).toContain("if (event.key !== 'Tab') return");
     expect(dialogSource).toContain("document.querySelectorAll<HTMLElement>('.admin-dialog')");
     expect(dialogSource).toContain('previousFocus?.focus()');
+    expect(confirmDialogSource).toContain(':labelled-by="titleId"');
+    expect(confirmDialogSource).toContain('<h3 :id="titleId">');
+    expect(appSource).toContain('<AdminToast>');
+    expect(appSource).toContain('<RouterView />');
+    expect(toastSource).toContain('<slot />');
   });
 });
 

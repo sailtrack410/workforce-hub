@@ -8,6 +8,8 @@ import { errorMessage, permissionActionLabel, permissionDisplayName, permissionM
 import { useToast } from '@/composables/useToast';
 import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
+import AdminMetricStrip from '@/components/AdminMetricStrip.vue';
+import AdminFilterBar from '@/components/AdminFilterBar.vue';
 
 const router = useRouter();
 const toast = useToast();
@@ -33,12 +35,25 @@ const rows = computed(() => permissions.value.filter((item) => {
     && (!filters.actionCode || item.actionCode === filters.actionCode)
     && (!filters.status || item.status === filters.status);
 }));
+const unassignedPermissionCount = computed(() => permissions.value.filter((permission) =>
+  !roles.value.some((role) => role.permissions?.some((item) => String(item.permissionId) === String(permission.permissionId))),
+).length);
+const permissionMetrics = computed(() => [
+  { label: '权限点总数', value: permissions.value.length },
+  { label: '业务模块', value: moduleOptions.value.length },
+  { label: '已启用', value: permissions.value.filter((item) => item.status === 'ACTIVE').length },
+  { label: '未关联角色', value: unassignedPermissionCount.value },
+]);
 
 function roleNames(permissionId: string | number) {
   const names = roles.value
     .filter((role) => role.permissions?.some((item) => String(item.permissionId) === String(permissionId)))
     .map((role) => role.roleName);
   return names.length ? names.join('、') : '未分配';
+}
+
+function roleCount(permissionId: string | number) {
+  return roles.value.filter((role) => role.permissions?.some((item) => String(item.permissionId) === String(permissionId))).length;
 }
 
 async function loadPage() {
@@ -65,32 +80,36 @@ onMounted(loadPage);
 </script>
 
 <template>
-  <main class="page-grid">
-    <AdminPanel :span="12" :title="`权限点 (${rows.length}/${permissions.length})`" subtitle="权限点由系统预置，角色授权请进入角色配置">
+  <main class="page-grid permission-page">
+    <AdminPanel :span="12" title="权限目录态势" subtitle="权限点由系统预置，未关联角色的权限不会进入实际授权范围">
       <template #actions>
         <button class="secondary-button" :disabled="loading" @click="loadPage"><RefreshCcw :size="16" />刷新</button>
         <button class="primary-button" @click="router.push('/roles')"><ShieldCheck :size="16" />角色配置</button>
       </template>
-      <div class="permission-filters" aria-label="权限点筛选">
+      <AdminMetricStrip :cards="permissionMetrics" />
+    </AdminPanel>
+
+    <AdminPanel :span="12" :title="`权限点目录 (${rows.length}/${permissions.length})`" subtitle="按模块、动作与状态定位权限，角色关联数反映实际授权覆盖">
+      <AdminFilterBar :show-search="false" aria-label="权限点筛选">
         <input v-model.trim="filters.keyword" placeholder="权限名称或编码" />
         <select v-model="filters.moduleCode"><option value="">全部模块</option><option v-for="item in moduleOptions" :key="item" :value="item">{{ permissionModuleLabel(item) }}</option></select>
         <select v-model="filters.actionCode"><option value="">全部动作</option><option v-for="item in actionOptions" :key="item" :value="item">{{ permissionActionLabel(item) }}</option></select>
         <select v-model="filters.status"><option value="">全部状态</option><option value="ACTIVE">启用</option><option value="INACTIVE">停用</option></select>
         <button class="secondary-button" type="button" @click="resetFilters">重置</button>
-      </div>
+      </AdminFilterBar>
       <AdminTable :columns="columns" :rows="rows" :loading="loading" row-key="permissionId">
         <template #cell-permName="{ row }"><strong>{{ permissionDisplayName(row.permName) }}</strong><span>{{ row.permCode }}</span></template>
         <template #cell-moduleCode="{ row }">{{ permissionModuleLabel(row.moduleCode) }}</template>
         <template #cell-actionCode="{ row }">{{ permissionActionLabel(row.actionCode) }}</template>
-        <template #cell-roles="{ row }">{{ roleNames(row.permissionId) }}</template>
-        <template #cell-status="{ row }"><span class="status-pill">{{ statusLabel(row.status) }}</span></template>
+        <template #cell-roles="{ row }"><strong :class="{ 'risk-text': roleCount(row.permissionId) === 0 }">{{ roleNames(row.permissionId) }}</strong><span>{{ roleCount(row.permissionId) }} 个角色</span></template>
+        <template #cell-status="{ row }"><span class="status-pill" :class="{ 'risk-status': row.status !== 'ACTIVE' }">{{ statusLabel(row.status) }}</span></template>
       </AdminTable>
     </AdminPanel>
   </main>
 </template>
 
 <style scoped>
-.permission-filters { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-base); }
-.permission-filters input, .permission-filters select { width: min(100%, 220px); }
-@media (max-width: 640px) { .permission-filters input, .permission-filters select, .permission-filters button { width: 100%; } }
+.permission-page { letter-spacing: 0; }
+.risk-status,
+.risk-text { color: var(--red-dark) !important; }
 </style>

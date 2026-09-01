@@ -3,52 +3,72 @@
    ========================================================= */
 :root {
   /* ---- 品牌色系 ---- */
-  --green:        #1677FF;
-  --green-dark:   #0F66E8;
-  --green-deep:   #0958D9;
-  --green-light:  #69B1FF;
+  --green:        #2563EB;
+  --green-dark:   #1D4ED8;
+  --green-deep:   #173B78;
+  --green-light:  #93B4F5;
   --primary:      var(--green);
   --primary-hover: var(--green-dark);
-  --primary-soft: #E8F3FF;
+  --primary-soft: #EAF1FF;
   --success:      #168A50;
-  --red:          #D93026;
-  --red-dark:     #B9231B;
-  --amber:        #FF9F18;
+  --red:          #C9362B;
+  --red-dark:     #9E2A23;
+  --amber:        #D97706;
 
   /* ---- 文本色系 ---- */
-  --ink:          #1F2329;
-  --muted:        #646A73;
-  --muted-light:  #A5ADBA;
-  --sidebar-text: #D0D5DD;
-  --sidebar-text-active: #ffffff;
-  --sidebar-brand-text: #F2F4F7;
+  --ink:          #182230;
+  --muted:        #5F6B7A;
+  --muted-light:  #8A96A6;
+  --sidebar-text: #C8D1DC;
+  --sidebar-text-active: #F8FAFC;
+  --sidebar-brand-text: #F8FAFC;
+  --sidebar-muted: #8795A8;
 
   /* ---- 填充/背景色系 ---- */
-  --surface:      #F7F8FA;
+  --surface:      #F3F5F7;
+  --surface-subtle: #F7F9FB;
   --panel:        #FFFFFF;
-  --panel-strong: #ffffff;
-  --line:         #DDE3EC;
-  --line-soft:    rgba(15, 23, 42, 0.1);
-  --table-head-bg:#F8FAFC;
-  --dialog-overlay-bg: rgba(0, 20, 60, 0.4);
+  --panel-strong: #FFFFFF;
+  --line:         #D8DEE8;
+  --line-strong:  #C2CAD6;
+  --line-soft:    rgba(24, 34, 48, 0.08);
+  --table-head-bg:#F4F6F9;
+  --dialog-overlay-bg: rgba(15, 23, 34, 0.54);
   --dialog-z:      9999;
-  --control-border: #D0D5DD;
-  --focus-ring: rgba(22, 119, 255, 0.34);
+  --control-border: #C7D0DC;
+  --focus-ring: rgba(37, 99, 235, 0.28);
+  --topbar-bg: rgba(255, 255, 255, 0.94);
+  --scrollbar-thumb: #BCC6D3;
+  --scrollbar-track: transparent;
 
   /* ---- 语义背景 ---- */
-  --hover-bg:     #F0F6FF;
-  --pill-bg:      #E8F3FF;
+  --hover-bg:     #EEF4FF;
+  --pill-bg:      #EAF1FF;
+  --pill-border:  #CFE0FF;
   --error-bg:     #FCE9E8;
   --success-bg:   #E8F8F0;
   --error-border: #F0B8B4;
   --success-border: #A8DFC1;
   --toast-error-border: rgba(179, 49, 49, 0.2);
   --toast-success-border: rgba(22, 163, 74, 0.2);
-  --avatar-bg:    #E8F3FF;
-  --ring-bg:      #B3D9FF;
-  --brand-mark-bg:#E8F3FF;
-  --org-link-stroke: rgba(22, 119, 255, 0.42);
-  --org-link-port-ring: rgba(22, 119, 255, 0.1);
+  --avatar-bg:    #EAF1FF;
+  --ring-bg:      #BED4FB;
+  --brand-mark-bg:#DCE9FF;
+  --org-link-stroke: rgba(37, 99, 235, 0.42);
+  --org-link-port-ring: rgba(37, 99, 235, 0.1);
+
+  /* ---- 认证页素材槽 ---- */
+  --auth-bg: #111D2D;
+  --auth-panel: #182B42;
+  --auth-panel-strong: #203A58;
+  --auth-line: rgba(218, 230, 246, 0.18);
+  --auth-grid-line: rgba(151, 181, 220, 0.12);
+  --auth-text: #F8FAFC;
+  --auth-muted: #AAB9CC;
+  --auth-accent: #70A7FF;
+  --auth-accent-soft: rgba(112, 167, 255, 0.16);
+  --auth-success: #61D3A2;
+  --auth-shadow: 0 24px 72px rgba(5, 13, 24, 0.34);
 
   /* ---- DAG ---- */
   --dag-edge-arrow: rgba(0, 137, 255, 0.7);
@@ -85,18 +105,21 @@
   --dag-array-border: rgba(22, 119, 255, 0.18);
 
   /* ---- 侧边栏 ---- */
-  --sidebar-bg:   #FFFFFF;
-  --sidebar-hover:#F0F6FF;
-  --sidebar-active:#E8F3FF;
+  --sidebar-bg:   #17202B;
+  --sidebar-border: #2A3544;
+  --sidebar-hover: rgba(255, 255, 255, 0.07);
+  --sidebar-active:#25364F;
 
   /* ---- 阴影 ---- */
-  --shadow:       0 8px 18px rgba(16, 24, 40, 0.08);
+  --shadow:       0 18px 44px rgba(16, 24, 40, 0.16);
   --shadow-sm:    0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-panel: 0 1px 1px rgba(16, 24, 40, 0.04);
+  --button-shadow: 0 1px 2px rgba(29, 78, 216, 0.2);
 
   /* ---- 圆角 ---- */
-  --radius-sm:    8px;
-  --radius-md:    8px;
-  --radius-lg:    12px;
+  --radius-sm:    6px;
+  --radius-md:    6px;
+  --radius-lg:    8px;
   --radius-pill:  999px;
   --radius-circle: 50%;
 
@@ -120,13 +143,18 @@
   --space-3xl:    32px;
 
   /* ---- 控件 ---- */
-  --control-h:    40px;
-  --control-px:   16px;
+  --control-h:    36px;
+  --control-px:   12px;
+
+  /* ---- 框架尺寸 ---- */
+  --sidebar-width: 232px;
+  --topbar-height: 64px;
+  --page-gutter: 24px;
 
   /* ---- 全局基础 ---- */
   color: var(--ink);
   background: var(--surface);
-  font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "Aptos", "HarmonyOS Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -162,7 +190,7 @@ body::-webkit-scrollbar {
 button, input, select, textarea { font: inherit; }
 button {
   cursor: pointer;
-  transition: all 200ms ease;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 button:disabled { cursor: not-allowed; opacity: 0.62; }
 
@@ -185,8 +213,15 @@ input, select, textarea {
   min-height: var(--control-h);
   padding: var(--space-sm) var(--space-md);
   outline: none;
-  transition: all 200ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
+
+input::placeholder,
+textarea::placeholder { color: var(--muted-light); }
+
+input:hover,
+select:hover,
+textarea:hover { border-color: var(--line-strong); }
 
 textarea {
   min-height: 88px;
@@ -217,7 +252,7 @@ textarea[aria-invalid="true"] {
    ========================================================= */
 .stack-form {
   display: grid;
-  gap: var(--space-lg);
+  gap: var(--space-base);
 }
 
 .stack-form label {
@@ -242,6 +277,7 @@ textarea[aria-invalid="true"] {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--space-base);
+  align-items: start;
 }
 
 .span-12 { grid-column: span 12; }
@@ -251,11 +287,11 @@ textarea[aria-invalid="true"] {
 
 .panel {
   min-width: 0;
-  padding: var(--space-xl);
+  padding: var(--space-lg);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-panel);
 }
 
 .panel-title,
@@ -270,7 +306,8 @@ textarea[aria-invalid="true"] {
 .panel-title h2,
 .toolbar h2 {
   margin: 0;
-  font-size: 16px;
+  color: var(--ink);
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.35;
@@ -307,15 +344,16 @@ textarea[aria-invalid="true"] {
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
-  transition: all 200ms ease;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .primary-button {
   border-color: var(--green);
   background: var(--green);
   color: var(--panel-strong);
+  box-shadow: var(--button-shadow);
 }
-.secondary-button { border: 1px solid var(--line); background: var(--panel-strong); color: var(--ink); }
+.secondary-button { border: 1px solid var(--control-border); background: var(--panel-strong); color: var(--ink); }
 .danger-button {
   border-color: var(--red);
   background: var(--red);
@@ -334,7 +372,7 @@ textarea[aria-invalid="true"] {
 .icon-button {
   width: var(--control-h);
   padding: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   background: var(--panel-strong);
   color: var(--ink);
 }
@@ -342,7 +380,7 @@ textarea[aria-invalid="true"] {
 .primary-button:hover { background: var(--green-dark); border-color: var(--green-dark); }
 .secondary-button:hover,
 .ghost-button:hover,
-.icon-button:hover { border-color: var(--green-light); color: var(--green-dark); }
+.icon-button:hover { border-color: var(--green-light); background: var(--hover-bg); color: var(--green-dark); }
 .ghost-button.danger:hover { border-color: var(--red); color: var(--red-dark); }
 .danger-button:hover { background: var(--red-dark); border-color: var(--red-dark); }
 
@@ -389,11 +427,12 @@ textarea[aria-invalid="true"] {
   display: inline-flex;
   align-items: center;
   width: max-content;
-  border-radius: var(--radius-pill);
+  border: 1px solid var(--pill-border);
+  border-radius: var(--space-xs);
   min-height: 24px;
   padding: 0 var(--space-sm);
   background: var(--pill-bg);
-  color: var(--green);
+  color: var(--green-dark);
   font-size: var(--text-xs);
   font-weight: 700;
 }
@@ -415,12 +454,13 @@ textarea[aria-invalid="true"] {
    Empty State
    ========================================================= */
 .empty-state {
-  min-height: 42px;
+  min-height: 72px;
   display: grid;
   place-items: center;
   color: var(--muted);
   font-size: var(--text-sm);
   padding: var(--space-base);
+  background: var(--surface-subtle);
 }
 
 /* =========================================================
@@ -447,6 +487,8 @@ textarea[aria-invalid="true"] {
   .toolbar > :not(:first-child) {
     width: 100%;
   }
+
+  .page-grid { gap: var(--space-md); }
 }
 
 @media (prefers-reduced-motion: reduce) {

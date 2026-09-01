@@ -17,17 +17,23 @@ public final class HelloPlugin extends WorkforcePlugin {
     }
 
     @Override
-    public void start() {
+    protected void onStart() {
         started = true;
+        stopped = false;
     }
 
     @Override
-    public void stop() {
+    protected void onStop() {
+        started = false;
         stopped = true;
     }
 
     public String getContextPluginId() {
         return getContext().getPluginId();
+    }
+
+    public String getConfigValue(String key) {
+        return getContext().getConfig().get(key).orElse(null);
     }
 
     public boolean isStarted() {

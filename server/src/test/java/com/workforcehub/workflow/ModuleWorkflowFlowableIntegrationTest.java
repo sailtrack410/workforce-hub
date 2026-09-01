@@ -3,6 +3,9 @@ package com.workforcehub.workflow;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.file.storage.LocalStorageProvider;
+import com.workforcehub.plugin.runtime.PluginEventDispatcher;
+import com.workforcehub.plugin.sdk.DomainEvent;
+import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.support.FixedClockTestConfiguration;
 import com.workforcehub.support.MutableTestClock;
 import com.workforcehub.support.WorkflowFlowableIntegrationTestSupport;
@@ -16,9 +19,11 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,16 +31,28 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.time.LocalDateTime;
+import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -78,6 +95,12 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     @Autowired
     private LocalStorageProvider localStorageProvider;
 
+    @Autowired
+    private DataSource dataSource;
+
+    @MockBean
+    private PluginEventDispatcher pluginEventDispatcher;
+
     @Test
     @DisplayName("员工提交请假申请后应启动Flowable并由直属上级审批通过")
     void employeeLeaveRequestShouldBeApprovedByManagerWithFlowable() throws Exception {
@@ -113,6 +136,15 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         assertEquals("APPROVED", requestStatus(scenario.requestId()));
         assertEquals(1L, actionCount(scenario.requestId(), "APPROVE", MANAGER_USER_ID));
         assertEquals(0L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(pluginEventDispatcher, times(1)).dispatch(eventCaptor.capture());
+        assertWorkflowCompletedEvent(
+            eventCaptor.getValue(),
+            scenario,
+            EventTypes.WORKFLOW_APPROVED,
+            "approved",
+            "APPROVED"
+        );
     }
 
     @Test
@@ -249,6 +281,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         assertEquals("IN_APPROVAL", requestStatus(scenario.requestId()));
         assertEquals(0L, actionCount(scenario.requestId(), "APPROVE", EMPLOYEE_USER_ID));
         assertEquals(1L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+        verifyNoInteractions(pluginEventDispatcher);
     }
 
     @Test
@@ -277,6 +310,77 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         assertEquals("REJECTED", requestStatus(scenario.requestId()));
         assertEquals(1L, actionCount(scenario.requestId(), "REJECT", MANAGER_USER_ID));
         assertEquals(0L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(pluginEventDispatcher, times(1)).dispatch(eventCaptor.capture());
+        assertWorkflowCompletedEvent(
+            eventCaptor.getValue(),
+            scenario,
+            EventTypes.WORKFLOW_REJECTED,
+            "rejected",
+            "REJECTED"
+        );
+    }
+
+    @Test
+    @DisplayName("同一人工任务并发通过和驳回时只允许一个终态并发布一次事件")
+    void concurrentApproveAndRejectShouldCompleteOnceAndDispatchOnce() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie approveSession = loginManager();
+        Cookie rejectSession = loginManager();
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession);
+
+        try (Connection lockConnection = dataSource.getConnection()) {
+            lockConnection.setAutoCommit(false);
+            try (PreparedStatement statement = lockConnection.prepareStatement(
+                    "SELECT id FROM wf_request WHERE id = ? FOR UPDATE")) {
+                statement.setLong(1, scenario.requestId());
+                statement.executeQuery();
+
+                ExecutorService executor = Executors.newFixedThreadPool(2);
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch start = new CountDownLatch(1);
+                try {
+                    Future<MvcResult> approved = executor.submit(() -> completeTask(
+                        scenario.managerTask().getId(),
+                        "approve",
+                        approveSession,
+                        ready,
+                        start
+                    ));
+                    Future<MvcResult> rejected = executor.submit(() -> completeTask(
+                        scenario.managerTask().getId(),
+                        "reject",
+                        rejectSession,
+                        ready,
+                        start
+                    ));
+                    ready.await();
+                    start.countDown();
+                    Thread.sleep(200L);
+                    lockConnection.commit();
+
+                    List<MvcResult> results = List.of(approved.get(), rejected.get());
+                    long successCount = results.stream()
+                        .filter(result -> result.getResponse().getStatus() == 200)
+                        .count();
+                    long missingCount = results.stream()
+                        .filter(result -> result.getResponse().getStatus() == 404)
+                        .count();
+                    assertEquals(1L, successCount);
+                    assertEquals(1L, missingCount);
+                } finally {
+                    executor.shutdownNow();
+                }
+            }
+        }
+
+        String terminalStatus = requestStatus(scenario.requestId());
+        assertTrue(Set.of("APPROVED", "REJECTED").contains(terminalStatus));
+        assertEquals(1L, terminalActionCount(scenario.requestId()));
+        assertEquals(0L, pendingTodoCount(scenario.requestId(), MANAGER_USER_ID));
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(pluginEventDispatcher, times(1)).dispatch(eventCaptor.capture());
+        assertEquals(terminalStatus, eventCaptor.getValue().payload().get("afterStatus"));
     }
 
     @Test
@@ -801,6 +905,24 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         return result.getResponse().getCookie("SESSION");
     }
 
+    private MvcResult completeTask(String taskId,
+                                   String action,
+                                   Cookie session,
+                                   CountDownLatch ready,
+                                   CountDownLatch start) throws Exception {
+        ready.countDown();
+        start.await();
+        return mockMvc.perform(post("/api/employee/workflow/tasks/{taskId}/{action}", taskId, action)
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "comment": "并发审批"
+                    }
+                    """))
+            .andReturn();
+    }
+
     private void seedWorkflowDefinitions() {
         jdbcTemplate.update("""
             INSERT INTO wf_process_type
@@ -996,9 +1118,47 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
         return root.get("data");
     }
 
+    private void assertWorkflowCompletedEvent(DomainEvent event,
+                                              LeaveApprovalScenario scenario,
+                                              String eventType,
+                                              String result,
+                                              String afterStatus) {
+        String stableId = "workflow-" + result + "-" + scenario.requestId() + "-" + scenario.managerTask().getId();
+        assertEquals(eventType, event.eventType());
+        assertEquals(stableId, event.eventId());
+        assertEquals(stableId, event.idempotencyKey());
+        assertEquals(1L, event.version());
+        assertEquals(String.valueOf(MANAGER_USER_ID), event.triggeredBy());
+        assertTrue(event.occurredAt() > 0);
+        assertEquals(Set.of(
+            "requestId",
+            "requestNo",
+            "bizType",
+            "applicantUserId",
+            "taskId",
+            "beforeStatus",
+            "afterStatus"
+        ), event.payload().keySet());
+        assertEquals(scenario.requestId(), event.payload().get("requestId"));
+        assertEquals(requestNo(scenario.requestId()), event.payload().get("requestNo"));
+        assertEquals("LEAVE", event.payload().get("bizType"));
+        assertEquals(EMPLOYEE_USER_ID, event.payload().get("applicantUserId"));
+        assertEquals(scenario.managerTask().getId(), event.payload().get("taskId"));
+        assertEquals("IN_APPROVAL", event.payload().get("beforeStatus"));
+        assertEquals(afterStatus, event.payload().get("afterStatus"));
+    }
+
     private String requestStatus(long requestId) {
         return jdbcTemplate.queryForObject(
             "SELECT status FROM wf_request WHERE id = ?",
+            String.class,
+            requestId
+        );
+    }
+
+    private String requestNo(long requestId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT request_no FROM wf_request WHERE id = ?",
             String.class,
             requestId
         );
@@ -1050,6 +1210,15 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
             FROM wf_task_action
             WHERE request_id = ? AND action_type = ? AND actor_type = 'USER' AND actor_id = ?
             """, Long.class, requestId, actionType, actorId);
+    }
+
+    private Long terminalActionCount(long requestId) {
+        return jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM wf_task_action
+            WHERE request_id = ?
+              AND action_type IN ('APPROVE', 'REJECT')
+            """, Long.class, requestId);
     }
 
     private Long pendingTodoCount(long requestId, long ownerId) {

@@ -26,6 +26,9 @@ public final class ServiceResult<T> {
     }
 
     public static <T> ServiceResult<T> fail(int code, String message, boolean retryable) {
+        if (code == 0) {
+            throw new IllegalArgumentException("失败结果不能使用成功码 0");
+        }
         return new ServiceResult<>(code, message, null, retryable);
     }
 

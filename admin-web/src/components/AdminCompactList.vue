@@ -24,13 +24,20 @@ withDefaults(
   padding: var(--space-md);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--panel-strong);
+  background: var(--surface-subtle);
+  transition: border-color 140ms ease, background-color 140ms ease;
 }
 
 .compact-list :slotted(article.clickable) { cursor: pointer; }
 
+.compact-list :slotted(article.clickable:hover) {
+  border-color: var(--green-light);
+  background: var(--hover-bg);
+}
+
 .compact-list :slotted(article.selected) {
   background: var(--hover-bg);
+  box-shadow: inset 3px 0 0 var(--green);
 }
 
 .compact-list :slotted(span) { color: var(--muted); font-size: var(--text-xs); }

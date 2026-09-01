@@ -85,6 +85,12 @@ const publishDefinitionKey = computed(() => {
 });
 const formConfigChanged = computed(() => normalizedJson(currentPublishedVersion.value?.formSchemaJson) !== normalizedJson(publishTarget.value?.formSchemaJson));
 const ruleConfigChanged = computed(() => normalizedJson(currentPublishedVersion.value?.ruleSnapshotJson) !== normalizedJson(publishTarget.value?.ruleSnapshotJson));
+const pendingReviewCount = computed(() => items.value.filter((item) => item.status === 'PENDING_REVIEW').length);
+const approvingCount = computed(() => items.value.filter((item) => item.status === STATUS_APPROVING).length);
+const backlogCount = computed(() => pendingReviewCount.value + approvingCount.value);
+const finishedCount = computed(() => items.value.filter((item) => ['APPROVED', 'REJECTED', 'WITHDRAWN'].includes(item.status)).length);
+const activeTemplateCount = computed(() => templates.value.filter((item) => item.status === 'ACTIVE').length);
+const draftVersionCount = computed(() => templateVersions.value.filter((item) => item.status === 'DRAFT').length);
 
 const detailRows = computed<DetailRow[]>(() => {
   const r = selectedDetail.value;
@@ -166,6 +172,13 @@ async function selectRequest(request: WorkflowRequestSummaryResponse) {
   } finally {
     detailLoading.value = false;
   }
+}
+
+function focusRequestStatus(status: string) {
+  activeTab.value = 'requests';
+  store.filters.status = status;
+  store.pagination.pageNo = 1;
+  void loadPage();
 }
 
 function validJson(value: string, label: string) {
@@ -289,6 +302,29 @@ async function publishTemplateVersion() {
 
 <template>
   <main class="workflow-page">
+    <AdminPanel :span="12" title="审批运行态" subtitle="当前页面积压与流程配置状态">
+      <template #actions>
+        <button class="secondary-button" type="button" :disabled="loading" @click="loadPage">
+          <RefreshCcw :size="16" />
+          <span>刷新运行态</span>
+        </button>
+      </template>
+      <div class="workflow-command-grid">
+        <button :class="['backlog-card', { attention: backlogCount }]" type="button" @click="focusRequestStatus('PENDING_REVIEW')">
+          <span>当前页面待处置</span>
+          <strong>{{ backlogCount }}</strong>
+          <small>{{ backlogCount ? '建议优先完成预审并追踪审批中申请' : '当前页面无积压' }}</small>
+          <b>查看待预审</b>
+        </button>
+        <div class="workflow-metric-grid">
+          <button type="button" @click="focusRequestStatus('PENDING_REVIEW')"><span>待预审</span><strong>{{ pendingReviewCount }}</strong></button>
+          <button type="button" @click="focusRequestStatus(STATUS_APPROVING)"><span>审批中</span><strong>{{ approvingCount }}</strong></button>
+          <article><span>本页已完成</span><strong>{{ finishedCount }}</strong></article>
+          <button type="button" @click="activeTab = 'templates'"><span>启用模板</span><strong>{{ activeTemplateCount }}</strong><small>{{ draftVersionCount }} 个选中模板草稿</small></button>
+        </div>
+      </div>
+    </AdminPanel>
+
     <div class="workflow-tabs" role="tablist" aria-label="审批治理任务">
       <button type="button" role="tab" :aria-selected="activeTab === 'requests'" :class="{ active: activeTab === 'requests' }" @click="activeTab = 'requests'">
         <FileSearch :size="16" />申请监控
@@ -500,6 +536,85 @@ async function publishTemplateVersion() {
   gap: var(--space-base);
 }
 
+.workflow-command-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 1.05fr) minmax(0, 2.2fr);
+  gap: var(--space-md);
+}
+
+.backlog-card,
+.workflow-metric-grid > * {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-strong);
+  color: var(--ink);
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.backlog-card {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 136px;
+  padding: var(--space-lg);
+}
+
+.backlog-card.attention {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+.backlog-card:hover,
+.workflow-metric-grid button:hover {
+  border-color: var(--green);
+  background: var(--hover-bg);
+}
+
+.backlog-card > span,
+.workflow-metric-grid span,
+.workflow-metric-grid small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.backlog-card strong {
+  color: var(--red-dark);
+  font-size: 34px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.backlog-card small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.backlog-card b {
+  color: var(--red-dark);
+  font-size: var(--text-sm);
+}
+
+.workflow-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.workflow-metric-grid > * {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 136px;
+  padding: var(--space-base);
+}
+
+.workflow-metric-grid strong {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
 .workflow-tabs {
   display: inline-flex;
   width: max-content;
@@ -579,6 +694,8 @@ async function publishTemplateVersion() {
 }
 
 @media (max-width: 980px) {
+  .workflow-command-grid { grid-template-columns: 1fr; }
+  .workflow-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .split-content { grid-template-columns: 1fr; }
 }
 
@@ -586,6 +703,9 @@ async function publishTemplateVersion() {
   .workflow-tabs,
   .workflow-tabs button { width: 100%; }
   .workflow-tabs button { justify-content: center; }
+  .workflow-metric-grid { grid-template-columns: 1fr; }
+  .backlog-card,
+  .workflow-metric-grid > * { min-height: 104px; }
   .publish-impact dl { grid-template-columns: 1fr; }
 }
 </style>

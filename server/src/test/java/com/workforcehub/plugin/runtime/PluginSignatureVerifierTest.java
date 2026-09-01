@@ -73,6 +73,36 @@ class PluginSignatureVerifierTest {
     }
 
     @Test
+    void shouldRejectSignatureLengthThatDoesNotMatchTrustedRsaKey() throws Exception {
+        Path jarPath = writeJar("signed-plugin");
+
+        assertThrows(
+            PluginSignatureVerifier.PluginSignatureException.class,
+            () -> verifier("official").verify(jarPath, "official", new byte[255])
+        );
+    }
+
+    @Test
+    void shouldRejectMalformedSignatureWithExpectedLength() throws Exception {
+        Path jarPath = writeJar("signed-plugin");
+
+        assertThrows(
+            PluginSignatureVerifier.PluginSignatureException.class,
+            () -> verifier("official").verify(jarPath, "official", new byte[256])
+        );
+    }
+
+    @Test
+    void shouldTreatMissingJarAsInfrastructureFailure() {
+        Path jarPath = tempDir.resolve("missing-plugin.jar");
+
+        assertThrows(
+            IllegalStateException.class,
+            () -> verifier("official").verify(jarPath, "official", new byte[256])
+        );
+    }
+
+    @Test
     void shouldFailClosedWhenNoTrustedSignerConfigured() throws Exception {
         Path jarPath = writeJar("signed-plugin");
 

@@ -25,6 +25,8 @@ import com.workforcehub.attendance.repository.AttendanceRepository;
 import com.workforcehub.attendance.repository.AttendanceScheduleRow;
 import com.workforcehub.attendance.repository.AttendanceShiftRow;
 import com.workforcehub.attendance.repository.PunchRecordRow;
+import com.workforcehub.common.event.DomainEventPublisher;
+import com.workforcehub.common.event.attendance.AttendanceExceptionCreatedEvent;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.leave.repository.ApprovedLeavePeriod;
@@ -42,6 +44,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -69,6 +72,7 @@ public class AttendanceService {
     private static final String EXCEPTION_LATE = "LATE";
     private static final String EXCEPTION_EARLY_LEAVE = "EARLY_LEAVE";
     private static final String EXCEPTION_MISS_PUNCH = "MISS_PUNCH";
+    private static final String EXCEPTION_STATUS_PENDING = "PENDING";
     private static final String SOURCE_APP = "APP";
     private static final String SOURCE_PC = "PC";
     private static final String SOURCE_MANUAL = "MANUAL";
@@ -79,16 +83,19 @@ public class AttendanceService {
     private final LeaveService leaveService;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
+    private final DomainEventPublisher domainEventPublisher;
     private final ConcurrentMap<Long, ReentrantLock> membershipLocks = new ConcurrentHashMap<>();
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              LeaveService leaveService,
                              ObjectProvider<Clock> clockProvider,
-                             TransactionTemplate transactionTemplate) {
+                             TransactionTemplate transactionTemplate,
+                             DomainEventPublisher domainEventPublisher) {
         this.attendanceRepository = attendanceRepository;
         this.leaveService = leaveService;
         this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
         this.transactionTemplate = transactionTemplate;
+        this.domainEventPublisher = domainEventPublisher;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -434,7 +441,10 @@ public class AttendanceService {
     private AttendanceDailyResultRow recalculateDailyResult(Long userId, LocalDate workDate) {
         AttendanceGroupRow group = attendanceRepository.getEffectiveGroupForUpdate(userId, workDate);
         if (group == null) {
-            return upsertDailyResult(userId, workDate, null, null, null, RESULT_NO_RULE, 0, 0, 0, 0, true);
+            AttendanceDailyResultRow row =
+                upsertDailyResult(userId, workDate, null, null, null, RESULT_NO_RULE, 0, 0, 0, 0, true);
+            rebuildExceptions(row, 0, 0, 0);
+            return attendanceRepository.getDailyResult(userId, workDate);
         }
 
         AttendanceScheduleRow schedule = attendanceRepository.getActiveSchedule(userId, workDate);
@@ -469,7 +479,7 @@ public class AttendanceService {
                 0,
                 false
             );
-            attendanceRepository.deleteExceptionsByDailyResultId(row.dailyResultId());
+            rebuildExceptions(row, 0, 0, 0);
             return attendanceRepository.getDailyResult(userId, workDate);
         }
 
@@ -512,7 +522,7 @@ public class AttendanceService {
             workMinutes,
             exceptionFlag
         );
-        rebuildExceptions(row.dailyResultId(), lateMinutes, earlyLeaveMinutes, absenceMinutes);
+        rebuildExceptions(row, lateMinutes, earlyLeaveMinutes, absenceMinutes);
         return attendanceRepository.getDailyResult(userId, workDate);
     }
 
@@ -527,7 +537,7 @@ public class AttendanceService {
                                                        int absenceMinutes,
                                                        int workMinutes,
                                                        boolean exceptionFlag) {
-        LocalDateTime calculatedAt = LocalDateTime.now();
+        LocalDateTime calculatedAt = LocalDateTime.now(clock);
         attendanceRepository.upsertDailyResult(
             IdGenerator.nextId(),
             userId,
@@ -543,37 +553,54 @@ public class AttendanceService {
             exceptionFlag,
             calculatedAt
         );
-        return attendanceRepository.getDailyResult(userId, workDate);
+        return attendanceRepository.getDailyResultForUpdate(userId, workDate);
     }
 
-    private void rebuildExceptions(Long dailyResultId,
+    private void rebuildExceptions(AttendanceDailyResultRow dailyResult,
                                    int lateMinutes,
                                    int earlyLeaveMinutes,
                                    int absenceMinutes) {
-        attendanceRepository.deleteExceptionsByDailyResultId(dailyResultId);
+        Map<String, String> desiredExceptions = new LinkedHashMap<>();
         if (lateMinutes > 0) {
-            attendanceRepository.insertException(
-                IdGenerator.nextId(),
-                dailyResultId,
-                EXCEPTION_LATE,
-                "迟到%s分钟".formatted(lateMinutes)
-            );
+            desiredExceptions.put(EXCEPTION_LATE, "迟到%s分钟".formatted(lateMinutes));
         }
         if (earlyLeaveMinutes > 0) {
-            attendanceRepository.insertException(
-                IdGenerator.nextId(),
-                dailyResultId,
-                EXCEPTION_EARLY_LEAVE,
-                "早退%s分钟".formatted(earlyLeaveMinutes)
-            );
+            desiredExceptions.put(EXCEPTION_EARLY_LEAVE, "早退%s分钟".formatted(earlyLeaveMinutes));
         }
         if (absenceMinutes > 0) {
+            desiredExceptions.put(EXCEPTION_MISS_PUNCH, "缺卡导致缺勤%s分钟".formatted(absenceMinutes));
+        }
+
+        for (AttendanceExceptionRow existing :
+                attendanceRepository.listExceptionsByDailyResultId(dailyResult.dailyResultId())) {
+            String desiredDescription = desiredExceptions.remove(existing.exceptionType());
+            if (desiredDescription == null) {
+                attendanceRepository.deleteException(existing.exceptionId());
+            } else if (!desiredDescription.equals(existing.exceptionDesc())) {
+                attendanceRepository.updateExceptionDescription(existing.exceptionId(), desiredDescription);
+            }
+        }
+
+        for (Map.Entry<String, String> desired : desiredExceptions.entrySet()) {
+            Long exceptionId = IdGenerator.nextId();
             attendanceRepository.insertException(
-                IdGenerator.nextId(),
-                dailyResultId,
-                EXCEPTION_MISS_PUNCH,
-                "缺卡导致缺勤%s分钟".formatted(absenceMinutes)
+                exceptionId,
+                dailyResult.dailyResultId(),
+                desired.getKey(),
+                desired.getValue()
             );
+            var currentUser = CurrentUserHolder.current();
+            domainEventPublisher.publishAfterCommit(new AttendanceExceptionCreatedEvent(
+                exceptionId,
+                dailyResult.dailyResultId(),
+                dailyResult.userId(),
+                dailyResult.workDate(),
+                desired.getKey(),
+                desired.getValue(),
+                EXCEPTION_STATUS_PENDING,
+                currentUser == null ? null : currentUser.getUserId(),
+                LocalDateTime.now(clock)
+            ));
         }
     }
 

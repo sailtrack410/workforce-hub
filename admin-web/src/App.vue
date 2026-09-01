@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import AdminToast from '@/components/AdminToast.vue';
+</script>
+
 <template>
-  <RouterView />
+  <AdminToast>
+    <RouterView />
+  </AdminToast>
 </template>

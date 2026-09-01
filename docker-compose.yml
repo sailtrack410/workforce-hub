@@ -9,7 +9,7 @@ services:
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
+      - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
     volumes:
       - mysql-data:/var/lib/mysql
@@ -86,6 +86,7 @@ services:
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
       WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED: ${WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED:-false}
       WORKFORCE_AUTH_REDIS_KEY_PREFIX: ${WORKFORCE_AUTH_REDIS_KEY_PREFIX:-workforce-hub:}
+      WORKFORCE_PLUGIN_CONFIG_ENCRYPTION_KEY_BASE64: ${WORKFORCE_PLUGIN_CONFIG_ENCRYPTION_KEY_BASE64:-}
       WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS: ${WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1}
       WORKFORCE_FILE_STORAGE_PROVIDER: MINIO
       WORKFORCE_FILE_LOCAL_ROOT: /app/storage
@@ -100,6 +101,7 @@ services:
       - "minio.localhost:host-gateway"
     volumes:
       - server-storage:/app/storage
+      - server-plugins:/app/plugins
     ports:
       - "${SERVER_PORT:-8080}:8080"
     healthcheck:
@@ -123,3 +125,4 @@ volumes:
   redis-data:
   minio-data:
   server-storage:
+  server-plugins:

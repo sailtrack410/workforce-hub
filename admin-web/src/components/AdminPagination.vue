@@ -92,9 +92,17 @@ function onPageSizeChange(e: Event) {
 .pagination {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-xs);
-  margin-top: var(--space-lg);
+  margin-top: var(--space-base);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--line);
   flex-wrap: wrap;
+}
+
+.pagination > .icon-button {
+  width: 32px;
+  min-height: 32px;
 }
 
 .page-btn {
@@ -150,5 +158,11 @@ function onPageSizeChange(e: Event) {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
+}
+
+@media (max-width: 640px) {
+  .pagination { justify-content: flex-start; }
+  .page-info { margin-left: 0; }
+  .page-size-select { margin-left: 0; }
 }
 </style>

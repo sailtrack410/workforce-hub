@@ -131,23 +131,35 @@ function toggleSort(col: TableColumn) {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--panel-strong);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  overscroll-behavior: contain;
 }
 
-table { width: 100%; border-collapse: collapse; }
+table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
 
 th, td {
   border-bottom: 1px solid var(--line);
-  padding: var(--space-md);
+  height: 44px;
+  padding: 9px var(--space-md);
   text-align: left;
   vertical-align: middle;
   font-size: var(--text-sm);
 }
 
 th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: var(--table-head-bg);
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 tbody tr:last-child td { border-bottom: 0; }
@@ -158,9 +170,17 @@ td span { color: var(--muted); margin-top: 3px; }
 
 tbody tr.interactive { cursor: pointer; }
 
+tbody tr {
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
 tbody tr.interactive:hover,
 tbody tr.selected {
   background: var(--hover-bg);
+}
+
+tbody tr.selected {
+  box-shadow: inset 3px 0 0 var(--green);
 }
 
 tbody tr.interactive:focus-visible {
@@ -199,5 +219,14 @@ tbody tr.interactive:focus-visible {
 
 .sorted {
   color: var(--green-dark);
+}
+
+.data-table > .empty-state {
+  min-height: 112px;
+  border-top: 0;
+}
+
+@media (max-width: 640px) {
+  table { min-width: 560px; }
 }
 </style>

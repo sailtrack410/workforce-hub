@@ -9,5 +9,7 @@ public interface PluginContext {
 
     String getPluginId();
 
+    PluginConfig getConfig();
+
     <T extends HostService> T getService(Class<T> type);
 }

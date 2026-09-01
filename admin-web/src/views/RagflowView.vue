@@ -6,6 +6,7 @@ import { errorMessage, roleCodeLabel } from '@/utils/format';
 import { uploadToTicketTarget } from '@/utils/upload-target';
 import { useToast } from '@/composables/useToast';
 import type { TableColumn } from '@/components/AdminTable.vue';
+import AdminPanel from '@/components/AdminPanel.vue';
 import RagflowCreateDialog from '@/components/ragflow/RagflowCreateDialog.vue';
 import RagflowDetailPanel from '@/components/ragflow/RagflowDetailPanel.vue';
 import RagflowDocumentDeleteDialog from '@/components/ragflow/RagflowDocumentDeleteDialog.vue';
@@ -158,6 +159,22 @@ const aclColumns: TableColumn[] = [
 
 const inDetail = computed(() => Boolean(selected.value));
 const currentTitle = computed(() => selected.value?.spaceName ?? '知识库');
+const totalDocumentCount = computed(() => items.value.reduce((total, item) => total + Number(item.documentCount ?? 0), 0));
+const totalChunkCount = computed(() => items.value.reduce((total, item) => total + Number(item.chunkCount ?? 0), 0));
+const inactiveSpaceCount = computed(() => items.value.filter((item) => item.status !== 'ACTIVE').length);
+const globalModelReady = computed(() => Boolean(globalSetting.value?.embeddingModelId || globalSetting.value?.embeddingModel));
+const failedDocumentCount = computed(() => documents.value.filter((item) => ['FAILED', 'ERROR'].includes(item.ingestStatus) || ['FAILED', 'ERROR'].includes(item.vectorStatus || '')).length);
+const processingDocumentCount = computed(() => documents.value.filter((item) => ['PENDING', 'PROCESSING', 'RUNNING'].includes(item.ingestStatus) || ['PENDING', 'PROCESSING', 'RUNNING'].includes(item.vectorStatus || '')).length);
+const knowledgeIssueCount = computed(() => inDetail.value
+  ? failedDocumentCount.value
+  : inactiveSpaceCount.value + (globalModelReady.value ? 0 : 1));
+const knowledgeHealthLabel = computed(() => {
+  if (failedDocumentCount.value > 0) return '入库异常';
+  if (!inDetail.value && !globalModelReady.value) return '缺少嵌入模型';
+  if (!inDetail.value && inactiveSpaceCount.value > 0) return '存在停用空间';
+  if (processingDocumentCount.value > 0) return '正在入库';
+  return '健康';
+});
 const aclSubjectOptions = computed(() => {
   if (aclForm.subjectType === 'ROLE') {
     return roles.value.map((item) => ({ id: item.roleId, name: item.roleName || roleCodeLabel(item.roleCode) }));
@@ -730,6 +747,36 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
 
 <template>
   <main class="page-grid ragflow-page">
+    <AdminPanel :span="12" :title="inDetail ? `${currentTitle} 健康度` : '知识库运行态'" :subtitle="inDetail ? '追踪文件入库、向量化与检索就绪情况' : '聚合知识空间、文档与嵌入模型健康度'">
+      <template #actions>
+        <button class="secondary-button" type="button" :disabled="loading || docLoading" @click="inDetail ? loadDocuments() : loadList()">
+          <span>{{ loading || docLoading ? '刷新中' : '刷新健康度' }}</span>
+        </button>
+        <button class="primary-button" type="button" @click="selected ? openSettings(selected) : openGlobalSettings()">
+          <span>{{ selected ? '知识库设置' : '模型设置' }}</span>
+        </button>
+      </template>
+      <div class="knowledge-health-grid">
+        <article :class="['knowledge-primary', { attention: knowledgeIssueCount }]">
+          <span>{{ inDetail ? '当前知识库' : '全局健康' }}</span>
+          <strong>{{ knowledgeHealthLabel }}</strong>
+          <p>{{ knowledgeIssueCount ? `${knowledgeIssueCount} 项需要管理员检查` : '知识检索链路已就绪' }}</p>
+        </article>
+        <div v-if="inDetail" class="knowledge-metric-grid">
+          <article><span>文件</span><strong>{{ documents.length }}</strong><small>已登记文档</small></article>
+          <article><span>正在入库</span><strong>{{ processingDocumentCount }}</strong><small>解析或向量化中</small></article>
+          <article :class="{ attention: failedDocumentCount }"><span>入库异常</span><strong>{{ failedDocumentCount }}</strong><small>需重新入库</small></article>
+          <article><span>切片</span><strong>{{ selected?.chunkCount ?? 0 }}</strong><small>可检索知识单元</small></article>
+        </div>
+        <div v-else class="knowledge-metric-grid">
+          <article><span>知识空间</span><strong>{{ items.length }}</strong><small>{{ inactiveSpaceCount }} 个未启用</small></article>
+          <article><span>文档</span><strong>{{ totalDocumentCount }}</strong><small>全部知识库</small></article>
+          <article><span>切片</span><strong>{{ totalChunkCount }}</strong><small>可检索知识单元</small></article>
+          <article :class="{ attention: !globalModelReady }"><span>嵌入模型</span><strong>{{ globalModelReady ? '已配置' : '未配置' }}</strong><small>全局向量化基座</small></article>
+        </div>
+      </div>
+    </AdminPanel>
+
     <RagflowListPanel
       v-if="!inDetail"
       v-model:keyword="keyword"
@@ -833,3 +880,90 @@ function normalizeUploadHeaders(headers: Record<string, string>, file: File) {
     />
   </main>
 </template>
+
+<style scoped>
+.knowledge-health-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 1.05fr) minmax(0, 2.2fr);
+  gap: var(--space-md);
+}
+
+.knowledge-primary,
+.knowledge-metric-grid article {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-strong);
+  letter-spacing: 0;
+}
+
+.knowledge-primary {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 130px;
+  padding: var(--space-lg);
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
+.knowledge-primary.attention,
+.knowledge-metric-grid article.attention {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+.knowledge-primary > span,
+.knowledge-metric-grid span,
+.knowledge-metric-grid small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.knowledge-primary strong {
+  color: var(--success);
+  font-size: var(--text-xl);
+}
+
+.knowledge-primary.attention strong,
+.knowledge-metric-grid article.attention strong {
+  color: var(--red-dark);
+}
+
+.knowledge-primary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.knowledge-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.knowledge-metric-grid article {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 130px;
+  padding: var(--space-base);
+}
+
+.knowledge-metric-grid strong {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 980px) {
+  .knowledge-health-grid { grid-template-columns: 1fr; }
+  .knowledge-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .knowledge-metric-grid { grid-template-columns: 1fr; }
+  .knowledge-primary,
+  .knowledge-metric-grid article { min-height: 102px; }
+}
+</style>

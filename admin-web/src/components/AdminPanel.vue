@@ -16,7 +16,9 @@ withDefaults(
         <h2 v-if="title">{{ title }}</h2>
         <span v-if="subtitle" class="panel-subtitle">{{ subtitle }}</span>
       </div>
-      <slot name="actions" />
+      <div v-if="$slots.actions" class="panel-actions">
+        <slot name="actions" />
+      </div>
     </div>
     <slot />
   </section>
@@ -27,11 +29,30 @@ withDefaults(
   justify-content: flex-end;
 }
 
+.panel-title > div:first-child {
+  min-width: 0;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
 .panel-subtitle {
   color: var(--muted);
   display: inline-block;
   margin-top: var(--space-xs);
   font-size: var(--text-sm);
   line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .panel-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>

@@ -41,6 +41,11 @@ const createErrors = computed(() => ({
   agentName: requiredText(createForm.agentName, '助手名称') || maxLength(createForm.agentName, 128, '助手名称'),
 }));
 const editNameError = computed(() => requiredText(editForm.agentName, '助手名称') || maxLength(editForm.agentName, 128, '助手名称'));
+const activeAgentCount = computed(() => items.value.filter((item) => item.status === 'ACTIVE').length);
+const publishedAgentCount = computed(() => items.value.filter((item) => item.status !== 'DEPRECATED' && item.publishedVersionId).length);
+const unpublishedAgentCount = computed(() => items.value.filter((item) => item.status !== 'DEPRECATED' && !item.publishedVersionId).length);
+const knowledgeRiskCount = computed(() => items.value.filter((item) => Number(item.knowledgeIssueCount ?? 0) > 0).length);
+const inactiveAgentCount = computed(() => items.value.filter((item) => item.status === 'INACTIVE' || item.status === 'DEPRECATED').length);
 
 const agentOptions = [
   { value: 'LEAVE_HELPER', label: '假期助手' },
@@ -212,7 +217,36 @@ onMounted(() => {
 
 <template>
   <main class="page-grid">
-    <AdminPanel :span="12" title="助手列表">
+    <AdminPanel :span="12" title="助手发布态" subtitle="识别未发布与知识库异常，确保启用的助手具备可用版本">
+      <template #actions>
+        <button class="secondary-button" type="button" @click="router.push('/ai-models')">
+          <Settings :size="16" />
+          <span>模型基座</span>
+        </button>
+        <button class="primary-button" type="button" @click="openCreate">
+          <Plus :size="16" />
+          <span>新建助手</span>
+        </button>
+      </template>
+      <div class="agent-governance-grid">
+        <article :class="['release-card', { attention: unpublishedAgentCount || knowledgeRiskCount }]">
+          <span>当前发布状态</span>
+          <strong>{{ unpublishedAgentCount || knowledgeRiskCount ? '需处置' : '发布就绪' }}</strong>
+          <p>
+            {{ unpublishedAgentCount ? `${unpublishedAgentCount} 个助手尚未发布` : '所有可用助手均已发布' }}
+            <template v-if="knowledgeRiskCount"> · {{ knowledgeRiskCount }} 个知识配置异常</template>
+          </p>
+        </article>
+        <div class="agent-metric-grid">
+          <article><span>已启用</span><strong>{{ activeAgentCount }}</strong></article>
+          <article><span>已发布</span><strong>{{ publishedAgentCount }}</strong></article>
+          <article :class="{ attention: knowledgeRiskCount }"><span>知识异常</span><strong>{{ knowledgeRiskCount }}</strong></article>
+          <article><span>停用 / 弃用</span><strong>{{ inactiveAgentCount }}</strong></article>
+        </div>
+      </div>
+    </AdminPanel>
+
+    <AdminPanel :span="12" title="助手发布清单" subtitle="编辑基本资料、进入流程编排并管理运行状态">
     <template #actions>
       <form class="agent-search" @submit.prevent="handleSearch">
         <input v-model="keyword" placeholder="搜索名称" />
@@ -412,6 +446,86 @@ onMounted(() => {
   padding: 0 var(--space-sm);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.agent-governance-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(0, 2fr);
+  gap: var(--space-md);
+}
+
+.release-card,
+.agent-metric-grid article {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-strong);
+  letter-spacing: 0;
+}
+
+.release-card {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 132px;
+  padding: var(--space-lg);
+}
+
+.release-card.attention,
+.agent-metric-grid article.attention {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+.release-card > span,
+.agent-metric-grid span {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.release-card strong {
+  font-size: var(--text-xl);
+}
+
+.release-card.attention strong,
+.agent-metric-grid article.attention strong {
+  color: var(--red-dark);
+}
+
+.release-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.agent-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.agent-metric-grid article {
+  display: grid;
+  align-content: center;
+  gap: var(--space-sm);
+  min-height: 132px;
+  padding: var(--space-base);
+}
+
+.agent-metric-grid strong {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1050px) {
+  .agent-governance-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .agent-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .release-card,
+  .agent-metric-grid article { min-height: 104px; }
 }
 
 </style>

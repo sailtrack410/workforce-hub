@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { Plus, RefreshCcw, Save } from 'lucide-vue-next';
+import { Plus, RefreshCcw, Save, TriangleAlert } from 'lucide-vue-next';
 import { adminApi } from '@/api/admin';
 import type {
   AttendanceCalendarResponse,
@@ -19,6 +19,7 @@ import AdminPanel from '@/components/AdminPanel.vue';
 import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
 import AdminUserPicker from '@/components/AdminUserPicker.vue';
 import AdminDialog from '@/components/AdminDialog.vue';
+import AdminMetricStrip from '@/components/AdminMetricStrip.vue';
 
 const toast = useToast();
 
@@ -120,6 +121,17 @@ const resultColumns: TableColumn[] = [
 
 const activeCalendars = computed(() => calendars.value.filter((item) => item.status === 'ACTIVE'));
 const activeShifts = computed(() => shifts.value.filter((item) => item.status === 'ACTIVE'));
+const exceptionResults = computed(() => dailyResults.value.filter((item) => item.exceptionFlag));
+const exceptionEmployeeCount = computed(() => new Set(exceptionResults.value.map((item) => String(item.userId))).size);
+const attendanceMetrics = computed(() => [
+  { label: '有效班次', value: `${activeShifts.value.length}/${shifts.value.length}` },
+  { label: '考勤组', value: groups.value.length },
+  { label: '当前排班', value: schedules.value.length },
+  { label: '结果异常', value: exceptionResults.value.length },
+]);
+const exceptionRate = computed(() => dailyResults.value.length
+  ? `${Math.round((exceptionResults.value.length / dailyResults.value.length) * 100)}%`
+  : '0%');
 
 function localDate(date: Date) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -353,24 +365,33 @@ onMounted(loadPage);
 </script>
 
 <template>
-  <main class="page-grid">
-    <AdminPanel :span="12">
+  <main class="page-grid attendance-page">
+    <AdminPanel :span="12" title="考勤运行中心" subtitle="从规则、覆盖、执行到结果异常形成连续治理链路">
       <template #actions>
         <button class="secondary-button" :disabled="loading" @click="loadPage">
           <RefreshCcw :size="16" />
           <span>刷新</span>
         </button>
       </template>
+      <div class="attendance-command">
+        <button class="exception-focus" type="button" @click="activeTab = 'results'">
+          <span>结果异常率</span>
+          <strong>{{ exceptionRate }}</strong>
+          <small>{{ exceptionEmployeeCount }} 名员工 · {{ exceptionResults.length }} 条异常</small>
+          <span class="exception-breakout" aria-hidden="true"><TriangleAlert :size="20" /></span>
+        </button>
+        <AdminMetricStrip :cards="attendanceMetrics" />
+      </div>
       <div class="attendance-tabs" role="tablist">
-        <button :class="{ active: activeTab === 'shifts' }" type="button" @click="activeTab = 'shifts'">班次</button>
-        <button :class="{ active: activeTab === 'groups' }" type="button" @click="activeTab = 'groups'">考勤组</button>
-        <button :class="{ active: activeTab === 'schedules' }" type="button" @click="activeTab = 'schedules'">排班</button>
-        <button :class="{ active: activeTab === 'results' }" type="button" @click="activeTab = 'results'">日结果</button>
+        <button :aria-selected="activeTab === 'shifts'" :class="{ active: activeTab === 'shifts' }" role="tab" type="button" @click="activeTab = 'shifts'">规则配置 <span>{{ shifts.length }}</span></button>
+        <button :aria-selected="activeTab === 'groups'" :class="{ active: activeTab === 'groups' }" role="tab" type="button" @click="activeTab = 'groups'">组织覆盖 <span>{{ groups.length }}</span></button>
+        <button :aria-selected="activeTab === 'schedules'" :class="{ active: activeTab === 'schedules' }" role="tab" type="button" @click="activeTab = 'schedules'">排班执行 <span>{{ schedules.length }}</span></button>
+        <button :aria-selected="activeTab === 'results'" :class="{ active: activeTab === 'results' }" role="tab" type="button" @click="activeTab = 'results'">结果异常 <span>{{ exceptionResults.length }}</span></button>
       </div>
     </AdminPanel>
 
     <template v-if="activeTab === 'shifts'">
-      <AdminPanel :span="12" :title="`班次 (${shifts.length})`">
+      <AdminPanel :span="12" :title="`班次规则 (${shifts.length})`" subtitle="集中核对工作时段、打卡窗口与启停状态">
         <template #actions><button class="primary-button" type="button" @click="shiftDialogVisible = true"><Plus :size="16" />新建班次</button></template>
         <AdminTable :columns="shiftColumns" :rows="shifts" :loading="loading" row-key="shiftId">
           <template #cell-workTime="{ row }">{{ row.startTime }} - {{ row.endTime }}</template>
@@ -384,14 +405,14 @@ onMounted(loadPage);
     </template>
 
     <template v-else-if="activeTab === 'groups'">
-      <AdminPanel :span="5" :title="`工作日历 (${calendars.length})`">
+      <AdminPanel :span="5" :title="`工作日历 (${calendars.length})`" subtitle="定义组织工作日基线">
         <template #actions><button class="primary-button" type="button" @click="calendarDialogVisible = true"><Plus :size="16" />新建日历</button></template>
         <AdminTable :columns="calendarColumns" :rows="calendars" :loading="loading" row-key="calendarId">
           <template #cell-status="{ row }"><span class="status-pill">{{ statusLabel(row.status) }}</span></template>
         </AdminTable>
       </AdminPanel>
 
-      <AdminPanel :span="7" :title="`考勤组 (${groups.length})`">
+      <AdminPanel :span="7" :title="`考勤组 (${groups.length})`" subtitle="选择考勤组后维护其成员覆盖">
         <template #actions><button class="primary-button" type="button" @click="groupDialogVisible = true"><Plus :size="16" />新建考勤组</button></template>
         <AdminTable
           interactive
@@ -409,7 +430,7 @@ onMounted(loadPage);
         </AdminTable>
       </AdminPanel>
 
-      <AdminPanel :span="12" title="考勤组成员">
+      <AdminPanel :span="12" :title="`考勤组成员 (${groupMembers.length})`" subtitle="成员生效区间决定规则实际覆盖范围">
         <template #actions><button class="primary-button" type="button" :disabled="!selectedGroupId" @click="memberDialogVisible = true"><Plus :size="16" />添加成员</button></template>
         <AdminTable :columns="memberColumns" :rows="groupMembers" :loading="loading" row-key="memberId">
           <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
@@ -421,16 +442,13 @@ onMounted(loadPage);
     </template>
 
     <template v-else-if="activeTab === 'schedules'">
-      <AdminPanel :span="12" title="排班筛选">
+      <AdminPanel :span="12" :title="`排班执行 (${schedules.length})`" subtitle="按员工与日期窗口检查实际排班，点击记录可直接修改">
+        <template #actions><button class="primary-button" type="button" @click="newSchedule"><Plus :size="16" />新建排班</button></template>
         <AdminFilterBar @search="loadSchedules">
           <AdminUserPicker v-model="scheduleFilterUserId" label="员工" @select="onScheduleFilterUser" />
-          <input v-model="scheduleFilters.startDate" required type="date" />
-          <input v-model="scheduleFilters.endDate" required type="date" />
+          <input v-model="scheduleFilters.startDate" aria-label="排班开始日期" required type="date" />
+          <input v-model="scheduleFilters.endDate" aria-label="排班结束日期" required type="date" />
         </AdminFilterBar>
-      </AdminPanel>
-
-      <AdminPanel :span="12" :title="`排班 (${schedules.length})`">
-        <template #actions><button class="primary-button" type="button" @click="newSchedule"><Plus :size="16" />新建排班</button></template>
         <AdminTable
           interactive
           :columns="scheduleColumns"
@@ -449,23 +467,20 @@ onMounted(loadPage);
     </template>
 
     <template v-else>
-      <AdminPanel :span="12" title="日结果筛选">
+      <AdminPanel :span="12" :title="`日结果与异常 (${dailyResults.length})`" subtitle="异常优先展示迟到、早退与缺勤影响，按员工和日期范围复核">
         <AdminFilterBar @search="loadResults">
           <AdminUserPicker v-model="resultFilterUserId" label="员工" @select="onResultFilterUser" />
-          <input v-model="resultFilters.startDate" required type="date" />
-          <input v-model="resultFilters.endDate" required type="date" />
+          <input v-model="resultFilters.startDate" aria-label="结果开始日期" required type="date" />
+          <input v-model="resultFilters.endDate" aria-label="结果结束日期" required type="date" />
         </AdminFilterBar>
-      </AdminPanel>
-
-      <AdminPanel :span="12" :title="`日结果 (${dailyResults.length})`">
         <AdminTable :columns="resultColumns" :rows="dailyResults" :loading="loading" row-key="dailyResultId">
           <template #cell-userId="{ row }">{{ employeeLabel(row) }}</template>
-          <template #cell-resultStatus="{ row }"><span class="status-pill">{{ attendanceResultLabel(row.resultStatus) }}</span></template>
+          <template #cell-resultStatus="{ row }"><span class="status-pill" :class="{ 'risk-status': row.exceptionFlag }">{{ attendanceResultLabel(row.resultStatus) }}</span></template>
           <template #cell-minutes="{ row }">
             <strong>工作 {{ formatMinutes(row.workMinutes) }}</strong>
             <span>迟到 {{ row.lateMinutes }} / 早退 {{ row.earlyLeaveMinutes }} / 缺勤 {{ row.absenceMinutes }}</span>
           </template>
-          <template #cell-exceptionFlag="{ row }">{{ row.exceptionFlag ? '是' : '否' }}</template>
+          <template #cell-exceptionFlag="{ row }"><strong :class="{ 'risk-text': row.exceptionFlag }">{{ row.exceptionFlag ? '待复核' : '正常' }}</strong></template>
           <template #cell-calculatedAt="{ row }">{{ formatDateTime(row.calculatedAt) }}</template>
         </AdminTable>
       </AdminPanel>
@@ -530,10 +545,58 @@ onMounted(loadPage);
 </template>
 
 <style scoped>
+.attendance-page { letter-spacing: 0; }
+
+.attendance-command {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 2.2fr);
+  align-items: stretch;
+  gap: var(--space-base);
+  padding: var(--space-sm) 0 var(--space-base);
+}
+
+.exception-focus {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: var(--space-xs);
+  min-height: 118px;
+  padding: var(--space-base);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-lg);
+  background: var(--error-bg);
+  color: var(--red-dark);
+  text-align: left;
+  overflow: visible;
+}
+
+.exception-focus:hover { border-color: var(--red); }
+.exception-focus:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-ring); }
+.exception-focus > span:first-child,
+.exception-focus small { font-size: var(--text-xs); font-weight: 700; }
+.exception-focus strong { font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
+
+.exception-breakout {
+  position: absolute;
+  top: calc(var(--space-base) * -1);
+  right: var(--space-base);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--panel);
+  border-radius: var(--radius-md);
+  background: var(--red);
+  color: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
+}
+
 .attendance-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--line);
 }
 
 .attendance-tabs button {
@@ -544,7 +607,19 @@ onMounted(loadPage);
   background: var(--panel-strong);
   color: var(--ink);
   font-weight: 700;
-  transition: all 200ms ease;
+  transition: color 200ms ease, border-color 200ms ease, background-color 200ms ease;
+}
+
+.attendance-tabs button span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  min-height: 20px;
+  margin-left: var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: var(--text-xs);
 }
 
 .attendance-tabs button:hover {
@@ -557,6 +632,11 @@ onMounted(loadPage);
   background: var(--green);
   color: var(--panel-strong);
 }
+
+.attendance-tabs button.active span { background: var(--panel-strong); color: var(--green-dark); }
+
+.risk-status,
+.risk-text { color: var(--red-dark) !important; }
 
 .attendance-form {
   display: grid;
@@ -587,9 +667,17 @@ onMounted(loadPage);
 }
 
 @media (max-width: 900px) {
+  .attendance-command { grid-template-columns: 1fr; }
+
   .attendance-form,
   .single-form {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 520px) {
+  .attendance-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .attendance-tabs button { width: 100%; padding: 0 var(--space-sm); }
+  .exception-breakout { right: var(--space-sm); }
 }
 </style>

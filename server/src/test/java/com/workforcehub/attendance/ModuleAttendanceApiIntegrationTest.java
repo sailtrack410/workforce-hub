@@ -3,15 +3,20 @@ package com.workforcehub.attendance;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.attendance.service.AttendanceService;
+import com.workforcehub.plugin.runtime.PluginEventDispatcher;
+import com.workforcehub.plugin.sdk.DomainEvent;
+import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.support.FixedClockTestConfiguration;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import com.workforcehub.support.MutableTestClock;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,9 +24,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,8 +37,13 @@ import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -65,6 +77,9 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private AttendanceService attendanceRecalculationService;
+
+    @MockBean
+    private PluginEventDispatcher pluginEventDispatcher;
 
     @Test
     @DisplayName("后台配置考勤基础数据后，员工应能打卡并生成正常日结果，直属上级应能查询团队结果")
@@ -330,6 +345,202 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[?(@.exceptionType=='EARLY_LEAVE')]", hasSize(1)));
 
         assertEquals(2L, exceptionCount(EMPLOYEE_USER_ID, "2026-05-08"));
+    }
+
+    @Test
+    @DisplayName("重复重算和异常说明变化应保留异常ID且不重复发布事件")
+    void recalculationShouldPreserveExceptionIdentityAndPublishNoDuplicateEvent() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_STABLE_" + suffix, "稳定异常日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_STABLE_" + suffix, "稳定异常班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_STABLE_" + suffix, "稳定异常组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-20T09:20:00", "ON_DUTY")
+            .andExpect(status().isOk());
+        punch(employeeSession, "2026-05-20T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk());
+
+        long initialExceptionId = exceptionId(EMPLOYEE_USER_ID, "2026-05-20", "LATE");
+        clearInvocations(pluginEventDispatcher);
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-20")
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-20")
+        );
+
+        assertEquals(initialExceptionId, exceptionId(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        assertEquals("迟到20分钟", exceptionDescription(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        verifyNoInteractions(pluginEventDispatcher);
+
+        jdbcTemplate.update("""
+            UPDATE att_punch_record
+            SET punch_at = ?
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = 'ON_DUTY'
+            """,
+            Timestamp.valueOf("2026-05-20 09:30:00"),
+            EMPLOYEE_USER_ID,
+            "2026-05-20"
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-20")
+        );
+
+        assertEquals(initialExceptionId, exceptionId(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        assertEquals("迟到30分钟", exceptionDescription(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        verifyNoInteractions(pluginEventDispatcher);
+    }
+
+    @Test
+    @DisplayName("异常消失后再次出现应生成新ID并发布精确白名单事件")
+    void reappearingExceptionShouldCreateNewIdentityAndEvent() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_REAPPEAR_" + suffix, "重现异常日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_REAPPEAR_" + suffix, "重现异常班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_REAPPEAR_" + suffix, "重现异常组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-21T09:20:00", "ON_DUTY")
+            .andExpect(status().isOk());
+        punch(employeeSession, "2026-05-21T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk());
+        long initialExceptionId = exceptionId(EMPLOYEE_USER_ID, "2026-05-21", "LATE");
+
+        jdbcTemplate.update("""
+            UPDATE att_punch_record
+            SET punch_at = ?
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = 'ON_DUTY'
+            """,
+            Timestamp.valueOf("2026-05-21 09:00:00"),
+            EMPLOYEE_USER_ID,
+            "2026-05-21"
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-21")
+        );
+        assertEquals(0L, exceptionTypeCount(EMPLOYEE_USER_ID, "2026-05-21", "LATE"));
+
+        clearInvocations(pluginEventDispatcher);
+        jdbcTemplate.update("""
+            UPDATE att_punch_record
+            SET punch_at = ?
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = 'ON_DUTY'
+            """,
+            Timestamp.valueOf("2026-05-21 09:20:00"),
+            EMPLOYEE_USER_ID,
+            "2026-05-21"
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-21")
+        );
+
+        long newExceptionId = exceptionId(EMPLOYEE_USER_ID, "2026-05-21", "LATE");
+        assertNotEquals(initialExceptionId, newExceptionId);
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(pluginEventDispatcher).dispatch(eventCaptor.capture());
+        DomainEvent event = eventCaptor.getValue();
+        String stableId = "attendance-exception-" + newExceptionId;
+        assertEquals(EventTypes.ATTENDANCE_EXCEPTION, event.eventType());
+        assertEquals(stableId, event.eventId());
+        assertEquals(stableId, event.idempotencyKey());
+        assertEquals("system", event.triggeredBy());
+        assertEquals(Set.of(
+            "exceptionId",
+            "dailyResultId",
+            "userId",
+            "workDate",
+            "exceptionType",
+            "exceptionDesc",
+            "status"
+        ), event.payload().keySet());
+        assertEquals(newExceptionId, event.payload().get("exceptionId"));
+        assertEquals(dailyResultId(EMPLOYEE_USER_ID, "2026-05-21"), event.payload().get("dailyResultId"));
+        assertEquals(EMPLOYEE_USER_ID, event.payload().get("userId"));
+        assertEquals("2026-05-21", event.payload().get("workDate"));
+        assertEquals("LATE", event.payload().get("exceptionType"));
+        assertEquals("迟到20分钟", event.payload().get("exceptionDesc"));
+        assertEquals("PENDING", event.payload().get("status"));
+    }
+
+    @Test
+    @DisplayName("同一日结果并发重算只能新建并发布一个同类异常")
+    void concurrentRecalculationShouldCreateAndPublishOneExceptionPerType() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_EVENT_CON_" + suffix, "并发异常日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_EVENT_CON_" + suffix, "并发异常班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_EVENT_CON_" + suffix, "并发异常组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-22T09:20:00", "ON_DUTY")
+            .andExpect(status().isOk());
+        punch(employeeSession, "2026-05-22T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk());
+
+        jdbcTemplate.update("""
+            DELETE ae
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ? AND adr.work_date = ?
+            """, EMPLOYEE_USER_ID, "2026-05-22");
+        jdbcTemplate.update(
+            "DELETE FROM att_daily_result WHERE user_id = ? AND work_date = ?",
+            EMPLOYEE_USER_ID,
+            "2026-05-22"
+        );
+        clearInvocations(pluginEventDispatcher);
+
+        int workerCount = 6;
+        CountDownLatch ready = new CountDownLatch(workerCount);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (int i = 0; i < workerCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(start.await(5, TimeUnit.SECONDS), "并发重算启动超时");
+                    attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+                        EMPLOYEE_USER_ID,
+                        java.time.LocalDate.parse("2026-05-22")
+                    );
+                    return null;
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "并发重算准备超时");
+            start.countDown();
+            for (Future<Void> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-05-22"));
+        assertEquals(1L, exceptionTypeCount(EMPLOYEE_USER_ID, "2026-05-22", "LATE"));
+        verify(pluginEventDispatcher, times(1)).dispatch(org.mockito.ArgumentMatchers.any(DomainEvent.class));
     }
 
     @Test
@@ -891,6 +1102,15 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
         return count == null ? 0L : count;
     }
 
+    private long dailyResultId(long userId, String workDate) {
+        Long id = jdbcTemplate.queryForObject("""
+            SELECT id
+            FROM att_daily_result
+            WHERE user_id = ? AND work_date = ?
+            """, Long.class, userId, workDate);
+        return id == null ? 0L : id;
+    }
+
     private String dailyResultStatus(long userId, String workDate) {
         return jdbcTemplate.queryForObject("""
             SELECT result_status
@@ -936,6 +1156,41 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
             WHERE adr.user_id = ?
               AND adr.work_date = ?
             """, Long.class, userId, workDate);
+        return count == null ? 0L : count;
+    }
+
+    private long exceptionId(long userId, String workDate, String exceptionType) {
+        Long id = jdbcTemplate.queryForObject("""
+            SELECT ae.id
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+              AND ae.exception_type = ?
+            """, Long.class, userId, workDate, exceptionType);
+        return id == null ? 0L : id;
+    }
+
+    private String exceptionDescription(long userId, String workDate, String exceptionType) {
+        return jdbcTemplate.queryForObject("""
+            SELECT ae.exception_desc
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+              AND ae.exception_type = ?
+            """, String.class, userId, workDate, exceptionType);
+    }
+
+    private long exceptionTypeCount(long userId, String workDate, String exceptionType) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+              AND ae.exception_type = ?
+            """, Long.class, userId, workDate, exceptionType);
         return count == null ? 0L : count;
     }
 }

@@ -429,6 +429,7 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
         </button>
         <div class="dag-title-group">
           <span class="bar-title">{{ humanizeText(agent.agentName) || 'AI 助手' }}</span>
+          <span class="dag-agent-code">{{ agent.agentCode }} · V{{ versionDisplay(selectedVersion) || '-' }}</span>
         </div>
         <span v-if="agent.status === 'DEPRECATED'" class="version-state deprecated">已弃用</span>
         <span :class="['version-state', selectedVersion?.publishStatus?.toLowerCase()]">{{ versionStateText }}</span>
@@ -466,6 +467,20 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
           <ShieldCheck :size="15" />
           <span>可用范围</span>
         </div>
+        <dl class="acl-summary" aria-label="发布上下文">
+          <div>
+            <dt>有效授权</dt>
+            <dd>{{ activeAclList.length }}</dd>
+          </div>
+          <div>
+            <dt>可用工具</dt>
+            <dd>{{ tools.length }}</dd>
+          </div>
+          <div>
+            <dt>知识空间</dt>
+            <dd>{{ knowledgeSpaces.length }}</dd>
+          </div>
+        </dl>
         <div class="acl-form">
           <select v-model="aclForm.subjectId" :disabled="aclSaving || isReadonly">
             <option v-for="role in roleOptions" :key="role.id" :value="role.id">{{ role.label }}</option>
@@ -715,6 +730,46 @@ watch([workflowConfigJson, systemPrompt, modelConfigJson], () => {
   color: var(--ink);
   font-size: 13px;
   font-weight: 900;
+}
+
+.acl-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 0 var(--space-base);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.acl-summary div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: var(--space-sm);
+  border-right: 1px solid var(--line);
+}
+
+.acl-summary div:last-child {
+  border-right: 0;
+}
+
+.acl-summary dt,
+.acl-summary dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.acl-summary dt {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.acl-summary dd {
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
 }
 
 .acl-state {

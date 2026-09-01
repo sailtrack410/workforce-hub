@@ -46,6 +46,15 @@ const columns: TableColumn[] = [
 ];
 
 const statusCards = computed(() => summary.value?.statusCounts ?? []);
+const sentCount = computed(() => statusCards.value.find((item) => item.status === 'SENT')?.count ?? 0);
+const failedCount = computed(() => statusCards.value.find((item) => item.status === 'FAILED')?.count ?? 0);
+const deadCount = computed(() => statusCards.value.find((item) => item.status === 'DEAD')?.count ?? 0);
+const deliveryRiskCount = computed(() => failedCount.value + deadCount.value + Number(summary.value?.staleSendingCount ?? 0));
+const sentShare = computed(() => {
+  const total = Number(summary.value?.totalCount ?? 0);
+  return total ? `${Math.round((sentCount.value / total) * 1000) / 10}%` : '-';
+});
+const deliveryHealthLabel = computed(() => deliveryRiskCount.value ? '投递受阻' : '链路稳定');
 const retryableRows = computed(() => events.value.list.filter((item) => ['FAILED', 'DEAD'].includes(item.status)));
 const allRetryableSelected = computed(() => retryableRows.value.length > 0 && retryableRows.value.every((row) => selectedIds.value.some((id) => String(id) === String(row.eventId))));
 const confirmTitle = computed(() => operation.value === 'dispatch' ? '派发到期事件' : operation.value === 'batch' ? '批量重试事件' : '重试投递事件');
@@ -173,13 +182,28 @@ function prettyJson(value?: string | null) {
         <button class="secondary-button" :disabled="loading" @click="loadPage"><RefreshCcw :size="16" />刷新</button>
         <button class="primary-button" type="button" :disabled="operating" @click="requestDispatch"><Send :size="16" />派发到期事件</button>
       </template>
-      <div class="summary-grid">
-        <button v-for="card in statusCards" :key="card.status" type="button" :class="['summary-card', { active: filters.status === card.status }]" @click="filterByStatus(card.status)">
-          <span>{{ card.statusName || statusLabel(card.status) }}</span>
-          <strong>{{ card.count }}</strong>
-        </button>
-        <button type="button" class="summary-card" @click="filters.status = ''; search()"><span>到期可派发</span><strong>{{ summary?.dueDispatchCount ?? 0 }}</strong></button>
-        <div class="summary-card"><span>发送中停滞</span><strong>{{ summary?.staleSendingCount ?? 0 }}</strong></div>
+      <div class="delivery-command-grid">
+        <article :class="['delivery-health', { attention: deliveryRiskCount }]">
+          <span>当前投递健康</span>
+          <strong>{{ deliveryHealthLabel }}</strong>
+          <p>{{ deliveryRiskCount ? `${deliveryRiskCount} 条失败、终止或停滞事件待处置` : '未发现失败与停滞事件' }}</p>
+          <small>已发送占比 {{ sentShare }}</small>
+        </article>
+        <div class="delivery-queue-grid">
+          <button type="button" @click="requestDispatch"><span>到期可派发</span><strong>{{ summary?.dueDispatchCount ?? 0 }}</strong><small>立即进入派发确认</small></button>
+          <button :class="{ attention: failedCount }" type="button" @click="filterByStatus('FAILED')"><span>投递失败</span><strong>{{ failedCount }}</strong><small>可选择后批量重试</small></button>
+          <button :class="{ attention: deadCount }" type="button" @click="filterByStatus('DEAD')"><span>已终止</span><strong>{{ deadCount }}</strong><small>需人工核对后重试</small></button>
+          <button :class="{ attention: summary?.staleSendingCount }" type="button" @click="filterByStatus('SENDING')"><span>发送中停滞</span><strong>{{ summary?.staleSendingCount ?? 0 }}</strong><small>检查锁定与超时事件</small></button>
+        </div>
+      </div>
+      <div class="status-breakdown">
+        <span>状态分布</span>
+        <div class="summary-grid">
+          <button v-for="card in statusCards" :key="card.status" type="button" :class="['summary-card', { active: filters.status === card.status }]" @click="filterByStatus(card.status)">
+            <span>{{ card.statusName || statusLabel(card.status) }}</span>
+            <strong>{{ card.count }}</strong>
+          </button>
+        </div>
       </div>
     </AdminPanel>
 
@@ -242,8 +266,23 @@ function prettyJson(value?: string | null) {
 </template>
 
 <style scoped>
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-md); }
-.summary-card { display: grid; gap: var(--space-sm); min-height: 88px; padding: var(--space-base); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel-strong); color: var(--ink); text-align: left; }
+.delivery-command-grid { display: grid; grid-template-columns: minmax(260px, 1.1fr) minmax(0, 2.2fr); gap: var(--space-md); }
+.delivery-health, .delivery-queue-grid button { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel-strong); color: var(--ink); letter-spacing: 0; text-align: left; }
+.delivery-health { display: grid; align-content: center; gap: var(--space-sm); min-height: 138px; padding: var(--space-lg); border-color: var(--success-border); background: var(--success-bg); }
+.delivery-health.attention, .delivery-queue-grid button.attention { border-color: var(--error-border); background: var(--error-bg); }
+.delivery-health > span, .delivery-queue-grid span, .delivery-queue-grid small { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+.delivery-health strong { color: var(--success); font-size: var(--text-xl); }
+.delivery-health.attention strong, .delivery-queue-grid button.attention strong { color: var(--red-dark); }
+.delivery-health p { margin: 0; color: var(--muted); font-size: var(--text-sm); line-height: 1.5; }
+.delivery-health small { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+.delivery-queue-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-md); }
+.delivery-queue-grid button { display: grid; align-content: center; gap: var(--space-sm); min-height: 138px; padding: var(--space-base); }
+.delivery-queue-grid button:hover { border-color: var(--green); background: var(--hover-bg); }
+.delivery-queue-grid strong { font-size: 25px; line-height: 1; font-variant-numeric: tabular-nums; }
+.status-breakdown { display: grid; gap: var(--space-sm); margin-top: var(--space-lg); padding-top: var(--space-base); border-top: 1px solid var(--line); }
+.status-breakdown > span { color: var(--muted); font-size: var(--text-xs); font-weight: 800; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-sm); }
+.summary-card { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); min-height: 50px; padding: var(--space-sm) var(--space-md); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel-strong); color: var(--ink); letter-spacing: 0; text-align: left; }
 .summary-card:hover, .summary-card.active { border-color: var(--green); background: var(--hover-bg); }
 .summary-card span { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
 .summary-card strong { font-size: var(--text-lg); }
@@ -266,5 +305,6 @@ function prettyJson(value?: string | null) {
 .operation-impact p { margin: 0; color: var(--muted); line-height: 1.5; }
 .operation-impact label { display: grid; gap: var(--space-xs); color: var(--muted); font-size: var(--text-sm); font-weight: 700; }
 .operation-impact > span { color: var(--muted); font-size: var(--text-sm); }
-@media (max-width: 700px) { .event-detail dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } .detail-head { align-items: stretch; flex-direction: column; } }
+@media (max-width: 1050px) { .delivery-command-grid { grid-template-columns: 1fr; } .delivery-queue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .delivery-queue-grid { grid-template-columns: 1fr; } .delivery-health, .delivery-queue-grid button { min-height: 104px; } .event-detail dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } .detail-head { align-items: stretch; flex-direction: column; } }
 </style>

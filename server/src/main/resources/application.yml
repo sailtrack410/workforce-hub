@@ -4,6 +4,11 @@ server:
     context-path: /
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 32MB
+      max-request-size: 33MB
+
   config:
     import:
       - optional:file:../.env[.properties]
@@ -90,8 +95,7 @@ mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-  # INSERT 自动补 created_by/updated_by 的 AuditFillInterceptor 以 @Component 注册，由 starter 自动挂载
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
 # ==================== Flowable ====================
 # Flowable BPMN 引擎表（ACT_* / FLW_*）已通过 Flyway V11 纳入主库迁移。
@@ -101,6 +105,10 @@ flowable:
   database-schema-update: ${FLOWABLE_DB_SCHEMA_UPDATE:false}
   async-executor-activate: true
   history-level: audit
+  idm:
+    enabled: false
+  eventregistry:
+    enabled: false
 
 # ==================== Workforce Hub 业务配置 ====================
 workforce:
@@ -110,6 +118,8 @@ workforce:
   file:
     storage-provider: ${FILE_STORAGE_PROVIDER:LOCAL}
   plugin:
+    config:
+      encryption-key-base64: ${WORKFORCE_PLUGIN_CONFIG_ENCRYPTION_KEY_BASE64:}
     gateway:
       csrf:
         allowed-origins: ${WORKFORCE_PLUGIN_GATEWAY_CSRF_ALLOWED_ORIGINS:http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}

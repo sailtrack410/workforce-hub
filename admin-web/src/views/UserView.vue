@@ -15,6 +15,7 @@ import AdminPagination from '@/components/AdminPagination.vue';
 import OrgMindTree from '@/components/OrgMindTree.vue';
 import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
 import AdminDialog from '@/components/AdminDialog.vue';
+import AdminMetricStrip from '@/components/AdminMetricStrip.vue';
 import { maxLength, mobileFormat, requiredText } from '@/utils/validation';
 
 const store = useUserViewStore();
@@ -64,6 +65,7 @@ interface OrgLink {
 
 const columns: TableColumn[] = [
   { key: 'realName', label: '姓名' },
+  { key: 'employeeNo', label: '员工编号' },
   { key: 'primaryDeptName', label: '部门' },
   { key: 'positionName', label: '岗位' },
   { key: 'employmentStatus', label: '状态' },
@@ -120,6 +122,12 @@ const usersByDept = computed(() => {
 });
 
 const unassignedUsers = computed(() => usersByDept.value.get('') ?? []);
+const peopleMetrics = computed(() => [
+  { label: '组织人数', value: orgUsers.value.length },
+  { label: '在职员工', value: orgUsers.value.filter((item) => item.employmentStatus === 'ACTIVE').length },
+  { label: '试用员工', value: orgUsers.value.filter((item) => item.employmentStatus === 'PROBATION').length },
+  { label: '未分配部门', value: unassignedUsers.value.length },
+]);
 const expandedDeptIds = ref<string[]>([]);
 
 const orgVisibleEdges = computed(() => {
@@ -398,8 +406,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="page-grid">
-    <AdminPanel :span="12" title="组织架构">
+  <div class="page-grid user-page">
+    <AdminPanel :span="12" title="人员主数据态势" subtitle="组织归属、在职状态与岗位信息共同构成人事协同基线">
+      <AdminMetricStrip :cards="peopleMetrics" />
+    </AdminPanel>
+
+    <AdminPanel :span="12" title="组织拓扑" subtitle="拖动画布查看完整组织，点击员工进入详情；未分配人员单独列示">
       <template #actions>
         <button class="icon-button" title="新建部门" @click="startCreateDepartment(null)"><Plus :size="16" /></button>
         <button class="icon-button" title="重置视图" @click="resetOrgPan"><Crosshair :size="16" /></button>
@@ -423,17 +435,22 @@ onBeforeUnmount(() => {
       </div>
 
       <AdminSkeleton v-if="orgLoading" :lines="5" />
-      <div
-        v-else
-        ref="orgViewportRef"
-        class="org-chart"
-        @pointerdown="startOrgPan"
-        @pointermove="moveOrgPan"
-        @pointerup="endOrgPan"
-        @pointercancel="endOrgPan"
-        @click.capture="preventOrgClickAfterPan"
-        @scroll="scheduleOrgLinks"
-      >
+      <template v-else>
+        <div class="org-health" aria-label="组织拓扑摘要">
+          <span><strong>{{ flatDepts.length }}</strong> 个部门</span>
+          <span><strong>{{ orgUsers.length }}</strong> 名员工</span>
+          <span :class="{ risk: unassignedUsers.length }"><strong>{{ unassignedUsers.length }}</strong> 人未归属</span>
+        </div>
+        <div
+          ref="orgViewportRef"
+          class="org-chart"
+          @pointerdown="startOrgPan"
+          @pointermove="moveOrgPan"
+          @pointerup="endOrgPan"
+          @pointercancel="endOrgPan"
+          @click.capture="preventOrgClickAfterPan"
+          @scroll="scheduleOrgLinks"
+        >
         <div ref="orgCanvasRef" class="org-canvas">
           <svg
             class="org-link-layer"
@@ -481,10 +498,11 @@ onBeforeUnmount(() => {
             <span>{{ statusLabel(user.employmentStatus ?? '') }}</span>
           </button>
         </div>
-      </div>
+        </div>
+      </template>
     </AdminPanel>
 
-    <AdminPanel :span="7" title="人员列表">
+    <AdminPanel :span="7" :title="`人员目录 (${store.pagination.total})`" subtitle="按姓名、部门与在职状态定位员工，选择记录查看完整资料">
       <template #actions>
         <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
       </template>
@@ -502,32 +520,6 @@ onBeforeUnmount(() => {
         </select>
       </AdminFilterBar>
 
-      <details class="create-section">
-        <summary class="create-summary">新建员工</summary>
-        <div class="stack-form create-form">
-          <label>员工编号 <input v-model="createForm.employeeNo" :aria-invalid="userCreateTouched.employeeNo && Boolean(userCreateErrors.employeeNo)" maxlength="64" placeholder="可选" @blur="userCreateTouched.employeeNo = true" /><small v-if="userCreateTouched.employeeNo && userCreateErrors.employeeNo" class="field-error">{{ userCreateErrors.employeeNo }}</small></label>
-          <label>姓名 <input v-model="createForm.realName" :aria-invalid="userCreateTouched.realName && Boolean(userCreateErrors.realName)" maxlength="64" @blur="userCreateTouched.realName = true" /><small v-if="userCreateTouched.realName && userCreateErrors.realName" class="field-error">{{ userCreateErrors.realName }}</small></label>
-          <label>手机 <input v-model="createForm.mobile" :aria-invalid="userCreateTouched.mobile && Boolean(userCreateErrors.mobile)" maxlength="32" inputmode="tel" placeholder="可选" @blur="userCreateTouched.mobile = true" /><small v-if="userCreateTouched.mobile && userCreateErrors.mobile" class="field-error">{{ userCreateErrors.mobile }}</small></label>
-          <label>部门
-            <select v-model="createForm.primaryDeptId" :aria-invalid="userCreateTouched.primaryDeptId && Boolean(userCreateErrors.primaryDeptId)" @blur="userCreateTouched.primaryDeptId = true">
-              <option :value="undefined">请选择</option>
-              <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ f.node.deptName }}</option>
-            </select>
-            <small v-if="userCreateTouched.primaryDeptId && userCreateErrors.primaryDeptId" class="field-error">{{ userCreateErrors.primaryDeptId }}</small>
-          </label>
-          <label>岗位
-            <select v-model="createForm.positionId" :aria-invalid="userCreateTouched.positionId && Boolean(userCreateErrors.positionId)" @blur="userCreateTouched.positionId = true">
-              <option :value="undefined">请选择</option>
-              <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.positionName }}</option>
-            </select>
-            <small v-if="userCreateTouched.positionId && userCreateErrors.positionId" class="field-error">{{ userCreateErrors.positionId }}</small>
-          </label>
-          <button class="primary-button" :disabled="creating || userCreateInvalid" @click="handleCreate">
-            <Plus :size="16" /> 创建
-          </button>
-        </div>
-      </details>
-
       <AdminTable
         interactive
         :columns="columns"
@@ -537,7 +529,10 @@ onBeforeUnmount(() => {
         row-key="userId"
         @row-click="onRowClick"
       >
-        <template #cell-employmentStatus="{ row }">{{ statusLabel(row.employmentStatus ?? '') }}</template>
+        <template #cell-realName="{ row }"><strong>{{ row.realName }}</strong><span>{{ row.positionName || '未分配岗位' }}</span></template>
+        <template #cell-employeeNo="{ row }">{{ row.employeeNo || '-' }}</template>
+        <template #cell-primaryDeptName="{ row }"><span :class="{ 'risk-text': !row.primaryDeptName }">{{ row.primaryDeptName || '未分配部门' }}</span></template>
+        <template #cell-employmentStatus="{ row }"><span class="status-pill" :class="{ 'risk-status': row.employmentStatus !== 'ACTIVE' }">{{ statusLabel(row.employmentStatus ?? '') }}</span></template>
       </AdminTable>
       <AdminPagination
         :page-no="store.pagination.pageNo"
@@ -546,6 +541,35 @@ onBeforeUnmount(() => {
         @update:page-no="(v) => { store.pagination.pageNo = v; loadList(); }"
         @update:page-size="(v) => { store.pagination.pageSize = v; store.pagination.pageNo = 1; loadList(); }"
       />
+    </AdminPanel>
+
+    <AdminPanel :span="5" title="新增员工" subtitle="先完成组织和岗位归属，再创建人员主数据">
+      <div class="stack-form create-form">
+        <label>员工编号 <input v-model="createForm.employeeNo" :aria-invalid="userCreateTouched.employeeNo && Boolean(userCreateErrors.employeeNo)" maxlength="64" placeholder="可选" @blur="userCreateTouched.employeeNo = true" /><small v-if="userCreateTouched.employeeNo && userCreateErrors.employeeNo" class="field-error">{{ userCreateErrors.employeeNo }}</small></label>
+        <label>姓名 <input v-model="createForm.realName" :aria-invalid="userCreateTouched.realName && Boolean(userCreateErrors.realName)" maxlength="64" @blur="userCreateTouched.realName = true" /><small v-if="userCreateTouched.realName && userCreateErrors.realName" class="field-error">{{ userCreateErrors.realName }}</small></label>
+        <label>手机 <input v-model="createForm.mobile" :aria-invalid="userCreateTouched.mobile && Boolean(userCreateErrors.mobile)" maxlength="32" inputmode="tel" placeholder="可选" @blur="userCreateTouched.mobile = true" /><small v-if="userCreateTouched.mobile && userCreateErrors.mobile" class="field-error">{{ userCreateErrors.mobile }}</small></label>
+        <label>部门
+          <select v-model="createForm.primaryDeptId" :aria-invalid="userCreateTouched.primaryDeptId && Boolean(userCreateErrors.primaryDeptId)" @blur="userCreateTouched.primaryDeptId = true">
+            <option :value="undefined">请选择</option>
+            <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ f.node.deptName }}</option>
+          </select>
+          <small v-if="userCreateTouched.primaryDeptId && userCreateErrors.primaryDeptId" class="field-error">{{ userCreateErrors.primaryDeptId }}</small>
+        </label>
+        <label>岗位
+          <select v-model="createForm.positionId" :aria-invalid="userCreateTouched.positionId && Boolean(userCreateErrors.positionId)" @blur="userCreateTouched.positionId = true">
+            <option :value="undefined">请选择</option>
+            <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.positionName }}</option>
+          </select>
+          <small v-if="userCreateTouched.positionId && userCreateErrors.positionId" class="field-error">{{ userCreateErrors.positionId }}</small>
+        </label>
+        <div class="create-impact">
+          <span>创建后状态</span>
+          <strong>在职 · 账号启用</strong>
+        </div>
+        <button class="primary-button" :disabled="creating || userCreateInvalid" @click="handleCreate">
+          <Plus :size="16" /> 创建员工
+        </button>
+      </div>
     </AdminPanel>
 
     <AdminDialog v-model:visible="detailDialogOpen" title="员工详情" labelled-by="user-detail-title" width="min(560px, 92vw)" @close="closeUserDetail">
@@ -567,20 +591,21 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.create-section {
-  margin-bottom: var(--space-md);
+.user-page { letter-spacing: 0; }
+
+.create-impact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-left: 3px solid var(--green);
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: var(--text-xs);
 }
 
-.create-summary {
-  cursor: pointer;
-  color: var(--green);
-  font-weight: 700;
-  font-size: 13px;
-}
-
-.create-form {
-  margin-top: var(--space-sm);
-}
+.create-impact strong { color: var(--ink); }
 
 .department-form {
   margin-bottom: var(--space-md);
@@ -593,6 +618,29 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: var(--space-sm);
 }
+
+.org-health {
+  display: flex;
+  gap: var(--space-base);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.org-health span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  padding-right: var(--space-base);
+  border-right: 1px solid var(--line);
+}
+
+.org-health strong { color: var(--ink); font-size: var(--text-base); }
+.org-health .risk,
+.org-health .risk strong,
+.risk-status,
+.risk-text { color: var(--red-dark) !important; }
 
 .org-chart {
   height: min(68vh, 720px);
@@ -672,7 +720,7 @@ onBeforeUnmount(() => {
   color: var(--ink);
   padding: var(--space-sm) var(--space-md);
   text-align: left;
-  transition: all 200ms ease;
+  transition: border-color 200ms ease, background-color 200ms ease;
 }
 
 .org-user:hover,
@@ -688,6 +736,12 @@ onBeforeUnmount(() => {
   color: var(--muted);
   font-size: var(--text-sm);
   font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .org-health { display: grid; gap: var(--space-sm); }
+  .org-health span { border-right: 0; }
+  .create-impact { align-items: flex-start; flex-direction: column; }
 }
 
 </style>

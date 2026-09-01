@@ -31,6 +31,7 @@ provide(toastKey, api);
 </script>
 
 <template>
+  <slot />
   <Teleport to="body">
     <div class="toast-container" aria-live="polite">
       <div

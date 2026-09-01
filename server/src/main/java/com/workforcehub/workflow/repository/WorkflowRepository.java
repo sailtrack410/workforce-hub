@@ -350,7 +350,7 @@ public class WorkflowRepository {
         );
     }
 
-    public WorkflowRequestRow getRequestByTaskIdOrThrow(String taskId) {
+    public WorkflowRequestRow getRequestByTaskIdForUpdateOrThrow(String taskId) {
         List<WorkflowRequestRow> rows = jdbcTemplate.query("""
             SELECT wr.id, wr.request_no, wr.biz_type, wr.status, wr.title, wr.applicant_user_id,
                    wr.flowable_process_instance_id, wr.agent_pre_review_task_id
@@ -359,6 +359,7 @@ public class WorkflowRepository {
             WHERE art.ID_ = ?
               AND wr.is_deleted = 0
             LIMIT 1
+            FOR UPDATE
             """,
             this::mapRequest,
             taskId

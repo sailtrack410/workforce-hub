@@ -542,6 +542,57 @@ export interface AdminAuditLogResponse {
   occurredAt?: string | null;
 }
 
+/* =========================================================
+   Plugin Management
+   ========================================================= */
+
+export interface AdminPluginDependencyResponse {
+  pluginId: string;
+  minVersion?: string | null;
+  maxVersion?: string | null;
+}
+
+export interface AdminPluginResponse {
+  id: string;
+  name: string;
+  description?: string | null;
+  version: string;
+  sdkVersion: string;
+  minHostVersion: string;
+  maxHostVersion: string;
+  javaVersion: string;
+  type: string;
+  status: string;
+  frontendEntry?: string | null;
+  provider?: string | null;
+  dependencies: AdminPluginDependencyResponse[];
+  installedAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface PluginConfigResponse {
+  key: string;
+  valueType: string;
+  value?: string | null;
+  defaultValue?: string | null;
+  description?: string | null;
+  requiresRestart: boolean;
+  secret: boolean;
+  hasValue: boolean;
+  deleted: boolean;
+  version: string | number;
+  updatedAt?: string | null;
+}
+
+export interface PluginConfigSaveRequest {
+  expectedVersion: string | number;
+  valueType: string;
+  value?: string | null;
+  defaultValue?: string | null;
+  description?: string | null;
+  requiresRestart: boolean;
+}
+
 export interface AttendanceCalendarResponse {
   calendarId: EntityId;
   calendarCode: string;

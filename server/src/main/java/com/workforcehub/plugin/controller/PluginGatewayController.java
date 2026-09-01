@@ -5,9 +5,12 @@ import com.workforcehub.common.response.R;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
+import com.workforcehub.plugin.runtime.PluginActionIdempotencyService;
 import com.workforcehub.plugin.runtime.PluginManagerService;
 import com.workforcehub.plugin.runtime.PluginParamValidator;
 import com.workforcehub.plugin.runtime.PluginPermissionService;
+import com.workforcehub.plugin.sdk.ActionDescriptor;
+import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.InvocationContext;
 import com.workforcehub.plugin.sdk.InvocationContextBinder;
 import com.workforcehub.plugin.sdk.PluginActionHandler;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -34,6 +38,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 插件动作调用网关。
@@ -45,12 +50,15 @@ import java.util.Set;
 public class PluginGatewayController {
 
     private static final Logger log = LoggerFactory.getLogger(PluginGatewayController.class);
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+    private static final Pattern IDEMPOTENCY_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._:-]{1,128}");
 
     private final PluginManagerService pluginManagerService;
     private final InvocationContextBinder contextBinder;
     private final PluginPermissionService permissionService;
     private final PluginParamValidator paramValidator;
     private final PluginLifecycleGuard lifecycleGuard;
+    private final PluginActionIdempotencyService idempotencyService;
     private final Set<String> allowedOrigins;
 
     public PluginGatewayController(
@@ -59,12 +67,14 @@ public class PluginGatewayController {
             PluginPermissionService permissionService,
             PluginParamValidator paramValidator,
             PluginLifecycleGuard lifecycleGuard,
+            PluginActionIdempotencyService idempotencyService,
             @Value("${workforce.plugin.gateway.csrf.allowed-origins}") String allowedOrigins) {
         this.pluginManagerService = pluginManagerService;
         this.contextBinder = contextBinder;
         this.permissionService = permissionService;
         this.paramValidator = paramValidator;
         this.lifecycleGuard = lifecycleGuard;
+        this.idempotencyService = idempotencyService;
         this.allowedOrigins = parseAllowedOrigins(allowedOrigins);
     }
 
@@ -88,6 +98,18 @@ public class PluginGatewayController {
             params = Map.of();
         }
 
+        // 4. 绑定调用上下文
+        InvocationContext ctx;
+        try {
+            ctx = contextBinder.bindFromRequest(request, pluginId);
+            // 5. 权限校验（三重：插件能力 + 动作授权 + 调用者权限）
+            permissionService.checkPermission(ctx, pluginId, actionCode);
+        } catch (PluginPermissionService.PermissionDeniedException | AccessDeniedException e) {
+            log.debug("权限校验失败: pluginId={}, actionCode={}, reason={}", pluginId, actionCode, e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(R.fail(BusinessErrorCode.FORBIDDEN.code(), "权限不足"));
+        }
+
         // 1. 检查插件是否存在（不抛异常）
         PluginRow plugin;
         try {
@@ -108,27 +130,42 @@ public class PluginGatewayController {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(R.fail(BusinessErrorCode.CONFLICT.code(), "插件正在停用"));
         }
+        Thread requestThread = Thread.currentThread();
+        ClassLoader originalContextClassLoader = requestThread.getContextClassLoader();
+        boolean originallyInterrupted = requestThread.isInterrupted();
         try {
-            return doExecute(pluginId, actionCode, params, request);
+            return doExecute(pluginId, actionCode, params, request, ctx);
+        } catch (Throwable e) {
+            rethrowIfFatal(e);
+            log.error(
+                "插件动作网关失败: pluginId={}, actionCode={}, errorType={}",
+                pluginId,
+                actionCode,
+                e.getClass().getName()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(R.fail(BusinessErrorCode.INTERNAL_ERROR.code(), "动作执行失败"));
         } finally {
-            lifecycleGuard.release(pluginId);
+            try {
+                useHostThreadState(requestThread);
+                lifecycleGuard.release(pluginId);
+            } finally {
+                requestThread.setContextClassLoader(originalContextClassLoader);
+                if (originallyInterrupted) {
+                    requestThread.interrupt();
+                } else {
+                    Thread.interrupted();
+                }
+            }
         }
     }
 
     private ResponseEntity<R<Object>> doExecute(
-            String pluginId, String actionCode, Map<String, Object> params, HttpServletRequest request) {
-
-        // 4. 绑定调用上下文
-        InvocationContext ctx;
-        try {
-            ctx = contextBinder.bindFromRequest(request, pluginId);
-            // 5. 权限校验（三重：插件能力 + 动作授权 + 调用者权限）
-            permissionService.checkPermission(ctx, pluginId, actionCode);
-        } catch (PluginPermissionService.PermissionDeniedException | AccessDeniedException e) {
-            log.debug("权限校验失败: pluginId={}, actionCode={}, reason={}", pluginId, actionCode, e.getMessage());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(R.fail(BusinessErrorCode.FORBIDDEN.code(), "权限不足"));
-        }
+            String pluginId,
+            String actionCode,
+            Map<String, Object> params,
+            HttpServletRequest request,
+            InvocationContext ctx) {
 
         // 3. 发现动作处理器
         Optional<PluginActionHandler> handlerOpt;
@@ -137,6 +174,8 @@ public class PluginGatewayController {
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(R.fail(BusinessErrorCode.NOT_FOUND.code(), "插件不存在"));
+        } finally {
+            useHostThreadState(Thread.currentThread());
         }
         if (handlerOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -146,22 +185,63 @@ public class PluginGatewayController {
         PluginActionHandler handler = handlerOpt.get();
 
         // 6. 参数校验（根据 inputSchema）
-        List<String> paramErrors = paramValidator.validate(handler.getDescriptor(), params);
+        ActionDescriptor descriptor;
+        try {
+            descriptor = handler.getDescriptor();
+        } finally {
+            useHostThreadState(Thread.currentThread());
+        }
+        List<String> paramErrors = paramValidator.validate(descriptor, params);
         if (!paramErrors.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(R.fail(BusinessErrorCode.BAD_REQUEST.code(), String.join("; ", paramErrors)));
         }
 
+        if (!descriptor.idempotent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(R.fail(ErrorCodes.STATE_CONFLICT, "动作未声明为幂等，禁止 HTTP 调用"));
+        }
+        if (actionCode.length() > 128) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(R.fail(ErrorCodes.INVALID_PARAM, "动作编码不能超过 128 个字符"));
+        }
+
+        List<String> idempotencyKeys = Collections.list(request.getHeaders(IDEMPOTENCY_KEY_HEADER));
+        if (idempotencyKeys.size() != 1
+                || !IDEMPOTENCY_KEY_PATTERN.matcher(idempotencyKeys.get(0)).matches()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(R.fail(ErrorCodes.INVALID_PARAM, "Idempotency-Key 必须是 1-128 位安全 ASCII"));
+        }
+
         // 7. 执行动作
         try {
-            ServiceResult<Object> result = handler.execute(ctx, params);
+            ServiceResult<Object> result = idempotencyService.execute(
+                pluginId,
+                actionCode,
+                idempotencyKeys.get(0),
+                ctx,
+                params,
+                handler
+            );
             if (result.getCode() != 0) {
                 // 插件动作的业务失败：保留插件自身错误码，仅换成统一响应包装
                 return ResponseEntity.ok(R.fail(result.getCode(), result.getMessage()));
             }
             return ResponseEntity.ok(R.ok(result.getData()));
+        } catch (PluginActionIdempotencyService.ActionInProgressException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .header(HttpHeaders.RETRY_AFTER, "1")
+                .body(R.fail(ErrorCodes.STATE_CONFLICT, "相同请求正在处理"));
+        } catch (PluginActionIdempotencyService.IdempotencyConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(R.fail(ErrorCodes.DUPLICATE_OPERATION, "幂等键已用于不同请求"));
         } catch (Exception e) {
-            log.error("插件动作执行失败: pluginId={}, actionCode={}", pluginId, actionCode, e);
+            log.error(
+                "插件动作执行失败: pluginId={}, actionCode={}, errorType={}",
+                pluginId,
+                actionCode,
+                e.getClass().getName()
+            );
             // 不泄露内部信息
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(R.fail(BusinessErrorCode.INTERNAL_ERROR.code(), "动作执行失败"));
@@ -179,7 +259,7 @@ public class PluginGatewayController {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<R<Object>> handleException(Exception e) {
-        log.error("网关异常", e);
+        log.error("网关异常: errorType={}", e.getClass().getName());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(R.fail(BusinessErrorCode.INTERNAL_ERROR.code(), "服务内部错误"));
     }
@@ -212,6 +292,20 @@ public class PluginGatewayController {
                 parsed.add(normalized);
             });
         return Set.copyOf(parsed);
+    }
+
+    private static void useHostThreadState(Thread thread) {
+        thread.setContextClassLoader(PluginGatewayController.class.getClassLoader());
+        Thread.interrupted();
+    }
+
+    private static void rethrowIfFatal(Throwable throwable) {
+        if (throwable instanceof VirtualMachineError error) {
+            throw error;
+        }
+        if (throwable instanceof ThreadDeath threadDeath) {
+            throw threadDeath;
+        }
     }
 
     private String normalizeOrigin(String value, boolean allowPath) {

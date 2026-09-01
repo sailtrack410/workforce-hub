@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -65,6 +66,47 @@ class HostServiceRegistryTest {
             InvocationContext.CallerType.USER, "req-1");
 
         assertEquals("delegated", proxy.doSomething(ctx));
+    }
+
+    @Test
+    void shouldUseHostThreadStateAndRestoreCallerState() {
+        Thread callerThread = Thread.currentThread();
+        ClassLoader original = callerThread.getContextClassLoader();
+        ClassLoader pluginClassLoader = new ClassLoader(original) { };
+        AtomicReference<ClassLoader> permissionClassLoader = new AtomicReference<>();
+        AtomicReference<Boolean> permissionInterrupted = new AtomicReference<>();
+        AtomicReference<ClassLoader> delegateClassLoader = new AtomicReference<>();
+        AtomicReference<Boolean> delegateInterrupted = new AtomicReference<>();
+        doAnswer(invocation -> {
+            permissionClassLoader.set(callerThread.getContextClassLoader());
+            permissionInterrupted.set(callerThread.isInterrupted());
+            return null;
+        }).when(permissionService).checkPluginCapability("p1", "FAKE_CAP");
+        FakeService impl = context -> {
+            delegateClassLoader.set(callerThread.getContextClassLoader());
+            delegateInterrupted.set(callerThread.isInterrupted());
+            return "delegated";
+        };
+        HostServiceRegistry registry = new HostServiceRegistry(List.of(impl), permissionService);
+        FakeService proxy = registry.getRequired(FakeService.class, "p1");
+        InvocationContext ctx = binder.forHttpRequest("p1", 1L,
+            InvocationContext.CallerType.USER, "req-1");
+
+        callerThread.setContextClassLoader(pluginClassLoader);
+        callerThread.interrupt();
+        try {
+            assertEquals("delegated", proxy.doSomething(ctx));
+
+            assertSame(HostServiceRegistry.class.getClassLoader(), permissionClassLoader.get());
+            assertEquals(Boolean.FALSE, permissionInterrupted.get());
+            assertSame(HostServiceRegistry.class.getClassLoader(), delegateClassLoader.get());
+            assertEquals(Boolean.FALSE, delegateInterrupted.get());
+            assertSame(pluginClassLoader, callerThread.getContextClassLoader());
+            assertTrue(callerThread.isInterrupted());
+        } finally {
+            callerThread.setContextClassLoader(original);
+            Thread.interrupted();
+        }
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.workforcehub.plugin;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginLifecycleGuard;
@@ -29,7 +31,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.reset;
@@ -68,6 +72,9 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
     private PluginLifecycleGuard lifecycleGuard;
 
     @MockBean
@@ -77,6 +84,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
 
     @BeforeEach
     void setUpPluginFixture() {
+        jdbcTemplate.update("DELETE FROM sys_plugin_action_idempotency WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_action_permission WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_capability WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_visibility WHERE plugin_id = ?", PLUGIN_ID);
@@ -120,6 +128,7 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
     @AfterEach
     void tearDownPluginFixture() {
         lifecycleGuard.remove(PLUGIN_ID);
+        jdbcTemplate.update("DELETE FROM sys_plugin_action_idempotency WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_visibility WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_action_permission WHERE plugin_id = ?", PLUGIN_ID);
         jdbcTemplate.update("DELETE FROM sys_plugin_capability WHERE plugin_id = ?", PLUGIN_ID);
@@ -164,6 +173,24 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.data.executed").value(true));
 
         verify(handler).execute(any(InvocationContext.class), anyMap());
+        assertEquals(1, pluginActionAuditCount());
+        Map<String, Object> audit = jdbcTemplate.queryForMap("""
+            SELECT operator_type, operator_id, result, target_type, target_id,
+                   CAST(detail_json AS CHAR) AS detail_json
+            FROM sys_audit_log
+            WHERE action_type = 'PLUGIN_ACTION_EXECUTED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, PLUGIN_ID);
+        assertEquals("ADMIN", audit.get("operator_type"));
+        assertEquals(8001L, ((Number) audit.get("operator_id")).longValue());
+        assertEquals("SUCCESS", audit.get("result"));
+        assertEquals("PLUGIN_ACTION", audit.get("target_type"));
+        assertEquals(null, audit.get("target_id"));
+        JsonNode detail = objectMapper.readTree((String) audit.get("detail_json"));
+        assertEquals(
+            Set.of("pluginId", "actionCode", "triggerSource", "serviceCode", "retryable"),
+            objectMapper.convertValue(detail, Map.class).keySet()
+        );
     }
 
     @Test
@@ -180,7 +207,9 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value(100403));
 
+        verify(pluginManagerService, never()).getPlugin(PLUGIN_ID);
         verify(handler, never()).execute(any(), anyMap());
+        assertEquals(0, pluginActionAuditCount());
     }
 
     @Test
@@ -202,6 +231,58 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.code").value(100403));
 
         verify(handler, times(1)).execute(any(), anyMap());
+        assertEquals(1, pluginActionAuditCount());
+    }
+
+    @Test
+    void duplicateSameRequestShouldReplayWithoutExecutingAgain() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        invokeGateway(adminSession)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.executed").value(true));
+        invokeGateway(adminSession)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.executed").value(true));
+
+        verify(handler, times(1)).execute(any(), anyMap());
+        assertEquals(1, pluginActionAuditCount());
+    }
+
+    @Test
+    void sameKeyWithDifferentParamsShouldConflict() throws Exception {
+        when(handler.getDescriptor()).thenReturn(new ActionDescriptor(
+            ACTION_CODE,
+            "权限矩阵动作",
+            "权限矩阵集成测试动作",
+            Map.of("value", com.workforcehub.plugin.sdk.ParamSchema.string("值", false)),
+            Map.of(),
+            DB_CAPABILITY,
+            java.time.Duration.ofSeconds(5),
+            true
+        ));
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(gatewayRequest(adminSession, "same-key", "{\"value\":\"a\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(gatewayRequest(adminSession, "same-key", "{\"value\":\"b\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(3001));
+
+        verify(handler, times(1)).execute(any(), anyMap());
+        assertEquals(1, pluginActionAuditCount());
+    }
+
+    @Test
+    void idempotencyKeyShouldBeCaseSensitive() throws Exception {
+        Cookie adminSession = loginAdmin();
+
+        mockMvc.perform(gatewayRequest(adminSession, "Case-Key", "{}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(gatewayRequest(adminSession, "case-key", "{}"))
+            .andExpect(status().isOk());
+
+        verify(handler, times(2)).execute(any(), anyMap());
     }
 
     @Test
@@ -298,11 +379,16 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
     }
 
     private MockHttpServletRequestBuilder gatewayRequest(Cookie session) {
+        return gatewayRequest(session, "permission-matrix-key", "{}");
+    }
+
+    private MockHttpServletRequestBuilder gatewayRequest(Cookie session, String idempotencyKey, String content) {
         return post("/api/plugin-gateway/" + PLUGIN_ID + "/actions/" + ACTION_CODE)
             .cookie(session)
             .header(HttpHeaders.ORIGIN, TRUSTED_ORIGIN)
+            .header("Idempotency-Key", idempotencyKey)
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{}");
+            .content(content);
     }
 
     private Cookie loginAdmin() throws Exception {
@@ -319,6 +405,16 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             .andExpect(jsonPath("$.code").value(0))
             .andReturn();
         return result.getResponse().getCookie("SESSION");
+    }
+
+    private int pluginActionAuditCount() {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM sys_audit_log
+            WHERE action_type = 'PLUGIN_ACTION_EXECUTED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.pluginId')) = ?
+            """, Integer.class, PLUGIN_ID);
+        return count == null ? 0 : count;
     }
 
     private Cookie loginEmployee() throws Exception {

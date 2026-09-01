@@ -1,6 +1,7 @@
 package com.workforcehub.plugin.runtime;
 
 import com.workforcehub.plugin.sdk.HostService;
+import com.workforcehub.plugin.sdk.PluginConfig;
 import com.workforcehub.plugin.sdk.PluginContext;
 
 /**
@@ -10,15 +11,25 @@ public final class DefaultPluginContext implements PluginContext {
 
     private final String pluginId;
     private final HostServiceRegistry serviceRegistry;
+    private final PluginConfig pluginConfig;
 
-    public DefaultPluginContext(String pluginId, HostServiceRegistry serviceRegistry) {
+    public DefaultPluginContext(
+            String pluginId,
+            HostServiceRegistry serviceRegistry,
+            PluginConfig pluginConfig) {
         this.pluginId = pluginId;
         this.serviceRegistry = serviceRegistry;
+        this.pluginConfig = pluginConfig;
     }
 
     @Override
     public String getPluginId() {
         return pluginId;
+    }
+
+    @Override
+    public PluginConfig getConfig() {
+        return pluginConfig;
     }
 
     @Override

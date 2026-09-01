@@ -110,6 +110,7 @@ function closeDialog() {
   place-items: center;
   padding: var(--space-xl);
   background: var(--dialog-overlay-bg);
+  backdrop-filter: blur(2px);
 }
 
 .admin-dialog {
@@ -119,7 +120,8 @@ function closeDialog() {
   border-radius: var(--radius-lg);
   background: var(--panel-strong);
   box-shadow: var(--shadow);
-  padding: var(--space-xl);
+  padding: var(--space-lg);
+  animation: admin-dialog-enter 160ms ease-out;
 }
 
 .admin-dialog-head {
@@ -127,11 +129,35 @@ function closeDialog() {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: var(--space-base);
+  margin: calc(var(--space-lg) * -1) calc(var(--space-lg) * -1) var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-subtle);
 }
 
 .admin-dialog-head h3 {
   margin: 0;
   font-size: var(--text-md);
+}
+
+.admin-dialog-head .icon-button {
+  width: 32px;
+  min-height: 32px;
+}
+
+@keyframes admin-dialog-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 640px) {
+  .admin-dialog-overlay {
+    align-items: end;
+    padding: var(--space-md);
+  }
+
+  .admin-dialog {
+    max-height: calc(100vh - var(--space-xl));
+  }
 }
 </style>

@@ -9,6 +9,8 @@ public interface OrgUserMapper {
 
     OrgUser selectById(@Param("id") Long id);
 
+    OrgUser selectByIdForUpdate(@Param("id") Long id);
+
     int insert(OrgUser user);
 
     int updateById(OrgUser user);

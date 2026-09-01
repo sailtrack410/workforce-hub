@@ -6,6 +6,7 @@ import com.workforcehub.plugin.repository.PluginOperationIdempotencyRow;
 import com.workforcehub.plugin.sdk.ErrorCodes;
 import com.workforcehub.plugin.sdk.EventTypes;
 import com.workforcehub.plugin.sdk.InvocationContext;
+import com.workforcehub.plugin.sdk.PluginActionHandler;
 import com.workforcehub.plugin.sdk.ServiceResult;
 import com.workforcehub.plugin.sdk.service.EventService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -43,21 +45,25 @@ public class DefaultEventService implements EventService {
     private final PluginEventSubscriptionRepository subscriptionRepository;
     private final PluginOperationIdempotencyRepository idempotencyRepository;
     private final PluginPermissionService permissionService;
+    private final PluginAuditService auditService;
 
     public DefaultEventService(
             ObjectProvider<PluginManagerService> pluginManagerProvider,
             PluginEventSubscriptionRepository subscriptionRepository,
             PluginOperationIdempotencyRepository idempotencyRepository,
-            PluginPermissionService permissionService) {
+            PluginPermissionService permissionService,
+            PluginAuditService auditService) {
         this.pluginManagerProvider = pluginManagerProvider;
         this.subscriptionRepository = subscriptionRepository;
         this.idempotencyRepository = idempotencyRepository;
         this.permissionService = permissionService;
+        this.auditService = auditService;
     }
 
     @Override
     @Transactional
     public ServiceResult<Void> subscribe(InvocationContext ctx, String eventType, String actionCode, String idempotencyKey) {
+        Thread hostThread = Thread.currentThread();
         ServiceResult<Void> base = validateBase(ctx, eventType, idempotencyKey);
         if (base != null) return base;
 
@@ -79,8 +85,23 @@ public class DefaultEventService implements EventService {
         if (pms == null) {
             throw new IllegalStateException("PluginManagerService 不可用");
         }
-        if (pms.findActionHandler(pluginId, actionCode).isEmpty()) {
+        Optional<PluginActionHandler> handler;
+        try {
+            handler = pms.findActionHandler(pluginId, actionCode);
+        } finally {
+            useHostThreadState(hostThread);
+        }
+        if (handler.isEmpty()) {
             return ServiceResult.fail(ErrorCodes.STATE_CONFLICT, "插件动作不存在: " + actionCode);
+        }
+        boolean idempotent;
+        try {
+            idempotent = handler.get().getDescriptor().idempotent();
+        } finally {
+            useHostThreadState(hostThread);
+        }
+        if (!idempotent) {
+            return ServiceResult.fail(ErrorCodes.STATE_CONFLICT, "事件处理动作必须声明为幂等");
         }
 
         String requestHash = computeHash(eventType, actionCode);
@@ -92,6 +113,7 @@ public class DefaultEventService implements EventService {
         }
 
         subscriptionRepository.save(pluginId, eventType, actionCode);
+        auditService.writeEventSubscription(ctx, eventType, actionCode, true);
         return ServiceResult.ok(null);
     }
 
@@ -112,6 +134,7 @@ public class DefaultEventService implements EventService {
         }
 
         subscriptionRepository.delete(pluginId, eventType);
+        auditService.writeEventSubscription(ctx, eventType, null, false);
         return ServiceResult.ok(null);
     }
 
@@ -153,6 +176,11 @@ public class DefaultEventService implements EventService {
             return ServiceResult.ok(null);
         }
         return ServiceResult.fail(ErrorCodes.DUPLICATE_OPERATION, "同幂等键已用于不同请求");
+    }
+
+    private static void useHostThreadState(Thread thread) {
+        thread.setContextClassLoader(DefaultEventService.class.getClassLoader());
+        Thread.interrupted();
     }
 
     /**
