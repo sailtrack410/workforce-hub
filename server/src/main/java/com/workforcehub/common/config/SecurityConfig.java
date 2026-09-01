@@ -118,6 +118,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/auth/login").permitAll()
                 // email/bind 等其余 auth 接口需要登录态
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/doc.html", "/webjars/**", "/favicon.ico").permitAll()
                 .requestMatchers("/actuator/health/**").permitAll()
                 .anyRequest().authenticated()
             )
