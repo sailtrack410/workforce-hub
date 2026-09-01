@@ -48,3 +48,12 @@ docs/.obsidian/
 server-8080.pid
 docs/毕业设计/
 .playwright-cli/
+
+# 证据截图仅本地保存（AGENTS.md 验收要求，不入库）
+/*.png
+employee-web/*.png
+admin-web/*.png
+
+# 临时审查产物与素材生成中转目录
+/output/
+/ui-assets/generated/
