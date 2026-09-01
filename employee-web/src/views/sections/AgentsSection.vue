@@ -8,6 +8,7 @@ import { agentTypeLabel, humanizeText, identityModeLabel, statusText } from '@/u
 import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
+import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 import AppTag from '../../components/ui/AppTag.vue';
 import avatarQa from '../../assets/brand/avatar-qa.jpg';
 import avatarEcho from '../../assets/brand/avatar-echo.jpg';
@@ -170,7 +171,7 @@ watch(agents, (rows) => {
       </dl>
     </section>
 
-    <p v-if="agentsLoading" class="form-hint">加载中…</p>
+    <AppSkeleton v-if="agentsLoading" variant="grid" :count="6" />
     <p v-else-if="agentsError" class="dialog-error">{{ agentsError }}</p>
     <AppEmptyState
       v-else-if="!filteredAgents.length"

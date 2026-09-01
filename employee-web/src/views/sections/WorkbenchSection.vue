@@ -51,6 +51,7 @@ import AppEmptyState from '../../components/ui/AppEmptyState.vue';
 import AppErrorState from '../../components/ui/AppErrorState.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppLoadingState from '../../components/ui/AppLoadingState.vue';
+import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 import AppTag from '../../components/ui/AppTag.vue';
 import WorkbenchToday from '../../components/WorkbenchToday.vue';
 import PluginWorkbenchHost from '../../components/plugins/PluginWorkbenchHost.vue';
@@ -894,7 +895,7 @@ watch(workflowRequests, () => {
         action-label="重试"
         @retry="refreshActiveWorkbench"
       />
-      <AppLoadingState v-else-if="workbenchLoading" />
+      <AppSkeleton v-else-if="workbenchLoading" variant="list" :count="4" />
       <template v-else>
         <section class="oa-workbench">
           <aside class="oa-status-rail" aria-label="申请状态">
@@ -927,7 +928,7 @@ watch(workflowRequests, () => {
               action-label="重试"
               @retry="loadWorkflowRequests"
             />
-            <AppLoadingState v-else-if="workflowRequestsLoading" />
+            <AppSkeleton v-else-if="workflowRequestsLoading" variant="list" :count="3" />
             <AppEmptyState v-else-if="!workflowRequests.length" title="暂无申请" description="发起你的第一个申请，审批进度会实时同步到这里。" icon="workbench" action-label="发起申请" @action="openProcessCatalog" />
             <AppEmptyState v-else-if="!filteredWorkflowRequests.length" :title="`暂无${activeWorkflowBucket.label}申请`" icon="workbench" />
             <div v-else class="oa-request-list">
@@ -1109,7 +1110,7 @@ watch(workflowRequests, () => {
               <span>{{ attendanceRiskSummary.map((row) => `${row[0]} ${row[1]}`).join(' · ') }}</span>
             </div>
           </div>
-          <AppLoadingState v-if="attendanceLoading" />
+          <AppSkeleton v-if="attendanceLoading" variant="text" :count="4" />
           <AppEmptyState v-else-if="!teamAttendanceRows.length" title="团队考勤正常" icon="workbench" />
           <div v-else class="attendance-action-list">
             <div v-for="item in teamAttendanceRows" :key="`team-${item.userId}-${item.workDate}`" class="attendance-action-row">
@@ -1124,7 +1125,7 @@ watch(workflowRequests, () => {
 
         <article class="detail-card attendance-history-card">
           <h3>月度记录</h3>
-          <AppLoadingState v-if="attendanceLoading" />
+          <AppSkeleton v-if="attendanceLoading" variant="text" :count="4" />
           <AppEmptyState v-else-if="!attendanceDailyResults.length" title="暂无月度记录" icon="workbench" />
           <div v-else class="compact-table">
             <div v-for="item in attendanceDailyResults" :key="item.dailyResultId">
@@ -1146,7 +1147,7 @@ watch(workflowRequests, () => {
           action-label="重试"
           @retry="refreshActiveWorkbench"
         />
-        <AppLoadingState v-else-if="workbenchLoading" />
+        <AppSkeleton v-else-if="workbenchLoading" variant="block" :count="2" block-height="7rem" />
         <template v-else>
           <article class="leave-balance-hero">
             <div class="leave-balance-primary">

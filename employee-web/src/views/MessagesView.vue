@@ -80,6 +80,7 @@ import AppErrorState from '../components/ui/AppErrorState.vue';
 import AppInput from '../components/ui/AppInput.vue';
 import AppListItem from '../components/ui/AppListItem.vue';
 import AppLoadingState from '../components/ui/AppLoadingState.vue';
+import AppSkeleton from '../components/ui/AppSkeleton.vue';
 import AppTag from '../components/ui/AppTag.vue';
 import ShellNavButton from '../components/shell/ShellNavButton.vue';
 import ProfileMenu from '../components/shell/ProfileMenu.vue';
@@ -1302,7 +1303,7 @@ provideEmployeeShellContexts(employeeShellContexts);
 
       <div class="list-body">
         <div v-if="currentListLoading" class="loading-wrap">
-          <AppLoadingState />
+          <AppSkeleton variant="list" :count="6" />
         </div>
 
         <AppErrorState

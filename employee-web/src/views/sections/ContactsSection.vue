@@ -28,6 +28,7 @@ import AppAvatar from '../../components/ui/AppAvatar.vue';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
+import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 import AppTag from '../../components/ui/AppTag.vue';
 import type { ContactCategoryItem, ContactTreeNode } from '../../components/contact-category';
 import { contactsTreeNodesForView } from '../../components/contact-category';
@@ -532,7 +533,7 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
       <template v-if="shell.contactsViewMode === 'list'">
         <!-- AI 助理列表 -->
         <template v-if="isAiCategory">
-          <p v-if="agentsLoading" class="form-hint">加载中…</p>
+          <AppSkeleton v-if="agentsLoading" variant="list" :count="3" />
           <AppEmptyState
             v-else-if="!agents.length"
             title="暂无 AI 助手"
@@ -565,7 +566,7 @@ watch(() => shell.contactsCategoryId, syncCategoryState, { immediate: true });
 
         <!-- 好友申请列表 -->
         <template v-else-if="currentCategory?.id === 'new-friends'">
-          <p v-if="friendRequestsLoading" class="form-hint">加载中…</p>
+          <AppSkeleton v-if="friendRequestsLoading" variant="list" :count="3" />
           <AppEmptyState
             v-else-if="!currentMembers.length"
             title="暂无好友申请"

@@ -40,6 +40,7 @@ import AppButton from '../../components/ui/AppButton.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppErrorState from '../../components/ui/AppErrorState.vue';
 import AppInput from '../../components/ui/AppInput.vue';
+import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 
 type FieldRows = Array<[string, string]>;
 type NotificationPreferenceField = 'notifSound' | 'notifDesktop' | 'notifMentionOnly' | 'notifUnreadBadge';
@@ -751,7 +752,7 @@ onBeforeUnmount(() => {
         <header class="settings-group-title">直属下级</header>
         <div class="settings-group-body settings-group-padded">
           <p v-if="colleaguesError" class="dialog-error">{{ colleaguesError }}</p>
-          <p v-else-if="colleaguesLoading" class="form-hint">加载中</p>
+          <AppSkeleton v-else-if="colleaguesLoading" variant="text" :count="3" />
           <div v-else-if="relationTree.subordinates.length" class="settings-member-list compact-member-list">
             <span v-for="user in relationTree.subordinates" :key="user.userId">
               {{ user.realName }}

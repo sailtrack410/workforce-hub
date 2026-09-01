@@ -36,7 +36,7 @@ import wordFileIcon from '@/assets/file-icons/word.png';
 import AppButton from '../../components/ui/AppButton.vue';
 import AppDialog from '../../components/ui/AppDialog.vue';
 import AppEmptyState from '../../components/ui/AppEmptyState.vue';
-import AppLoadingState from '../../components/ui/AppLoadingState.vue';
+import AppSkeleton from '../../components/ui/AppSkeleton.vue';
 
 const {
   im,
@@ -632,7 +632,11 @@ function onContextMenuEsc(event: KeyboardEvent) {
           </button>
         </div>
 
-        <AppLoadingState v-if="quickView === 'all' && browserLoading" />
+        <AppSkeleton
+          v-if="quickView === 'all' && browserLoading"
+          :variant="viewMode === 'grid' ? 'grid' : 'list'"
+          :count="viewMode === 'grid' ? 8 : 5"
+        />
         <p v-else-if="quickView === 'all' && browserError" class="dialog-error">{{ browserError }}</p>
         <AppEmptyState
           v-else-if="!visibleBrowserFolders.length && !visibleBrowserFiles.length"

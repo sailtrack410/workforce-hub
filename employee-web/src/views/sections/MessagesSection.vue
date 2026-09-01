@@ -307,9 +307,7 @@ async function sendMentionPrivateMessage() {
 
   <section v-if="hasActiveConversation" ref="messageStream" class="message-stream">
     <div v-if="im.messageLoading" class="stream-placeholder">
-      <AppSkeleton />
-      <AppSkeleton />
-      <AppSkeleton />
+      <AppSkeleton variant="chat" :count="5" />
     </div>
 
     <template v-else>
@@ -661,7 +659,7 @@ async function sendMentionPrivateMessage() {
             </AppButton>
           </div>
           <div v-if="groupFilesLoading" class="group-file-loading">
-            <AppSkeleton />
+            <AppSkeleton variant="text" :count="3" />
           </div>
           <p v-else-if="!groupFiles.length" class="group-file-empty">暂无文件</p>
           <div v-else class="file-list group-file-list">
