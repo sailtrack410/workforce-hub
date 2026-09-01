@@ -946,7 +946,7 @@ watch(workflowRequests, () => {
                   <AppTag :tone="toneOfStatus(request.status)">{{ request.statusName || statusText(request.status) }}</AppTag>
                 </div>
                 <div class="oa-request-row-meta">
-                  <span>{{ displayField(request.currentStepName) }}</span>
+                  <span>{{ humanizeText(displayField(request.currentStepName)) }}</span>
                   <span>{{ formatDateTime(request.submittedAt) }}</span>
                   <span v-if="request.finishedAt">{{ formatDateTime(request.finishedAt) }}</span>
                 </div>
@@ -959,7 +959,7 @@ watch(workflowRequests, () => {
             <header class="oa-detail-head">
               <div>
                 <h3>{{ activeWorkflowDetail?.title ?? '申请详情' }}</h3>
-                <span v-if="activeWorkflowDetail">{{ activeWorkflowDetail.bizTypeName || bizTypeLabel(activeWorkflowDetail.bizType) }} · {{ displayField(activeWorkflowDetail.currentStepName) }}</span>
+                <span v-if="activeWorkflowDetail">{{ activeWorkflowDetail.bizTypeName || bizTypeLabel(activeWorkflowDetail.bizType) }} · {{ humanizeText(displayField(activeWorkflowDetail.currentStepName)) }}</span>
               </div>
               <div class="request-panel-actions">
                 <AppTag v-if="activeWorkflowDetail" :tone="toneOfStatus(activeWorkflowDetail.status)">{{ activeWorkflowDetail.statusName || statusText(activeWorkflowDetail.status) }}</AppTag>

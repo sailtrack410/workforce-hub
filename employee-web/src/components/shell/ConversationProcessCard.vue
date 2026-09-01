@@ -6,7 +6,7 @@ import AppButton from '../ui/AppButton.vue';
 import { statusText } from '../../utils/employee-format';
 
 const emit = defineEmits<{
-  open: [];
+  open: [card: ProcessCard];
 }>();
 
 const props = defineProps<{
@@ -31,7 +31,7 @@ function toneOf(statusTone: ProcessCard['statusTone']) {
       <span v-if="props.message.time">{{ props.message.time }}</span>
     </div>
 
-    <button class="process-card" type="button" @click="emit('open')">
+    <button class="process-card" type="button" @click="emit('open', processCard)">
       <div class="card-main">
         <div class="header">
           <strong>{{ processCard.title }}</strong>

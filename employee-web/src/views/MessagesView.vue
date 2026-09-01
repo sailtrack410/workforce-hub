@@ -758,6 +758,12 @@ function openDetail(payload?: unknown) {
       return;
     }
   }
+  // 流程卡片“查看详情”：跳到工作台 OA 申请，而不是打开会话详情抽屉
+  if (payload && typeof payload === 'object' && 'statusTone' in payload && 'title' in payload) {
+    navigateSection('workbench', 'oa');
+    shell.selectItem('workbench', 'oa');
+    return;
+  }
   shell.setDetailOpen(true);
 }
 
