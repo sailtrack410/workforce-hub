@@ -3522,7 +3522,7 @@
   display: grid;
   grid-template-columns: minmax(14rem, 0.72fr) minmax(0, 1fr);
   gap: var(--space-16);
-  align-items: center;
+  align-items: stretch;
   min-width: 0;
   padding: var(--space-18);
   border: 1px solid var(--border-default);
@@ -3590,6 +3590,7 @@
 
 .leave-balance-side {
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--space-12);
   min-width: 0;
 }
@@ -3627,7 +3628,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
   gap: var(--space-16);
-  align-items: start;
+  align-items: stretch;
   min-width: 0;
 }
 
