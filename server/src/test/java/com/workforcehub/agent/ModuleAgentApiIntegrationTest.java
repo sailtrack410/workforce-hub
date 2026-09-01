@@ -422,6 +422,38 @@ class ModuleAgentApiIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("员工工具调用载荷不得查询非下属用户")
+    void employeeToolCallShouldRejectUnauthorizedTargetUser() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        long toolId = createTool(adminSession, "LEAVE_GET_BALANCES", "假期余额查询", "SPI", "READONLY", true);
+        long agentId = createAgent(adminSession, "TOOL_USER_AUTH_AGENT", "工具越权助手", "QA");
+        long versionId = createVersion(adminSession, agentId, 1);
+        bindTool(adminSession, versionId, toolId, "AUTO");
+        grantAcl(adminSession, agentId, "USER", EMPLOYEE_USER_ID, "use");
+        publishVersion(adminSession, versionId);
+
+        // 2004 不是 2003 的下属，工具层应拒绝
+        mockMvc.perform(post("/api/employee/agents/{agentId}/tasks", agentId)
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "triggerType": "MANUAL",
+                      "contextType": "USER_QUERY",
+                      "contextId": 2004,
+                      "toolCalls": [
+                        { "toolCode": "LEAVE_GET_BALANCES", "requestPayloadJson": "{\\"userId\\":2004}" }
+                      ]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("FAILED"))
+            .andExpect(jsonPath("$.data.errorMessage").value("无权查询该员工信息"));
+    }
+
+    @Test
     @DisplayName("DAG提示词节点应能内嵌工具调用")
     void promptWorkflowNodeShouldExecuteEmbeddedToolCalls() throws Exception {
         Cookie adminSession = loginAdmin();

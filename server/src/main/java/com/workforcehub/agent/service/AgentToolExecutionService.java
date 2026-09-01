@@ -2,11 +2,13 @@ package com.workforcehub.agent.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.workforcehub.agent.repository.AgentToolBindingRow;
 import com.workforcehub.attendance.service.AttendanceService;
 import com.workforcehub.common.exception.BizException;
 import com.workforcehub.leave.service.LeaveService;
 import com.workforcehub.org.dto.OrgDepartmentSummaryResponse;
+import com.workforcehub.org.dto.OrgUserDetailResponse;
 import com.workforcehub.org.dto.OrgUserSummaryResponse;
 import com.workforcehub.org.service.OrgDirectoryService;
 import com.workforcehub.ragflow.service.RagflowKnowledgeSearchService;
@@ -45,11 +47,25 @@ public class AgentToolExecutionService {
         this.knowledgeSearchServiceProvider = knowledgeSearchServiceProvider;
     }
 
-    public String execute(AgentToolBindingRow binding, String requestPayloadJson) {
+    public String execute(AgentToolBindingRow binding, String requestPayloadJson, Long operatorUserId) {
         if ("CONNECTOR".equals(binding.toolType())) {
             throw new BizException(501, "连接器工具执行器尚未接入");
         }
         JsonNode payload = readJson(requestPayloadJson);
+        // 载荷里的 userId 只允许查本人或直属下属（与工作流数据源 resolveAuthorizedTargetUserId 同一规则），
+        // 防止借工具调用跨用户读取他人假期/考勤等数据。传 null 表示不强制（仅限管理端试运行）。
+        if (operatorUserId != null) {
+            JsonNode requested = payload.path("userId");
+            if (requested.canConvertToLong()) {
+                Long targetUserId = requested.asLong();
+                if (!targetUserId.equals(operatorUserId)) {
+                    OrgUserDetailResponse target = orgDirectoryService.getUserDetail(targetUserId);
+                    if (!operatorUserId.equals(target.getManagerUserId())) {
+                        throw new BizException(403, "无权查询该员工信息");
+                    }
+                }
+            }
+        }
         Object result = switch (binding.toolCode()) {
             case "ORG_GET_USER_SUMMARY" -> getUserSummary(requiredLong(payload, "userId"));
             case "ORG_GET_DEPT_SUMMARY" -> getDeptSummary(requiredLong(payload, "deptId"));

@@ -588,7 +588,7 @@ public class AgentService {
                 agentRepository.updateTaskExecutionTrace(taskId, result.traceJson(), userId);
             } else {
                 for (PreparedToolCall call : preparedToolCalls) {
-                    executeAndLogToolCall(taskId, call);
+                    executeAndLogToolCall(taskId, call, userId);
                 }
             }
             agentRepository.finishTask(taskId, "SUCCEEDED", null, userId);
@@ -624,7 +624,7 @@ public class AgentService {
         audit(task.id(), "TASK_RUNNING", "AGENT_TASK", task.id(), "人工确认后继续执行", false);
         try {
             for (AgentPendingToolCallRow pendingToolCall : pendingToolCalls) {
-                executePendingToolCall(pendingToolCall);
+                executePendingToolCall(pendingToolCall, userId);
             }
             agentRepository.finishTask(task.id(), "SUCCEEDED", null, userId);
             audit(task.id(), "TASK_SUCCEEDED", "AGENT_TASK", task.id(), "AI任务执行成功", false);
@@ -678,9 +678,9 @@ public class AgentService {
         return new PreparedToolCall(binding, normalize(objectMapper, toolCall.getRequestPayloadJson(), "工具请求载荷不是合法JSON"));
     }
 
-    private void executeAndLogToolCall(Long taskId, PreparedToolCall call) {
+    private void executeAndLogToolCall(Long taskId, PreparedToolCall call, Long operatorUserId) {
         try {
-            String responsePayload = toolExecutionService.execute(call.binding(), call.requestPayloadJson());
+            String responsePayload = toolExecutionService.execute(call.binding(), call.requestPayloadJson(), operatorUserId);
             agentRepository.insertToolCallLog(
                 IdGenerator.nextId(),
                 taskId,
@@ -708,7 +708,7 @@ public class AgentService {
         }
     }
 
-    private void executePendingToolCall(AgentPendingToolCallRow pendingToolCall) {
+    private void executePendingToolCall(AgentPendingToolCallRow pendingToolCall, Long operatorUserId) {
         AgentToolBindingRow binding = new AgentToolBindingRow(
             null,
             null,
@@ -724,7 +724,7 @@ public class AgentService {
             null
         );
         try {
-            String responsePayload = toolExecutionService.execute(binding, pendingToolCall.requestPayloadJson());
+            String responsePayload = toolExecutionService.execute(binding, pendingToolCall.requestPayloadJson(), operatorUserId);
             agentRepository.markToolCallApprovedSuccess(pendingToolCall.logId(), responsePayload);
         } catch (BizException e) {
             String errorMessage = safeSummary(e.getMessage());

@@ -81,6 +81,7 @@ public class WorkflowExecutor {
         WorkflowContext context = new WorkflowContext(objectMapper);
         JsonNode input = normalizeInput(readJson(StringUtils.hasText(inputPayloadJson) ? inputPayloadJson : "{}"));
         if (currentUserId != null && input instanceof ObjectNode inputObject) {
+            // 仅在客户端未提供时注入；input.userId 保留客户端值，数据源/工具层各自做授权校验
             if (!inputObject.has("currentUserId")) inputObject.put("currentUserId", currentUserId);
             if (!inputObject.has("userId")) inputObject.put("userId", currentUserId);
         }
@@ -151,6 +152,12 @@ public class WorkflowExecutor {
         }
     }
 
+    // 从工作流上下文取服务端注入的任务归属人；取不到返回 null，由工具层按"不强制"兜底（仅管理端试运行场景）
+    private Long operatorUserId(WorkflowContext context) {
+        JsonNode userId = context.get("currentUserId");
+        return userId == null || userId.isNull() ? null : userId.asLong();
+    }
+
     private String executeToolNode(Long taskId,
                                    AgentVersionRow version,
                                    WorkflowDefinition definition,
@@ -166,7 +173,7 @@ public class WorkflowExecutor {
         JsonNode args = templateResolver.resolveJson(node.config().path("args"), context);
         String requestPayloadJson = write(objectMapper, args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
         try {
-            String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson);
+            String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson, operatorUserId(context));
             agentRepository.insertToolCallLog(
                 IdGenerator.nextId(),
                 taskId,
@@ -316,7 +323,7 @@ public class WorkflowExecutor {
         JsonNode args = templateResolver.resolveJson(toolCall.path("args"), context);
         String requestPayloadJson = write(objectMapper, args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
         try {
-            String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson);
+            String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson, operatorUserId(context));
             agentRepository.insertToolCallLog(
                 IdGenerator.nextId(),
                 taskId,
@@ -890,7 +897,7 @@ public class WorkflowExecutor {
                                 agentRepository.getActiveToolByCodeOrThrow(toolCode);
                                 throw new BizException(403, "AI助手未授权调用该工具");
                             }
-                            JsonNode output = applyOutputFormat(node, readJson(toolExecutionService.execute(binding, requestPayloadJson)));
+                            JsonNode output = applyOutputFormat(node, readJson(toolExecutionService.execute(binding, requestPayloadJson, operatorUserId(context))));
                             context.putJson(outputKey(node), output);
                             result.set("output", output);
                         }
@@ -988,7 +995,7 @@ public class WorkflowExecutor {
         }
         JsonNode args = templateResolver.resolveJson(toolCall.path("args"), context);
         String requestPayloadJson = write(objectMapper, args == null || args.isMissingNode() ? objectMapper.createObjectNode() : args);
-        String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson);
+        String responsePayloadJson = toolExecutionService.execute(binding, requestPayloadJson, operatorUserId(context));
         ObjectNode output = objectMapper.createObjectNode();
         output.put("toolCode", toolCode);
         output.set("request", readJson(requestPayloadJson));
