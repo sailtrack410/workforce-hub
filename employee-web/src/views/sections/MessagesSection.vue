@@ -233,6 +233,16 @@ function openMentionProfile(mention: MessageMention) {
   mentionProfile.value = mention;
 }
 
+// 群成员卡片复用 @ 提及的个人主页弹窗，部门/职位/头像由 mentionProfileContact 兜底补齐
+function openGroupMemberProfile(member: { userId?: string | number; name: string; originalName?: string; memberType?: string }) {
+  if (!member.userId || member.memberType === 'AGENT') return;
+  openMentionProfile({
+    userId: member.userId,
+    name: member.name,
+    originalName: member.originalName,
+  });
+}
+
 function closeMentionProfile() {
   if (mentionActionLoading.value) return;
   mentionProfile.value = null;
@@ -629,9 +639,18 @@ async function sendMentionPrivateMessage() {
             </div>
           </div>
 
-          <!-- 成员卡片网格 -->
+          <!-- 成员卡片网格：点卡片看成员主页，移除按钮不冒泡 -->
           <div class="group-member-grid">
-            <div v-for="member in activeConversation.panel.members" :key="`${member.name}-${member.role}`" class="group-member-card">
+            <div
+              v-for="member in activeConversation.panel.members"
+              :key="`${member.name}-${member.role}`"
+              class="group-member-card"
+              :class="{ 'is-clickable': member.userId && member.memberType !== 'AGENT' }"
+              :role="member.userId && member.memberType !== 'AGENT' ? 'button' : undefined"
+              :tabindex="member.userId && member.memberType !== 'AGENT' ? 0 : undefined"
+              @click="openGroupMemberProfile(member)"
+              @keydown.enter.prevent="openGroupMemberProfile(member)"
+            >
               <AppAvatar :label="member.name" tone="primary" size="md" />
               <span class="group-member-name">{{ member.name }}</span>
               <span v-if="member.role === '群主'" class="group-role-badge owner">群主</span>
@@ -641,7 +660,7 @@ async function sendMentionPrivateMessage() {
                 type="button"
                 aria-label="移除成员"
                 :disabled="im.actionLoading"
-                @click="groupProfileForm.removeMemberUserIds = String(member.userId || ''); removeGroupMembers()"
+                @click.stop="groupProfileForm.removeMemberUserIds = String(member.userId || ''); removeGroupMembers()"
               >
                 <UserMinus :size="13" />
               </button>

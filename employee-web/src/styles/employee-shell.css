@@ -5768,6 +5768,10 @@ button.settings-row:hover,
   transition: background 0.14s ease;
 }
 
+.group-member-card.is-clickable {
+  cursor: pointer;
+}
+
 .group-member-card:hover {
   background: var(--surface-panel-muted);
 }
