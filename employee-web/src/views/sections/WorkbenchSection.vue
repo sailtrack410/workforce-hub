@@ -424,8 +424,64 @@ const activeGenericFields = computed(() => activeGenericProcess.value?.formField
 const genericOaSubmitDisabled = computed(() => genericOaSubmitting.value || !activeGenericProcess.value);
 const leaveAvailableMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.availableMinutes ?? 0), 0));
 const leaveFrozenMinutes = computed(() => leaveAccounts.value.reduce((sum, account) => sum + Math.max(0, account.frozenMinutes ?? 0), 0));
-const activeLeaveAccountCount = computed(() => leaveAccounts.value.filter((account) => account.status === 'ACTIVE').length);
 const recentLeaveAccounts = computed(() => leaveAccounts.value.filter((account) => account.lastChangeMinutes !== undefined && account.lastChangeMinutes !== null));
+
+// 假种卡包：余额账户卡 + 不扣余额假种卡（后者没有账户，不展示会让人以为不能请）
+type LeaveWalletCard = {
+  key: string;
+  leaveName: string;
+  modeText: string;
+  tone: 'success' | 'warning' | 'neutral' | 'primary';
+  tagText: string;
+  valueText: string;
+  percent: number | null;
+  barLabel: string;
+  foot: string[];
+};
+
+const leaveWalletCards = computed<LeaveWalletCard[]>(() => {
+  const cards: LeaveWalletCard[] = [];
+  // 先放有余额的账户卡（不依赖假种下拉口径，避免账户被漏掉）
+  for (const account of leaveAccounts.value) {
+    const available = Math.max(0, account.availableMinutes ?? 0);
+    const frozen = Math.max(0, account.frozenMinutes ?? 0);
+    const total = available + frozen;
+    cards.push({
+      key: `acc-${account.accountId}`,
+      leaveName: account.leaveName,
+      modeText: leaveBalanceModeText(account),
+      tone: leaveAccountTone(account),
+      tagText: leaveAccountApplyText(account),
+      valueText: minutesToDayLabel(available),
+      percent: total > 0 ? Math.round((available / total) * 100) : null,
+      barLabel: `可用 ${minutesToDayLabel(available)}，冻结 ${minutesToDayLabel(frozen)}`,
+      foot: frozen > 0
+        ? [`可用 ${minutesToDayLabel(available)}`, `冻结 ${minutesToDayLabel(frozen)}`]
+        : [`可用 ${minutesToDayLabel(available)}`],
+    });
+  }
+  // 再补不扣余额的假种卡
+  const accountedTypeIds = new Set(leaveAccounts.value.map((account) => String(account.leaveTypeId)));
+  for (const type of selectableLeaveTypes.value) {
+    if (accountedTypeIds.has(String(type.leaveTypeId))) continue;
+    if (type.balanceMode === 'NO_DEDUCT') {
+      cards.push({
+        key: `type-${type.leaveTypeId}`,
+        leaveName: type.leaveName,
+        modeText: '不扣余额',
+        tone: 'primary',
+        tagText: '可申请',
+        valueText: '不限',
+        percent: null,
+        barLabel: '',
+        foot: ['按实际请假时长记录'],
+      });
+    }
+  }
+  return cards;
+});
+
+const appliableLeaveTypeCount = computed(() => leaveWalletCards.value.filter((card) => card.tagText === '可申请').length);
 const workflowBuckets = computed(() => [
   { key: 'pending' as const, label: '待处理', count: workflowRequests.value.filter((request) => workflowBucketOf(request.status) === 'pending').length },
   { key: 'active' as const, label: '进行中', count: workflowRequests.value.filter((request) => workflowBucketOf(request.status) === 'active').length },
@@ -449,12 +505,6 @@ function leaveAccountApplyText(account: LeaveAccountResponse) {
   if (account.status !== 'ACTIVE') return statusText(account.status);
   if (account.balanceMode === 'NO_DEDUCT') return '可申请';
   return (account.availableMinutes ?? 0) > 0 ? '可申请' : '余额不足';
-}
-
-function leaveAvailablePercent(account: LeaveAccountResponse) {
-  const total = Math.max(0, account.availableMinutes ?? 0) + Math.max(0, account.frozenMinutes ?? 0);
-  if (!total) return 100;
-  return Math.round((Math.max(0, account.availableMinutes ?? 0) / total) * 100);
 }
 
 function leaveChangeDirection(account: LeaveAccountResponse) {
@@ -1174,7 +1224,7 @@ watch(workflowRequests, () => {
               <span class="leave-hero-label">可用假期余额</span>
               <strong class="leave-hero-value">{{ minutesToDayLabel(leaveAvailableMinutes) }}</strong>
               <p class="leave-hero-sub">
-                冻结 {{ minutesToDayLabel(leaveFrozenMinutes) }} · {{ activeLeaveAccountCount }} 个假种可申请
+                冻结 {{ minutesToDayLabel(leaveFrozenMinutes) }} · {{ appliableLeaveTypeCount }} 个假种可申请
               </p>
             </div>
             <div class="leave-hero-actions">
@@ -1187,35 +1237,34 @@ watch(workflowRequests, () => {
           <section class="leave-wallet">
             <header class="leave-section-head">
               <h3>假种卡包</h3>
-              <span>{{ leaveAccounts.length }} 个账户</span>
+              <span>{{ leaveWalletCards.length }} 个假种</span>
             </header>
-            <div v-if="leaveAccounts.length" class="leave-wallet-track">
+            <div v-if="leaveWalletCards.length" class="leave-wallet-track">
               <article
-                v-for="account in leaveAccounts"
-                :key="account.accountId"
+                v-for="card in leaveWalletCards"
+                :key="card.key"
                 class="leave-wallet-card"
               >
                 <header class="leave-wallet-head">
-                  <strong>{{ account.leaveName }}</strong>
-                  <AppTag :tone="leaveAccountTone(account)">{{ leaveAccountApplyText(account) }}</AppTag>
+                  <strong>{{ card.leaveName }}</strong>
+                  <AppTag :tone="card.tone">{{ card.tagText }}</AppTag>
                 </header>
-                <small class="leave-wallet-mode">{{ leaveBalanceModeText(account) }}</small>
-                <strong class="leave-wallet-value">{{ minutesToDayLabel(account.availableMinutes) }}</strong>
+                <small class="leave-wallet-mode">{{ card.modeText }}</small>
+                <strong class="leave-wallet-value">{{ card.valueText }}</strong>
                 <div
-                  v-if="(account.availableMinutes ?? 0) + (account.frozenMinutes ?? 0) > 0"
+                  v-if="card.percent !== null"
                   class="leave-wallet-bar"
                   role="img"
-                  :aria-label="`可用 ${minutesToDayLabel(account.availableMinutes)}，冻结 ${minutesToDayLabel(account.frozenMinutes)}`"
+                  :aria-label="card.barLabel"
                 >
-                  <i :style="{ width: `${leaveAvailablePercent(account)}%` }" />
+                  <i :style="{ width: `${card.percent}%` }" />
                 </div>
                 <footer class="leave-wallet-foot">
-                  <span>可用 {{ minutesToDayLabel(account.availableMinutes) }}</span>
-                  <span v-if="(account.frozenMinutes ?? 0) > 0">冻结 {{ minutesToDayLabel(account.frozenMinutes) }}</span>
+                  <span v-for="text in card.foot" :key="text">{{ text }}</span>
                 </footer>
               </article>
             </div>
-            <AppEmptyState v-else title="暂无假期账户" description="假期账户由企业按制度发放，发放后会显示在这里。" icon="workbench" />
+            <AppEmptyState v-else title="暂无可请假种" description="假种由企业在管理端配置，开通后会显示在这里。" icon="workbench" />
           </section>
 
           <!-- 近期变动：账单式流水 -->
