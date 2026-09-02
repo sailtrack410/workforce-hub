@@ -8,7 +8,10 @@ import org.springframework.util.StringUtils;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * module-leave 第一版 JDBC 仓储。
@@ -130,6 +133,27 @@ public class LeaveRepository {
         return row;
     }
 
+    /**
+     * 员工各假种已获批的请假总时长（分钟），key=假种ID；不扣余额的假种没有账户，用量只能从这里统计
+     */
+    public Map<Long, Integer> sumApprovedLeaveMinutesByType(Long userId) {
+        return jdbcTemplate.query("""
+            SELECT l.leave_type_id, COALESCE(SUM(l.duration_minutes), 0) AS used_minutes
+            FROM wf_req_leave l
+            JOIN wf_request r ON r.id = l.request_id
+            WHERE r.applicant_user_id = ? AND r.status = 'APPROVED'
+            GROUP BY l.leave_type_id
+            """,
+            (rs) -> {
+                Map<Long, Integer> map = new HashMap<>();
+                while (rs.next()) {
+                    map.put(rs.getLong("leave_type_id"), rs.getInt("used_minutes"));
+                }
+                return map;
+            },
+            userId);
+    }
+
     public List<LeaveTypeRow> listLeaveTypes() {
         return jdbcTemplate.query("""
             SELECT id, leave_code, leave_name, balance_mode, status, created_at, updated_at
@@ -159,6 +183,44 @@ public class LeaveRepository {
               AND is_deleted = 0
             """, Long.class, userId);
         return count != null && count > 0;
+    }
+
+    /**
+     * 各账户最新一条流水（按主键倒序取首条），用于账户列表展示“最近变动”
+     */
+    public Map<Long, LeaveAccountTxnRow> findLatestTxnByAccountIds(List<Long> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(", ", accountIds.stream().map((id) -> "?").toList());
+        // 两组 IN 占位符共用同一份参数，必须展开成扁平数组，嵌套数组会被当成单个参数绑定
+        Object[] params = Stream.concat(accountIds.stream(), accountIds.stream()).toArray();
+        List<LeaveAccountTxnRow> rows = jdbcTemplate.query("""
+            SELECT id, account_id, txn_type, change_minutes, balance_after,
+                   source_type, source_id, source_txn_key
+            FROM lv_account_txn
+            WHERE account_id IN (%s)
+              AND id IN (
+                SELECT MAX(id) FROM lv_account_txn WHERE account_id IN (%s) GROUP BY account_id
+              )
+            """.formatted(placeholders, placeholders),
+            (rs, rowNum) -> new LeaveAccountTxnRow(
+                rs.getLong("id"),
+                rs.getLong("account_id"),
+                rs.getString("txn_type"),
+                rs.getInt("change_minutes"),
+                rs.getInt("balance_after"),
+                rs.getString("source_type"),
+                rs.getObject("source_id", Long.class),
+                rs.getString("source_txn_key")
+            ),
+            params
+        );
+        Map<Long, LeaveAccountTxnRow> latestByAccount = new HashMap<>();
+        for (LeaveAccountTxnRow row : rows) {
+            latestByAccount.put(row.accountId(), row);
+        }
+        return latestByAccount;
     }
 
     public LeaveAccountTxnRow getTxnBySourceTxnKey(String sourceTxnKey) {

@@ -460,23 +460,23 @@ const leaveWalletCards = computed<LeaveWalletCard[]>(() => {
         : [`可用 ${minutesToDayLabel(available)}`],
     });
   }
-  // 再补不扣余额的假种卡
+  // 再补不扣余额的假种卡：显示今年已请天数；丧假沉底，靠前展示观感不佳
   const accountedTypeIds = new Set(leaveAccounts.value.map((account) => String(account.leaveTypeId)));
-  for (const type of selectableLeaveTypes.value) {
-    if (accountedTypeIds.has(String(type.leaveTypeId))) continue;
-    if (type.balanceMode === 'NO_DEDUCT') {
-      cards.push({
-        key: `type-${type.leaveTypeId}`,
-        leaveName: type.leaveName,
-        modeText: '不扣余额',
-        tone: 'primary',
-        tagText: '可申请',
-        valueText: '不限',
-        percent: null,
-        barLabel: '',
-        foot: ['按实际请假时长记录'],
-      });
-    }
+  const freeTypes = selectableLeaveTypes.value
+    .filter((type) => !accountedTypeIds.has(String(type.leaveTypeId)) && type.balanceMode === 'NO_DEDUCT')
+    .sort((a, b) => Number(a.leaveCode === 'BEREAVEMENT') - Number(b.leaveCode === 'BEREAVEMENT'));
+  for (const type of freeTypes) {
+    cards.push({
+      key: `type-${type.leaveTypeId}`,
+      leaveName: type.leaveName,
+      modeText: '不扣余额',
+      tone: 'primary',
+      tagText: '可申请',
+      valueText: `已请 ${minutesToDayLabel(type.usedMinutes ?? 0)}`,
+      percent: null,
+      barLabel: '',
+      foot: ['按实际请假时长记录'],
+    });
   }
   return cards;
 });

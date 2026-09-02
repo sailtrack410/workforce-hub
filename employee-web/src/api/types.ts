@@ -576,6 +576,7 @@ export interface LeaveTypeResponse {
   leaveName: string;
   balanceMode: string;
   status: string;
+  usedMinutes?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }

@@ -19,6 +19,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Map;
 
@@ -143,10 +144,33 @@ public class LeaveService {
             .toList();
     }
 
+    /**
+     * 员工端假种列表：附带当前员工各假种今年已获批的请假时长，供“假种卡包”展示已请天数
+     */
+    public List<LeaveTypeResponse> listCurrentEmployeeLeaveTypes() {
+        Long userId = CurrentUserHolder.requireUserId();
+        Map<Long, Integer> usedByType = leaveRepository.sumApprovedLeaveMinutesByType(userId);
+        return leaveRepository.listLeaveTypes().stream()
+            .filter(row -> !"ANNUAL_DEMO".equals(row.leaveCode()))
+            .map(row -> {
+                LeaveTypeResponse response = toLeaveTypeResponse(row);
+                response.setUsedMinutes(usedByType.getOrDefault(row.id(), 0));
+                return response;
+            })
+            .toList();
+    }
+
     public List<LeaveAccountResponse> listCurrentEmployeeAccounts() {
         Long userId = CurrentUserHolder.requireUserId();
-        return leaveRepository.listUserAccounts(userId).stream()
-            .map(row -> toAccountResponse(row, null, null))
+        List<LeaveAccountRow> accounts = leaveRepository.listUserAccounts(userId);
+        Map<Long, LeaveAccountTxnRow> latestTxns = leaveRepository.findLatestTxnByAccountIds(
+            accounts.stream().map(LeaveAccountRow::accountId).toList()
+        );
+        return accounts.stream()
+            .map(row -> {
+                LeaveAccountTxnRow txn = latestTxns.get(row.accountId());
+                return toAccountResponse(row, txn == null ? null : txn.txnType(), txn == null ? null : txn.changeMinutes());
+            })
             .toList();
     }
 

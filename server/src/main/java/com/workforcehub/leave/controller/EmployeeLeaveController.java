@@ -34,6 +34,6 @@ public class EmployeeLeaveController {
     @Operation(summary = "查询假期类型列表", operationId = "listMyLeaveTypes")
     @GetMapping("/types")
     public R<List<LeaveTypeResponse>> types() {
-        return R.ok(leaveService.listLeaveTypes());
+        return R.ok(leaveService.listCurrentEmployeeLeaveTypes());
     }
 }
