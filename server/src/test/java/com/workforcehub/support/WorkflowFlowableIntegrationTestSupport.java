@@ -62,21 +62,22 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
+        // 主机/端口/账号统一走 TestEnv（JVM 环境变量 → 仓库 .env），与 LocalIntegrationTestSupport 同源
         registry.add("spring.datasource.url", () -> String.format(
             MYSQL_URL_TEMPLATE,
-            envOrFallback("TEST_DB_HOST", "DB_HOST", "localhost"),
-            envOrFallback("TEST_DB_PORT", "DB_PORT", "3306"),
+            TestEnv.get("TEST_DB_HOST", TestEnv.get("DB_HOST", "localhost")),
+            TestEnv.get("TEST_DB_PORT", TestEnv.get("DB_PORT", "3306")),
             env("TEST_DB_NAME", "workforce_hub_test")
         ));
-        registry.add("spring.datasource.username", () -> envOrFallback("TEST_DB_USER", "DB_USER", "root"));
+        registry.add("spring.datasource.username", () -> TestEnv.get("TEST_DB_USER", TestEnv.get("DB_USER", "root")));
         // 数据库口令只从环境变量/.env 读取，无兜底：缺失即失败，避免真实凭证入库
         registry.add("spring.datasource.password", () -> TestEnv.require("TEST_DB_PASSWORD", "DB_PASSWORD"));
-        registry.add("spring.data.redis.host", () -> env("REDIS_HOST", "localhost"));
+        registry.add("spring.data.redis.host", () -> TestEnv.get("TEST_REDIS_HOST", TestEnv.get("REDIS_HOST", "localhost")));
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
         registry.add("spring.datasource.hikari.minimum-idle", () -> "0");
         registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
-        registry.add("spring.data.redis.port", () -> env("REDIS_PORT", "6379"));
-        registry.add("spring.data.redis.password", () -> env("REDIS_PASSWORD", ""));
+        registry.add("spring.data.redis.port", () -> TestEnv.get("TEST_REDIS_PORT", TestEnv.get("REDIS_PORT", "6379")));
+        registry.add("spring.data.redis.password", () -> TestEnv.get("TEST_REDIS_PASSWORD", TestEnv.get("REDIS_PASSWORD", "")));
         registry.add("spring.session.redis.namespace", WorkflowFlowableIntegrationTestSupport::testSessionRedisNamespace);
         registry.add("workforce.auth.redis-key-prefix", WorkflowFlowableIntegrationTestSupport::testAuthRedisKeyPrefix);
         registry.add("spring.mail.host", () -> env("MAIL_HOST", "localhost"));
@@ -241,14 +242,6 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
     private static String env(String key, String defaultValue) {
         String value = System.getenv(key);
         return value == null || value.isBlank() ? defaultValue : value;
-    }
-
-    private static String envOrFallback(String primaryKey, String fallbackKey, String defaultValue) {
-        String primary = System.getenv(primaryKey);
-        if (primary != null && !primary.isBlank()) {
-            return primary;
-        }
-        return env(fallbackKey, defaultValue);
     }
 
     private static String testSessionRedisNamespace() {
