@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "请假审批数据流:申请单、余额与预审结论的流转",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.1.0请假审批数据流图.html",
+    "viewBox": [1080, 720],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main-path",
+        "label": "主数据流",
+        "focus": ["employee", "leaveSvc", "preReview", "manager", "settle"],
+        "note": "一份请假申请从提交、冻结、预审、人工审批到扣减与考勤重算。"
+      },
+      {
+        "id": "pre-review",
+        "label": "预审结论流向",
+        "focus": ["preReview", "llm", "agentTask", "taskAction", "manager"],
+        "note": "预审输入如何进模型,结论又如何回到审批人眼前。"
+      },
+      {
+        "id": "terminal",
+        "label": "终态与解冻",
+        "focus": ["manager", "lvAccount", "settle", "attResult"],
+        "note": "通过走扣减,驳回与撤回走解冻,两条路都回到同一个假期账户。"
+      }
+    ]
+  },
+  "stages": [
+    { "label": "提交" },
+    { "label": "冻结与落单" },
+    { "label": "Agent 预审" },
+    { "label": "人工审批" },
+    { "label": "结算" }
+  ],
+  "nodes": [
+    { "id": "employee", "type": "frontend", "label": "员工提交请假单", "sublabel": "employee-web", "stage": 0, "row": 1, "tag": "REST", "width": 120 },
+    { "id": "wfRequest", "type": "database", "label": "申请单存储", "sublabel": "wf_request", "stage": 1, "row": 0, "tag": "IN_APPROVAL", "width": 120 },
+    { "id": "leaveSvc", "type": "backend", "label": "冻结与落单", "sublabel": "LeaveService", "stage": 1, "row": 1, "tag": "同事务", "width": 120 },
+    { "id": "agentTask", "type": "database", "label": "预审任务存储", "sublabel": "agt_task", "stage": 2, "row": 0, "tag": "WORKFLOW", "width": 120 },
+    { "id": "preReview", "type": "backend", "label": "预审触发", "sublabel": "Trigger", "stage": 2, "row": 1, "tag": "PENDING", "width": 120 },
+    { "id": "llm", "type": "external", "label": "大模型预审", "sublabel": "OpenAI 兼容", "stage": 2, "row": 2, "tag": "超时 30s", "width": 120 },
+    { "id": "taskAction", "type": "database", "label": "预审结论", "sublabel": "wf_task_action", "stage": 3, "row": 0, "tag": "PRE_REVIEW", "width": 120 },
+    { "id": "manager", "type": "frontend", "label": "审批人处理", "sublabel": "sys_todo_item", "stage": 3, "row": 1, "tag": "manager", "width": 120 },
+    { "id": "attResult", "type": "database", "label": "考勤日结果", "sublabel": "att_daily", "stage": 4, "row": 0, "tag": "重算", "width": 120 },
+    { "id": "settle", "type": "backend", "label": "结算", "sublabel": "consumeFrozen", "stage": 4, "row": 1, "tag": "DEDUCT", "width": 120 },
+    { "id": "lvAccount", "type": "database", "label": "假期账户", "sublabel": "lv_account", "stage": 4, "row": 2, "tag": "frozen", "width": 120 }
+  ],
+  "flows": [
+    { "from": "employee", "to": "leaveSvc", "label": "申请单", "variant": "emphasis", "labelDy": 30 },
+    { "from": "leaveSvc", "to": "wfRequest", "label": "落库", "variant": "emphasis", "labelDx": 58 },
+    { "from": "leaveSvc", "to": "preReview", "label": "触发预审", "variant": "emphasis", "labelDy": 30 },
+    { "from": "preReview", "to": "agentTask", "label": "任务", "variant": "default", "labelDx": 58 },
+    { "from": "preReview", "to": "llm", "label": "预审输入", "variant": "emphasis", "labelDy": 30 },
+    { "from": "llm", "to": "taskAction", "label": "结论", "variant": "emphasis", "labelDy": 30 },
+    { "from": "taskAction", "to": "manager", "label": "预审意见", "variant": "emphasis", "labelDy": 30 },
+    { "from": "manager", "to": "settle", "label": "通过", "variant": "emphasis", "labelDy": 30 },
+    { "from": "settle", "to": "attResult", "label": "时段", "variant": "default", "labelDx": 58 },
+    { "from": "settle", "to": "lvAccount", "label": "扣减", "variant": "emphasis", "labelDy": 26 },
+    { "from": "manager", "to": "lvAccount", "label": "驳回解冻", "variant": "security", "route": "bottom-channel" }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "数据存储分工",
+      "items": [
+        "申请单落 wf_request,余额落 lv_account,预审结论落 wf_task_action",
+        "余额每次变动都追加 lv_account_txn 流水,不用余额列覆盖历史"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "冻结、扣减与解冻",
+      "items": [
+        "提交时同事务冻结,通过时从冻结扣减,驳回与撤回把冻结退回可用",
+        "幂等键 WORKFLOW_REQUEST:{requestId},重复回调不会二次记账"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "预审的真实边界",
+      "items": [
+        "预审输入只有申请单明细与固定系统提示词,不含余额与制度检索",
+        "模型超时 30s 或失败时转人工,人工审批仍是必经环节"
+      ]
+    }
+  ]
+}

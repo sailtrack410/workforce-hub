@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "RAG 问答时序:IM 提问 → 知识检索 → LLM 生成",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.0.0知识库问答时序图.html",
+    "viewBox": [
+      880,
+      760
+    ],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "ask",
+        "label": "提问与任务",
+        "focus": [
+          "user",
+          "web",
+          "im",
+          "agent"
+        ],
+        "note": "员工的一条消息如何变成异步 Agent 任务。"
+      },
+      {
+        "id": "rag",
+        "label": "检索与生成",
+        "focus": [
+          "agent",
+          "llm",
+          "search",
+          "vecdb"
+        ],
+        "note": "知识检索的两个外部依赖:Embedding API 与 pgvector。"
+      },
+      {
+        "id": "push",
+        "label": "可靠推送",
+        "focus": [
+          "agent",
+          "im",
+          "web",
+          "user"
+        ],
+        "note": "回答如何经 outbox 可靠到达在线与离线员工。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "员工",
+      "sublabel": "employee-web 会话"
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "employee-web",
+      "sublabel": "IM 消息优先"
+    },
+    {
+      "id": "im",
+      "type": "backend",
+      "label": "IM 服务",
+      "sublabel": "ImService + outbox"
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "Agent 编排",
+      "sublabel": "任务编排 + 节点执行"
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "LLM 服务",
+      "sublabel": "OpenAI 兼容 API"
+    },
+    {
+      "id": "search",
+      "type": "backend",
+      "label": "RAGFlow 检索",
+      "sublabel": "知识检索服务"
+    },
+    {
+      "id": "vecdb",
+      "type": "database",
+      "label": "pgvector",
+      "sublabel": "kb_vector_chunk"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 255,
+      "label": "提问与任务"
+    },
+    {
+      "from": 290,
+      "to": 560,
+      "label": "检索与生成"
+    },
+    {
+      "from": 596,
+      "to": 670,
+      "label": "可靠推送"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m-ask",
+      "from": "user",
+      "to": "web",
+      "y": 185,
+      "label": "输入问题",
+      "variant": "default"
+    },
+    {
+      "id": "m-post",
+      "from": "web",
+      "to": "im",
+      "y": 228,
+      "label": "POST /im/conversations/{id}/messages",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-task",
+      "from": "im",
+      "to": "agent",
+      "y": 268,
+      "label": "建 PENDING 任务 · 事务提交后异步",
+      "variant": "dashed"
+    },
+    {
+      "id": "m-tool",
+      "from": "agent",
+      "to": "search",
+      "y": 308,
+      "label": "KNOWLEDGE_SEARCH_CHUNKS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-embed",
+      "from": "search",
+      "to": "llm",
+      "y": 344,
+      "label": "POST /v1/embeddings · 查询向量化",
+      "variant": "default"
+    },
+    {
+      "id": "m-vec",
+      "from": "llm",
+      "to": "search",
+      "y": 380,
+      "label": "查询向量",
+      "variant": "return"
+    },
+    {
+      "id": "m-cosine",
+      "from": "search",
+      "to": "vecdb",
+      "y": 418,
+      "label": "余弦检索 kb_vector_chunk",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-topk",
+      "from": "vecdb",
+      "to": "search",
+      "y": 454,
+      "label": "top-K 相关切片",
+      "variant": "return"
+    },
+    {
+      "id": "m-chat",
+      "from": "agent",
+      "to": "llm",
+      "y": 500,
+      "label": "/v1/chat/completions · 携带检索上下文",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-answer",
+      "from": "llm",
+      "to": "agent",
+      "y": 536,
+      "label": "生成的回答",
+      "variant": "return"
+    },
+    {
+      "id": "m-persist",
+      "from": "agent",
+      "to": "im",
+      "y": 578,
+      "label": "AGENT 消息入库 TEXT / KNOWLEDGE_CARD",
+      "variant": "default"
+    },
+    {
+      "id": "m-push",
+      "from": "im",
+      "to": "web",
+      "y": 616,
+      "label": "WebSocket AGENT_MESSAGE_CREATED · outbox",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-render",
+      "from": "web",
+      "to": "user",
+      "y": 654,
+      "label": "渲染消息卡片",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "web",
+      "from": 220,
+      "to": 658,
+      "type": "frontend"
+    },
+    {
+      "participant": "im",
+      "from": 228,
+      "to": 620,
+      "type": "backend"
+    },
+    {
+      "participant": "agent",
+      "from": 262,
+      "to": 582,
+      "type": "backend"
+    },
+    {
+      "participant": "llm",
+      "from": 340,
+      "to": 540,
+      "type": "external"
+    },
+    {
+      "participant": "search",
+      "from": 304,
+      "to": 458,
+      "type": "backend"
+    },
+    {
+      "participant": "vecdb",
+      "from": 414,
+      "to": 458,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "异步任务链",
+      "items": [
+        "ImService 落库后触发 triggerAgentReplyAfterCommitIfNeeded",
+        "REQUIRES_NEW 建 PENDING 任务,事务提交后 agentExecutor 线程池执行",
+        "有 workflow 配置走 WorkflowExecutor(LLM/KNOWLEDGE/INTENT 节点),否则单轮直调"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "知识检索",
+      "items": [
+        "工具码 KNOWLEDGE_SEARCH_CHUNKS → RagflowKnowledgeSearchService",
+        "查询先经 /v1/embeddings 向量化,再查 pgvector",
+        "余弦距离:1 - embedding <=> ?(独立 PostgreSQL 数据源)"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "可靠推送",
+      "items": [
+        "AGENT 消息落库后写 outbox,事务提交后立即投递",
+        "在线由 WebSocket 直推,离线由 ImWebSocketOutboxDispatcher 每 3s 兜底轮询",
+        "前端无需轮询,事件驱动到达"
+      ]
+    }
+  ]
+}

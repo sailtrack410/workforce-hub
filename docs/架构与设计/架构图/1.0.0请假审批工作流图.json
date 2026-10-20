@@ -1,0 +1,51 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "请假审批工作流:Agent 预审 + 直属上级审批",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.0.0请假审批工作流图.html",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "main-path", "label": "主路径", "focus": ["submit", "freeze", "prereview", "human", "settle"], "note": "从员工提交到余额扣减、考勤重算的完整主链路。" },
+      { "id": "ai-gate", "label": "AI 预审门", "focus": ["prereview", "rejected", "human"], "note": "预审如何拦截风险单据或放行进入人工审批。" },
+      { "id": "exits", "label": "终态与余额", "focus": ["rejected", "withdrawn", "human"], "note": "三个非通过终态都伴随冻结余额解冻。" }
+    ]
+  },
+  "lanes": [
+    { "id": "ui", "label": "员工入口" },
+    { "id": "agent", "label": "Agent 预审" },
+    { "id": "flow", "label": "审批与结算" },
+    { "id": "except", "label": "终态出口", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "intake", "label": "提交与冻结", "fromCol": 0, "toCol": 1 },
+    { "id": "ai", "label": "AI 预审门", "fromCol": 2, "toCol": 2, "variant": "emphasis" },
+    { "id": "approval", "label": "人工审批与结算", "fromCol": 3, "toCol": 4 }
+  ],
+  "mainPath": ["submit", "freeze", "prereview", "human", "settle"],
+  "nodes": [
+    { "id": "submit", "lane": "ui", "col": 0, "type": "frontend", "label": "员工提交请假单", "sublabel": "employee-web · REST", "width": 140 },
+    { "id": "freeze", "lane": "flow", "col": 1, "type": "backend", "label": "冻结假期余额", "sublabel": "LeaveService · 幂等 FREEZE", "width": 140 },
+    { "id": "prereview", "lane": "agent", "col": 2, "type": "backend", "label": "Agent LLM 预审", "sublabel": "PENDING_REVIEW · 流程暂不启动", "tag": "WorkflowAgentPreReviewTrigger", "width": 150 },
+    { "id": "human", "lane": "flow", "col": 3, "type": "backend", "label": "直属上级审批", "sublabel": "Flowable · manager_approval", "width": 140 },
+    { "id": "settle", "lane": "flow", "col": 4, "type": "backend", "label": "通过后结算", "sublabel": "扣减余额 + 考勤重算", "tag": "APPROVED", "width": 140 },
+    { "id": "rejected", "lane": "except", "col": 3, "type": "security", "label": "REJECTED 已驳回", "sublabel": "解冻余额", "tag": "拒绝/超时/驳回", "width": 140 },
+    { "id": "withdrawn", "lane": "except", "col": 4, "type": "security", "label": "WITHDRAWN 已撤回", "sublabel": "解冻余额 · 删除流程实例", "width": 140 }
+  ],
+  "edges": [
+    { "id": "e-submit", "from": "submit", "to": "freeze", "label": "提交 · 冻结余额", "variant": "emphasis" },
+    { "id": "e-trigger", "from": "freeze", "to": "prereview", "label": "触发 LLM 预审" },
+    { "id": "e-pass", "from": "prereview", "to": "human", "label": "通过 / 转人工 · 启动流程", "variant": "emphasis" },
+    { "id": "e-ai-reject", "from": "prereview", "to": "rejected", "label": "拒绝 / 60s 超时", "variant": "security", "role": "error" },
+    { "id": "e-approve", "from": "human", "to": "settle", "label": "审批通过", "variant": "emphasis" },
+    { "id": "e-man-reject", "from": "human", "to": "rejected", "label": "人工驳回", "variant": "security", "role": "error" },
+    { "id": "e-withdraw", "from": "human", "to": "withdrawn", "label": "申请人撤回", "variant": "dashed", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "审批链路", "items": ["BPMN leave_manager_approval 只有一个用户任务:直属上级审批", "Agent 预审发生在 Flowable 启动之前;PENDING_REVIEW 期间流程实例不存在", "预审通过或转人工后,由 WorkflowAgentResultCallback 启动流程"] },
+    { "dot": "rose", "title": "终态与余额", "items": ["REJECTED 三个入口:预审拒绝、预审超时(AgentTaskTimeoutJobService 60s 扫描)、人工驳回", "仅 IN_APPROVAL 状态可撤回,撤回即删除流程实例", "冻结 / 扣减 / 解冻全部按 sourceTxnKey 幂等"] },
+    { "dot": "emerald", "title": "通过后联动", "items": ["consumeFrozenForWorkflowApproval 扣减冻结余额", "attendanceService 按天重算考勤结果", "finishRequest(APPROVED) 归档并关闭待办"] }
+  ]
+}

@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Workforce Hub 功能架构:模块与能力视图",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.0.0功能架构图.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "governance",
+        "label": "治理视角",
+        "focus": [
+          "admin_web",
+          "nginx",
+          "org_hr",
+          "attend_leave",
+          "flow_domain"
+        ],
+        "note": "管理后台治理的功能域:组织权限、考勤假期、流程审批。"
+      },
+      {
+        "id": "ai",
+        "label": "智能视角",
+        "focus": [
+          "ai_domain",
+          "llm",
+          "pgvector",
+          "collab"
+        ],
+        "note": "Agent 三条链路依赖的能力域与外部 AI 服务。"
+      },
+      {
+        "id": "data",
+        "label": "数据视角",
+        "focus": [
+          "mysql",
+          "redis",
+          "minio",
+          "pgvector"
+        ],
+        "note": "四类存储各自服务的能力域。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "admin_web",
+      "type": "frontend",
+      "label": "admin-web 管理后台",
+      "sublabel": "系统治理控制台",
+      "pos": [
+        40,
+        60
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "employee_web",
+      "type": "frontend",
+      "label": "employee-web 员工端",
+      "sublabel": "消息优先工作台",
+      "pos": [
+        260,
+        60
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "nginx",
+      "type": "backend",
+      "label": "Nginx 统一入口",
+      "sublabel": "静态资源 + /api /ws 反向代理",
+      "pos": [
+        150,
+        210
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "org_hr",
+      "type": "backend",
+      "label": "组织与权限域",
+      "sublabel": "认证会话 · 组织架构 · 通讯录",
+      "tag": "auth · org · hr · contact · system",
+      "pos": [
+        40,
+        360
+      ],
+      "size": [
+        170,
+        96
+      ]
+    },
+    {
+      "id": "attend_leave",
+      "type": "backend",
+      "label": "考勤假期域",
+      "sublabel": "打卡与日结果 · 余额与申请",
+      "tag": "attendance · leave",
+      "pos": [
+        230,
+        360
+      ],
+      "size": [
+        170,
+        96
+      ]
+    },
+    {
+      "id": "flow_domain",
+      "type": "backend",
+      "label": "流程审批域",
+      "sublabel": "BPMN 审批 · 审批治理",
+      "tag": "workflow · Flowable 7",
+      "pos": [
+        420,
+        360
+      ],
+      "size": [
+        170,
+        96
+      ]
+    },
+    {
+      "id": "collab",
+      "type": "backend",
+      "label": "协作消息域",
+      "sublabel": "IM WebSocket · 文件 · 待办",
+      "tag": "im · file",
+      "pos": [
+        610,
+        360
+      ],
+      "size": [
+        170,
+        96
+      ]
+    },
+    {
+      "id": "ai_domain",
+      "type": "backend",
+      "label": "智能应用域",
+      "sublabel": "预审 / 问答 / 提醒 · 知识库",
+      "tag": "agent · ragflow",
+      "pos": [
+        800,
+        360
+      ],
+      "size": [
+        170,
+        96
+      ]
+    },
+    {
+      "id": "platform",
+      "type": "backend",
+      "label": "平台支撑域",
+      "sublabel": "插件网关 · 公共组件",
+      "tag": "plugin · common",
+      "pos": [
+        990,
+        360
+      ],
+      "size": [
+        170,
+        96
+      ]
+    },
+    {
+      "id": "mysql",
+      "type": "database",
+      "label": "MySQL 8.4",
+      "sublabel": "全域业务库 · Flowable 表",
+      "pos": [
+        140,
+        550
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis 7.4",
+      "sublabel": "Session · 缓存",
+      "pos": [
+        320,
+        550
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "minio",
+      "type": "database",
+      "label": "MinIO",
+      "sublabel": "S3 对象存储",
+      "pos": [
+        620,
+        550
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "pgvector",
+      "type": "database",
+      "label": "pgvector",
+      "sublabel": "知识向量库 · 可选",
+      "tag": "默认关闭",
+      "pos": [
+        800,
+        550
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "LLM 服务",
+      "sublabel": "OpenAI 兼容 Chat / Embedding",
+      "pos": [
+        990,
+        690
+      ],
+      "size": [
+        170,
+        62
+      ]
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "SMTP 邮件",
+      "sublabel": "Mailpit(开发环境)",
+      "pos": [
+        140,
+        690
+      ],
+      "size": [
+        150,
+        62
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "浏览器端 · Vue3 + TS",
+      "wraps": [
+        "admin_web",
+        "employee_web"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Spring Boot 3.2 模块化单体 · Java 17",
+      "wraps": [
+        "org_hr",
+        "attend_leave",
+        "flow_domain",
+        "collab",
+        "ai_domain",
+        "platform"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "数据与中间件",
+      "wraps": [
+        "mysql",
+        "redis",
+        "minio",
+        "pgvector"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "外部服务",
+      "wraps": [
+        "llm",
+        "smtp"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "admin_web",
+      "to": "nginx",
+      "label": "REST /api",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "employee_web",
+      "to": "nginx",
+      "label": "REST + WS",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "nginx",
+      "to": "org_hr",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "nginx",
+      "to": "attend_leave",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "nginx",
+      "to": "flow_domain",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "nginx",
+      "to": "collab",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "nginx",
+      "to": "ai_domain",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "nginx",
+      "to": "platform",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "org_hr",
+      "to": "mysql",
+      "label": "JDBC",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": -60
+    },
+    {
+      "from": "org_hr",
+      "to": "redis",
+      "label": "Session",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": 56
+    },
+    {
+      "from": "collab",
+      "to": "minio",
+      "label": "S3",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "from": "ai_domain",
+      "to": "pgvector",
+      "label": "向量",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24,
+      "labelDx": -30
+    },
+    {
+      "from": "ai_domain",
+      "to": "llm",
+      "label": "Chat",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": 30
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "管理后台功能(对应 admin-web 页面)",
+      "items": [
+        "权限:用户 / 角色 / 权限 · 组织:部门 / 职位 · 字典 / 系统设置",
+        "考勤治理 · 假期类型 / 假期治理 · 流程审批治理 · 审计日志",
+        "IM 出站治理 / 文件清理 · 登录与仪表盘",
+        "智能:Agent 配置 / DAG / 任务 · RAGFlow 空间与文档"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "员工端功能(employee-web 分区)",
+      "items": [
+        "消息:IM 会话 / Agent 问答 / 系统通知卡片(消息优先)",
+        "待办:审批待办创建与处理 · 超时提醒",
+        "自助:通讯录 / 文件 / 工作台 / 设置"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "智能链路(智能应用域对内提供)",
+      "items": [
+        "预审:单据提交触发 LLM 预审,拒绝 / 超时不进人工",
+        "问答:IM 提问 → 知识检索 → LLM 生成 → 卡片回复",
+        "提醒:主动提醒任务与超时扫描(60s)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "数据归属",
+      "items": [
+        "MySQL:全部业务域共享,含 Flowable 表与 ingest_job",
+        "Redis:登录会话与缓存 · MinIO:附件与知识库原始文件",
+        "pgvector:kb_vector_chunk 向量(独立 PostgreSQL,默认关闭)"
+      ]
+    }
+  ]
+}

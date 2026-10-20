@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "知识库文档入库流水线:上传 → 解析 → 向量化 → 可检索",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.0.0知识库入库数据流图.html",
+    "viewBox": [
+      1080,
+      720
+    ],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "happy-path",
+        "label": "主链路",
+        "focus": [
+          "upload",
+          "job",
+          "ingest",
+          "embed",
+          "vecdb"
+        ],
+        "note": "文档从管理台上传到向量可检索的完整路径。"
+      },
+      {
+        "id": "parse",
+        "label": "解析分流",
+        "focus": [
+          "parse",
+          "ocr",
+          "chunks"
+        ],
+        "note": "图片走 OCR 视觉模型,Office/PDF 走 Tika,纯文本直读。"
+      },
+      {
+        "id": "failure",
+        "label": "失败与重入库",
+        "focus": [
+          "bizdb",
+          "job",
+          "ingest"
+        ],
+        "note": "入库失败标记 FAILED,可从管理台触发重新入库。"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "上传"
+    },
+    {
+      "label": "异步任务"
+    },
+    {
+      "label": "解析与分块"
+    },
+    {
+      "label": "向量化"
+    },
+    {
+      "label": "存储与检索"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "upload",
+      "type": "frontend",
+      "label": "admin-web 上传",
+      "sublabel": "票据确认 + addDocument",
+      "stage": 0,
+      "row": 1,
+      "tag": "ingest_job",
+      "width": 130
+    },
+    {
+      "id": "job",
+      "type": "messagebus",
+      "label": "kbIngestExecutor",
+      "sublabel": "线程池异步执行",
+      "stage": 1,
+      "row": 1,
+      "tag": "PENDING → PROCESSING",
+      "width": 130
+    },
+    {
+      "id": "ingest",
+      "type": "backend",
+      "label": "入库调度服务",
+      "sublabel": "markIngestRunning",
+      "stage": 2,
+      "row": 1,
+      "tag": "RagflowIngestService",
+      "width": 130
+    },
+    {
+      "id": "parse",
+      "type": "backend",
+      "label": "解析分流",
+      "sublabel": "按 MIME 路由",
+      "stage": 2,
+      "row": 0,
+      "tag": "parseText",
+      "width": 130
+    },
+    {
+      "id": "ocr",
+      "type": "external",
+      "label": "OCR 视觉模型",
+      "sublabel": "OpenAI 兼容 vision",
+      "stage": 3,
+      "row": 0,
+      "tag": "图片专用",
+      "width": 130
+    },
+    {
+      "id": "chunks",
+      "type": "backend",
+      "label": "切片窗口",
+      "sublabel": "chunk 800 · overlap 100",
+      "stage": 3,
+      "row": 1,
+      "tag": "splitChunks",
+      "width": 130
+    },
+    {
+      "id": "embed",
+      "type": "external",
+      "label": "Embedding API",
+      "sublabel": "/v1/embeddings 批量",
+      "stage": 3,
+      "row": 2,
+      "tag": "OpenAI 格式",
+      "width": 130
+    },
+    {
+      "id": "vecdb",
+      "type": "database",
+      "label": "pgvector 向量库",
+      "sublabel": "kb_vector_chunk · 余弦",
+      "stage": 4,
+      "row": 2,
+      "tag": "独立数据源",
+      "width": 130
+    },
+    {
+      "id": "bizdb",
+      "type": "database",
+      "label": "MySQL 业务库",
+      "sublabel": "切片 · READY / FAILED",
+      "stage": 2,
+      "row": 2,
+      "tag": "replaceChunks",
+      "width": 130
+    },
+    {
+      "id": "search",
+      "type": "backend",
+      "label": "知识检索服务",
+      "sublabel": "问答 top-K 查询",
+      "stage": 4,
+      "row": 0,
+      "tag": "RAG 消费方",
+      "width": 130
+    }
+  ],
+  "flows": [
+    {
+      "from": "upload",
+      "to": "job",
+      "label": "建任务",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "from": "job",
+      "to": "ingest",
+      "label": "执行",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "from": "parse",
+      "to": "ocr",
+      "classification": "外部调用",
+      "variant": "dashed",
+      "route": "straight",
+      "label": "vision"
+    },
+    {
+      "from": "ingest",
+      "to": "chunks",
+      "label": "切片",
+      "variant": "emphasis"
+    },
+    {
+      "from": "chunks",
+      "to": "embed",
+      "label": "向量化",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "from": "embed",
+      "to": "vecdb",
+      "label": "写向量",
+      "variant": "emphasis",
+      "route": "vertical-channel"
+    },
+    {
+      "from": "ingest",
+      "to": "bizdb",
+      "label": "落状态",
+      "variant": "default",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "from": "bizdb",
+      "to": "job",
+      "label": "FAILED → 重新入库",
+      "classification": "reingestDocument",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [
+        [
+          240,
+          385
+        ],
+        [
+          240,
+          271
+        ]
+      ]
+    },
+    {
+      "from": "vecdb",
+      "to": "search",
+      "label": "检索",
+      "classification": "余弦距离",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": 82
+    },
+    {
+      "from": "ingest",
+      "to": "parse",
+      "label": "读文件",
+      "variant": "default",
+      "route": "straight"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "异步契约",
+      "items": [
+        "上传确认后 insertIngestJob,事务提交后进 kbIngestExecutor 线程池",
+        "不是 MQ:重启即丢任务,靠 ingest_job 状态表 + 管理台重新入库兜底",
+        "IngestStatus:NOT_INGESTED / PENDING / PROCESSING / READY / FAILED / OFFLINE"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "解析分流",
+      "items": [
+        "图片:OCR 视觉模型(OpenAI 兼容 chat + vision)",
+        "txt / md / csv:直接读取;其余:Apache Tika AutoDetectParser",
+        "切片固定窗口 800 字符、重叠 100"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "外部依赖与一致性",
+      "items": [
+        "Embedding API 为外部 OpenAI 格式 REST,严格校验返回数量与维度",
+        "重新入库先旧向量 is_active=FALSE 再写新向量,避免双份命中",
+        "pgvector 走独立 PostgreSQL 数据源,与业务库 MySQL 分离"
+      ]
+    }
+  ]
+}

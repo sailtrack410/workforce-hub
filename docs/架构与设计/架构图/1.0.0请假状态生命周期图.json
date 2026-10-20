@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "请假单状态机:Agent 预审介入的生命周期",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.0.0请假状态生命周期图.html",
+    "viewBox": [
+      700,
+      660
+    ],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main-flow",
+        "label": "主生命周期",
+        "focus": [
+          "pending_review",
+          "in_approval",
+          "approved"
+        ],
+        "note": "从提交到审批通过的主轨道,余额从冻结走向扣减。"
+      },
+      {
+        "id": "ai-gate",
+        "label": "AI 预审窗口",
+        "focus": [
+          "pending_review",
+          "in_approval",
+          "rejected"
+        ],
+        "note": "PENDING_REVIEW 期间流程实例尚不存在,预审结果决定去留。"
+      },
+      {
+        "id": "terminal",
+        "label": "三个终态",
+        "focus": [
+          "rejected",
+          "withdrawn",
+          "approved"
+        ],
+        "note": "所有非通过终态都会解冻余额。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "生命周期主轨"
+    },
+    {
+      "id": "gates",
+      "label": "人工介入"
+    },
+    {
+      "id": "terminal",
+      "label": "终态出口"
+    }
+  ],
+  "states": [
+    {
+      "id": "pending_review",
+      "type": "start",
+      "label": "PENDING_REVIEW",
+      "sublabel": "提交 · 冻结余额 · LLM 预审中",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "流程未启动"
+    },
+    {
+      "id": "in_approval",
+      "type": "active",
+      "label": "IN_APPROVAL",
+      "sublabel": "Flowable manager_approval",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "可撤回"
+    },
+    {
+      "id": "approved",
+      "type": "success",
+      "label": "APPROVED",
+      "sublabel": "扣减冻结余额 · 考勤重算",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "终态"
+    },
+    {
+      "id": "withdrawn",
+      "type": "failure",
+      "label": "WITHDRAWN",
+      "sublabel": "申请人撤回 · 删除流程实例 · 解冻",
+      "lane": "gates",
+      "col": 1,
+      "tag": "终态"
+    },
+    {
+      "id": "rejected",
+      "type": "failure",
+      "label": "REJECTED",
+      "sublabel": "拒绝 / 超时 / 驳回 · 解冻",
+      "lane": "terminal",
+      "col": 0,
+      "tag": "终态"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-pass",
+      "from": "pending_review",
+      "to": "in_approval",
+      "label": "通过 / 转人工",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": 55
+    },
+    {
+      "id": "t-approve",
+      "from": "in_approval",
+      "to": "approved",
+      "label": "直属上级通过",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": 55,
+      "labelDx": 60
+    },
+    {
+      "id": "t-withdraw",
+      "from": "in_approval",
+      "to": "withdrawn",
+      "label": "申请人撤回",
+      "variant": "dashed",
+      "route": "drop",
+      "labelDy": 24
+    },
+    {
+      "id": "t-ai-reject",
+      "from": "pending_review",
+      "to": "rejected",
+      "label": "预审拒绝 / 60s 超时",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [
+        [
+          94,
+          415
+        ],
+        [
+          402,
+          415
+        ]
+      ]
+    },
+    {
+      "id": "t-man-reject",
+      "from": "in_approval",
+      "to": "rejected",
+      "label": "人工驳回",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "right",
+      "via": [
+        [
+          330,
+          157
+        ],
+        [
+          330,
+          479
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "主轨道",
+      "items": [
+        "insertWorkflowRequest 无预审时直接写 IN_APPROVAL",
+        "markPendingAgentPreReview 置 PENDING_REVIEW,此时 Flowable 实例不存在",
+        "markHumanApprovalStarted 启动流程并回到 IN_APPROVAL"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "人工介入",
+      "items": [
+        "仅 IN_APPROVAL 可撤回(withdrawRequest)",
+        "撤回 = runtimeService.deleteProcessInstance + 解冻余额",
+        "预审超时由 AgentTaskTimeoutJobService 每 60s 扫描触发"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "终态与余额联动",
+      "items": [
+        "APPROVED:consumeFrozenForWorkflowApproval 扣减",
+        "REJECTED / WITHDRAWN:全部幂等解冻(sourceTxnKey)",
+        "三个终态统一走 finishRequest 收口并关闭待办"
+      ]
+    }
+  ]
+}

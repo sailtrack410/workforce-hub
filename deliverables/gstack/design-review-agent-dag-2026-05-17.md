@@ -3,7 +3,7 @@
 **日期**：2026-05-17
 **场景**：产品评审（设计稿可行性评估）
 **参与成员**：产品评审员（gstack-product-reviewer）
-**评审文件**：`docs/架构与设计/Agent工作流DAG设计.md`
+**评审文件**：`docs/架构与设计/智能体工作流编排设计.md`
 
 ---
 
@@ -93,7 +93,7 @@
 
 ## 📚 评审依据
 
-- 评审文件：`docs/架构与设计/Agent工作流DAG设计.md`（v1.0，2026-05-14）
+- 评审文件：`docs/架构与设计/智能体工作流编排设计.md`（v1.0，2026-05-14）
 - 后端代码：`server/src/main/java/com/workforcehub/agent/` 目录（AgentTaskExecutionService、AgentToolExecutionService、OpenAiCompatibleAgentModelClient、AgentVersionRow）
 - 数据库：`agt_agent_version` 表（已预留 `workflow_config_json` 字段）
 - SPI 接口：`WorkflowAgentPreReviewTrigger`、`WorkflowAgentResultCallback`

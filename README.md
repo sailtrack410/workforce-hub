@@ -72,7 +72,7 @@ cd employee-web && npm install && npm run dev   # 员工端
 
 ## 文档
 
-- [docs/README.md](docs/README.md) — 文档总索引（产品、架构、API、部署、开发日志）
+- [docs/说明.md](docs/说明.md) — 文档总索引（产品、架构、接口、部署、开发日志）
 - [docs/部署与交付/部署与初始化.md](docs/部署与交付/部署与初始化.md) — 部署手册
 - [PROJECT_INTRO.md](PROJECT_INTRO.md) — 完整项目介绍（创新点、竞品对比、部署方案）
 

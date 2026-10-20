@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Workforce Hub 系统架构",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.0.0系统架构图.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "admin_web", "type": "frontend", "label": "admin-web 管理后台", "sublabel": "Vue3 + TS + Pinia", "pos": [40, 90], "size": [170, 64] },
+    { "id": "employee_web", "type": "frontend", "label": "employee-web 员工端", "sublabel": "Vue3 + TS · 消息优先", "pos": [40, 260], "size": [170, 64] },
+    { "id": "nginx", "type": "backend", "label": "Nginx", "sublabel": "静态资源 + 反向代理 :80", "pos": [260, 175], "size": [150, 64] },
+    { "id": "server", "type": "backend", "label": "workforce-hub server", "sublabel": "Spring Boot 3.2 · Java 17 模块化单体", "tag": "MyBatis + Flyway", "pos": [540, 140], "size": [210, 110] },
+    { "id": "mysql", "type": "database", "label": "MySQL 8.4", "sublabel": "业务库 · Flowable 表", "pos": [880, 40], "size": [160, 62] },
+    { "id": "redis", "type": "database", "label": "Redis 7.4", "sublabel": "Session + 缓存", "pos": [880, 150], "size": [160, 62] },
+    { "id": "minio", "type": "database", "label": "MinIO", "sublabel": "S3 对象存储 · 文件", "pos": [880, 260], "size": [160, 62] },
+    { "id": "mail", "type": "external", "label": "SMTP 邮件", "sublabel": "Mailpit(开发环境)", "pos": [470, 530], "size": [160, 64] },
+    { "id": "llm", "type": "external", "label": "LLM 服务", "sublabel": "OpenAI 兼容 API · Agent 预审/问答", "pos": [670, 530], "size": [180, 64] },
+    { "id": "ragflow", "type": "external", "label": "RAGFlow", "sublabel": "知识库检索 API", "pos": [890, 530], "size": [130, 64] },
+    { "id": "pgvector", "type": "database", "label": "pgvector 向量库", "sublabel": "RAG 向量检索", "tag": "可选", "pos": [1060, 530], "size": [160, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "docker-compose 私有化交付", "wraps": ["nginx", "server", "mysql", "redis", "minio"], "pad": 20 },
+    { "kind": "region", "label": "外部服务 · 按部署环境接入", "wraps": ["mail", "llm", "ragflow", "pgvector"], "pad": 20 }
+  ],
+  "connections": [
+    { "from": "admin_web", "to": "nginx", "label": "HTTP", "fromSide": "right", "toSide": "left" },
+    { "from": "employee_web", "to": "nginx", "label": "HTTP · WS", "fromSide": "right", "toSide": "left" },
+    { "from": "nginx", "to": "server", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "from": "server", "to": "mysql", "label": "JDBC · Flyway", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "from": "server", "to": "redis", "label": "Session / 缓存", "fromSide": "right", "toSide": "left", "labelDy": 13 },
+    { "from": "server", "to": "minio", "label": "S3 文件", "fromSide": "right", "toSide": "left" },
+    { "from": "server", "to": "mail", "label": "SMTP", "fromSide": "bottom", "toSide": "top" },
+    { "from": "server", "to": "llm", "label": "Chat API", "fromSide": "bottom", "toSide": "top" },
+    { "from": "server", "to": "ragflow", "label": "检索 API", "fromSide": "bottom", "toSide": "top" },
+    { "from": "server", "to": "pgvector", "label": "向量查询", "variant": "dashed", "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "后端模块化单体", "items": ["Spring Boot 3.2 · Java 17 · MyBatis + Flyway 迁移", "业务模块:auth / org / hr / attendance / leave / im / contact / file / system", "workflow:Flowable 7 审批引擎 · plugin:PF4J 插件网关", "agent:预审 / RAG 问答 / 主动提醒 · ragflow:知识库接入"] },
+    { "dot": "violet", "title": "外部依赖", "items": ["MySQL 8.4 业务库 · Redis 7.4 会话缓存 · MinIO 对象存储", "SMTP 邮件:开发用 Mailpit,生产接真实 SMTP", "LLM:OpenAI 兼容 API(AGENT_MODEL_* 配置)", "RAGFlow 知识检索 · pgvector 向量库(RAGFLOW_VECTOR_*,默认关闭)"] },
+    { "dot": "emerald", "title": "前端与交付", "items": ["admin-web / employee-web:Vue3 + TS + Pinia 双端", "shared-web:双端共享 HTTP 封装", "Nginx 统一入口:静态资源 + /api、/ws 反向代理", "docker-compose 一键私有化交付"] }
+  ]
+}
