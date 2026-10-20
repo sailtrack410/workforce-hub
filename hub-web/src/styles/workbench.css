@@ -1,0 +1,526 @@
+/* ============================================================
+   Workbench 工作台样式（hub-web，对齐画布 3:1285，批次⑪）
+   画布结构：问候区（左文案+右指标卡×4 高88 r18 同行）→
+   行A 290 / 行B 240 / 行C 弹性；右栏 336 = Agent(hug) + 通知(弹性) + 快捷(104 钉底)。
+   布局契约：1440×900/760 无页面滚动；矮视口行 C 让位、极端矮由 .wb-page 滚动兜底。
+   ============================================================ */
+
+.wb-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- 问候区（画布：问候文案与指标卡同一行） ---------- */
+.wb-greeting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex: none;
+}
+.wb-greeting-copy h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--hw-ink);
+  letter-spacing: 0.01em;
+}
+.wb-greeting-copy p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--hw-tertiary);
+}
+
+/* ---------- 指标卡 ×4（画布：88 高 r18） ---------- */
+.wb-metrics {
+  display: flex;
+  gap: 14px;
+  flex: none;
+}
+.wb-metric {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 172px;
+  height: 88px;
+  padding: 16px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: var(--hw-card);
+  min-width: 0;
+}
+.wb-metric-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--hw-sky);
+  color: var(--hw-primary);
+  flex: none;
+}
+.wb-metric-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wb-metric-copy small { font-size: 12px; color: var(--hw-tertiary); white-space: nowrap; }
+.wb-metric-copy strong { font-size: 20px; font-weight: 700; color: var(--hw-ink); }
+.wb-metric-copy strong em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--hw-muted);
+  margin-left: 3px;
+}
+
+/* ---------- 主区 ---------- */
+.wb-main {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+.wb-col {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wb-row {
+  display: flex;
+  gap: 20px;
+  min-height: 0;
+}
+/* 画布行高：A 290 / B 240 / C 弹性；最小高度防裁切，矮视口由页面滚动兜底 */
+.wb-row-a { flex: 0 1 auto; height: 290px; min-height: 240px; }
+.wb-row-b { flex: 0 1 auto; height: 240px; min-height: 200px; }
+.wb-row-c { flex: 1 1 auto; min-height: 120px; }
+
+.wb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: var(--hw-card);
+  min-width: 0;
+  min-height: 0;
+}
+.wb-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex: none;
+}
+.wb-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hw-ink);
+}
+.wb-card-head-side { font-size: 12px; color: var(--hw-muted); white-space: nowrap; }
+.wb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--hw-primary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+.wb-card-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--hw-tertiary);
+}
+.wb-card-note b { color: var(--hw-primary); font-weight: 600; }
+.wb-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--hw-muted);
+  text-align: center;
+  padding: 12px 0;
+}
+
+/* 行内左右卡按 25:22（画布 500:440）比例分配 */
+.wb-card-attendance,
+.wb-card-leave { flex: 25 1 0; }
+.wb-card-week,
+.wb-card-requests { flex: 22 1 0; }
+.wb-card-schedule { flex: 1; }
+
+/* ---------- 今日考勤 ---------- */
+.wb-punch-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+.wb-punch {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--hw-inner);
+}
+.wb-punch small { font-size: 12px; color: var(--hw-tertiary); }
+.wb-punch strong { font-size: 24px; font-weight: 700; color: var(--hw-ink); }
+.wb-punch em { font-style: normal; font-size: 11px; color: var(--hw-muted); }
+.wb-attend-actions {
+  display: flex;
+  gap: 10px;
+  flex: none;
+}
+.wb-btn-primary {
+  flex: 1;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--hw-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.wb-btn-primary:hover:not(:disabled) { background: var(--hw-primary-deep); }
+.wb-btn-primary:disabled { opacity: 0.65; cursor: default; }
+.wb-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--hw-chip);
+  color: var(--hw-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.wb-btn-ghost:hover { background: var(--hw-track); }
+
+/* ---------- 本周出勤柱状图（画布：bars + 今天高亮） ---------- */
+.wb-chart {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+.wb-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 0;
+}
+.wb-bar-value {
+  font-size: 10px;
+  color: var(--hw-muted);
+  height: 14px;
+  line-height: 14px;
+}
+.wb-bar {
+  width: 100%;
+  max-width: 34px;
+  border-radius: 8px;
+  background: var(--hw-sky-strong);
+  transition: height 0.3s var(--hw-ease);
+}
+.wb-bar-col.today .wb-bar { background: var(--hw-primary); }
+.wb-bar-col.future .wb-bar { background: var(--hw-track); }
+.wb-bar-col small { font-size: 11px; color: var(--hw-tertiary); }
+.wb-bar-col.today small { color: var(--hw-primary); font-weight: 600; }
+
+/* ---------- 假期余额（画布：假种+进度条） ---------- */
+.wb-leave-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+.wb-leave-item {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.wb-leave-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.wb-leave-label span { font-size: 13px; color: var(--hw-ink); }
+.wb-leave-label strong { font-size: 14px; font-weight: 600; color: var(--hw-primary); }
+.wb-leave-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--hw-inner);
+  overflow: hidden;
+}
+.wb-leave-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--hw-sky-strong), var(--hw-primary));
+  transition: width 0.3s var(--hw-ease);
+}
+
+/* ---------- 审批进行中 ---------- */
+.wb-req-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.wb-req-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--hw-inner);
+}
+.wb-req-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wb-req-copy strong {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--hw-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wb-req-copy small { font-size: 11px; color: var(--hw-muted); }
+.wb-status {
+  font-style: normal;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--hw-green-bg);
+  color: var(--hw-green);
+  flex: none;
+}
+.wb-status.running { background: var(--hw-sky); color: var(--hw-primary); }
+
+/* ---------- 今日日程 ---------- */
+.wb-schedule-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+}
+.wb-schedule-empty small { font-size: 11px; color: var(--hw-muted); }
+
+/* ---------- 右栏 336 ---------- */
+.wb-side {
+  width: 336px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* Agent 卡（画布：图标+标题+在线标签+能力说明+快捷提问+输入框，内容自适应） */
+.wb-card-agent { flex: none; gap: 10px; }
+.wb-agent-head { display: flex; align-items: center; gap: 8px; }
+.wb-agent-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--hw-sky-strong), var(--hw-primary));
+  color: #fff;
+  flex: none;
+}
+.wb-agent-online {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--hw-green);
+}
+.wb-agent-online::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--hw-green);
+}
+.wb-agent-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--hw-tertiary);
+}
+.wb-agent-questions { display: flex; flex-wrap: wrap; gap: 8px; }
+.wb-agent-q {
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--hw-inner);
+  color: var(--hw-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.wb-agent-q:hover { background: var(--hw-sky); color: var(--hw-primary); }
+.wb-agent-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 6px 0 14px;
+  border-radius: 999px;
+  background: var(--hw-inner);
+}
+.wb-agent-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--hw-ink);
+}
+.wb-agent-input input::placeholder { color: var(--hw-muted); }
+.wb-agent-input button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hw-primary);
+  color: #fff;
+  cursor: pointer;
+  flex: none;
+}
+
+/* 通知卡：弹性填充 */
+.wb-card-notify { flex: 1 1 auto; min-height: 0; }
+.wb-notify-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.wb-notify-item { display: flex; gap: 10px; align-items: flex-start; }
+.wb-notify-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--hw-primary);
+  margin-top: 7px;
+  flex: none;
+}
+.wb-notify-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wb-notify-copy strong {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--hw-ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.wb-notify-copy small { font-size: 11px; color: var(--hw-muted); }
+.wb-notify-all { align-self: center; flex: none; }
+
+/* 快捷入口：固定 104 钉底（12 + 80 + 12，2026-10-13 与用户确认） */
+.wb-card-quick {
+  flex: none;
+  gap: 8px;
+  padding: 12px 20px;
+}
+.wb-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.wb-quick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 80px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--hw-inner);
+  color: var(--hw-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.wb-quick-item:hover { background: var(--hw-sky); color: var(--hw-primary); }
+
+/* ---------- 批次⑬：联调新增（今日班次/通知标签/已读点） ---------- */
+.wb-schedule-today {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.wb-shift-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 40px;
+  border-radius: 16px;
+  background: var(--hw-inner);
+}
+.wb-shift-hero small { font-size: 12px; color: var(--hw-tertiary); }
+.wb-shift-hero strong { font-size: 18px; font-weight: 700; color: var(--hw-ink); }
+.wb-shift-hero em {
+  font-style: normal;
+  font-size: 14px;
+  color: var(--hw-primary);
+  font-weight: 600;
+}
+.wb-notify-tag {
+  font-style: normal;
+  font-size: 10px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--hw-chip);
+  color: var(--hw-tertiary);
+  vertical-align: 1px;
+}
+.wb-notify-dot.read { background: var(--hw-track); }

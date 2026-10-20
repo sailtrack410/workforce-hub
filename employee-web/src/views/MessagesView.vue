@@ -53,7 +53,6 @@ import { useImStore } from '../stores/im';
 import { useSessionStore } from '../stores/session';
 import { usePluginsStore } from '../stores/plugins';
 import { useCurrentUserAvatarUrl } from '../composables/useCurrentUserAvatarUrl';
-import { useEmployeeAuthFlow } from '../composables/useEmployeeAuthFlow';
 import { useFileUpload } from '../composables/useFileUpload';
 import { useImSocket } from '../composables/useImSocket';
 import { usePersonalFileTransfer } from '../composables/usePersonalFileTransfer';
@@ -85,7 +84,6 @@ import AppTag from '../components/ui/AppTag.vue';
 import ShellNavButton from '../components/shell/ShellNavButton.vue';
 import ProfileMenu from '../components/shell/ProfileMenu.vue';
 import ContactsCategoryNav from '../components/ContactsCategoryNav.vue';
-import authHeroImage from '../assets/auth-hero-employee.jpg';
 import workbenchIconOa from '../assets/brand/app-icon-oa.jpg';
 import workbenchIconAttendance from '../assets/brand/app-icon-attendance.jpg';
 import workbenchIconLeave from '../assets/brand/app-icon-leave.jpg';
@@ -166,12 +164,6 @@ const fileUsageCircumference = 2 * Math.PI * 52;
 const activeFileUsage = computed(() => Math.max(0, Math.min(100, Number(activeFile.value.usage || 0))));
 const activeFileUsageOffset = computed(() => fileUsageCircumference * (1 - activeFileUsage.value / 100));
 const themeLabel = computed(() => (shell.theme === 'light' ? '浅色' : '深色'));
-// 登录页品牌标语轮播：来自公开品牌配置（管理端企业设置维护），失败时回退内置文案
-const DEFAULT_TAGLINE = '消息、待办、审批与智能助手，在同一个工作区内持续协同。';
-const brandTaglines = ref<string[]>([DEFAULT_TAGLINE]);
-const taglineIndex = ref(0);
-const activeTagline = computed(() => brandTaglines.value[taglineIndex.value % brandTaglines.value.length] || DEFAULT_TAGLINE);
-let taglineTimer: number | undefined;
 const searchModel = computed({
   get: () => shell.search[activeSection.value],
   set: (value: string) => shell.setSearch(activeSection.value, value),
@@ -403,38 +395,6 @@ async function refreshSearchAgentAvatarUrls(agents: AgentResponse[]) {
   }));
   searchAgentAvatarUrls.value = Object.fromEntries(entries);
 }
-
-const {
-  authMode,
-  loginName,
-  password,
-  loginEmailCode,
-  loginRequiresEmailCode,
-  loginRequiresEmailBinding,
-  loginBindEmail,
-  loginCodeSending,
-  loginCodeCooldown,
-  resetEmail,
-  resetCode,
-  resetPasswordValue,
-  resetCodeSending,
-  resetCodeCooldown,
-  authNotice,
-  authModeTitle,
-  authModeSubtitle,
-  loginCodeButtonText,
-  resetCodeButtonText,
-  setAuthMode,
-  submitLogin,
-  sendLoginCode,
-  sendResetCode,
-  submitPasswordReset,
-  resetAuthCooldowns,
-} = useEmployeeAuthFlow({
-  session,
-  loadAuthenticatedWorkspace,
-});
-const showAuthModeHead = computed(() => loginRequiresEmailBinding.value || loginRequiresEmailCode.value || Boolean(authModeSubtitle.value));
 
 function runAction(action?: SectionAction) {
   if (!action) return;
@@ -879,18 +839,12 @@ onMounted(async () => {
   window.addEventListener('resize', updateFilterOverflow);
   // 全局右键拦截：屏蔽浏览器默认菜单，输入类元素放行以保留系统编辑菜单
   window.addEventListener('contextmenu', handleGlobalContextMenu);
-  employeeApi.auth.branding()
-    .then((res) => {
-      if (res.taglines?.length) brandTaglines.value = res.taglines;
-    })
-    .catch(() => undefined);
-  taglineTimer = window.setInterval(() => {
-    taglineIndex.value = (taglineIndex.value + 1) % Math.max(1, brandTaglines.value.length);
-  }, 4500);
   if (!session.initialized) {
     await session.loadCurrentUser().catch(() => undefined);
     if (!session.isAuthenticated) {
       session.error = '';
+      // 未登录统一走 hub 新登录页
+      void router.replace({ name: 'employee-login' });
     }
   }
   if (session.isAuthenticated) {
@@ -907,8 +861,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('contextmenu', handleGlobalContextMenu);
   if (toastTimer) window.clearTimeout(toastTimer);
   if (searchAgentsTimer) window.clearTimeout(searchAgentsTimer);
-  if (taglineTimer) window.clearInterval(taglineTimer);
-  resetAuthCooldowns();
   closeImSocket();
 });
 
@@ -1123,126 +1075,9 @@ provideEmployeeShellContexts(employeeShellContexts);
 </script>
 
 <template>
-  <main v-if="!session.initialized && session.loading" class="auth-shell auth-shell-loading" :data-theme="shell.theme">
-    <section class="auth-card loading-card">
-      <AppLoadingState />
-    </section>
-  </main>
-
-  <main v-else-if="!session.isAuthenticated" class="auth-shell" :data-theme="shell.theme">
-    <section class="auth-hero" aria-label="员工端登录">
-      <div class="auth-brand-row">
-        <div class="auth-brand-identity">
-          <AppAvatar label="Workforce Hub" kind="org" tone="neutral" size="md" />
-          <span>
-            <strong>Workforce Hub</strong>
-            <small>员工协同端</small>
-          </span>
-        </div>
-        <button class="theme-toggle auth-theme-toggle" type="button" @click="shell.toggleTheme()">
-          <component :is="shell.theme === 'light' ? MoonStar : SunMedium" :size="16" />
-          <span>{{ themeLabel }}</span>
-        </button>
-      </div>
-      <div class="auth-hero-copy">
-        <p class="auth-kicker">EMPLOYEE WORKSPACE</p>
-        <h1>Workforce Hub</h1>
-        <p class="auth-hero-summary">
-          <Transition name="tagline-fade" mode="out-in">
-            <span :key="activeTagline" class="auth-tagline">{{ activeTagline }}</span>
-          </Transition>
-        </p>
-      </div>
-      <div class="auth-hero-visual" aria-label="员工协同工作流主视觉">
-        <img class="auth-hero-image" :src="authHeroImage" alt="" aria-hidden="true" />
-      </div>
-    </section>
-
-    <section class="auth-card" :aria-label="authModeTitle">
-      <div class="auth-mode-tabs" role="tablist" aria-label="认证方式">
-        <button type="button" :class="{ active: authMode === 'login' }" @click="setAuthMode('login')">登录</button>
-        <button type="button" :class="{ active: authMode === 'reset' }" @click="setAuthMode('reset')">找回</button>
-      </div>
-
-      <div v-if="showAuthModeHead" class="auth-card-head">
-        <h2>{{ authModeTitle }}</h2>
-        <p v-if="authModeSubtitle">{{ authModeSubtitle }}</p>
-      </div>
-
-      <form v-if="authMode === 'login'" class="auth-form" @submit.prevent="submitLogin">
-        <label class="auth-field">
-          <span>登录名</span>
-          <AppInput v-model="loginName" autocomplete="username" placeholder="员工登录名" />
-        </label>
-        <label class="auth-field">
-          <span>密码</span>
-          <AppInput v-model="password" type="password" autocomplete="current-password" placeholder="密码" />
-        </label>
-        <label v-if="loginRequiresEmailBinding" class="auth-field">
-          <span>绑定邮箱</span>
-          <AppInput v-model="loginBindEmail" type="email" autocomplete="email" placeholder="邮箱地址" />
-        </label>
-        <div v-if="loginRequiresEmailCode || loginRequiresEmailBinding" class="auth-code-row">
-          <label class="auth-field">
-            <span>邮箱验证码</span>
-            <AppInput v-model="loginEmailCode" autocomplete="one-time-code" placeholder="邮箱验证码" />
-          </label>
-          <AppButton
-            variant="secondary"
-            type="button"
-            :disabled="loginCodeSending || loginCodeCooldown.isActive.value || (loginRequiresEmailBinding ? !loginBindEmail.trim() : !loginName.trim())"
-            @click="sendLoginCode"
-          >
-            {{ loginCodeButtonText }}
-          </AppButton>
-        </div>
-        <p v-if="session.error" class="auth-error">{{ session.error }}</p>
-        <p v-if="authNotice" class="auth-notice">{{ authNotice }}</p>
-        <AppButton variant="primary" size="lg" block type="submit" :disabled="session.loading || !loginName.trim() || !password">
-          {{ session.loading ? '登录中' : (loginRequiresEmailCode || loginRequiresEmailBinding) ? '验证并进入' : '进入工作区' }}
-        </AppButton>
-      </form>
-
-      <form v-else class="auth-form" @submit.prevent="submitPasswordReset">
-        <label class="auth-field">
-          <span>绑定邮箱</span>
-          <AppInput v-model="resetEmail" type="email" autocomplete="email" placeholder="已绑定邮箱" />
-        </label>
-        <div class="auth-code-row">
-          <label class="auth-field">
-            <span>验证码</span>
-            <AppInput v-model="resetCode" autocomplete="one-time-code" placeholder="验证码" />
-          </label>
-          <AppButton
-            variant="secondary"
-            type="button"
-            :disabled="resetCodeSending || resetCodeCooldown.isActive.value || !resetEmail.trim()"
-            @click="sendResetCode"
-          >
-            {{ resetCodeButtonText }}
-          </AppButton>
-        </div>
-        <label class="auth-field">
-          <span>新密码</span>
-          <AppInput v-model="resetPasswordValue" type="password" autocomplete="new-password" placeholder="8-64 位新密码" />
-        </label>
-        <p v-if="session.error" class="auth-error">{{ session.error }}</p>
-        <p v-if="authNotice" class="auth-notice">{{ authNotice }}</p>
-        <AppButton
-          variant="primary"
-          size="lg"
-          block
-          type="submit"
-          :disabled="session.loading || !resetEmail.trim() || !resetCode.trim() || resetPasswordValue.length < 8"
-        >
-          {{ session.loading ? '提交中' : '重置密码' }}
-        </AppButton>
-      </form>
-    </section>
-  </main>
 
   <main
-    v-else
+    v-if="session.initialized && session.isAuthenticated"
     class="employee-shell"
     :class="[
       `section-${activeSection}`,

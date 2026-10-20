@@ -6,17 +6,14 @@ describe('employee router', () => {
     const employeeRoutes = await loadEmployeeRoutes();
     const root = employeeRoutes.find((route) => route.path === '/');
 
-    expect(root?.redirect).toBe('/messages');
+    expect(root?.redirect).toBe('/hub/messages');
   });
 
   it.each([
-    ['/messages', 'employee-messages', 'messages'],
-    ['/messages/conv-1001', 'employee-message-detail', 'messages'],
-    ['/todos', 'employee-todos', 'todos'],
-    ['/todos/todo-1001', 'employee-todo-detail', 'todos'],
-    ['/workbench', 'employee-workbench', 'workbench'],
-    ['/workbench/leave', 'employee-workbench-detail', 'workbench'],
-    ['/workbench/oa', 'employee-workbench-detail', 'workbench'],
+    ['/hub/messages', 'hub-messages', 'messages'],
+    ['/hub/messages/conv-1001', 'hub-messages-detail', 'messages'],
+    ['/hub/approvals', 'hub-approvals', 'approval'],
+    ['/hub/workbench', 'hub-workbench', 'workbench'],
     ['/files', 'employee-files', 'files'],
     ['/contacts', 'employee-contacts', 'contacts'],
     ['/settings', 'employee-settings', 'settings'],
@@ -79,9 +76,10 @@ async function loadEmployeeRoutes(): Promise<RouteRecordRaw[]> {
 
 function findRoute(employeeRoutes: RouteRecordRaw[], path: string) {
   const normalizedPath = path.replace(/^\//, '');
-  return employeeRoutes.find((route) => route.path === path)
-    ?? employeeRoutes.flatMap((route) => route.children ?? []).find((route) => {
-      const routePath = route.path.replace(/\/:[^/]+/g, '/[^/]+');
-      return new RegExp(`^${routePath}$`).test(normalizedPath);
-    });
+  const matchPattern = (routePath: string) => {
+    const pattern = routePath.replace(/^\//, '').replace(/\/:[^/]+/g, '/[^/]+');
+    return new RegExp(`^${pattern}$`).test(normalizedPath);
+  };
+  return employeeRoutes.find((route) => route.path === path || matchPattern(route.path))
+    ?? employeeRoutes.flatMap((route) => route.children ?? []).find((route) => matchPattern(route.path));
 }

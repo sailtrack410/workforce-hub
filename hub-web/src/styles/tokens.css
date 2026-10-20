@@ -1,0 +1,89 @@
+/* hub-web 设计令牌：取自画布「员工端」系列（3:1285 / 3:2204 / 8:34） */
+:root {
+  /* 画布底色与卡片 */
+  --hw-canvas: #edf1f7;
+  --hw-card: #ffffff;
+  --hw-inner: #f6f8fb;
+  --hw-chip: #f2f5f9;
+  --hw-track: #eaeff5;
+  --hw-sky: #d9ebff;
+  --hw-sky-strong: #87c2ff;
+
+  /* 文字 */
+  --hw-ink: #181d23;
+  --hw-secondary: #424b56;
+  --hw-tertiary: #717d8c;
+  --hw-muted: #9ba6b4;
+
+  /* 品牌与语义 */
+  --hw-primary: #1677ff;
+  --hw-primary-deep: #124da3;
+  --hw-pill-dark: #181d23;
+  --hw-green: #1fad66;
+  --hw-green-bg: #edf7f1;
+  --hw-amber: #ff9f18;
+  --hw-amber-bg: #fbf5e8;
+  --hw-amber-strong: #d98a1f;
+  --hw-red: #ff5a4e;
+  --hw-red-bg: #fdeceb;
+
+  /* 动效 */
+  --hw-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --hw-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --hw-morph: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+[data-theme='dark'] {
+  --hw-canvas: #0e1319;
+  --hw-card: #1a222c;
+  --hw-inner: #232c39;
+  --hw-chip: #26303d;
+  --hw-track: #2a3542;
+  --hw-sky: #1d3350;
+  --hw-sky-strong: #2c4a73;
+  --hw-ink: #e9edf2;
+  --hw-secondary: #aeb8c4;
+  --hw-tertiary: #8b96a3;
+  --hw-muted: #6e7a87;
+  --hw-pill-dark: #38455a;
+  --hw-green-bg: #14301f;
+  --hw-amber-bg: #33270f;
+  --hw-red-bg: #3a1a17;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+}
+
+body {
+  font-family: "Noto Sans SC", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--hw-ink);
+  background: var(--hw-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hw-track);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hw-muted);
+}
