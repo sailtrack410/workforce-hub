@@ -115,6 +115,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/employee/auth/login/send-code").permitAll()
                 .requestMatchers("/api/employee/auth/email/send-code").permitAll()
                 .requestMatchers("/api/employee/auth/password/reset").permitAll()
+                .requestMatchers("/api/public/auth/register/send-sms-code").permitAll()
+                .requestMatchers("/api/public/auth/register").permitAll()
                 .requestMatchers("/api/admin/auth/login").permitAll()
                 .requestMatchers("/api/public/branding").permitAll()
                 // email/bind 等其余 auth 接口需要登录态

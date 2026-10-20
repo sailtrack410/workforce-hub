@@ -37,6 +37,9 @@ import com.workforcehub.workflow.dto.WorkflowRequestWithdrawRequest;
 import com.workforcehub.workflow.dto.WorkflowTaskApproveRequest;
 import com.workforcehub.workflow.dto.WorkflowTaskActionResponse;
 import com.workforcehub.workflow.dto.WorkflowTaskRejectRequest;
+import com.workforcehub.workflow.dto.WorkflowAiReviewSummaryResponse;
+import com.workforcehub.workflow.dto.WorkflowCcResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestStatResponse;
 import com.workforcehub.workflow.dto.WorkflowTodoResponse;
 import com.workforcehub.workflow.repository.WorkflowAttachmentRow;
 import com.workforcehub.workflow.repository.WorkflowClockCorrectionDetailRow;
@@ -67,6 +70,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Map;
 
 import static com.workforcehub.common.util.TextValues.blankToNull;
@@ -473,9 +477,97 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
     public List<WorkflowTodoResponse> listCurrentEmployeeTodos() {
         Long ownerUserId = CurrentUserHolder.requireUserId();
-        return workflowRepository.listPendingTodos(ownerUserId).stream()
-            .map(this::toTodoResponse)
+        List<WorkflowTodoRow> rows = workflowRepository.listPendingTodos(ownerUserId);
+        // 接口需求表 #6：批量取 AI 预审结论
+        Map<Long, String> decisions = workflowRepository.findLatestPreReviewDecisions(
+            rows.stream().map(WorkflowTodoRow::requestId).collect(Collectors.toSet()));
+        return rows.stream()
+            .map(row -> {
+                WorkflowTodoResponse response = toTodoResponse(row);
+                String decision = decisions.get(row.requestId());
+                if (decision != null) {
+                    response.setAiVerdict(mapAiVerdict(decision));
+                    response.setAiVerdictName(aiVerdictName(response.getAiVerdict()));
+                }
+                return response;
+            })
             .toList();
+    }
+
+
+
+
+    /** 接口需求表 #8：我发起的审批统计 */
+    @Transactional(readOnly = true)
+    public WorkflowRequestStatResponse myRequestSummary() {
+        Long userId = CurrentUserHolder.requireUserId();
+        var row = workflowRepository.countMyRequestSummary(userId);
+        WorkflowRequestStatResponse response = new WorkflowRequestStatResponse();
+        response.setInFlight(row.inFlight());
+        response.setFinishedThisMonth(row.finishedThisMonth());
+        response.setAvgHandleHours(row.avgHandleHours() == null ? null : Math.round(row.avgHandleHours() * 10) / 10.0);
+        return response;
+    }
+
+    /** 接口需求表 #7：分页查抄送我的 */
+    public PageResult<WorkflowCcResponse> pageCcToMe(long pageNo, long pageSize) {
+        Long userId = CurrentUserHolder.requireUserId();
+        long total = workflowRepository.countCcToMe(userId);
+        List<WorkflowCcResponse> rows = workflowRepository.pageCcToMe(userId, (int) pageNo, (int) pageSize).stream()
+            .map(row -> {
+                WorkflowCcResponse response = new WorkflowCcResponse();
+                response.setRequestId(String.valueOf(row.requestId()));
+                response.setRequestNo(row.requestNo());
+                response.setBizTypeName(row.bizTypeName());
+                response.setTitle(row.title());
+                response.setApplicantName(row.applicantName());
+                response.setCcAt(row.ccAt());
+                response.setStatus(row.status());
+                response.setStatusName(row.statusName());
+                response.setRead(row.read());
+                return response;
+            })
+            .toList();
+        return PageResult.of(pageNo, pageSize, total, rows);
+    }
+
+    /** 接口需求表 #7：标记抄送已读 */
+    @Transactional(rollbackFor = Exception.class)
+    public void markCcRead(String requestId) {
+        Long userId = CurrentUserHolder.requireUserId();
+        workflowRepository.markCcRead(userId, Long.valueOf(requestId));
+    }
+
+    /** 接口需求表 #6 期望A：本周 AI 预审统计 */
+    public WorkflowAiReviewSummaryResponse aiReviewSummary() {
+        Long userId = CurrentUserHolder.requireUserId();
+        LocalDate weekStart = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1L);
+        Map<String, Long> distribution = workflowRepository.countMyPreReviewDecisions(userId, weekStart);
+        long reviewed = distribution.values().stream().mapToLong(Long::longValue).sum();
+        long pass = distribution.getOrDefault("APPROVED", 0L);
+        long blocked = distribution.getOrDefault("REJECTED", 0L);
+        WorkflowAiReviewSummaryResponse response = new WorkflowAiReviewSummaryResponse();
+        response.setWeekReviewed(reviewed);
+        response.setPassRate(reviewed == 0 ? null : Math.round(pass * 100.0 / reviewed) / 100.0);
+        response.setBlockedCount(blocked);
+        response.setBlockedRules(List.of());
+        return response;
+    }
+
+    private String mapAiVerdict(String decision) {
+        return switch (decision) {
+            case "APPROVED" -> "PASS";
+            case "REJECTED" -> "BLOCKED";
+            default -> "REVIEWING";
+        };
+    }
+
+    private String aiVerdictName(String verdict) {
+        return switch (verdict) {
+            case "PASS" -> "AI 预审通过";
+            case "BLOCKED" -> "预审未通过";
+            default -> "AI 预审中";
+        };
     }
 
     public PageResult<WorkflowRequestSummaryResponse> pageCurrentEmployeeRequests(WorkflowRequestListQuery query) {

@@ -1,5 +1,6 @@
 package com.workforcehub.im.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -30,4 +31,10 @@ public class ImConversationSummaryResponse {
     private String memberRoleName;
     private Boolean hasMentionMe;
     private Boolean hasReplyMe;
+    @Schema(description = "群成员数(仅群会话返回)", example = "12")
+    private Long memberCount;
+    @Schema(description = "保存到通讯录", example = "false")
+    private Boolean saveToContacts;
+    @Schema(description = "显示成员昵称", example = "true")
+    private Boolean showMemberNickname;
 }

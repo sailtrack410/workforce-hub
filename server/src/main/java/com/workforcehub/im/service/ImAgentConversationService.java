@@ -281,6 +281,9 @@ public class ImAgentConversationService {
         response.setMemberRoleName(memberRoleName(row.memberRole()));
         response.setHasMentionMe(Boolean.TRUE.equals(row.hasMentionMe()));
         response.setHasReplyMe(Boolean.TRUE.equals(row.hasReplyMe()));
+        response.setMemberCount("GROUP".equals(row.conversationType()) ? row.memberCount() : null);
+        response.setSaveToContacts(Boolean.TRUE.equals(row.saveToContacts()));
+        response.setShowMemberNickname(Boolean.TRUE.equals(row.showMemberNickname()));
         return response;
     }
 

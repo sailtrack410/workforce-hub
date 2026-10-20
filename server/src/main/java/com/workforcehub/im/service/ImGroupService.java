@@ -12,6 +12,8 @@ import com.workforcehub.file.repository.AttachmentRefRepository;
 import com.workforcehub.file.repository.DownloadAttachmentRow;
 import com.workforcehub.file.service.DownloadTicketExecutionService;
 import com.workforcehub.file.storage.StorageObjectResource;
+import com.workforcehub.im.dto.ImGroupNoticeResponse;
+import com.workforcehub.im.dto.PublishGroupNoticeRequest;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import com.workforcehub.im.dto.CreateGroupConversationRequest;
 import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
@@ -125,8 +127,12 @@ public class ImGroupService {
         Long userId = requireActiveEmployeeUserId();
         ensureCanAccessActiveGroup(conversationId, userId);
         ImGroupFileRow file = getUsableGroupFileOrThrow(conversationId, attachmentRefId);
-        if (!"SINGLE".equalsIgnoreCase(request.getDownloadType())) {
-            throw new BizException(400, "第一版仅支持单文件下载");
+        String downloadType = request.getDownloadType();
+        if (downloadType != null
+            && !"SINGLE".equalsIgnoreCase(downloadType)
+            && !"INLINE".equalsIgnoreCase(downloadType)
+            && !"ATTACHMENT".equalsIgnoreCase(downloadType)) {
+            throw new BizException(400, "不支持的下载类型");
         }
 
         Long ticketId = IdGenerator.nextId();
@@ -586,4 +592,44 @@ public class ImGroupService {
         }
         return text.replace("\\", "\\\\").replace("\"", "\\\"");
     }
+    /** 接口需求表 #5：群公告列表 */
+    @Transactional(readOnly = true)
+    public List<ImGroupNoticeResponse> listGroupNotices(Long conversationId) {
+        Long userId = requireActiveEmployeeUserId();
+        ensureCanAccessActiveGroup(conversationId, userId);
+        return imGroupRepository.listGroupNotices(conversationId).stream()
+            .map(row -> {
+                ImGroupNoticeResponse response = new ImGroupNoticeResponse();
+                response.setNoticeId(String.valueOf(row.noticeId()));
+                response.setTitle(row.title());
+                response.setContent(row.content());
+                response.setPublisherName(row.publisherName());
+                response.setPublishedAt(row.createdAt());
+                return response;
+            })
+            .toList();
+    }
+
+    /** 接口需求表 #5：发布群公告(群主/管理员) */
+    @Transactional(rollbackFor = Exception.class)
+    public ImGroupNoticeResponse publishGroupNotice(Long conversationId, PublishGroupNoticeRequest request) {
+        Long userId = requireActiveEmployeeUserId();
+        String memberRole = ensureCanAccessActiveGroupAndReturnRole(conversationId, userId);
+        if (!"OWNER".equals(memberRole) && !"ADMIN".equals(memberRole)) {
+            throw new BizException(403, "仅群主或群管理员可发布公告");
+        }
+        if (request.getContent() == null || request.getContent().isBlank()) {
+            throw new BizException(400, "公告内容不能为空");
+        }
+        Long noticeId = IdGenerator.nextId();
+        imGroupRepository.insertGroupNotice(noticeId, conversationId, request.getTitle(), request.getContent(), userId);
+        ImGroupNoticeResponse response = new ImGroupNoticeResponse();
+        response.setNoticeId(String.valueOf(noticeId));
+        response.setTitle(request.getTitle());
+        response.setContent(request.getContent());
+        response.setPublisherName(null);
+        response.setPublishedAt(LocalDateTime.now());
+        return response;
+    }
+
 }

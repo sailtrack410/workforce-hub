@@ -166,10 +166,16 @@ public class LeaveService {
         Map<Long, LeaveAccountTxnRow> latestTxns = leaveRepository.findLatestTxnByAccountIds(
             accounts.stream().map(LeaveAccountRow::accountId).toList()
         );
+        // 接口需求表 #14：年度总额度 = 当年 GRANT 流水累计
+        Map<Long, Integer> entitlements = leaveRepository.sumAnnualGrantMinutesByAccountIds(
+            accounts.stream().map(LeaveAccountRow::accountId).toList()
+        );
         return accounts.stream()
             .map(row -> {
                 LeaveAccountTxnRow txn = latestTxns.get(row.accountId());
-                return toAccountResponse(row, txn == null ? null : txn.txnType(), txn == null ? null : txn.changeMinutes());
+                LeaveAccountResponse response = toAccountResponse(row, txn == null ? null : txn.txnType(), txn == null ? null : txn.changeMinutes());
+                response.setEntitlementMinutes(entitlements.get(row.accountId()));
+                return response;
             })
             .toList();
     }

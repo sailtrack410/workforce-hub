@@ -150,7 +150,11 @@ public class ImRepository {
                    CAST(lm.content_json AS CHAR) AS last_message_content_json,
                    lm.quoted_message_id AS last_message_quoted_message_id,
                    lm.status AS last_message_status,
-                   lm.sent_at AS last_message_sent_at
+                   lm.sent_at AS last_message_sent_at,
+                   (SELECT COUNT(*) FROM im_conversation_member cm
+                     WHERE cm.conversation_id = c.id AND cm.status = 'ACTIVE') AS member_count,
+                   m.save_to_contacts_flag AS save_to_contacts,
+                   m.show_member_nickname_flag AS show_member_nickname
             FROM im_conversation_member m
             JOIN im_conversation c ON c.id = m.conversation_id
             LEFT JOIN im_conversation_member private_peer
@@ -602,7 +606,40 @@ public class ImRepository {
         );
     }
 
-    public int updateMemberPreference(Long conversationId, Long userId, Boolean pin, Boolean mute) {
+
+    /** 接口需求表 #3：设置本群昵称(空串=清除) */
+    public int updateGroupNickname(Long conversationId, Long userId, String nickname) {
+        return jdbcTemplate.update("""
+            UPDATE im_conversation_member
+            SET group_nickname = ?
+            WHERE conversation_id = ?
+              AND member_type = 'USER'
+              AND member_id = ?
+              AND status = 'ACTIVE'
+            """,
+            nickname == null || nickname.isBlank() ? null : nickname,
+            conversationId,
+            userId
+        );
+    }
+
+    /** 接口需求表 #4：清空当前用户视角的会话消息(推进 cleared_seq 到会话最新 seq) */
+    public int clearConversationForUser(Long conversationId, Long userId) {
+        return jdbcTemplate.update("""
+            UPDATE im_conversation_member m
+            JOIN im_conversation c ON c.id = m.conversation_id
+            SET m.cleared_seq = c.last_message_seq
+            WHERE m.conversation_id = ?
+              AND m.member_type = 'USER'
+              AND m.member_id = ?
+              AND m.status = 'ACTIVE'
+            """,
+            conversationId,
+            userId
+        );
+    }
+        public int updateMemberPreference(Long conversationId, Long userId, Boolean pin, Boolean mute,
+                                      Boolean saveToContacts, Boolean showMemberNickname) {
         List<String> assignments = new java.util.ArrayList<>();
         List<Object> args = new java.util.ArrayList<>();
         if (pin != null) {
@@ -612,6 +649,14 @@ public class ImRepository {
         if (mute != null) {
             assignments.add("mute_flag = ?");
             args.add(Boolean.TRUE.equals(mute) ? 1 : 0);
+        }
+        if (saveToContacts != null) {
+            assignments.add("save_to_contacts_flag = ?");
+            args.add(Boolean.TRUE.equals(saveToContacts) ? 1 : 0);
+        }
+        if (showMemberNickname != null) {
+            assignments.add("show_member_nickname_flag = ?");
+            args.add(Boolean.TRUE.equals(showMemberNickname) ? 1 : 0);
         }
         if (assignments.isEmpty()) {
             return 0;
@@ -664,6 +709,9 @@ public class ImRepository {
             rs.getString("member_role"),
             rs.getInt("has_mention_me") == 1,
             rs.getInt("has_reply_me") == 1,
+            rs.getLong("member_count"),
+            rs.getInt("save_to_contacts") == 1,
+            rs.getInt("show_member_nickname") == 1,
             lastMessage
         );
     }

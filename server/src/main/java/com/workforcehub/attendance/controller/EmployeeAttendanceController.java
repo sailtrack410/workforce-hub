@@ -3,6 +3,7 @@ package com.workforcehub.attendance.controller;
 import com.workforcehub.attendance.dto.AttendanceDailyResultResponse;
 import com.workforcehub.attendance.dto.AttendanceDateRangeQuery;
 import com.workforcehub.attendance.dto.AttendanceExceptionResponse;
+import com.workforcehub.attendance.dto.AttendanceScheduleResponse;
 import com.workforcehub.attendance.dto.CreatePunchRecordRequest;
 import com.workforcehub.attendance.dto.PunchRecordResponse;
 import com.workforcehub.attendance.dto.TeamAttendanceDateRangeQuery;
@@ -42,6 +43,12 @@ public class EmployeeAttendanceController {
     @GetMapping("/daily-results")
     public R<List<AttendanceDailyResultResponse>> dailyResults(@Valid AttendanceDateRangeQuery query) {
         return R.ok(attendanceService.listCurrentEmployeeDailyResults(query.getStartDate(), query.getEndDate()));
+    }
+
+    @Operation(summary = "查询个人排班区间", operationId = "listEmployeeAttendanceSchedules")
+    @GetMapping("/schedules")
+    public R<List<AttendanceScheduleResponse>> schedules(@Valid AttendanceDateRangeQuery query) {
+        return R.ok(attendanceService.listCurrentEmployeeSchedules(query.getStartDate(), query.getEndDate()));
     }
 
     @Operation(summary = "查询个人考勤异常", operationId = "listEmployeeAttendanceExceptions")

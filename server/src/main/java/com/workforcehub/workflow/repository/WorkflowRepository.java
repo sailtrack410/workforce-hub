@@ -15,7 +15,12 @@ import java.sql.Timestamp;
 import java.sql.Date;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * module-workflow 第一版 JDBC 仓储。
@@ -306,6 +311,86 @@ public class WorkflowRepository {
             ),
             ownerUserId
         );
+    }
+
+
+    /** 接口需求表 #6：当前用户提交申请的 AI 预审结论分布（本周窗口由 service 传日期过滤 submitted_at） */
+    public Map<String, Long> countMyPreReviewDecisions(Long applicantUserId, LocalDate sinceDate) {
+        return jdbcTemplate.query("""
+            SELECT latest.decision, COUNT(*) AS cnt
+            FROM (
+                SELECT ta.request_id,
+                       SUBSTRING_INDEX(
+                           SUBSTRING_INDEX(ta.agent_decision_json, '"decision": "', -1), '"', 1
+                       ) AS decision,
+                       ROW_NUMBER() OVER (PARTITION BY ta.request_id ORDER BY ta.id DESC) AS rn
+                FROM wf_task_action ta
+                JOIN wf_request wr ON wr.id = ta.request_id
+                WHERE ta.agent_decision_json IS NOT NULL
+                  AND wr.applicant_user_id = ?
+                  AND wr.submitted_at >= ?
+            ) latest
+            WHERE latest.rn = 1
+            GROUP BY latest.decision
+            """,
+            rs -> {
+                Map<String, Long> result = new HashMap<>();
+                while (rs.next()) {
+                    result.put(rs.getString("decision"), rs.getLong("cnt"));
+                }
+                return result;
+            },
+            applicantUserId,
+            sinceDate.atStartOfDay()
+        );
+    }
+    /** 接口需求表 #6：批量取各申请最新 Agent 预审结论（requestId → decision/APPROVED|REJECTED|TO_HUMAN） */
+    public Map<Long, String> findLatestPreReviewDecisions(Collection<Long> requestIds) {
+        if (requestIds == null || requestIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = requestIds.stream().map(id -> "?").collect(Collectors.joining(","));
+        Object[] args = requestIds.toArray();
+        return jdbcTemplate.query("""
+            SELECT ta.request_id, ta.agent_decision_json
+            FROM wf_task_action ta
+            JOIN (
+                SELECT request_id, MAX(id) AS max_id
+                FROM wf_task_action
+                WHERE agent_decision_json IS NOT NULL
+                  AND request_id IN (""" + placeholders + """
+                )
+                GROUP BY request_id
+            ) latest ON latest.request_id = ta.request_id AND latest.max_id = ta.id
+            """,
+            rs -> {
+                Map<Long, String> result = new HashMap<>();
+                while (rs.next()) {
+                    String json = rs.getString("agent_decision_json");
+                    String decision = extractDecision(json);
+                    if (decision != null) {
+                        result.put(rs.getLong("request_id"), decision);
+                    }
+                }
+                return result;
+            },
+            args
+        );
+    }
+
+    /** 从预审结论 JSON 中提取 decision 字段 */
+    private String extractDecision(String decisionJson) {
+        if (decisionJson == null || decisionJson.isBlank()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node =
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(decisionJson);
+            String decision = node.path("decision").asText(null);
+            return decision == null ? null : decision.toUpperCase();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public long countRequests(Long applicantUserId, WorkflowRequestListQuery query) {
@@ -965,4 +1050,120 @@ public class WorkflowRepository {
 
     public record WorkflowAttachmentDownloadScopeRow(Long requestId) {
     }
+    /** 接口需求表 #7：抄送我的记录行 */
+    public record WorkflowCcRow(
+        Long requestId,
+        String requestNo,
+        String bizTypeName,
+        String title,
+        String applicantName,
+        LocalDateTime ccAt,
+        String status,
+        String statusName,
+        Boolean read
+    ) {
+    }
+
+    /** 接口需求表 #7：分页查抄送我的记录 */
+    public List<WorkflowCcRow> pageCcToMe(Long userId, int pageNo, int pageSize) {
+        int offset = (Math.max(pageNo, 1) - 1) * Math.max(pageSize, 1);
+        return jdbcTemplate.query("""
+            SELECT cc.request_id, wr.request_no, wr.biz_type, wr.title,
+                   applicant.real_name AS applicant_name, cc.created_at AS cc_at,
+                   cc.status AS cc_status, wr.status
+            FROM wf_cc_record cc
+            JOIN wf_request wr ON wr.id = cc.request_id
+            LEFT JOIN org_user applicant ON applicant.id = wr.applicant_user_id
+            WHERE cc.receiver_user_id = ?
+            ORDER BY cc.created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (rs, rowNum) -> new WorkflowCcRow(
+                rs.getLong("request_id"),
+                rs.getString("request_no"),
+                bizTypeName(rs.getString("biz_type")),
+                rs.getString("title"),
+                rs.getString("applicant_name"),
+                rs.getTimestamp("cc_at").toLocalDateTime(),
+                rs.getString("status"),
+                statusName(rs.getString("status")),
+                "READ".equals(rs.getString("cc_status"))
+            ),
+            userId, pageSize, offset
+        );
+    }
+
+    /** 接口需求表 #7：抄送我的总数 */
+    public long countCcToMe(Long userId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM wf_cc_record WHERE receiver_user_id = ?
+            """, Long.class, userId);
+        return count == null ? 0 : count;
+    }
+
+    /** 接口需求表 #7：标记抄送已读 */
+    public int markCcRead(Long userId, Long requestId) {
+        return jdbcTemplate.update("""
+            UPDATE wf_cc_record
+            SET status = 'READ', read_at = NOW()
+            WHERE receiver_user_id = ? AND request_id = ? AND status = 'UNREAD'
+            """, userId, requestId);
+    }
+
+    private static String bizTypeName(String value) {
+        if ("LEAVE".equals(value)) return "请假";
+        if ("CLOCK_CORRECTION".equals(value)) return "补卡";
+        if ("EXPENSE".equals(value)) return "费用报销";
+        if ("BUSINESS_TRIP".equals(value)) return "出差";
+        if ("OVERTIME".equals(value)) return "加班";
+        if ("SEAL".equals(value)) return "用章";
+        if ("PURCHASE".equals(value)) return "采购";
+        if ("CERTIFICATE".equals(value)) return "证明开具";
+        if ("BORROW".equals(value)) return "备用金借款";
+        if ("PROJECT".equals(value)) return "项目立项";
+        return "其他业务";
+    }
+
+    private static String statusName(String value) {
+        if ("PENDING_REVIEW".equals(value)) return "待预审";
+        if ("IN_APPROVAL".equals(value)) return "审批中";
+        if ("APPROVED".equals(value)) return "已通过";
+        if ("REJECTED".equals(value)) return "已驳回";
+        if ("WITHDRAWN".equals(value)) return "已撤回";
+        return value == null ? null : "未知状态";
+    }
+
+    /** 接口需求表 #8：我发起的统计(进行中/本月已完成/平均处理时长小时) */
+    public record MyRequestSummaryRow(
+        long inFlight,
+        long finishedThisMonth,
+        Double avgHandleHours
+    ) {
+    }
+
+    public MyRequestSummaryRow countMyRequestSummary(Long applicantUserId) {
+        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        return jdbcTemplate.query("""
+            SELECT
+                SUM(CASE WHEN status IN ('PENDING_REVIEW', 'IN_APPROVAL') THEN 1 ELSE 0 END) AS in_flight,
+                SUM(CASE WHEN status = 'APPROVED' AND finished_at >= ? THEN 1 ELSE 0 END) AS finished_month,
+                AVG(CASE WHEN finished_at IS NOT NULL AND submitted_at IS NOT NULL
+                    THEN TIMESTAMPDIFF(MICROSECOND, submitted_at, finished_at) / 3600000000.0 END) AS avg_hours
+            FROM wf_request
+            WHERE applicant_user_id = ? AND is_deleted = 0
+            """,
+            rs -> {
+                if (!rs.next()) {
+                    return new MyRequestSummaryRow(0, 0, null);
+                }
+                long inFlight = rs.getLong("in_flight");
+                long finished = rs.getLong("finished_month");
+                Double avg = rs.getObject("avg_hours") == null ? null : rs.getDouble("avg_hours");
+                return new MyRequestSummaryRow(inFlight, finished, avg);
+            },
+            monthStart.atStartOfDay(),
+            applicantUserId
+        );
+    }
+
 }

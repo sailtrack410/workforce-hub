@@ -117,7 +117,10 @@ class ModuleLeaveApiIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)]", leaveTypeId).value(hasSize(1)))
             .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].leaveCode", leaveTypeId).value("ANNUAL_" + suffix))
             .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].availableMinutes", leaveTypeId).value(960))
-            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].frozenMinutes", leaveTypeId).value(0));
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].frozenMinutes", leaveTypeId).value(0))
+            // 账户列表须带出最新流水，供员工端“近期变动”展示
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].lastTxnType", leaveTypeId).value("ADJUST"))
+            .andExpect(jsonPath("$.data[?(@.leaveTypeId==%d)].lastChangeMinutes", leaveTypeId).value(960));
 
         mockMvc.perform(get("/api/admin/leave/accounts")
                 .cookie(adminSession)

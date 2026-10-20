@@ -18,6 +18,9 @@ import com.workforcehub.workflow.dto.WorkflowRequestWithdrawRequest;
 import com.workforcehub.workflow.dto.WorkflowTaskApproveRequest;
 import com.workforcehub.workflow.dto.WorkflowTaskActionResponse;
 import com.workforcehub.workflow.dto.WorkflowTaskRejectRequest;
+import com.workforcehub.workflow.dto.WorkflowAiReviewSummaryResponse;
+import com.workforcehub.workflow.dto.WorkflowCcResponse;
+import com.workforcehub.workflow.dto.WorkflowRequestStatResponse;
 import com.workforcehub.workflow.dto.WorkflowTodoResponse;
 import com.workforcehub.workflow.service.WorkflowService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +30,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -71,6 +75,34 @@ public class EmployeeWorkflowController {
     public R<WorkflowRequestCreateResponse> submitGenericRequest(
             @Valid @RequestBody GenericWorkflowRequestCreateRequest request) {
         return R.ok(workflowService.submitGenericRequest(request));
+    }
+
+    @Operation(summary = "查询我发起的审批统计", operationId = "getMyWorkflowRequestSummary")
+    @GetMapping("/requests/summary")
+    public R<WorkflowRequestStatResponse> myRequestSummary() {
+        return R.ok(workflowService.myRequestSummary());
+    }
+
+    @Operation(summary = "分页查询抄送我的审批", operationId = "pageMyWorkflowCcList")
+    @GetMapping("/cc-list")
+    public R<PageResult<WorkflowCcResponse>> pageCcToMe(
+        @RequestParam(name = "pageNo", defaultValue = "1") long pageNo,
+        @RequestParam(name = "pageSize", defaultValue = "20") long pageSize
+    ) {
+        return R.ok(workflowService.pageCcToMe(pageNo, pageSize));
+    }
+
+    @Operation(summary = "标记抄送已读", operationId = "markMyWorkflowCcRead")
+    @PostMapping("/cc-list/{requestId}/read")
+    public R<Void> markCcRead(@PathVariable String requestId) {
+        workflowService.markCcRead(requestId);
+        return R.ok(null);
+    }
+
+    @Operation(summary = "查询本周AI预审统计", operationId = "getMyAiReviewSummary")
+    @GetMapping("/ai-review/summary")
+    public R<WorkflowAiReviewSummaryResponse> aiReviewSummary() {
+        return R.ok(workflowService.aiReviewSummary());
     }
 
     @Operation(summary = "查询我的待办任务", operationId = "listMyWorkflowTodos")

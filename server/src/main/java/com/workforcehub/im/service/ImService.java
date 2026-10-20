@@ -22,6 +22,7 @@ import com.workforcehub.im.dto.ForwardImMessageRequest;
 import com.workforcehub.im.dto.ImConversationDetailResponse;
 import com.workforcehub.im.dto.ImMessageActionResponse;
 import com.workforcehub.im.dto.ImMessageAttachmentResponse;
+import com.workforcehub.im.dto.ImConversationMemberResponse;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImMessageMentionResponse;
 import com.workforcehub.im.dto.ImMessageResponse;
@@ -472,8 +473,12 @@ public class ImService {
             throw new BizException(404, "消息不存在");
         }
         ensureMessageAllowsAttachmentDownload(message);
-        if (!"SINGLE".equalsIgnoreCase(request.getDownloadType())) {
-            throw new BizException(400, "第一版仅支持单文件下载");
+        String downloadType = request.getDownloadType();
+        if (downloadType != null
+            && !"SINGLE".equalsIgnoreCase(downloadType)
+            && !"INLINE".equalsIgnoreCase(downloadType)
+            && !"ATTACHMENT".equalsIgnoreCase(downloadType)) {
+            throw new BizException(400, "不支持的下载类型");
         }
 
         ImAttachmentRow attachment = imRepository.findAttachmentById(attachmentRefId)
@@ -606,10 +611,12 @@ public class ImService {
     ) {
         Long userId = requireActiveEmployeeUserId();
         ensureCanAccessConversation(conversationId, userId);
-        if (request.getPin() == null && request.getMute() == null) {
+        if (request.getPin() == null && request.getMute() == null && request.getSaveToContacts() == null
+            && request.getShowMemberNickname() == null) {
             throw new BizException(400, "会话偏好更新内容不能为空");
         }
-        int updated = imRepository.updateMemberPreference(conversationId, userId, request.getPin(), request.getMute());
+        int updated = imRepository.updateMemberPreference(conversationId, userId, request.getPin(), request.getMute(),
+            request.getSaveToContacts(), request.getShowMemberNickname());
         if (updated == 0) {
             throw new BizException(409, "会话偏好更新失败");
         }
@@ -634,6 +641,33 @@ public class ImService {
         return response;
     }
 
+    /** 接口需求表 #3：设置本群昵称 */
+    @Transactional(rollbackFor = Exception.class)
+    public ImConversationMemberResponse updateMyGroupNickname(Long conversationId, String nickname) {
+        Long userId = requireActiveEmployeeUserId();
+        ensureCanAccessConversation(conversationId, userId);
+        int updated = imRepository.updateGroupNickname(conversationId, userId, nickname);
+        if (updated == 0) {
+            throw new BizException(409, "本群昵称更新失败");
+        }
+        ImConversationMemberResponse response = new ImConversationMemberResponse();
+        response.setMemberId(userId);
+        response.setGroupNickname(nickname == null || nickname.isBlank() ? null : nickname);
+        return response;
+    }
+
+    /** 接口需求表 #4：清空当前用户视角的会话消息 */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> clearMyConversationMessages(Long conversationId) {
+        Long userId = requireActiveEmployeeUserId();
+        ensureCanAccessConversation(conversationId, userId);
+        int updated = imRepository.clearConversationForUser(conversationId, userId);
+        if (updated == 0) {
+            throw new BizException(409, "清空聊天记录失败");
+        }
+        return Map.of("cleared", true);
+    }
+
     private ImConversationSummaryResponse toConversationSummaryResponse(ImConversationSummaryRow row) {
         ImConversationSummaryResponse response = new ImConversationSummaryResponse();
         response.setConversationId(row.conversationId());
@@ -655,6 +689,9 @@ public class ImService {
         response.setMemberRoleName(memberRoleName(row.memberRole()));
         response.setHasMentionMe(Boolean.TRUE.equals(row.hasMentionMe()));
         response.setHasReplyMe(Boolean.TRUE.equals(row.hasReplyMe()));
+        response.setMemberCount("GROUP".equals(row.conversationType()) ? row.memberCount() : null);
+        response.setSaveToContacts(Boolean.TRUE.equals(row.saveToContacts()));
+        response.setShowMemberNickname(Boolean.TRUE.equals(row.showMemberNickname()));
         response.setLastMessage(row.lastMessage() == null ? null : toMessageResponse(row.lastMessage()));
         return response;
     }

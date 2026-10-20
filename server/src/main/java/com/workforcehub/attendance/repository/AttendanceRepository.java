@@ -12,7 +12,10 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * module-attendance 第一版 JDBC 仓储。
@@ -937,6 +940,59 @@ public class AttendanceRepository {
             ORDER BY adr.work_date ASC
             """,
             this::mapDailyResult,
+            userId,
+            startDate,
+            endDate
+        );
+    }
+
+    /** #11 打卡首末签聚合：workDate → (firstPunchAt, lastPunchAt) */
+    public Map<LocalDate, List<LocalDateTime>> listFirstLastPunchByDate(Long userId, LocalDate startDate, LocalDate endDate) {
+        List<PunchRecordRow> rows = jdbcTemplate.query("""
+            SELECT id, user_id, punch_at, punch_type, source_type, status
+            FROM att_punch_record
+            WHERE user_id = ?
+              AND punch_at BETWEEN ? AND ?
+              AND status = 'NORMAL'
+            ORDER BY punch_at ASC
+            """,
+            (rs, rowNum) -> new PunchRecordRow(
+                rs.getLong("id"),
+                rs.getLong("user_id"),
+                rs.getTimestamp("punch_at").toLocalDateTime(),
+                rs.getString("punch_type"),
+                rs.getString("source_type"),
+                rs.getString("status")
+            ),
+            userId,
+            startDate.atStartOfDay(),
+            endDate.plusDays(1).atStartOfDay()
+        );
+        Map<LocalDate, List<LocalDateTime>> result = new LinkedHashMap<>();
+        for (PunchRecordRow row : rows) {
+            result.computeIfAbsent(row.punchAt().toLocalDate(), k -> new ArrayList<>()).add(row.punchAt());
+        }
+        return result;
+    }
+
+    /** #9 排班区间查询(带班次起止时间聚合) */
+    public List<Map<String, Object>> listSchedulesForUser(Long userId, LocalDate startDate, LocalDate endDate) {
+        return jdbcTemplate.queryForList("""
+            SELECT s.work_date,
+                   s.shift_id,
+                   sh.shift_name,
+                   MIN(ss.start_time) AS start_time,
+                   MAX(ss.end_time)   AS end_time,
+                   s.status
+            FROM att_schedule s
+            JOIN att_shift sh ON sh.id = s.shift_id AND sh.is_deleted = 0
+            LEFT JOIN att_shift_segment ss ON ss.shift_id = sh.id
+            WHERE s.user_id = ?
+              AND s.work_date BETWEEN ? AND ?
+              AND s.status <> 'CANCELLED'
+            GROUP BY s.work_date, s.shift_id, sh.shift_name, s.status
+            ORDER BY s.work_date ASC
+            """,
             userId,
             startDate,
             endDate

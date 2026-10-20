@@ -333,8 +333,39 @@ public class AttendanceService {
                                                                                 LocalDate endDate) {
         validateDateRange(startDate, endDate);
         Long userId = CurrentUserHolder.requireUserId();
+        // 接口需求表 #11：注入当日首签/末签时间
+        Map<LocalDate, List<LocalDateTime>> punchByDate =
+            attendanceRepository.listFirstLastPunchByDate(userId, startDate, endDate);
         return attendanceRepository.listDailyResults(userId, startDate, endDate).stream()
-            .map(this::toDailyResultResponse)
+            .map(row -> {
+                AttendanceDailyResultResponse response = toDailyResultResponse(row);
+                List<LocalDateTime> punches = punchByDate.get(row.workDate());
+                if (punches != null && !punches.isEmpty()) {
+                    response.setFirstPunchAt(punches.get(0));
+                    response.setLastPunchAt(punches.get(punches.size() - 1));
+                }
+                return response;
+            })
+            .toList();
+    }
+
+    /** 接口需求表 #9：员工排班区间查询 */
+    public List<AttendanceScheduleResponse> listCurrentEmployeeSchedules(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        Long userId = CurrentUserHolder.requireUserId();
+        return attendanceRepository.listSchedulesForUser(userId, startDate, endDate).stream()
+            .map(row -> {
+                AttendanceScheduleResponse response = new AttendanceScheduleResponse();
+                response.setWorkDate(((java.sql.Date) row.get("work_date")).toLocalDate());
+                response.setShiftId((Long) row.get("shift_id"));
+                response.setShiftName((String) row.get("shift_name"));
+                java.sql.Time start = (java.sql.Time) row.get("start_time");
+                java.sql.Time end = (java.sql.Time) row.get("end_time");
+                response.setStartTime(start == null ? null : start.toLocalTime().toString());
+                response.setEndTime(end == null ? null : end.toLocalTime().toString());
+                response.setIsWorkday(start != null);
+                return response;
+            })
             .toList();
     }
 

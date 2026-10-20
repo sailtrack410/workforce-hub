@@ -19,6 +19,9 @@ public record ImConversationSummaryRow(
     String memberRole,
     Boolean hasMentionMe,
     Boolean hasReplyMe,
+    Long memberCount,
+    Boolean saveToContacts,
+    Boolean showMemberNickname,
     ImMessageRow lastMessage
 ) {
 }

@@ -8,11 +8,14 @@ import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.file.dto.FileTrashRequest;
 import com.workforcehub.file.dto.FileTrashResponse;
 import com.workforcehub.im.dto.CreateGroupConversationRequest;
+import com.workforcehub.im.dto.UpdateMyGroupNicknameRequest;
 import com.workforcehub.im.dto.EditImMessageRequest;
 import com.workforcehub.im.dto.ForwardImMessageRequest;
 import com.workforcehub.im.dto.GroupMemberUserIdsRequest;
 import com.workforcehub.im.dto.ImConversationDetailResponse;
 import com.workforcehub.im.dto.ImConversationMemberResponse;
+import com.workforcehub.im.dto.ImGroupNoticeResponse;
+import com.workforcehub.im.dto.PublishGroupNoticeRequest;
 import com.workforcehub.im.dto.ImConversationSummaryResponse;
 import com.workforcehub.im.dto.ImGroupFileResponse;
 import com.workforcehub.im.dto.ImGroupProfileResponse;
@@ -23,6 +26,7 @@ import com.workforcehub.im.dto.SendImMessageRequest;
 import com.workforcehub.im.dto.StartAgentConversationRequest;
 import com.workforcehub.im.dto.StartPrivateConversationRequest;
 import com.workforcehub.im.dto.TranslateImMessageResponse;
+import java.util.Map;
 import com.workforcehub.im.dto.UpdateConversationPreferenceRequest;
 import com.workforcehub.im.dto.UpdateGroupConversationRequest;
 import com.workforcehub.im.dto.UpdateReadPositionRequest;
@@ -281,6 +285,36 @@ public class EmployeeImController {
     public R<ImConversationSummaryResponse> updateReadPosition(@PathVariable Long conversationId,
                                                                @Valid @RequestBody UpdateReadPositionRequest request) {
         return R.ok(imService.updateCurrentEmployeeReadPosition(conversationId, request));
+    }
+
+    @Operation(summary = "查询群公告列表", operationId = "listGroupNotices")
+    @GetMapping("/group-conversations/{conversationId}/notices")
+    public R<List<ImGroupNoticeResponse>> listGroupNotices(@PathVariable Long conversationId) {
+        return R.ok(imGroupService.listGroupNotices(conversationId));
+    }
+
+    @Operation(summary = "发布群公告", operationId = "publishGroupNotice")
+    @PostMapping("/group-conversations/{conversationId}/notices")
+    public R<ImGroupNoticeResponse> publishGroupNotice(
+        @PathVariable Long conversationId,
+        @Valid @RequestBody PublishGroupNoticeRequest request
+    ) {
+        return R.ok(imGroupService.publishGroupNotice(conversationId, request));
+    }
+
+    @Operation(summary = "设置本群昵称", operationId = "updateMyGroupNickname")
+    @PostMapping("/group-conversations/{conversationId}/my-nickname")
+    public R<ImConversationMemberResponse> updateMyGroupNickname(
+        @PathVariable Long conversationId,
+        @Valid @RequestBody UpdateMyGroupNicknameRequest request
+    ) {
+        return R.ok(imService.updateMyGroupNickname(conversationId, request.getNickname()));
+    }
+
+    @Operation(summary = "清空当前用户视角的聊天记录", operationId = "clearMyConversationMessages")
+    @PostMapping("/conversations/{conversationId}/messages/clear")
+    public R<Map<String, Object>> clearMyConversationMessages(@PathVariable Long conversationId) {
+        return R.ok(imService.clearMyConversationMessages(conversationId));
     }
 
     @Operation(summary = "更新会话设置", operationId = "updateImConversationPreference")

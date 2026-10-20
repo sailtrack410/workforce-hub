@@ -476,4 +476,42 @@ public class LeaveRepository {
             rs.getString("status")
         );
     }
+    /** 接口需求表 #14：按账户累计年度发放额度(GRANT 流水之和) */
+    public Map<Long, Integer> sumAnnualGrantMinutesByAccountIds(List<Long> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = accountIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+        Object[] args = new Object[accountIds.size() + 1];
+        args[0] = LocalDate.now().getYear();
+        for (int i = 0; i < accountIds.size(); i++) {
+            args[i + 1] = accountIds.get(i);
+        }
+        return jdbcTemplate.query("""
+            SELECT account_id, SUM(change_minutes) AS granted
+            FROM lv_account_txn
+            WHERE txn_type = 'GRANT'
+              AND account_id IN (""" + placeholders + """
+            )
+              AND effective_at >= ?
+            GROUP BY account_id
+            """,
+            rs -> {
+                Map<Long, Integer> result = new java.util.HashMap<>();
+                while (rs.next()) {
+                    result.put(rs.getLong("account_id"), rs.getInt("granted"));
+                }
+                return result;
+            },
+            yearStartAtLocal(args)
+        );
+    }
+
+    private Object[] yearStartAtLocal(Object[] args) {
+        Object[] rebuilt = new Object[args.length];
+        rebuilt[0] = java.time.LocalDateTime.of((Integer) args[0], 1, 1, 0, 0);
+        System.arraycopy(args, 1, rebuilt, 1, args.length - 1);
+        return rebuilt;
+    }
+
 }

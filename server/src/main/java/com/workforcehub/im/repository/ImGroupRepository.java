@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -508,4 +509,52 @@ public class ImGroupRepository {
         long value = rs.getLong(columnName);
         return rs.wasNull() ? null : value;
     }
+
+    /** 接口需求表 #5：群公告记录行 */
+    public record ImGroupNoticeRow(
+        Long noticeId,
+        Long conversationId,
+        String title,
+        String content,
+        Long publisherId,
+        String publisherName,
+        LocalDateTime createdAt
+    ) {
+    }
+
+    /** 接口需求表 #5：群公告列表(发布时间倒序) */
+    public List<ImGroupNoticeRow> listGroupNotices(Long conversationId) {
+        return jdbcTemplate.query("""
+            SELECT n.id, n.conversation_id, n.title, n.content, n.publisher_id,
+                   u.real_name AS publisher_name, n.created_at
+            FROM im_group_notice n
+            LEFT JOIN org_user u ON u.id = n.publisher_id
+            WHERE n.conversation_id = ? AND n.is_deleted = 0
+            ORDER BY n.created_at DESC
+            """,
+            (rs, rowNum) -> new ImGroupNoticeRow(
+                rs.getLong("id"),
+                rs.getLong("conversation_id"),
+                rs.getString("title"),
+                rs.getString("content"),
+                rs.getLong("publisher_id"),
+                rs.getString("publisher_name"),
+                rs.getTimestamp("created_at").toLocalDateTime()
+            ),
+            conversationId
+        );
+    }
+
+    /** 接口需求表 #5：发布群公告 */
+    public void insertGroupNotice(Long noticeId, Long conversationId, String title, String content, Long publisherId) {
+        jdbcTemplate.update("""
+            INSERT INTO im_group_notice (id, conversation_id, title, content, publisher_id)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            noticeId, conversationId,
+            title == null || title.isBlank() ? null : title,
+            content, publisherId
+        );
+    }
+
 }

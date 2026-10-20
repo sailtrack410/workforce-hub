@@ -1,5 +1,6 @@
 package com.workforcehub.im.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -18,5 +19,7 @@ public class ImConversationMemberResponse {
     private String memberRoleName;
     private String status;
     private String statusName;
+    @Schema(description = "本群昵称", example = "小李")
+    private String groupNickname;
     private LocalDateTime joinedAt;
 }

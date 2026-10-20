@@ -1,5 +1,6 @@
 package com.workforcehub.leave.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -19,6 +20,8 @@ public class LeaveAccountResponse {
     private String balanceModeName;
     private Integer availableMinutes;
     private Integer frozenMinutes;
+    @Schema(description = "年度总额度(分钟,当年GRANT累计)", example = "5760")
+    private Integer entitlementMinutes;
     private String status;
     private String statusName;
     private String lastTxnType;
