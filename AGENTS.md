@@ -11,8 +11,9 @@ Workforce Hub 是一套面向中小企业、支持私有化部署的智能人事
 | `server/` | Spring Boot 3 后端（Java 17，Maven，模块化单体） |
 | `admin-web/` | 管理后台前端（Vue3 + TS + Vite + Pinia） |
 | `employee-web/` | 员工端前端（Vue3 + TS + Vite + Pinia，消息优先风格） |
+| `hub-web/` | 员工端画布版独立前端（Vue3 + TS + Vite，画布对齐与新交互验证） |
 | `shared-web/` | 双前端共享代码（HTTP 封装） |
-| `docs/` | 架构、产品、API、部署、审查等全部文档 |
+| `docs/` | 架构、产品、接口、部署、审查等全部文档（目录与文件统一中文命名，索引见 `docs/说明.md`） |
 | `deploy/` | Nginx 配置与部署环境变量模板 |
 | `docker-compose.yml` | 私有化交付编排（api/worker/mysql/pgvector/redis/minio） |
 | `deliverables/` | 交付产物 |

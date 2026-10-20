@@ -57,3 +57,15 @@ admin-web/*.png
 # 临时审查产物与素材生成中转目录
 /output/
 /ui-assets/generated/
+
+# 本地工具缓存与开发中间产物（勿入库）
+.mimosa/
+.mimocode/
+.ccg/
+.claude/
+artifacts/
+/outputs/
+
+# hub-web 前端依赖与构建产物
+hub-web/node_modules/
+hub-web/dist/
