@@ -47,6 +47,7 @@ docs/.obsidian/
 *.err
 server-8080.pid
 docs/毕业设计/
+docs/论文/
 .playwright-cli/
 
 # 证据截图仅本地保存（AGENTS.md 验收要求，不入库）
@@ -59,12 +60,15 @@ admin-web/*.png
 /ui-assets/generated/
 
 # 本地工具缓存与开发中间产物（勿入库）
+.zcode/
 .mimosa/
 .mimocode/
 .ccg/
 .claude/
 artifacts/
 /outputs/
+*.pyc
+__pycache__/
 
 # hub-web 前端依赖与构建产物
 hub-web/node_modules/
