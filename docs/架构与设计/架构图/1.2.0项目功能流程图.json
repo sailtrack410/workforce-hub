@@ -1,0 +1,286 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Workforce Hub 项目功能流程",
+    "locale": "zh-CN",
+    "output": "docs/架构与设计/架构图/1.2.0项目功能流程图.html",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main-chain",
+        "label": "主功能链",
+        "focus": [
+          "login",
+          "desk",
+          "submit",
+          "rule",
+          "prereview",
+          "approve",
+          "settle",
+          "notify"
+        ],
+        "note": "从统一登录到业务落账与消息触达的完整主链路。"
+      },
+      {
+        "id": "ai-chain",
+        "label": "Agent 三条链路",
+        "focus": [
+          "kbqa",
+          "prereview",
+          "remind"
+        ],
+        "note": "知识库问答、审批预审、主动提醒共同构成智能协同能力。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "入口与工作台"
+    },
+    {
+      "id": "core",
+      "label": "统一服务"
+    },
+    {
+      "id": "agent",
+      "label": "Agent 智能协同"
+    },
+    {
+      "id": "out",
+      "label": "落账与触达"
+    }
+  ],
+  "phases": [
+    {
+      "id": "access",
+      "label": "身份与工作台",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "business",
+      "label": "业务发起与预审",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "settle",
+      "label": "审批 · 落账 · 触达",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "login",
+    "desk",
+    "submit",
+    "rule",
+    "prereview",
+    "approve",
+    "settle",
+    "notify"
+  ],
+  "nodes": [
+    {
+      "id": "login",
+      "lane": "entry",
+      "col": 0,
+      "type": "frontend",
+      "label": "统一登录认证",
+      "sublabel": "员工 · 领导 · 管理员",
+      "width": 140
+    },
+    {
+      "id": "desk",
+      "lane": "entry",
+      "col": 1,
+      "type": "frontend",
+      "label": "角色工作台",
+      "sublabel": "按角色展示可用功能",
+      "width": 140
+    },
+    {
+      "id": "submit",
+      "lane": "entry",
+      "col": 2,
+      "type": "frontend",
+      "label": "发起业务申请",
+      "sublabel": "请假 · 补卡 · 审批单",
+      "width": 140
+    },
+    {
+      "id": "rule",
+      "lane": "core",
+      "col": 2,
+      "type": "security",
+      "label": "权限与审批链解析",
+      "sublabel": "角色 + 组织 + 规则",
+      "width": 150
+    },
+    {
+      "id": "approve",
+      "lane": "core",
+      "col": 4,
+      "type": "backend",
+      "label": "人工审批",
+      "sublabel": "直属上级 / 管理员",
+      "width": 140
+    },
+    {
+      "id": "settle",
+      "lane": "core",
+      "col": 5,
+      "type": "backend",
+      "label": "业务落账",
+      "sublabel": "余额冻结扣减 · 考勤重算",
+      "tag": "审批通过",
+      "width": 150
+    },
+    {
+      "id": "kbqa",
+      "lane": "agent",
+      "col": 2,
+      "type": "backend",
+      "label": "知识库问答",
+      "sublabel": "RAG 检索 + 回答引用",
+      "width": 140
+    },
+    {
+      "id": "prereview",
+      "lane": "agent",
+      "col": 3,
+      "type": "backend",
+      "label": "Agent 预审",
+      "sublabel": "规则校验 + 风险提示",
+      "tag": "PENDING_REVIEW",
+      "width": 150
+    },
+    {
+      "id": "remind",
+      "lane": "agent",
+      "col": 4,
+      "type": "messagebus",
+      "label": "主动提醒",
+      "sublabel": "待办超时 · 流程催办",
+      "width": 140
+    },
+    {
+      "id": "notify",
+      "lane": "out",
+      "col": 5,
+      "type": "messagebus",
+      "label": "消息与待办",
+      "sublabel": "站内信 · 小程序推送",
+      "width": 140
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-login",
+      "from": "login",
+      "to": "desk",
+      "label": "进入工作台",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-desk-submit",
+      "from": "desk",
+      "to": "submit",
+      "label": "考勤 / 假期 / 审批",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-submit-rule",
+      "from": "submit",
+      "to": "rule",
+      "label": "校验权限与规则",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-rule-review",
+      "from": "rule",
+      "to": "prereview",
+      "label": "触发 Agent 预审"
+    },
+    {
+      "id": "e-review-approve",
+      "from": "prereview",
+      "to": "approve",
+      "label": "通过 / 转人工",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-approve-settle",
+      "from": "approve",
+      "to": "settle",
+      "label": "审批通过",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "e-settle-notify",
+      "from": "settle",
+      "to": "notify",
+      "label": "结果通知"
+    },
+    {
+      "id": "e-desk-kbqa",
+      "from": "desk",
+      "to": "kbqa",
+      "label": "制度咨询",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-approve-remind",
+      "from": "approve",
+      "to": "remind",
+      "label": "待办超时",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-remind-notify",
+      "from": "remind",
+      "to": "notify",
+      "label": "催办提醒",
+      "variant": "dashed",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "功能域",
+      "items": [
+        "组织与权限、考勤、假期、审批、消息会话",
+        "知识库与 Agent 由管理员在后台配置并授权",
+        "员工端与小程序共享同一业务能力"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "角色与权限",
+      "items": [
+        "角色决定能力，组织决定数据范围",
+        "审批人不是固定个人，由规则动态解析",
+        "管理员独立于业务用户体系"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "AI 协同三条链路",
+      "items": [
+        "预审:流程启动前拦截风险单据",
+        "问答:基于知识库检索并给出引用",
+        "提醒:待办超时与流程催办形成闭环"
+      ]
+    }
+  ]
+}
