@@ -67,6 +67,7 @@ admin-web/*.png
 .claude/
 artifacts/
 /outputs/
+/.tmp-ocr/
 *.pyc
 __pycache__/
 
