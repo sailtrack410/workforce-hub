@@ -470,6 +470,15 @@ export interface EditImMessageRequest {
   text: string;
 }
 
+export interface LeaveDurationQuery {
+  startAt: string;
+  endAt: string;
+}
+
+export interface LeaveDurationResponse {
+  durationMinutes: number;
+}
+
 export interface LeaveRequestCreateRequest {
   leaveTypeId: EntityId;
   startAt: string;

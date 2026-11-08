@@ -42,44 +42,6 @@ interface UseWorkbenchStateOptions {
   showToast: (message: string) => void;
 }
 
-const HALF_DAY_MINUTES = 240;
-
-function overlapMinutes(rangeStart: Date, rangeEnd: Date, segmentStart: Date, segmentEnd: Date) {
-  const start = Math.max(rangeStart.getTime(), segmentStart.getTime());
-  const end = Math.min(rangeEnd.getTime(), segmentEnd.getTime());
-  if (end <= start) return 0;
-  return Math.round((end - start) / 60000);
-}
-
-// 按半天（4h）为最小单位计算请假时长，只计算工作时间段（9-12, 13-18）
-function calculateLeaveDurationMinutes(startAt: string, endAt: string) {
-  if (!startAt || !endAt) return 0;
-  const start = new Date(startAt);
-  const end = new Date(endAt);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
-  let minutes = 0;
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    const day = new Date(cursor);
-    day.setHours(0, 0, 0, 0);
-    const morningStart = new Date(day);
-    morningStart.setHours(9, 0, 0, 0);
-    const morningEnd = new Date(day);
-    morningEnd.setHours(12, 0, 0, 0);
-    const afternoonStart = new Date(day);
-    afternoonStart.setHours(13, 0, 0, 0);
-    const afternoonEnd = new Date(day);
-    afternoonEnd.setHours(18, 0, 0, 0);
-    minutes += overlapMinutes(start, end, morningStart, morningEnd);
-    minutes += overlapMinutes(start, end, afternoonStart, afternoonEnd);
-    cursor.setDate(cursor.getDate() + 1);
-    cursor.setHours(0, 0, 0, 0);
-  }
-  if (minutes <= 0) return 0;
-  // 向上取整到半天
-  return Math.ceil(minutes / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
-}
-
 function accountAsLeaveType(account: LeaveAccountResponse): LeaveTypeResponse {
   return {
     leaveTypeId: account.leaveTypeId,
@@ -120,13 +82,14 @@ export function useWorkbenchState({
     leaveTypeId: '',
     startAt: '',
     endAt: '',
-    durationMinutes: '480',
+    durationMinutes: '',
     reason: '',
   });
   const leaveAttachmentIds = ref<Array<number | string>>([]);
   const leaveSubmitting = ref(false);
   const leaveResult = ref<WorkflowRequestCreateResponse | null>(null);
   const leaveError = ref('');
+  let leaveDurationRequestSeq = 0;
   const workflowRequests = ref<WorkflowRequestSummaryResponse[]>([]);
   const workflowRequestsTotal = ref(0);
   const workflowRequestsLoading = ref(false);
@@ -188,9 +151,6 @@ export function useWorkbenchState({
       note: annualLeaveAccount.value?.leaveName ?? '假期',
     },
   ]);
-  const computedLeaveDurationMinutes = computed(() => (
-    calculateLeaveDurationMinutes(leaveForm.value.startAt, leaveForm.value.endAt)
-  ));
   const workflowDetailRows = computed<FieldRows>(() => {
     const detail = workflowDetail.value;
     if (!detail) return [];
@@ -297,21 +257,33 @@ export function useWorkbenchState({
   }
 
   async function submitLeaveRequest() {
+    if (leaveSubmitting.value) return;
     leaveError.value = '';
     leaveResult.value = null;
     const leaveTypeId = leaveForm.value.leaveTypeId.trim();
-    const durationMinutes = computedLeaveDurationMinutes.value;
+    const { startAt, endAt } = leaveForm.value;
     const reason = leaveForm.value.reason.trim();
-    if (!leaveTypeId || !leaveForm.value.startAt || !leaveForm.value.endAt || !durationMinutes || !reason) {
+    if (!leaveTypeId || !startAt || !endAt || !reason) {
       leaveError.value = '请完整填写请假申请';
       return;
     }
     leaveSubmitting.value = true;
     try {
+      const durationMinutes = await refreshLeaveDuration(startAt, endAt);
+      if (startAt !== leaveForm.value.startAt || endAt !== leaveForm.value.endAt
+        || leaveTypeId !== leaveForm.value.leaveTypeId.trim() || reason !== leaveForm.value.reason.trim()) {
+        leaveError.value = '申请内容已变更，请重新提交';
+        return;
+      }
+      if (durationMinutes === null) return;
+      if (durationMinutes <= 0) {
+        leaveError.value = '所选时段无可请假工作时间';
+        return;
+      }
       leaveResult.value = await employeeApi.workflow.submitLeaveRequest({
         leaveTypeId,
-        startAt: toApiDateTime(leaveForm.value.startAt),
-        endAt: toApiDateTime(leaveForm.value.endAt),
+        startAt: toApiDateTime(startAt),
+        endAt: toApiDateTime(endAt),
         durationMinutes,
         reason,
         attachmentRefIds: leaveAttachmentIds.value,
@@ -329,12 +301,41 @@ export function useWorkbenchState({
     }
   }
 
+  async function refreshLeaveDuration(startAt: string, endAt: string): Promise<number | null> {
+    const requestSeq = ++leaveDurationRequestSeq;
+    leaveForm.value.durationMinutes = '';
+    leaveError.value = '';
+    if (!startAt || !endAt) return null;
+    if (!Number.isFinite(Date.parse(startAt)) || !Number.isFinite(Date.parse(endAt)) || endAt <= startAt) {
+      leaveError.value = '结束时间必须晚于开始时间';
+      return null;
+    }
+    try {
+      const result = await employeeApi.workflow.leaveDuration({
+        startAt: toApiDateTime(startAt).replace(' ', 'T'),
+        endAt: toApiDateTime(endAt).replace(' ', 'T'),
+      });
+      if (requestSeq !== leaveDurationRequestSeq) return null;
+      if (!Number.isSafeInteger(result.durationMinutes) || result.durationMinutes < 0) {
+        throw new Error('请假时长计算失败');
+      }
+      leaveForm.value.durationMinutes = String(result.durationMinutes);
+      return result.durationMinutes;
+    } catch (error) {
+      if (requestSeq === leaveDurationRequestSeq) {
+        leaveError.value = error instanceof Error ? error.message : '请假时长计算失败';
+      }
+      return null;
+    }
+  }
+
+  // 以下两条注释描述旧算法，现已由服务端排班计时替代。
+  // 按半天（4h）为最小单位计算请假时长，只计算工作时间段（9-12, 13-18）
+  // 向上取整到半天
   watch(
-    computedLeaveDurationMinutes,
-    (minutes) => {
-      leaveForm.value.durationMinutes = minutes > 0 ? String(minutes) : '';
-    },
-    { immediate: true },
+    () => [leaveForm.value.startAt, leaveForm.value.endAt],
+    ([startAt, endAt]) => { void refreshLeaveDuration(startAt, endAt); },
+    { immediate: true, flush: 'sync' },
   );
 
   async function loadWorkflowRequests() {
@@ -473,6 +474,7 @@ export function useWorkbenchState({
 
   if (getCurrentInstance()) {
     onBeforeUnmount(() => {
+      leaveDurationRequestSeq += 1;
       closeWorkflowFilePreview();
     });
   }

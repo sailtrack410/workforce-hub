@@ -9,6 +9,7 @@ import com.workforcehub.file.dto.DownloadFileResult;
 import com.workforcehub.file.dto.DownloadTicketResponse;
 import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
+import com.workforcehub.workflow.dto.LeaveDurationResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestCreateResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
@@ -37,6 +38,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import org.springframework.format.annotation.DateTimeFormat;
 
 /**
  * 员工端审批流程接口。
@@ -54,6 +57,14 @@ public class EmployeeWorkflowController {
                                       FileDownloadResponseFactory downloadResponseFactory) {
         this.workflowService = workflowService;
         this.downloadResponseFactory = downloadResponseFactory;
+    }
+
+    @Operation(summary = "计算请假工作时长", operationId = "previewLeaveDuration")
+    @GetMapping("/leave-duration")
+    public R<LeaveDurationResponse> leaveDuration(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startAt,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endAt) {
+        return R.ok(workflowService.previewLeaveDuration(startAt, endAt));
     }
 
     @Operation(summary = "提交请假申请", operationId = "submitLeaveRequest")

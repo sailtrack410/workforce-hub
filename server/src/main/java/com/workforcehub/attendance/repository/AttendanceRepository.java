@@ -96,6 +96,50 @@ public class AttendanceRepository {
         );
     }
 
+    public Boolean findCalendarWorkday(Long calendarId, LocalDate workDate) {
+        List<Boolean> days = jdbcTemplate.query("""
+            SELECT is_workday FROM att_work_calendar_day
+            WHERE calendar_id = ? AND work_date = ?
+            """, (rs, rowNum) -> rs.getBoolean("is_workday"), calendarId, workDate);
+        return days.isEmpty() ? null : days.get(0);
+    }
+
+    public List<AttendanceWorkPeriod> listShiftWorkPeriods(Long shiftId, LocalDate workDate) {
+        List<LocalTime[]> segments = jdbcTemplate.query("""
+            SELECT start_time, end_time FROM att_shift_segment
+            WHERE shift_id = ? ORDER BY segment_no, id
+            """, (rs, rowNum) -> new LocalTime[]{rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime()}, shiftId);
+        List<AttendanceWorkPeriod> periods = new ArrayList<>();
+        LocalDate segmentDate = workDate;
+        LocalDateTime previousStart = null;
+        for (LocalTime[] segment : segments) {
+            LocalDateTime start = segmentDate.atTime(segment[0]);
+            if (previousStart != null && start.isBefore(previousStart)) {
+                segmentDate = segmentDate.plusDays(1);
+                start = segmentDate.atTime(segment[0]);
+            }
+            LocalDateTime end = segmentDate.atTime(segment[1]);
+            if (!end.isAfter(start)) end = end.plusDays(1);
+            if (!periods.isEmpty() && start.isBefore(periods.get(periods.size() - 1).endAt())) {
+                throw new BizException(400, "班次工作时段重叠，请调整班次");
+            }
+            periods.add(new AttendanceWorkPeriod(start, end));
+            previousStart = start;
+        }
+        return periods;
+    }
+
+    public LocalDateTime getPunchAtInPeriod(Long userId, LocalDateTime startAt, LocalDateTime endAt, String punchType) {
+        List<LocalDateTime> punches = jdbcTemplate.query("""
+            SELECT punch_at FROM att_punch_record
+            WHERE user_id = ? AND punch_at >= ? AND punch_at <= ?
+              AND punch_type = ? AND status = 'NORMAL'
+            ORDER BY punch_at
+            """, (rs, rowNum) -> rs.getTimestamp("punch_at").toLocalDateTime(), userId, startAt, endAt, punchType);
+        if (punches.isEmpty()) return null;
+        return "ON_DUTY".equals(punchType) ? punches.get(0) : punches.get(punches.size() - 1);
+    }
+
     public boolean existsShiftCode(String shiftCode) {
         Long count = jdbcTemplate.queryForObject("""
             SELECT COUNT(*)

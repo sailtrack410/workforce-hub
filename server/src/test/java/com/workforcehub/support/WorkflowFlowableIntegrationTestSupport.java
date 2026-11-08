@@ -104,6 +104,12 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
         populator.setSqlScriptEncoding("UTF-8");
         populator.addScript(resolveSeedScript());
         DatabasePopulatorUtils.execute(populator, dataSource);
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.update("INSERT INTO att_work_calendar(id,calendar_code,calendar_name,calendar_type,status) VALUES(9801,'CAL_WORKFLOW_BASE','审批计时日历','STANDARD','ACTIVE')");
+        jdbc.update("INSERT INTO att_shift(id,shift_code,shift_name,status) VALUES(9802,'SHIFT_WORKFLOW_BASE','审批计时班次','ACTIVE')");
+        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(9803,9802,1,'09:00:00','12:00:00'),(9806,9802,2,'13:00:00','18:00:00')");
+        jdbc.update("INSERT INTO att_group(id,group_code,group_name,calendar_id,default_shift_id,status) VALUES(9804,'GROUP_WORKFLOW_BASE','审批计时考勤组',9801,9802,'ACTIVE')");
+        jdbc.update("INSERT INTO att_group_member(id,group_id,user_id,effective_from,source_type,status) VALUES(9805,9804,2003,'2000-01-01','MANUAL','ACTIVE')");
     }
 
     protected ResultMatcher jsonLong(String expression, long expected) {

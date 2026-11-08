@@ -422,6 +422,7 @@ export function attendanceSourceLabel(value?: string | null) {
 export function attendanceResultLabel(value?: string | null) {
   const labels: Record<string, string> = {
     NORMAL: '正常',
+    REST: '休息',
     ABNORMAL: '异常',
     NO_RULE: '未排班',
     LEAVE: '请假',

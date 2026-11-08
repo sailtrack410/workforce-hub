@@ -26,6 +26,16 @@ function createSpyClient() {
 }
 
 describe('createEmployeeApi', () => {
+  it('previews leave duration using the authenticated workflow calendar endpoint', async () => {
+    const { client, calls } = createSpyClient();
+    const api = createEmployeeApi(client);
+    const query = { startAt: '2026-05-07T09:00:00', endAt: '2026-05-07T12:00:00' };
+
+    await api.workflow.leaveDuration(query);
+
+    expect(calls).toEqual([['get', '/api/employee/workflow/leave-duration', { query }]]);
+  });
+
   it('maps auth endpoints to backend employee auth controller', async () => {
     const { client, calls } = createSpyClient();
     const api = createEmployeeApi(client);

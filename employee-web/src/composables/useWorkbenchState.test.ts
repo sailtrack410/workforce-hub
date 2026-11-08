@@ -169,7 +169,8 @@ describe('useWorkbenchState', () => {
     expect(state.workflowRequests.value[0]?.requestId).toBe('REQ-1');
   });
 
-  it('computes leave minutes from datetime range and rounds up to half day', async () => {
+  it('uses calendar minutes from the server without rounding up to half day', async () => {
+    const preview = vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes: 120 });
     vi.spyOn(employeeApi.leave, 'types').mockResolvedValue([
       { leaveTypeId: 'L-1', leaveCode: 'ANNUAL', leaveName: '年假', balanceMode: 'DEDUCT', status: 'ACTIVE' },
       { leaveTypeId: 'L-2', leaveCode: 'SICK', leaveName: '病假', balanceMode: 'NO_DEDUCT', status: 'ACTIVE' },
@@ -188,7 +189,108 @@ describe('useWorkbenchState', () => {
     state.leaveForm.value.endAt = '2026-05-08T10:00';
     await nextTick();
 
-    expect(state.leaveForm.value.durationMinutes).toBe('240');
+    expect(state.leaveForm.value.durationMinutes).toBe('120');
+    expect(preview).toHaveBeenCalledWith({ startAt: '2026-05-07T17:00:00', endAt: '2026-05-08T10:00:00' });
+  });
+
+  it.each([180, 300, 60, 0])('displays authoritative duration %i for the selected calendar range', async (durationMinutes) => {
+    vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes });
+    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
+    state.leaveForm.value.startAt = '2026-05-07T09:00';
+    state.leaveForm.value.endAt = '2026-05-07T12:00';
+    await nextTick();
+
+    expect(state.leaveForm.value.durationMinutes).toBe(String(durationMinutes));
+  });
+
+  it('discards stale previews and clears duration immediately when dates change or are removed', async () => {
+    const older = createDeferred<{ durationMinutes: number }>();
+    const newer = createDeferred<{ durationMinutes: number }>();
+    vi.spyOn(employeeApi.workflow, 'leaveDuration')
+      .mockImplementationOnce(() => older.promise)
+      .mockImplementationOnce(() => newer.promise);
+    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
+    state.leaveForm.value.startAt = '2026-05-07T09:00';
+    state.leaveForm.value.endAt = '2026-05-07T12:00';
+    state.leaveForm.value.endAt = '2026-05-07T18:00';
+    expect(state.leaveForm.value.durationMinutes).toBe('');
+    newer.resolve({ durationMinutes: 480 });
+    await nextTick();
+    older.resolve({ durationMinutes: 180 });
+    await nextTick();
+    expect(state.leaveForm.value.durationMinutes).toBe('480');
+
+    const pending = createDeferred<{ durationMinutes: number }>();
+    vi.mocked(employeeApi.workflow.leaveDuration).mockImplementationOnce(() => pending.promise);
+    state.leaveForm.value.endAt = '2026-05-07T17:00';
+    state.leaveForm.value.startAt = '';
+    pending.resolve({ durationMinutes: 420 });
+    await nextTick();
+    expect(state.leaveForm.value.durationMinutes).toBe('');
+  });
+
+  it('clears old duration and blocks submission when the calendar preview fails', async () => {
+    vi.spyOn(employeeApi.workflow, 'leaveDuration')
+      .mockResolvedValueOnce({ durationMinutes: 180 })
+      .mockRejectedValue(new Error('未配置员工排班'));
+    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
+    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
+    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
+    await nextTick();
+    expect(state.leaveForm.value.durationMinutes).toBe('180');
+    await state.submitLeaveRequest();
+
+    expect(state.leaveForm.value.durationMinutes).toBe('');
+    expect(state.leaveError.value).toBe('未配置员工排班');
+    expect(state.leaveSubmitting.value).toBe(false);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('revalidates the duration before submission instead of trusting an old displayed value', async () => {
+    const preview = vi.spyOn(employeeApi.workflow, 'leaveDuration')
+      .mockResolvedValueOnce({ durationMinutes: 180 })
+      .mockResolvedValueOnce({ durationMinutes: 150 });
+    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest').mockRejectedValue(new Error('测试提交结束'));
+    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
+    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
+    await nextTick();
+    state.leaveForm.value.durationMinutes = '999';
+    await state.submitLeaveRequest();
+
+    expect(preview).toHaveBeenCalledTimes(2);
+    expect(submit).toHaveBeenCalledExactlyOnceWith({ leaveTypeId: 'L-1', startAt: '2026-05-07 09:00:00', endAt: '2026-05-07 12:00:00', durationMinutes: 150, reason: '休假', attachmentRefIds: [] });
+  });
+
+  it('does not submit a stale range when dates change during submission preview', async () => {
+    const pending = createDeferred<{ durationMinutes: number }>();
+    vi.spyOn(employeeApi.workflow, 'leaveDuration')
+      .mockResolvedValueOnce({ durationMinutes: 180 })
+      .mockImplementationOnce(() => pending.promise)
+      .mockResolvedValueOnce({ durationMinutes: 480 });
+    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
+    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
+    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
+    await nextTick();
+    const submitting = state.submitLeaveRequest();
+    await state.submitLeaveRequest();
+    state.leaveForm.value.endAt = '2026-05-07T18:00';
+    pending.resolve({ durationMinutes: 180 });
+    await submitting;
+
+    expect(state.leaveForm.value.durationMinutes).toBe('480');
+    expect(state.leaveSubmitting.value).toBe(false);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, Number.NaN])('rejects nonpositive or invalid authoritative duration %s', async (durationMinutes) => {
+    vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes });
+    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
+    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
+    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
+    await state.submitLeaveRequest();
+
+    expect(state.leaveError.value).not.toBe('');
+    expect(submit).not.toHaveBeenCalled();
   });
 
   it('keeps no-deduct leave types selectable without annual leave default bias', async () => {

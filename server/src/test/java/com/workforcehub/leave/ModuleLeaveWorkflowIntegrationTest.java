@@ -269,7 +269,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:00:00",
             "2026-05-07 10:00:00",
-            240,
+            60,
             "上午临时请假一小时"
         );
         approveManagerTask(managerSession, scenario.managerTask().getId());
@@ -282,7 +282,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
             .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
-            .andExpect(jsonPath("$.data[0].absenceMinutes").value(480));
+            .andExpect(jsonPath("$.data[0].absenceMinutes").value(420));
 
         assertEquals(1L, attendanceExceptionCount());
     }
@@ -301,15 +301,15 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
                     leaveTypeId,
                     "2026-05-07 17:00:00",
                     "2026-05-08 10:00:00",
-                    240,
+                    120,
                     "跨天请假"
                 )))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"));
 
-        assertEquals(720, availableMinutes(leaveTypeId));
-        assertEquals(240, frozenMinutes(leaveTypeId));
+        assertEquals(840, availableMinutes(leaveTypeId));
+        assertEquals(120, frozenMinutes(leaveTypeId));
     }
 
     @Test
@@ -326,7 +326,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:00:00",
             "2026-05-07 10:00:00",
-            240,
+            60,
             "上午临时请假一小时"
         );
         approveManagerTask(managerSession, firstScenario.managerTask().getId());
@@ -335,7 +335,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:30:00",
             "2026-05-07 10:30:00",
-            240,
+            60,
             "继续请假一小时"
         );
         approveManagerTask(managerSession, secondScenario.managerTask().getId());
@@ -348,7 +348,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
             .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
-            .andExpect(jsonPath("$.data[0].absenceMinutes").value(450));
+            .andExpect(jsonPath("$.data[0].absenceMinutes").value(390));
 
         assertEquals(1L, attendanceExceptionCount());
     }
@@ -367,7 +367,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 09:00:00",
             "2026-05-07 10:00:00",
-            240,
+            60,
             "上午请假一小时"
         );
         approveManagerTask(managerSession, morningScenario.managerTask().getId());
@@ -376,7 +376,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
             leaveTypeId,
             "2026-05-07 17:00:00",
             "2026-05-07 18:00:00",
-            240,
+            60,
             "下午请假一小时"
         );
         approveManagerTask(managerSession, eveningScenario.managerTask().getId());
@@ -609,9 +609,11 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
                  on_duty_punch_start, on_duty_punch_end,
                  off_duty_punch_start, off_duty_punch_end)
             VALUES
-                (9603, 9602, 1, '09:00:00', '18:00:00',
+                (9603, 9602, 1, '09:00:00', '12:00:00',
                  '08:00:00', '10:00:00',
-                 '17:00:00', '19:00:00')
+                 '17:00:00', '19:00:00'),
+                (9606, 9602, 2, '13:00:00', '18:00:00',
+                 '12:00:00', '14:00:00', '17:00:00', '19:00:00')
             """);
         jdbcTemplate.update("""
             INSERT INTO att_group

@@ -42,6 +42,8 @@ import type {
   ImMessageActionResponse,
   ImMessageResponse,
   LeaveRequestCreateRequest,
+  LeaveDurationQuery,
+  LeaveDurationResponse,
   LeaveAccountResponse,
   LeaveTypeResponse,
   LoginSendCodeRequest,
@@ -115,6 +117,7 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
       deptTree: () => client.get<OrgDepartmentTreeNodeResponse[]>('/api/employee/contacts/dept-tree'),
     },
     workflow: {
+      leaveDuration: (query: LeaveDurationQuery) => client.get<LeaveDurationResponse>('/api/employee/workflow/leave-duration', { query: { ...query } }),
       submitLeaveRequest: (request: LeaveRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/leave-requests', request),
       submitClockCorrectionRequest: (request: ClockCorrectionRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/clock-correction-requests', request),
       submitGenericRequest: (request: GenericWorkflowRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/generic-requests', request),

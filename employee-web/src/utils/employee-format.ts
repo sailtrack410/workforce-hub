@@ -56,6 +56,7 @@ export function statusText(status: string) {
   if (status === 'IN_APPROVAL') return '审批中';
   if (status === 'ABNORMAL') return '异常';
   if (status === 'NORMAL') return '正常';
+  if (status === 'REST') return '休息';
   if (status === 'ACTIVE') return '正常';
   if (status === 'READY') return '就绪';
   if (status === 'PASSED') return '已通过';

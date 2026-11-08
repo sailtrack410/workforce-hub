@@ -24,6 +24,7 @@ import com.workforcehub.attendance.repository.AttendanceGroupRow;
 import com.workforcehub.attendance.repository.AttendanceRepository;
 import com.workforcehub.attendance.repository.AttendanceScheduleRow;
 import com.workforcehub.attendance.repository.AttendanceShiftRow;
+import com.workforcehub.attendance.repository.AttendanceWorkPeriod;
 import com.workforcehub.attendance.repository.PunchRecordRow;
 import com.workforcehub.common.event.DomainEventPublisher;
 import com.workforcehub.common.event.attendance.AttendanceExceptionCreatedEvent;
@@ -96,6 +97,60 @@ public class AttendanceService {
         this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
         this.transactionTemplate = transactionTemplate;
         this.domainEventPublisher = domainEventPublisher;
+    }
+
+    @Transactional
+    public int calculateLeaveDurationMinutes(Long userId, LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt == null || endAt == null || !endAt.isAfter(startAt)) {
+            throw new BizException(400, "结束时间必须晚于开始时间");
+        }
+        if (startAt.getSecond() != 0 || startAt.getNano() != 0 || endAt.getSecond() != 0 || endAt.getNano() != 0) {
+            throw new BizException(400, "请假时间必须精确到整分钟");
+        }
+        if (startAt.plusDays(366).isBefore(endAt)) {
+            throw new BizException(400, "请假跨度不能超过366天");
+        }
+        int minutes = 0;
+        LocalDateTime previousEnd = null;
+        // 前一天的跨日班次可能覆盖申请开始时间。
+        for (LocalDate date = startAt.toLocalDate().minusDays(1); date.atStartOfDay().isBefore(endAt); date = date.plusDays(1)) {
+            AttendanceGroupRow group = attendanceRepository.getEffectiveGroupForUpdate(userId, date);
+            if (group == null) {
+                if (!date.isBefore(startAt.toLocalDate()) && date.atStartOfDay().isBefore(endAt)) {
+                    throw new BizException(400, "请假期间未配置有效考勤组");
+                }
+                continue;
+            }
+            AttendanceScheduleRow schedule = attendanceRepository.getActiveSchedule(userId, date);
+            for (AttendanceWorkPeriod period : resolveWorkPeriods(date, group, schedule)) {
+                int overlap = period.overlapMinutes(startAt, endAt);
+                if (overlap == 0) continue;
+                LocalDateTime from = period.startAt().isAfter(startAt) ? period.startAt() : startAt;
+                if (previousEnd != null && from.isBefore(previousEnd)) {
+                    throw new BizException(400, "员工相邻排班工作时段重叠，请调整排班");
+                }
+                previousEnd = period.endAt().isBefore(endAt) ? period.endAt() : endAt;
+                minutes = Math.addExact(minutes, overlap);
+            }
+        }
+        return minutes;
+    }
+
+    private List<AttendanceWorkPeriod> resolveWorkPeriods(LocalDate date, AttendanceGroupRow group, AttendanceScheduleRow schedule) {
+        Long calendarId = schedule != null && schedule.calendarId() != null ? schedule.calendarId() : group.calendarId();
+        AttendanceCalendarRow calendar = attendanceRepository.getCalendarOrThrow(calendarId);
+        if (!STATUS_ACTIVE.equals(calendar.status())) throw new BizException(400, "工作日历已停用");
+        Boolean workday = attendanceRepository.findCalendarWorkday(calendarId, date);
+        if (Boolean.FALSE.equals(workday) || (workday == null && schedule == null && date.getDayOfWeek().getValue() > 5)) {
+            return List.of();
+        }
+        Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
+        if (shiftId == null) throw new BizException(400, "未配置有效班次");
+        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
+        if (!STATUS_ACTIVE.equals(shift.status())) throw new BizException(400, "班次已停用");
+        List<AttendanceWorkPeriod> periods = attendanceRepository.listShiftWorkPeriods(shiftId, date);
+        if (periods.isEmpty()) throw new BizException(400, "班次未配置工作时段");
+        return periods;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -439,6 +494,21 @@ public class AttendanceService {
         recalculateDailyResult(userId, workDate);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void recalculateDailyResultsForApprovedLeave(Long userId, LocalDateTime startAt, LocalDateTime endAt) {
+        LocalDate firstDate = startAt.toLocalDate();
+        LocalDate previousDate = firstDate.minusDays(1);
+        AttendanceGroupRow previousGroup = attendanceRepository.getEffectiveGroupForUpdate(userId, previousDate);
+        if (previousGroup != null && resolveWorkPeriods(previousDate, previousGroup,
+                attendanceRepository.getActiveSchedule(userId, previousDate)).stream()
+                .anyMatch(period -> period.overlapMinutes(startAt, endAt) > 0)) {
+            firstDate = previousDate;
+        }
+        for (LocalDate date = firstDate; date.atStartOfDay().isBefore(endAt); date = date.plusDays(1)) {
+            recalculateDailyResult(userId, date);
+        }
+    }
+
     // 补卡审批通过后，插入虚拟打卡记录并重算当天考勤
     @Transactional(rollbackFor = Exception.class)
     public void applyApprovedClockCorrection(Long userId,
@@ -482,19 +552,30 @@ public class AttendanceService {
         Long scheduleId = schedule == null ? null : schedule.scheduleId();
         // 没有特殊排班就用考勤组的默认班次
         Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
-        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
-        LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
-        LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
+        List<AttendanceWorkPeriod> periods = resolveWorkPeriods(workDate, group, schedule);
+        if (periods.isEmpty()) {
+            AttendanceDailyResultRow row = upsertDailyResult(userId, workDate, scheduleId, group.groupId(), shiftId,
+                "REST", 0, 0, 0, 0, false);
+            rebuildExceptions(row, 0, 0, 0);
+            return attendanceRepository.getDailyResult(userId, workDate);
+        }
+        LocalDateTime expectedStart = periods.get(0).startAt();
+        LocalDateTime expectedEnd = periods.get(periods.size() - 1).endAt();
+        boolean crossDay = expectedEnd.toLocalDate().isAfter(workDate);
+        LocalDateTime firstPunchAt = crossDay
+            ? attendanceRepository.getPunchAtInPeriod(userId, workDate.atStartOfDay(), expectedEnd, PUNCH_TYPE_ON_DUTY)
+            : attendanceRepository.getFirstPunchAt(userId, workDate);
+        LocalDateTime lastPunchAt = crossDay
+            ? attendanceRepository.getPunchAtInPeriod(userId, expectedStart, expectedEnd.toLocalDate().plusDays(1).atStartOfDay(), PUNCH_TYPE_OFF_DUTY)
+            : attendanceRepository.getLastPunchAt(userId, workDate);
         // 获取当天已审批通过的请假时段，用于抵扣迟到/早退/缺勤
-        List<ApprovedLeavePeriod> approvedLeavePeriods =
-            leaveService.listApprovedLeavePeriodsOnDate(userId, workDate);
-        int requiredWorkMinutes = minutesBetween(shift.startTime(), shift.endTime());
-        int approvedLeaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(
-            approvedLeavePeriods,
-            workDate,
-            shift.startTime(),
-            shift.endTime()
-        );
+        List<ApprovedLeavePeriod> approvedLeavePeriods = new ArrayList<>(leaveService.listApprovedLeavePeriodsOnDate(userId, workDate));
+        if (expectedEnd.toLocalDate().isAfter(workDate)) {
+            approvedLeavePeriods.addAll(leaveService.listApprovedLeavePeriodsOnDate(userId, expectedEnd.toLocalDate()));
+        }
+        int requiredWorkMinutes = periods.stream().mapToInt(AttendanceWorkPeriod::minutes).sum();
+        int approvedLeaveCoveredMinutes = periods.stream().mapToInt(period ->
+            calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, period.startAt(), period.endAt())).sum();
         // 请假覆盖了全部应出勤时间，直接标记为请假状态
         if (approvedLeaveCoveredMinutes >= requiredWorkMinutes) {
             AttendanceDailyResultRow row = upsertDailyResult(
@@ -514,29 +595,31 @@ public class AttendanceService {
             return attendanceRepository.getDailyResult(userId, workDate);
         }
 
-        int lateMinutes = calculateLateMinutes(
-            firstPunchAt,
-            workDate,
-            shift.startTime(),
-            group.lateGraceMinutes(),
-            approvedLeavePeriods
-        );
-        int earlyLeaveMinutes = calculateEarlyLeaveMinutes(
-            lastPunchAt,
-            workDate,
-            shift.endTime(),
-            group.earlyLeaveGraceMinutes(),
-            approvedLeavePeriods
-        );
-        int absenceMinutes = calculateAbsenceMinutes(
-            firstPunchAt,
-            lastPunchAt,
-            workDate,
-            shift.startTime(),
-            shift.endTime(),
-            approvedLeavePeriods
-        );
-        int workMinutes = calculateWorkMinutes(firstPunchAt, lastPunchAt);
+        int lateMinutes = 0;
+        int earlyLeaveMinutes = 0;
+        int absenceMinutes = 0;
+        int workMinutes = 0;
+        int missingHalfMinutes = requiredWorkMinutes / 2;
+        int precedingMinutes = 0;
+        for (AttendanceWorkPeriod period : periods) {
+            LocalDateTime lateStart = expectedStart.plusMinutes(group.lateGraceMinutes());
+            LocalDateTime earlyEnd = expectedEnd.minusMinutes(group.earlyLeaveGraceMinutes());
+            if (firstPunchAt != null) {
+                lateMinutes += uncoveredWorkMinutes(period, lateStart, firstPunchAt, approvedLeavePeriods);
+            }
+            if (lastPunchAt != null) {
+                earlyLeaveMinutes += uncoveredWorkMinutes(period, lastPunchAt, earlyEnd, approvedLeavePeriods);
+            }
+            if (firstPunchAt == null && lastPunchAt == null) {
+                absenceMinutes += period.minutes() - calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, period.startAt(), period.endAt());
+            } else if (firstPunchAt == null || lastPunchAt == null) {
+                int from = firstPunchAt == null ? 0 : Math.max(0, missingHalfMinutes - precedingMinutes);
+                int to = firstPunchAt == null ? Math.min(period.minutes(), missingHalfMinutes - precedingMinutes) : period.minutes();
+                if (to > from) absenceMinutes += uncoveredWorkMinutes(period, period.startAt().plusMinutes(from), period.startAt().plusMinutes(to), approvedLeavePeriods);
+            }
+            if (firstPunchAt != null && lastPunchAt != null) workMinutes += period.overlapMinutes(firstPunchAt, lastPunchAt);
+            precedingMinutes += period.minutes();
+        }
         boolean exceptionFlag = lateMinutes > 0 || earlyLeaveMinutes > 0 || absenceMinutes > 0;
         String resultStatus = exceptionFlag ? RESULT_ABNORMAL : RESULT_NORMAL;
 
@@ -633,6 +716,14 @@ public class AttendanceService {
                 LocalDateTime.now(clock)
             ));
         }
+    }
+
+    private int uncoveredWorkMinutes(AttendanceWorkPeriod period, LocalDateTime start, LocalDateTime end,
+                                     List<ApprovedLeavePeriod> leaves) {
+        LocalDateTime from = start.isAfter(period.startAt()) ? start : period.startAt();
+        LocalDateTime to = end.isBefore(period.endAt()) ? end : period.endAt();
+        if (!to.isAfter(from)) return 0;
+        return period.overlapMinutes(from, to) - calculateApprovedLeaveCoveredMinutes(leaves, from, to);
     }
 
     private int calculateLateMinutes(LocalDateTime firstPunchAt,
@@ -978,6 +1069,7 @@ public class AttendanceService {
         if (RESULT_ABNORMAL.equals(value)) return "异常";
         if (RESULT_NO_RULE.equals(value)) return "未设置规则";
         if (RESULT_LEAVE.equals(value)) return "请假";
+        if ("REST".equals(value)) return "休息";
         return "未知结果";
     }
 

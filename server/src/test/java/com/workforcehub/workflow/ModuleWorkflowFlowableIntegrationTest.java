@@ -248,7 +248,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
             .andExpect(jsonPath("$.data", hasSize(1)))
             .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"))
             .andExpect(jsonPath("$.data[0].exceptionFlag").value(false))
-            .andExpect(jsonPath("$.data[0].workMinutes").value(540));
+            .andExpect(jsonPath("$.data[0].workMinutes").value(480));
     }
 
     @Test
@@ -553,8 +553,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
     }
 
     @Test
-    @DisplayName("请假时长按半天向上取整")
-    void leaveRequestShouldRoundUpToHalfDay() throws Exception {
+    @DisplayName("跨日请假按实际工作分钟累计")
+    void leaveRequestShouldUseActualWorkingMinutes() throws Exception {
         Cookie employeeSession = loginEmployee();
         Long annualLeaveTypeId = seedWorkflowAndLeaveType();
 
@@ -566,8 +566,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                       "leaveTypeId": %d,
                       "startAt": "2026-05-07 17:00:00",
                       "endAt": "2026-05-08 10:00:00",
-                      "durationMinutes": 240,
-                      "reason": "半天起算"
+                      "durationMinutes": 120,
+                      "reason": "跨日两小时"
                     }
                     """.formatted(annualLeaveTypeId)))
             .andExpect(status().isOk())
@@ -1268,10 +1268,13 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
                  on_duty_punch_start, on_duty_punch_end,
                  off_duty_punch_start, off_duty_punch_end)
             VALUES
-                (9703, 9702, 1, '09:00:00', '18:00:00',
+                (9703, 9702, 1, '09:00:00', '12:00:00',
                  '08:00:00', '10:00:00',
-                 '17:00:00', '19:00:00')
+                 '17:00:00', '19:00:00'),
+                (9706, 9702, 2, '13:00:00', '18:00:00',
+                 '12:00:00', '14:00:00', '17:00:00', '19:00:00')
             """);
+        jdbcTemplate.update("INSERT INTO att_work_calendar_day(id,calendar_id,work_date,day_type,is_workday) VALUES(9707,9701,'2026-05-16','WORKDAY',1)");
         jdbcTemplate.update("""
             INSERT INTO att_group
                 (id, group_code, group_name, calendar_id, default_shift_id,

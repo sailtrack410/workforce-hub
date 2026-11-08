@@ -24,6 +24,7 @@ import com.workforcehub.org.service.OrgDirectoryService;
 import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
 import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
 import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
+import com.workforcehub.workflow.dto.LeaveDurationResponse;
 import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowGenericDetailResponse;
 import com.workforcehub.workflow.dto.WorkflowLeaveDetailResponse;
@@ -62,10 +63,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -101,11 +100,6 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         "BORROW",
         "PROJECT"
     );
-    private static final long HALF_DAY_MINUTES = 240L;
-    private static final LocalTime WORK_START = LocalTime.of(9, 0);
-    private static final LocalTime LUNCH_BREAK_START = LocalTime.of(12, 0);
-    private static final LocalTime LUNCH_BREAK_END = LocalTime.of(13, 0);
-    private static final LocalTime WORK_END = LocalTime.of(18, 0);
     private static final DateTimeFormatter REQUEST_NO_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
@@ -827,12 +821,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
 
     // 请假审批通过后，重新计算请假期间每天的考勤结果
     private void recalculateAttendanceForApprovedLeave(Long userId, WorkflowLeaveDetailRow leaveDetail) {
-        LocalDate workDate = leaveDetail.startAt().toLocalDate();
-        LocalDate endDate = leaveDetail.endAt().toLocalDate();
-        while (!workDate.isAfter(endDate)) {
-            attendanceService.recalculateDailyResultForExternalEvent(userId, workDate);
-            workDate = workDate.plusDays(1);
-        }
+        attendanceService.recalculateDailyResultsForApprovedLeave(userId, leaveDetail.startAt(), leaveDetail.endAt());
     }
 
     private void ensureRequestParticipant(Long requestId, Long userId) {
@@ -901,7 +890,10 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         if (!request.getEndAt().isAfter(request.getStartAt())) {
             throw new BizException(400, "结束时间必须晚于开始时间");
         }
-        long actualDurationMinutes = roundLeaveDurationMinutes(calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt()));
+        long actualDurationMinutes = calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt());
+        if (actualDurationMinutes <= 0) {
+            throw new BizException(400, "请假期间没有应出勤工作时间");
+        }
         if (actualDurationMinutes != request.getDurationMinutes()) {
             throw new BizException(400, "请假时长与开始结束时间不一致");
         }
@@ -927,35 +919,13 @@ public class WorkflowService implements WorkflowAgentResultCallback {
         }
     }
 
+    @Transactional
+    public LeaveDurationResponse previewLeaveDuration(LocalDateTime startAt, LocalDateTime endAt) {
+        return new LeaveDurationResponse(Math.toIntExact(calculateLeaveDurationMinutes(startAt, endAt)));
+    }
+
     private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
-        long durationMinutes = 0;
-        LocalDate currentDate = startAt.toLocalDate();
-        LocalDate endDate = endAt.toLocalDate();
-        while (!currentDate.isAfter(endDate)) {
-            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(WORK_START), currentDate.atTime(LUNCH_BREAK_START));
-            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(LUNCH_BREAK_END), currentDate.atTime(WORK_END));
-            currentDate = currentDate.plusDays(1);
-        }
-        return durationMinutes;
-    }
-
-    private long roundLeaveDurationMinutes(long durationMinutes) {
-        if (durationMinutes <= 0) {
-            return 0;
-        }
-        return ((durationMinutes + HALF_DAY_MINUTES - 1) / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
-    }
-
-    private long overlapMinutes(LocalDateTime rangeStart,
-                                LocalDateTime rangeEnd,
-                                LocalDateTime segmentStart,
-                                LocalDateTime segmentEnd) {
-        LocalDateTime overlapStart = rangeStart.isAfter(segmentStart) ? rangeStart : segmentStart;
-        LocalDateTime overlapEnd = rangeEnd.isBefore(segmentEnd) ? rangeEnd : segmentEnd;
-        if (!overlapEnd.isAfter(overlapStart)) {
-            return 0;
-        }
-        return Duration.between(overlapStart, overlapEnd).toMinutes();
+        return attendanceService.calculateLeaveDurationMinutes(CurrentUserHolder.requireUserId(), startAt, endAt);
     }
 
     private WorkflowTodoResponse toTodoResponse(WorkflowTodoRow row) {
