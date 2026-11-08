@@ -306,7 +306,8 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             "UPDATE admin_permission SET status = 'INACTIVE' WHERE perm_code = 'ADMIN_PLUGIN_CALL'"
         );
 
-        assertGatewayForbidden(adminSession);
+        assertGatewayUnauthenticated(adminSession);
+        assertGatewayForbidden(loginAdmin());
 
         verify(handler, never()).execute(any(), anyMap());
     }
@@ -318,7 +319,8 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
             "UPDATE admin_permission SET is_deleted = 1 WHERE perm_code = 'ADMIN_PLUGIN_CALL'"
         );
 
-        assertGatewayForbidden(adminSession);
+        assertGatewayUnauthenticated(adminSession);
+        assertGatewayForbidden(loginAdmin());
 
         verify(handler, never()).execute(any(), anyMap());
     }
@@ -328,7 +330,12 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
         Cookie adminSession = loginAdmin();
         jdbcTemplate.update("UPDATE admin_user SET status = 'DISABLED' WHERE id = 8001");
 
-        assertGatewayForbidden(adminSession);
+        assertGatewayUnauthenticated(adminSession);
+        mockMvc.perform(post("/api/admin/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"loginName\":\"admin.demo\",\"password\":\"Admin@123456\"}"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403));
 
         verify(handler, never()).execute(any(), anyMap());
     }
@@ -376,6 +383,14 @@ class PluginGatewayPermissionMatrixIntegrationTest extends LocalIntegrationTestS
         invokeGateway(session)
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value(100403));
+    }
+
+    private void assertGatewayUnauthenticated(Cookie session) throws Exception {
+        invokeGateway(session)
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(100401));
+        invokeGateway(session)
+            .andExpect(status().isUnauthorized());
     }
 
     private MockHttpServletRequestBuilder gatewayRequest(Cookie session) {

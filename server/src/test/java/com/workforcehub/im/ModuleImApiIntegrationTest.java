@@ -6,6 +6,8 @@ import com.workforcehub.agent.service.ImAgentReplyResult;
 import com.workforcehub.im.service.ImAgentConversationService;
 import com.workforcehub.im.websocket.ImWebSocketOutboxDispatcher;
 import com.workforcehub.im.websocket.ImWebSocketSessionRegistry;
+import com.workforcehub.im.websocket.ImWebSocketAuthentication;
+import com.workforcehub.auth.security.EmployeeUserDetailsService;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -82,6 +84,9 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private ImWebSocketSessionRegistry webSocketSessionRegistry;
+
+    @Autowired
+    private EmployeeUserDetailsService employeeUserDetailsService;
 
     @Autowired
     private ImWebSocketOutboxDispatcher imWebSocketOutboxDispatcher;
@@ -492,9 +497,9 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
                       "clientMessageId": "client-msg-offboarded"
                     }
                     """))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(100403))
-            .andExpect(jsonPath("$.message").value("当前员工状态不允许使用会话"));
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(100401))
+            .andExpect(jsonPath("$.message").value("登录状态已变更，请重新登录"));
 
         assertEquals(2L, jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM im_message WHERE conversation_id = 7001",
@@ -2769,7 +2774,7 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
         return result.getResponse().getCookie("SESSION");
     }
 
-    private static class CapturingWebSocketSession implements WebSocketSession {
+    private class CapturingWebSocketSession implements WebSocketSession {
 
         private final String id;
         private final Map<String, Object> attributes;
@@ -2778,7 +2783,10 @@ class ModuleImApiIntegrationTest extends LocalIntegrationTestSupport {
 
         private CapturingWebSocketSession(Long userId) {
             this.id = "test-im-ws-" + userId;
-            this.attributes = Map.of("imUserId", userId);
+            String loginName = jdbcTemplate.queryForObject(
+                "SELECT login_name FROM auth_user_account WHERE user_id = ?", String.class, userId);
+            this.attributes = Map.of("imUserId", userId, ImWebSocketAuthentication.PRINCIPAL_ATTRIBUTE,
+                employeeUserDetailsService.loadUserByUsername(loginName));
         }
 
         protected List<String> messages() {

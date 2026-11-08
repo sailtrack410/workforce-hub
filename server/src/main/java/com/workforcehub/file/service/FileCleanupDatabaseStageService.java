@@ -203,8 +203,8 @@ public class FileCleanupDatabaseStageService {
 
     private void releaseUsage(RecycleRefCleanupRow row) {
         if ("PERSONAL_FILE".equals(row.ownerType()) && row.uploaderId() != null) {
-            storageUsageLedgerService.releaseUsage("USER", row.uploaderId(), row.fileSize(), 1);
             storageUsageLedgerService.releaseUsage("GLOBAL", null, row.fileSize(), 1);
+            storageUsageLedgerService.releaseUsage("USER", row.uploaderId(), row.fileSize(), 1);
             return;
         }
         if ("ADMIN_FILE".equals(row.ownerType())) {

@@ -121,8 +121,8 @@ public class FileUploadTicketService {
                 throw e;
             }
             fileObjectRepository.increaseRefCount(existing.id());
-            fileUploadRules.increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
-            storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+            fileQuotaPolicyService.reserveUsage("IM_GROUP_FILE".equals(request.getOwnerType()) ? null : userId,
+                request.getFileSize());
             auditLogWriter.write("USER", userId, "FILE_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
             return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);
@@ -177,7 +177,7 @@ public class FileUploadTicketService {
                 throw e;
             }
             fileObjectRepository.increaseRefCount(existing.id());
-            storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+            fileQuotaPolicyService.reserveUsage(null, request.getFileSize());
             auditLogWriter.write("ADMIN", adminId, "FILE_ADMIN_UPLOAD_DEDUP", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",
                 "{\"fileObjectId\":%s}".formatted(existing.id()));
             return deduplicatedResponse(deduplicatedTicketId, "UP" + deduplicatedTicketId, existing, attachmentRefId);

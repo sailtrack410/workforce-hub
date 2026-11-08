@@ -791,9 +791,9 @@ class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
                       "sourceType": "PC"
                     }
                     """))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value(100403))
-            .andExpect(jsonPath("$.message").value("员工当前状态不允许打卡"));
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(100401))
+            .andExpect(jsonPath("$.message").value("登录状态已变更，请重新登录"));
 
         assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-09"));
     }

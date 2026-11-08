@@ -3,6 +3,7 @@ package com.workforcehub.plugin;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.auth.security.AdminUserDetails;
+import com.workforcehub.auth.security.AdminUserDetailsService;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginStatus;
 import com.workforcehub.plugin.runtime.PluginManagerService;
@@ -47,6 +48,7 @@ class AdminPluginLifecycleAuditIntegrationTest extends LocalIntegrationTestSuppo
 
     private static final String PLUGIN_ID = "lifecycle-audit-plugin";
     private static final long ADMIN_ID = 9_001L;
+    private static final long AUDIT_READER_ID = 9_002L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -57,6 +59,9 @@ class AdminPluginLifecycleAuditIntegrationTest extends LocalIntegrationTestSuppo
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private AdminUserDetailsService adminUserDetailsService;
+
     @MockBean
     private PluginManagerService pluginManagerService;
 
@@ -64,6 +69,34 @@ class AdminPluginLifecycleAuditIntegrationTest extends LocalIntegrationTestSuppo
 
     @BeforeEach
     void configureLifecycleManager() {
+        // 请求身份必须与数据库授权一致，避免会话有效性校验先于业务权限校验返回 401。
+        jdbcTemplate.update("""
+            INSERT INTO admin_user (id, username, password_hash, display_name, status)
+            VALUES (?, 'plugin.audit.admin', 'fixture-unused', '插件管理员', 'ACTIVE'),
+                   (?, 'plugin.audit.reader', 'fixture-unused', '审计查看员', 'ACTIVE')
+            """, ADMIN_ID, AUDIT_READER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO admin_role (id, role_code, role_name, status)
+            VALUES (?, 'PLUGIN_AUDIT_OPERATOR', '插件管理测试角色', 'ACTIVE'),
+                   (?, 'PLUGIN_AUDIT_READER', '审计查看测试角色', 'ACTIVE')
+            """, ADMIN_ID, AUDIT_READER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO admin_permission (id, perm_code, perm_name, module_code, action_code, status)
+            SELECT 9003, 'ADMIN_AUDIT_LOG_VIEW', '审计日志查询', 'AUDIT_LOG', 'VIEW', 'ACTIVE'
+            WHERE NOT EXISTS (SELECT 1 FROM admin_permission WHERE perm_code = 'ADMIN_AUDIT_LOG_VIEW')
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO admin_role_permission (id, role_id, permission_id)
+            SELECT ?, ?, id FROM admin_permission WHERE perm_code = 'ADMIN_PLUGIN_MANAGE'
+            """, ADMIN_ID, ADMIN_ID);
+        jdbcTemplate.update("""
+            INSERT INTO admin_role_permission (id, role_id, permission_id)
+            SELECT ?, ?, id FROM admin_permission WHERE perm_code = 'ADMIN_AUDIT_LOG_VIEW'
+            """, AUDIT_READER_ID, AUDIT_READER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO admin_user_role (id, admin_user_id, role_id)
+            VALUES (?, ?, ?), (?, ?, ?)
+            """, ADMIN_ID, ADMIN_ID, ADMIN_ID, AUDIT_READER_ID, AUDIT_READER_ID, AUDIT_READER_ID);
         reset(pluginManagerService);
         pluginStatus.set(PluginStatus.INSTALLED);
         when(pluginManagerService.getPlugin(PLUGIN_ID))
@@ -159,6 +192,24 @@ class AdminPluginLifecycleAuditIntegrationTest extends LocalIntegrationTestSuppo
         assertAuditDisplay("PLUGIN_DISABLED", "停用插件", "失败");
     }
 
+    @Test
+    void pluginManagementPermissionMustNotGrantAuditReadAccess() throws Exception {
+        assertEquals(List.of("ADMIN_PLUGIN_MANAGE"),
+            ((AdminUserDetails) adminUserDetailsService.loadUserByUsername("plugin.audit.admin")).getPermissionCodes());
+        assertEquals(List.of("ADMIN_AUDIT_LOG_VIEW"),
+            ((AdminUserDetails) adminUserDetailsService.loadUserByUsername("plugin.audit.reader")).getPermissionCodes());
+
+        mockMvc.perform(put("/api/admin/plugins/{pluginId}/enable", PLUGIN_ID)
+                .with(admin()).with(csrf().asHeader()))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/admin/system/audit-logs")
+                .with(admin()).param("targetType", "PLUGIN"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403));
+        assertAuditDisplay("PLUGIN_ENABLED", "启用插件", "成功");
+        System.out.println("AUDIT_AUTHORIZATION plugin-only=403; database-audit-reader=200; persisted-audit=1");
+    }
+
     private void assertAudit(
             AuditRow audit,
             String actionType,
@@ -188,7 +239,7 @@ class AdminPluginLifecycleAuditIntegrationTest extends LocalIntegrationTestSuppo
 
     private void assertAuditDisplay(String actionType, String actionName, String resultName) throws Exception {
         mockMvc.perform(get("/api/admin/system/audit-logs")
-                .with(admin())
+                .with(admin("plugin.audit.reader"))
                 .param("actionType", actionType)
                 .param("targetType", "PLUGIN"))
             .andExpect(status().isOk())
@@ -216,15 +267,11 @@ class AdminPluginLifecycleAuditIntegrationTest extends LocalIntegrationTestSuppo
     }
 
     private RequestPostProcessor admin() {
-        AdminUserDetails principal = new AdminUserDetails(
-            ADMIN_ID,
-            "plugin.audit.admin",
-            "unused",
-            "插件审计管理员",
-            "ACTIVE",
-            List.of(),
-            List.of("ADMIN_PLUGIN_MANAGE")
-        );
+        return admin("plugin.audit.admin");
+    }
+
+    private RequestPostProcessor admin(String username) {
+        AdminUserDetails principal = (AdminUserDetails) adminUserDetailsService.loadUserByUsername(username);
         return authentication(UsernamePasswordAuthenticationToken.authenticated(
             principal,
             null,

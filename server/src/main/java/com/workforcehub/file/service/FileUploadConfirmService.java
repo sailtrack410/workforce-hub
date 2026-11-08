@@ -134,8 +134,8 @@ public class FileUploadConfirmService {
         }
         publishFileUploadedEvent(attachmentRefId, userId);
         fileObjectRepository.increaseRefCount(fileObject.id());
-        fileUploadRules.increaseEmployeeUsage(request.getOwnerType(), userId, request.getFileSize());
-        storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+        fileQuotaPolicyService.reserveUsage("IM_GROUP_FILE".equals(request.getOwnerType()) ? null : userId,
+            request.getFileSize());
         if (deduplicated) {
             scheduleDeduplicatedUploadObjectCleanup(ticket, fileObject);
         }
@@ -214,7 +214,7 @@ public class FileUploadConfirmService {
         }
         publishFileUploadedEvent(attachmentRefId, adminId);
         fileObjectRepository.increaseRefCount(fileObject.id());
-        storageUsageLedgerService.increaseUsage("GLOBAL", null, request.getFileSize(), 1);
+        fileQuotaPolicyService.reserveUsage(null, request.getFileSize());
         if (deduplicated) {
             scheduleDeduplicatedUploadObjectCleanup(ticket, fileObject);
         }

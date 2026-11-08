@@ -6,11 +6,13 @@ import com.workforcehub.auth.security.AdminUserDetailsService;
 import com.workforcehub.auth.security.EmployeeUserDetailsService;
 import com.workforcehub.auth.security.UserTypePathFilter;
 import com.workforcehub.auth.security.WfhAuthenticationProvider;
+import com.workforcehub.auth.security.SessionValidityFilter;
 import com.workforcehub.common.enums.UserType;
 import com.workforcehub.common.exception.BusinessErrorCode;
 import com.workforcehub.common.response.R;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -90,7 +92,14 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public FilterRegistrationBean<SessionValidityFilter> sessionValidityFilterRegistration(SessionValidityFilter filter) {
+        var registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, SessionValidityFilter sessionValidityFilter) throws Exception {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieCustomizer(cookie -> cookie.path("/").sameSite("Lax"));
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
@@ -127,7 +136,8 @@ public class SecurityConfig {
             )
 
             // 路径与身份匹配校验
-            .addFilterAfter(userTypePathFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(sessionValidityFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(userTypePathFilter, SessionValidityFilter.class)
             .addFilterAfter(adminPermissionFilter, UserTypePathFilter.class)
 
             .exceptionHandling(ex -> ex

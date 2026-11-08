@@ -2,6 +2,7 @@ package com.workforcehub.plugin;
 
 import com.jayway.jsonpath.JsonPath;
 import com.workforcehub.auth.security.AdminUserDetails;
+import com.workforcehub.auth.security.AdminUserDetailsService;
 import com.workforcehub.plugin.repository.PluginDependencySpec;
 import com.workforcehub.plugin.repository.PluginRow;
 import com.workforcehub.plugin.repository.PluginRepository;
@@ -171,6 +172,9 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private AdminUserDetailsService adminUserDetailsService;
 
     @BeforeEach
     void resetPluginState() {
@@ -1537,15 +1541,7 @@ class PluginManagerServiceIntegrationTest extends LocalIntegrationTestSupport {
     }
 
     private RequestPostProcessor adminPluginManager() {
-        AdminUserDetails principal = new AdminUserDetails(
-            8_001L,
-            "admin.demo",
-            "unused",
-            "插件生命周期管理员",
-            "ACTIVE",
-            List.of(),
-            List.of("ADMIN_PLUGIN_MANAGE")
-        );
+        AdminUserDetails principal = (AdminUserDetails) adminUserDetailsService.loadUserByUsername("admin.demo");
         return authentication(UsernamePasswordAuthenticationToken.authenticated(
             principal,
             null,

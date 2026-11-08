@@ -18,13 +18,16 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
     public static final String DISPLAY_NAME_ATTRIBUTE = "imDisplayName";
 
     private final ImWebSocketSessionRegistry sessionRegistry;
+    private final ImWebSocketAuthentication authentication;
 
-    public ImWebSocketHandler(ImWebSocketSessionRegistry sessionRegistry) {
+    public ImWebSocketHandler(ImWebSocketSessionRegistry sessionRegistry, ImWebSocketAuthentication authentication) {
         this.sessionRegistry = sessionRegistry;
+        this.authentication = authentication;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        if (!authentication.check(session)) return;
         Long userId = currentUserId(session);
         if (userId == null) {
             session.close(CloseStatus.POLICY_VIOLATION);
@@ -39,6 +42,10 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
     // 心跳响应：兼容纯文本 PING 和 JSON 格式 {"PING"}
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        if (!authentication.check(session)) {
+            unregister(session);
+            return;
+        }
         String payload = message.getPayload();
         if ("PING".equalsIgnoreCase(payload) || payload.contains("\"PING\"")) {
             session.sendMessage(new TextMessage("""

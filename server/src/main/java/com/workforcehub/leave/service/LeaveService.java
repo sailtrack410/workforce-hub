@@ -209,14 +209,16 @@ public class LeaveService {
                                             int durationMinutes,
                                             Long requestId,
                                             Long operatorId) {
-        LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
-        if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
+        ensurePositiveDuration(durationMinutes);
+        String balanceMode = leaveRepository.lockWorkflowBalanceMode(userId, leaveTypeId, durationMinutes, requestId);
+        if (BALANCE_MODE_NO_DEDUCT.equals(balanceMode)) {
             return;
         }
-        ensurePositiveDuration(durationMinutes);
+        // 统一先锁账户再读取流水，避免同一账户的不同申请互持流水间隙锁。
+        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
         String sourceTxnKey = workflowFreezeSourceTxnKey(requestId);
         // 幂等：重复提交不重复冻结
-        LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
+        LeaveAccountTxnRow existingTxn = leaveRepository.getWorkflowFreezeForUpdate(requestId);
         if (existingTxn != null) {
             LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
             ensureWorkflowFreezeIdempotencyFingerprint(
@@ -230,8 +232,13 @@ public class LeaveService {
             return;
         }
 
+        LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
+        leaveRepository.snapshotWorkflowBalanceMode(requestId, leaveType.balanceMode());
+        if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
+            return;
+        }
+
         // SELECT FOR UPDATE 行锁，防止并发扣减
-        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
         if (account == null || account.availableMinutes() < durationMinutes) {
             throw new BizException(400, "假期余额不足");
         }
@@ -259,14 +266,15 @@ public class LeaveService {
                                                  int durationMinutes,
                                                  Long requestId,
                                                  Long operatorId) {
-        LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
-        if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
-            return;
-        }
         ensurePositiveDuration(durationMinutes);
+        String balanceMode = leaveRepository.lockWorkflowBalanceMode(userId, leaveTypeId, durationMinutes, requestId);
+        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
         String sourceTxnKey = workflowDeductSourceTxnKey(requestId);
-        LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
+        LeaveAccountTxnRow existingTxn = leaveRepository.getWorkflowSettlement(requestId, sourceTxnKey);
         if (existingTxn != null) {
+            if (!sourceTxnKey.equals(existingTxn.sourceTxnKey())) {
+                throw new BizException(409, "请假申请已释放冻结余额，不能再次扣减");
+            }
             LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
             ensureWorkflowDeductIdempotencyFingerprint(
                 existingTxn,
@@ -278,15 +286,25 @@ public class LeaveService {
             );
             return;
         }
-        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
+        LeaveAccountTxnRow freezeTxn = leaveRepository.getWorkflowFreezeForUpdate(requestId);
+        if (freezeTxn == null && BALANCE_MODE_NO_DEDUCT.equals(balanceMode)) {
+            return;
+        }
+        // 历史记录只能由原冻结流水证明扣减，不能根据当前假种或其他申请的冻结额猜测。
+        if (freezeTxn == null && !BALANCE_MODE_DEDUCT.equals(balanceMode)) {
+            throw new BizException(409, "历史请假缺少扣减规则和冻结流水，请核对后结算");
+        }
         if (account == null) {
             throw new BizException(400, "假期余额不足");
         }
 
         // 优先从冻结余额扣，降级到可用余额（兼容历史无冻结记录的申请）
-        LeaveAccountTxnRow freezeTxn = leaveRepository.getTxnBySourceTxnKey(workflowFreezeSourceTxnKey(requestId));
         int balanceAfter;
-        if (account.frozenMinutes() >= durationMinutes) {
+        if (freezeTxn != null) {
+            ensureWorkflowFreezeIdempotencyFingerprint(freezeTxn, account, userId, leaveTypeId, durationMinutes, requestId);
+            if (!freezeTxn.accountId().equals(account.accountId()) || account.frozenMinutes() < durationMinutes) {
+                throw new BizException(400, "冻结假期余额不足");
+            }
             balanceAfter = account.availableMinutes();
             leaveRepository.updateAccountBalances(
                 account.accountId(),
@@ -323,19 +341,20 @@ public class LeaveService {
                                                  Long requestId,
                                                  String terminalStatus,
                                                  Long operatorId) {
-        LeaveTypeRow leaveType = leaveRepository.getActiveLeaveTypeOrThrow(leaveTypeId);
-        if (BALANCE_MODE_NO_DEDUCT.equals(leaveType.balanceMode())) {
-            return;
-        }
         ensurePositiveDuration(durationMinutes);
+        leaveRepository.lockWorkflowBalanceMode(userId, leaveTypeId, durationMinutes, requestId);
+        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
         // 没有冻结记录说明是历史申请，跳过
-        LeaveAccountTxnRow freezeTxn = leaveRepository.getTxnBySourceTxnKey(workflowFreezeSourceTxnKey(requestId));
+        LeaveAccountTxnRow freezeTxn = leaveRepository.getWorkflowFreezeForUpdate(requestId);
         if (freezeTxn == null) {
             return;
         }
         String sourceTxnKey = workflowUnfreezeSourceTxnKey(requestId, terminalStatus);
-        LeaveAccountTxnRow existingTxn = leaveRepository.getTxnBySourceTxnKey(sourceTxnKey);
+        LeaveAccountTxnRow existingTxn = leaveRepository.getWorkflowSettlement(requestId, sourceTxnKey);
         if (existingTxn != null) {
+            if (!sourceTxnKey.equals(existingTxn.sourceTxnKey())) {
+                throw new BizException(409, "请假申请已完成其他终态结算");
+            }
             LeaveAccountRow existingAccount = leaveRepository.getAccountByIdOrThrow(existingTxn.accountId());
             ensureWorkflowUnfreezeIdempotencyFingerprint(
                 existingTxn,
@@ -348,9 +367,12 @@ public class LeaveService {
             return;
         }
 
-        LeaveAccountRow account = leaveRepository.getAccountForUpdate(userId, leaveTypeId);
         if (account == null || account.frozenMinutes() < durationMinutes) {
             throw new BizException(400, "冻结假期余额不足");
+        }
+        ensureWorkflowFreezeIdempotencyFingerprint(freezeTxn, account, userId, leaveTypeId, durationMinutes, requestId);
+        if (!freezeTxn.accountId().equals(account.accountId())) {
+            throw new BizException(409, "冻结流水与假期账户不一致");
         }
 
         int availableAfter = account.availableMinutes() + durationMinutes;

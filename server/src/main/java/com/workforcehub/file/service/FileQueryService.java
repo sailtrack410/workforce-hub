@@ -244,8 +244,7 @@ public class FileQueryService {
             userId
         );
         jdbcTemplate.update("UPDATE sys_file_object SET ref_count = ref_count + 1 WHERE id = ?", source.fileObjectId());
-        storageUsageLedgerService.increaseUsage("USER", userId, source.fileSize(), 1);
-        storageUsageLedgerService.increaseUsage("GLOBAL", null, source.fileSize(), 1);
+        fileQuotaPolicyService.reserveUsage(userId, source.fileSize());
         auditLogWriter.write("USER", userId, "FILE_COPIED", "ATTACHMENT_REF", copiedAttachmentRefId, "SUCCESS",
             "{\"sourceAttachmentRefId\":%s,\"targetFolderId\":%s}".formatted(
                 attachmentRefId,

@@ -4,6 +4,8 @@ import com.workforcehub.auth.security.AdminPermissionFilter;
 import com.workforcehub.auth.security.AdminUserDetailsService;
 import com.workforcehub.auth.security.EmployeeUserDetailsService;
 import com.workforcehub.auth.security.UserTypePathFilter;
+import com.workforcehub.auth.security.SessionValidityFilter;
+import com.workforcehub.auth.security.SessionValidityService;
 import com.workforcehub.auth.security.WfhUserDetails;
 import com.workforcehub.common.config.SecurityConfig;
 import com.workforcehub.common.enums.UserType;
@@ -87,6 +89,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     SecurityConfig.class,
     UserTypePathFilter.class,
     AdminPermissionFilter.class,
+    SessionValidityFilter.class,
     InvocationContextBinder.class,
     PluginParamValidator.class,
     PluginLifecycleGuard.class,
@@ -116,6 +119,9 @@ class PluginGatewaySecurityTest {
     @MockBean(name = "adminUserDetailsService")
     private AdminUserDetailsService adminUserDetailsService;
 
+    @MockBean
+    private SessionValidityService sessionValidity;
+
     @Autowired
     private PluginLifecycleGuard lifecycleGuard;
 
@@ -123,6 +129,7 @@ class PluginGatewaySecurityTest {
 
     @BeforeEach
     void setUp() {
+        when(sessionValidity.isCurrent(any())).thenReturn(true);
         // 每个测试前 enable 插件，使 guard 有 slot
         lifecycleGuard.enable(PLUGIN_ID);
 

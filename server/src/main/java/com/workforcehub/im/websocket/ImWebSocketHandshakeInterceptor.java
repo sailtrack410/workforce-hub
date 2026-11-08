@@ -1,6 +1,7 @@
 package com.workforcehub.im.websocket;
 
 import com.workforcehub.auth.security.WfhUserDetails;
+import com.workforcehub.auth.security.SessionValidityService;
 import com.workforcehub.common.enums.UserType;
 import com.workforcehub.im.repository.ImRepository;
 import org.springframework.http.HttpStatus;
@@ -26,9 +27,11 @@ import java.util.Map;
 public class ImWebSocketHandshakeInterceptor implements HandshakeInterceptor {
 
     private final ImRepository imRepository;
+    private final SessionValidityService validity;
 
-    public ImWebSocketHandshakeInterceptor(ImRepository imRepository) {
+    public ImWebSocketHandshakeInterceptor(ImRepository imRepository, SessionValidityService validity) {
         this.imRepository = imRepository;
+        this.validity = validity;
     }
 
     @Override
@@ -45,12 +48,13 @@ public class ImWebSocketHandshakeInterceptor implements HandshakeInterceptor {
             response.setStatusCode(HttpStatus.FORBIDDEN);
             return false;
         }
-        if (!imRepository.existsLoginAllowedOrgUser(user.getUserId())) {
+        if (!validity.isCurrent(user) || !imRepository.existsLoginAllowedOrgUser(user.getUserId())) {
             response.setStatusCode(HttpStatus.FORBIDDEN);
             return false;
         }
         attributes.put(ImWebSocketHandler.USER_ID_ATTRIBUTE, user.getUserId());
         attributes.put(ImWebSocketHandler.DISPLAY_NAME_ATTRIBUTE, user.getDisplayName());
+        attributes.put(ImWebSocketAuthentication.PRINCIPAL_ATTRIBUTE, user);
         return true;
     }
 

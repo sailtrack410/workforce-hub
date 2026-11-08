@@ -3,6 +3,7 @@ package com.workforcehub.im.websocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -23,6 +24,25 @@ public class ImWebSocketSessionRegistry {
     private static final Logger log = LoggerFactory.getLogger(ImWebSocketSessionRegistry.class);
 
     private final ConcurrentHashMap<Long, CopyOnWriteArraySet<WebSocketSession>> sessionsByUserId = new ConcurrentHashMap<>();
+    private final ImWebSocketAuthentication authentication;
+
+    public ImWebSocketSessionRegistry(ImWebSocketAuthentication authentication) {
+        this.authentication = authentication;
+    }
+
+    @Scheduled(fixedDelay = 5000)
+    public void closeInvalidSessions() {
+        sessionsByUserId.forEach((userId, sessions) -> {
+            for (WebSocketSession session : sessions) {
+                try {
+                    if (!session.isOpen() || !authentication.check(session)) unregister(userId, session);
+                } catch (IOException e) {
+                    unregister(userId, session);
+                    log.warn("IM WebSocket 失效连接关闭失败 userId={}", userId, e);
+                }
+            }
+        });
+    }
 
     public void register(Long userId, WebSocketSession session) {
         sessionsByUserId.computeIfAbsent(userId, ignored -> new CopyOnWriteArraySet<>()).add(session);
@@ -70,6 +90,10 @@ public class ImWebSocketSessionRegistry {
         int deliveredCount = 0;
         for (WebSocketSession session : sessions) {
             if (!session.isOpen()) {
+                unregister(userId, session);
+                continue;
+            }
+            if (!authentication.check(session)) {
                 unregister(userId, session);
                 continue;
             }

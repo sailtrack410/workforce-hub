@@ -88,7 +88,7 @@ class AdminPermissionFilterTest {
     }
 
     @Test
-    void similarPrefixShouldNotBeTreatedAsPluginApi() throws Exception {
+    void similarPrefixShouldBeDeniedAsUndeclaredAdminApi() throws Exception {
         AdminPermissionFilter filter = new AdminPermissionFilter(new ObjectMapper());
         authenticate(List.of(), List.of());
         MockHttpServletRequest request = new MockHttpServletRequest(
@@ -98,8 +98,8 @@ class AdminPermissionFilterTest {
 
         filter.doFilter(request, response, (servletRequest, servletResponse) -> called.set(true));
 
-        assertTrue(called.get());
-        assertEquals(200, response.getStatus());
+        assertFalse(called.get());
+        assertEquals(403, response.getStatus());
     }
 
     @Test

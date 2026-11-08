@@ -14,6 +14,7 @@ import com.workforcehub.file.storage.StorageProvider;
 import com.workforcehub.file.storage.StorageProviderRegistry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -207,6 +208,25 @@ public class FileQuotaPolicyService {
         long used = storageUsageLedgerService.usedBytes("GLOBAL", null);
         if (used + incomingBytes > quota) {
             throw new BizException(507, "企业文件总空间不足，请联系系统管理员扩容");
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    public void reserveUsage(Long personalUserId, Long incomingBytes) {
+        if (incomingBytes == null || incomingBytes < 0) {
+            throw new BizException(422, "文件大小不合法");
+        }
+        // GLOBAL 排在 USER 前，避免首次建账时唯一索引的间隙锁逆序；各作用域须一起回滚。
+        long globalQuota = resolveQuota("GLOBAL", null, DEFAULT_GLOBAL_QUOTA_BYTES);
+        if (!storageUsageLedgerService.tryIncreaseUsage("GLOBAL", null, incomingBytes, globalQuota)) {
+            throw new BizException(507, "企业文件总空间不足，请联系系统管理员扩容");
+        }
+        if (personalUserId != null) {
+            long personalQuota = resolveQuota("USER", personalUserId,
+                resolveQuota("USER_DEFAULT", null, DEFAULT_PERSONAL_QUOTA_BYTES));
+            if (!storageUsageLedgerService.tryIncreaseUsage("USER", personalUserId, incomingBytes, personalQuota)) {
+                throw new BizException(507, "个人云空间不足，请清理文件或联系管理员扩容");
+            }
         }
     }
 

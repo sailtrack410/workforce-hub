@@ -133,8 +133,8 @@ public class FileLifecycleService {
         if (updated == 0) {
             throw new BizException(404, "附件引用不存在");
         }
-        storageUsageLedgerService.releaseUsage("USER", userId, attachment.fileSize(), 1);
         storageUsageLedgerService.releaseUsage("GLOBAL", null, attachment.fileSize(), 1);
+        storageUsageLedgerService.releaseUsage("USER", userId, attachment.fileSize(), 1);
         boolean cleanupScheduled = refreshFileObjectCleanupState(attachment);
 
         auditLogWriter.write("USER", userId, "FILE_PURGED", "ATTACHMENT_REF", attachmentRefId, "SUCCESS",

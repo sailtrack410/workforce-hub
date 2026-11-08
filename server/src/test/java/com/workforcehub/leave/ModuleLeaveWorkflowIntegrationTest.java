@@ -13,6 +13,9 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import com.workforcehub.leave.service.LeaveService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -63,6 +66,9 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
 
     @Autowired
     private MutableTestClock mutableTestClock;
+
+    @Autowired
+    private LeaveService leaveService;
 
     @Test
     @DisplayName("员工请假余额不足时应在提交阶段被拦截且不生成审批申请")
@@ -163,6 +169,64 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
         assertEquals(480, frozenMinutes(leaveTypeId));
         assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
         assertEquals("IN_APPROVAL", workflowRequestStatus(scenario.requestId()));
+        System.out.println("MYSQL_FINGERPRINT_CONFLICT http=409 available=900 frozen=480 status=IN_APPROVAL");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"MODE,APPROVED", "MODE,REJECTED", "MODE,WITHDRAWN", "INACTIVE,APPROVED", "INACTIVE,REJECTED",
+        "INACTIVE,WITHDRAWN", "DELETED,APPROVED", "DELETED,REJECTED", "DELETED,WITHDRAWN"})
+    void frozenLeaveShouldSettleAfterTypeConfigurationChanges(String change, String outcome) throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        assertEquals("DEDUCT", jdbcTemplate.queryForObject(
+            "SELECT balance_mode_snapshot FROM wf_req_leave WHERE request_id=?", String.class, scenario.requestId()));
+        switch (change) {
+            case "MODE" -> jdbcTemplate.update("UPDATE lv_type SET balance_mode='NO_DEDUCT' WHERE id=?", leaveTypeId);
+            case "INACTIVE" -> jdbcTemplate.update("UPDATE lv_type SET status='INACTIVE' WHERE id=?", leaveTypeId);
+            case "DELETED" -> jdbcTemplate.update("UPDATE lv_type SET is_deleted=1 WHERE id=?", leaveTypeId);
+        }
+        if ("APPROVED".equals(outcome)) {
+            approveManagerTask(managerSession, scenario.managerTask().getId());
+            leaveService.consumeFrozenForWorkflowApproval(EMPLOYEE_USER_ID, leaveTypeId, 480, scenario.requestId(), MANAGER_USER_ID);
+        } else {
+            String endpoint = "REJECTED".equals(outcome)
+                ? "/api/employee/workflow/tasks/" + scenario.managerTask().getId() + "/reject"
+                : "/api/employee/workflow/requests/" + scenario.requestId() + "/withdraw";
+            mockMvc.perform(post(endpoint)
+                    .cookie("REJECTED".equals(outcome) ? managerSession : employeeSession)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"comment\":\"配置变更后终态结算\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(outcome));
+            leaveService.releaseFrozenForWorkflowTerminal(EMPLOYEE_USER_ID, leaveTypeId, 480, scenario.requestId(), outcome, MANAGER_USER_ID);
+        }
+        assertEquals(outcome, workflowRequestStatus(scenario.requestId()));
+        assertEquals("APPROVED".equals(outcome) ? 480 : 960, availableMinutes(leaveTypeId));
+        assertEquals(0, frozenMinutes(leaveTypeId));
+        assertEquals(1L, leaveWorkflowTxnCount(leaveTypeId, "APPROVED".equals(outcome) ? "DEDUCT" : "UNFREEZE"));
+        assertNull(runtimeService.createProcessInstanceQuery().processInstanceId(scenario.processInstanceId()).singleResult());
+        System.out.printf("MYSQL_CONFIGURATION change=%s outcome=%s available=%d frozen=%d terminal_txns=1%n",
+            change, outcome, availableMinutes(leaveTypeId), frozenMinutes(leaveTypeId));
+    }
+
+    @Test
+    void originallyNonDeductingLeaveShouldNotDeductAfterTypeChangesInMySql() throws Exception {
+        Cookie employeeSession = loginEmployee();
+        Cookie managerSession = loginManager();
+        long leaveTypeId = seedWorkflowAndLeaveType();
+        seedLeaveAccount(leaveTypeId, 960);
+        jdbcTemplate.update("UPDATE lv_type SET balance_mode='NO_DEDUCT' WHERE id=?", leaveTypeId);
+        LeaveApprovalScenario scenario = submitLeaveRequest(employeeSession, leaveTypeId);
+        assertEquals("NO_DEDUCT", jdbcTemplate.queryForObject(
+            "SELECT balance_mode_snapshot FROM wf_req_leave WHERE request_id=?", String.class, scenario.requestId()));
+        jdbcTemplate.update("UPDATE lv_type SET balance_mode='DEDUCT' WHERE id=?", leaveTypeId);
+        approveManagerTask(managerSession, scenario.managerTask().getId());
+        assertEquals(960, availableMinutes(leaveTypeId));
+        assertEquals(0, frozenMinutes(leaveTypeId));
+        assertEquals(0L, leaveDeductTxnCount(leaveTypeId));
+        System.out.println("MYSQL_ORIGINAL_NO_DEDUCT current=DEDUCT outcome=APPROVED available=960 frozen=0 deduct_txns=0");
     }
 
     @Test

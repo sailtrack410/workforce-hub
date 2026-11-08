@@ -190,6 +190,13 @@
         </dependency>
 
         <!-- ==================== Test ==================== -->
+        <!-- 隔离余额结算事务测试，避免读取本地凭证或改写共享测试数据库。 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.3.232</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

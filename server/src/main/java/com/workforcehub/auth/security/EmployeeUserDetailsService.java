@@ -59,6 +59,10 @@ public class EmployeeUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("员工档案不存在");
         }
 
+        if (!"ACTIVE".equals(orgUser.getStatus())) {
+            throw new EmploymentLoginBlockedException("员工档案已停用，无法登录");
+        }
+
         // 按登录准入矩阵校验
         String status = orgUser.getEmploymentStatus();
         if (!LOGIN_ALLOWED_STATUSES.contains(status)) {

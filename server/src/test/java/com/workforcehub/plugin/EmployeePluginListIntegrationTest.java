@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -175,26 +177,27 @@ class EmployeePluginListIntegrationTest extends LocalIntegrationTestSupport {
         restoreSubordinates();
     }
 
-    @Test
-    void invalidOrgUserReturnsEmpty() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"DELETED", "DISABLED", "OFFBOARDED"})
+    void invalidOrgUserRejectsExistingSession(String change) throws Exception {
         Cookie s = login("zhangsan.employee", "Employee@123456", "/api/employee/auth/login");
 
-        jdbc.execute("UPDATE org_user SET is_deleted=1 WHERE id=2003");
         mockMvc.perform(get("/api/employee/plugins/mine").cookie(s))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.length()").value(0));
+            .andExpect(jsonPath("$.data.length()").value(6));
 
-        jdbc.execute("UPDATE org_user SET is_deleted=0,status='ACTIVE',employment_status='ACTIVE' WHERE id=2003");
-        jdbc.execute("UPDATE org_user SET status='DISABLED' WHERE id=2003");
+        jdbc.execute(switch (change) {
+            case "DELETED" -> "UPDATE org_user SET is_deleted=1 WHERE id=2003";
+            case "DISABLED" -> "UPDATE org_user SET status='DISABLED' WHERE id=2003";
+            default -> "UPDATE org_user SET employment_status='OFFBOARDED' WHERE id=2003";
+        });
         mockMvc.perform(get("/api/employee/plugins/mine").cookie(s))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.length()").value(0));
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(100401))
+            .andExpect(jsonPath("$.data").doesNotExist());
 
-        jdbc.execute("UPDATE org_user SET is_deleted=0,status='ACTIVE',employment_status='ACTIVE' WHERE id=2003");
-        jdbc.execute("UPDATE org_user SET employment_status='OFFBOARDED' WHERE id=2003");
         mockMvc.perform(get("/api/employee/plugins/mine").cookie(s))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.length()").value(0));
+            .andExpect(status().isUnauthorized());
     }
 
     // --- helpers ---

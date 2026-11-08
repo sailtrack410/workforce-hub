@@ -263,6 +263,63 @@ public class LeaveRepository {
         return rows.get(0);
     }
 
+    public String lockWorkflowBalanceMode(Long userId, Long leaveTypeId, int durationMinutes, Long requestId) {
+        List<String> rows = jdbcTemplate.query("""
+            SELECT l.balance_mode_snapshot
+            FROM wf_req_leave l
+            JOIN wf_request r ON r.id = l.request_id
+            WHERE l.request_id = ? AND r.biz_type = 'LEAVE'
+              AND r.applicant_user_id = ? AND l.leave_type_id = ? AND l.duration_minutes = ?
+            FOR UPDATE
+            """, (rs, rowNum) -> rs.getString("balance_mode_snapshot"), requestId, userId, leaveTypeId, durationMinutes);
+        if (rows.isEmpty()) {
+            throw new BizException(409, "请假结算参数与申请不一致");
+        }
+        return rows.get(0);
+    }
+
+    public void snapshotWorkflowBalanceMode(Long requestId, String balanceMode) {
+        jdbcTemplate.update("""
+            UPDATE wf_req_leave SET balance_mode_snapshot = ?
+            WHERE request_id = ? AND balance_mode_snapshot IS NULL
+            """, balanceMode, requestId);
+    }
+
+    public LeaveAccountTxnRow getWorkflowFreezeForUpdate(Long requestId) {
+        List<LeaveAccountTxnRow> rows = jdbcTemplate.query("""
+            SELECT id, account_id, txn_type, change_minutes, balance_after,
+                   source_type, source_id, source_txn_key
+            FROM lv_account_txn
+            WHERE source_txn_key = ?
+            FOR UPDATE
+            """, (rs, rowNum) -> new LeaveAccountTxnRow(
+                rs.getLong("id"), rs.getLong("account_id"), rs.getString("txn_type"),
+                rs.getInt("change_minutes"), rs.getInt("balance_after"), rs.getString("source_type"),
+                rs.getObject("source_id", Long.class), rs.getString("source_txn_key")
+            ), "WORKFLOW_REQUEST:" + requestId + ":FREEZE");
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public LeaveAccountTxnRow getWorkflowSettlement(Long requestId, String sourceTxnKey) {
+        List<LeaveAccountTxnRow> rows = jdbcTemplate.query("""
+            SELECT id, account_id, txn_type, change_minutes, balance_after,
+                   source_type, source_id, source_txn_key
+            FROM lv_account_txn
+            WHERE (source_type = 'WORKFLOW_REQUEST' AND source_id = ?
+                   AND txn_type IN ('DEDUCT', 'UNFREEZE'))
+               OR source_txn_key = ?
+            FOR UPDATE
+            """, (rs, rowNum) -> new LeaveAccountTxnRow(
+                rs.getLong("id"), rs.getLong("account_id"), rs.getString("txn_type"),
+                rs.getInt("change_minutes"), rs.getInt("balance_after"), rs.getString("source_type"),
+                rs.getObject("source_id", Long.class), rs.getString("source_txn_key")
+            ), requestId, sourceTxnKey);
+        if (rows.size() > 1) {
+            throw new BizException(409, "请假申请存在多笔终态结算，请核对流水");
+        }
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
     public LeaveAccountRow getAccountForUpdate(Long userId, Long leaveTypeId) {
         List<LeaveAccountRow> rows = jdbcTemplate.query(accountSelectSql() + """
             WHERE la.user_id = ?

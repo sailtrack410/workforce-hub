@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.im.websocket.ImWebSocketOutboxDispatcher;
 import com.workforcehub.im.websocket.ImWebSocketSessionRegistry;
+import com.workforcehub.im.websocket.ImWebSocketAuthentication;
+import com.workforcehub.auth.security.EmployeeUserDetailsService;
 import com.workforcehub.support.LocalIntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import org.hamcrest.Matchers;
@@ -60,6 +62,9 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
 
     @Autowired
     private ImWebSocketSessionRegistry webSocketSessionRegistry;
+
+    @Autowired
+    private EmployeeUserDetailsService employeeUserDetailsService;
 
     @Autowired
     private ImWebSocketOutboxDispatcher imWebSocketOutboxDispatcher;
@@ -631,7 +636,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
         assertTrue(condition.getAsBoolean(), message);
     }
 
-    private static class CapturingWebSocketSession implements WebSocketSession {
+    private class CapturingWebSocketSession implements WebSocketSession {
 
         private final String id;
         private final Map<String, Object> attributes;
@@ -640,7 +645,10 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
 
         private CapturingWebSocketSession(Long userId) {
             this.id = "test-im-ws-" + userId;
-            this.attributes = Map.of("imUserId", userId);
+            String loginName = jdbcTemplate.queryForObject(
+                "SELECT login_name FROM auth_user_account WHERE user_id = ?", String.class, userId);
+            this.attributes = Map.of("imUserId", userId, ImWebSocketAuthentication.PRINCIPAL_ATTRIBUTE,
+                employeeUserDetailsService.loadUserByUsername(loginName));
         }
 
         protected List<String> messages() {
@@ -733,7 +741,7 @@ class ModuleImOutboxIntegrationTest extends LocalIntegrationTestSupport {
         }
     }
 
-    private static class FailingOnceWebSocketSession extends CapturingWebSocketSession {
+    private class FailingOnceWebSocketSession extends CapturingWebSocketSession {
 
         private boolean failed;
 
