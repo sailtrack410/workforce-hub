@@ -4,6 +4,26 @@ const { MessageStore } = require('./message-store.cjs');
 
 let store;
 let mainWindow;
+const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+
+async function persistSessionCookies(webContents) {
+  // 服务端 SESSION 默认仅存活到浏览器退出；桌面端按服务端 7 天滑动会话持久化。
+  // 不在 SQLite 或业务存储中保存密码、Session ID 等认证信息。
+  const cookies = await webContents.session.cookies.get({ name: 'SESSION' });
+  const now = Date.now() / 1000;
+  await Promise.all(cookies
+    .map((cookie) => webContents.session.cookies.set({
+      url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path,
+      secure: cookie.secure,
+      httpOnly: cookie.httpOnly,
+      sameSite: cookie.sameSite,
+      expirationDate: now + SESSION_MAX_AGE_SECONDS,
+    })));
+}
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,6 +45,12 @@ async function createWindow() {
     },
   });
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  const renewSession = () => {
+    void persistSessionCookies(mainWindow.webContents).catch(() => undefined);
+  };
+  mainWindow.webContents.on('did-finish-load', renewSession);
+  mainWindow.webContents.session.webRequest.onCompleted(
+    { urls: ['http://127.0.0.1/*', 'http://localhost/*'] }, renewSession);
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: 'deny' };

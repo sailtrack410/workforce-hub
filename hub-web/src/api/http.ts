@@ -123,6 +123,7 @@ function skipWhitespace(text: string, start: number): number {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = { Accept: 'application/json' };
+  if (window.workforceDesktop) headers['X-Workforce-Client'] = 'desktop';
   if (!SAFE_METHODS.has(method)) {
     await ensureCsrfToken();
     const token = readCookie('XSRF-TOKEN');

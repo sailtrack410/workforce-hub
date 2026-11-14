@@ -3,6 +3,7 @@ package com.workforcehub.common.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workforcehub.auth.security.AdminPermissionFilter;
 import com.workforcehub.auth.security.AdminUserDetailsService;
+import com.workforcehub.auth.security.DesktopSessionFilter;
 import com.workforcehub.auth.security.EmployeeUserDetailsService;
 import com.workforcehub.auth.security.UserTypePathFilter;
 import com.workforcehub.auth.security.WfhAuthenticationProvider;
@@ -26,6 +27,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
@@ -99,7 +101,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, SessionValidityFilter sessionValidityFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, SessionValidityFilter sessionValidityFilter,
+                                           DesktopSessionFilter desktopSessionFilter) throws Exception {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieCustomizer(cookie -> cookie.path("/").sameSite("Lax"));
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
@@ -135,7 +138,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
 
-            // 路径与身份匹配校验
+            // 桌面会话在认证信息恢复前设置期限；路径与身份匹配继续使用现有过滤器。
+            .addFilterBefore(desktopSessionFilter, SecurityContextHolderFilter.class)
             .addFilterAfter(sessionValidityFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(userTypePathFilter, SessionValidityFilter.class)
             .addFilterAfter(adminPermissionFilter, UserTypePathFilter.class)

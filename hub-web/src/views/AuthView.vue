@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 登录/注册：对齐画布 10:6 / 10:10；自助注册与短信能力仍等待后端接口。 */
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   BellRing, Check, Eye, EyeOff, LoaderCircle, MessageSquare, ShieldCheck, Sparkles, X,
@@ -26,6 +26,7 @@ const password = ref('');
 const showPassword = ref(false);
 const loginError = ref('');
 const loginState = ref<'idle' | 'loading' | 'success' | 'error'>('idle');
+const restoring = ref(true);
 let loginTimer = 0;
 
 async function submitLogin() {
@@ -73,6 +74,15 @@ async function submitRegister() {
     showToast('自助注册暂未开放，请联系管理员开通（接口需求 #12）');
   }, 240);
 }
+onMounted(async () => {
+  if (session.isAuthenticated) {
+    await router.replace('/messages');
+    return;
+  }
+  await session.loadCurrentUser();
+  if (session.isAuthenticated) await router.replace('/messages');
+  restoring.value = false;
+});
 onBeforeUnmount(() => window.clearTimeout(loginTimer));
 </script>
 
@@ -95,6 +105,8 @@ onBeforeUnmount(() => window.clearTimeout(loginTimer));
       <section class="auth-form">
         <Transition name="auth-view" mode="out-in">
           <div v-if="mode === 'login'" key="login" class="auth-view">
+            <p v-if="restoring" class="auth-dialog-note">正在恢复登录状态…</p>
+            <template v-else>
             <header class="auth-heading"><h2>欢迎回来</h2><p>登录 Workforce Hub 员工端</p></header>
             <div class="auth-tabs" role="tablist" aria-label="登录方式">
               <button type="button" role="tab" :aria-selected="loginTab === 'password'" :class="{ active: loginTab === 'password' }" @click="loginTab = 'password'">密码登录</button>
@@ -122,6 +134,7 @@ onBeforeUnmount(() => window.clearTimeout(loginTimer));
             <div class="auth-divider"><i /><small>其他登录方式</small><i /></div>
             <button type="button" class="auth-wechat" @click="showToast('微信扫码登录即将上线')"><MessageSquare :size="18" />微信扫码登录</button>
             <p class="auth-guide">还没有账号？<button type="button" class="auth-link" @click="router.push({ name: 'register' })">立即注册</button></p>
+            </template>
           </div>
 
           <div v-else key="register" class="auth-view register-view">

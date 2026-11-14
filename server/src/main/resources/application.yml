@@ -57,6 +57,9 @@ spring:
     redis:
       namespace: workforce:session
 
+  # Electron 桌面端使用 7 天滑动会话；普通 Web/管理端仍沿用上方 2 小时配置。
+  desktop-session-timeout: 604800
+
   # ==================== Flyway ====================
   flyway:
     enabled: true
