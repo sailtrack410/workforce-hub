@@ -31,6 +31,7 @@ import com.workforcehub.im.repository.ImRepository;
 import com.workforcehub.im.websocket.ImWebSocketEvent;
 import com.workforcehub.im.websocket.ImWebSocketEventTypes;
 import com.workforcehub.im.websocket.ImWebSocketPushService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -56,19 +57,22 @@ public class ImGroupService {
     private final AttachmentRefRepository attachmentRefRepository;
     private final DownloadTicketExecutionService downloadTicketExecutionService;
     private final StorageProviderRegistry storageProviderRegistry;
+    private final ImService imService;
 
     public ImGroupService(ImRepository imRepository,
                           ImGroupRepository imGroupRepository,
                           ImWebSocketPushService webSocketPushService,
                           AttachmentRefRepository attachmentRefRepository,
                           DownloadTicketExecutionService downloadTicketExecutionService,
-                          StorageProviderRegistry storageProviderRegistry) {
+                          StorageProviderRegistry storageProviderRegistry,
+                          @Lazy ImService imService) {
         this.imRepository = imRepository;
         this.imGroupRepository = imGroupRepository;
         this.webSocketPushService = webSocketPushService;
         this.attachmentRefRepository = attachmentRefRepository;
         this.downloadTicketExecutionService = downloadTicketExecutionService;
         this.storageProviderRegistry = storageProviderRegistry;
+        this.imService = imService;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -482,7 +486,12 @@ public class ImGroupService {
         response.setGroupType(row.groupType());
         response.setGroupTypeName(groupTypeName(row.groupType()));
         response.setOwnerUserId(row.ownerUserId());
-        response.setNoticeText(row.noticeText());
+        // 历史公告可能没有同步到旧版群资料字段，详情始终展示最新有效公告。
+        String latestNotice = imGroupRepository.listGroupNotices(row.conversationId()).stream()
+            .findFirst()
+            .map(ImGroupRepository.ImGroupNoticeRow::content)
+            .orElse(row.noticeText());
+        response.setNoticeText(latestNotice);
         response.setStatus(row.status());
         response.setStatusName(statusName(row.status()));
         response.setCurrentMemberRole(currentMemberRole);
@@ -623,11 +632,13 @@ public class ImGroupService {
         }
         Long noticeId = IdGenerator.nextId();
         imGroupRepository.insertGroupNotice(noticeId, conversationId, request.getTitle(), request.getContent(), userId);
+        imGroupRepository.updateGroupProfile(conversationId, null, request.getContent().trim(), userId);
+        imService.publishGroupNoticeMessage(conversationId, userId, request.getTitle(), request.getContent());
         ImGroupNoticeResponse response = new ImGroupNoticeResponse();
         response.setNoticeId(String.valueOf(noticeId));
         response.setTitle(request.getTitle());
         response.setContent(request.getContent());
-        response.setPublisherName(null);
+        response.setPublisherName(imRepository.findActiveOrgUser(userId).map(row -> row.realName()).orElse(""));
         response.setPublishedAt(LocalDateTime.now());
         return response;
     }

@@ -286,6 +286,42 @@ public class ImService {
         return response;
     }
 
+    /** 群公告发布时写入系统消息，让消息流、会话列表和未读数使用现有 IM 链路。 */
+    @Transactional(rollbackFor = Exception.class)
+    public ImMessageResponse publishGroupNoticeMessage(Long conversationId, Long publisherId,
+                                                       String title, String content) {
+        Long lastSeq = imMessageRepository.lockActiveConversationAndGetLastSeq(conversationId);
+        if (lastSeq == null) {
+            throw new BizException(404, "会话不存在");
+        }
+        long seqNo = lastSeq + 1;
+        Long messageId = IdGenerator.nextId();
+        LocalDateTime sentAt = LocalDateTime.now();
+        String text = "群公告：" + (StringUtils.hasText(title) ? title.trim() + "\n" : "") + content.trim();
+        String contentJson = write(objectMapper, Map.of("text", text));
+        imMessageRepository.insertMessage(messageId, conversationId, seqNo, "SYSTEM", publisherId,
+            "SYSTEM", "group-notice-" + messageId, null, contentJson, sentAt);
+        imMessageRepository.updateConversationLastMessage(conversationId, seqNo, messageId, sentAt, publisherId);
+        imMessageRepository.updateMemberLastReadSeq(conversationId, publisherId, seqNo);
+        ImMessageResponse response = new ImMessageResponse();
+        response.setMessageId(messageId);
+        response.setConversationId(conversationId);
+        response.setSeqNo(seqNo);
+        response.setSenderType("SYSTEM");
+        response.setSenderTypeName("系统");
+        response.setSenderId(publisherId);
+        response.setMessageType("SYSTEM");
+        response.setMessageTypeName("系统消息");
+        response.setContentJson(contentJson);
+        response.setContentText(text);
+        response.setStatus("NORMAL");
+        response.setStatusName("正常");
+        response.setSentAt(sentAt);
+        pushConversationEventAfterCommit(conversationId,
+            ImWebSocketEvent.of(ImWebSocketEventTypes.MESSAGE_CREATED, conversationId, messageId, seqNo, publisherId, response));
+        return response;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public ImMessageResponse editCurrentEmployeeMessage(Long conversationId,
                                                         Long messageId,

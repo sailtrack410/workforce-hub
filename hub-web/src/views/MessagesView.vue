@@ -8,7 +8,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  AtSign, BellOff, BookUser, Check, ChevronRight, Cloud, Download, FileText,
+  AtSign, BellOff, BookUser, Check, ChevronDown, ChevronRight, Cloud, Download, FileText,
   FolderOpen, Image, MessageSquare, MoreHorizontal,
   PanelRightClose, PanelRightOpen, Paperclip, Pin, Plus, Search, Send,
   UsersRound, X, Quote, Zap,
@@ -202,10 +202,22 @@ const filteredConversations = computed(() => {
 
 /* ---------- 消息流滚动 ---------- */
 const messageStream = ref<HTMLElement | null>(null);
+const awayFromLatest = ref(false);
+function updateLatestVisibility() {
+  const el = messageStream.value;
+  awayFromLatest.value = Boolean(el && el.scrollHeight - el.scrollTop - el.clientHeight > 120);
+}
+function scrollToLatest() {
+  scrollToBottom();
+  awayFromLatest.value = false;
+}
 function scrollToBottom() {
   void nextTick(() => requestAnimationFrame(() => {
     const el = messageStream.value;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+      awayFromLatest.value = false;
+    }
   }));
 }
 function saveScrollPosition() {
@@ -227,6 +239,7 @@ function restoreScrollPosition(id: string, el: HTMLElement | null) {
     const saved = im.scrollPositions[id];
     if (!saved) {
       el.scrollTop = el.scrollHeight;
+      updateLatestVisibility();
       return;
     }
     el.scrollTop = saved.top;
@@ -237,6 +250,7 @@ function restoreScrollPosition(id: string, el: HTMLElement | null) {
       const offset = anchor.getBoundingClientRect().top - el.getBoundingClientRect().top;
       el.scrollTop += offset - saved.offset;
     }
+    updateLatestVisibility();
   }));
 }
 
@@ -921,7 +935,11 @@ async function publishNotice() {
     noticePublishOpen.value = false;
     noticeTitle.value = '';
     noticeContent.value = '';
-    void im.loadDetail(activeId.value);
+    await Promise.all([
+      im.loadDetail(activeId.value),
+      im.loadMessages(activeId.value),
+      im.loadConversations(),
+    ]);
     showToast('公告已发布');
   } catch (error) {
     showToast(error instanceof Error ? error.message : '发布失败');
@@ -1061,7 +1079,8 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div :key="activeId" :ref="(el) => { messageStream = el as HTMLElement | null; restoreScrollPosition(activeId, el as HTMLElement | null); }" class="im-stream">
+      <div class="im-stream-wrap">
+      <div :key="activeId" :ref="(el) => { messageStream = el as HTMLElement | null; restoreScrollPosition(activeId, el as HTMLElement | null); }" class="im-stream" @scroll.passive="updateLatestVisibility">
         <TransitionGroup name="im-message">
         <template v-if="streamItems.length">
           <template v-for="item in streamItems" :key="item.key">
@@ -1104,6 +1123,12 @@ onBeforeUnmount(() => {
         </template>
         <HubEmpty v-else key="empty-stream" :title="im.loadingConversations[activeId] ? '正在加载消息…' : recordKeyword ? `没有包含「${recordKeyword}」的消息` : '暂无消息，说点什么吧'" :icon="MessageSquare" />
         </TransitionGroup>
+      </div>
+      <Transition name="im-latest">
+        <button v-if="awayFromLatest" type="button" class="im-latest-btn" aria-label="回到最新消息" @click="scrollToLatest">
+          <ChevronDown :size="15" :stroke-width="2" />回到最新
+        </button>
+      </Transition>
       </div>
 
       <footer class="im-composer">

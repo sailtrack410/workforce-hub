@@ -39,6 +39,7 @@ export function lastMessageText(conversation: ImConversationSummaryResponse): st
   const last = conversation.lastMessage;
   const text = (last?.contentText || '').trim();
   const type = (last?.messageType || 'TEXT').toUpperCase();
+  if (type === 'SYSTEM' && text) return text;
   if (type !== 'TEXT') return `[${MESSAGE_TYPE_LABEL[type] ?? '消息'}]`;
   if (!text) return '暂无消息';
   if (text.startsWith('{')) return '[卡片]';

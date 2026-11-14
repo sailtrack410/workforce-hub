@@ -44,7 +44,12 @@
 .im-head-icon.active { background: var(--hw-sky); color: var(--hw-primary); }
 .im-record-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--hw-border); border-radius: 6px; color: var(--hw-muted); flex: none; animation: im-panel-in 150ms var(--hw-motion-enter); }
 .im-record-search input { min-width: 0; border: 0; outline: 0; background: transparent; color: var(--hw-ink); font-size: 12px; flex: 1; }
+.im-stream-wrap { position: relative; display: flex; flex: 1; min-height: 0; }
 .im-stream { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+.im-latest-btn { position: absolute; right: 16px; bottom: 16px; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border: 1px solid var(--hw-border); border-radius: 16px; background: var(--hw-card); box-shadow: var(--hw-shadow-menu); color: var(--hw-secondary); font-size: 12px; cursor: pointer; z-index: 4; }
+.im-latest-btn:hover { color: var(--hw-primary); border-color: var(--hw-sky-strong); }
+.im-latest-enter-active, .im-latest-leave-active { transition: opacity var(--hw-duration-fast), transform var(--hw-duration-fast); }
+.im-latest-enter-from, .im-latest-leave-to { opacity: 0; transform: translateY(4px); }
 .im-row { display: flex; min-width: 0; margin-bottom: 8px; }
 .im-row.right { justify-content: flex-end; }
 .im-row.system { justify-content: center; }

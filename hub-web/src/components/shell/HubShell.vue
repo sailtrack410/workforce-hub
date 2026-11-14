@@ -214,7 +214,9 @@ onBeforeUnmount(() => {
 .hw-brand strong { font-size: 16px; font-weight: 600; white-space: nowrap; }
 .hw-global-search { display: flex; align-items: center; gap: 10px; width: 400px; height: 40px; padding: 0 12px; border: 1px solid transparent; border-radius: 6px; background: var(--hw-inner); color: var(--hw-muted); transition: border-color var(--hw-duration-fast) var(--hw-motion-enter), background var(--hw-duration-fast); }
 .hw-global-search:focus-within { border-color: var(--hw-sky-strong); background: var(--hw-card); }
-.hw-global-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--hw-ink); font-size: 12px; }
+.hw-global-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--hw-ink); font-size: 12px; appearance: none; -webkit-appearance: none; }
+.hw-global-search input:focus-visible { outline: none; }
+.hw-global-search input::-webkit-search-cancel-button, .hw-global-search input::-webkit-search-decoration { display: none; }
 .hw-global-search input::placeholder { color: var(--hw-muted); }
 .hw-global-search kbd { font: 11px Inter, sans-serif; color: var(--hw-muted); white-space: nowrap; }
 .hw-body { display: flex; flex: 1; min-height: 0; position: relative; }

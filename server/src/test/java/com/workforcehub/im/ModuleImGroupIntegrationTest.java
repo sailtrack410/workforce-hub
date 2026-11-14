@@ -763,6 +763,41 @@ class ModuleImGroupIntegrationTest extends LocalIntegrationTestSupport {
             .andExpect(jsonPath("$.data.list[?(@.attachmentRefId == %s)]".formatted(deduplicatedAttachmentRefId)).isEmpty());
     }
 
+    @Test
+    @DisplayName("发布群公告应同步详情、会话消息和其他成员未读")
+    void publishNoticeShouldSyncConversationAndUnread() throws Exception {
+        Cookie ownerSession = loginEmployee("zhangsan.employee");
+        Cookie memberSession = loginEmployee("lisi.manager");
+        seedCustomGroup();
+
+        mockMvc.perform(post("/api/employee/im/group-conversations/{conversationId}/notices", 7301L)
+                .cookie(ownerSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"周报提醒","content":"请在周五前提交周报"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.content").value("请在周五前提交周报"))
+            .andExpect(jsonPath("$.data.publisherName").value("张三"));
+
+        assertEquals("请在周五前提交周报", jdbcTemplate.queryForObject(
+            "SELECT notice_text FROM im_group_profile WHERE conversation_id = 7301", String.class));
+        assertEquals("群公告：周报提醒\n请在周五前提交周报", jdbcTemplate.queryForObject(
+            "SELECT JSON_UNQUOTE(JSON_EXTRACT(content_json, '$.text')) FROM im_message WHERE conversation_id = 7301 AND seq_no = 1",
+            String.class));
+        mockMvc.perform(get("/api/employee/im/conversations").cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].unreadCount").value(1))
+            .andExpect(jsonPath("$.data[0].lastMessage.contentText").value("群公告：周报提醒\n请在周五前提交周报"));
+        mockMvc.perform(get("/api/employee/im/conversations").cookie(ownerSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].unreadCount").value(0));
+        mockMvc.perform(get("/api/employee/im/conversations/{conversationId}", 7301L).cookie(memberSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.groupProfile.noticeText").value("请在周五前提交周报"));
+    }
+
     private void seedCustomGroup() {
         jdbcTemplate.update("""
             INSERT INTO im_conversation
