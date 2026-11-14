@@ -74,6 +74,8 @@ export const imApi = {
     http.post<ImConversationMemberResponse[]>(`/api/employee/im/group-conversations/${id(conversationId)}/members/remove`, { memberUserIds }),
   leaveGroup: (conversationId: EntityId) =>
     http.post<ImConversationMemberResponse[]>(`/api/employee/im/group-conversations/${id(conversationId)}/leave`),
+  dismissGroup: (conversationId: EntityId) =>
+    http.post<void>(`/api/employee/im/group-conversations/${id(conversationId)}/dismiss`),
   updateReadPosition: (conversationId: EntityId, lastReadSeq: number) =>
     http.post<ImConversationSummaryResponse>(`/api/employee/im/conversations/${id(conversationId)}/read-position`, { lastReadSeq }),
   updatePreference: (conversationId: EntityId, request: { pin?: boolean; mute?: boolean; saveToContacts?: boolean; showMemberNickname?: boolean }) =>
