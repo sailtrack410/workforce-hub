@@ -5,10 +5,11 @@
  * 弹层与细节：新建会话、群管理（资料/公告/成员增删/退出解散）、@提及面板、附件菜单、消息操作菜单。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import { useRoute, useRouter } from 'vue-router';
 import {
   AtSign, BellOff, BookUser, Check, ChevronRight, Cloud, Download, FileText,
-  FolderOpen, Image, MessageSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen,
+  FolderOpen, Image, MessageSquare, MoreHorizontal,
   PanelRightClose, PanelRightOpen, Paperclip, Pin, Plus, Search, Send,
   UsersRound, X, Quote, Zap,
 } from 'lucide-vue-next';
@@ -28,7 +29,7 @@ import { uploadImAttachment } from '@/composables/useUpload';
 import { agentApi, contactsApi, fileApi, imApi } from '@/api';
 import type { AgentResponse, EmployeeFileResponse, EntityId, ImConversationSummaryResponse, ImGroupFileResponse, ImGroupNoticeResponse, ImMessageAttachment, ImMessageResponse } from '@/api/types';
 import { toMessageView, friendlyTime, TIME_DIVIDER_GAP, type MessageView } from '@/utils/message';
-import { conversationTime, conversationWidth } from '@/utils/imLayout';
+import { conversationTime, conversationWidth, resolveConversationId } from '@/utils/imLayout';
 
 const session = useSessionStore();
 const im = useImStore();
@@ -64,14 +65,19 @@ const activeSubtitle = computed(() => {
 
 async function syncConversation(id: string) {
   if (!id || !session.isAuthenticated) return;
-  await Promise.all([
-    im.loadMessages(id),
-    im.loadDetail(id).catch(() => undefined),
-  ]);
-  void im.markRead(id);
+  try {
+    await Promise.all([
+      im.loadMessages(id),
+      im.loadDetail(id).catch(() => undefined),
+    ]);
+    void im.markRead(id);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '消息加载失败');
+  }
 }
 
 function selectConversation(id: string) {
+  im.selectConversation(id);
   if (id === activeId.value) return;
   void router.push({ name: 'messages-detail', params: { conversationId: id } });
 }
@@ -80,7 +86,9 @@ function selectConversation(id: string) {
 const { connected: wsConnected, connect: connectSocket, close: closeSocket } = useImSocket({
   onMessage: (conversationId) => {
     if (conversationId === activeId.value) {
-      scrollToBottom();
+      // 浏览历史时不强制跳转；只有本来就在底部才跟随新消息。
+      const el = messageStream.value;
+      if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 48) scrollToBottom();
       void im.markRead(conversationId);
     } else {
       void im.loadConversations().catch(() => undefined);
@@ -92,7 +100,6 @@ const { connected: wsConnected, connect: connectSocket, close: closeSocket } = u
 const recordSearchOpen = ref(false);
 const recordKeyword = ref('');
 const detailOpen = ref(false);
-const listCollapsed = ref(false);
 const listWidth = ref(280);
 const resizing = ref(false);
 const pageEl = ref<HTMLElement | null>(null);
@@ -104,15 +111,10 @@ function readListPreference(key: string) {
 function saveListPreference() {
   try {
     localStorage.setItem('hw-conversation-width', String(listWidth.value));
-    localStorage.setItem('hw-conversation-collapsed', String(listCollapsed.value));
   } catch { /* 隐私模式不阻断 */ }
 }
-function toggleList() {
-  listCollapsed.value = !listCollapsed.value;
-  saveListPreference();
-}
 function startListResize(event: PointerEvent) {
-  if (event.button !== 0 || listCollapsed.value) return;
+  if (event.button !== 0) return;
   event.preventDefault();
   const startX = event.clientX;
   const startWidth = listWidth.value;
@@ -206,7 +208,37 @@ function scrollToBottom() {
     if (el) el.scrollTop = el.scrollHeight;
   }));
 }
-watch(() => streamItems.value.length, scrollToBottom);
+function saveScrollPosition() {
+  const el = messageStream.value;
+  if (!activeId.value || !el) return;
+  const streamTop = el.getBoundingClientRect().top;
+  const anchor = [...el.querySelectorAll<HTMLElement>('[data-message-id]')]
+    .find((item) => item.getBoundingClientRect().bottom > streamTop);
+  im.scrollPositions[activeId.value] = {
+    top: el.scrollTop,
+    messageId: anchor?.dataset.messageId ?? '',
+    offset: anchor ? anchor.getBoundingClientRect().top - streamTop : 0,
+  };
+}
+function restoreScrollPosition(id: string, el: HTMLElement | null) {
+  if (!el || el.dataset.scrollRestored === 'true') return;
+  el.dataset.scrollRestored = 'true';
+  void nextTick(() => requestAnimationFrame(() => {
+    const saved = im.scrollPositions[id];
+    if (!saved) {
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    el.scrollTop = saved.top;
+    // 图片等异步内容改变高度后，用原消息锚点修正，保持视口内容不变。
+    const anchor = [...el.querySelectorAll<HTMLElement>('[data-message-id]')]
+      .find((item) => item.dataset.messageId === saved.messageId);
+    if (anchor) {
+      const offset = anchor.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      el.scrollTop += offset - saved.offset;
+    }
+  }));
+}
 
 /* ---------- 头像 ---------- */
 function conversationAvatar(c: ImConversationSummaryResponse) {
@@ -902,11 +934,11 @@ function noticeTime(isoText: string) {
 }
 
 /* ---------- 生命周期 ---------- */
+onBeforeRouteLeave(saveScrollPosition);
+
 onMounted(async () => {
   const savedWidth = Number(readListPreference('hw-conversation-width'));
   if (savedWidth >= 240 && savedWidth <= 360) listWidth.value = savedWidth;
-  const savedCollapsed = readListPreference('hw-conversation-collapsed');
-  listCollapsed.value = savedCollapsed === null ? window.innerWidth <= 1100 : savedCollapsed === 'true';
   // 父应用壳可能在恢复会话；等待本次初始化收敛，不重复发起请求。
   if (!session.initialized) await session.loadCurrentUser();
   if (!session.isAuthenticated) {
@@ -915,15 +947,26 @@ onMounted(async () => {
   }
   await Promise.allSettled([im.loadConversations(), session.loadOrgProfile()]);
   connectSocket();
-  if (activeId.value) {
-    await syncConversation(activeId.value);
-    scrollToBottom();
-  } else if (im.conversations.length) {
-    selectConversation(String(im.conversations[0].conversationId));
+  if (activeId.value) im.selectConversation(activeId.value);
+  const restoredId = resolveConversationId(
+    activeId.value,
+    im.activeConversationId,
+    im.conversations.map((item) => String(item.conversationId)),
+  );
+  if (restoredId) {
+    im.selectConversation(restoredId);
+    // 无参 /messages 先恢复原路由，已有消息立即可见，再静默刷新。
+    if (!route.params.conversationId) {
+      await router.replace({ name: 'messages-detail', params: { conversationId: restoredId } });
+    } else {
+      await syncConversation(restoredId);
+    }
   }
 });
 
 watch(activeId, async (id) => {
+  saveScrollPosition();
+  if (id) im.selectConversation(id);
   draft.value = '';
   quotedMessage.value = null;
   mentionPanelUserIds.value = new Set();
@@ -932,13 +975,11 @@ watch(activeId, async (id) => {
   recordKeyword.value = '';
   recordSearchOpen.value = false;
   detailOpen.value = false;
-  if (id) {
-    await syncConversation(id);
-    scrollToBottom();
-  }
+  if (id) await syncConversation(id);
 });
 
 onBeforeUnmount(() => {
+  saveScrollPosition();
   resizeCleanup?.();
   closeSocket();
 });
@@ -947,17 +988,14 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="pageEl" class="im-page" :class="{ resizing }"
-    :style="{ '--im-list-width': `${listCollapsed ? 0 : listWidth}px` }"
+    :style="{ '--im-list-width': `${listWidth}px` }"
     @click="closeMessageMenu"
   >
-    <!-- 会话列表：240–360px 拖拽调宽，折叠后恢复上次宽度 -->
-    <aside class="im-list" :class="{ collapsed: listCollapsed }" :aria-hidden="listCollapsed">
+    <!-- 会话列表：240–360px 拖拽调宽 -->
+    <aside class="im-list">
       <header class="im-list-head">
         <h2>消息</h2>
-        <div>
-          <button type="button" class="im-icon-btn" aria-label="收起会话列表" title="收起会话列表" @click="toggleList"><PanelLeftClose :size="17" /></button>
-          <button type="button" class="im-icon-btn" aria-label="从通讯录发起会话" title="从通讯录发起会话" @click="openCreate('private')"><BookUser :size="18" /></button>
-        </div>
+        <button type="button" class="im-icon-btn" aria-label="从通讯录发起会话" title="从通讯录发起会话" @click="openCreate('private')"><BookUser :size="18" /></button>
       </header>
       <div class="im-filters" role="tablist" aria-label="会话筛选">
         <button v-for="f in LIST_FILTERS" :key="f" type="button" role="tab" class="im-filter-chip" :class="{ active: activeFilter === f }" :aria-selected="activeFilter === f" @click="activeFilter = f">{{ f }}</button>
@@ -975,7 +1013,7 @@ onBeforeUnmount(() => {
       </div>
     </aside>
     <div
-      v-if="!listCollapsed" class="im-list-resizer" role="separator" aria-label="调整会话列表宽度"
+      class="im-list-resizer" role="separator" aria-label="调整会话列表宽度"
       aria-orientation="vertical" :aria-valuenow="listWidth" aria-valuemin="240" aria-valuemax="360"
       tabindex="0" @pointerdown="startListResize"
       @keydown.left.prevent="listWidth = Math.max(240, listWidth - 4); saveListPreference()"
@@ -990,7 +1028,6 @@ onBeforeUnmount(() => {
           <span><span class="im-chat-name"><h2>{{ activeTitle }}</h2><em v-if="activeKind === 'agent'">AI 助手</em></span><small>{{ activeSubtitle }}</small></span>
         </div>
         <div class="im-chat-actions">
-          <button v-if="listCollapsed" type="button" class="im-icon-btn im-head-icon" aria-label="展开会话列表" title="展开会话列表" @click="toggleList"><PanelLeftOpen :size="17" /></button>
           <button
             type="button" class="im-icon-btn im-head-icon"
             :class="{ active: recordSearchOpen }" aria-label="记录搜索"
@@ -1024,7 +1061,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div ref="messageStream" class="im-stream">
+      <div :key="activeId" :ref="(el) => { messageStream = el as HTMLElement | null; restoreScrollPosition(activeId, el as HTMLElement | null); }" class="im-stream">
         <TransitionGroup name="im-message">
         <template v-if="streamItems.length">
           <template v-for="item in streamItems" :key="item.key">
@@ -1065,7 +1102,7 @@ onBeforeUnmount(() => {
             </article>
           </template>
         </template>
-        <HubEmpty v-else key="empty-stream" :title="recordKeyword ? `没有包含「${recordKeyword}」的消息` : '暂无消息，说点什么吧'" :icon="MessageSquare" />
+        <HubEmpty v-else key="empty-stream" :title="im.loadingConversations[activeId] ? '正在加载消息…' : recordKeyword ? `没有包含「${recordKeyword}」的消息` : '暂无消息，说点什么吧'" :icon="MessageSquare" />
         </TransitionGroup>
       </div>
 

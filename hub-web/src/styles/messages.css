@@ -1,15 +1,12 @@
 /* 桌面 IM：与一级导航、会话列表共用细分隔线，不使用悬浮卡片栏。 */
 .im-page { display: flex; flex: 1; min-width: 0; min-height: 0; position: relative; }
-.im-list { display: flex; flex-direction: column; gap: 12px; width: var(--im-list-width, 280px); padding: 16px 10px; border-right: 1px solid var(--hw-border); background: var(--hw-card); flex: none; min-height: 0; overflow: hidden; transition: width var(--hw-duration-panel) var(--hw-motion-enter), padding var(--hw-duration-panel); }
-.im-list.collapsed { padding-inline: 0; border-right: 0; pointer-events: none; visibility: hidden; }
-.resizing .im-list { transition: none; }
+.im-list { display: flex; flex-direction: column; gap: 12px; width: var(--im-list-width, 280px); padding: 16px 10px; border-right: 1px solid var(--hw-border); background: var(--hw-card); flex: none; min-height: 0; overflow: hidden; }
 .im-list-head { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 2px; flex: none; }
 .im-list-head h2 { font-size: 20px; font-weight: 600; }
 .im-list-head > div { display: flex; gap: 4px; }
-.im-list-resizer { position: absolute; top: 0; bottom: 0; left: var(--im-list-width, 280px); width: 8px; margin-left: -4px; cursor: col-resize; z-index: 8; transition: left var(--hw-duration-panel) var(--hw-motion-enter); }
+.im-list-resizer { position: absolute; top: 0; bottom: 0; left: var(--im-list-width, 280px); width: 8px; margin-left: -4px; cursor: col-resize; z-index: 8; touch-action: none; }
 .im-list-resizer::after { content: ''; position: absolute; inset: 0 3px; background: transparent; transition: background var(--hw-duration-fast); }
 .im-list-resizer:hover::after, .im-list-resizer:focus-visible::after, .resizing .im-list-resizer::after { background: var(--hw-primary); }
-.resizing .im-list-resizer { transition: none; }
 .im-icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--hw-secondary); cursor: pointer; transition: background var(--hw-duration-fast), color var(--hw-duration-fast); flex: none; }
 .im-icon-btn:hover { background: var(--hw-chip); color: var(--hw-primary); }
 .im-icon-btn:disabled { opacity: .45; cursor: default; }

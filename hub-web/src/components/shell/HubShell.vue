@@ -1,17 +1,18 @@
 <script setup lang="ts">
-/** 桌面应用壳：56px 顶导 + 可折叠一级导航，页面负责自己的工作区。 */
+/** 桌面应用壳：56px 顶导 + 可拖拽调宽的一级导航，页面负责自己的工作区。 */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  Bell, BookOpen, BookUser, CalendarDays, CheckSquare, ChevronDown, ChevronLeft,
+  Bell, BookOpen, BookUser, CalendarDays, CheckSquare, ChevronDown,
   ChevronRight, Cloud, LayoutDashboard, LogOut, MessageSquare, Moon,
-  PanelLeftClose, PanelLeftOpen, Search, Settings, Stamp, SunMedium, UserRound,
+  Search, Settings, Stamp, SunMedium, UserRound,
 } from 'lucide-vue-next';
 import HubAvatar from '@/components/base/HubAvatar.vue';
 import HubToast from '@/components/base/HubToast.vue';
 import { useSessionStore } from '@/stores/session';
 import { useImStore } from '@/stores/im';
 import { useToast } from '@/composables/useToast';
+import { NAV_MAX_WIDTH, NAV_MIN_WIDTH, navigationWidth } from '@/utils/imLayout';
 
 const session = useSessionStore();
 const im = useImStore();
@@ -19,9 +20,11 @@ const route = useRoute();
 const router = useRouter();
 const { message: toastMessage, show: showToast } = useToast();
 const accountOpen = ref(false);
-const navCollapsed = ref(false);
+const navWidth = ref(208);
+const navResizing = ref(false);
 const theme = ref<'light' | 'dark'>('light');
 const searchKeyword = ref('');
+let resizeCleanup: (() => void) | null = null;
 
 const primaryNav = [
   { id: 'messages', label: '消息', path: '/messages', icon: MessageSquare },
@@ -41,9 +44,35 @@ const displayName = computed(() => session.displayName || '同事');
 function readPreference(key: string) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
-function toggleNav() {
-  navCollapsed.value = !navCollapsed.value;
-  try { localStorage.setItem('hw-nav-collapsed', String(navCollapsed.value)); } catch { /* 隐私模式不阻断 */ }
+function saveNavWidth() {
+  try { localStorage.setItem('hw-nav-width', String(navWidth.value)); } catch { /* 隐私模式不阻断 */ }
+}
+function startNavResize(event: PointerEvent) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  const startX = event.clientX;
+  const startWidth = navWidth.value;
+  const available = window.innerWidth - 680;
+  navResizing.value = true;
+  const onMove = (move: PointerEvent) => {
+    navWidth.value = navigationWidth(startWidth, move.clientX - startX, available);
+  };
+  const onUp = () => {
+    navResizing.value = false;
+    saveNavWidth();
+    resizeCleanup?.();
+  };
+  resizeCleanup = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    resizeCleanup = null;
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp, { once: true });
+}
+function resizeNavByKeyboard(delta: number) {
+  navWidth.value = navigationWidth(navWidth.value, delta, window.innerWidth - 680);
+  saveNavWidth();
 }
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light';
@@ -52,6 +81,12 @@ function toggleTheme() {
 }
 function goto(path: string) {
   accountOpen.value = false;
+  // 返回消息模块时恢复上次停留会话，而不是无参路由触发首项选择。
+  if (path === '/messages' && im.activeConversationId) {
+    const target = `/messages/${im.activeConversationId}`;
+    if (route.path !== target) void router.push(target);
+    return;
+  }
   if (route.path !== path) void router.push(path);
 }
 function globalSearch() {
@@ -83,7 +118,8 @@ function onKeydown(event: KeyboardEvent) {
 
 onMounted(async () => {
   if (loggingOut.value) return;
-  navCollapsed.value = readPreference('hw-nav-collapsed') === 'true';
+  const savedWidth = Number(readPreference('hw-nav-width'));
+  if (savedWidth >= NAV_MIN_WIDTH && savedWidth <= NAV_MAX_WIDTH) navWidth.value = savedWidth;
   theme.value = readPreference('hw-theme') === 'dark' ? 'dark' : 'light';
   document.body.dataset.theme = theme.value;
   document.addEventListener('click', onDocumentClick);
@@ -97,6 +133,7 @@ onMounted(async () => {
   void im.loadConversations().catch(() => undefined);
 });
 onBeforeUnmount(() => {
+  resizeCleanup?.();
   document.removeEventListener('click', onDocumentClick);
   document.removeEventListener('keydown', onKeydown);
 });
@@ -116,13 +153,13 @@ onBeforeUnmount(() => {
       </form>
     </header>
 
-    <div class="hw-body">
-      <aside class="hw-primary-nav" :class="{ collapsed: navCollapsed }" aria-label="一级导航">
+    <div class="hw-body" :class="{ 'nav-resizing': navResizing }" :style="{ '--hw-nav-width': `${navWidth}px` }">
+      <aside class="hw-primary-nav" :class="{ compact: navWidth === NAV_MIN_WIDTH }" aria-label="一级导航">
         <nav class="hw-nav-list">
           <button
             v-for="item in primaryNav" :key="item.id" type="button"
             class="hw-nav-item" :class="{ active: activeId === item.id }"
-            :aria-label="item.label" :title="navCollapsed ? item.label : undefined"
+            :aria-label="item.label" :title="item.label"
             :aria-current="activeId === item.id ? 'page' : undefined"
             @click="goto(item.path)"
           >
@@ -154,16 +191,14 @@ onBeforeUnmount(() => {
               <ChevronDown class="hw-nav-label" :size="14" />
             </button>
           </div>
-          <button
-            type="button" class="hw-collapse" :aria-label="navCollapsed ? '展开导航' : '收起导航'"
-            :title="navCollapsed ? '展开导航' : '收起导航'" @click="toggleNav"
-          >
-            <PanelLeftOpen v-if="navCollapsed" :size="18" /><PanelLeftClose v-else :size="18" />
-            <span class="hw-nav-label">{{ navCollapsed ? '展开导航' : '收起导航' }}</span>
-            <ChevronRight v-if="navCollapsed" :size="14" /><ChevronLeft v-else class="hw-nav-label" :size="14" />
-          </button>
         </div>
       </aside>
+      <div
+        class="hw-nav-resizer" role="separator" aria-label="调整一级导航宽度"
+        aria-orientation="vertical" :aria-valuenow="navWidth" :aria-valuemin="NAV_MIN_WIDTH" :aria-valuemax="NAV_MAX_WIDTH"
+        tabindex="0" @pointerdown="startNavResize"
+        @keydown.left.prevent="resizeNavByKeyboard(-4)" @keydown.right.prevent="resizeNavByKeyboard(4)"
+      />
       <main class="hw-content"><slot /></main>
     </div>
     <HubToast :message="toastMessage" />
@@ -182,36 +217,38 @@ onBeforeUnmount(() => {
 .hw-global-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--hw-ink); font-size: 12px; }
 .hw-global-search input::placeholder { color: var(--hw-muted); }
 .hw-global-search kbd { font: 11px Inter, sans-serif; color: var(--hw-muted); white-space: nowrap; }
-.hw-body { display: flex; flex: 1; min-height: 0; }
-.hw-primary-nav { display: flex; flex-direction: column; justify-content: space-between; width: 208px; padding: 16px 10px 12px; background: var(--hw-nav-bg); color: var(--hw-nav-text); flex: none; overflow: visible; transition: width var(--hw-duration-panel) var(--hw-motion-enter); z-index: 10; }
-.hw-primary-nav.collapsed { width: 64px; }
+.hw-body { display: flex; flex: 1; min-height: 0; position: relative; }
+.hw-primary-nav { display: flex; flex-direction: column; justify-content: space-between; width: var(--hw-nav-width, 208px); padding: 16px 10px 12px; background: var(--hw-nav-bg); color: var(--hw-nav-text); flex: none; overflow: visible; z-index: 10; }
+.hw-nav-resizer { position: absolute; top: 0; bottom: 0; left: var(--hw-nav-width, 208px); width: 8px; margin-left: -4px; cursor: col-resize; touch-action: none; z-index: 20; }
+.hw-nav-resizer::after { content: ''; position: absolute; inset: 0 3px; background: transparent; transition: background var(--hw-duration-fast); }
+.hw-nav-resizer:hover::after, .hw-nav-resizer:focus-visible::after, .nav-resizing .hw-nav-resizer::after { background: var(--hw-primary); }
+.nav-resizing { cursor: col-resize; user-select: none; }
 .hw-nav-list { display: flex; flex-direction: column; gap: 6px; }
-.hw-nav-item, .hw-account, .hw-collapse { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 14px; text-align: left; cursor: pointer; white-space: nowrap; transition: background var(--hw-duration-fast), color var(--hw-duration-fast); }
-.hw-nav-item:hover, .hw-account:hover, .hw-collapse:hover { background: var(--hw-nav-hover); color: var(--hw-on-primary); }
+.hw-nav-item, .hw-account { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 14px; text-align: left; cursor: pointer; white-space: nowrap; transition: background var(--hw-duration-fast), color var(--hw-duration-fast); }
+.hw-nav-item:hover, .hw-account:hover { background: var(--hw-nav-hover); color: var(--hw-on-primary); }
 .hw-nav-item.active { background: var(--hw-nav-active); color: var(--hw-on-primary); }
-.hw-nav-item > svg, .hw-account > :first-child, .hw-collapse > svg:first-child { flex: none; }
-.hw-nav-label { overflow: hidden; opacity: 1; transition: opacity var(--hw-duration-fast); }
-.hw-nav-item .hw-nav-label, .hw-account .hw-nav-label:first-of-type, .hw-collapse .hw-nav-label { flex: 1; }
-.hw-primary-nav.collapsed .hw-nav-item, .hw-primary-nav.collapsed .hw-account, .hw-primary-nav.collapsed .hw-collapse { justify-content: center; padding: 0; }
-.hw-primary-nav.collapsed .hw-nav-label { display: none; opacity: 0; }
+.hw-nav-item > svg, .hw-account > :first-child { flex: none; }
+.hw-nav-label { overflow: hidden; text-overflow: ellipsis; }
+.hw-nav-item .hw-nav-label, .hw-account .hw-nav-label:first-of-type { flex: 1; }
+.hw-primary-nav.compact { padding-inline: 6px; }
+.hw-primary-nav.compact .hw-nav-item, .hw-primary-nav.compact .hw-account { justify-content: center; padding: 0; }
+.hw-primary-nav.compact .hw-nav-label { display: none; }
+.hw-primary-nav.compact .hw-nav-badge { top: 3px; right: 3px; min-width: 8px; width: 8px; height: 8px; padding: 0; color: transparent; overflow: hidden; }
 .hw-nav-badge { position: absolute; right: 12px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--hw-red); color: var(--hw-on-primary); font: 500 11px/20px Inter, sans-serif; font-style: normal; }
-.collapsed .hw-nav-badge { top: 3px; right: 3px; min-width: 8px; width: 8px; height: 8px; padding: 0; color: transparent; overflow: hidden; }
 .hw-nav-bottom { display: flex; flex-direction: column; gap: 8px; }
 .hw-account-wrap { position: relative; }
 .hw-account { border: 1px solid var(--hw-nav-active); background: var(--hw-nav-hover); }
 .hw-account-menu { position: absolute; left: 0; bottom: calc(100% + 10px); width: 188px; padding: 6px; border: 1px solid var(--hw-border); border-radius: 8px; background: var(--hw-card); box-shadow: var(--hw-shadow-menu); color: var(--hw-secondary); z-index: 30; }
-.collapsed .hw-account-menu { left: 0; }
 .hw-account-menu button { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 13px; cursor: pointer; text-align: left; }
 .hw-account-menu button:hover { background: var(--hw-chip); color: var(--hw-ink); }
 .hw-account-menu button > :last-child:not(:first-child) { margin-left: auto; }
 .hw-account-menu small { margin-left: auto; color: var(--hw-muted); }
 .hw-account-menu .danger { color: var(--hw-red); border-top: 1px solid var(--hw-border); border-radius: 0 0 6px 6px; margin-top: 4px; }
-.hw-collapse { height: 36px; color: var(--hw-nav-text); font-size: 12px; }
 .hw-menu-enter-active { transition: opacity 150ms var(--hw-motion-enter), transform 150ms var(--hw-motion-enter); }
 .hw-menu-leave-active { transition: opacity 100ms var(--hw-motion-exit), transform 100ms var(--hw-motion-exit); }
 .hw-menu-enter-from, .hw-menu-leave-to { opacity: 0; transform: translateY(4px); }
 .hw-content { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--hw-focus); outline-offset: 2px; }
 @media (max-width: 960px) { .hw-global-search { width: 280px; } .hw-global-search kbd { display: none; } }
-@media (prefers-reduced-motion: reduce) { .hw-primary-nav, .hw-nav-label, .hw-menu-enter-active, .hw-menu-leave-active { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .hw-menu-enter-active, .hw-menu-leave-active { transition: none; } }
 </style>

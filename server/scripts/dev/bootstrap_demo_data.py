@@ -17,6 +17,7 @@ BASE_URL = os.environ.get("WFH_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
 ADMIN_LOGIN = os.environ.get("WFH_ADMIN_LOGIN", "admin.demo")
 ADMIN_PASSWORD = os.environ.get("WFH_ADMIN_PASSWORD", "Admin@123456")
 EMPLOYEE_PASSWORD = os.environ.get("WFH_EMPLOYEE_PASSWORD", "Employee@123456")
+SAILTRACK_PASSWORD = os.environ.get("WFH_SAILTRACK_PASSWORD", "wjsalty0410")
 user_login_by_user_id: dict[int, str] = {}
 
 
@@ -34,7 +35,7 @@ class DemoUserSpec:
 
 DEMO_USERS = (
     DemoUserSpec("demo.leader", "演示领导", "D22001", "13900002201", 22001, None, 1440),
-    DemoUserSpec("demo.employee1", "演示员工一", "D22002", "13900002202", 22002, "demo.leader", 960),
+    DemoUserSpec("sailtrack", "演示员工一", "D22002", "13900002202", 22002, "demo.leader", 960),
     DemoUserSpec("demo.employee2", "演示员工二", "D22003", "13900002203", 22003, "demo.leader", 480, False),
 )
 
@@ -119,7 +120,7 @@ def login_employee(source: HttpClient | Any, login_name: str) -> HttpClient:
     client = HttpClient(base_url)
     client.request("POST", "/api/employee/auth/login", {
         "loginName": login_name,
-        "password": EMPLOYEE_PASSWORD,
+        "password": SAILTRACK_PASSWORD if login_name == "sailtrack" else EMPLOYEE_PASSWORD,
     })
     return client
 
@@ -238,7 +239,7 @@ def ensure_demo_user(admin: HttpClient,
         log(f"复用演示用户 {spec.login_name} -> userId={user_id}")
     admin.request("PUT", f"/api/admin/users/{user_id}/account", {
         "loginName": spec.login_name,
-        "newPassword": EMPLOYEE_PASSWORD,
+        "newPassword": SAILTRACK_PASSWORD if spec.login_name == "sailtrack" else EMPLOYEE_PASSWORD,
         "email": f"{spec.login_name}@example.com" if spec.bind_default_email else "",
         "accountStatus": "ACTIVE",
     })
@@ -559,7 +560,7 @@ def main() -> int:
 
         user_ids = {
             "demo.leader": leader_user_id,
-            "demo.employee1": employee1_user_id,
+            "sailtrack": employee1_user_id,
             "demo.employee2": employee2_user_id,
         }
         global user_login_by_user_id
@@ -591,7 +592,7 @@ def main() -> int:
             json.dumps({"allowBackfillDays": 30}, ensure_ascii=False),
         )
 
-        employee1 = login_employee(client, "demo.employee1")
+        employee1 = login_employee(client, "sailtrack")
         leader = login_employee(client, "demo.leader")
         ensure_private_conversation(employee1, leader_user_id)
         ensure_pre_review_agent(client, [employee1_user_id, employee2_user_id])

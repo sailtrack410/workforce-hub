@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { conversationTime, conversationWidth } from './imLayout';
+import { conversationTime, conversationWidth, navigationWidth, resolveConversationId } from './imLayout';
+
+describe('navigationWidth', () => {
+  it('一级导航最小为纯图标宽度，最大为 280px', () => {
+    expect(navigationWidth(208, -200)).toBe(64);
+    expect(navigationWidth(208, 100)).toBe(280);
+    expect(navigationWidth(208, 13)).toBe(220);
+    expect(navigationWidth(208, -88)).toBe(120);
+    expect(navigationWidth(208, -112)).toBe(64);
+  });
+});
+
+describe('resolveConversationId', () => {
+  it('路由会话优先，空路由恢复仍有效的上次会话', () => {
+    expect(resolveConversationId('route', 'remembered', ['first', 'remembered'])).toBe('route');
+    expect(resolveConversationId('', 'remembered', ['first', 'remembered'])).toBe('remembered');
+    expect(resolveConversationId('', 'missing', ['first'])).toBe('first');
+    expect(resolveConversationId('', '', [])).toBe('');
+  });
+});
 
 describe('conversationWidth', () => {
   it('限制在 240–360px，并按 4px 步进', () => {

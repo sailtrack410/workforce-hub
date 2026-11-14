@@ -14,6 +14,12 @@ export interface ConversationView extends ImConversationSummaryResponse {
   kind: 'team' | 'agent' | 'private' | 'system';
 }
 
+export interface MessageScrollAnchor {
+  top: number;
+  messageId: string;
+  offset: number;
+}
+
 export function kindOf(conversation: ImConversationSummaryResponse): ConversationView['kind'] {
   const type = (conversation.conversationType || '').toUpperCase();
   if (type === 'GROUP') return 'team';
@@ -43,31 +49,43 @@ function clientId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function readActiveConversationId() {
+  try { return localStorage.getItem('hw-active-conversation') ?? ''; } catch { return ''; }
+}
+
 export const useImStore = defineStore('hw-im', {
   state: () => ({
     conversations: [] as ImConversationSummaryResponse[],
     messagesByConversation: {} as Record<string, ImMessageResponse[]>,
     detailsByConversation: {} as Record<string, ImConversationDetailResponse>,
-    messagesLoading: false,
+    activeConversationId: readActiveConversationId(),
+    scrollPositions: {} as Record<string, MessageScrollAnchor>,
+    loadingConversations: {} as Record<string, boolean>,
     sending: false,
   }),
   actions: {
+    selectConversation(conversationId: EntityId) {
+      this.activeConversationId = String(conversationId);
+      try { localStorage.setItem('hw-active-conversation', this.activeConversationId); } catch { /* 隐私模式不阻断 */ }
+    },
     async loadConversations() {
       this.conversations = await imApi.conversations();
     },
     async loadMessages(conversationId: EntityId) {
-      this.messagesLoading = true;
+      const key = String(conversationId);
+      if (this.loadingConversations[key]) return;
+      this.loadingConversations[key] = true;
       const userId = useSessionStore().user?.userId;
       try {
         const messages = await imApi.messages(conversationId, { limit: 100 });
-        this.messagesByConversation[String(conversationId)] = messages;
+        this.messagesByConversation[key] = messages;
         if (userId) void cacheMessages(userId, messages).catch(() => undefined);
       } catch (error) {
         const cached = userId ? await listCachedMessages(userId, conversationId).catch(() => []) : [];
-        if (cached.length) this.messagesByConversation[String(conversationId)] = cached;
+        if (cached.length) this.messagesByConversation[key] = cached;
         else throw error;
       } finally {
-        this.messagesLoading = false;
+        this.loadingConversations[key] = false;
       }
     },
     async loadDetail(conversationId: EntityId) {
