@@ -56,14 +56,16 @@ const loading = computed(() => props.card.loading);
 </template>
 
 <style scoped>
-.im-kc-row { display: flex; align-items: flex-start; gap: 10px; }
+.im-kc-row { display: flex; align-items: flex-start; gap: 8px; width: 100%; }
 .im-kc {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: min(520px, 100%);
+  width: 520px;
+  max-width: calc(100% - 48px);
+  min-width: 0;
   padding: 16px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--hw-inner);
 }
 .im-kc-head {
@@ -116,9 +118,10 @@ const loading = computed(() => props.card.loading);
 }
 .im-kc-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .im-kc-action {
+  min-height: 36px;
   padding: 7px 16px;
   border: 1px solid var(--hw-track);
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--hw-card);
   color: var(--hw-secondary);
   font-size: 12px;

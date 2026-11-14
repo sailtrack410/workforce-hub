@@ -235,8 +235,8 @@ function fileSize(bytes?: number | null) {
 .im-bubble-row {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  max-width: 78%;
+  gap: 8px;
+  max-width: 88%;
 }
 .im-bubble-row.right { align-self: flex-end; }
 .im-bubble-stack {
@@ -265,7 +265,7 @@ function fileSize(bytes?: number | null) {
 }
 .im-bubble {
   padding: 12px 16px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--hw-inner);
   color: var(--hw-ink);
   min-width: 0;

@@ -14,10 +14,11 @@ export const router = createRouter({
     { path: '/workbench', name: 'workbench', component: WorkbenchView },
     { path: '/messages', name: 'messages', component: MessagesView },
     { path: '/messages/:conversationId', name: 'messages-detail', component: MessagesView },
-    { path: '/approvals', name: 'approvals', component: PlaceholderView },
-    { path: '/attendance', name: 'attendance', component: PlaceholderView },
-    { path: '/agent', name: 'agent', component: PlaceholderView },
-    { path: '/', redirect: '/workbench' },
-    { path: '/:pathMatch(.*)*', redirect: '/workbench' },
+    ...['tasks', 'todos', 'approvals', 'attendance', 'knowledge', 'drive', 'contacts'].map((name) => ({
+      path: `/${name}`, name, component: PlaceholderView,
+    })),
+    { path: '/agent', redirect: '/messages' },
+    { path: '/', redirect: '/messages' },
+    { path: '/:pathMatch(.*)*', redirect: '/messages' },
   ],
 });

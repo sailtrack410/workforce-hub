@@ -6,8 +6,8 @@ import { useRoute } from 'vue-router';
 
 const route = useRoute();
 const TITLES: Record<string, string> = {
-  attendance: '我的考勤',
-  agent: 'Agent',
+  tasks: '任务', todos: '待办', approvals: '审批', attendance: '考勤',
+  knowledge: '知识库', drive: '云空间', contacts: '通讯录',
 };
 const title = TITLES[String(route.name) || ''] || '页面';
 </script>

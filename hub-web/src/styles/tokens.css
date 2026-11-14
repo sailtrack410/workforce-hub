@@ -6,6 +6,7 @@
   --hw-inner: #f6f8fb;
   --hw-chip: #f2f5f9;
   --hw-track: #eaeff5;
+  --hw-border: #e8edf3;
   --hw-sky: #d9ebff;
   --hw-sky-strong: #87c2ff;
 
@@ -26,11 +27,22 @@
   --hw-amber-strong: #d98a1f;
   --hw-red: #ff5a4e;
   --hw-red-bg: #fdeceb;
+  --hw-on-primary: #ffffff;
+  --hw-focus: #1677ff;
+  --hw-nav-bg: linear-gradient(180deg, #1677ff 0%, #124da3 100%);
+  --hw-nav-text: #e7f0ff;
+  --hw-nav-hover: #ffffff14;
+  --hw-nav-active: #ffffff29;
+  --hw-shadow-card: 0 24px 64px #0f1e371f;
+  --hw-shadow-menu: 0 12px 32px #0f1e3724;
+  --hw-shadow-switch: 0 1px 3px #00000033;
 
-  /* 动效 */
+  /* 动效：进入减速、退出加速 */
   --hw-ease: cubic-bezier(0.33, 1, 0.68, 1);
-  --hw-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --hw-morph: cubic-bezier(0.65, 0, 0.35, 1);
+  --hw-motion-enter: cubic-bezier(0.2, 0, 0, 1);
+  --hw-motion-exit: cubic-bezier(0.4, 0, 1, 1);
+  --hw-duration-fast: 120ms;
+  --hw-duration-panel: 200ms;
 }
 
 [data-theme='dark'] {
@@ -39,6 +51,7 @@
   --hw-inner: #232c39;
   --hw-chip: #26303d;
   --hw-track: #2a3542;
+  --hw-border: #2a3542;
   --hw-sky: #1d3350;
   --hw-sky-strong: #2c4a73;
   --hw-ink: #e9edf2;
@@ -62,6 +75,7 @@ html, body, #app {
 }
 
 body {
+  --hw-desktop-inset: 0px;
   font-family: "Noto Sans SC", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: var(--hw-ink);
   background: var(--hw-canvas);
@@ -86,4 +100,22 @@ input, textarea, select {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--hw-muted);
+}
+
+body[data-desktop-platform='darwin'] {
+  --hw-desktop-inset: 80px;
+}
+
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--hw-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -42,15 +42,17 @@ const statusClass = computed(() => `is-${props.card.statusTone}`);
 </template>
 
 <style scoped>
-.im-pc-row { display: flex; align-items: flex-start; gap: 10px; }
+.im-pc-row { display: flex; align-items: flex-start; gap: 8px; width: 100%; }
 .im-pc {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: min(520px, 100%);
+  width: 520px;
+  max-width: calc(100% - 48px);
+  min-width: 0;
   padding: 16px;
   border: 1px solid var(--hw-sky-strong);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--hw-card);
 }
 .im-pc-head { display: flex; align-items: center; gap: 8px; }
@@ -82,9 +84,10 @@ const statusClass = computed(() => `is-${props.card.statusTone}`);
 .im-pc-field span { font-size: 12px; font-weight: 500; color: var(--hw-ink); text-align: right; }
 .im-pc-actions { display: flex; gap: 10px; }
 .im-pc-action {
+  min-height: 36px;
   padding: 7px 16px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--hw-primary);
   color: #fff;
   font-size: 12px;

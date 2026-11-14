@@ -1,15 +1,16 @@
 <script setup lang="ts">
 /**
- * hub-web 消息页：对齐画布「员工端-新消息」3:2204 及其全部状态帧。
- * 三栏：会话列表 344 / 聊天窗口 弹性 / 会话详情栏 300。
+ * hub-web 消息页：对齐最新桌面画布 24:923。
+ * 三栏：会话列表 240–360 / 聊天窗口弹性 / 详情栏按需展开。
  * 弹层与细节：新建会话、群管理（资料/公告/成员增删/退出解散）、@提及面板、附件菜单、消息操作菜单。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   AtSign, BellOff, BookUser, Check, ChevronRight, Cloud, Download, FileText,
-  FolderOpen, Image, MessageSquare, PanelRightClose, PanelRightOpen, Paperclip,
-  Pin, Plus, Search, Send, UsersRound, X, Quote, Zap,
+  FolderOpen, Image, MessageSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen,
+  PanelRightClose, PanelRightOpen, Paperclip, Pin, Plus, Search, Send,
+  UsersRound, X, Quote, Zap,
 } from 'lucide-vue-next';
 import HubAvatar from '@/components/base/HubAvatar.vue';
 import HubDialog from '@/components/base/HubDialog.vue';
@@ -27,6 +28,7 @@ import { uploadImAttachment } from '@/composables/useUpload';
 import { agentApi, contactsApi, fileApi, imApi } from '@/api';
 import type { AgentResponse, EmployeeFileResponse, EntityId, ImConversationSummaryResponse, ImGroupFileResponse, ImGroupNoticeResponse, ImMessageAttachment, ImMessageResponse } from '@/api/types';
 import { toMessageView, friendlyTime, TIME_DIVIDER_GAP, type MessageView } from '@/utils/message';
+import { conversationTime, conversationWidth } from '@/utils/imLayout';
 
 const session = useSessionStore();
 const im = useImStore();
@@ -55,8 +57,9 @@ const activeTitle = computed(() => {
 const activeSubtitle = computed(() => {
   const c = activeConversation.value;
   if (!c) return '';
+  if (activeKind.value === 'agent') return wsConnected.value === false ? '连接已断开 · 正在尝试恢复' : '在线 · 已绑定知识库 · 平均响应 1 秒';
   const kindText = { team: '群聊', agent: 'AI 助手', private: '私聊', system: '系统会话' }[activeKind.value];
-  return `${kindText} · ${(c.lastMessageAt || '').slice(5, 10) || ''}`;
+  return `${kindText}${wsConnected.value === false ? ' · 连接已断开' : ''}`;
 });
 
 async function syncConversation(id: string) {
@@ -88,7 +91,49 @@ const { connected: wsConnected, connect: connectSocket, close: closeSocket } = u
 /* ---------- 聊天头：记录搜索 + 面板切换（画布 3:2303） ---------- */
 const recordSearchOpen = ref(false);
 const recordKeyword = ref('');
-const detailOpen = ref(true);
+const detailOpen = ref(false);
+const listCollapsed = ref(false);
+const listWidth = ref(280);
+const resizing = ref(false);
+const pageEl = ref<HTMLElement | null>(null);
+let resizeCleanup: (() => void) | null = null;
+
+function readListPreference(key: string) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function saveListPreference() {
+  try {
+    localStorage.setItem('hw-conversation-width', String(listWidth.value));
+    localStorage.setItem('hw-conversation-collapsed', String(listCollapsed.value));
+  } catch { /* 隐私模式不阻断 */ }
+}
+function toggleList() {
+  listCollapsed.value = !listCollapsed.value;
+  saveListPreference();
+}
+function startListResize(event: PointerEvent) {
+  if (event.button !== 0 || listCollapsed.value) return;
+  event.preventDefault();
+  const startX = event.clientX;
+  const startWidth = listWidth.value;
+  const available = (pageEl.value?.clientWidth ?? 1280) - 480;
+  resizing.value = true;
+  const onMove = (move: PointerEvent) => {
+    listWidth.value = conversationWidth(startWidth, move.clientX - startX, available);
+  };
+  const onUp = () => {
+    resizing.value = false;
+    saveListPreference();
+    resizeCleanup?.();
+  };
+  resizeCleanup = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    resizeCleanup = null;
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp, { once: true });
+}
 
 const visibleMessages = computed<MessageView[]>(() => {
   const kw = recordKeyword.value.trim();
@@ -130,8 +175,10 @@ watch(() => route.query.section, (s) => {
     activeFilter.value = s as ListFilter;
   }
 });
-const keyword = ref('');
-
+const keyword = ref(typeof route.query.keyword === 'string' ? route.query.keyword : '');
+watch(() => route.query.keyword, (value) => {
+  if (typeof value === 'string') keyword.value = value;
+});
 const filteredConversations = computed(() => {
   const kw = keyword.value.trim().toLowerCase();
   return im.conversations
@@ -154,12 +201,12 @@ const filteredConversations = computed(() => {
 /* ---------- 消息流滚动 ---------- */
 const messageStream = ref<HTMLElement | null>(null);
 function scrollToBottom() {
-  void nextTick(() => {
+  void nextTick(() => requestAnimationFrame(() => {
     const el = messageStream.value;
     if (el) el.scrollTop = el.scrollHeight;
-  });
+  }));
 }
-watch(() => activeMessages.value.length, scrollToBottom);
+watch(() => streamItems.value.length, scrollToBottom);
 
 /* ---------- 头像 ---------- */
 function conversationAvatar(c: ImConversationSummaryResponse) {
@@ -179,7 +226,7 @@ function resolveQuote(id?: EntityId | null) {
 }
 function jumpToQuoted(id: string) {
   const el = messageStream.value?.querySelector(`[data-message-id="${id}"]`);
-  if (el instanceof HTMLElement) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (el instanceof HTMLElement) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
 }
 
 /* ---------- 发送 ---------- */
@@ -221,14 +268,8 @@ const mentionedUserIds = computed<EntityId[]>(() => {
 const allMentionNames = computed(() =>
   session.contacts.flatMap((c) => [c.name, c.originalName].filter(Boolean) as string[]),
 );
-const draftMentionNames = computed(() =>
-  session.contacts
-    .filter((c) => [c.name, c.originalName].some((n) => n && draft.value.includes(`@${n}`)))
-    .map((c) => `@${c.originalName || c.name}`),
-);
-
 function onDraftInput(event: Event) {
-  const value = (event.target as HTMLInputElement).value;
+  const value = (event.target as HTMLTextAreaElement).value;
   // 光标前刚输入 @ 且当前是群聊 → 弹出成员面板
   mentionPanelOpen.value = activeKind.value === 'team' && /@$/.test(value);
 }
@@ -260,10 +301,15 @@ async function handleAttachSelected(event: Event) {
   const file = input.files?.[0];
   input.value = '';
   if (!file || !activeId.value || attachSending.value) return;
+  const conversationId = activeId.value;
   attachSending.value = true;
   try {
     const uploaded = await uploadImAttachment(file);
-    await im.sendFile(activeId.value, uploaded.attachmentRefId);
+    if (activeId.value !== conversationId) {
+      showToast('已切换会话，附件未发送');
+      return;
+    }
+    await im.sendFile(conversationId, uploaded.attachmentRefId);
     showToast('文件已发送');
     scrollToBottom();
   } catch (error) {
@@ -272,9 +318,9 @@ async function handleAttachSelected(event: Event) {
     attachSending.value = false;
   }
 }
-async function openAttachment(file: ImMessageAttachment) {
+async function openAttachment(file: ImMessageAttachment, message: MessageView) {
   try {
-    const ticket = await fileApi.createDownloadTicket(file.attachmentRefId, 'INLINE');
+    const ticket = await imApi.createMessageAttachmentDownloadTicket(message.conversationId, message.id, file.attachmentRefId, 'INLINE');
     window.open(ticket.downloadUrl || ticket.url || fileApi.downloadUrl(ticket.ticketNo), '_blank', 'noopener');
   } catch (error) {
     showToast(error instanceof Error ? error.message : '附件打开失败');
@@ -286,8 +332,9 @@ const menuTarget = ref<MessageView | null>(null);
 const menuPos = ref<{ x: number; y: number } | null>(null);
 const menuCanRecall = computed(() => {
   const m = menuTarget.value;
-  if (!m || m.side !== 'right' || m.recalled || !m.time) return false;
-  return Date.now() - new Date(m.time.replace(' ', 'T')).getTime() <= 2 * 60 * 1000;
+  if (!m || m.side !== 'right' || m.recalled || !m.sentAt) return false;
+  const sentAt = new Date(m.sentAt).getTime();
+  return Number.isFinite(sentAt) && Date.now() - sentAt <= 2 * 60 * 1000;
 });
 function openMessageMenu(message: MessageView, event: MouseEvent) {
   menuTarget.value = message;
@@ -305,6 +352,7 @@ function closeMessageMenu() {
 async function runMenuAction(action: 'copy' | 'quote' | 'forward' | 'delete-or-recall') {
   const m = menuTarget.value;
   if (!m) return;
+  const canRecall = menuCanRecall.value;
   closeMessageMenu();
   if (action === 'copy') {
     await navigator.clipboard.writeText(m.body || '').then(
@@ -322,7 +370,7 @@ async function runMenuAction(action: 'copy' | 'quote' | 'forward' | 'delete-or-r
     return;
   }
   try {
-    if (menuCanRecall.value) {
+    if (canRecall) {
       await im.recall(activeId.value, m.id);
       showToast('已撤回');
     } else {
@@ -420,7 +468,7 @@ const groupNotice = ref('');
 const groupSubmitting = ref(false);
 
 async function openGroupPanel() {
-  if (!activeId.value) return;
+  if (!activeId.value || !isGroupOwner.value) return;
   try {
     const detail = await im.loadDetail(activeId.value);
     groupTitle.value = detail.groupProfile?.title ?? activeConversation.value?.title ?? '';
@@ -478,6 +526,26 @@ async function leaveActiveGroup() {
 /* ---------- 退群确认（画布 8:5409） ---------- */
 const leaveConfirmOpen = ref(false);
 const leaveConfirming = ref(false);
+const isGroupOwner = computed(() => activeDetail.value?.groupProfile?.currentMemberRole === 'OWNER');
+const dismissConfirmOpen = ref(false);
+const dismissing = ref(false);
+async function dismissActiveGroup() {
+  if (!activeId.value || dismissing.value) return;
+  dismissing.value = true;
+  try {
+    await imApi.dismissGroup(activeId.value);
+    dismissConfirmOpen.value = false;
+    showToast('群聊已解散');
+    await im.loadConversations();
+    const first = im.conversations[0];
+    if (first) selectConversation(String(first.conversationId));
+    else void router.push({ name: 'messages' });
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '解散失败');
+  } finally {
+    dismissing.value = false;
+  }
+}
 
 /* ---------- 添加群成员弹窗（画布 8:4881） ---------- */
 const addMembersOpen = ref(false);
@@ -593,17 +661,19 @@ async function togglePreference(key: PrefKey) {
 const groupFiles = ref<ImGroupFileResponse[]>([]);
 const groupFilesLoading = ref(false);
 async function loadGroupFiles() {
-  if (!activeId.value || activeKind.value !== 'team') {
+  const id = activeId.value;
+  if (!id || activeKind.value !== 'team') {
     groupFiles.value = [];
     return;
   }
   groupFilesLoading.value = true;
   try {
-    groupFiles.value = await imApi.groupFiles(activeId.value);
+    const files = await imApi.groupFiles(id);
+    if (activeId.value === id) groupFiles.value = files;
   } catch {
-    groupFiles.value = [];
+    if (activeId.value === id) groupFiles.value = [];
   } finally {
-    groupFilesLoading.value = false;
+    if (activeId.value === id) groupFilesLoading.value = false;
   }
 }
 watch([activeId, activeKind], loadGroupFiles);
@@ -833,6 +903,12 @@ function noticeTime(isoText: string) {
 
 /* ---------- 生命周期 ---------- */
 onMounted(async () => {
+  const savedWidth = Number(readListPreference('hw-conversation-width'));
+  if (savedWidth >= 240 && savedWidth <= 360) listWidth.value = savedWidth;
+  const savedCollapsed = readListPreference('hw-conversation-collapsed');
+  listCollapsed.value = savedCollapsed === null ? window.innerWidth <= 1100 : savedCollapsed === 'true';
+  // 父应用壳可能在恢复会话；等待本次初始化收敛，不重复发起请求。
+  if (!session.initialized) await session.loadCurrentUser();
   if (!session.isAuthenticated) {
     void router.replace({ name: 'login' });
     return;
@@ -848,6 +924,14 @@ onMounted(async () => {
 });
 
 watch(activeId, async (id) => {
+  draft.value = '';
+  quotedMessage.value = null;
+  mentionPanelUserIds.value = new Set();
+  mentionPanelOpen.value = false;
+  attachMenuOpen.value = false;
+  recordKeyword.value = '';
+  recordSearchOpen.value = false;
+  detailOpen.value = false;
   if (id) {
     await syncConversation(id);
     scrollToBottom();
@@ -855,60 +939,58 @@ watch(activeId, async (id) => {
 });
 
 onBeforeUnmount(() => {
+  resizeCleanup?.();
   closeSocket();
 });
 </script>
 
 <template>
-  <div class="im-page" @click="closeMessageMenu">
-    <!-- 会话列表 344 -->
-    <aside class="im-list">
+  <div
+    ref="pageEl" class="im-page" :class="{ resizing }"
+    :style="{ '--im-list-width': `${listCollapsed ? 0 : listWidth}px` }"
+    @click="closeMessageMenu"
+  >
+    <!-- 会话列表：240–360px 拖拽调宽，折叠后恢复上次宽度 -->
+    <aside class="im-list" :class="{ collapsed: listCollapsed }" :aria-hidden="listCollapsed">
       <header class="im-list-head">
-        <h3>消息</h3>
-        <button type="button" class="im-icon-btn" aria-label="从通讯录发起会话" title="从通讯录发起会话" @click="openCreate('private')">
-          <BookUser :size="16" :stroke-width="2" />
-        </button>
+        <h2>消息</h2>
+        <div>
+          <button type="button" class="im-icon-btn" aria-label="收起会话列表" title="收起会话列表" @click="toggleList"><PanelLeftClose :size="17" /></button>
+          <button type="button" class="im-icon-btn" aria-label="从通讯录发起会话" title="从通讯录发起会话" @click="openCreate('private')"><BookUser :size="18" /></button>
+        </div>
       </header>
-      <div class="im-filters" role="tablist">
-        <button
-          v-for="f in LIST_FILTERS" :key="f" type="button" role="tab"
-          class="im-filter-chip" :class="{ active: activeFilter === f }"
-          @click="activeFilter = f"
-        >{{ f }}</button>
+      <div class="im-filters" role="tablist" aria-label="会话筛选">
+        <button v-for="f in LIST_FILTERS" :key="f" type="button" role="tab" class="im-filter-chip" :class="{ active: activeFilter === f }" :aria-selected="activeFilter === f" @click="activeFilter = f">{{ f }}</button>
       </div>
-      <label class="im-search">
-        <Search :size="16" :stroke-width="2" />
-        <input v-model="keyword" type="text" placeholder="搜索会话" />
-      </label>
+      <label class="im-search"><Search :size="16" /><input v-model="keyword" type="search" aria-label="搜索会话" placeholder="搜索会话" /></label>
       <div class="im-conversations">
-        <button
-          v-for="c in filteredConversations" :key="String(c.conversationId)" type="button"
-          class="im-conv" :class="{ active: String(c.conversationId) === activeId }"
-          @click="selectConversation(String(c.conversationId))"
-        >
-          <HubAvatar :label="c.title" :image="conversationAvatar(c)" size="lg" :agent="kindOf(c) === 'agent'" />
+        <button v-for="c in filteredConversations" :key="String(c.conversationId)" type="button" class="im-conv" :class="{ active: String(c.conversationId) === activeId }" @click="selectConversation(String(c.conversationId))">
+          <HubAvatar :label="c.title" :image="conversationAvatar(c)" size="md" :agent="kindOf(c) === 'agent'" />
           <span class="im-conv-copy">
-            <strong>{{ c.title }}<em v-if="c.memberCount" class="im-conv-count">{{ c.memberCount }}人</em><Pin v-if="c.pin" :size="12" :stroke-width="2.5" class="im-pin-icon" /></strong>
-            <small>{{ lastMessageText(c) }}</small>
-          </span>
-          <span class="im-conv-side">
-            <small>{{ (c.lastMessageAt || '').slice(5, 10) }}</small>
-            <BellOff v-if="c.mute" :size="12" :stroke-width="2" class="im-mute-icon" />
-            <i v-if="c.unreadCount > 0" class="im-unread" :class="{ muted: c.mute }">{{ c.unreadCount > 99 ? '99+' : c.unreadCount }}</i>
+            <span class="im-conv-top"><strong>{{ c.title }}<Pin v-if="c.pin" :size="12" class="im-pin-icon" /></strong><time>{{ conversationTime(c.lastMessageAt) }}</time></span>
+            <span class="im-conv-bottom"><small>{{ lastMessageText(c) }}<em v-if="c.memberCount" class="im-conv-count"> · {{ c.memberCount }}人</em></small><BellOff v-if="c.mute" :size="12" class="im-mute-icon" /><i v-if="c.unreadCount > 0" class="im-unread" :class="{ muted: c.mute }">{{ c.unreadCount > 99 ? '99+' : c.unreadCount }}</i></span>
           </span>
         </button>
         <HubEmpty v-if="!filteredConversations.length" title="没有匹配的会话" :icon="MessageSquare" />
       </div>
     </aside>
+    <div
+      v-if="!listCollapsed" class="im-list-resizer" role="separator" aria-label="调整会话列表宽度"
+      aria-orientation="vertical" :aria-valuenow="listWidth" aria-valuemin="240" aria-valuemax="360"
+      tabindex="0" @pointerdown="startListResize"
+      @keydown.left.prevent="listWidth = Math.max(240, listWidth - 4); saveListPreference()"
+      @keydown.right.prevent="listWidth = Math.min(360, listWidth + 4); saveListPreference()"
+    />
 
     <!-- 聊天窗口 弹性 -->
     <section v-if="activeConversation" class="im-chat">
       <header class="im-chat-head">
         <div class="im-chat-title">
-          <h3>{{ activeTitle }}</h3>
-          <small>{{ activeSubtitle }}<template v-if="wsConnected === false"> · 连接已断开</template></small>
+          <HubAvatar :label="activeConversation.title" size="md" :agent="activeKind === 'agent'" />
+          <span><span class="im-chat-name"><h2>{{ activeTitle }}</h2><em v-if="activeKind === 'agent'">AI 助手</em></span><small>{{ activeSubtitle }}</small></span>
         </div>
         <div class="im-chat-actions">
+          <button v-if="listCollapsed" type="button" class="im-icon-btn im-head-icon" aria-label="展开会话列表" title="展开会话列表" @click="toggleList"><PanelLeftOpen :size="17" /></button>
           <button
             type="button" class="im-icon-btn im-head-icon"
             :class="{ active: recordSearchOpen }" aria-label="记录搜索"
@@ -943,6 +1025,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div ref="messageStream" class="im-stream">
+        <TransitionGroup name="im-message">
         <template v-if="streamItems.length">
           <template v-for="item in streamItems" :key="item.key">
             <!-- 微信式时间分隔条：间隔 >5 分钟的第一条消息前插入 -->
@@ -976,13 +1059,14 @@ onBeforeUnmount(() => {
                 :quote="resolveQuote(item.message.quotedMessageId)"
                 :mention-names="allMentionNames"
                 @action="openMessageMenu"
-                @attachment="openAttachment"
+                @attachment="(file) => openAttachment(file, item.message)"
                 @quote="jumpToQuoted"
               />
             </article>
           </template>
         </template>
-        <HubEmpty v-else :title="recordKeyword ? `没有包含「${recordKeyword}」的消息` : '暂无消息，说点什么吧'" :icon="MessageSquare" />
+        <HubEmpty v-else key="empty-stream" :title="recordKeyword ? `没有包含「${recordKeyword}」的消息` : '暂无消息，说点什么吧'" :icon="MessageSquare" />
+        </TransitionGroup>
       </div>
 
       <footer class="im-composer">
@@ -1000,12 +1084,17 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="im-composer-row">
+          <div class="im-input-wrap">
+            <textarea v-model="draft" rows="3" placeholder="输入消息，@ 可提及成员或 Agent…" :disabled="sending" @input="onDraftInput" @keydown.enter.exact.prevent="sendMessage" />
+          </div>
+          <div class="im-composer-tools">
+          <div class="im-tool-group">
           <div class="im-attach-wrap">
             <button
               type="button" class="im-icon-btn" aria-label="附件"
               :disabled="attachSending" @click.stop="openAttachMenu"
             >
-              <Paperclip :size="16" :stroke-width="2" />
+              <Paperclip :size="18" :stroke-width="2" />
             </button>
             <div v-if="attachMenuOpen" class="im-attach-menu" @click.stop>
               <button type="button" @click="pickAttachFile">
@@ -1024,16 +1113,9 @@ onBeforeUnmount(() => {
           </div>
           <input ref="attachInput" type="file" hidden @change="handleAttachSelected" />
 
-          <div class="im-input-wrap">
-            <div v-if="draftMentionNames.length" class="im-mention-preview" aria-hidden="true">
-              <span v-for="name in draftMentionNames" :key="name">{{ name }}</span>
-            </div>
-            <input
-              v-model="draft" type="text" placeholder="输入消息，群聊支持 @同事"
-              :disabled="sending"
-              @input="onDraftInput"
-              @keydown.enter.prevent="sendMessage"
-            />
+          <button type="button" class="im-icon-btn im-tool-btn" aria-label="上传图片" title="上传图片" @click="pickAttachFile"><Image :size="18" /></button>
+          <button type="button" class="im-icon-btn im-tool-btn" aria-label="@提及" @click.stop="insertAtSymbol"><AtSign :size="18" /></button>
+          <div class="im-input-wrap im-mention-wrap">
             <div v-if="mentionPanelOpen" class="im-mention-panel" @click.stop>
               <button
                 v-for="m in mentionCandidates" :key="String(m.memberId)" type="button"
@@ -1046,16 +1128,10 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <button type="button" class="im-mention-btn" aria-label="@提及" @click.stop="insertAtSymbol">
-            <AtSign :size="14" :stroke-width="2" />
-          </button>
-          <button
-            type="button" class="im-send-btn"
-            :disabled="sending || !draft.trim()" @click="sendMessage"
-          >
-            <Send :size="16" :stroke-width="2" />
-            发送
-          </button>
+          <button type="button" class="im-icon-btn im-tool-btn" aria-label="更多消息工具" title="更多消息工具" @click.stop="openAttachMenu"><MoreHorizontal :size="18" /></button>
+          </div>
+          <button type="button" class="im-send-btn" :disabled="sending || !draft.trim()" @click="sendMessage"><Send :size="16" />发送</button>
+          </div>
         </div>
       </footer>
     </section>
@@ -1066,7 +1142,8 @@ onBeforeUnmount(() => {
       </HubEmpty>
     </section>
 
-    <!-- 会话详情栏 300 -->
+    <!-- 会话详情：默认收起，避免挤压标准三栏 -->
+    <Transition name="im-detail">
     <aside v-if="activeConversation && detailOpen" class="im-detail">
       <div class="im-profile">
         <HubAvatar :label="activeConversation.title" size="xl" :agent="activeKind === 'agent'" />
@@ -1087,7 +1164,7 @@ onBeforeUnmount(() => {
           <span v-for="m in groupMembers.slice(0, 12)" :key="String(m.memberId)" class="im-member" :title="m.displayName">
             <HubAvatar :label="m.displayName" size="sm" :agent="m.memberType === 'AGENT'" />
           </span>
-          <button type="button" class="im-member-add" aria-label="添加成员" @click="openAddMembers">
+          <button v-if="isGroupOwner" type="button" class="im-member-add" aria-label="添加成员" @click="openAddMembers">
             <Plus :size="14" :stroke-width="2" />
           </button>
         </div>
@@ -1102,13 +1179,13 @@ onBeforeUnmount(() => {
             <span>群聊名称</span>
             <em class="im-detail-row-value">{{ activeConversation.title }}</em>
           </div>
-          <button type="button" class="im-detail-row" @click="openGroupPanel">
+          <button v-if="isGroupOwner" type="button" class="im-detail-row" @click="openGroupPanel">
             <FileText :size="16" :stroke-width="2" />
             <span>群公告</span>
             <em class="im-detail-row-value">{{ activeDetail?.groupProfile?.noticeText ? '已发布' : '未设置' }}</em>
             <ChevronRight :size="14" :stroke-width="2" class="im-row-arrow" />
           </button>
-          <button type="button" class="im-detail-row" @click="openGroupPanel">
+          <button v-if="isGroupOwner" type="button" class="im-detail-row" @click="openGroupPanel">
             <UsersRound :size="16" :stroke-width="2" />
             <span>群管理</span>
             <ChevronRight :size="14" :stroke-width="2" class="im-row-arrow" />
@@ -1177,7 +1254,11 @@ onBeforeUnmount(() => {
         </div>
         <div class="im-detail-danger">
           <button type="button" class="im-danger-link" @click="clearConfirmOpen = true">清空聊天记录</button>
-          <button type="button" class="im-danger-link" @click="leaveConfirmOpen = true">退出群聊</button>
+          <button v-if="isGroupOwner" type="button" class="im-danger-link" @click="dismissConfirmOpen = true">解散群聊</button>
+          <button v-else type="button" class="im-danger-link" @click="leaveConfirmOpen = true">退出群聊</button>
+          <HubDialog v-if="dismissConfirmOpen" @close="dismissConfirmOpen = false">
+            <div class="im-dialog"><h2>解散群聊</h2><p class="im-confirm-text">解散后所有成员都无法继续发送消息，此操作不可撤销。</p><footer class="im-dialog-foot"><HubButton :disabled="dismissing" @click="dismissConfirmOpen = false">取消</HubButton><HubButton variant="danger" :disabled="dismissing" @click="dismissActiveGroup">{{ dismissing ? '解散中…' : '确认解散' }}</HubButton></footer></div>
+          </HubDialog>
         </div>
       </template>
 
@@ -1223,6 +1304,7 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </aside>
+    </Transition>
 
     <!-- 新建会话弹窗 -->
     <HubDialog v-if="createOpen" @close="closeCreate">
@@ -1328,8 +1410,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="im-member-actions">
-            <HubButton variant="secondary" @click="openAddMembers">添加成员</HubButton>
-            <HubButton variant="secondary" @click="openRemoveMembers">移除成员</HubButton>
+            <template v-if="isGroupOwner"><HubButton variant="secondary" @click="openAddMembers">添加成员</HubButton>
+            <HubButton variant="secondary" @click="openRemoveMembers">移除成员</HubButton></template>
           </div>
         </section>
 

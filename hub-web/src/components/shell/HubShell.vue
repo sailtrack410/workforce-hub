@@ -1,432 +1,217 @@
 <script setup lang="ts">
-/**
- * HubShell：应用壳 = 顶部导航 64（弹性滑块胶囊）+ 左侧图标栏 64（次级导航，由页面注入）。
- * 画布规范：圆角 20 卡片式顶导、蓝色渐变图标栏。
- * 次级导航约定：页面通过 <template #rail> 注入自己的分区导航，未注入时回退到页面级默认分区。
- */
-import { computed, onMounted, ref, watch } from 'vue';
+/** 桌面应用壳：56px 顶导 + 可折叠一级导航，页面负责自己的工作区。 */
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  AtSign, Bell, CalendarDays, ChevronDown, Clock, FileUp, Inbox, LayoutDashboard,
-  Mails, MessageSquare, Moon, Search, Settings, Sparkles, SunMedium, UserRound, UsersRound,
+  Bell, BookOpen, BookUser, CalendarDays, CheckSquare, ChevronDown, ChevronLeft,
+  ChevronRight, Cloud, LayoutDashboard, LogOut, MessageSquare, Moon,
+  PanelLeftClose, PanelLeftOpen, Search, Settings, Stamp, SunMedium, UserRound,
 } from 'lucide-vue-next';
+import HubAvatar from '@/components/base/HubAvatar.vue';
+import HubToast from '@/components/base/HubToast.vue';
 import { useSessionStore } from '@/stores/session';
-import { notificationApi } from '@/api';
+import { useImStore } from '@/stores/im';
+import { useToast } from '@/composables/useToast';
 
 const session = useSessionStore();
+const im = useImStore();
 const route = useRoute();
 const router = useRouter();
+const { message: toastMessage, show: showToast } = useToast();
+const accountOpen = ref(false);
+const navCollapsed = ref(false);
 const theme = ref<'light' | 'dark'>('light');
+const searchKeyword = ref('');
 
-/** 通知中心未读数（#10 联调）：铃铛数字徽标，点击全部已读 */
-const unreadCount = ref(0);
-async function loadUnread() {
-  try {
-    unreadCount.value = await notificationApi.unreadCount();
-  } catch { /* 未读数失败不阻断 */ }
-}
-async function onBell() {
-  if (unreadCount.value > 0) {
-    try {
-      await notificationApi.markAllRead();
-      unreadCount.value = 0;
-    } catch { /* 忽略 */ }
-  }
-  if (route.path !== '/workbench') void router.push('/workbench');
-}
-
-onMounted(async () => {
-  document.body.dataset.theme = theme.value;
-  if (!session.initialized) {
-    await session.loadCurrentUser();
-    if (!session.isAuthenticated) void router.replace({ name: 'login' });
-    else void session.loadOrgProfile();
-  }
-  void loadUnread();
-});
-
-/** 顶部主导航：滑块胶囊项 */
 const primaryNav = [
-  { id: 'workbench', label: '工作台', path: '/workbench' },
-  { id: 'messages', label: '消息', path: '/messages' },
-  { id: 'approval', label: '审批', path: '/approvals' },
-  { id: 'attendance', label: '考勤', path: '/attendance' },
-  { id: 'agent', label: 'Agent', path: '/agent' },
+  { id: 'messages', label: '消息', path: '/messages', icon: MessageSquare },
+  { id: 'workbench', label: '工作台', path: '/workbench', icon: LayoutDashboard },
+  { id: 'tasks', label: '任务', path: '/tasks', icon: CheckSquare },
+  { id: 'todos', label: '待办', path: '/todos', icon: Bell },
+  { id: 'approvals', label: '审批', path: '/approvals', icon: Stamp },
+  { id: 'attendance', label: '考勤', path: '/attendance', icon: CalendarDays },
+  { id: 'knowledge', label: '知识库', path: '/knowledge', icon: BookOpen },
+  { id: 'drive', label: '云空间', path: '/drive', icon: Cloud },
+  { id: 'contacts', label: '通讯录', path: '/contacts', icon: BookUser },
 ];
-
-const activeId = computed(() => {
-  const p = route.path;
-  if (p.startsWith('/messages')) return 'messages';
-  if (p.startsWith('/approvals')) return 'approval';
-  if (p.startsWith('/workbench')) return 'workbench';
-  if (p.startsWith('/attendance')) return 'attendance';
-  if (p.startsWith('/agent')) return 'agent';
-  return '';
-});
-
-const navEl = ref<HTMLElement | null>(null);
-/** 滑块位置：基于激活按钮的 offsetLeft/offsetWidth 计算，切页与点击时平滑跟随 */
-const thumb = ref({ left: 0, width: 0, ready: false });
-
-function updateThumb() {
-  const nav = navEl.value;
-  if (!nav) return;
-  const idx = primaryNav.findIndex((n) => n.id === activeId.value);
-  if (idx < 0) {
-    thumb.value = { ...thumb.value, ready: false };
-    return;
-  }
-  // 注意：nav.children 含滑块自身，必须只取按钮
-  const btn = nav.querySelectorAll<HTMLElement>('.hw-nav-item')[idx];
-  if (!btn) return;
-  thumb.value = { left: btn.offsetLeft, width: btn.offsetWidth, ready: true };
-}
-
-watch(activeId, () => requestAnimationFrame(updateThumb));
-watch(navEl, () => requestAnimationFrame(updateThumb));
-window.addEventListener('resize', updateThumb);
-
-/** 各页面次级导航定义：route 前缀 → 分区列表（图标语义唯一，不重复） */
-const secondaryByPage: Record<string, Array<{ id: string; label: string; icon: unknown }>> = {
-  '/messages': [
-    { id: 'all', label: '全部会话', icon: MessageSquare },
-    { id: '@我', label: '@我的消息', icon: AtSign },
-    { id: '单聊', label: '单聊', icon: UserRound },
-    { id: '群组', label: '群组', icon: UsersRound },
-    { id: 'AI', label: 'AI 助手', icon: Sparkles },
-  ],
-  '/workbench': [
-    { id: 'overview', label: '概览', icon: LayoutDashboard },
-    { id: 'attendance', label: '考勤速览', icon: Clock },
-    { id: 'leave', label: '假期余额', icon: CalendarDays },
-  ],
-  '/approvals': [
-    { id: 'todo', label: '待我审批', icon: Inbox },
-    { id: 'mine', label: '我发起的', icon: FileUp },
-    { id: 'cc', label: '抄送我', icon: Mails },
-  ],
-};
-
-const secondaryItems = computed(() => {
-  const prefix = Object.keys(secondaryByPage).find((k) => route.path.startsWith(k));
-  return prefix ? secondaryByPage[prefix] : [];
-});
-
-/** 页面通过 defineExpose 或 provide 接收次级导航选择；这里用 route query 兜底 */
-const secondaryActive = computed(() => String(route.query.section || secondaryItems.value[0]?.id || ''));
-
-function onSecondary(id: string) {
-  void router.push({ path: route.path, query: { ...route.query, section: id } });
-}
-
+const activeId = computed(() => primaryNav.find((item) => route.path.startsWith(item.path))?.id ?? '');
+const unreadTotal = computed(() => im.conversations.reduce((sum, item) => sum + (item.mute ? 0 : item.unreadCount), 0));
 const displayName = computed(() => session.displayName || '同事');
-const avatarChar = computed(() => displayName.value.slice(0, 1));
 
-function goto(path?: string) {
-  if (path) void router.push(path);
+function readPreference(key: string) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function toggleNav() {
+  navCollapsed.value = !navCollapsed.value;
+  try { localStorage.setItem('hw-nav-collapsed', String(navCollapsed.value)); } catch { /* 隐私模式不阻断 */ }
 }
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light';
   document.body.dataset.theme = theme.value;
+  try { localStorage.setItem('hw-theme', theme.value); } catch { /* 隐私模式不阻断 */ }
 }
+function goto(path: string) {
+  accountOpen.value = false;
+  if (route.path !== path) void router.push(path);
+}
+function globalSearch() {
+  const keyword = searchKeyword.value.trim();
+  if (keyword) void router.push({ path: '/messages', query: { keyword } });
+}
+function comingSoon(label: string) {
+  accountOpen.value = false;
+  showToast(`${label}正在按画布实现中`);
+}
+const loggingOut = ref(false);
+async function logout() {
+  if (loggingOut.value) return;
+  loggingOut.value = true;
+  accountOpen.value = false;
+  await session.logout();
+  await router.replace({ name: 'login' });
+}
+function onDocumentClick(event: MouseEvent) {
+  if (!(event.target as Element | null)?.closest('.hw-account-wrap')) accountOpen.value = false;
+}
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') accountOpen.value = false;
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    document.querySelector<HTMLInputElement>('.hw-global-search input')?.focus();
+  }
+}
+
+onMounted(async () => {
+  if (loggingOut.value) return;
+  navCollapsed.value = readPreference('hw-nav-collapsed') === 'true';
+  theme.value = readPreference('hw-theme') === 'dark' ? 'dark' : 'light';
+  document.body.dataset.theme = theme.value;
+  document.addEventListener('click', onDocumentClick);
+  document.addEventListener('keydown', onKeydown);
+  if (!session.initialized) await session.loadCurrentUser();
+  if (!session.isAuthenticated) {
+    void router.replace({ name: 'login' });
+    return;
+  }
+  void session.loadOrgProfile();
+  void im.loadConversations().catch(() => undefined);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocumentClick);
+  document.removeEventListener('keydown', onKeydown);
+});
 </script>
 
 <template>
   <div class="hw-shell">
     <header class="hw-topbar">
-      <div class="hw-brand" @click="goto('/workbench')">
-        <span class="hw-brand-avatar">W</span>
+      <button type="button" class="hw-brand" aria-label="返回工作台" @click="goto('/workbench')">
+        <span class="hw-brand-mark">W</span>
         <strong>Workforce Hub</strong>
-      </div>
-      <nav ref="navEl" class="hw-nav" aria-label="主功能">
-        <span
-          v-if="thumb.ready"
-          class="hw-nav-thumb"
-          :style="{ transform: `translateX(${thumb.left}px)`, width: `${thumb.width}px` }"
-        />
-        <button
-          v-for="item in primaryNav" :key="item.id" type="button"
-          class="hw-nav-item" :class="{ active: activeId === item.id }"
-          @click="goto(item.path)"
-        >{{ item.label }}</button>
-      </nav>
-      <div class="hw-topbar-actions">
-        <div class="hw-search">
-          <Search :size="16" :stroke-width="2" />
-          <input type="text" placeholder="搜索同事、申请、知识…" disabled />
-        </div>
-        <button type="button" class="hw-icon-btn" aria-label="通知" @click="onBell">
-          <Bell :size="18" :stroke-width="2" />
-          <span v-if="unreadCount > 0" class="hw-badge-num">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
-        </button>
-        <button type="button" class="hw-icon-btn" aria-label="设置">
-          <Settings :size="18" :stroke-width="2" />
-        </button>
-        <button type="button" class="hw-user" :aria-label="displayName">
-          <span class="hw-user-avatar">{{ avatarChar }}</span>
-          <ChevronDown :size="14" :stroke-width="2" />
-        </button>
-      </div>
+      </button>
+      <form class="hw-global-search" role="search" @submit.prevent="globalSearch">
+        <Search :size="17" :stroke-width="2" />
+        <input v-model="searchKeyword" type="search" aria-label="全局搜索" placeholder="搜索同事、申请、知识…" />
+        <kbd>⌘ K</kbd>
+      </form>
     </header>
 
     <div class="hw-body">
-      <!-- 左栏：次级导航（页面分区），非顶部复刻 -->
-      <aside class="hw-rail" aria-label="次级导航">
-        <template v-if="secondaryItems.length">
+      <aside class="hw-primary-nav" :class="{ collapsed: navCollapsed }" aria-label="一级导航">
+        <nav class="hw-nav-list">
           <button
-            v-for="item in secondaryItems" :key="item.id" type="button"
-            class="hw-rail-btn" :class="{ active: secondaryActive === item.id }"
-            :data-label="item.label" :aria-label="item.label"
-            @click="onSecondary(item.id)"
+            v-for="item in primaryNav" :key="item.id" type="button"
+            class="hw-nav-item" :class="{ active: activeId === item.id }"
+            :aria-label="item.label" :title="navCollapsed ? item.label : undefined"
+            :aria-current="activeId === item.id ? 'page' : undefined"
+            @click="goto(item.path)"
           >
             <component :is="item.icon" :size="20" :stroke-width="2" />
+            <span class="hw-nav-label">{{ item.label }}</span>
+            <em v-if="item.id === 'messages' && unreadTotal" class="hw-nav-badge">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</em>
           </button>
-        </template>
-        <span class="hw-rail-spacer" />
-        <button
-          type="button" class="hw-rail-btn dim"
-          :data-label="theme === 'light' ? '深色模式' : '浅色模式'"
-          aria-label="切换主题" @click="toggleTheme"
-        >
-          <Moon v-if="theme === 'light'" :size="20" :stroke-width="2" />
-          <SunMedium v-else :size="20" :stroke-width="2" />
-        </button>
+        </nav>
+
+        <div class="hw-nav-bottom">
+          <div class="hw-account-wrap">
+            <Transition name="hw-menu">
+              <div v-if="accountOpen" class="hw-account-menu">
+                <button type="button" @click="comingSoon('个人中心')"><UserRound :size="17" />个人中心<ChevronRight :size="14" /></button>
+                <button type="button" @click="comingSoon('设置')"><Settings :size="17" />设置<ChevronRight :size="14" /></button>
+                <button type="button" @click="toggleTheme">
+                  <SunMedium v-if="theme === 'dark'" :size="17" /><Moon v-else :size="17" />
+                  {{ theme === 'light' ? '深色模式' : '浅色模式' }}<small>{{ theme === 'light' ? '关闭' : '开启' }}</small>
+                </button>
+                <button type="button" class="danger" @click="logout"><LogOut :size="17" />退出登录</button>
+              </div>
+            </Transition>
+            <button
+              type="button" class="hw-account" :aria-label="`${displayName}的账户菜单`"
+              :aria-expanded="accountOpen" @click.stop="accountOpen = !accountOpen"
+            >
+              <HubAvatar :label="displayName" size="sm" />
+              <span class="hw-nav-label">{{ displayName }}</span>
+              <ChevronDown class="hw-nav-label" :size="14" />
+            </button>
+          </div>
+          <button
+            type="button" class="hw-collapse" :aria-label="navCollapsed ? '展开导航' : '收起导航'"
+            :title="navCollapsed ? '展开导航' : '收起导航'" @click="toggleNav"
+          >
+            <PanelLeftOpen v-if="navCollapsed" :size="18" /><PanelLeftClose v-else :size="18" />
+            <span class="hw-nav-label">{{ navCollapsed ? '展开导航' : '收起导航' }}</span>
+            <ChevronRight v-if="navCollapsed" :size="14" /><ChevronLeft v-else class="hw-nav-label" :size="14" />
+          </button>
+        </div>
       </aside>
-      <main class="hw-content">
-        <slot />
-      </main>
+      <main class="hw-content"><slot /></main>
     </div>
+    <HubToast :message="toastMessage" />
   </div>
 </template>
 
 <style scoped>
-.hw-shell {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  height: 100vh;
-  padding: 16px 20px 20px;
-  background: var(--hw-canvas);
-}
-
-/* 顶部导航 */
-.hw-topbar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  height: 64px;
-  padding: 0 16px 0 24px;
-  border-radius: 20px;
-  background: var(--hw-card);
-  flex: none;
-}
-.hw-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  justify-self: start;
-}
-.hw-brand-avatar {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #4fa1ff, #124da3);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-}
-.hw-brand strong { font-size: 15px; font-weight: 700; }
-
-/* 弹性滑块导航 */
-.hw-nav {
-  position: relative;
-  display: flex;
-  gap: 6px;
-  justify-self: center;
-}
-.hw-nav-thumb {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 40px;
-  border-radius: 999px;
-  background: var(--hw-pill-dark);
-  transition: transform 0.35s cubic-bezier(0.34, 1.3, 0.5, 1), width 0.35s cubic-bezier(0.34, 1.3, 0.5, 1);
-  will-change: transform, width;
-}
-.hw-nav-item {
-  position: relative;
-  z-index: 1;
-  height: 40px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--hw-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  transition: color 0.25s var(--hw-ease);
-}
-.hw-nav-item:hover:not(.active) { color: var(--hw-ink); }
-.hw-nav-item.active {
-  color: #fff;
-  font-weight: 500;
-}
-.hw-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-self: end;
-}
-.hw-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 224px;
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: var(--hw-chip);
-  color: var(--hw-muted);
-}
-.hw-search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: none;
-  background: transparent;
-  font-size: 13px;
-  color: var(--hw-ink);
-}
-.hw-search input::placeholder { color: var(--hw-muted); }
-.hw-icon-btn {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--hw-chip);
-  color: var(--hw-secondary);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.hw-icon-btn:hover { background: var(--hw-track); }
-.hw-badge-dot {
-  position: absolute;
-  top: 9px;
-  right: 10px;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--hw-red);
-}
-.hw-badge-num {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--hw-red);
-  color: #fff;
-  font-size: 10px;
-  line-height: 16px;
-  text-align: center;
-}
-.hw-user {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 36px;
-  padding: 0 4px 0 0;
-  border: 0;
-  background: transparent;
-  color: var(--hw-secondary);
-  cursor: pointer;
-}
-.hw-user-avatar {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  background: var(--hw-sky);
-  color: var(--hw-primary);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-/* 主体：左栏=次级导航 */
-.hw-body {
-  display: flex;
-  gap: 16px;
-  flex: 1;
-  min-height: 0;
-}
-.hw-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 64px;
-  padding: 16px 10px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, var(--hw-primary) 0%, var(--hw-primary-deep) 100%);
-  flex: none;
-}
-.hw-rail-btn {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.75);
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-.hw-rail-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
-.hw-rail-btn.active { background: rgba(255, 255, 255, 0.22); color: #fff; }
-.hw-rail-btn.dim { color: rgba(255, 255, 255, 0.6); }
-/* 悬停文字提示：自定义 tooltip（原生 title 延迟久且无样式） */
-.hw-rail-btn[data-label]::after {
-  content: attr(data-label);
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%) translateX(-4px);
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: var(--hw-pill-dark);
-  color: #fff;
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.18s var(--hw-ease), transform 0.18s var(--hw-ease);
-  z-index: 20;
-}
-.hw-rail-btn[data-label]:hover::after {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
-  transition-delay: 0.25s;
-}
-.hw-rail-spacer { flex: 1; }
-.hw-content {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+.hw-shell { display: flex; flex-direction: column; height: 100dvh; min-width: 960px; background: var(--hw-canvas); overflow: hidden; }
+.hw-topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 20px 0 calc(20px + var(--hw-desktop-inset)); border-bottom: 1px solid var(--hw-border); background: var(--hw-card); flex: none; app-region: drag; -webkit-app-region: drag; }
+.hw-topbar button, .hw-topbar input, .hw-topbar form { app-region: no-drag; -webkit-app-region: no-drag; }
+.hw-brand { display: flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--hw-ink); cursor: pointer; }
+.hw-brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--hw-primary); color: var(--hw-on-primary); font-size: 14px; font-weight: 600; }
+.hw-brand strong { font-size: 16px; font-weight: 600; white-space: nowrap; }
+.hw-global-search { display: flex; align-items: center; gap: 10px; width: 400px; height: 40px; padding: 0 12px; border: 1px solid transparent; border-radius: 6px; background: var(--hw-inner); color: var(--hw-muted); transition: border-color var(--hw-duration-fast) var(--hw-motion-enter), background var(--hw-duration-fast); }
+.hw-global-search:focus-within { border-color: var(--hw-sky-strong); background: var(--hw-card); }
+.hw-global-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--hw-ink); font-size: 12px; }
+.hw-global-search input::placeholder { color: var(--hw-muted); }
+.hw-global-search kbd { font: 11px Inter, sans-serif; color: var(--hw-muted); white-space: nowrap; }
+.hw-body { display: flex; flex: 1; min-height: 0; }
+.hw-primary-nav { display: flex; flex-direction: column; justify-content: space-between; width: 208px; padding: 16px 10px 12px; background: var(--hw-nav-bg); color: var(--hw-nav-text); flex: none; overflow: visible; transition: width var(--hw-duration-panel) var(--hw-motion-enter); z-index: 10; }
+.hw-primary-nav.collapsed { width: 64px; }
+.hw-nav-list { display: flex; flex-direction: column; gap: 6px; }
+.hw-nav-item, .hw-account, .hw-collapse { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 14px; text-align: left; cursor: pointer; white-space: nowrap; transition: background var(--hw-duration-fast), color var(--hw-duration-fast); }
+.hw-nav-item:hover, .hw-account:hover, .hw-collapse:hover { background: var(--hw-nav-hover); color: var(--hw-on-primary); }
+.hw-nav-item.active { background: var(--hw-nav-active); color: var(--hw-on-primary); }
+.hw-nav-item > svg, .hw-account > :first-child, .hw-collapse > svg:first-child { flex: none; }
+.hw-nav-label { overflow: hidden; opacity: 1; transition: opacity var(--hw-duration-fast); }
+.hw-nav-item .hw-nav-label, .hw-account .hw-nav-label:first-of-type, .hw-collapse .hw-nav-label { flex: 1; }
+.hw-primary-nav.collapsed .hw-nav-item, .hw-primary-nav.collapsed .hw-account, .hw-primary-nav.collapsed .hw-collapse { justify-content: center; padding: 0; }
+.hw-primary-nav.collapsed .hw-nav-label { display: none; opacity: 0; }
+.hw-nav-badge { position: absolute; right: 12px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--hw-red); color: var(--hw-on-primary); font: 500 11px/20px Inter, sans-serif; font-style: normal; }
+.collapsed .hw-nav-badge { top: 3px; right: 3px; min-width: 8px; width: 8px; height: 8px; padding: 0; color: transparent; overflow: hidden; }
+.hw-nav-bottom { display: flex; flex-direction: column; gap: 8px; }
+.hw-account-wrap { position: relative; }
+.hw-account { border: 1px solid var(--hw-nav-active); background: var(--hw-nav-hover); }
+.hw-account-menu { position: absolute; left: 0; bottom: calc(100% + 10px); width: 188px; padding: 6px; border: 1px solid var(--hw-border); border-radius: 8px; background: var(--hw-card); box-shadow: var(--hw-shadow-menu); color: var(--hw-secondary); z-index: 30; }
+.collapsed .hw-account-menu { left: 0; }
+.hw-account-menu button { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+.hw-account-menu button:hover { background: var(--hw-chip); color: var(--hw-ink); }
+.hw-account-menu button > :last-child:not(:first-child) { margin-left: auto; }
+.hw-account-menu small { margin-left: auto; color: var(--hw-muted); }
+.hw-account-menu .danger { color: var(--hw-red); border-top: 1px solid var(--hw-border); border-radius: 0 0 6px 6px; margin-top: 4px; }
+.hw-collapse { height: 36px; color: var(--hw-nav-text); font-size: 12px; }
+.hw-menu-enter-active { transition: opacity 150ms var(--hw-motion-enter), transform 150ms var(--hw-motion-enter); }
+.hw-menu-leave-active { transition: opacity 100ms var(--hw-motion-exit), transform 100ms var(--hw-motion-exit); }
+.hw-menu-enter-from, .hw-menu-leave-to { opacity: 0; transform: translateY(4px); }
+.hw-content { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--hw-focus); outline-offset: 2px; }
+@media (max-width: 960px) { .hw-global-search { width: 280px; } .hw-global-search kbd { display: none; } }
+@media (prefers-reduced-motion: reduce) { .hw-primary-nav, .hw-nav-label, .hw-menu-enter-active, .hw-menu-leave-active { transition: none; } }
 </style>

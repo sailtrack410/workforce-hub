@@ -34,8 +34,8 @@ withDefaults(defineProps<{
   transition: background 0.2s var(--hw-ease), opacity 0.2s;
 }
 .hw-btn:disabled { opacity: 0.5; cursor: default; }
-.hw-btn-sm { height: 32px; padding: 0 12px; border-radius: 999px; font-size: 12px; }
-.hw-btn-md { height: 40px; padding: 0 18px; border-radius: 12px; font-size: 13px; }
+.hw-btn-sm { height: 32px; padding: 0 12px; border-radius: 6px; font-size: 12px; }
+.hw-btn-md { height: 36px; padding: 0 16px; border-radius: 6px; font-size: 13px; }
 .hw-btn-primary { background: var(--hw-primary); color: #fff; }
 .hw-btn-primary:hover { background: var(--hw-primary-deep); }
 .hw-btn-secondary { background: var(--hw-chip); color: var(--hw-secondary); }
