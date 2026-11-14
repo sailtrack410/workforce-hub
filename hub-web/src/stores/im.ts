@@ -77,14 +77,17 @@ export const useImStore = defineStore('hw-im', {
       if (this.loadingConversations[key]) return;
       this.loadingConversations[key] = true;
       const userId = useSessionStore().user?.userId;
+      // 桌面端先显示 SQLite 缓存，再以后台服务端结果覆盖；缓存为空不能当作有效离线数据。
+      if (userId && !this.messagesByConversation[key]?.length) {
+        const cached = await listCachedMessages(userId, conversationId).catch(() => []);
+        if (cached.length) this.messagesByConversation[key] = cached;
+      }
       try {
         const messages = await imApi.messages(conversationId, { limit: 100 });
         this.messagesByConversation[key] = messages;
         if (userId) void cacheMessages(userId, messages).catch(() => undefined);
       } catch (error) {
-        const cached = userId ? await listCachedMessages(userId, conversationId).catch(() => []) : [];
-        if (cached.length) this.messagesByConversation[key] = cached;
-        else throw error;
+        if (!this.messagesByConversation[key]?.length) throw error;
       } finally {
         this.loadingConversations[key] = false;
       }
