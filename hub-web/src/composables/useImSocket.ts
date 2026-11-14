@@ -27,6 +27,10 @@ export function useImSocket(options: {
 
   function url() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (window.workforceDesktop && window.location.protocol === 'file:') {
+      const api = new URL(import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080');
+      return `${api.protocol === 'https:' ? 'wss:' : 'ws:'}//${api.host}/ws/employee/im`;
+    }
     return `${protocol}//${window.location.host}/ws/employee/im`;
   }
 

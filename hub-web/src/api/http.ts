@@ -130,7 +130,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(`${path}${buildQuery(options.query)}`, {
+  const apiBase = window.workforceDesktop && window.location.protocol === 'file:'
+    ? (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080') : '';
+  const response = await fetch(`${apiBase}${path}${buildQuery(options.query)}`, {
     method,
     credentials: 'include',
     headers,

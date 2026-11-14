@@ -36,7 +36,9 @@ export async function uploadImAttachment(file: File): Promise<{ attachmentRefId:
   if (/^https?:\/\//i.test(ticket.uploadUrl)) {
     response = await fetch(ticket.uploadUrl, { method: 'PUT', headers, body: file });
   } else {
-    response = await fetch('/__employee-local-upload', {
+    const uploadBase = window.workforceDesktop && window.location.protocol === 'file:'
+      ? (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080') : '';
+    response = await fetch(`${uploadBase}/__employee-local-upload`, {
       method: 'PUT',
       headers: { ...headers, 'X-Upload-Path': ticket.uploadUrl },
       body: file,

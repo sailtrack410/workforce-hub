@@ -74,3 +74,4 @@ __pycache__/
 # hub-web 前端依赖与构建产物
 hub-web/node_modules/
 hub-web/dist/
+hub-web/desktop-dist/

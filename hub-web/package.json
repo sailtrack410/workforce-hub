@@ -3,10 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "vitest run --exclude 'electron/**' && node --test electron/message-store.test.cjs",
+    "desktop": "electron .",
+    "desktop:pack": "npm run build && electron-packager . 'Workforce Hub' --out=desktop-dist --overwrite --prune=true --ignore='^/(desktop-dist|src|node_modules/.cache)'"
   },
   "dependencies": {
     "lucide-vue-next": "^0.469.0",
@@ -15,7 +18,9 @@
     "vue-router": "^4.4.5"
   },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "@vitejs/plugin-vue": "^5.2.1",
+    "electron": "^45.3.2",
     "typescript": "^5.6.3",
     "vite": "^6.0.3",
     "vitest": "^2.1.8",

@@ -7,6 +7,8 @@ import type {
   ImConversationSummaryResponse,
   ImMessageResponse,
 } from '@/api/types';
+import { cacheMessages, listCachedMessages } from '@/services/desktopMessages';
+import { useSessionStore } from '@/stores/session';
 
 export interface ConversationView extends ImConversationSummaryResponse {
   kind: 'team' | 'agent' | 'private' | 'system';
@@ -55,9 +57,15 @@ export const useImStore = defineStore('hw-im', {
     },
     async loadMessages(conversationId: EntityId) {
       this.messagesLoading = true;
+      const userId = useSessionStore().user?.userId;
       try {
         const messages = await imApi.messages(conversationId, { limit: 100 });
         this.messagesByConversation[String(conversationId)] = messages;
+        if (userId) void cacheMessages(userId, messages).catch(() => undefined);
+      } catch (error) {
+        const cached = userId ? await listCachedMessages(userId, conversationId).catch(() => []) : [];
+        if (cached.length) this.messagesByConversation[String(conversationId)] = cached;
+        else throw error;
       } finally {
         this.messagesLoading = false;
       }
@@ -75,6 +83,8 @@ export const useImStore = defineStore('hw-im', {
       else list.push(message);
       list.sort((a, b) => a.seqNo - b.seqNo);
       this.messagesByConversation[key] = list;
+      const userId = useSessionStore().user?.userId;
+      if (userId) void cacheMessages(userId, [message]).catch(() => undefined);
     },
     async sendText(conversationId: EntityId, text: string, options: { quotedMessageId?: EntityId; mentionUserIds?: EntityId[] } = {}) {
       this.sending = true;
