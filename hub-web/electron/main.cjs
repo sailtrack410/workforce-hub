@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const { MessageStore } = require('./message-store.cjs');
+const { writeLocalUpload } = require('./local-upload.cjs');
 
 let store;
 let mainWindow;
@@ -65,6 +66,8 @@ app.whenReady().then(async () => {
     store.list(String(userId), String(conversationId)));
   ipcMain.handle('messages:save', (_event, userId, messages) =>
     store.save(String(userId), messages));
+  ipcMain.handle('files:write-local-upload', (_event, uploadPath, content) =>
+    writeLocalUpload(uploadPath, content));
   // 仅本机显式指定输出路径时生成验收截图，不对渲染进程暴露此能力。
   if (process.env.HUB_DESKTOP_CAPTURE) {
     ipcMain.on('desktop:capture', async (event) => {

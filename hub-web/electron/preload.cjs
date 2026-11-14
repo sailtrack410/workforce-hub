@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('workforceDesktop', {
   platform: process.platform,
   listMessages: (userId, conversationId) => ipcRenderer.invoke('messages:list', userId, conversationId),
   saveMessages: (userId, messages) => ipcRenderer.invoke('messages:save', userId, messages),
+  writeLocalUpload: (uploadPath, content) => ipcRenderer.invoke('files:write-local-upload', uploadPath, content),
   capture: process.env.HUB_DESKTOP_CAPTURE
     ? () => ipcRenderer.sendSync('desktop:capture') : undefined,
 });

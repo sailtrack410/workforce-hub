@@ -36,13 +36,18 @@ export async function uploadImAttachment(file: File): Promise<{ attachmentRefId:
   if (/^https?:\/\//i.test(ticket.uploadUrl)) {
     response = await fetch(ticket.uploadUrl, { method: 'PUT', headers, body: file });
   } else {
-    const uploadBase = window.workforceDesktop && window.location.protocol === 'file:'
-      ? (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080') : '';
-    response = await fetch(`${uploadBase}/__employee-local-upload`, {
-      method: 'PUT',
-      headers: { ...headers, 'X-Upload-Path': ticket.uploadUrl },
-      body: file,
-    });
+    if (window.workforceDesktop) {
+      // LOCAL 文件由 Electron 写入票据指定目录，再由服务端确认大小与哈希。
+      await window.workforceDesktop.writeLocalUpload(ticket.uploadUrl, Array.from(new Uint8Array(await file.arrayBuffer())));
+      response = Response.json({ ok: true });
+    } else {
+      response = await fetch('/__employee-local-upload', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { ...headers, 'X-Upload-Path': ticket.uploadUrl },
+        body: file,
+      });
+    }
   }
   if (!response.ok) {
     throw new Error(await response.text().catch(() => '') || '文件上传失败');
