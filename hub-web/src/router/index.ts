@@ -5,6 +5,7 @@ const AuthView = () => import('@/views/AuthView.vue');
 const PlaceholderView = () => import('@/views/PlaceholderView.vue');
 const WorkbenchView = () => import('@/views/WorkbenchView.vue');
 const MessagesView = () => import('@/views/MessagesView.vue');
+const AttendanceView = () => import('@/views/AttendanceView.vue');
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -14,7 +15,8 @@ export const router = createRouter({
     { path: '/workbench', name: 'workbench', component: WorkbenchView },
     { path: '/messages', name: 'messages', component: MessagesView },
     { path: '/messages/:conversationId', name: 'messages-detail', component: MessagesView },
-    ...['tasks', 'todos', 'approvals', 'attendance', 'knowledge', 'drive', 'contacts'].map((name) => ({
+    { path: '/attendance', name: 'attendance', component: AttendanceView },
+    ...['tasks', 'todos', 'approvals', 'knowledge', 'drive', 'contacts'].map((name) => ({
       path: `/${name}`, name, component: PlaceholderView,
     })),
     { path: '/agent', redirect: '/messages' },
