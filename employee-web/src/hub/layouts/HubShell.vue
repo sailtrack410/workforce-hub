@@ -31,7 +31,7 @@ const primaryNav = [
   { id: 'workbench', label: '工作台', icon: Home, path: '/hub/workbench' },
   { id: 'messages', label: '消息', icon: MessageSquare, path: '/hub/messages' },
   { id: 'approval', label: '审批', icon: FileCheck, path: '/hub/approvals' },
-  { id: 'attendance', label: '考勤', icon: Clock, path: '/hub/messages' },
+  { id: 'attendance', label: '考勤', icon: Clock, path: '/hub/attendance' },
   { id: 'agent', label: 'Agent', icon: Sparkles, path: '/hub/messages' },
 ];
 
@@ -39,7 +39,7 @@ const railNav = [
   { id: 'workbench', label: '工作台', icon: Home, path: '/hub/workbench' },
   { id: 'messages', label: '消息', icon: MessageSquare, path: '/hub/messages' },
   { id: 'approval', label: '审批', icon: FileCheck, path: '/hub/approvals' },
-  { id: 'attendance', label: '考勤', icon: Clock, path: '/hub/messages' },
+  { id: 'attendance', label: '考勤', icon: Clock, path: '/hub/attendance' },
   { id: 'agent', label: 'Agent', icon: Sparkles, path: '/hub/messages' },
   { id: 'sep', label: '', icon: null, path: '' },
   { id: 'files', label: '文件', icon: FileCheck, path: '/files' },
@@ -50,6 +50,7 @@ const activeNavId = computed(() => {
   const p = route.path;
   if (p.startsWith('/hub/messages')) return 'messages';
   if (p.startsWith('/hub/approvals')) return 'approval';
+  if (p.startsWith('/hub/attendance')) return 'attendance';
   if (p.startsWith('/hub/workbench')) return 'workbench';
   const hit = primaryNav.find((n) => n.path && !n.path.startsWith('/hub') && p.startsWith(n.path));
   return hit?.id ?? '';

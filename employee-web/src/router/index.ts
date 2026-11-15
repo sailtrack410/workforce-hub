@@ -15,6 +15,8 @@ const HubWorkbench = () => import('@/hub/views/WorkbenchView.vue');
 const HubMessages = () => import('@/hub/views/MessagesView.vue');
 // hub 审批中心：画布版审批中心
 const HubApprovals = () => import('@/hub/views/ApprovalsView.vue');
+// hub 考勤：画布版重构后的考勤页
+const HubAttendance = () => import('@/hub/views/AttendanceView.vue');
 
 export const employeeRoutes = [
   {
@@ -47,6 +49,12 @@ export const employeeRoutes = [
     name: 'hub-approvals',
     component: HubApprovals,
     meta: { section: 'approval', hub: true },
+  },
+  {
+    path: '/hub/attendance',
+    name: 'hub-attendance',
+    component: HubAttendance,
+    meta: { section: 'attendance', hub: true },
   },
   {
     path: '/',

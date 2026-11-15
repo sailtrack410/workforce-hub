@@ -1,0 +1,312 @@
+/* 移动端考勤页样式：对齐画布「员工端-考勤」重构版。颜色走 --hub-* token。 */
+.at-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  padding: 4px 2px 8px;
+}
+
+/* ---------- 页头 ---------- */
+.at-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+.at-head h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 32px;
+  font-weight: 700;
+}
+.at-head p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--hub-tertiary);
+}
+.at-head-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.at-btn-primary,
+.at-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font: 500 13px/18px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.at-btn-primary {
+  border: 1px solid var(--hub-primary);
+  background: var(--hub-primary);
+  color: #fff;
+  transition: background 0.2s var(--hub-ease);
+}
+.at-btn-primary:hover:not(:disabled) { background: var(--hub-primary-deep); }
+.at-btn-primary:disabled { opacity: 0.65; cursor: default; }
+.at-btn-secondary {
+  border: 1px solid var(--hub-border, #e8edf3);
+  background: var(--hub-card);
+  color: var(--hub-secondary);
+  transition: background 0.2s var(--hub-ease);
+}
+.at-btn-secondary:hover { background: var(--hub-inner); }
+
+/* ---------- 卡片通用 ---------- */
+.at-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--hub-border, #e8edf3);
+  border-radius: 10px;
+  background: var(--hub-card);
+  min-width: 0;
+}
+.at-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+.at-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+.at-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  font: 500 12px/18px "Noto Sans SC", sans-serif;
+  color: var(--hub-primary);
+  cursor: pointer;
+}
+.at-link:hover { opacity: 0.8; }
+
+/* ---------- 今日考勤 ---------- */
+.at-today { flex: none; }
+.at-today-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.at-punch-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  flex: 1;
+}
+.at-punch-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--hub-inner);
+}
+.at-punch-block small,
+.at-punch-block span {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--hub-tertiary);
+}
+.at-punch-block strong {
+  font: 600 22px/28px Inter, "Noto Sans SC", sans-serif;
+  color: var(--hub-ink);
+  font-variant-numeric: tabular-nums;
+}
+.at-punch-block strong.ok,
+.at-punch-block span.ok { color: var(--hub-green); }
+.at-punch-btn {
+  width: 128px;
+  flex: none;
+  height: 44px;
+}
+
+/* ---------- 状态标签 ---------- */
+.at-status {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--hub-chip);
+  color: var(--hub-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+.at-status.success { background: #edf7f1; color: var(--hub-green); }
+.at-status.warn { background: #fdeceb; color: var(--hub-red); }
+.at-status.info { background: var(--hub-sky); color: var(--hub-primary); }
+
+/* ---------- 本月概览摘要 ---------- */
+.at-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--hub-border, #e8edf3);
+  border-radius: 10px;
+  background: var(--hub-card);
+  flex: none;
+  box-sizing: border-box;
+}
+.at-summary strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.at-summary span {
+  font-size: 12px;
+  color: var(--hub-secondary);
+}
+.at-summary span.ok { color: var(--hub-green); }
+
+/* ---------- 综合记录 ---------- */
+.at-records { flex: 1; min-height: 220px; }
+.at-filters {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.at-filters button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hub-tertiary);
+  font: 400 12px/16px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease), color 0.2s var(--hub-ease);
+}
+.at-filters button.active {
+  background: var(--hub-sky);
+  color: var(--hub-primary);
+  font-weight: 500;
+}
+.at-record-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.at-record {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background 0.2s var(--hub-ease);
+}
+.at-record:hover { background: var(--hub-inner); }
+.at-record > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.at-record strong,
+.at-record small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.at-record strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--hub-ink);
+}
+.at-record small {
+  font-size: 12px;
+  color: var(--hub-muted);
+}
+
+/* ---------- 假期余额 ---------- */
+.at-leave { flex: none; }
+.at-leave-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.at-leave-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.at-leave-item > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.at-leave-item span { color: var(--hub-secondary); }
+.at-leave-item strong { font-weight: 500; color: var(--hub-ink); }
+.at-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--hub-track);
+  overflow: hidden;
+}
+.at-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hub-primary);
+  transition: width 0.6s var(--hub-morph);
+}
+.at-track i.warm { background: #f7a325; }
+
+/* ---------- Toast ---------- */
+.at-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--hub-pill-dark, #181d23);
+  color: #fff;
+  font-size: 13px;
+  white-space: nowrap;
+  z-index: 60;
+  pointer-events: none;
+}
+.at-toast-enter-active,
+.at-toast-leave-active {
+  transition: opacity 0.2s var(--hub-ease), transform 0.2s var(--hub-ease);
+}
+.at-toast-enter-from,
+.at-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 960px) {
+  .at-head { flex-direction: column; align-items: flex-start; }
+  .at-head-actions { width: 100%; }
+  .at-head-actions .at-btn-primary,
+  .at-head-actions .at-btn-secondary { flex: 1; }
+  .at-today-row { flex-direction: column; align-items: stretch; }
+  .at-punch-btn { width: 100%; }
+  .at-summary { flex-wrap: wrap; gap: 8px 16px; }
+}
