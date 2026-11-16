@@ -1,0 +1,45 @@
+/* 个人中心：对齐画布「员工端-个人中心-桌面端1280」。颜色走 --hw-* token。 */
+.pc-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  background: var(--hw-canvas);
+  overflow-y: auto;
+}
+.pc-head h1 { font-size: 22px; font-weight: 700; line-height: 32px; }
+.pc-head p { margin-top: 4px; font-size: 12px; color: var(--hw-tertiary); }
+.pc-card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--hw-border); border-radius: 8px; background: var(--hw-card); }
+.pc-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pc-card-head h2 { font-size: 16px; font-weight: 700; line-height: 24px; }
+.pc-card-note { font-size: 12px; color: var(--hw-muted); }
+.pc-identity { flex-direction: row; align-items: center; }
+.pc-identity-copy { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.pc-identity-copy strong { font-size: 20px; line-height: 28px; font-weight: 500; }
+.pc-identity-copy span { font-size: 14px; color: var(--hw-secondary); }
+.pc-identity-copy small { font-size: 12px; color: var(--hw-muted); }
+.pc-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--hw-border); border-radius: 6px; background: var(--hw-card); color: var(--hw-secondary); font-size: 13px; cursor: pointer; white-space: nowrap; flex: none; }
+.pc-btn-secondary:hover { background: var(--hw-inner); }
+.pc-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--hw-red); border-radius: 6px; background: var(--hw-red); color: var(--hw-on-primary); font-size: 13px; cursor: pointer; white-space: nowrap; flex: none; }
+.pc-btn-danger:hover { opacity: 0.88; }
+.pc-link { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--hw-primary); font-size: 12px; cursor: pointer; flex: none; }
+.pc-link:hover { opacity: 0.8; }
+.pc-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
+.pc-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pc-field small { font-size: 14px; color: var(--hw-secondary); }
+.pc-field-readonly, .pc-field-value { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; padding: 0 12px; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+.pc-field-readonly { background: var(--hw-chip); color: var(--hw-tertiary); }
+.pc-field-value { border: 1px solid var(--hw-border); color: var(--hw-ink); }
+.pc-rows { display: flex; flex-direction: column; }
+.pc-row { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.pc-row-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 6px; background: var(--hw-inner); color: var(--hw-primary); }
+.pc-row-icon.danger { background: var(--hw-red-bg); color: var(--hw-red); }
+.pc-row-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-row-copy strong { font-size: 14px; font-weight: 500; }
+.pc-row-copy strong.danger { color: var(--hw-red); }
+.pc-row-copy small { font-size: 12px; color: var(--hw-muted); }
+.pc-divider { height: 1px; margin: 4px 0; background: var(--hw-track); }
+@media (max-width: 1100px) { .pc-identity { flex-wrap: wrap; } }
