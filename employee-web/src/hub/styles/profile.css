@@ -1,0 +1,252 @@
+/* 移动端个人中心样式：对齐画布「员工端-个人中心-桌面端1280」。颜色走 --hub-* token。 */
+.pc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  padding: 4px 2px 8px;
+}
+
+/* ---------- 页头 ---------- */
+.pc-head h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 32px;
+  font-weight: 700;
+}
+.pc-head p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--hub-tertiary);
+}
+
+/* ---------- 卡片通用 ---------- */
+.pc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--hub-border, #e8edf3);
+  border-radius: 10px;
+  background: var(--hub-card);
+  min-width: 0;
+}
+.pc-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pc-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+.pc-card-note {
+  font-size: 12px;
+  color: var(--hub-muted);
+}
+
+/* ---------- 身份摘要 ---------- */
+.pc-identity {
+  flex-direction: row;
+  align-items: center;
+}
+.pc-identity-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.pc-identity-copy strong {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+}
+.pc-identity-copy span {
+  font-size: 14px;
+  color: var(--hub-secondary);
+}
+.pc-identity-copy small {
+  font-size: 12px;
+  color: var(--hub-muted);
+}
+
+/* ---------- 按钮 ---------- */
+.pc-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hub-border, #e8edf3);
+  border-radius: 8px;
+  background: var(--hub-card);
+  color: var(--hub-secondary);
+  font: 500 13px/18px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s var(--hub-ease);
+  flex: none;
+}
+.pc-btn-secondary:hover { background: var(--hub-inner); }
+.pc-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hub-red, #ff5a4e);
+  border-radius: 8px;
+  background: var(--hub-red, #ff5a4e);
+  color: #fff;
+  font: 500 13px/18px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+  transition: opacity 0.2s var(--hub-ease);
+}
+.pc-btn-danger:hover { opacity: 0.88; }
+.pc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  font: 500 12px/18px "Noto Sans SC", sans-serif;
+  color: var(--hub-primary);
+  cursor: pointer;
+  flex: none;
+}
+.pc-link:hover { opacity: 0.8; }
+
+/* ---------- 资料字段 ---------- */
+.pc-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+.pc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.pc-field small {
+  font-size: 14px;
+  color: var(--hub-secondary);
+}
+.pc-field-readonly,
+.pc-field-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+.pc-field-readonly {
+  background: var(--hub-chip);
+  color: var(--hub-tertiary);
+}
+.pc-field-value {
+  border: 1px solid var(--hub-border, #e8edf3);
+  color: var(--hub-ink);
+}
+.pc-field-value > span:first-child,
+.pc-field-readonly {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 行式设置 ---------- */
+.pc-rows {
+  display: flex;
+  flex-direction: column;
+}
+.pc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+}
+.pc-row-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--hub-inner);
+  color: var(--hub-primary);
+}
+.pc-row-icon.danger {
+  background: #fdeceb;
+  color: var(--hub-red, #ff5a4e);
+}
+.pc-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.pc-row-copy strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.pc-row-copy strong.danger { color: var(--hub-red, #ff5a4e); }
+.pc-row-copy small {
+  font-size: 12px;
+  color: var(--hub-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--hub-track);
+}
+
+/* ---------- Toast ---------- */
+.pc-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--hub-pill-dark, #181d23);
+  color: #fff;
+  font-size: 13px;
+  white-space: nowrap;
+  z-index: 60;
+  pointer-events: none;
+}
+.pc-toast-enter-active,
+.pc-toast-leave-active {
+  transition: opacity 0.2s var(--hub-ease), transform 0.2s var(--hub-ease);
+}
+.pc-toast-enter-from,
+.pc-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 960px) {
+  .pc-identity { flex-direction: column; align-items: flex-start; }
+  .pc-fields { grid-template-columns: 1fr; }
+}

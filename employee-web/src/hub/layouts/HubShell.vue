@@ -62,6 +62,10 @@ const avatarChar = computed(() => displayName.value.slice(0, 1) || '我');
 function goto(item: { path: string }) {
   if (item.path) router.push(item.path).catch(() => undefined);
 }
+
+function gotoProfile() {
+  router.push('/hub/profile').catch(() => undefined);
+}
 </script>
 
 <template>
@@ -96,7 +100,7 @@ function goto(item: { path: string }) {
         <button type="button" class="hub-icon-btn" aria-label="设置">
           <Settings :size="18" :stroke-width="2" />
         </button>
-        <button type="button" class="hub-avatar" :aria-label="displayName || '用户'">
+        <button type="button" class="hub-avatar" :aria-label="`${displayName || '用户'}的个人中心`" title="个人中心" @click="gotoProfile">
           <span class="hub-avatar-img">{{ avatarChar }}</span>
           <ChevronDown :size="14" :stroke-width="2" class="hub-avatar-caret" />
         </button>

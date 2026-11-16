@@ -17,6 +17,8 @@ const HubMessages = () => import('@/hub/views/MessagesView.vue');
 const HubApprovals = () => import('@/hub/views/ApprovalsView.vue');
 // hub 考勤：画布版重构后的考勤页
 const HubAttendance = () => import('@/hub/views/AttendanceView.vue');
+// hub 个人中心：画布版个人中心
+const HubProfile = () => import('@/hub/views/ProfileView.vue');
 
 export const employeeRoutes = [
   {
@@ -55,6 +57,12 @@ export const employeeRoutes = [
     name: 'hub-attendance',
     component: HubAttendance,
     meta: { section: 'attendance', hub: true },
+  },
+  {
+    path: '/hub/profile',
+    name: 'hub-profile',
+    component: HubProfile,
+    meta: { section: 'profile', hub: true },
   },
   {
     path: '/',
