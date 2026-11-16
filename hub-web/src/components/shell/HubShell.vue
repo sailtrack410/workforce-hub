@@ -196,7 +196,7 @@ onBeforeUnmount(() => {
       <div
         class="hw-nav-resizer" role="separator" aria-label="调整一级导航宽度"
         aria-orientation="vertical" :aria-valuenow="navWidth" :aria-valuemin="NAV_MIN_WIDTH" :aria-valuemax="NAV_MAX_WIDTH"
-        tabindex="0" @pointerdown="startNavResize"
+        :tabindex="accountOpen ? -1 : 0" :style="{ pointerEvents: accountOpen ? 'none' : undefined }" @pointerdown="startNavResize"
         @keydown.left.prevent="resizeNavByKeyboard(-4)" @keydown.right.prevent="resizeNavByKeyboard(4)"
       />
       <main class="hw-content"><slot /></main>
