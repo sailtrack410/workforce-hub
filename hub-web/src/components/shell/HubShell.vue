@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
             <Transition name="hw-menu">
               <div v-if="accountOpen" class="hw-account-menu">
                 <button type="button" @click="goto('/profile')"><UserRound :size="17" />个人中心<ChevronRight :size="14" /></button>
-                <button type="button" @click="comingSoon('设置')"><Settings :size="17" />设置<ChevronRight :size="14" /></button>
+                <button type="button" @click="goto('/settings')"><Settings :size="17" />设置<ChevronRight :size="14" /></button>
                 <button type="button" @click="toggleTheme">
                   <SunMedium v-if="theme === 'dark'" :size="17" /><Moon v-else :size="17" />
                   {{ theme === 'light' ? '深色模式' : '浅色模式' }}<small>{{ theme === 'light' ? '关闭' : '开启' }}</small>

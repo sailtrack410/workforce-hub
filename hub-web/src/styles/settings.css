@@ -1,0 +1,36 @@
+/* 设置：对齐画布「员工端-设置-桌面端1280」。颜色走 --hw-* token。 */
+.st-page { display: flex; flex: 1; min-width: 0; min-height: 0; background: var(--hw-canvas); overflow: hidden; }
+.st-sidebar { display: flex; flex-direction: column; gap: 16px; width: 220px; padding: 24px 16px; border-right: 1px solid var(--hw-border); background: var(--hw-card); flex: none; }
+.st-sidebar h1 { font-size: 22px; font-weight: 700; line-height: 32px; }
+.st-sidebar nav { display: flex; flex-direction: column; gap: 4px; }
+.st-sidebar nav button { height: 40px; padding: 0 16px; border: 0; border-radius: 6px; background: transparent; color: var(--hw-secondary); font-size: 14px; text-align: left; cursor: pointer; }
+.st-sidebar nav button:hover { background: var(--hw-chip); }
+.st-sidebar nav button.active { background: var(--hw-sky); color: var(--hw-primary); font-weight: 500; }
+.st-main { display: flex; flex: 1; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; padding: 24px; overflow-y: auto; }
+.st-head h2 { font-size: 22px; font-weight: 700; line-height: 32px; }
+.st-head p { margin-top: 4px; font-size: 12px; color: var(--hw-tertiary); }
+.st-card { display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid var(--hw-border); border-radius: 8px; background: var(--hw-card); }
+.st-card h3 { font-size: 16px; font-weight: 700; line-height: 24px; }
+.st-row { display: flex; align-items: center; gap: 16px; min-height: 52px; }
+.st-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.st-copy strong { font-size: 14px; font-weight: 500; }
+.st-copy small { font-size: 12px; color: var(--hw-muted); }
+.st-big { font-size: 24px; font-weight: 600; }
+.st-seg { display: flex; gap: 4px; padding: 4px; border-radius: 6px; background: var(--hw-chip); }
+.st-seg button { height: 24px; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: var(--hw-tertiary); font-size: 12px; cursor: pointer; }
+.st-seg button.active { background: var(--hw-card); color: var(--hw-ink); font-weight: 500; }
+.st-toggle { position: relative; width: 40px; height: 22px; border: 0; border-radius: 999px; background: var(--hw-track); cursor: pointer; flex: none; }
+.st-toggle i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 999px; background: var(--hw-card); transition: left 0.15s; }
+.st-toggle.on { background: var(--hw-primary); }
+.st-toggle.on i { left: 20px; }
+.st-select, .st-btn { height: 36px; padding: 0 14px; border: 1px solid var(--hw-border); border-radius: 6px; background: var(--hw-card); color: var(--hw-secondary); font-size: 13px; cursor: pointer; }
+.st-select:hover, .st-btn:hover { background: var(--hw-inner); }
+.st-path { min-width: 0; padding: 8px 12px; border-radius: 6px; background: var(--hw-inner); color: var(--hw-secondary); font-size: 13px; }
+.st-about { align-items: center; text-align: center; }
+.st-logo { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 8px; background: var(--hw-primary); color: var(--hw-on-primary); font-size: 22px; font-weight: 600; }
+.st-about h3 { font-size: 20px; font-weight: 500; }
+.st-about small { font-size: 12px; color: var(--hw-muted); }
+.st-about p { font-size: 14px; color: var(--hw-secondary); }
+.st-links { display: flex; gap: 24px; }
+.st-links button { border: 0; background: transparent; color: var(--hw-primary); font-size: 12px; cursor: pointer; }
+.st-link { border: 0; background: transparent; color: var(--hw-muted); font-size: 20px; cursor: pointer; }

@@ -7,6 +7,7 @@ const WorkbenchView = () => import('@/views/WorkbenchView.vue');
 const MessagesView = () => import('@/views/MessagesView.vue');
 const AttendanceView = () => import('@/views/AttendanceView.vue');
 const ProfileView = () => import('@/views/ProfileView.vue');
+const SettingsView = () => import('@/views/SettingsView.vue');
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -18,6 +19,7 @@ export const router = createRouter({
     { path: '/messages/:conversationId', name: 'messages-detail', component: MessagesView },
     { path: '/attendance', name: 'attendance', component: AttendanceView },
     { path: '/profile', name: 'profile', component: ProfileView },
+    { path: '/settings', name: 'settings', component: SettingsView },
     ...['tasks', 'todos', 'approvals', 'knowledge', 'drive', 'contacts'].map((name) => ({
       path: `/${name}`, name, component: PlaceholderView,
     })),
