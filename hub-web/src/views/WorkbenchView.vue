@@ -7,7 +7,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  CalendarCheck, CalendarDays, ChevronRight, Grid2X2, Inbox,
+  BookOpen, CalendarCheck, CalendarDays, ChevronRight, Clock, Cloud, Grid2X2, Inbox,
   ListTodo, Receipt, Sparkles, Stamp, Timer,
 } from 'lucide-vue-next';
 import { useSessionStore } from '@/stores/session';
@@ -20,6 +20,7 @@ import type {
 } from '@/api/types';
 import { useToast } from '@/composables/useToast';
 import HubToast from '@/components/base/HubToast.vue';
+import HubDialog from '@/components/base/HubDialog.vue';
 
 const session = useSessionStore();
 const router = useRouter();
@@ -108,21 +109,26 @@ const notifyRows = computed(() => notifications.value.slice(0, 4).map((n) => ({
 })));
 
 const quickEntries = [
-  { id: 'leave', label: '请假', icon: CalendarDays, tone: 'amber' },
-  { id: 'expense', label: '报销', icon: Receipt, tone: 'blue' },
-  { id: 'overtime', label: '加班', icon: Timer, tone: 'blue' },
-  { id: 'seal', label: '用印', icon: Stamp, tone: 'blue' },
-  { id: 'tasks', label: '任务', icon: ListTodo, tone: 'blue' },
-  { id: 'leave-balance', label: '假期', icon: CalendarCheck, tone: 'blue' },
-  { id: 'requests', label: '申请', icon: Inbox, tone: 'blue' },
-  { id: 'all', label: '全部', icon: Grid2X2, tone: 'blue' },
+  { id: 'leave', label: '请假', icon: CalendarDays, tone: 'amber', path: '' },
+  { id: 'expense', label: '报销', icon: Receipt, tone: 'blue', path: '' },
+  { id: 'overtime', label: '加班', icon: Timer, tone: 'blue', path: '' },
+  { id: 'seal', label: '用印', icon: Stamp, tone: 'blue', path: '' },
+  { id: 'tasks', label: '任务', icon: ListTodo, tone: 'blue', path: '/tasks' },
+  { id: 'leave-balance', label: '假期', icon: CalendarCheck, tone: 'blue', path: '/attendance' },
+  { id: 'requests', label: '申请', icon: Inbox, tone: 'blue', path: '' },
+  { id: 'all', label: '全部', icon: Grid2X2, tone: 'blue', path: '' },
 ];
+const allAppsOpen = ref(false);
 function onQuick(id: string) {
-  if (id === 'tasks') { void router.push('/tasks'); return; }
-  if (id === 'leave-balance') { void router.push('/attendance'); return; }
+  if (id === 'all') { allAppsOpen.value = true; return; }
+  const item = quickEntries.find((q) => q.id === id);
+  if (item?.path) { void router.push(item.path); return; }
   if (id === 'requests') { document.getElementById('wb-requests')?.scrollIntoView({ block: 'nearest' }); return; }
-  if (id === 'all') { showToast('全部应用面板即将上线'); return; }
-  showToast(`「${quickEntries.find((q) => q.id === id)?.label}」表单即将上线`);
+  showToast(`「${item?.label}」表单即将上线`);
+}
+function openApp(path: string) {
+  allAppsOpen.value = false;
+  if (path) void router.push(path);
 }
 </script>
 
@@ -218,6 +224,32 @@ function onQuick(id: string) {
       </section>
     </section>
     <HubToast :message="toastMessage" />
+
+    <HubDialog v-if="allAppsOpen" @close="allAppsOpen = false">
+      <div class="wb-apps-panel">
+        <header class="wb-apps-head">
+          <h2>全部应用</h2>
+          <button type="button" class="wb-apps-close" aria-label="关闭" @click="allAppsOpen = false">×</button>
+        </header>
+        <div class="wb-apps-body">
+          <nav class="wb-apps-cats">
+            <button type="button" class="active">常用</button>
+            <button type="button" @click="showToast('分类筛选即将上线')">人事</button>
+            <button type="button" @click="showToast('分类筛选即将上线')">协同</button>
+            <button type="button" @click="showToast('分类筛选即将上线')">知识与文件</button>
+          </nav>
+          <div class="wb-apps-grid">
+            <button v-for="q in quickEntries.filter(x => x.id !== 'all')" :key="q.id" type="button" class="wb-apps-item" @click="openApp(q.path || `/workbench?app=${q.id}`)">
+              <span class="wb-quick-icon" :class="q.tone"><component :is="q.icon" :size="18" :stroke-width="1.8" /></span>
+              <span>{{ q.label }}</span>
+            </button>
+            <button type="button" class="wb-apps-item" @click="openApp('/attendance')"><span class="wb-quick-icon blue"><Clock :size="18" :stroke-width="1.8" /></span><span>考勤</span></button>
+            <button type="button" class="wb-apps-item" @click="openApp('/knowledge')"><span class="wb-quick-icon blue"><BookOpen :size="18" :stroke-width="1.8" /></span><span>知识库</span></button>
+            <button type="button" class="wb-apps-item" @click="openApp('/drive')"><span class="wb-quick-icon blue"><Cloud :size="18" :stroke-width="1.8" /></span><span>云空间</span></button>
+          </div>
+        </div>
+      </div>
+    </HubDialog>
   </div>
 </template>
 

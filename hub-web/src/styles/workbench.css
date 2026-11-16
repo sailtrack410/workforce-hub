@@ -61,3 +61,17 @@
   .wb-card-tasks { grid-column: span 2; min-height: 180px; }
   .wb-quick-grid { gap: 8px; }
 }
+
+/* 全部应用面板 */
+.wb-apps-panel { display: flex; flex-direction: column; width: 680px; max-width: calc(100vw - 96px); gap: 20px; }
+.wb-apps-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wb-apps-head h2 { font-size: 20px; font-weight: 500; }
+.wb-apps-close { width: 32px; height: 32px; border: 0; border-radius: 6px; background: var(--hw-chip); color: var(--hw-tertiary); font-size: 20px; cursor: pointer; }
+.wb-apps-body { display: flex; gap: 24px; }
+.wb-apps-cats { display: flex; flex-direction: column; gap: 4px; width: 128px; flex: none; }
+.wb-apps-cats button { height: 36px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--hw-secondary); font-size: 14px; text-align: left; cursor: pointer; }
+.wb-apps-cats button.active { background: var(--hw-sky); color: var(--hw-primary); font-weight: 500; }
+.wb-apps-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; flex: 1; }
+.wb-apps-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 76px; padding: 8px 0; border: 0; border-radius: 6px; background: transparent; color: var(--hw-secondary); font-size: 12px; cursor: pointer; }
+.wb-apps-item:hover { background: var(--hw-inner); }
+

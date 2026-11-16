@@ -43,3 +43,16 @@
 .pc-row-copy small { font-size: 12px; color: var(--hw-muted); }
 .pc-divider { height: 1px; margin: 4px 0; background: var(--hw-track); }
 @media (max-width: 1100px) { .pc-identity { flex-wrap: wrap; } }
+
+.pc-dialog { display: flex; flex-direction: column; width: 480px; max-width: calc(100vw - 96px); gap: 20px; }
+.pc-dialog h2 { font-size: 20px; font-weight: 500; }
+.pc-dialog-confirm { width: 400px; }
+.pc-dialog-confirm p { font-size: 14px; line-height: 22px; color: var(--hw-secondary); }
+.pc-dialog-field { display: flex; flex-direction: column; gap: 8px; }
+.pc-dialog-field > span { font-size: 14px; color: var(--hw-secondary); }
+.pc-dialog-field input { height: 36px; padding: 0 12px; border: 1px solid var(--hw-border); border-radius: 6px; background: var(--hw-card); color: var(--hw-ink); font-size: 14px; }
+.pc-dialog-field input:focus { outline: 2px solid var(--hw-focus); outline-offset: 0; }
+.pc-dialog-note { font-size: 12px; color: var(--hw-muted); }
+.pc-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pc-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--hw-primary); border-radius: 6px; background: var(--hw-primary); color: var(--hw-on-primary); font-size: 13px; cursor: pointer; white-space: nowrap; }
+.pc-btn-primary:hover { background: var(--hw-primary-deep); }
