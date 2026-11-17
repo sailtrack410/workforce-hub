@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.hr.mapper.HrEmployeeEventMapper">
+
+    <insert id="insert">
+        INSERT INTO hr_employee_event
+            (id, user_id, change_type, request_id, before_snapshot_json, after_snapshot_json,
+             effective_at, status, created_by, updated_by)
+        VALUES
+            (#{id}, #{userId}, #{changeType}, #{requestId}, #{beforeSnapshotJson}, #{afterSnapshotJson},
+             #{effectiveAt}, #{status}, #{createdBy}, #{updatedBy})
+    </insert>
+
+</mapper>

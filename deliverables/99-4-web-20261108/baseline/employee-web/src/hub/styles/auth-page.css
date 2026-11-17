@@ -1,0 +1,689 @@
+/* 登录注册页样式：参数对齐画布「员工端-登录注册」(10:5)，色值全部来自画布 Theme 变量集 */
+
+.auth-page {
+  --auth-canvas: #edf1f7;
+  --auth-card: #ffffff;
+  --auth-inner: #f6f8fb;
+  --auth-chip: #f2f5f9;
+  --auth-track: #eaeff5;
+  --auth-pill-dark: #181d23;
+  --auth-ink: #181d23;
+  --auth-secondary: #424b56;
+  --auth-tertiary: #717d8c;
+  --auth-muted: #9ba6b4;
+  --auth-faint: #b8c5d3;
+  --auth-wechat-border: #d6dee8;
+  --auth-primary: #1677ff;
+  --auth-primary-deep: #124da3;
+  --auth-sky: #d9ebff;
+  --auth-danger: var(--danger-700, #c73a31);
+  --auth-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --auth-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* morph 专用缓动：先快后慢无回弹，收缩过程平滑不跳变 */
+  --auth-morph: cubic-bezier(0.65, 0, 0.35, 1);
+
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background: var(--auth-canvas);
+  color: var(--auth-ink);
+  font-family: "Noto Sans SC", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  padding: 40px 24px;
+  box-sizing: border-box;
+}
+
+[data-theme="dark"] .auth-page {
+  --auth-canvas: #0e1319;
+  --auth-card: #1a222c;
+  --auth-inner: #232c39;
+  --auth-chip: #26303d;
+  --auth-track: #2a3542;
+  --auth-pill-dark: #38455a;
+  --auth-ink: #e9edf2;
+  --auth-secondary: #aeb8c4;
+  --auth-tertiary: #8b96a3;
+  --auth-muted: #6e7a87;
+  --auth-faint: #59636f;
+  --auth-wechat-border: #38455a;
+}
+
+/* ---------- 登录卡片：1100×720 圆角24 白卡，左右分栏 ---------- */
+.auth-card {
+  display: grid;
+  grid-template-columns: 440px 1fr;
+  width: 1100px;
+  max-width: 100%;
+  min-height: 720px;
+  /* 全局 employee-shell.css 对旧登录页 .auth-card 有 padding/gap/border 污染，此处显式归零 */
+  padding: 0;
+  gap: 0;
+  border: 0;
+  border-radius: 24px;
+  background: var(--auth-card);
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(15, 30, 55, 0.10);
+  animation: card-in 0.6s var(--auth-ease) both;
+}
+
+/* ---------- 品牌区：440 宽，135° 渐变 #1677ff→#124da3，内边距48，gap18 ---------- */
+.brand-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 48px;
+  box-sizing: border-box;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1677ff 0%, #124da3 100%);
+  animation: brand-in 0.7s var(--auth-ease) both;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  font: 700 15px/1 Inter, sans-serif;
+}
+
+.brand-logo strong {
+  font: 700 20px/1 Inter, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.brand-slogan {
+  margin: 6px 0 0;
+  font-size: 30px;
+  line-height: 42px;
+  font-weight: 700;
+}
+
+.brand-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 21px;
+  color: var(--auth-sky);
+}
+
+.brand-spacer {
+  flex: 1;
+}
+
+.brand-features {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: feature-in 0.6s var(--auth-spring) both;
+}
+.feature-row:nth-child(1) { animation-delay: 0.25s; }
+.feature-row:nth-child(2) { animation-delay: 0.35s; }
+.feature-row:nth-child(3) { animation-delay: 0.45s; }
+
+.feature-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.feature-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.feature-copy strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.feature-copy small {
+  font-size: 12px;
+  color: var(--auth-sky);
+}
+
+.brand-foot {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #a8ccf7;
+}
+
+/* ---------- 表单区：内边距56，gap16 ---------- */
+.form-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 56px;
+  box-sizing: border-box;
+}
+
+.pane-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.3;
+  font-weight: 700;
+  animation: rise-in 0.5s var(--auth-ease) both;
+}
+
+.pane-subtitle {
+  margin: -10px 0 0;
+  font-size: 14px;
+  color: var(--auth-tertiary);
+  animation: rise-in 0.5s var(--auth-ease) 0.05s both;
+}
+
+/* 登录方式胶囊 Tab：激活 pill-dark 深底白字，高38 圆角999 */
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-tab {
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--auth-chip);
+  font: 400 13px/38px "Noto Sans SC", sans-serif;
+  color: var(--auth-secondary);
+  cursor: pointer;
+  transition: background 0.25s var(--auth-ease), color 0.25s var(--auth-ease), transform 0.15s var(--auth-ease);
+}
+.mode-tab:hover:not(.active) {
+  background: var(--auth-track);
+}
+.mode-tab:active {
+  transform: scale(0.96);
+}
+.mode-tab.active {
+  background: var(--auth-pill-dark);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* ---------- 表单 ---------- */
+.pane-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pane-form-register {
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pane-form-register .field {
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--auth-ink);
+}
+
+.field-input {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  background: var(--auth-inner);
+  padding: 0 14px;
+  box-sizing: border-box;
+  /* focus 视觉只保留单层边框过渡，box-shadow 移除避免与 border 叠成双层框 */
+  transition: border-color 0.25s var(--auth-ease), background 0.25s var(--auth-ease);
+  border: 1px solid transparent;
+}
+
+.input-48 { height: 48px; }
+.input-44 { height: 44px; }
+
+.field-input.focused {
+  border-color: var(--auth-primary);
+  background: var(--auth-card);
+}
+
+.field-input input {
+  flex: 1;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  font: 400 14px/20px "Noto Sans SC", sans-serif;
+  color: var(--auth-ink);
+  /* 压制浏览器 UA 的 focus 高亮与自动填充预览框，避免容器内出现第二层框 */
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.field-input input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.field-input input:-webkit-autofill,
+.field-input input:-webkit-autofill:hover,
+.field-input input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--auth-inner) inset;
+  -webkit-text-fill-color: var(--auth-ink);
+  caret-color: var(--auth-ink);
+  transition: background-color 999999s ease-in-out 0s;
+}
+.field-input input::placeholder {
+  color: var(--auth-muted);
+}
+.field-input input:disabled {
+  opacity: 0.6;
+}
+
+.field-eye {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--auth-muted);
+  cursor: pointer;
+  transition: color 0.2s var(--auth-ease);
+}
+.field-eye:hover {
+  color: var(--auth-primary);
+}
+
+.link-right {
+  align-self: flex-end;
+  margin-top: -6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: 400 13px/19px "Noto Sans SC", sans-serif;
+  color: var(--auth-primary);
+  cursor: pointer;
+  transition: opacity 0.2s var(--auth-ease);
+}
+.link-right:hover {
+  opacity: 0.8;
+}
+.link-right:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 验证码/短信行 */
+.sms-row {
+  display: flex;
+  gap: 8px;
+}
+.sms-input {
+  flex: 1;
+}
+.sms-send {
+  flex: none;
+  height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--auth-chip);
+  font: 500 13px/18px "Noto Sans SC", sans-serif;
+  color: var(--auth-primary);
+  cursor: pointer;
+  transition: background 0.2s var(--auth-ease), transform 0.15s var(--auth-ease), opacity 0.2s var(--auth-ease);
+  white-space: nowrap;
+}
+.sms-send:hover:not(:disabled) {
+  background: var(--auth-track);
+}
+.sms-send:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.sms-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 错误/提示 */
+.form-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(199, 58, 49, 0.10);
+  color: var(--auth-danger);
+  font-size: 13px;
+  line-height: 19px;
+}
+.form-ok {
+  background: rgba(22, 119, 255, 0.10);
+  color: var(--auth-primary);
+}
+
+.msg-pop-enter-active {
+  transition: opacity 0.25s var(--auth-ease), transform 0.25s var(--auth-spring);
+}
+.msg-pop-enter-from {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.msg-pop-leave-active {
+  transition: opacity 0.2s var(--auth-ease);
+}
+.msg-pop-leave-to {
+  opacity: 0;
+}
+
+/* ---------- 主提交按钮：高44 圆角12 主蓝；morph 圆 → spinner → 对勾/叉 ---------- */
+.submit-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--auth-primary);
+  color: #ffffff;
+  font: 600 15px/22px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  overflow: hidden;
+  /* 收缩 morph：宽/圆角/内边距全属性连续过渡，label 随内边距同步淡出 */
+  transition:
+    width 0.42s var(--auth-morph),
+    border-radius 0.42s var(--auth-morph),
+    padding 0.42s var(--auth-morph),
+    background 0.3s var(--auth-ease),
+    transform 0.15s var(--auth-ease),
+    box-shadow 0.3s var(--auth-ease);
+}
+
+.submit-btn:hover:enabled:not(.round) {
+  background: var(--auth-primary-deep);
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.32);
+}
+.submit-btn:active:enabled {
+  transform: scale(0.985);
+}
+
+/* 请求中：宽度收到 44px、圆角跟到 22px，形成平滑"胶囊→圆"收缩而非跳变 */
+.submit-btn.round {
+  width: 44px;
+  padding: 0;
+  border-radius: 22px;
+  margin-inline: auto;
+  cursor: wait;
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.30);
+}
+
+.submit-label {
+  max-width: 120px;
+  opacity: 1;
+  white-space: nowrap;
+  transition: opacity 0.22s var(--auth-ease) 0.08s, max-width 0.42s var(--auth-morph), font-size 0.42s var(--auth-morph);
+}
+.submit-btn.round .submit-label {
+  opacity: 0;
+  max-width: 0;
+  font-size: 0;
+  overflow: hidden;
+}
+
+.submit-spinner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  /* 等收缩动画过半再淡入，避免圆还没成形时图标已挤在里面 */
+  opacity: 0;
+  animation: spinner-in 0.3s var(--auth-ease) 0.25s forwards, spin 0.7s linear infinite;
+}
+
+@keyframes spinner-in {
+  to { opacity: 1; }
+}
+
+.submit-mark {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+}
+.submit-mark .mark-path {
+  stroke: #ffffff;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: mark-draw 0.32s var(--auth-ease) 0.05s forwards;
+}
+/* 错误叉在收缩完成后(0.45s)才开始画 */
+.submit-error .mark-path {
+  animation: mark-draw 0.26s var(--auth-ease) 0.5s forwards;
+}
+.mark-error .mark-path {
+  stroke-dasharray: 15;
+  stroke-dashoffset: 15;
+}
+
+.submit-success {
+  background: #22a05c;
+  transition: background 0.3s var(--auth-ease) 0.3s;
+  animation: mark-bounce 0.45s var(--auth-spring) 0.55s;
+}
+
+.submit-error {
+  /* 背景延迟 0.3s 变红：先完成收缩形变，再在稳定圆上变红画叉，两层动画不打架 */
+  background: var(--auth-danger);
+  transition: background 0.3s var(--auth-ease) 0.3s;
+  animation: mark-bounce 0.45s var(--auth-spring) 0.55s;
+}
+
+/* ---------- 分隔区 ---------- */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--auth-track);
+}
+
+.divider-text {
+  font-size: 12px;
+  color: var(--auth-muted);
+  white-space: nowrap;
+}
+
+/* ---------- 微信按钮：高50 圆角12 bg-card+描边 ---------- */
+.wechat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  border: 1px solid var(--auth-wechat-border);
+  border-radius: 12px;
+  background: var(--auth-card);
+  font: 500 14px/20px "Noto Sans SC", sans-serif;
+  color: var(--auth-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s var(--auth-ease), transform 0.15s var(--auth-ease), box-shadow 0.2s var(--auth-ease);
+}
+.wechat-btn:hover {
+  border-color: #22c05e;
+  box-shadow: 0 6px 16px rgba(34, 192, 94, 0.16);
+}
+.wechat-btn:active {
+  transform: scale(0.985);
+}
+.wechat-icon {
+  width: 18px;
+  height: 18px;
+  color: #22c05e;
+}
+
+/* ---------- 注册协议 ---------- */
+.agreement {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--auth-tertiary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.agreement-check {
+  appearance: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid var(--auth-faint);
+  border-radius: 5px;
+  background: var(--auth-card);
+  cursor: pointer;
+  transition: background 0.2s var(--auth-ease), border-color 0.2s var(--auth-ease);
+}
+.agreement-check:checked {
+  border-color: var(--auth-primary);
+  background: var(--auth-primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/10px no-repeat;
+}
+
+.agreement-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--auth-primary);
+  cursor: pointer;
+}
+
+/* ---------- 底部引导 ---------- */
+.switch-guide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 13px;
+  color: var(--auth-tertiary);
+}
+
+.guide-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: 500 13px/19px "Noto Sans SC", sans-serif;
+  color: var(--auth-primary);
+  cursor: pointer;
+  transition: opacity 0.2s var(--auth-ease);
+}
+.guide-link:hover {
+  opacity: 0.8;
+}
+
+/* ---------- keyframes ---------- */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes brand-in {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes feature-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes mark-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes mark-bounce {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 响应式：窄屏隐藏品牌区 ---------- */
+@media (max-width: 1024px) {
+  .auth-card {
+    grid-template-columns: 1fr;
+    width: 480px;
+  }
+  .brand-pane {
+    display: none;
+  }
+  .form-pane {
+    padding: 40px 32px;
+  }
+}
+
+/* 错误态叉接管，spinner 立即退场 */
+.submit-error .submit-spinner {
+  opacity: 0;
+  animation: none;
+}

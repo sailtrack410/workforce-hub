@@ -1,0 +1,1055 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ workforce-hub ---
+[INFO] Deleting /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 92 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 530 source files with javac [debug release 17] to target/classes
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 115 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.leave.LeaveSettlementTransactionTest
+SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=MODE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=MODE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=INACTIVE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=DELETED outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=WITHDRAWN available=1440 frozen=0
+[ERROR] Tests run: 32, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 1.452 s <<< FAILURE! -- in com.workforcehub.leave.LeaveSettlementTransactionTest
+[ERROR] com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[1] -- Time elapsed: 0.026 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(LeaveSettlementTransactionTest.java:234)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:762)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at com.workforcehub.leave.service.LeaveService.consumeFrozenForWorkflowApproval(LeaveService.java:323)
+	at jdk.internal.reflect.GeneratedMethodAccessor18.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.consumeFrozenForWorkflowApproval(<generated>)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.settle(LeaveSettlementTransactionTest.java:85)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.lambda$terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict$7(LeaveSettlementTransactionTest.java:234)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 35 more
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.index.Index.getDuplicateKeyException(Index.java:523)
+	at org.h2.mvstore.db.MVSecondaryIndex.checkUnique(MVSecondaryIndex.java:223)
+	at org.h2.mvstore.db.MVSecondaryIndex.add(MVSecondaryIndex.java:184)
+	at org.h2.mvstore.db.MVTable.addRow(MVTable.java:517)
+	at org.h2.command.dml.Insert.insertRows(Insert.java:174)
+	at org.h2.command.dml.Insert.update(Insert.java:135)
+	at org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+	at org.h2.command.CommandContainer.update(CommandContainer.java:139)
+	at org.h2.command.Command.executeUpdate(Command.java:304)
+	at org.h2.command.Command.executeUpdate(Command.java:248)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 57 more
+
+[ERROR] com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[2] -- Time elapsed: 0.022 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(LeaveSettlementTransactionTest.java:234)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:762)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:REJECTED' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at com.workforcehub.leave.service.LeaveService.releaseFrozenForWorkflowTerminal(LeaveService.java:381)
+	at jdk.internal.reflect.GeneratedMethodAccessor17.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.releaseFrozenForWorkflowTerminal(<generated>)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.settle(LeaveSettlementTransactionTest.java:86)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.lambda$terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict$7(LeaveSettlementTransactionTest.java:234)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 35 more
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:REJECTED' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.index.Index.getDuplicateKeyException(Index.java:523)
+	at org.h2.mvstore.db.MVSecondaryIndex.checkUnique(MVSecondaryIndex.java:223)
+	at org.h2.mvstore.db.MVSecondaryIndex.add(MVSecondaryIndex.java:184)
+	at org.h2.mvstore.db.MVTable.addRow(MVTable.java:517)
+	at org.h2.command.dml.Insert.insertRows(Insert.java:174)
+	at org.h2.command.dml.Insert.update(Insert.java:135)
+	at org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+	at org.h2.command.CommandContainer.update(CommandContainer.java:139)
+	at org.h2.command.Command.executeUpdate(Command.java:304)
+	at org.h2.command.Command.executeUpdate(Command.java:248)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 57 more
+
+[ERROR] com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[3] -- Time elapsed: 0.010 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(LeaveSettlementTransactionTest.java:234)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:762)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:WITHDRAWN' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at com.workforcehub.leave.service.LeaveService.releaseFrozenForWorkflowTerminal(LeaveService.java:381)
+	at jdk.internal.reflect.GeneratedMethodAccessor17.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.releaseFrozenForWorkflowTerminal(<generated>)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.settle(LeaveSettlementTransactionTest.java:86)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.lambda$terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict$7(LeaveSettlementTransactionTest.java:234)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 35 more
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:WITHDRAWN' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.index.Index.getDuplicateKeyException(Index.java:523)
+	at org.h2.mvstore.db.MVSecondaryIndex.checkUnique(MVSecondaryIndex.java:223)
+	at org.h2.mvstore.db.MVSecondaryIndex.add(MVSecondaryIndex.java:184)
+	at org.h2.mvstore.db.MVTable.addRow(MVTable.java:517)
+	at org.h2.command.dml.Insert.insertRows(Insert.java:174)
+	at org.h2.command.dml.Insert.update(Insert.java:135)
+	at org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+	at org.h2.command.CommandContainer.update(CommandContainer.java:139)
+	at org.h2.command.Command.executeUpdate(Command.java:304)
+	at org.h2.command.Command.executeUpdate(Command.java:248)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 57 more
+
+[INFO] Running com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+20:50:32.000 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest]: ModuleLeaveWorkflowIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+20:50:32.079 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:50:32.518+08:00  INFO [] 46436 --- [background-preinit] o.h.validator.internal.util.Version      : HV000001: Hibernate Validator 8.0.1.Final
+2026-11-08T20:50:32.527+08:00  INFO [] 46436 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Starting ModuleLeaveWorkflowIntegrationTest using Java 17.0.18 with PID 46436 (started by sailtrack in /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server)
+2026-11-08T20:50:32.527+08:00 DEBUG [] 46436 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:50:32.528+08:00  INFO [] 46436 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : The following 1 profile is active: "api"
+2026-11-08T20:50:34.146+08:00  INFO [] 46436 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:50:34.149+08:00  INFO [] 46436 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:50:34.213+08:00  INFO [] 46436 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 43 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:50:34.639+08:00  INFO [] 46436 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-11-08T20:50:34.738+08:00  INFO [] 46436 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-11-08T20:50:34.808+08:00  INFO [] 46436 --- [main] o.f.c.internal.license.VersionPrinter    : Flyway Community Edition 9.22.3 by Redgate
+2026-11-08T20:50:34.808+08:00  INFO [] 46436 --- [main] o.f.c.internal.license.VersionPrinter    : See release notes here: https://rd.gt/416ObMi
+2026-11-08T20:50:34.808+08:00  INFO [] 46436 --- [main] o.f.c.internal.license.VersionPrinter    : 
+2026-11-08T20:50:34.830+08:00  INFO [] 46436 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:62826/workforce_993_test (MySQL 8.4)
+2026-11-08T20:50:34.926+08:00  WARN [] 46436 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:50:34.993+08:00  INFO [] 46436 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 67 migrations (execution time 00:00.059s)
+2026-11-08T20:50:35.006+08:00  INFO [] 46436 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_993_test`: 69
+2026-11-08T20:50:35.009+08:00  INFO [] 46436 --- [main] o.f.core.internal.command.DbMigrate      : Schema `workforce_993_test` is up to date. No migration necessary.
+2026-11-08T20:50:35.950+08:00  INFO [] 46436 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:50:35.950+08:00  INFO [] 46436 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:50:35.951+08:00  INFO [] 46436 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:50:36.611+08:00  INFO [] 46436 --- [main] o.f.engine.impl.ProcessEngineImpl        : ProcessEngine default created
+2026-11-08T20:50:36.631+08:00  INFO [] 46436 --- [main] o.f.e.impl.cmd.ValidateV5EntitiesCmd     : Total of v5 deployments found: 0
+2026-11-08T20:50:37.010+08:00  INFO [] 46436 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:50:37.075+08:00  INFO [] 46436 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@41f5f4ba, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@685271b1, org.springframework.security.web.context.SecurityContextHolderFilter@235babaf, org.springframework.security.web.header.HeaderWriterFilter@5b9037b6, org.springframework.web.filter.CorsFilter@6236d83a, org.springframework.security.web.csrf.CsrfFilter@5a67843b, com.workforcehub.auth.security.SessionValidityFilter@7785430c, com.workforcehub.auth.security.UserTypePathFilter@193f5509, com.workforcehub.auth.security.AdminPermissionFilter@71ad1d0b, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@3910a29c, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@6767f1c4, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@34dd9ae1, org.springframework.security.web.session.SessionManagementFilter@1f878eed, org.springframework.security.web.access.ExceptionTranslationFilter@219acda9, org.springframework.security.web.access.intercept.AuthorizationFilter@3413a3a6]
+2026-11-08T20:50:37.432+08:00 DEBUG [] 46436 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:50:37.432+08:00 DEBUG [] 46436 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:50:37.432+08:00 DEBUG [] 46436 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:50:37.432+08:00 DEBUG [] 46436 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:50:37.432+08:00 DEBUG [] 46436 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:50:37.432+08:00  INFO [] 46436 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:50:37.432+08:00  INFO [] 46436 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:50:37.433+08:00  INFO [] 46436 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:50:37.509+08:00  INFO [] 46436 --- [main] o.f.s.c.DefaultAutoDeploymentStrategy    : Deploying resources [file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/borrow-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/business-trip-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/certificate-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/clock-correction-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/expense-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/leave-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/overtime-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/project-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/purchase-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/seal-manager-approval.bpmn20.xml]] for engine org.flowable.engine.impl.ProcessEngineImpl@26b78c2 deployment name hint SpringBootAutoDeployment
+2026-11-08T20:50:37.533+08:00  INFO [] 46436 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Started ModuleLeaveWorkflowIntegrationTest in 5.378 seconds (process running for 7.517)
+2026-11-08T20:50:37.567+08:00  INFO [] 46436 --- [main] c.w.plugin.runtime.PluginManagerService  : 恢复 0 个可用插件
+2026-11-08T20:50:38.649+08:00 DEBUG [1b6ac28edffb4d539b1b932f2f92e393] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:38.657+08:00  INFO [1b6ac28edffb4d539b1b932f2f92e393] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=870bab76-5881-4eae-af88-fac9b5bc8a7d
+2026-11-08T20:50:38.982+08:00  WARN [2ce19517dd3f480e9ef932f895c89cf7] 46436 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=400, code=100400, message=假期余额不足
+2026-11-08T20:50:39.171+08:00 DEBUG [160ce52cf36a46bf918dedd09fe6ec58] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:39.175+08:00  INFO [160ce52cf36a46bf918dedd09fe6ec58] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=2567cdf2-fcfa-45fe-9888-c0662ca1eb9d
+2026-11-08T20:50:39.265+08:00 DEBUG [07f94845d8e541b086999ab4e2116a9d] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:39.268+08:00  INFO [07f94845d8e541b086999ab4e2116a9d] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=9bd6f354-fd37-4d55-8f38-34dad51bfd19
+2026-11-08T20:50:39.783+08:00 DEBUG [c7f1e27e6a824e54a2af1b2e676a04a5] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:39.785+08:00  INFO [c7f1e27e6a824e54a2af1b2e676a04a5] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=25844e68-2b60-4b1e-96af-93e53b097b1c
+2026-11-08T20:50:39.851+08:00 DEBUG [f6c7864fbc83491398a634bbe18fb34a] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:39.854+08:00  INFO [f6c7864fbc83491398a634bbe18fb34a] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=c25779bb-cc5f-4a7f-8879-2eafd2261041
+2026-11-08T20:50:40.099+08:00 DEBUG [eede436cc6fa4350b43f495d87bb3921] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:40.102+08:00  INFO [eede436cc6fa4350b43f495d87bb3921] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=05b2578c-14d4-4979-9fec-2865911e093f
+2026-11-08T20:50:40.173+08:00 DEBUG [ad344dcd8a574feaad9640d2a6811393] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:40.177+08:00  INFO [ad344dcd8a574feaad9640d2a6811393] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=3e15c973-3b32-45b3-824b-eb3685a27057
+2026-11-08T20:50:40.269+08:00 ERROR [a1e3ec2cea2546c0b6de906b46de3af5] 46436 --- [main] c.w.c.exception.GlobalExceptionHandler   : 系统异常
+org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Duplicate entry 'WORKFLOW_REQUEST:1881294493659955201' for key 'lv_account_txn.uk_source_txn_key'
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.dao.support.PersistenceExceptionTranslationInterceptor.invoke(PersistenceExceptionTranslationInterceptor.java:137)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.repository.LeaveRepository$$SpringCGLIB$$0.insertAccountTxn(<generated>)
+	at com.workforcehub.leave.service.LeaveService.consumeFrozenForWorkflowApproval(LeaveService.java:323)
+	at jdk.internal.reflect.GeneratedMethodAccessor18.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.consumeFrozenForWorkflowApproval(<generated>)
+	at com.workforcehub.workflow.service.WorkflowService.completeManagerTask(WorkflowService.java:748)
+	at com.workforcehub.workflow.service.WorkflowService.approveTask(WorkflowService.java:584)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.workflow.service.WorkflowService$$SpringCGLIB$$0.approveTask(<generated>)
+	at com.workforcehub.workflow.controller.EmployeeWorkflowController.approveTask(EmployeeWorkflowController.java:124)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:255)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:188)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:926)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:831)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:165)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:108)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.ObservationFilterChainDecorator$FilterObservation$SimpleFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:479)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:340)
+	at org.springframework.security.web.ObservationFilterChainDecorator.lambda$wrapSecured$0(ObservationFilterChainDecorator.java:82)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:128)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:100)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.AdminPermissionFilter.doFilterInternal(AdminPermissionFilter.java:263)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.UserTypePathFilter.doFilterInternal(UserTypePathFilter.java:71)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.SessionValidityFilter.doFilterInternal(SessionValidityFilter.java:58)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.csrf.CsrfFilter.doFilterInternal(CsrfFilter.java:131)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$0(ObservationFilterChainDecorator.java:323)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:224)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.servlet.handler.HandlerMappingIntrospector.lambda$createCacheFilter$3(HandlerMappingIntrospector.java:195)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74)
+	at org.springframework.security.config.annotation.web.configuration.WebMvcSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebMvcSecurityConfiguration.java:230)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.session.web.http.SessionRepositoryFilter.doFilterInternal(SessionRepositoryFilter.java:142)
+	at org.springframework.session.web.http.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:82)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:101)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:101)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:109)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at com.workforcehub.common.config.RequestIdFilter.doFilterInternal(RequestIdFilter.java:46)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:201)
+	at com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint(ModuleLeaveWorkflowIntegrationTest.java:153)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:728)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:218)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:214)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:139)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: java.sql.SQLIntegrityConstraintViolationException: Duplicate entry 'WORKFLOW_REQUEST:1881294493659955201' for key 'lv_account_txn.uk_source_txn_key'
+	at com.mysql.cj.jdbc.exceptions.SQLError.createSQLException(SQLError.java:118)
+	at com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping.translateException(SQLExceptionsMapping.java:122)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeInternal(ClientPreparedStatement.java:912)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeUpdateInternal(ClientPreparedStatement.java:1054)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeUpdateInternal(ClientPreparedStatement.java:1003)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeLargeUpdate(ClientPreparedStatement.java:1312)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeUpdate(ClientPreparedStatement.java:988)
+	at com.zaxxer.hikari.pool.ProxyPreparedStatement.executeUpdate(ProxyPreparedStatement.java:61)
+	at com.zaxxer.hikari.pool.HikariProxyPreparedStatement.executeUpdate(HikariProxyPreparedStatement.java)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 271 common frames omitted
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"72", X-CSRF-TOKEN:"a6980dc9-b67c-4889-ba5e-e357a6b8ff06"]
+             Body = {
+  "loginName": "zhangsan.employee",
+  "password": "Employee@123456"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.auth.controller.EmployeeAuthController
+           Method = com.workforcehub.auth.controller.EmployeeAuthController#login(LoginRequest, HttpServletRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"eede436cc6fa4350b43f495d87bb3921", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=MDViMjU3OGMtMTRkNC00OTc5LTlmZWMtMjg2NTkxMWUwOTNm; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"userId":2003,"userType":"USER","displayName":"张三","loginName":"zhangsan.employee","requiresEmailCode":false,"maskedEmail":null,"requiresEmailBinding":false},"requestId":"eede436cc6fa4350b43f495d87bb3921"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@4a86103 name = 'SESSION', value = 'MDViMjU3OGMtMTRkNC00OTc5LTlmZWMtMjg2NTkxMWUwOTNm', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"67", X-CSRF-TOKEN:"f9b7e21e-4bc6-49cb-a199-ed8eb56cbe41"]
+             Body = {
+  "loginName": "lisi.manager",
+  "password": "Employee@123456"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.auth.controller.EmployeeAuthController
+           Method = com.workforcehub.auth.controller.EmployeeAuthController#login(LoginRequest, HttpServletRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"ad344dcd8a574feaad9640d2a6811393", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=M2UxNWM5NzMtM2IzMi00NWIzLTgyNGItZWIzNjg1YTI3MDU3; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"userId":2002,"userType":"USER","displayName":"李四","loginName":"lisi.manager","requiresEmailCode":false,"maskedEmail":null,"requiresEmailBinding":false},"requestId":"ad344dcd8a574feaad9640d2a6811393"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@6e0c20b8 name = 'SESSION', value = 'M2UxNWM5NzMtM2IzMi00NWIzLTgyNGItZWIzNjg1YTI3MDU3', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/workflow/leave-requests
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"162", Cookie:"SESSION=MDViMjU3OGMtMTRkNC00OTc5LTlmZWMtMjg2NTkxMWUwOTNm", X-CSRF-TOKEN:"12f5c9e6-76e5-4e81-bfef-6e5bbd80dd5c"]
+             Body = {
+  "leaveTypeId": 9401,
+  "startAt": "2026-05-07 09:00:00",
+  "endAt": "2026-05-07 18:00:00",
+  "durationMinutes": 480,
+  "reason": "家中有事请假一天"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.workflow.controller.EmployeeWorkflowController
+           Method = com.workforcehub.workflow.controller.EmployeeWorkflowController#submitLeaveRequest(LeaveRequestCreateRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"e5b03680ab424472a72d25a1b2dd418b", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"requestId":"1881294493659955201","requestNo":"WF-LEAVE-20261108205040-1881294493659955200","status":"IN_APPROVAL","statusName":"审批中","flowableProcessInstanceId":"008ba62e-db73-11f1-a989-66b27383b455","agentTaskId":null},"requestId":"e5b03680ab424472a72d25a1b2dd418b"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/workflow/tasks/008bcd46-db73-11f1-a989-66b27383b455/approve
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"47", Cookie:"SESSION=M2UxNWM5NzMtM2IzMi00NWIzLTgyNGItZWIzNjg1YTI3MDU3", X-CSRF-TOKEN:"a071ba08-754d-4e6d-9129-f81d65278555"]
+             Body = {
+  "comment": "同意，请安排好交接"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.workflow.controller.EmployeeWorkflowController
+           Method = com.workforcehub.workflow.controller.EmployeeWorkflowController#approveTask(String, WorkflowTaskApproveRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = org.springframework.dao.DuplicateKeyException
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 500
+    Error message = null
+          Headers = [X-Request-Id:"a1e3ec2cea2546c0b6de906b46de3af5", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json
+             Body = {"code":100500,"message":"系统内部错误","data":null,"requestId":"a1e3ec2cea2546c0b6de906b46de3af5"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+2026-11-08T20:50:40.415+08:00 DEBUG [a744ae44f52342c58031a01bb1686ace] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:40.417+08:00  INFO [a744ae44f52342c58031a01bb1686ace] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=ee7fcf9d-36d0-4213-90ec-bc92a75a9de2
+2026-11-08T20:50:40.581+08:00 DEBUG [437dfb757f1e41e9a7830877aab795c3] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:40.584+08:00  INFO [437dfb757f1e41e9a7830877aab795c3] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=58a2f939-bbd0-442d-91d4-7c7b0f234bc5
+2026-11-08T20:50:40.651+08:00 DEBUG [12caf47910584bb38b1e5a4ab190f8a7] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:40.654+08:00  INFO [12caf47910584bb38b1e5a4ab190f8a7] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=ce209637-d4a6-492a-b770-4e9e92754cae
+2026-11-08T20:50:40.938+08:00 DEBUG [ee880cc3eb6c4ded881d4b460e5f80b2] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:40.940+08:00  INFO [ee880cc3eb6c4ded881d4b460e5f80b2] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=e2e4b8a0-db91-493a-b655-0835f96392da
+2026-11-08T20:50:41.009+08:00 DEBUG [9f2528fc8fd74753810332cd8357886a] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.012+08:00  INFO [9f2528fc8fd74753810332cd8357886a] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=25f3eed1-7292-46a3-848c-0ff88ebdd011
+2026-11-08T20:50:41.232+08:00 DEBUG [eca460c338ac40168b4ac4fa6e71e059] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.235+08:00  INFO [eca460c338ac40168b4ac4fa6e71e059] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=029505f6-7c87-4251-bac1-21eae3d008e6
+2026-11-08T20:50:41.321+08:00 DEBUG [68ad0b9c89084c6baec9dba0b70e5b49] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.323+08:00  INFO [68ad0b9c89084c6baec9dba0b70e5b49] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=580adb7a-d4c8-4c8a-b47f-813b517e87b1
+2026-11-08T20:50:41.536+08:00 DEBUG [53397b1ce4564d15a6b1de97cb574bb0] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.538+08:00  INFO [53397b1ce4564d15a6b1de97cb574bb0] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=e8ab0894-46c3-41d7-8b15-ad5ac310cf0e
+2026-11-08T20:50:41.606+08:00 DEBUG [13509af0f6a04248832e248bab9861e2] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.609+08:00  INFO [13509af0f6a04248832e248bab9861e2] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=624197bf-0df6-4547-9f2c-9d600dac39b2
+MYSQL_ORIGINAL_NO_DEDUCT current=DEDUCT outcome=APPROVED available=960 frozen=0 deduct_txns=0
+2026-11-08T20:50:41.785+08:00 DEBUG [dd0ba6b223fd4b69a7cd1c8be722e1de] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.787+08:00  INFO [dd0ba6b223fd4b69a7cd1c8be722e1de] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=649d016c-c935-4bcb-8e3b-deadb32d853e
+2026-11-08T20:50:41.799+08:00  WARN [17da465e8926415a920508e881dec9e8] 46436 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=400, code=100400, message=假期余额不足
+2026-11-08T20:50:41.913+08:00 DEBUG [22e086878b2e40a990a3d5e95b9dae29] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.915+08:00  INFO [22e086878b2e40a990a3d5e95b9dae29] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=6192a50c-6c75-4be8-ad48-9aaf1b407733
+2026-11-08T20:50:41.980+08:00 DEBUG [07f2d388f03b45bab36021b081f63128] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:41.982+08:00  INFO [07f2d388f03b45bab36021b081f63128] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=107f5075-9b52-45a0-8fdc-0d46e4e7ca18
+2026-11-08T20:50:42.168+08:00 DEBUG [63731be2a41740f6864b24e2ad2d6b24] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:42.171+08:00  INFO [63731be2a41740f6864b24e2ad2d6b24] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=4de838db-61b3-46d7-829b-53f5bff06852
+2026-11-08T20:50:42.391+08:00 DEBUG [b72e96e68c184d19899c65a880a815be] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:42.399+08:00  INFO [b72e96e68c184d19899c65a880a815be] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=6f812b20-e1c7-4c9b-9a0e-8a88ea6bfa65
+2026-11-08T20:50:42.464+08:00 DEBUG [d4c8760dcacf4603821fa7a88c00d0b8] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:42.466+08:00  INFO [d4c8760dcacf4603821fa7a88c00d0b8] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=d2f0e217-11ca-42b7-b326-06babe14f824
+MYSQL_CONFIGURATION change=MODE outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:50:42.670+08:00 DEBUG [df573978c66741d7a8d349cc3209a039] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:42.673+08:00  INFO [df573978c66741d7a8d349cc3209a039] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=e13ae900-6ad5-4374-bc3a-06655f989a80
+2026-11-08T20:50:42.740+08:00 DEBUG [5dc07a83fe9542a9aaf1c800d1b2e7a5] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:42.743+08:00  INFO [5dc07a83fe9542a9aaf1c800d1b2e7a5] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=7322cbc8-6131-4af3-9b59-9f4d48e2c67f
+MYSQL_CONFIGURATION change=MODE outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:50:42.901+08:00 DEBUG [6c41a7fc3a9c4a75b6e8ac9ab58477dc] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:42.904+08:00  INFO [6c41a7fc3a9c4a75b6e8ac9ab58477dc] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=58a97977-dae7-4b74-b22f-3b2782c86842
+2026-11-08T20:50:42.969+08:00 DEBUG [6251538211114ea49ed1a27961bf6c92] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:42.971+08:00  INFO [6251538211114ea49ed1a27961bf6c92] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=70f3ff8a-45b8-41ff-ad0f-6cb37bd82ff8
+MYSQL_CONFIGURATION change=MODE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+2026-11-08T20:50:43.116+08:00 DEBUG [b3620572e5794337b30a6262149187ad] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.118+08:00  INFO [b3620572e5794337b30a6262149187ad] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=d98ba484-7ff2-4d46-bfc7-c4ad081a2f05
+2026-11-08T20:50:43.186+08:00 DEBUG [00ba3fb808a04bfc9de765164b1c0c32] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.188+08:00  INFO [00ba3fb808a04bfc9de765164b1c0c32] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=65eaa02c-67c7-41d2-bdc0-2ab0c1f48c1c
+MYSQL_CONFIGURATION change=INACTIVE outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:50:43.339+08:00 DEBUG [d1df97b1851a49cc8a356ac8e111c268] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.343+08:00  INFO [d1df97b1851a49cc8a356ac8e111c268] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=cac4a5d2-0ef0-439f-b84e-6e0b6a95d6f0
+2026-11-08T20:50:43.414+08:00 DEBUG [4a25cab4251c4d888748cec6d511b7b4] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.418+08:00  INFO [4a25cab4251c4d888748cec6d511b7b4] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=17268421-529f-46fa-b2c2-15c674e6c5ea
+MYSQL_CONFIGURATION change=INACTIVE outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:50:43.627+08:00 DEBUG [691be09194634d9f8b30257605a93f92] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.629+08:00  INFO [691be09194634d9f8b30257605a93f92] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=a60ae91f-5b5c-486d-80cd-e4e36e849f79
+2026-11-08T20:50:43.700+08:00 DEBUG [694ac3abe53f4d3c991062778b57f0e7] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.703+08:00  INFO [694ac3abe53f4d3c991062778b57f0e7] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=1a204785-f707-426f-b9e5-224d312a25f9
+MYSQL_CONFIGURATION change=INACTIVE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+2026-11-08T20:50:43.879+08:00 DEBUG [db23e74ab9e74a8ca96cbc79142d78bc] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.881+08:00  INFO [db23e74ab9e74a8ca96cbc79142d78bc] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=a9a03b9e-d840-4ee8-b77c-5d351f7dbe32
+2026-11-08T20:50:43.944+08:00 DEBUG [48a08609ad6444258e37d3235321166c] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:43.946+08:00  INFO [48a08609ad6444258e37d3235321166c] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=78e6b1d5-1766-4a22-953c-003015933711
+MYSQL_CONFIGURATION change=DELETED outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:50:44.100+08:00 DEBUG [72eaf4e0a5694711821f3cd07ed593bf] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:44.102+08:00  INFO [72eaf4e0a5694711821f3cd07ed593bf] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=5d4a1482-6ca4-422f-9fb7-6559e7bb3c00
+2026-11-08T20:50:44.165+08:00 DEBUG [9165aa54e0d548a0a38963c994c66e3f] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:44.167+08:00  INFO [9165aa54e0d548a0a38963c994c66e3f] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=b88dba79-5a4d-4f09-8cd3-00aa4493faf9
+MYSQL_CONFIGURATION change=DELETED outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:50:44.352+08:00 DEBUG [e0a5f06d8370407d8d6cc834c345ef84] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:44.354+08:00  INFO [e0a5f06d8370407d8d6cc834c345ef84] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=02a9c84e-7ce4-45b0-8f47-32ab62910974
+2026-11-08T20:50:44.421+08:00 DEBUG [bcc0d865e95248e786e8131a9fcba8f5] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:44.423+08:00  INFO [bcc0d865e95248e786e8131a9fcba8f5] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=1afbdea5-e8c5-41c1-ade6-bb04c123861b
+MYSQL_CONFIGURATION change=DELETED outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+[ERROR] Tests run: 21, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 12.50 s <<< FAILURE! -- in com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+[ERROR] com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint -- Time elapsed: 0.319 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<409> but was:<500>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint(ModuleLeaveWorkflowIntegrationTest.java:161)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[INFO] Running com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+2026-11-08T20:50:44.477+08:00  INFO [] 46436 --- [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.workforcehub.leave.ModuleLeaveApiIntegrationTest]: ModuleLeaveApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-11-08T20:50:44.478+08:00  INFO [] 46436 --- [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+2026-11-08T20:50:44.490+08:00  WARN [] 46436 --- [main] lowableLiquibaseEnvironmentPostProcessor : Liquibase has not been explicitly enabled or disabled. Overriding default from Spring Boot from `true` to `false`. Flowable pulls in Liquibase, but does not use the Spring Boot configuration for it. If you are using it you would need to set `spring.liquibase.enabled` to `true` by yourself
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:50:44.496+08:00  INFO [] 46436 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Starting ModuleLeaveApiIntegrationTest using Java 17.0.18 with PID 46436 (started by sailtrack in /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server)
+2026-11-08T20:50:44.496+08:00 DEBUG [] 46436 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:50:44.496+08:00  INFO [] 46436 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : The following 1 profile is active: "api"
+2026-11-08T20:50:44.767+08:00  INFO [] 46436 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:50:44.768+08:00  INFO [] 46436 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:50:44.782+08:00  INFO [] 46436 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 14 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:50:44.841+08:00  INFO [] 46436 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-11-08T20:50:44.846+08:00  INFO [] 46436 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-11-08T20:50:44.861+08:00  INFO [] 46436 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:62826/workforce_993_test (MySQL 8.4)
+2026-11-08T20:50:44.863+08:00  WARN [] 46436 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:50:44.891+08:00  INFO [] 46436 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 67 migrations (execution time 00:00.025s)
+2026-11-08T20:50:44.895+08:00  INFO [] 46436 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_993_test`: 69
+2026-11-08T20:50:44.895+08:00  INFO [] 46436 --- [main] o.f.core.internal.command.DbMigrate      : Schema `workforce_993_test` is up to date. No migration necessary.
+2026-11-08T20:50:45.014+08:00  INFO [] 46436 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:50:45.014+08:00  INFO [] 46436 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:50:45.014+08:00  INFO [] 46436 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:50:45.086+08:00  INFO [] 46436 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:50:45.091+08:00  INFO [] 46436 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@3bb35082, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@72e4f58f, org.springframework.security.web.context.SecurityContextHolderFilter@3ea65cf6, org.springframework.security.web.header.HeaderWriterFilter@4e1b36e6, org.springframework.web.filter.CorsFilter@4f67dcad, org.springframework.security.web.csrf.CsrfFilter@5a6a3251, com.workforcehub.auth.security.SessionValidityFilter@ced8cc7, com.workforcehub.auth.security.UserTypePathFilter@37c3aee0, com.workforcehub.auth.security.AdminPermissionFilter@55a60b34, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@3e07a967, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@29bc0447, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@1314b8f8, org.springframework.security.web.session.SessionManagementFilter@35d518a7, org.springframework.security.web.access.ExceptionTranslationFilter@6fbdf386, org.springframework.security.web.access.intercept.AuthorizationFilter@38fc8a6b]
+2026-11-08T20:50:45.148+08:00 DEBUG [] 46436 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:50:45.148+08:00 DEBUG [] 46436 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:50:45.148+08:00 DEBUG [] 46436 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:50:45.148+08:00 DEBUG [] 46436 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:50:45.148+08:00 DEBUG [] 46436 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:50:45.149+08:00  INFO [] 46436 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:50:45.149+08:00  INFO [] 46436 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:50:45.150+08:00  INFO [] 46436 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:50:45.172+08:00  INFO [] 46436 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Started ModuleLeaveApiIntegrationTest in 0.693 seconds (process running for 15.156)
+2026-11-08T20:50:45.174+08:00  INFO [] 46436 --- [main] c.w.plugin.runtime.PluginManagerService  : 恢复 0 个可用插件
+2026-11-08T20:50:45.370+08:00 DEBUG [2960b3b17d8545f2943b13d2252edb0c] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:45.373+08:00  INFO [2960b3b17d8545f2943b13d2252edb0c] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=910bd59b-25bf-4d29-9cd5-b733a59e777e
+2026-11-08T20:50:45.511+08:00 DEBUG [a2e0ba2bedd747009b38950c58a57572] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:45.513+08:00  INFO [a2e0ba2bedd747009b38950c58a57572] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=a1cbdec7-2f44-49f3-ae9b-633553845362
+2026-11-08T20:50:45.638+08:00 DEBUG [d1f08dbd0f9b45a1b25248f5adc79158] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:45.640+08:00  INFO [d1f08dbd0f9b45a1b25248f5adc79158] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=d7fc6936-7034-4792-95cf-2d523a25b415
+2026-11-08T20:50:45.818+08:00 DEBUG [b9947ea4e62440119c892efbb995e12a] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:45.820+08:00  INFO [b9947ea4e62440119c892efbb995e12a] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=31f21c0b-20f1-43ed-b014-a581b3e89a7a
+2026-11-08T20:50:45.972+08:00 DEBUG [fac866fe681749dba59c1aebb555b0c1] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:45.975+08:00  INFO [fac866fe681749dba59c1aebb555b0c1] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=a083cca3-ac2d-4d82-9b67-3bb1fb68dc0e
+2026-11-08T20:50:46.007+08:00  WARN [35ae270a51d44df590a5ff6da78af791] 46436 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:50:46.016+08:00  WARN [234fa1275ad64e32bfa5cf3ebf1e4b22] 46436 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:50:46.024+08:00  WARN [1bb7c832fd0b40b6991df2dd766b31cc] 46436 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:50:46.151+08:00 DEBUG [a52031851752453fb8a2c23724f2f597] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:46.155+08:00  INFO [a52031851752453fb8a2c23724f2f597] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=fb3f70d3-b04c-4eb7-9ee4-b6fc9e3a1eeb
+2026-11-08T20:50:46.248+08:00 DEBUG [0c7e9402831648fb83c71d6f1198712c] 46436 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:50:46.250+08:00  INFO [0c7e9402831648fb83c71d6f1198712c] 46436 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=a0215602-60bb-4963-950d-40195de3327e
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.791 s -- in com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict:234 Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+[ERROR]   LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict:234 Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+[ERROR]   LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict:234 Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+[ERROR]   ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint:161 Status expected:<409> but was:<500>
+[INFO] 
+[ERROR] Tests run: 58, Failures: 4, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  27.717 s
+[INFO] Finished at: 2026-11-08T20:50:46+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.1.2:test (default-test) on project workforce-hub: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -1,0 +1,27 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/plugin-runtime-security.test.ts > plugin runtime security boundaries > Nginx 对员工端和管理端文档启用最小 CSP
+Error: ENOENT: no such file or directory, open '/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-web-20261108/candidate/deploy/nginx/default.conf'
+ ❯ src/core/plugin-runtime-security.test.ts:32:20
+     30|
+     31|   it('Nginx 对员工端和管理端文档启用最小 CSP', () => {
+     32|     const source = readFileSync(resolve(currentDir, '../../../deploy/n…
+       |                    ^
+     33|     const defaultServer = source.slice(source.indexOf('listen 80 defau…
+     34|     const firstLocation = defaultServer.indexOf('location ');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/core/plugin-runtime-security.test.ts > plugin runtime security boundaries > Nginx 限制插件网关请求体并覆盖最长动作等待时间
+Error: ENOENT: no such file or directory, open '/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-web-20261108/candidate/deploy/nginx/default.conf'
+ ❯ src/core/plugin-runtime-security.test.ts:52:20
+     50|
+     51|   it('Nginx 限制插件网关请求体并覆盖最长动作等待时间', () => {
+     52|     const source = readFileSync(resolve(currentDir, '../../../deploy/n…
+       |                    ^
+     53|     const marker = 'location ~ ^/api/plugin-gateway/[^/]+/actions/[^/]…
+     54|     const start = source.indexOf(marker);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

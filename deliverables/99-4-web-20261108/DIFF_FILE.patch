@@ -1,0 +1,388 @@
+--- a/employee-web/src/api/types.ts
++++ b/employee-web/src/api/types.ts
+@@ -470,6 +470,15 @@
+   text: string;
+ }
+ 
++export interface LeaveDurationQuery {
++  startAt: string;
++  endAt: string;
++}
++
++export interface LeaveDurationResponse {
++  durationMinutes: number;
++}
++
+ export interface LeaveRequestCreateRequest {
+   leaveTypeId: EntityId;
+   startAt: string;
+--- a/employee-web/src/api/employee.ts
++++ b/employee-web/src/api/employee.ts
+@@ -42,6 +42,8 @@
+   ImMessageActionResponse,
+   ImMessageResponse,
+   LeaveRequestCreateRequest,
++  LeaveDurationQuery,
++  LeaveDurationResponse,
+   LeaveAccountResponse,
+   LeaveTypeResponse,
+   LoginSendCodeRequest,
+@@ -115,6 +117,7 @@
+       deptTree: () => client.get<OrgDepartmentTreeNodeResponse[]>('/api/employee/contacts/dept-tree'),
+     },
+     workflow: {
++      leaveDuration: (query: LeaveDurationQuery) => client.get<LeaveDurationResponse>('/api/employee/workflow/leave-duration', { query: { ...query } }),
+       submitLeaveRequest: (request: LeaveRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/leave-requests', request),
+       submitClockCorrectionRequest: (request: ClockCorrectionRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/clock-correction-requests', request),
+       submitGenericRequest: (request: GenericWorkflowRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/generic-requests', request),
+--- a/employee-web/src/api/employee.test.ts
++++ b/employee-web/src/api/employee.test.ts
+@@ -26,6 +26,16 @@
+ }
+ 
+ describe('createEmployeeApi', () => {
++  it('previews leave duration using the authenticated workflow calendar endpoint', async () => {
++    const { client, calls } = createSpyClient();
++    const api = createEmployeeApi(client);
++    const query = { startAt: '2026-05-07T09:00:00', endAt: '2026-05-07T12:00:00' };
++
++    await api.workflow.leaveDuration(query);
++
++    expect(calls).toEqual([['get', '/api/employee/workflow/leave-duration', { query }]]);
++  });
++
+   it('maps auth endpoints to backend employee auth controller', async () => {
+     const { client, calls } = createSpyClient();
+     const api = createEmployeeApi(client);
+--- a/employee-web/src/composables/useWorkbenchState.ts
++++ b/employee-web/src/composables/useWorkbenchState.ts
+@@ -42,44 +42,6 @@
+   showToast: (message: string) => void;
+ }
+ 
+-const HALF_DAY_MINUTES = 240;
+-
+-function overlapMinutes(rangeStart: Date, rangeEnd: Date, segmentStart: Date, segmentEnd: Date) {
+-  const start = Math.max(rangeStart.getTime(), segmentStart.getTime());
+-  const end = Math.min(rangeEnd.getTime(), segmentEnd.getTime());
+-  if (end <= start) return 0;
+-  return Math.round((end - start) / 60000);
+-}
+-
+-// 按半天（4h）为最小单位计算请假时长，只计算工作时间段（9-12, 13-18）
+-function calculateLeaveDurationMinutes(startAt: string, endAt: string) {
+-  if (!startAt || !endAt) return 0;
+-  const start = new Date(startAt);
+-  const end = new Date(endAt);
+-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
+-  let minutes = 0;
+-  const cursor = new Date(start);
+-  while (cursor <= end) {
+-    const day = new Date(cursor);
+-    day.setHours(0, 0, 0, 0);
+-    const morningStart = new Date(day);
+-    morningStart.setHours(9, 0, 0, 0);
+-    const morningEnd = new Date(day);
+-    morningEnd.setHours(12, 0, 0, 0);
+-    const afternoonStart = new Date(day);
+-    afternoonStart.setHours(13, 0, 0, 0);
+-    const afternoonEnd = new Date(day);
+-    afternoonEnd.setHours(18, 0, 0, 0);
+-    minutes += overlapMinutes(start, end, morningStart, morningEnd);
+-    minutes += overlapMinutes(start, end, afternoonStart, afternoonEnd);
+-    cursor.setDate(cursor.getDate() + 1);
+-    cursor.setHours(0, 0, 0, 0);
+-  }
+-  if (minutes <= 0) return 0;
+-  // 向上取整到半天
+-  return Math.ceil(minutes / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
+-}
+-
+ function accountAsLeaveType(account: LeaveAccountResponse): LeaveTypeResponse {
+   return {
+     leaveTypeId: account.leaveTypeId,
+@@ -120,13 +82,14 @@
+     leaveTypeId: '',
+     startAt: '',
+     endAt: '',
+-    durationMinutes: '480',
++    durationMinutes: '',
+     reason: '',
+   });
+   const leaveAttachmentIds = ref<Array<number | string>>([]);
+   const leaveSubmitting = ref(false);
+   const leaveResult = ref<WorkflowRequestCreateResponse | null>(null);
+   const leaveError = ref('');
++  let leaveDurationRequestSeq = 0;
+   const workflowRequests = ref<WorkflowRequestSummaryResponse[]>([]);
+   const workflowRequestsTotal = ref(0);
+   const workflowRequestsLoading = ref(false);
+@@ -188,9 +151,6 @@
+       note: annualLeaveAccount.value?.leaveName ?? '假期',
+     },
+   ]);
+-  const computedLeaveDurationMinutes = computed(() => (
+-    calculateLeaveDurationMinutes(leaveForm.value.startAt, leaveForm.value.endAt)
+-  ));
+   const workflowDetailRows = computed<FieldRows>(() => {
+     const detail = workflowDetail.value;
+     if (!detail) return [];
+@@ -297,21 +257,33 @@
+   }
+ 
+   async function submitLeaveRequest() {
++    if (leaveSubmitting.value) return;
+     leaveError.value = '';
+     leaveResult.value = null;
+     const leaveTypeId = leaveForm.value.leaveTypeId.trim();
+-    const durationMinutes = computedLeaveDurationMinutes.value;
++    const { startAt, endAt } = leaveForm.value;
+     const reason = leaveForm.value.reason.trim();
+-    if (!leaveTypeId || !leaveForm.value.startAt || !leaveForm.value.endAt || !durationMinutes || !reason) {
++    if (!leaveTypeId || !startAt || !endAt || !reason) {
+       leaveError.value = '请完整填写请假申请';
+       return;
+     }
+     leaveSubmitting.value = true;
+     try {
++      const durationMinutes = await refreshLeaveDuration(startAt, endAt);
++      if (startAt !== leaveForm.value.startAt || endAt !== leaveForm.value.endAt
++        || leaveTypeId !== leaveForm.value.leaveTypeId.trim() || reason !== leaveForm.value.reason.trim()) {
++        leaveError.value = '申请内容已变更，请重新提交';
++        return;
++      }
++      if (durationMinutes === null) return;
++      if (durationMinutes <= 0) {
++        leaveError.value = '所选时段无可请假工作时间';
++        return;
++      }
+       leaveResult.value = await employeeApi.workflow.submitLeaveRequest({
+         leaveTypeId,
+-        startAt: toApiDateTime(leaveForm.value.startAt),
+-        endAt: toApiDateTime(leaveForm.value.endAt),
++        startAt: toApiDateTime(startAt),
++        endAt: toApiDateTime(endAt),
+         durationMinutes,
+         reason,
+         attachmentRefIds: leaveAttachmentIds.value,
+@@ -329,12 +301,41 @@
+     }
+   }
+ 
++  async function refreshLeaveDuration(startAt: string, endAt: string): Promise<number | null> {
++    const requestSeq = ++leaveDurationRequestSeq;
++    leaveForm.value.durationMinutes = '';
++    leaveError.value = '';
++    if (!startAt || !endAt) return null;
++    if (!Number.isFinite(Date.parse(startAt)) || !Number.isFinite(Date.parse(endAt)) || endAt <= startAt) {
++      leaveError.value = '结束时间必须晚于开始时间';
++      return null;
++    }
++    try {
++      const result = await employeeApi.workflow.leaveDuration({
++        startAt: toApiDateTime(startAt).replace(' ', 'T'),
++        endAt: toApiDateTime(endAt).replace(' ', 'T'),
++      });
++      if (requestSeq !== leaveDurationRequestSeq) return null;
++      if (!Number.isSafeInteger(result.durationMinutes) || result.durationMinutes < 0) {
++        throw new Error('请假时长计算失败');
++      }
++      leaveForm.value.durationMinutes = String(result.durationMinutes);
++      return result.durationMinutes;
++    } catch (error) {
++      if (requestSeq === leaveDurationRequestSeq) {
++        leaveError.value = error instanceof Error ? error.message : '请假时长计算失败';
++      }
++      return null;
++    }
++  }
++
++  // 以下两条注释描述旧算法，现已由服务端排班计时替代。
++  // 按半天（4h）为最小单位计算请假时长，只计算工作时间段（9-12, 13-18）
++  // 向上取整到半天
+   watch(
+-    computedLeaveDurationMinutes,
+-    (minutes) => {
+-      leaveForm.value.durationMinutes = minutes > 0 ? String(minutes) : '';
+-    },
+-    { immediate: true },
++    () => [leaveForm.value.startAt, leaveForm.value.endAt],
++    ([startAt, endAt]) => { void refreshLeaveDuration(startAt, endAt); },
++    { immediate: true, flush: 'sync' },
+   );
+ 
+   async function loadWorkflowRequests() {
+@@ -473,6 +474,7 @@
+ 
+   if (getCurrentInstance()) {
+     onBeforeUnmount(() => {
++      leaveDurationRequestSeq += 1;
+       closeWorkflowFilePreview();
+     });
+   }
+--- a/employee-web/src/composables/useWorkbenchState.test.ts
++++ b/employee-web/src/composables/useWorkbenchState.test.ts
+@@ -169,7 +169,8 @@
+     expect(state.workflowRequests.value[0]?.requestId).toBe('REQ-1');
+   });
+ 
+-  it('computes leave minutes from datetime range and rounds up to half day', async () => {
++  it('uses calendar minutes from the server without rounding up to half day', async () => {
++    const preview = vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes: 120 });
+     vi.spyOn(employeeApi.leave, 'types').mockResolvedValue([
+       { leaveTypeId: 'L-1', leaveCode: 'ANNUAL', leaveName: '年假', balanceMode: 'DEDUCT', status: 'ACTIVE' },
+       { leaveTypeId: 'L-2', leaveCode: 'SICK', leaveName: '病假', balanceMode: 'NO_DEDUCT', status: 'ACTIVE' },
+@@ -188,7 +189,108 @@
+     state.leaveForm.value.endAt = '2026-05-08T10:00';
+     await nextTick();
+ 
+-    expect(state.leaveForm.value.durationMinutes).toBe('240');
++    expect(state.leaveForm.value.durationMinutes).toBe('120');
++    expect(preview).toHaveBeenCalledWith({ startAt: '2026-05-07T17:00:00', endAt: '2026-05-08T10:00:00' });
++  });
++
++  it.each([180, 300, 60, 0])('displays authoritative duration %i for the selected calendar range', async (durationMinutes) => {
++    vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes });
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value.startAt = '2026-05-07T09:00';
++    state.leaveForm.value.endAt = '2026-05-07T12:00';
++    await nextTick();
++
++    expect(state.leaveForm.value.durationMinutes).toBe(String(durationMinutes));
++  });
++
++  it('discards stale previews and clears duration immediately when dates change or are removed', async () => {
++    const older = createDeferred<{ durationMinutes: number }>();
++    const newer = createDeferred<{ durationMinutes: number }>();
++    vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockImplementationOnce(() => older.promise)
++      .mockImplementationOnce(() => newer.promise);
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value.startAt = '2026-05-07T09:00';
++    state.leaveForm.value.endAt = '2026-05-07T12:00';
++    state.leaveForm.value.endAt = '2026-05-07T18:00';
++    expect(state.leaveForm.value.durationMinutes).toBe('');
++    newer.resolve({ durationMinutes: 480 });
++    await nextTick();
++    older.resolve({ durationMinutes: 180 });
++    await nextTick();
++    expect(state.leaveForm.value.durationMinutes).toBe('480');
++
++    const pending = createDeferred<{ durationMinutes: number }>();
++    vi.mocked(employeeApi.workflow.leaveDuration).mockImplementationOnce(() => pending.promise);
++    state.leaveForm.value.endAt = '2026-05-07T17:00';
++    state.leaveForm.value.startAt = '';
++    pending.resolve({ durationMinutes: 420 });
++    await nextTick();
++    expect(state.leaveForm.value.durationMinutes).toBe('');
++  });
++
++  it('clears old duration and blocks submission when the calendar preview fails', async () => {
++    vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockResolvedValueOnce({ durationMinutes: 180 })
++      .mockRejectedValue(new Error('未配置员工排班'));
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await nextTick();
++    expect(state.leaveForm.value.durationMinutes).toBe('180');
++    await state.submitLeaveRequest();
++
++    expect(state.leaveForm.value.durationMinutes).toBe('');
++    expect(state.leaveError.value).toBe('未配置员工排班');
++    expect(state.leaveSubmitting.value).toBe(false);
++    expect(submit).not.toHaveBeenCalled();
++  });
++
++  it('revalidates the duration before submission instead of trusting an old displayed value', async () => {
++    const preview = vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockResolvedValueOnce({ durationMinutes: 180 })
++      .mockResolvedValueOnce({ durationMinutes: 150 });
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest').mockRejectedValue(new Error('测试提交结束'));
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await nextTick();
++    state.leaveForm.value.durationMinutes = '999';
++    await state.submitLeaveRequest();
++
++    expect(preview).toHaveBeenCalledTimes(2);
++    expect(submit).toHaveBeenCalledExactlyOnceWith({ leaveTypeId: 'L-1', startAt: '2026-05-07 09:00:00', endAt: '2026-05-07 12:00:00', durationMinutes: 150, reason: '休假', attachmentRefIds: [] });
++  });
++
++  it('does not submit a stale range when dates change during submission preview', async () => {
++    const pending = createDeferred<{ durationMinutes: number }>();
++    vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockResolvedValueOnce({ durationMinutes: 180 })
++      .mockImplementationOnce(() => pending.promise)
++      .mockResolvedValueOnce({ durationMinutes: 480 });
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await nextTick();
++    const submitting = state.submitLeaveRequest();
++    await state.submitLeaveRequest();
++    state.leaveForm.value.endAt = '2026-05-07T18:00';
++    pending.resolve({ durationMinutes: 180 });
++    await submitting;
++
++    expect(state.leaveForm.value.durationMinutes).toBe('480');
++    expect(state.leaveSubmitting.value).toBe(false);
++    expect(submit).not.toHaveBeenCalled();
++  });
++
++  it.each([0, -1, 1.5, Number.NaN])('rejects nonpositive or invalid authoritative duration %s', async (durationMinutes) => {
++    vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes });
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await state.submitLeaveRequest();
++
++    expect(state.leaveError.value).not.toBe('');
++    expect(submit).not.toHaveBeenCalled();
+   });
+ 
+   it('keeps no-deduct leave types selectable without annual leave default bias', async () => {
+--- a/employee-web/src/utils/employee-format.ts
++++ b/employee-web/src/utils/employee-format.ts
+@@ -56,6 +56,7 @@
+   if (status === 'IN_APPROVAL') return '审批中';
+   if (status === 'ABNORMAL') return '异常';
+   if (status === 'NORMAL') return '正常';
++  if (status === 'REST') return '休息';
+   if (status === 'ACTIVE') return '正常';
+   if (status === 'READY') return '就绪';
+   if (status === 'PASSED') return '已通过';
+--- a/employee-web/src/utils/employee-format.test.ts
++++ b/employee-web/src/utils/employee-format.test.ts
+@@ -19,6 +19,7 @@
+     expect(displayField('  ')).toBe('-');
+     expect(displayField(0)).toBe('0');
+     expect(statusText('IN_APPROVAL')).toBe('审批中');
++    expect(statusText('REST')).toBe('休息');
+     expect(statusText('UNKNOWN')).toBe('其他状态');
+     expect(bizTypeLabel('LEAVE')).toBe('请假');
+     expect(punchTypeLabel('OFF_DUTY')).toBe('下班');
+--- a/admin-web/src/utils/format.ts
++++ b/admin-web/src/utils/format.ts
+@@ -422,6 +422,7 @@
+ export function attendanceResultLabel(value?: string | null) {
+   const labels: Record<string, string> = {
+     NORMAL: '正常',
++    REST: '休息',
+     ABNORMAL: '异常',
+     NO_RULE: '未排班',
+     LEAVE: '请假',
+--- /dev/null
++++ b/admin-web/src/utils/format.test.ts
+@@ -0,0 +1,11 @@
++import { describe, expect, it } from 'vitest';
++import { attendanceResultLabel } from './format';
++
++describe('attendanceResultLabel', () => {
++  it('renders scheduled rest days as rest instead of an unknown attendance result', () => {
++    expect(attendanceResultLabel('REST')).toBe('休息');
++    expect(attendanceResultLabel('NORMAL')).toBe('正常');
++    expect(attendanceResultLabel('ABNORMAL')).toBe('异常');
++    expect(attendanceResultLabel('NO_RULE')).toBe('未排班');
++  });
++});

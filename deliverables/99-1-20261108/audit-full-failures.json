@@ -1,0 +1,26 @@
+[
+  {
+    "class": "com.workforcehub.leave.LeaveSettlementTransactionTest",
+    "test": "terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[1]",
+    "type": "failure",
+    "message": "Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>"
+  },
+  {
+    "class": "com.workforcehub.leave.LeaveSettlementTransactionTest",
+    "test": "terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[2]",
+    "type": "failure",
+    "message": "Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>"
+  },
+  {
+    "class": "com.workforcehub.leave.LeaveSettlementTransactionTest",
+    "test": "terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[3]",
+    "type": "failure",
+    "message": "Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>"
+  },
+  {
+    "class": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest",
+    "test": "workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint",
+    "type": "failure",
+    "message": "Status expected:<409> but was:<500>"
+  }
+]

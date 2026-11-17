@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "created_tasks": null,
+    "failed_tasks": null,
+    "guid": "42105db4-d930-4d71-8dab-c86576536eb0",
+    "url": "https://applink.feishu.cn/client/todo/task_list?guid=42105db4-d930-4d71-8dab-c86576536eb0"
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

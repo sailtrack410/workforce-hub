@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/Users/sailtrack/.codex/skills/playwright/scripts/playwright_cli.sh",
+    "-s=99-4-web-proof",
+    "--raw",
+    "resize",
+    "1200",
+    "1000"
+  ],
+  "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "exit_status": 0,
+  "stdout": "\n",
+  "stderr": ""
+}

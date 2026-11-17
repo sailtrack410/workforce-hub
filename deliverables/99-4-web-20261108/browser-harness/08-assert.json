@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/Users/sailtrack/.codex/skills/playwright/scripts/playwright_cli.sh",
+    "-s=99-4-web-proof",
+    "--raw",
+    "run-code",
+    "--filename",
+    "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-web-20261108/browser-harness/assert.cjs"
+  ],
+  "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "exit_status": 0,
+  "stdout": "{\"passed\":true,\"controlledApiHarness\":true,\"realBackendEndToEnd\":false,\"startAt\":\"2026-05-07T09:00\",\"endAt\":\"2026-05-07T12:00\",\"duration\":\"180 分钟\",\"employeeRest\":\"休息\",\"adminRest\":\"休息\",\"request\":{\"startAt\":\"2026-05-07T09:00:00\",\"endAt\":\"2026-05-07T12:00:00\"},\"error\":\"\"}\n",
+  "stderr": ""
+}

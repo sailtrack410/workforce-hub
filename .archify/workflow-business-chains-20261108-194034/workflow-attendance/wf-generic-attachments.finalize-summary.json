@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.candidate.json",
+    "sha256": "e15079afffbdda4e17fc06217ba88749f85b56a1ecba79ed4337f1b7b1ceb82c",
+    "bytes": 6076
+  },
+  "artifact": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.html"
+  },
+  "gates": {
+    "validate": "fail",
+    "deliver": "not-run",
+    "check": "not-run",
+    "browser-check": "not-run"
+  },
+  "failedStage": "validate",
+  "diagnostics": [
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "mainPath step \"approval\" -> \"ticket\" moves backward from col 4 to 3 — use a return edge outside mainPath for loops.",
+      "subject": {
+        "diagramType": "workflow"
+      }
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.finalize.json",
+    "summaryReceipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.3.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-08T11:33:45.718Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 329,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "nextAction": {
+    "action": "edit-in-place",
+    "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.candidate.json",
+    "constraint": "Preserve unaffected semantics and geometry; apply each diagnostic's supportedFixes, or the fix its message names, and do not replace the whole candidate.",
+    "then": "finalize-once"
+  }
+}

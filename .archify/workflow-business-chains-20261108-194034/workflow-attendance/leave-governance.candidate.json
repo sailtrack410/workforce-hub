@@ -1,0 +1,213 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "假种治理与管理员余额调整",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "govern",
+      "label": "假种与余额治理"
+    },
+    {
+      "id": "ledger",
+      "label": "账户与流水"
+    },
+    {
+      "id": "exception",
+      "label": "幂等与约束"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "types",
+      "lane": "govern",
+      "col": 0,
+      "type": "backend",
+      "label": "假种创建更新删除",
+      "sublabel": "编码、扣减模式与状态",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 51,
+          "end_line": 91
+        }
+      ]
+    },
+    {
+      "id": "ui",
+      "lane": "govern",
+      "col": 1,
+      "type": "frontend",
+      "label": "管理员提交调整",
+      "sublabel": "员工、假种、变更分钟",
+      "sources": [
+        {
+          "path": "admin-web/src/views/LeaveGovernanceView.vue",
+          "line": 87,
+          "end_line": 107
+        }
+      ]
+    },
+    {
+      "id": "gate",
+      "lane": "govern",
+      "col": 2,
+      "type": "security",
+      "label": "校验调整条件",
+      "sublabel": "非零、有效员工和假种",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 95,
+          "end_line": 103
+        }
+      ]
+    },
+    {
+      "id": "key",
+      "lane": "govern",
+      "col": 3,
+      "type": "backend",
+      "label": "查询sourceTxnKey",
+      "sublabel": "存在则核对请求指纹",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 104,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "lock",
+      "lane": "ledger",
+      "col": 3,
+      "type": "backend",
+      "label": "锁定或创建账户",
+      "sublabel": "SELECT FOR UPDATE",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 113,
+          "end_line": 118
+        }
+      ]
+    },
+    {
+      "id": "balance",
+      "lane": "ledger",
+      "col": 4,
+      "type": "backend",
+      "label": "计算可用余额",
+      "sublabel": "结果不能为负数",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 119,
+          "end_line": 124
+        }
+      ]
+    },
+    {
+      "id": "txn",
+      "lane": "ledger",
+      "col": 5,
+      "type": "database",
+      "label": "写ADJUST流水",
+      "sublabel": "返回更新后账户",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 125,
+          "end_line": 137
+        }
+      ]
+    },
+    {
+      "id": "reuse",
+      "lane": "exception",
+      "col": 3,
+      "type": "backend",
+      "label": "重复请求返回账户",
+      "sublabel": "相同key且指纹一致",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 104,
+          "end_line": 110
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "types",
+      "to": "ui"
+    },
+    {
+      "from": "ui",
+      "to": "gate"
+    },
+    {
+      "from": "gate",
+      "to": "key"
+    },
+    {
+      "from": "key",
+      "to": "lock",
+      "label": "新key"
+    },
+    {
+      "from": "lock",
+      "to": "balance"
+    },
+    {
+      "from": "balance",
+      "to": "txn"
+    },
+    {
+      "from": "key",
+      "to": "reuse",
+      "label": "已有key",
+      "role": "branch"
+    }
+  ],
+  "mainPath": [
+    "types",
+    "ui",
+    "gate",
+    "key",
+    "lock",
+    "balance",
+    "txn"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "幂等与冻结",
+      "items": [
+        "同一sourceTxnKey核对员工、假种及变更分钟；不同参数冲突。",
+        "调整作用于availableMinutes，不改frozenMinutes。",
+        "沿用99-3：假种可变状态与模式会改变审批中请求的后续结算判断。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "重试优化",
+      "items": [
+        "页面每次提交用Date.now生成新key。前次已提交但响应丢失后重试，会被服务端当作新调整。",
+        "同一编辑意图应持有稳定key，成功确认或明确新建调整时再换key。",
+        "静态证据已确认，未动态制造响应丢失或重复记账。"
+      ]
+    }
+  ]
+}

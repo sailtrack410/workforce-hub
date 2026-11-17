@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh",
+    "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/cumulative-rollback"
+  ],
+  "exit": 0,
+  "restored_hashes": {
+    "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": "6cd973d9bc8f8b3a87511a1a7cb3f422856fc0283ed92e00e579f1e382f997d4",
+    "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": "e1ecfe234d5c2fc329476cbc86ed13c039491eec330faf041a57d4e937f54d6a",
+    "server/pom.xml": "79269d1ee66ac035a0e544e4f2d245ce38dbb4dcfdf3b5b755ea2311d2e3a7a9",
+    "server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql": null,
+    "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": null,
+    "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "19ad71b932c9c1ced44f316719bcb1f1608478b1ba391b971217d227b2d5fdde"
+  }
+}

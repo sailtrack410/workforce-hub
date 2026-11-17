@@ -1,0 +1,517 @@
+package com.workforcehub.leave.repository;
+
+import com.workforcehub.common.exception.BizException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
+
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+
+/**
+ * module-leave 第一版 JDBC 仓储。
+ */
+@Repository
+public class LeaveRepository {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public LeaveRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public boolean existsLeaveCode(String leaveCode) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM lv_type
+            WHERE leave_code = ? AND is_deleted = 0
+            """, Long.class, leaveCode);
+        return count != null && count > 0;
+    }
+
+    public boolean existsLeaveCodeExceptId(String leaveCode, Long leaveTypeId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM lv_type
+            WHERE leave_code = ? AND id <> ? AND is_deleted = 0
+            """, Long.class, leaveCode, leaveTypeId);
+        return count != null && count > 0;
+    }
+
+    public void insertLeaveType(Long leaveTypeId,
+                                String leaveCode,
+                                String leaveName,
+                                String balanceMode,
+                                String status,
+                                Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO lv_type
+                (id, leave_code, leave_name, balance_mode, status, created_by, updated_by)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?)
+            """,
+            leaveTypeId,
+            leaveCode,
+            leaveName,
+            balanceMode,
+            status,
+            operatorId,
+            operatorId
+        );
+    }
+
+    public int updateLeaveType(Long leaveTypeId,
+                               String leaveCode,
+                               String leaveName,
+                               String balanceMode,
+                               String status,
+                               Long operatorId) {
+        return jdbcTemplate.update("""
+            UPDATE lv_type
+            SET leave_code = ?,
+                leave_name = ?,
+                balance_mode = ?,
+                status = ?,
+                updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """,
+            leaveCode,
+            leaveName,
+            balanceMode,
+            status,
+            operatorId,
+            leaveTypeId
+        );
+    }
+
+    public int deleteLeaveType(Long leaveTypeId, Long operatorId) {
+        return jdbcTemplate.update("""
+            UPDATE lv_type
+            SET is_deleted = 1,
+                updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """,
+            operatorId,
+            leaveTypeId
+        );
+    }
+
+    public LeaveTypeRow getLeaveTypeOrThrow(Long leaveTypeId) {
+        List<LeaveTypeRow> rows = jdbcTemplate.query("""
+            SELECT id, leave_code, leave_name, balance_mode, status, created_at, updated_at
+            FROM lv_type
+            WHERE id = ? AND is_deleted = 0
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new LeaveTypeRow(
+                rs.getLong("id"),
+                rs.getString("leave_code"),
+                rs.getString("leave_name"),
+                rs.getString("balance_mode"),
+                rs.getString("status"),
+                rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getTimestamp("updated_at").toLocalDateTime()
+            ),
+            leaveTypeId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "假种不存在");
+        }
+        return rows.get(0);
+    }
+
+    public LeaveTypeRow getActiveLeaveTypeOrThrow(Long leaveTypeId) {
+        LeaveTypeRow row = getLeaveTypeOrThrow(leaveTypeId);
+        if (!"ACTIVE".equals(row.status())) {
+            throw new BizException(409, "假种已停用");
+        }
+        return row;
+    }
+
+    /**
+     * 员工各假种已获批的请假总时长（分钟），key=假种ID；不扣余额的假种没有账户，用量只能从这里统计
+     */
+    public Map<Long, Integer> sumApprovedLeaveMinutesByType(Long userId) {
+        return jdbcTemplate.query("""
+            SELECT l.leave_type_id, COALESCE(SUM(l.duration_minutes), 0) AS used_minutes
+            FROM wf_req_leave l
+            JOIN wf_request r ON r.id = l.request_id
+            WHERE r.applicant_user_id = ? AND r.status = 'APPROVED'
+            GROUP BY l.leave_type_id
+            """,
+            (rs) -> {
+                Map<Long, Integer> map = new HashMap<>();
+                while (rs.next()) {
+                    map.put(rs.getLong("leave_type_id"), rs.getInt("used_minutes"));
+                }
+                return map;
+            },
+            userId);
+    }
+
+    public List<LeaveTypeRow> listLeaveTypes() {
+        return jdbcTemplate.query("""
+            SELECT id, leave_code, leave_name, balance_mode, status, created_at, updated_at
+            FROM lv_type
+            WHERE is_deleted = 0
+            ORDER BY leave_code ASC, id ASC
+            """,
+            (rs, rowNum) -> new LeaveTypeRow(
+                rs.getLong("id"),
+                rs.getString("leave_code"),
+                rs.getString("leave_name"),
+                rs.getString("balance_mode"),
+                rs.getString("status"),
+                rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getTimestamp("updated_at").toLocalDateTime()
+            )
+        );
+    }
+
+    public boolean existsActiveUser(Long userId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM org_user
+            WHERE id = ?
+              AND status = 'ACTIVE'
+              AND employment_status <> 'OFFBOARDED'
+              AND is_deleted = 0
+            """, Long.class, userId);
+        return count != null && count > 0;
+    }
+
+    /**
+     * 各账户最新一条流水（按主键倒序取首条），用于账户列表展示“最近变动”
+     */
+    public Map<Long, LeaveAccountTxnRow> findLatestTxnByAccountIds(List<Long> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(", ", accountIds.stream().map((id) -> "?").toList());
+        // 两组 IN 占位符共用同一份参数，必须展开成扁平数组，嵌套数组会被当成单个参数绑定
+        Object[] params = Stream.concat(accountIds.stream(), accountIds.stream()).toArray();
+        List<LeaveAccountTxnRow> rows = jdbcTemplate.query("""
+            SELECT id, account_id, txn_type, change_minutes, balance_after,
+                   source_type, source_id, source_txn_key
+            FROM lv_account_txn
+            WHERE account_id IN (%s)
+              AND id IN (
+                SELECT MAX(id) FROM lv_account_txn WHERE account_id IN (%s) GROUP BY account_id
+              )
+            """.formatted(placeholders, placeholders),
+            (rs, rowNum) -> new LeaveAccountTxnRow(
+                rs.getLong("id"),
+                rs.getLong("account_id"),
+                rs.getString("txn_type"),
+                rs.getInt("change_minutes"),
+                rs.getInt("balance_after"),
+                rs.getString("source_type"),
+                rs.getObject("source_id", Long.class),
+                rs.getString("source_txn_key")
+            ),
+            params
+        );
+        Map<Long, LeaveAccountTxnRow> latestByAccount = new HashMap<>();
+        for (LeaveAccountTxnRow row : rows) {
+            latestByAccount.put(row.accountId(), row);
+        }
+        return latestByAccount;
+    }
+
+    public LeaveAccountTxnRow getTxnBySourceTxnKey(String sourceTxnKey) {
+        if (!StringUtils.hasText(sourceTxnKey)) {
+            return null;
+        }
+        List<LeaveAccountTxnRow> rows = jdbcTemplate.query("""
+            SELECT id, account_id, txn_type, change_minutes, balance_after,
+                   source_type, source_id, source_txn_key
+            FROM lv_account_txn
+            WHERE source_txn_key = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new LeaveAccountTxnRow(
+                rs.getLong("id"),
+                rs.getLong("account_id"),
+                rs.getString("txn_type"),
+                rs.getInt("change_minutes"),
+                rs.getInt("balance_after"),
+                rs.getString("source_type"),
+                rs.getObject("source_id", Long.class),
+                rs.getString("source_txn_key")
+            ),
+            sourceTxnKey
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public LeaveAccountRow getAccountByIdOrThrow(Long accountId) {
+        List<LeaveAccountRow> rows = jdbcTemplate.query(accountSelectSql() + """
+            WHERE la.id = ?
+            LIMIT 1
+            """,
+            this::mapAccount,
+            accountId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "假期账户不存在");
+        }
+        return rows.get(0);
+    }
+
+    public LeaveAccountRow getAccountForUpdate(Long userId, Long leaveTypeId) {
+        List<LeaveAccountRow> rows = jdbcTemplate.query(accountSelectSql() + """
+            WHERE la.user_id = ?
+              AND la.leave_type_id = ?
+              AND la.status = 'ACTIVE'
+            LIMIT 1
+            FOR UPDATE
+            """,
+            this::mapAccount,
+            userId,
+            leaveTypeId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public void insertAccount(Long accountId, Long userId, Long leaveTypeId, Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO lv_account
+                (id, user_id, leave_type_id, available_minutes, frozen_minutes,
+                 version, status, created_by, updated_by)
+            VALUES
+                (?, ?, ?, 0, 0, 0, 'ACTIVE', ?, ?)
+            """,
+            accountId,
+            userId,
+            leaveTypeId,
+            operatorId,
+            operatorId
+        );
+    }
+
+    public void updateAccountBalance(Long accountId, int availableMinutes, Long operatorId, int expectedVersion) {
+        int updated = jdbcTemplate.update("""
+            UPDATE lv_account
+            SET available_minutes = ?,
+                version = version + 1,
+                updated_by = ?
+            WHERE id = ?
+              AND status = 'ACTIVE'
+              AND version = ?
+            """,
+            availableMinutes,
+            operatorId,
+            accountId,
+            expectedVersion
+        );
+        if (updated == 0) {
+            throw new BizException(409, "假期账户已被其他事务更新");
+        }
+    }
+
+    public void updateAccountBalances(Long accountId, int availableMinutes, int frozenMinutes, Long operatorId, int expectedVersion) {
+        int updated = jdbcTemplate.update("""
+            UPDATE lv_account
+            SET available_minutes = ?,
+                frozen_minutes = ?,
+                version = version + 1,
+                updated_by = ?
+            WHERE id = ?
+              AND status = 'ACTIVE'
+              AND version = ?
+            """,
+            availableMinutes,
+            frozenMinutes,
+            operatorId,
+            accountId,
+            expectedVersion
+        );
+        if (updated == 0) {
+            throw new BizException(409, "假期账户已被其他事务更新");
+        }
+    }
+
+    public void insertAccountTxn(Long txnId,
+                                 Long accountId,
+                                 String txnType,
+                                 int changeMinutes,
+                                 int balanceAfter,
+                                 String sourceType,
+                                 Long sourceId,
+                                 String sourceTxnKey,
+                                 LocalDateTime effectiveAt) {
+        jdbcTemplate.update("""
+            INSERT INTO lv_account_txn
+                (id, account_id, txn_type, change_minutes, balance_after,
+                 source_type, source_id, source_txn_key, effective_at)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            txnId,
+            accountId,
+            txnType,
+            changeMinutes,
+            balanceAfter,
+            sourceType,
+            sourceId,
+            sourceTxnKey,
+            effectiveAt
+        );
+    }
+
+    public List<LeaveAccountRow> listUserAccounts(Long userId) {
+        return jdbcTemplate.query(accountSelectSql() + """
+            WHERE la.user_id = ?
+              AND la.status = 'ACTIVE'
+              AND lt.is_deleted = 0
+            ORDER BY lt.leave_code ASC, la.id ASC
+            """,
+            this::mapAccount,
+            userId
+        );
+    }
+
+    public List<LeaveAccountRow> listAccounts(Long userId, Long leaveTypeId) {
+        java.util.ArrayList<Object> args = new java.util.ArrayList<>();
+        StringBuilder whereSql = new StringBuilder("""
+            WHERE la.status = 'ACTIVE'
+              AND lt.is_deleted = 0
+            """);
+        if (userId != null) {
+            whereSql.append("  AND la.user_id = ?\n");
+            args.add(userId);
+        }
+        if (leaveTypeId != null) {
+            whereSql.append("  AND la.leave_type_id = ?\n");
+            args.add(leaveTypeId);
+        }
+        return jdbcTemplate.query(accountSelectSql() + whereSql + """
+            ORDER BY la.user_id ASC, lt.leave_code ASC, la.id ASC
+            LIMIT 500
+            """,
+            this::mapAccount,
+            args.toArray()
+        );
+    }
+
+    public int getAvailableMinutes(Long userId, Long leaveTypeId) {
+        Integer minutes = jdbcTemplate.queryForObject("""
+            SELECT COALESCE((
+                SELECT la.available_minutes
+                FROM lv_account la
+                JOIN lv_type lt ON lt.id = la.leave_type_id
+                WHERE la.user_id = ?
+                  AND la.leave_type_id = ?
+                  AND la.status = 'ACTIVE'
+                  AND lt.status = 'ACTIVE'
+                  AND lt.is_deleted = 0
+                LIMIT 1
+            ), 0)
+            """, Integer.class, userId, leaveTypeId);
+        return minutes == null ? 0 : minutes;
+    }
+
+    public List<ApprovedLeavePeriod> listApprovedLeavePeriodsOnDate(Long userId, LocalDate workDate) {
+        LocalDateTime dayStart = workDate.atStartOfDay();
+        LocalDateTime nextDayStart = workDate.plusDays(1).atStartOfDay();
+        return jdbcTemplate.query("""
+            SELECT wrl.start_at, wrl.end_at
+            FROM wf_request wr
+            JOIN wf_req_leave wrl ON wrl.request_id = wr.id
+            WHERE wr.applicant_user_id = ?
+              AND wr.biz_type = 'LEAVE'
+              AND wr.status = 'APPROVED'
+              AND wrl.start_at < ?
+              AND wrl.end_at > ?
+              AND wr.is_deleted = 0
+            """,
+            (rs, rowNum) -> new ApprovedLeavePeriod(
+                rs.getTimestamp("start_at").toLocalDateTime(),
+                rs.getTimestamp("end_at").toLocalDateTime()
+            ),
+            userId,
+            Timestamp.valueOf(nextDayStart),
+            Timestamp.valueOf(dayStart)
+        );
+    }
+
+    private String accountSelectSql() {
+        return """
+            SELECT la.id AS account_id,
+                   la.user_id,
+                   u.employee_no,
+                   u.real_name,
+                   la.leave_type_id,
+                   lt.leave_code,
+                   lt.leave_name,
+                   lt.balance_mode,
+                   la.available_minutes,
+                   la.frozen_minutes,
+                   la.version,
+                   la.status
+            FROM lv_account la
+            JOIN lv_type lt ON lt.id = la.leave_type_id
+            LEFT JOIN org_user u ON u.id = la.user_id
+            """;
+    }
+
+    private LeaveAccountRow mapAccount(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        return new LeaveAccountRow(
+            rs.getLong("account_id"),
+            rs.getLong("user_id"),
+            rs.getString("employee_no"),
+            rs.getString("real_name"),
+            rs.getLong("leave_type_id"),
+            rs.getString("leave_code"),
+            rs.getString("leave_name"),
+            rs.getString("balance_mode"),
+            rs.getInt("available_minutes"),
+            rs.getInt("frozen_minutes"),
+            rs.getInt("version"),
+            rs.getString("status")
+        );
+    }
+    /** 接口需求表 #14：按账户累计年度发放额度(GRANT 流水之和) */
+    public Map<Long, Integer> sumAnnualGrantMinutesByAccountIds(List<Long> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = accountIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+        Object[] args = new Object[accountIds.size() + 1];
+        args[0] = LocalDate.now().getYear();
+        for (int i = 0; i < accountIds.size(); i++) {
+            args[i + 1] = accountIds.get(i);
+        }
+        return jdbcTemplate.query("""
+            SELECT account_id, SUM(change_minutes) AS granted
+            FROM lv_account_txn
+            WHERE txn_type = 'GRANT'
+              AND account_id IN (""" + placeholders + """
+            )
+              AND effective_at >= ?
+            GROUP BY account_id
+            """,
+            rs -> {
+                Map<Long, Integer> result = new java.util.HashMap<>();
+                while (rs.next()) {
+                    result.put(rs.getLong("account_id"), rs.getInt("granted"));
+                }
+                return result;
+            },
+            yearStartAtLocal(args)
+        );
+    }
+
+    private Object[] yearStartAtLocal(Object[] args) {
+        Object[] rebuilt = new Object[args.length];
+        rebuilt[0] = java.time.LocalDateTime.of((Integer) args[0], 1, 1, 0, 0);
+        System.arraycopy(args, 1, rebuilt, 1, args.length - 1);
+        return rebuilt;
+    }
+
+}

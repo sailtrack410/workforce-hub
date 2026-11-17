@@ -83,11 +83,11 @@ public class AgentToolExecutionService {
                 requiredLong(payload, "userId"),
                 requiredText(payload, "yearMonth")
             );
-            case "KNOWLEDGE_SEARCH_CHUNKS" -> requireKnowledgeSearchService().searchChunks(
-                requiredLong(payload, "spaceId"),
-                requiredText(payload, "query"),
-                optionalInt(payload, "topK", 5)
-            );
+            case "KNOWLEDGE_SEARCH_CHUNKS" -> operatorUserId == null
+                ? requireKnowledgeSearchService().searchChunksForAdmin(
+                    requiredLong(payload, "spaceId"), requiredText(payload, "query"), optionalInt(payload, "topK", 5))
+                : requireKnowledgeSearchService().searchChunksForEmployee(operatorUserId,
+                    requiredLong(payload, "spaceId"), requiredText(payload, "query"), optionalInt(payload, "topK", 5));
             default -> throw new BizException(400, "暂不支持该" + binding.toolType() + "工具执行");
         };
         return write(objectMapper, Map.of("status", "SUCCESS", "result", result == null ? Map.of() : result));

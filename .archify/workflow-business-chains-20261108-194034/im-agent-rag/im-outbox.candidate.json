@@ -1,0 +1,243 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Outbox认领、失败重试与人工审计",
+    "locale": "zh-CN",
+    "output": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "业务入口与结果"
+    },
+    {
+      "id": "core",
+      "label": "服务执行与落库"
+    },
+    {
+      "id": "recover",
+      "label": "分支、异常与恢复",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "pending",
+    "claim",
+    "socket",
+    "sent",
+    "metrics"
+  ],
+  "nodes": [
+    {
+      "id": "pending",
+      "lane": "entry",
+      "col": 0,
+      "type": "database",
+      "label": "待发事件",
+      "sublabel": "PENDING与到期FAILED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImEventOutboxRepository.java",
+          "line": 43,
+          "end_line": 70
+        }
+      ]
+    },
+    {
+      "id": "claim",
+      "lane": "core",
+      "col": 1,
+      "type": "backend",
+      "label": "独立事务认领",
+      "sublabel": "SKIP LOCKED；置SENDING",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketOutboxDispatcher.java",
+          "line": 82,
+          "end_line": 94
+        }
+      ]
+    },
+    {
+      "id": "socket",
+      "lane": "core",
+      "col": 2,
+      "type": "messagebus",
+      "label": "投递用户连接",
+      "sublabel": "失败连接解绑并抛错",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketSessionRegistry.java",
+          "line": 64,
+          "end_line": 90
+        }
+      ]
+    },
+    {
+      "id": "sent",
+      "lane": "core",
+      "col": 3,
+      "type": "database",
+      "label": "标记SENT",
+      "sublabel": "无在线连接也可成功",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketOutboxDispatcher.java",
+          "line": 97,
+          "end_line": 105
+        }
+      ]
+    },
+    {
+      "id": "metrics",
+      "lane": "entry",
+      "col": 4,
+      "type": "backend",
+      "label": "指标与失败摘要",
+      "sublabel": "状态统计、延迟与积压",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImOutboxAdminService.java",
+          "line": 95,
+          "end_line": 118
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "lane": "recover",
+      "col": 2,
+      "type": "database",
+      "label": "FAILED或DEAD",
+      "sublabel": "固定延迟；达到次数终止",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketOutboxDispatcher.java",
+          "line": 109,
+          "end_line": 119
+        }
+      ]
+    },
+    {
+      "id": "retry",
+      "lane": "recover",
+      "col": 3,
+      "type": "security",
+      "label": "管理员重试",
+      "sublabel": "只接受FAILED/DEAD",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImOutboxAdminService.java",
+          "line": 141,
+          "end_line": 163
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "lane": "recover",
+      "col": 4,
+      "type": "database",
+      "label": "记录治理审计",
+      "sublabel": "批量部分成功；派发结果",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImOutboxAdminService.java",
+          "line": 166,
+          "end_line": 199
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "recover",
+      "col": 1,
+      "type": "security",
+      "label": "校验原始载荷",
+      "sublabel": "类型/会话索引必须一致",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImOutboxAdminService.java",
+          "line": 202,
+          "end_line": 214
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "pending",
+      "to": "claim"
+    },
+    {
+      "from": "claim",
+      "to": "socket"
+    },
+    {
+      "from": "socket",
+      "to": "sent",
+      "label": "无异常"
+    },
+    {
+      "from": "sent",
+      "to": "metrics"
+    },
+    {
+      "from": "socket",
+      "to": "failed",
+      "label": "异常",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "failed",
+      "to": "retry",
+      "label": "人工恢复",
+      "role": "branch"
+    },
+    {
+      "from": "retry",
+      "to": "validate",
+      "label": "校验"
+    },
+    {
+      "from": "validate",
+      "to": "pending",
+      "label": "重置待发",
+      "role": "return"
+    },
+    {
+      "from": "retry",
+      "to": "audit"
+    },
+    {
+      "from": "audit",
+      "to": "metrics"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "范围与实现",
+      "items": [
+        "待发事件轮询、过期SENDING回收、FAILED/DEAD重试、后台审计与指标。",
+        "后台提供事件列表、失败摘要、单条/批量重试和手动派发API；前端是否可见不替代后台权限结论。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常与恢复",
+      "items": [
+        "状态SENT仅表示本轮连接派发未抛异常，不证明每位员工收到或读过。",
+        "过期SENDING由下一轮认领；DEAD必须人工重试，重置与审计同事务。"
+      ]
+    }
+  ]
+}

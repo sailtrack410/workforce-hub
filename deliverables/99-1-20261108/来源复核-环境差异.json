@@ -1,0 +1,31 @@
+{
+  "first_full_result": {
+    "tests": 1214,
+    "failures": 23,
+    "errors": 0,
+    "skipped": 2,
+    "exit": 1
+  },
+  "isolated_fixture_corrections": [
+    {
+      "cause": "Review runner explicitly set TEST_WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED=false, overriding email-specific test system properties",
+      "observed": "5 ModuleAuthEmailVerifyIntegrationTest failures",
+      "next_action": "Remove review-only override; preserve test-local configuration"
+    },
+    {
+      "cause": "Review runner explicitly set TEST_WORKFORCE_AGENT_MODEL_ENABLED=false, masking model-specific test setup",
+      "observed": "4 ModuleImApiIntegrationTest model/translation failures",
+      "next_action": "Remove review-only override; preserve test-local configuration"
+    },
+    {
+      "cause": "Review snapshot omitted server/src/test/plugin-fixtures",
+      "observed": "PluginEventEndToEndIntegrationTest compiler exit2",
+      "next_action": "Copy only versioned plugin test fixture source"
+    }
+  ],
+  "code_or_contract_followups": {
+    "99-2": 12,
+    "99-3": 1
+  },
+  "application_source_modified_by_reviewer": false
+}

@@ -1,0 +1,1 @@
+Initial rollback source hashes restored correctly, but Maven reused already compiled modified classes because restored source timestamps predated class timestamps. Its 58-pass result is invalid as a rollback behavior check. Preserved all initial outputs; rerun BASELINE/MODIFIED/ROLLBACK with identical clean test commands.

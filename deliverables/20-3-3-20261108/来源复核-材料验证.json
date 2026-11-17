@@ -1,0 +1,33 @@
+{
+  "issue": "20-3-3",
+  "roles": {
+    "MODIFIED_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/20-3-3-20261108/MODIFIED_FILE.tar.gz",
+    "DIFF_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/20-3-3-20261108/DIFF_FILE.patch",
+    "VERIFICATION": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/20-3-3-20261108/VERIFICATION.txt",
+    "ROLLBACK": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/20-3-3-20261108/ROLLBACK.sh"
+  },
+  "archive_file_count": 8,
+  "live_differences": [],
+  "rollback": {
+    "command": [
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/20-3-3-20261108/ROLLBACK.sh",
+      "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-source-review-20-3-3-xjetqtwi"
+    ],
+    "stdout": "RESTORED server/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java SHA256=346f11fbee118564eb90335a129c7d6b1619f1a88c603b9b865c10187ea1ce65\nRESTORED server/src/main/java/com/workforcehub/file/service/FileQuotaPolicyService.java SHA256=7cf5fed8927cf73c05eead11562bfe9d453dc039cd5e803336ee498053a58102\nRESTORED server/src/main/java/com/workforcehub/file/service/FileQueryService.java SHA256=87c37879fd51e1d22ca29493801fc595998a81f5446e5e8ecbef768d46f99686\nRESTORED server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java SHA256=246647f858251e54211a1a2b02b4c7d56da4259836ba3560d90ede2755306482\nRESTORED server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java SHA256=fdfb63e9771e165b137b594e5f039894690af9b8cc8c510e7e40ff52831be46f\nRESTORED server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java SHA256=25d512a88e96df41a2eaa046789139a9a5e77cbb7774ac0fd759959b04b9aaec\nRESTORED server/src/main/java/com/workforcehub/file/service/FileCleanupDatabaseStageService.java SHA256=49880e1b4fef40240b9caa2ea40814c6a8dfdf302ef6e540ab31da4024cc6752\nREMOVED server/src/test/java/com/workforcehub/file/FileQuotaConcurrencyTest.java\nROLLBACK_HASH_MATCH=TRUE\n",
+    "stderr": "",
+    "exit": 0,
+    "baseline_hashes_matched": 7,
+    "new_files_removed": 1
+  },
+  "patch": {
+    "command": [
+      "git",
+      "apply",
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/20-3-3-20261108/DIFF_FILE.patch"
+    ],
+    "stdout": "",
+    "stderr": "",
+    "exit": 0,
+    "reconstructed_hashes_matched": 8
+  }
+}

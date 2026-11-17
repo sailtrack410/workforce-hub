@@ -1,0 +1,55 @@
+{
+  "events": [
+    {
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-patch-tp50gpjm",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-patch-tp50gpjm",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/ROLLBACK.sh",
+        "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-patch-tp50gpjm"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-patch-tp50gpjm",
+      "stdout": "restored pristine 99-1 source files\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-patch-tp50gpjm",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    }
+  ],
+  "restored_hashes": {
+    "server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java": "f0d6336c2c3d8345a7fefd4c66a52de46fa58a0efeadda212c109d087d5d9d40",
+    "server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java": "579cd7287f2b74f11de0e07b76054de89e00683c82f8d5dfe5954c220cebc0b6"
+  },
+  "patch_reconstruction": "6/6 hashes match",
+  "rollback": "2 original files restored; 4 new files absent",
+  "reapplied": "6/6 hashes match"
+}

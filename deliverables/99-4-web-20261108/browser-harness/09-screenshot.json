@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/Users/sailtrack/.codex/skills/playwright/scripts/playwright_cli.sh",
+    "-s=99-4-web-proof",
+    "--raw",
+    "screenshot",
+    "--filename",
+    "/Users/sailtrack/工程文件/java_web/workforce-hub/请假排班计时-员工端.png",
+    "--full-page"
+  ],
+  "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "exit_status": 0,
+  "stdout": "- [Screenshot of full page](./请假排班计时-员工端.png)\n",
+  "stderr": ""
+}

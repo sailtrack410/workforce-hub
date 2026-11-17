@@ -1,0 +1,27 @@
+{
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-review-fix-a_j89u0n/server",
+  "command": [
+    "mvn",
+    "-Dtest=AdminPermissionFilterTest,AdminPermissionRouteMatrixTest,AdminPermissionWebTest,AdminPluginManagementWebTest,PluginGatewaySecurityTest,SessionValidityRequestChainTest",
+    "test"
+  ],
+  "java_home": "/Users/sailtrack/Library/Java/JavaVirtualMachines/ms-17.0.18/Contents/Home",
+  "scoped_hashes": {
+    "server/src/main/java/com/workforcehub/common/config/SecurityConfig.java": "7b51d1bff332b2bc9f8a931b5e773174c551770fec059f80501264bb1a88de3b",
+    "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketHandshakeInterceptor.java": "d9104a7021a4b10a8e17e3353211c77217fe5c5f2986f5c96db884498da80daf",
+    "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketHandler.java": "353b95ec033c5e1767434300eaf40d4edc7a2fc68533da02526ff1473952341f",
+    "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketSessionRegistry.java": "f96e0ca818aa9b1758b81b936a02f58a28ddb140e577489e8744d404363d7710",
+    "server/src/main/java/com/workforcehub/auth/security/EmployeeUserDetailsService.java": "4f0754906ddfcf9de9a37c92c3b6bb0aa4e386d0a42382ed2bc9e3989241f3cc",
+    "server/src/test/java/com/workforcehub/im/ModuleImApiIntegrationTest.java": "411c1b7384b9e2322e9787bf0a8783e54128f8098b1867975a0890d3c0fefc02",
+    "server/src/test/java/com/workforcehub/im/ModuleImOutboxIntegrationTest.java": "675cf647c3a9e9af0a182e122644c5053a3f04e828abd03b0378deb6e47bf12e",
+    "server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java": "aeff6ced2cad925ffee430b48ffdac2a1ce12d2000ab9ba1d4bb108f00f6ca6c",
+    "server/src/test/java/com/workforcehub/plugin/AdminPluginManagementWebTest.java": "47a9988f357fb5e594859ec5a1666a40af10ddaff6e9cedfeb263a78496cf65b",
+    "server/src/test/java/com/workforcehub/plugin/PluginGatewaySecurityTest.java": "e882b817859e1d3973bfb6fcd68dee76511b1dd1392dc2a9a70001ec14c47376",
+    "server/src/main/java/com/workforcehub/auth/security/SessionValidityService.java": "203a92171dbc43290e4b36a53deef045391c33d83672708930ac727a7ff1b122",
+    "server/src/main/java/com/workforcehub/auth/security/SessionValidityFilter.java": "708ef14593f9b66bf3e39b1dce3633f140d867391f20e461f9ecb8a237fdedfe",
+    "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketAuthentication.java": "6e43d495a98fa352dbf129f5927a9e0b423c36151005e459730d5ba32d64174a",
+    "server/src/test/java/com/workforcehub/auth/SessionValidityRequestChainTest.java": "3bea59b6d0cb42c67a07059dab13ab90ccec5d4b6be295d196a31ae4c4aedfa4"
+  },
+  "source_review": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/来源复核-执行.json",
+  "exit": 0
+}

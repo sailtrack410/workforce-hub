@@ -1,0 +1,15 @@
+{
+  "label": "ROLLBACK_FINAL",
+  "cwd": "/private/tmp/workforce-quota-2033-transaction/rollback/server",
+  "command": [
+    "mvn",
+    "-B",
+    "-Dtest=FileQuotaConcurrencyTest",
+    "-Dquota.mysql.url=jdbc:mysql://127.0.0.1:23383/quota_2033_test?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true",
+    "test"
+  ],
+  "input_sha256": "3d4b243ba619ea1a65bef533f136ced3fe81d570395a9dbed3383a5f88e75ac3",
+  "exit_status": 1,
+  "stdout": "ROLLBACK_FINAL.stdout",
+  "stderr": "ROLLBACK_FINAL.stderr"
+}

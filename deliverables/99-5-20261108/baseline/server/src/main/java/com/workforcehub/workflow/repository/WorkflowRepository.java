@@ -1,0 +1,1169 @@
+package com.workforcehub.workflow.repository;
+
+import com.workforcehub.common.util.IdGenerator;
+import com.workforcehub.common.exception.BizException;
+import com.workforcehub.file.repository.DownloadAttachmentRow;
+import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
+import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
+import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
+import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
+
+import java.sql.Timestamp;
+import java.sql.Date;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * module-workflow 第一版 JDBC 仓储。
+ */
+@Repository
+public class WorkflowRepository {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public WorkflowRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public WorkflowTemplateVersionRow getPublishedTemplateVersion(String processCode) {
+        List<WorkflowTemplateVersionRow> rows = jdbcTemplate.query("""
+            SELECT wtv.id, wtv.flowable_definition_key, wtv.flowable_definition_id
+            FROM wf_process_type wpt
+            JOIN wf_template wt ON wt.process_type_id = wpt.id
+            JOIN wf_template_version wtv ON wtv.template_id = wt.id
+            WHERE wpt.process_code = ?
+              AND wpt.status = 'ACTIVE'
+              AND wpt.is_deleted = 0
+              AND wt.status = 'ACTIVE'
+              AND wt.is_deleted = 0
+              AND wtv.status = 'PUBLISHED'
+              AND wtv.effective_from <= NOW()
+              AND (wtv.effective_to IS NULL OR wtv.effective_to > NOW())
+            ORDER BY wtv.version_no DESC, wtv.id DESC
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowTemplateVersionRow(
+                rs.getLong("id"),
+                rs.getString("flowable_definition_key"),
+                rs.getString("flowable_definition_id")
+            ),
+            processCode
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "未找到已发布的流程模板");
+        }
+        return rows.get(0);
+    }
+
+    public boolean existsActiveLeaveType(Long leaveTypeId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM lv_type
+            WHERE id = ? AND status = 'ACTIVE' AND is_deleted = 0
+            """, Long.class, leaveTypeId);
+        return count != null && count > 0;
+    }
+
+    public void insertWorkflowRequest(Long requestId,
+                                      String requestNo,
+                                      String bizType,
+                                      Long bizId,
+                                      Long applicantUserId,
+                                      Long applicantDeptId,
+                                      Long applicantPositionId,
+                                      String title,
+                                      Long templateVersionId) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_request
+                (id, request_no, biz_type, biz_id, applicant_user_id, applicant_dept_id,
+                 applicant_position_id, title, template_version_id, status,
+                 current_step_key, current_step_name, submitted_at, created_by, updated_by)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL',
+                 'manager_approval', (SELECT step_name FROM wf_step_config WHERE step_key = 'manager_approval'), NOW(), ?, ?)
+            """,
+            requestId,
+            requestNo,
+            bizType,
+            bizId,
+            applicantUserId,
+            applicantDeptId,
+            applicantPositionId,
+            title,
+            templateVersionId,
+            applicantUserId,
+            applicantUserId
+        );
+    }
+
+    public void insertClockCorrectionDetail(Long detailId,
+                                            Long requestId,
+                                            ClockCorrectionRequestCreateRequest request) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_req_clock_correction
+                (id, request_id, target_date, missing_punch_type, expected_punch_at, reason)
+            VALUES
+                (?, ?, ?, ?, ?, ?)
+            """,
+            detailId,
+            requestId,
+            Date.valueOf(request.getTargetDate()),
+            request.getMissingPunchType(),
+            Timestamp.valueOf(request.getExpectedPunchAt()),
+            request.getReason()
+        );
+    }
+
+    public void insertLeaveDetail(Long detailId, Long requestId, LeaveRequestCreateRequest request) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_req_leave
+                (id, request_id, leave_type_id, start_at, end_at, duration_minutes, reason)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?)
+            """,
+            detailId,
+            requestId,
+            request.getLeaveTypeId(),
+            Timestamp.valueOf(request.getStartAt()),
+            Timestamp.valueOf(request.getEndAt()),
+            request.getDurationMinutes(),
+            request.getReason()
+        );
+    }
+
+    public void insertGenericDetail(Long detailId,
+                                    Long requestId,
+                                    String processCode,
+                                    String payloadJson,
+                                    GenericWorkflowRequestCreateRequest request) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_req_generic
+                (id, request_id, process_code, summary, form_payload_json)
+            VALUES
+                (?, ?, ?, ?, CAST(? AS JSON))
+            """,
+            detailId,
+            requestId,
+            processCode,
+            request.getSummary(),
+            payloadJson
+        );
+    }
+
+    public void insertRequestAttachment(Long requestId, Long attachmentRefId, int sortOrder, Long operatorId) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_request_attachment
+                (id, request_id, attachment_ref_id, sort_order, created_by)
+            VALUES
+                (?, ?, ?, ?, ?)
+            """,
+            IdGenerator.nextId(),
+            requestId,
+            attachmentRefId,
+            sortOrder,
+            operatorId
+        );
+    }
+
+    public Long createWorkflowAttachmentRef(Long requestId,
+                                            WorkflowAttachmentRow sourceAttachment,
+                                            Long uploaderId) {
+        Long workflowAttachmentRefId = IdGenerator.nextId();
+        jdbcTemplate.update("""
+            INSERT INTO sys_attachment_ref
+                (id, owner_type, owner_id, file_object_id, original_file_name,
+                 display_name, uploader_type, uploader_id, visibility_scope, created_by, updated_by)
+            VALUES
+                (?, 'WF_REQUEST', ?, ?, ?, ?, 'USER', ?, 'WORKFLOW_PARTICIPANT', ?, ?)
+            """,
+            workflowAttachmentRefId,
+            requestId,
+            sourceAttachment.fileObjectId(),
+            sourceAttachment.displayName(),
+            sourceAttachment.displayName(),
+            uploaderId,
+            uploaderId,
+            uploaderId
+        );
+        jdbcTemplate.update("""
+            UPDATE sys_file_object
+            SET ref_count = ref_count + 1
+            WHERE id = ? AND is_deleted = 0
+            """, sourceAttachment.fileObjectId());
+        return workflowAttachmentRefId;
+    }
+
+    public void markPendingAgentPreReview(Long requestId, Long agentTaskId, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE wf_request
+            SET status = 'PENDING_REVIEW',
+                current_step_key = 'agent_pre_review',
+                current_step_name = (SELECT step_name FROM wf_step_config WHERE step_key = 'agent_pre_review'),
+                agent_pre_review_task_id = ?,
+                updated_by = ?
+            WHERE id = ?
+              AND status = 'IN_APPROVAL'
+              AND flowable_process_instance_id IS NULL
+              AND is_deleted = 0
+            """,
+            agentTaskId,
+            operatorId,
+            requestId
+        );
+    }
+
+    public int markHumanApprovalStarted(Long requestId, String processInstanceId, Long operatorId) {
+        return jdbcTemplate.update("""
+            UPDATE wf_request
+            SET status = 'IN_APPROVAL',
+                current_step_key = 'manager_approval',
+                current_step_name = (SELECT step_name FROM wf_step_config WHERE step_key = 'manager_approval'),
+                flowable_process_instance_id = ?,
+                updated_by = ?
+            WHERE id = ?
+              AND is_deleted = 0
+            """,
+            processInstanceId,
+            operatorId,
+            requestId
+        );
+    }
+
+    public WorkflowRequestRow getRequestByIdForUpdateOrThrow(Long requestId) {
+        List<WorkflowRequestRow> rows = jdbcTemplate.query("""
+            SELECT wr.id, wr.request_no, wr.biz_type, wr.status, wr.title, wr.applicant_user_id,
+                   wr.flowable_process_instance_id, wr.agent_pre_review_task_id
+            FROM wf_request wr
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
+            LIMIT 1
+            FOR UPDATE
+            """,
+            this::mapRequest,
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批申请不存在");
+        }
+        return rows.get(0);
+    }
+
+    public void insertTodo(Long requestId,
+                           Long ownerUserId,
+                           String taskId,
+                           String title,
+                           String summary) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_todo_item
+                (id, owner_type, owner_id, source_type, source_id, title, summary,
+                 route_path, status, priority)
+            VALUES
+                (?, 'USER', ?, 'WORKFLOW_TASK', ?, ?, ?, ?, 'PENDING', 'NORMAL')
+            """,
+            IdGenerator.nextId(),
+            ownerUserId,
+            requestId,
+            title,
+            summary,
+            "/workflow/requests/" + requestId + "?taskId=" + taskId
+        );
+    }
+
+    public List<WorkflowTodoRow> listPendingTodos(Long ownerUserId) {
+        return jdbcTemplate.query("""
+            SELECT sti.id AS todo_id,
+                   sti.source_id AS request_id,
+                   art.ID_ AS task_id,
+                   sti.title,
+                   sti.summary,
+                   sti.status,
+                   sti.priority,
+                   sti.created_at
+            FROM sys_todo_item sti
+            JOIN wf_request wr ON wr.id = sti.source_id
+            JOIN ACT_RU_TASK art ON art.PROC_INST_ID_ = wr.flowable_process_instance_id
+                                AND art.ASSIGNEE_ = CAST(sti.owner_id AS CHAR)
+            WHERE sti.owner_type = 'USER'
+              AND sti.owner_id = ?
+              AND sti.source_type = 'WORKFLOW_TASK'
+              AND sti.status = 'PENDING'
+              AND wr.is_deleted = 0
+            ORDER BY sti.created_at DESC, sti.id DESC
+            """,
+            (rs, rowNum) -> new WorkflowTodoRow(
+                rs.getLong("todo_id"),
+                rs.getLong("request_id"),
+                rs.getString("task_id"),
+                rs.getString("title"),
+                rs.getString("summary"),
+                rs.getString("status"),
+                rs.getString("priority"),
+                rs.getTimestamp("created_at").toLocalDateTime()
+            ),
+            ownerUserId
+        );
+    }
+
+
+    /** 接口需求表 #6：当前用户提交申请的 AI 预审结论分布（本周窗口由 service 传日期过滤 submitted_at） */
+    public Map<String, Long> countMyPreReviewDecisions(Long applicantUserId, LocalDate sinceDate) {
+        return jdbcTemplate.query("""
+            SELECT latest.decision, COUNT(*) AS cnt
+            FROM (
+                SELECT ta.request_id,
+                       SUBSTRING_INDEX(
+                           SUBSTRING_INDEX(ta.agent_decision_json, '"decision": "', -1), '"', 1
+                       ) AS decision,
+                       ROW_NUMBER() OVER (PARTITION BY ta.request_id ORDER BY ta.id DESC) AS rn
+                FROM wf_task_action ta
+                JOIN wf_request wr ON wr.id = ta.request_id
+                WHERE ta.agent_decision_json IS NOT NULL
+                  AND wr.applicant_user_id = ?
+                  AND wr.submitted_at >= ?
+            ) latest
+            WHERE latest.rn = 1
+            GROUP BY latest.decision
+            """,
+            rs -> {
+                Map<String, Long> result = new HashMap<>();
+                while (rs.next()) {
+                    result.put(rs.getString("decision"), rs.getLong("cnt"));
+                }
+                return result;
+            },
+            applicantUserId,
+            sinceDate.atStartOfDay()
+        );
+    }
+    /** 接口需求表 #6：批量取各申请最新 Agent 预审结论（requestId → decision/APPROVED|REJECTED|TO_HUMAN） */
+    public Map<Long, String> findLatestPreReviewDecisions(Collection<Long> requestIds) {
+        if (requestIds == null || requestIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = requestIds.stream().map(id -> "?").collect(Collectors.joining(","));
+        Object[] args = requestIds.toArray();
+        return jdbcTemplate.query("""
+            SELECT ta.request_id, ta.agent_decision_json
+            FROM wf_task_action ta
+            JOIN (
+                SELECT request_id, MAX(id) AS max_id
+                FROM wf_task_action
+                WHERE agent_decision_json IS NOT NULL
+                  AND request_id IN (""" + placeholders + """
+                )
+                GROUP BY request_id
+            ) latest ON latest.request_id = ta.request_id AND latest.max_id = ta.id
+            """,
+            rs -> {
+                Map<Long, String> result = new HashMap<>();
+                while (rs.next()) {
+                    String json = rs.getString("agent_decision_json");
+                    String decision = extractDecision(json);
+                    if (decision != null) {
+                        result.put(rs.getLong("request_id"), decision);
+                    }
+                }
+                return result;
+            },
+            args
+        );
+    }
+
+    /** 从预审结论 JSON 中提取 decision 字段 */
+    private String extractDecision(String decisionJson) {
+        if (decisionJson == null || decisionJson.isBlank()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node =
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(decisionJson);
+            String decision = node.path("decision").asText(null);
+            return decision == null ? null : decision.toUpperCase();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public long countRequests(Long applicantUserId, WorkflowRequestListQuery query) {
+        List<Object> args = new ArrayList<>();
+        String whereSql = buildRequestListWhereSql(applicantUserId, query, args);
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM wf_request wr
+            """ + whereSql,
+            Long.class,
+            args.toArray()
+        );
+        return count == null ? 0L : count;
+    }
+
+    public List<WorkflowRequestSummaryRow> pageRequests(Long applicantUserId, WorkflowRequestListQuery query) {
+        List<Object> args = new ArrayList<>();
+        String whereSql = buildRequestListWhereSql(applicantUserId, query, args);
+        args.add(Math.max(query.getPageSize(), 1L));
+        args.add((Math.max(query.getPageNo(), 1L) - 1) * Math.max(query.getPageSize(), 1L));
+        return jdbcTemplate.query("""
+            SELECT wr.id, wr.request_no, wr.biz_type, wr.biz_id, wr.title, wr.status,
+                   wr.current_step_key, wr.current_step_name, wr.submitted_at, wr.finished_at
+            FROM wf_request wr
+            """ + whereSql + """
+            ORDER BY wr.submitted_at DESC, wr.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (rs, rowNum) -> new WorkflowRequestSummaryRow(
+                rs.getLong("id"),
+                rs.getString("request_no"),
+                rs.getString("biz_type"),
+                rs.getLong("biz_id"),
+                rs.getString("title"),
+                rs.getString("status"),
+                rs.getString("current_step_key"),
+                rs.getString("current_step_name"),
+                rs.getTimestamp("submitted_at") == null ? null : rs.getTimestamp("submitted_at").toLocalDateTime(),
+                rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime()
+            ),
+            args.toArray()
+        );
+    }
+
+    public WorkflowRequestRow getRequestByTaskIdForUpdateOrThrow(String taskId) {
+        List<WorkflowRequestRow> rows = jdbcTemplate.query("""
+            SELECT wr.id, wr.request_no, wr.biz_type, wr.status, wr.title, wr.applicant_user_id,
+                   wr.flowable_process_instance_id, wr.agent_pre_review_task_id
+            FROM wf_request wr
+            JOIN ACT_RU_TASK art ON art.PROC_INST_ID_ = wr.flowable_process_instance_id
+            WHERE art.ID_ = ?
+              AND wr.is_deleted = 0
+            LIMIT 1
+            FOR UPDATE
+            """,
+            this::mapRequest,
+            taskId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批任务不存在");
+        }
+        return rows.get(0);
+    }
+
+    public void insertTaskAction(Long requestId,
+                                 String taskId,
+                                 Long actorId,
+                                 String actionType,
+                                 String comment,
+                                 String beforeStatus,
+                                 String afterStatus) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_task_action
+                (id, request_id, flowable_task_id, step_key, step_name, actor_type,
+                 actor_id, action_type, action_comment, before_status, after_status)
+            VALUES
+                (?, ?, ?, 'manager_approval', (SELECT step_name FROM wf_step_config WHERE step_key = 'manager_approval'), 'USER',
+                 ?, ?, ?, ?, ?)
+            """,
+            IdGenerator.nextId(),
+            requestId,
+            taskId,
+            actorId,
+            actionType,
+            comment,
+            beforeStatus,
+            afterStatus
+        );
+    }
+
+    public void insertAgentPreReviewAction(Long requestId,
+                                           Long agentTaskId,
+                                           String decisionJson,
+                                           String beforeStatus,
+                                           String afterStatus) {
+        jdbcTemplate.update("""
+            INSERT INTO wf_task_action
+                (id, request_id, flowable_task_id, step_key, step_name, actor_type,
+                 actor_id, action_type, action_comment, agent_decision_json, before_status, after_status)
+            VALUES
+                (?, ?, NULL, 'agent_pre_review', (SELECT step_name FROM wf_step_config WHERE step_key = 'agent_pre_review'), 'AGENT',
+                 ?, 'AGENT_PRE_REVIEW', NULL, CAST(? AS JSON), ?, ?)
+            """,
+            IdGenerator.nextId(),
+            requestId,
+            agentTaskId,
+            decisionJson,
+            beforeStatus,
+            afterStatus
+        );
+    }
+
+    public void finishRequest(Long requestId, String status, Long operatorId) {
+        jdbcTemplate.update("""
+            UPDATE wf_request
+            SET status = ?,
+                current_step_key = NULL,
+                current_step_name = NULL,
+                finished_at = ?,
+                updated_by = ?
+            WHERE id = ? AND is_deleted = 0
+            """, status, LocalDateTime.now(), operatorId, requestId);
+    }
+
+    public void closePendingTodo(Long requestId, Long ownerUserId) {
+        jdbcTemplate.update("""
+            UPDATE sys_todo_item
+            SET status = 'DONE'
+            WHERE source_type = 'WORKFLOW_TASK'
+              AND source_id = ?
+              AND owner_type = 'USER'
+              AND owner_id = ?
+              AND status = 'PENDING'
+            """, requestId, ownerUserId);
+    }
+
+    public void closeAllPendingTodos(Long requestId) {
+        jdbcTemplate.update("""
+            UPDATE sys_todo_item
+            SET status = 'CLOSED'
+            WHERE source_type = 'WORKFLOW_TASK'
+              AND source_id = ?
+              AND status = 'PENDING'
+            """, requestId);
+    }
+
+    public WorkflowRequestRow getRequestByIdOrThrow(Long requestId) {
+        List<WorkflowRequestRow> rows = jdbcTemplate.query("""
+            SELECT wr.id, wr.request_no, wr.biz_type, wr.status, wr.title, wr.applicant_user_id,
+                   wr.flowable_process_instance_id, wr.agent_pre_review_task_id
+            FROM wf_request wr
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
+            LIMIT 1
+            """,
+            this::mapRequest,
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批申请不存在");
+        }
+        return rows.get(0);
+    }
+
+    public WorkflowTemplateVersionRow getTemplateVersionByRequestId(Long requestId) {
+        List<WorkflowTemplateVersionRow> rows = jdbcTemplate.query("""
+            SELECT wtv.id, wtv.flowable_definition_key, wtv.flowable_definition_id
+            FROM wf_request wr
+            JOIN wf_template_version wtv ON wtv.id = wr.template_version_id
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowTemplateVersionRow(
+                rs.getLong("id"),
+                rs.getString("flowable_definition_key"),
+                rs.getString("flowable_definition_id")
+            ),
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批申请模板版本不存在");
+        }
+        return rows.get(0);
+    }
+
+    public WorkflowRequestDetailRow getRequestDetailOrThrow(Long requestId) {
+        List<WorkflowRequestDetailRow> rows = jdbcTemplate.query("""
+            SELECT wr.id,
+                   wr.request_no,
+                   wr.biz_type,
+                   wr.biz_id,
+                   wr.applicant_user_id,
+                   ou.real_name AS applicant_name,
+                   ou.employee_no AS applicant_employee_no,
+                   wr.title,
+                   wr.status,
+                   wr.current_step_key,
+                   wr.current_step_name,
+                   wr.flowable_process_instance_id,
+                   wr.submitted_at,
+                   wr.finished_at
+            FROM wf_request wr
+            LEFT JOIN org_user ou ON ou.id = wr.applicant_user_id
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowRequestDetailRow(
+                rs.getLong("id"),
+                rs.getString("request_no"),
+                rs.getString("biz_type"),
+                rs.getLong("biz_id"),
+                rs.getLong("applicant_user_id"),
+                rs.getString("applicant_name"),
+                rs.getString("applicant_employee_no"),
+                rs.getString("title"),
+                rs.getString("status"),
+                rs.getString("current_step_key"),
+                rs.getString("current_step_name"),
+                rs.getString("flowable_process_instance_id"),
+                rs.getTimestamp("submitted_at") == null ? null : rs.getTimestamp("submitted_at").toLocalDateTime(),
+                rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime()
+            ),
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批申请不存在");
+        }
+        return rows.get(0);
+    }
+
+    public WorkflowLeaveDetailRow getLeaveDetailByRequestId(Long requestId) {
+        List<WorkflowLeaveDetailRow> rows = jdbcTemplate.query("""
+            SELECT l.leave_type_id, lt.leave_name, l.start_at, l.end_at, l.duration_minutes, l.reason
+            FROM wf_req_leave l
+            LEFT JOIN lv_type lt ON lt.id = l.leave_type_id
+            WHERE l.request_id = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowLeaveDetailRow(
+                rs.getLong("leave_type_id"),
+                rs.getString("leave_name"),
+                rs.getTimestamp("start_at").toLocalDateTime(),
+                rs.getTimestamp("end_at").toLocalDateTime(),
+                rs.getInt("duration_minutes"),
+                rs.getString("reason")
+            ),
+            requestId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public WorkflowClockCorrectionDetailRow getClockCorrectionDetailByRequestId(Long requestId) {
+        List<WorkflowClockCorrectionDetailRow> rows = jdbcTemplate.query("""
+            SELECT target_date, missing_punch_type, expected_punch_at, reason
+            FROM wf_req_clock_correction
+            WHERE request_id = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowClockCorrectionDetailRow(
+                rs.getDate("target_date").toLocalDate(),
+                rs.getString("missing_punch_type"),
+                rs.getTimestamp("expected_punch_at").toLocalDateTime(),
+                rs.getString("reason")
+            ),
+            requestId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public WorkflowGenericDetailRow getGenericDetailByRequestId(Long requestId) {
+        List<WorkflowGenericDetailRow> rows = jdbcTemplate.query("""
+            SELECT process_code, summary, form_payload_json
+            FROM wf_req_generic
+            WHERE request_id = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowGenericDetailRow(
+                rs.getString("process_code"),
+                rs.getString("summary"),
+                rs.getString("form_payload_json")
+            ),
+            requestId
+        );
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public List<WorkflowAttachmentRow> listAttachmentsByRequestId(Long requestId) {
+        return jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.file_object_id,
+                   ar.owner_type,
+                   ar.owner_id,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.is_deleted AS file_deleted,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.content_sha256,
+                   fo.scan_status
+            FROM wf_request_attachment wra
+            JOIN sys_attachment_ref ar ON ar.id = wra.attachment_ref_id
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE wra.request_id = ?
+              AND wra.is_deleted = 0
+            ORDER BY wra.sort_order ASC, wra.id ASC
+            """,
+            this::mapAttachment,
+            requestId
+        );
+    }
+
+    public WorkflowAttachmentRow getWorkflowAttachmentOrThrow(Long requestId, Long attachmentRefId) {
+        List<WorkflowAttachmentRow> rows = jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.file_object_id,
+                   ar.owner_type,
+                   ar.owner_id,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.is_deleted AS file_deleted,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.content_sha256,
+                   fo.scan_status
+            FROM wf_request_attachment wra
+            JOIN sys_attachment_ref ar ON ar.id = wra.attachment_ref_id
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE wra.request_id = ?
+              AND wra.attachment_ref_id = ?
+              AND wra.is_deleted = 0
+              AND ar.owner_type = 'WF_REQUEST'
+              AND ar.owner_id = ?
+            LIMIT 1
+            """,
+            this::mapAttachment,
+            requestId,
+            attachmentRefId,
+            requestId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        return rows.get(0);
+    }
+
+    public WorkflowAttachmentRow getAttachmentByIdOrThrow(Long attachmentRefId) {
+        List<WorkflowAttachmentRow> rows = jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.file_object_id,
+                   ar.owner_type,
+                   ar.owner_id,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.is_deleted AS file_deleted,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.content_sha256,
+                   fo.scan_status
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE ar.id = ?
+            LIMIT 1
+            """,
+            this::mapAttachment,
+            attachmentRefId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "附件引用不存在");
+        }
+        return rows.get(0);
+    }
+
+    public List<WorkflowTaskActionRow> listTaskActions(Long requestId) {
+        return jdbcTemplate.query("""
+            SELECT wta.id,
+                   wta.request_id,
+                   wta.flowable_task_id,
+                   wta.step_key,
+                   wta.step_name,
+                   wta.actor_type,
+                   wta.actor_id,
+                   COALESCE(ou.real_name, agent.agent_name) AS actor_name,
+                   aua.login_name AS actor_account,
+                   wta.action_type,
+                   wta.action_comment,
+                   wta.agent_decision_json,
+                   wta.before_status,
+                   wta.after_status,
+                   wta.acted_at
+            FROM wf_task_action wta
+            LEFT JOIN org_user ou ON wta.actor_type = 'USER' AND ou.id = wta.actor_id
+            LEFT JOIN auth_user_account aua ON wta.actor_type = 'USER' AND aua.user_id = wta.actor_id
+            LEFT JOIN agt_task at ON wta.actor_type = 'AGENT' AND at.id = wta.actor_id
+            LEFT JOIN agt_agent agent ON agent.id = at.agent_id
+            WHERE wta.request_id = ?
+            ORDER BY wta.acted_at ASC, wta.id ASC
+            """,
+            (rs, rowNum) -> new WorkflowTaskActionRow(
+                rs.getLong("id"),
+                rs.getLong("request_id"),
+                rs.getString("flowable_task_id"),
+                rs.getString("step_key"),
+                rs.getString("step_name"),
+                rs.getString("actor_type"),
+                rs.getLong("actor_id"),
+                rs.getString("actor_name"),
+                rs.getString("actor_account"),
+                rs.getString("action_type"),
+                rs.getString("action_comment"),
+                rs.getString("agent_decision_json"),
+                rs.getString("before_status"),
+                rs.getString("after_status"),
+                rs.getTimestamp("acted_at").toLocalDateTime()
+            ),
+            requestId
+        );
+    }
+
+    public void insertDownloadTicket(Long ticketId,
+                                     String ticketNo,
+                                     Long attachmentRefId,
+                                     Long requesterId,
+                                     String downloadUrl,
+                                     String reason,
+                                     LocalDateTime expireAt) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_download_ticket
+                (id, ticket_no, attachment_ref_id, requester_type, requester_id,
+                 download_type, download_url, reason, expire_at, status)
+            VALUES
+                (?, ?, ?, 'USER', ?, 'SINGLE', ?, ?, ?, 'ACTIVE')
+            """,
+            ticketId,
+            ticketNo,
+            attachmentRefId,
+            requesterId,
+            downloadUrl,
+            reason,
+            expireAt
+        );
+    }
+
+    public WorkflowDownloadTicketRow getWorkflowDownloadTicketOrThrow(String ticketNo) {
+        List<WorkflowDownloadTicketRow> rows = jdbcTemplate.query("""
+            SELECT id, ticket_no, attachment_ref_id, requester_type, requester_id,
+                   expire_at, status
+            FROM sys_download_ticket
+            WHERE ticket_no = ? AND is_deleted = 0
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowDownloadTicketRow(
+                rs.getLong("id"),
+                rs.getString("ticket_no"),
+                rs.getLong("attachment_ref_id"),
+                rs.getString("requester_type"),
+                rs.getLong("requester_id"),
+                rs.getTimestamp("expire_at").toLocalDateTime(),
+                rs.getString("status")
+            ),
+            ticketNo
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "下载票据不存在");
+        }
+        return rows.get(0);
+    }
+
+    public WorkflowAttachmentDownloadScopeRow getWorkflowAttachmentDownloadScopeOrThrow(Long attachmentRefId) {
+        List<WorkflowAttachmentDownloadScopeRow> rows = jdbcTemplate.query("""
+            SELECT wra.request_id
+            FROM wf_request_attachment wra
+            JOIN sys_attachment_ref ar ON ar.id = wra.attachment_ref_id
+            WHERE wra.attachment_ref_id = ?
+              AND wra.is_deleted = 0
+              AND ar.owner_type = 'WF_REQUEST'
+              AND ar.owner_id = wra.request_id
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new WorkflowAttachmentDownloadScopeRow(rs.getLong("request_id")),
+            attachmentRefId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        return rows.get(0);
+    }
+
+    public DownloadAttachmentRow getDownloadAttachmentOrThrow(Long attachmentRefId) {
+        List<DownloadAttachmentRow> rows = jdbcTemplate.query("""
+            SELECT ar.id AS attachment_ref_id,
+                   ar.owner_type,
+                   ar.display_name,
+                   ar.uploader_type,
+                   ar.uploader_id,
+                   ar.deleted_at,
+                   ar.is_deleted AS attachment_deleted,
+                   fo.storage_provider,
+                   fo.bucket_name,
+                   fo.object_key,
+                   fo.mime_type,
+                   fo.file_size,
+                   fo.scan_status,
+                   fo.is_deleted AS file_deleted
+            FROM sys_attachment_ref ar
+            JOIN sys_file_object fo ON fo.id = ar.file_object_id
+            WHERE ar.id = ?
+            LIMIT 1
+            """,
+            (rs, rowNum) -> new DownloadAttachmentRow(
+                rs.getLong("attachment_ref_id"),
+                rs.getString("owner_type"),
+                rs.getString("display_name"),
+                rs.getString("uploader_type"),
+                rs.getLong("uploader_id"),
+                rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime(),
+                rs.getInt("attachment_deleted"),
+                rs.getString("storage_provider"),
+                rs.getString("bucket_name"),
+                rs.getString("object_key"),
+                rs.getString("mime_type"),
+                rs.getLong("file_size"),
+                rs.getString("scan_status"),
+                rs.getInt("file_deleted")
+            ),
+            attachmentRefId
+        );
+        if (rows.isEmpty()) {
+            throw new BizException(404, "审批附件不存在");
+        }
+        return rows.get(0);
+    }
+
+    public void insertAudit(String operatorType,
+                            Long operatorId,
+                            String actionType,
+                            String targetType,
+                            Long targetId,
+                            String result,
+                            String detailJson) {
+        jdbcTemplate.update("""
+            INSERT INTO sys_audit_log
+                (id, operator_type, operator_id, action_type, target_type, target_id, result, detail_json)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))
+            """,
+            IdGenerator.nextId(),
+            operatorType,
+            operatorId,
+            actionType,
+            targetType,
+            targetId,
+            result,
+            detailJson
+        );
+    }
+
+    public boolean isRequestParticipant(Long requestId, Long userId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM wf_request wr
+            WHERE wr.id = ?
+              AND wr.is_deleted = 0
+              AND (
+                  wr.applicant_user_id = ?
+                  OR EXISTS (
+                      SELECT 1
+                      FROM sys_todo_item sti
+                      WHERE sti.source_type = 'WORKFLOW_TASK'
+                        AND sti.source_id = wr.id
+                        AND sti.owner_type = 'USER'
+                        AND sti.owner_id = ?
+                  )
+                  OR EXISTS (
+                      SELECT 1
+                      FROM wf_task_action wta
+                      WHERE wta.request_id = wr.id
+                        AND wta.actor_type = 'USER'
+                        AND wta.actor_id = ?
+                  )
+              )
+            """, Long.class, requestId, userId, userId, userId);
+        return count != null && count > 0;
+    }
+
+    private String buildRequestListWhereSql(Long applicantUserId,
+                                            WorkflowRequestListQuery query,
+                                            List<Object> args) {
+        StringBuilder sql = new StringBuilder("""
+            WHERE wr.applicant_user_id = ?
+              AND wr.is_deleted = 0
+            """);
+        args.add(applicantUserId);
+        if (StringUtils.hasText(query.getStatus())) {
+            sql.append(" AND wr.status = ?\n");
+            args.add(query.getStatus().trim());
+        }
+        if (StringUtils.hasText(query.getBizType())) {
+            sql.append(" AND wr.biz_type = ?\n");
+            args.add(query.getBizType().trim());
+        }
+        return sql.toString();
+    }
+
+    private WorkflowAttachmentRow mapAttachment(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        return new WorkflowAttachmentRow(
+            rs.getLong("attachment_ref_id"),
+            rs.getLong("file_object_id"),
+            rs.getString("owner_type"),
+            rs.getObject("owner_id", Long.class),
+            rs.getString("display_name"),
+            rs.getString("uploader_type"),
+            rs.getLong("uploader_id"),
+            rs.getTimestamp("deleted_at") == null ? null : rs.getTimestamp("deleted_at").toLocalDateTime(),
+            rs.getInt("attachment_deleted"),
+            rs.getInt("file_deleted"),
+            rs.getString("mime_type"),
+            rs.getLong("file_size"),
+            rs.getString("content_sha256"),
+            rs.getString("scan_status")
+        );
+    }
+
+    private WorkflowRequestRow mapRequest(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        return new WorkflowRequestRow(
+            rs.getLong("id"),
+            rs.getString("request_no"),
+            rs.getString("biz_type"),
+            rs.getString("status"),
+            rs.getString("title"),
+            rs.getLong("applicant_user_id"),
+            rs.getString("flowable_process_instance_id"),
+            rs.getObject("agent_pre_review_task_id", Long.class)
+        );
+    }
+
+    public record WorkflowDownloadTicketRow(
+        Long id,
+        String ticketNo,
+        Long attachmentRefId,
+        String requesterType,
+        Long requesterId,
+        LocalDateTime expireAt,
+        String status
+    ) {
+    }
+
+    public record WorkflowAttachmentDownloadScopeRow(Long requestId) {
+    }
+    /** 接口需求表 #7：抄送我的记录行 */
+    public record WorkflowCcRow(
+        Long requestId,
+        String requestNo,
+        String bizTypeName,
+        String title,
+        String applicantName,
+        LocalDateTime ccAt,
+        String status,
+        String statusName,
+        Boolean read
+    ) {
+    }
+
+    /** 接口需求表 #7：分页查抄送我的记录 */
+    public List<WorkflowCcRow> pageCcToMe(Long userId, int pageNo, int pageSize) {
+        int offset = (Math.max(pageNo, 1) - 1) * Math.max(pageSize, 1);
+        return jdbcTemplate.query("""
+            SELECT cc.request_id, wr.request_no, wr.biz_type, wr.title,
+                   applicant.real_name AS applicant_name, cc.created_at AS cc_at,
+                   cc.status AS cc_status, wr.status
+            FROM wf_cc_record cc
+            JOIN wf_request wr ON wr.id = cc.request_id
+            LEFT JOIN org_user applicant ON applicant.id = wr.applicant_user_id
+            WHERE cc.receiver_user_id = ?
+            ORDER BY cc.created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (rs, rowNum) -> new WorkflowCcRow(
+                rs.getLong("request_id"),
+                rs.getString("request_no"),
+                bizTypeName(rs.getString("biz_type")),
+                rs.getString("title"),
+                rs.getString("applicant_name"),
+                rs.getTimestamp("cc_at").toLocalDateTime(),
+                rs.getString("status"),
+                statusName(rs.getString("status")),
+                "READ".equals(rs.getString("cc_status"))
+            ),
+            userId, pageSize, offset
+        );
+    }
+
+    /** 接口需求表 #7：抄送我的总数 */
+    public long countCcToMe(Long userId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM wf_cc_record WHERE receiver_user_id = ?
+            """, Long.class, userId);
+        return count == null ? 0 : count;
+    }
+
+    /** 接口需求表 #7：标记抄送已读 */
+    public int markCcRead(Long userId, Long requestId) {
+        return jdbcTemplate.update("""
+            UPDATE wf_cc_record
+            SET status = 'READ', read_at = NOW()
+            WHERE receiver_user_id = ? AND request_id = ? AND status = 'UNREAD'
+            """, userId, requestId);
+    }
+
+    private static String bizTypeName(String value) {
+        if ("LEAVE".equals(value)) return "请假";
+        if ("CLOCK_CORRECTION".equals(value)) return "补卡";
+        if ("EXPENSE".equals(value)) return "费用报销";
+        if ("BUSINESS_TRIP".equals(value)) return "出差";
+        if ("OVERTIME".equals(value)) return "加班";
+        if ("SEAL".equals(value)) return "用章";
+        if ("PURCHASE".equals(value)) return "采购";
+        if ("CERTIFICATE".equals(value)) return "证明开具";
+        if ("BORROW".equals(value)) return "备用金借款";
+        if ("PROJECT".equals(value)) return "项目立项";
+        return "其他业务";
+    }
+
+    private static String statusName(String value) {
+        if ("PENDING_REVIEW".equals(value)) return "待预审";
+        if ("IN_APPROVAL".equals(value)) return "审批中";
+        if ("APPROVED".equals(value)) return "已通过";
+        if ("REJECTED".equals(value)) return "已驳回";
+        if ("WITHDRAWN".equals(value)) return "已撤回";
+        return value == null ? null : "未知状态";
+    }
+
+    /** 接口需求表 #8：我发起的统计(进行中/本月已完成/平均处理时长小时) */
+    public record MyRequestSummaryRow(
+        long inFlight,
+        long finishedThisMonth,
+        Double avgHandleHours
+    ) {
+    }
+
+    public MyRequestSummaryRow countMyRequestSummary(Long applicantUserId) {
+        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        return jdbcTemplate.query("""
+            SELECT
+                SUM(CASE WHEN status IN ('PENDING_REVIEW', 'IN_APPROVAL') THEN 1 ELSE 0 END) AS in_flight,
+                SUM(CASE WHEN status = 'APPROVED' AND finished_at >= ? THEN 1 ELSE 0 END) AS finished_month,
+                AVG(CASE WHEN finished_at IS NOT NULL AND submitted_at IS NOT NULL
+                    THEN TIMESTAMPDIFF(MICROSECOND, submitted_at, finished_at) / 3600000000.0 END) AS avg_hours
+            FROM wf_request
+            WHERE applicant_user_id = ? AND is_deleted = 0
+            """,
+            rs -> {
+                if (!rs.next()) {
+                    return new MyRequestSummaryRow(0, 0, null);
+                }
+                long inFlight = rs.getLong("in_flight");
+                long finished = rs.getLong("finished_month");
+                Double avg = rs.getObject("avg_hours") == null ? null : rs.getDouble("avg_hours");
+                return new MyRequestSummaryRow(inFlight, finished, avg);
+            },
+            monthStart.atStartOfDay(),
+            applicantUserId
+        );
+    }
+
+}

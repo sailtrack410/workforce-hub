@@ -1,0 +1,1196 @@
+package com.workforcehub.attendance;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.attendance.service.AttendanceService;
+import com.workforcehub.plugin.runtime.PluginEventDispatcher;
+import com.workforcehub.plugin.sdk.DomainEvent;
+import com.workforcehub.plugin.sdk.EventTypes;
+import com.workforcehub.support.FixedClockTestConfiguration;
+import com.workforcehub.support.LocalIntegrationTestSupport;
+import com.workforcehub.support.MutableTestClock;
+import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * module-attendance 第一版考勤接口自动化冒烟。
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("api")
+@Import(FixedClockTestConfiguration.class)
+class ModuleAttendanceApiIntegrationTest extends LocalIntegrationTestSupport {
+
+    private static final long EMPLOYEE_USER_ID = 2003L;
+    private static final long MANAGER_USER_ID = 2002L;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private MutableTestClock mutableTestClock;
+
+    @Autowired
+    private AttendanceService attendanceRecalculationService;
+
+    @MockBean
+    private PluginEventDispatcher pluginEventDispatcher;
+
+    @Test
+    @DisplayName("后台配置考勤基础数据后，员工应能打卡并生成正常日结果，直属上级应能查询团队结果")
+    void employeePunchShouldCreateNormalDailyResultAndManagerShouldQueryTeamResult() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        Cookie managerSession = loginEmployee("lisi.manager");
+        String suffix = uniqueSuffix();
+
+        long calendarId = createCalendar(adminSession, "CAL_" + suffix, "标准日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_" + suffix, "标准班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_" + suffix, "研发考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data.userId", EMPLOYEE_USER_ID))
+            .andExpect(jsonLong("$.data.groupId", groupId));
+
+        punch(employeeSession, "2026-05-07T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data.userId", EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data.punchType").value("ON_DUTY"));
+        punch(employeeSession, "2026-05-07T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("NORMAL"))
+            .andExpect(jsonPath("$.data.dailyResult.exceptionFlag").value(false))
+            .andExpect(jsonPath("$.data.dailyResult.workMinutes").value(540));
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-07")
+                .param("endDate", "2026-05-07"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonLong("$.data[0].userId", EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data[0].workDate").value("2026-05-07"))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(false));
+
+        mockMvc.perform(get("/api/employee/attendance/team/daily-results")
+                .cookie(managerSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("startDate", "2026-05-07")
+                .param("endDate", "2026-05-07"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonLong("$.data[0].userId", EMPLOYEE_USER_ID))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"));
+
+        assertEquals(2L, punchCount(EMPLOYEE_USER_ID, "2026-05-07"));
+        assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-05-07"));
+    }
+
+    @Test
+    @DisplayName("后台应能查询考勤配置、排班和日结果")
+    void adminShouldListAttendanceGovernanceData() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+
+        long calendarId = createCalendar(adminSession, "CAL_LIST_" + suffix, "查询日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_LIST_" + suffix, "查询班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_LIST_" + suffix, "查询考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        MvcResult scheduleResult = createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-17", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        punch(employeeSession, "2026-05-17T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-17T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(get("/api/admin/attendance/calendars").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.calendarId==%d)]".formatted(calendarId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/shifts").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.shiftId==%d)]".formatted(shiftId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/groups").cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[?(@.groupId==%d)]".formatted(groupId), hasSize(1)));
+        mockMvc.perform(get("/api/admin/attendance/groups/{groupId}/members", groupId).cookie(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].userId").value(EMPLOYEE_USER_ID));
+        mockMvc.perform(get("/api/admin/attendance/schedules")
+                .cookie(adminSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("startDate", "2026-05-17")
+                .param("endDate", "2026-05-17"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].scheduleId").value(scheduleId));
+        mockMvc.perform(get("/api/admin/attendance/daily-results")
+                .cookie(adminSession)
+                .param("userId", String.valueOf(EMPLOYEE_USER_ID))
+                .param("startDate", "2026-05-17")
+                .param("endDate", "2026-05-17"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"));
+    }
+
+    @Test
+    @DisplayName("同一员工考勤组生效区间重叠时应拒绝写入")
+    void overlappingGroupMembershipShouldBeRejected() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_OV_" + suffix, "重叠日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_OV_" + suffix, "重叠班次-" + suffix);
+        long firstGroupId = createGroup(adminSession, "GROUP_A_" + suffix, "考勤组A-" + suffix, calendarId, shiftId);
+        long secondGroupId = createGroup(adminSession, "GROUP_B_" + suffix, "考勤组B-" + suffix, calendarId, shiftId);
+
+        addGroupMember(adminSession, firstGroupId, EMPLOYEE_USER_ID, "2026-05-01", "2026-05-31")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        addGroupMember(adminSession, secondGroupId, EMPLOYEE_USER_ID, "2026-05-15", null)
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("员工考勤组生效区间重叠"));
+
+        assertEquals(1L, activeGroupMemberCount(EMPLOYEE_USER_ID));
+    }
+
+    @Test
+    @DisplayName("并发添加同一员工重叠考勤组成员时也只能成功一条")
+    void concurrentOverlappingGroupMembershipShouldAllowOnlyOneActiveRecord() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_CON_" + suffix, "并发日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_CON_" + suffix, "并发班次-" + suffix);
+        List<Long> groupIds = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            groupIds.add(createGroup(
+                adminSession,
+                "GROUP_CON_" + i + "_" + suffix,
+                "并发考勤组" + i + "-" + suffix,
+                calendarId,
+                shiftId
+            ));
+        }
+
+        CountDownLatch ready = new CountDownLatch(groupIds.size());
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(groupIds.size());
+        try {
+            List<Future<Integer>> futures = new ArrayList<>();
+            for (Long groupId : groupIds) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(start.await(5, TimeUnit.SECONDS), "并发测试启动超时");
+                    MvcResult result = addGroupMember(
+                        adminSession,
+                        groupId,
+                        EMPLOYEE_USER_ID,
+                        "2026-06-01",
+                        null
+                    )
+                        .andReturn();
+                    int responseStatus = result.getResponse().getStatus();
+                    assertTrue(responseStatus == 200 || responseStatus == 409);
+                    return objectMapper.readTree(result.getResponse().getContentAsString()).get("code").asInt();
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "并发测试准备超时");
+            start.countDown();
+
+            long successCount = 0L;
+            for (Future<Integer> future : futures) {
+                if (future.get(10, TimeUnit.SECONDS) == 0) {
+                    successCount++;
+                }
+            }
+
+            assertEquals(1L, successCount);
+            assertEquals(1L, activeGroupMemberCount(EMPLOYEE_USER_ID));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("无考勤组并发重算日结果时也只能生成一条NO_RULE结果")
+    void concurrentNoRuleDailyResultRecalculationShouldCreateOnlyOneRow() throws Exception {
+        int workerCount = 8;
+        CountDownLatch ready = new CountDownLatch(workerCount);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (int i = 0; i < workerCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(start.await(5, TimeUnit.SECONDS), "并发重算启动超时");
+                    attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+                        EMPLOYEE_USER_ID,
+                        java.time.LocalDate.parse("2026-07-01")
+                    );
+                    return null;
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "并发重算准备超时");
+            start.countDown();
+
+            for (Future<Void> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+
+            assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-07-01"));
+            assertEquals("NO_RULE", dailyResultStatus(EMPLOYEE_USER_ID, "2026-07-01"));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("迟到和早退打卡应生成异常日结果与待处理异常")
+    void lateAndEarlyPunchShouldCreateAbnormalDailyResultAndExceptions() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_EX_" + suffix, "异常日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_EX_" + suffix, "异常班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_EX_" + suffix, "异常考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-08T09:20:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-08T17:40:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("ABNORMAL"))
+            .andExpect(jsonPath("$.data.dailyResult.lateMinutes").value(20))
+            .andExpect(jsonPath("$.data.dailyResult.earlyLeaveMinutes").value(20))
+            .andExpect(jsonPath("$.data.dailyResult.exceptionFlag").value(true));
+
+        mockMvc.perform(get("/api/employee/attendance/exceptions")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-08")
+                .param("endDate", "2026-05-08"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(2)))
+            .andExpect(jsonPath("$.data[?(@.exceptionType=='LATE')]", hasSize(1)))
+            .andExpect(jsonPath("$.data[?(@.exceptionType=='EARLY_LEAVE')]", hasSize(1)));
+
+        assertEquals(2L, exceptionCount(EMPLOYEE_USER_ID, "2026-05-08"));
+    }
+
+    @Test
+    @DisplayName("重复重算和异常说明变化应保留异常ID且不重复发布事件")
+    void recalculationShouldPreserveExceptionIdentityAndPublishNoDuplicateEvent() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_STABLE_" + suffix, "稳定异常日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_STABLE_" + suffix, "稳定异常班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_STABLE_" + suffix, "稳定异常组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-20T09:20:00", "ON_DUTY")
+            .andExpect(status().isOk());
+        punch(employeeSession, "2026-05-20T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk());
+
+        long initialExceptionId = exceptionId(EMPLOYEE_USER_ID, "2026-05-20", "LATE");
+        clearInvocations(pluginEventDispatcher);
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-20")
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-20")
+        );
+
+        assertEquals(initialExceptionId, exceptionId(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        assertEquals("迟到20分钟", exceptionDescription(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        verifyNoInteractions(pluginEventDispatcher);
+
+        jdbcTemplate.update("""
+            UPDATE att_punch_record
+            SET punch_at = ?
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = 'ON_DUTY'
+            """,
+            Timestamp.valueOf("2026-05-20 09:30:00"),
+            EMPLOYEE_USER_ID,
+            "2026-05-20"
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-20")
+        );
+
+        assertEquals(initialExceptionId, exceptionId(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        assertEquals("迟到30分钟", exceptionDescription(EMPLOYEE_USER_ID, "2026-05-20", "LATE"));
+        verifyNoInteractions(pluginEventDispatcher);
+    }
+
+    @Test
+    @DisplayName("异常消失后再次出现应生成新ID并发布精确白名单事件")
+    void reappearingExceptionShouldCreateNewIdentityAndEvent() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_REAPPEAR_" + suffix, "重现异常日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_REAPPEAR_" + suffix, "重现异常班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_REAPPEAR_" + suffix, "重现异常组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-21T09:20:00", "ON_DUTY")
+            .andExpect(status().isOk());
+        punch(employeeSession, "2026-05-21T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk());
+        long initialExceptionId = exceptionId(EMPLOYEE_USER_ID, "2026-05-21", "LATE");
+
+        jdbcTemplate.update("""
+            UPDATE att_punch_record
+            SET punch_at = ?
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = 'ON_DUTY'
+            """,
+            Timestamp.valueOf("2026-05-21 09:00:00"),
+            EMPLOYEE_USER_ID,
+            "2026-05-21"
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-21")
+        );
+        assertEquals(0L, exceptionTypeCount(EMPLOYEE_USER_ID, "2026-05-21", "LATE"));
+
+        clearInvocations(pluginEventDispatcher);
+        jdbcTemplate.update("""
+            UPDATE att_punch_record
+            SET punch_at = ?
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+              AND punch_type = 'ON_DUTY'
+            """,
+            Timestamp.valueOf("2026-05-21 09:20:00"),
+            EMPLOYEE_USER_ID,
+            "2026-05-21"
+        );
+        attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+            EMPLOYEE_USER_ID,
+            java.time.LocalDate.parse("2026-05-21")
+        );
+
+        long newExceptionId = exceptionId(EMPLOYEE_USER_ID, "2026-05-21", "LATE");
+        assertNotEquals(initialExceptionId, newExceptionId);
+        ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(pluginEventDispatcher).dispatch(eventCaptor.capture());
+        DomainEvent event = eventCaptor.getValue();
+        String stableId = "attendance-exception-" + newExceptionId;
+        assertEquals(EventTypes.ATTENDANCE_EXCEPTION, event.eventType());
+        assertEquals(stableId, event.eventId());
+        assertEquals(stableId, event.idempotencyKey());
+        assertEquals("system", event.triggeredBy());
+        assertEquals(Set.of(
+            "exceptionId",
+            "dailyResultId",
+            "userId",
+            "workDate",
+            "exceptionType",
+            "exceptionDesc",
+            "status"
+        ), event.payload().keySet());
+        assertEquals(newExceptionId, event.payload().get("exceptionId"));
+        assertEquals(dailyResultId(EMPLOYEE_USER_ID, "2026-05-21"), event.payload().get("dailyResultId"));
+        assertEquals(EMPLOYEE_USER_ID, event.payload().get("userId"));
+        assertEquals("2026-05-21", event.payload().get("workDate"));
+        assertEquals("LATE", event.payload().get("exceptionType"));
+        assertEquals("迟到20分钟", event.payload().get("exceptionDesc"));
+        assertEquals("PENDING", event.payload().get("status"));
+    }
+
+    @Test
+    @DisplayName("同一日结果并发重算只能新建并发布一个同类异常")
+    void concurrentRecalculationShouldCreateAndPublishOneExceptionPerType() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_EVENT_CON_" + suffix, "并发异常日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_EVENT_CON_" + suffix, "并发异常班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_EVENT_CON_" + suffix, "并发异常组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-22T09:20:00", "ON_DUTY")
+            .andExpect(status().isOk());
+        punch(employeeSession, "2026-05-22T18:00:00", "OFF_DUTY")
+            .andExpect(status().isOk());
+
+        jdbcTemplate.update("""
+            DELETE ae
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ? AND adr.work_date = ?
+            """, EMPLOYEE_USER_ID, "2026-05-22");
+        jdbcTemplate.update(
+            "DELETE FROM att_daily_result WHERE user_id = ? AND work_date = ?",
+            EMPLOYEE_USER_ID,
+            "2026-05-22"
+        );
+        clearInvocations(pluginEventDispatcher);
+
+        int workerCount = 6;
+        CountDownLatch ready = new CountDownLatch(workerCount);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (int i = 0; i < workerCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(start.await(5, TimeUnit.SECONDS), "并发重算启动超时");
+                    attendanceRecalculationService.recalculateDailyResultForExternalEvent(
+                        EMPLOYEE_USER_ID,
+                        java.time.LocalDate.parse("2026-05-22")
+                    );
+                    return null;
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "并发重算准备超时");
+            start.countDown();
+            for (Future<Void> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-05-22"));
+        assertEquals(1L, exceptionTypeCount(EMPLOYEE_USER_ID, "2026-05-22", "LATE"));
+        verify(pluginEventDispatcher, times(1)).dispatch(org.mockito.ArgumentMatchers.any(DomainEvent.class));
+    }
+
+    @Test
+    @DisplayName("管理员排班后，日结果计算应优先使用排班班次而不是考勤组默认班次")
+    void scheduleShouldOverrideDefaultGroupShiftWhenCalculatingDailyResult() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_SCH_" + suffix, "排班日历-" + suffix);
+        long defaultShiftId = createShift(adminSession, "SHIFT_DEF_" + suffix, "默认班次-" + suffix);
+        long scheduledShiftId = createShift(
+            adminSession,
+            "SHIFT_SCH_" + suffix,
+            "排班班次-" + suffix,
+            "10:00:00",
+            "19:00:00"
+        );
+        long groupId = createGroup(adminSession, "GROUP_SCH_" + suffix, "排班考勤组-" + suffix, calendarId, defaultShiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        MvcResult scheduleResult = mockMvc.perform(post("/api/admin/attendance/schedules")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "userId": %d,
+                      "workDate": "2026-05-10",
+                      "shiftId": %d,
+                      "calendarId": %d,
+                      "scheduleSource": "MANUAL"
+                    }
+                    """.formatted(EMPLOYEE_USER_ID, scheduledShiftId, calendarId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.scheduleId").isString())
+            .andExpect(jsonLong("$.data.shiftId", scheduledShiftId))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        punch(employeeSession, "2026-05-10T10:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-10T19:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data.dailyResult.scheduleId", scheduleId))
+            .andExpect(jsonLong("$.data.dailyResult.shiftId", scheduledShiftId))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("NORMAL"))
+            .andExpect(jsonPath("$.data.dailyResult.exceptionFlag").value(false))
+            .andExpect(jsonPath("$.data.dailyResult.workMinutes").value(540));
+
+        assertEquals(1L, dailyResultCount(EMPLOYEE_USER_ID, "2026-05-10"));
+    }
+
+    @Test
+    @DisplayName("同一员工同一天重复创建有效排班时应返回冲突")
+    void duplicateActiveScheduleShouldBeRejected() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_DUP_SCH_" + suffix, "重复排班日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_DUP_SCH_" + suffix, "重复排班班次-" + suffix);
+
+        createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-12", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-12", shiftId, calendarId)
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("员工当天已存在排班，请通过修改原排班恢复或改班"));
+    }
+
+    @Test
+    @DisplayName("已停用排班仍占用员工单日排班唯一模型，不能通过新增绕过")
+    void inactiveScheduleShouldStillRejectCreateForSameUserDate() throws Exception {
+        Cookie adminSession = loginAdmin();
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_INACT_SCH_" + suffix, "停用排班日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_INACT_SCH_" + suffix, "停用排班班次-" + suffix);
+
+        MvcResult scheduleResult = createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-16", shiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        mockMvc.perform(put("/api/admin/attendance/schedules/{scheduleId}", scheduleId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shiftId": %d,
+                      "calendarId": %d,
+                      "scheduleSource": "MANUAL",
+                      "status": "INACTIVE"
+                    }
+                    """.formatted(shiftId, calendarId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.status").value("INACTIVE"));
+
+        createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-16", shiftId, calendarId)
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("员工当天已存在排班，请通过修改原排班恢复或改班"));
+
+        assertEquals(1L, scheduleCount(EMPLOYEE_USER_ID, "2026-05-16"));
+        assertEquals("INACTIVE", scheduleStatus(scheduleId));
+    }
+
+    @Test
+    @DisplayName("管理员修改已有排班后，应重算已有日结果")
+    void updatingScheduleShouldRecalculateExistingDailyResult() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_UP_SCH_" + suffix, "改排日历-" + suffix);
+        long defaultShiftId = createShift(adminSession, "SHIFT_UP_DEF_" + suffix, "改排默认班次-" + suffix);
+        long firstShiftId = createShift(adminSession, "SHIFT_UP_A_" + suffix, "改排班次A-" + suffix, "10:00:00", "19:00:00");
+        long secondShiftId = createShift(adminSession, "SHIFT_UP_B_" + suffix, "改排班次B-" + suffix, "09:00:00", "18:00:00");
+        long groupId = createGroup(adminSession, "GROUP_UP_SCH_" + suffix, "改排考勤组-" + suffix, calendarId, defaultShiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        MvcResult scheduleResult = createSchedule(adminSession, EMPLOYEE_USER_ID, "2026-05-13", firstShiftId, calendarId)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        long scheduleId = data(scheduleResult).get("scheduleId").asLong();
+
+        punch(employeeSession, "2026-05-13T10:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-13T19:00:00", "OFF_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("NORMAL"))
+            .andExpect(jsonLong("$.data.dailyResult.shiftId", firstShiftId));
+
+        mockMvc.perform(put("/api/admin/attendance/schedules/{scheduleId}", scheduleId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shiftId": %d,
+                      "calendarId": %d,
+                      "scheduleSource": "MANUAL",
+                      "status": "ACTIVE"
+                    }
+                    """.formatted(secondShiftId, calendarId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data.shiftId", secondShiftId));
+
+        mockMvc.perform(get("/api/employee/attendance/daily-results")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-13")
+                .param("endDate", "2026-05-13"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonLong("$.data[0].scheduleId", scheduleId))
+            .andExpect(jsonLong("$.data[0].shiftId", secondShiftId))
+            .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+            .andExpect(jsonPath("$.data[0].lateMinutes").value(60))
+            .andExpect(jsonPath("$.data[0].exceptionFlag").value(true));
+    }
+
+    @Test
+    @DisplayName("只有上班卡时应生成缺卡异常")
+    void missingOffDutyPunchShouldCreateMissPunchException() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_MISS_" + suffix, "缺卡日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_MISS_" + suffix, "缺卡班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_MISS_" + suffix, "缺卡考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-11T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.dailyResult.resultStatus").value("ABNORMAL"))
+            .andExpect(jsonPath("$.data.dailyResult.absenceMinutes").value(270))
+            .andExpect(jsonPath("$.data.dailyResult.exceptionFlag").value(true));
+
+        mockMvc.perform(get("/api/employee/attendance/exceptions")
+                .cookie(employeeSession)
+                .param("startDate", "2026-05-11")
+                .param("endDate", "2026-05-11"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].exceptionType").value("MISS_PUNCH"));
+
+        assertEquals(1L, exceptionCount(EMPLOYEE_USER_ID, "2026-05-11"));
+    }
+
+    @Test
+    @DisplayName("员工登录后被离职时，旧会话也不能继续打卡")
+    void offboardedEmployeeShouldNotPunchWithExistingSession() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_OFF_" + suffix, "离职日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_OFF_" + suffix, "离职班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_OFF_" + suffix, "离职考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-09T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(put("/api/admin/users/{userId}/employment-status", EMPLOYEE_USER_ID)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "employmentStatus": "PENDING_OFFBOARD"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        mockMvc.perform(put("/api/admin/users/{userId}/employment-status", EMPLOYEE_USER_ID)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "employmentStatus": "OFFBOARDED"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchAt": "2026-05-09T18:00:00",
+                      "punchType": "OFF_DUTY",
+                      "sourceType": "PC"
+                    }
+                    """))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(100403))
+            .andExpect(jsonPath("$.message").value("员工当前状态不允许打卡"));
+
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-09"));
+    }
+
+    @Test
+    @DisplayName("员工实时打卡不应信任客户端传入的历史打卡时间")
+    void employeePunchShouldUseServerReceivedTimeInsteadOfClientPunchAt() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        mutableTestClock.setTime(LocalDateTime.of(2026, 5, 14, 10, 30));
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_TRUST_" + suffix, "可信打卡日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_TRUST_" + suffix, "可信打卡班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_TRUST_" + suffix, "可信打卡考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchAt": "2026-05-07T09:00:00",
+                      "punchType": "ON_DUTY",
+                      "sourceType": "PC"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.punchAt").value("2026-05-14T10:30:00"));
+
+        assertEquals(0L, punchCount(EMPLOYEE_USER_ID, "2026-05-07"));
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-14"));
+    }
+
+    @Test
+    @DisplayName("员工实时打卡不应要求客户端传入打卡时间")
+    void employeePunchShouldAllowMissingClientPunchAt() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        mutableTestClock.setTime(LocalDateTime.of(2026, 5, 15, 9, 5));
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_NO_CLIENT_TIME_" + suffix, "无客户端时间日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_NO_CLIENT_TIME_" + suffix, "无客户端时间班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_NO_CLIENT_TIME_" + suffix, "无客户端时间考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchType": "ON_DUTY",
+                      "sourceType": "PC"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.punchAt").value("2026-05-15T09:05:00"));
+
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-15"));
+    }
+
+    @Test
+    @DisplayName("员工同一天同类型重复打卡应返回冲突")
+    void duplicateSameDayPunchTypeShouldBeRejected() throws Exception {
+        Cookie adminSession = loginAdmin();
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+        String suffix = uniqueSuffix();
+        long calendarId = createCalendar(adminSession, "CAL_DUP_PUNCH_" + suffix, "重复打卡日历-" + suffix);
+        long shiftId = createShift(adminSession, "SHIFT_DUP_PUNCH_" + suffix, "重复打卡班次-" + suffix);
+        long groupId = createGroup(adminSession, "GROUP_DUP_PUNCH_" + suffix, "重复打卡考勤组-" + suffix, calendarId, shiftId);
+        addGroupMember(adminSession, groupId, EMPLOYEE_USER_ID, "2026-05-01", null)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+
+        punch(employeeSession, "2026-05-18T09:00:00", "ON_DUTY")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
+        punch(employeeSession, "2026-05-18T09:01:00", "ON_DUTY")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(100409))
+            .andExpect(jsonPath("$.message").value("当天同类型打卡已存在"));
+
+        assertEquals(1L, punchCount(EMPLOYEE_USER_ID, "2026-05-18"));
+    }
+
+    @Test
+    @DisplayName("员工实时打卡不应允许伪造受控来源")
+    void employeePunchShouldRejectControlledManualSourceType() throws Exception {
+        Cookie employeeSession = loginEmployee("zhangsan.employee");
+
+        mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchAt": "2026-05-07T09:00:00",
+                      "punchType": "ON_DUTY",
+                      "sourceType": "MANUAL"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(100400))
+            .andExpect(jsonPath("$.message").value("员工实时打卡来源仅支持 APP/PC"));
+    }
+
+    private long createCalendar(Cookie adminSession, String calendarCode, String calendarName) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/admin/attendance/calendars")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "calendarCode": "%s",
+                      "calendarName": "%s",
+                      "calendarType": "STANDARD",
+                      "status": "ACTIVE"
+                    }
+                    """.formatted(calendarCode, calendarName)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.calendarId").isString())
+            .andReturn();
+        return data(result).get("calendarId").asLong();
+    }
+
+    private long createShift(Cookie adminSession, String shiftCode, String shiftName) throws Exception {
+        return createShift(adminSession, shiftCode, shiftName, "09:00:00", "18:00:00");
+    }
+
+    private long createShift(Cookie adminSession,
+                             String shiftCode,
+                             String shiftName,
+                             String startTime,
+                             String endTime) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/admin/attendance/shifts")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "shiftCode": "%s",
+                      "shiftName": "%s",
+                      "startTime": "%s",
+                      "endTime": "%s",
+                      "onDutyPunchStart": "08:00:00",
+                      "onDutyPunchEnd": "10:00:00",
+                      "offDutyPunchStart": "17:00:00",
+                      "offDutyPunchEnd": "19:00:00",
+                      "status": "ACTIVE"
+                    }
+                    """.formatted(shiftCode, shiftName, startTime, endTime)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.shiftId").isString())
+            .andReturn();
+        return data(result).get("shiftId").asLong();
+    }
+
+    private long createGroup(Cookie adminSession,
+                             String groupCode,
+                             String groupName,
+                             long calendarId,
+                             long shiftId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/admin/attendance/groups")
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "groupCode": "%s",
+                      "groupName": "%s",
+                      "calendarId": %d,
+                      "defaultShiftId": %d,
+                      "lateGraceMinutes": 0,
+                      "earlyLeaveGraceMinutes": 0,
+                      "status": "ACTIVE"
+                    }
+                    """.formatted(groupCode, groupName, calendarId, shiftId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.groupId").isString())
+            .andReturn();
+        return data(result).get("groupId").asLong();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions addGroupMember(Cookie adminSession,
+                                                                              long groupId,
+                                                                              long userId,
+                                                                              String effectiveFrom,
+                                                                              String effectiveTo) throws Exception {
+        String effectiveToField = effectiveTo == null ? "" : "\"effectiveTo\": \"%s\",".formatted(effectiveTo);
+        return mockMvc.perform(post("/api/admin/attendance/groups/{groupId}/members", groupId)
+                .cookie(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "userId": %d,
+                      "effectiveFrom": "%s",
+                      %s
+                      "sourceType": "MANUAL"
+                    }
+                    """.formatted(userId, effectiveFrom, effectiveToField)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions punch(Cookie employeeSession,
+                                                                     String punchAt,
+                                                                     String punchType) throws Exception {
+        mutableTestClock.setTime(LocalDateTime.parse(punchAt));
+        return mockMvc.perform(post("/api/employee/attendance/punch")
+                .cookie(employeeSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "punchAt": "%s",
+                      "punchType": "%s",
+                      "sourceType": "PC",
+                      "locationText": "杭州总部",
+                      "ipAddress": "127.0.0.1",
+                      "deviceId": "test-device"
+                    }
+                    """.formatted(punchAt, punchType)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions createSchedule(Cookie adminSession,
+                                                                              long userId,
+                                                                              String workDate,
+                                                                              long shiftId,
+                                                                              long calendarId) throws Exception {
+        return mockMvc.perform(post("/api/admin/attendance/schedules")
+            .cookie(adminSession)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "userId": %d,
+                  "workDate": "%s",
+                  "shiftId": %d,
+                  "calendarId": %d,
+                  "scheduleSource": "MANUAL"
+                }
+                """.formatted(userId, workDate, shiftId, calendarId)));
+    }
+
+    private Cookie loginAdmin() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/admin/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "admin.demo",
+                      "password": "Admin@123456"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(cookie().exists("SESSION"))
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        Cookie session = result.getResponse().getCookie("SESSION");
+        assertNotNull(session, "后台登录后应返回 SESSION");
+        return session;
+    }
+
+    private Cookie loginEmployee(String loginName) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employee/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "loginName": "%s",
+                      "password": "Employee@123456"
+                    }
+                    """.formatted(loginName)))
+            .andExpect(status().isOk())
+            .andExpect(cookie().exists("SESSION"))
+            .andExpect(jsonPath("$.code").value(0))
+            .andReturn();
+        Cookie session = result.getResponse().getCookie("SESSION");
+        assertNotNull(session, "员工登录后应返回 SESSION");
+        return session;
+    }
+
+    private JsonNode data(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
+    }
+
+    private String uniqueSuffix() {
+        return Long.toString(System.nanoTime(), 36).toUpperCase();
+    }
+
+    private long punchCount(long userId, String workDate) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_punch_record
+            WHERE user_id = ?
+              AND DATE(punch_at) = ?
+            """, Long.class, userId, workDate);
+        return count == null ? 0L : count;
+    }
+
+    private long dailyResultCount(long userId, String workDate) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_daily_result
+            WHERE user_id = ?
+              AND work_date = ?
+            """, Long.class, userId, workDate);
+        return count == null ? 0L : count;
+    }
+
+    private long dailyResultId(long userId, String workDate) {
+        Long id = jdbcTemplate.queryForObject("""
+            SELECT id
+            FROM att_daily_result
+            WHERE user_id = ? AND work_date = ?
+            """, Long.class, userId, workDate);
+        return id == null ? 0L : id;
+    }
+
+    private String dailyResultStatus(long userId, String workDate) {
+        return jdbcTemplate.queryForObject("""
+            SELECT result_status
+            FROM att_daily_result
+            WHERE user_id = ?
+              AND work_date = ?
+            """, String.class, userId, workDate);
+    }
+
+    private long scheduleCount(long userId, String workDate) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_schedule
+            WHERE user_id = ?
+              AND work_date = ?
+            """, Long.class, userId, workDate);
+        return count == null ? 0L : count;
+    }
+
+    private String scheduleStatus(long scheduleId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM att_schedule WHERE id = ?",
+            String.class,
+            scheduleId
+        );
+    }
+
+    private long activeGroupMemberCount(long userId) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_group_member
+            WHERE user_id = ?
+              AND status = 'ACTIVE'
+            """, Long.class, userId);
+        return count == null ? 0L : count;
+    }
+
+    private long exceptionCount(long userId, String workDate) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+            """, Long.class, userId, workDate);
+        return count == null ? 0L : count;
+    }
+
+    private long exceptionId(long userId, String workDate, String exceptionType) {
+        Long id = jdbcTemplate.queryForObject("""
+            SELECT ae.id
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+              AND ae.exception_type = ?
+            """, Long.class, userId, workDate, exceptionType);
+        return id == null ? 0L : id;
+    }
+
+    private String exceptionDescription(long userId, String workDate, String exceptionType) {
+        return jdbcTemplate.queryForObject("""
+            SELECT ae.exception_desc
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+              AND ae.exception_type = ?
+            """, String.class, userId, workDate, exceptionType);
+    }
+
+    private long exceptionTypeCount(long userId, String workDate, String exceptionType) {
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM att_exception ae
+            JOIN att_daily_result adr ON adr.id = ae.daily_result_id
+            WHERE adr.user_id = ?
+              AND adr.work_date = ?
+              AND ae.exception_type = ?
+            """, Long.class, userId, workDate, exceptionType);
+        return count == null ? 0L : count;
+    }
+}

@@ -1,0 +1,513 @@
+{
+  "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+  "kind": "source-derived diagrams and artifact browser validation",
+  "businessRuntimeTested": false,
+  "verified": [
+    {
+      "id": "auth-login",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-login.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-login.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-login.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "b6394a8792626a5cdb97ecf22b2ebbe680b7995e04f7116fc7c7e192129beedd",
+      "artifactSha256": "426a833197de32878b97dc75c41c6a9f0627fde1237d318c336c1d01da0a2315"
+    },
+    {
+      "id": "auth-email",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-email.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-email.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-email.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "58c770a59ce7a424ab6ebc22eb5d21ca2ea8274a7178182860524173b459ef89",
+      "artifactSha256": "5394becb6ef7d7ac6a943656a6d4260487e2d720e80f3daebd9fec649662a916"
+    },
+    {
+      "id": "auth-register",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-register.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-register.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-register.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "317ea3b782f8129c258684286b73c45d2a3eb3af2a4a1b4c04116a8d7e9e8786",
+      "artifactSha256": "4b3e8a0e5980092b48afd458bd5034f6f74926e0f9297aae437a744ba14d714d"
+    },
+    {
+      "id": "org-lifecycle",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "dc72738c9b3c5f5f804f0c194b7bb602e2f420e20800a7e32c12016febd18c06",
+      "artifactSha256": "b83fedca274276d3a28feea096a4abba157adbd50cdfd07d5845e3105e350461"
+    },
+    {
+      "id": "auth-rbac",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "2c1955d08dbe5f8a4720f48701477653a768e48c4412435a8cd3f57c25a9f85b",
+      "artifactSha256": "af9fa322b4ef8607ffdeac0bb46594e7cdbb191d91e9e37d3ff8b48c9ba10fec"
+    },
+    {
+      "id": "contacts-friends",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "48909f0ac7549197a9416f7762a628cdf767df0f5209f6f2a91b8801deb3194e",
+      "artifactSha256": "be5e51635f92864e53de4fca2340303ce75cf44318d74059b587819c3196d0e8"
+    },
+    {
+      "id": "system-dict-brand",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "5ec03680baf74277fae02ffb97f01e2754cc0e519dc6f8da77db72535ca894c7",
+      "artifactSha256": "a8de16e925ce847e61a5b02ab662433a77be30da6c7a18f72ea8189fadaa4082"
+    },
+    {
+      "id": "system-operations",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/system-operations.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/system-operations.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/system-operations.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "b3ac7aecc7da3081febbb8d6fc7a77805f6c564ff06355c77076bc8a9a2d9d93",
+      "artifactSha256": "c28885d5ae9da99d4b8f81be8addfe1012c6f3096a8edc09bc7c0dd85c53ac05"
+    },
+    {
+      "id": "employee-personal",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "43de368c03bb172e88d6aaa932bf50905e9e38197f9e0cc45269ebf198a52ff6",
+      "artifactSha256": "964598b4493351138a9c650c12d9661a18d56adb312e616dee682e55a1e0bf78"
+    },
+    {
+      "id": "wf-template",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "9fc738977ace1373f22dc07e346f2dea51f84b119f4ef583d9c70128ef1f2e5a",
+      "artifactSha256": "9aa3d47e0f45d2af2014983676e1d2385a4040c2924c1ffae2863f5535f704b4"
+    },
+    {
+      "id": "wf-leave-ai",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "07073037098b8addfc9ce100477377c3aee65f35cc485a6438736d15718ec24a",
+      "artifactSha256": "77b9002a70639089d1cf2894ea5669a746f9508d62d992591492fa200301f285"
+    },
+    {
+      "id": "wf-settlement",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.review-2/wf-settlement.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "cd0e668fe0ea77c22946b150d2c19fe54820d03e5da41c244318f1bbc15f2ecd",
+      "artifactSha256": "35bd53df84a2737daba7c08d62f1833b1df2b810eb9a5c708268dab62e0176ee"
+    },
+    {
+      "id": "wf-correction",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "320a0ead68f29e8ea45afa087a565c7dce530436db3f69da30fa5c1e3c1859e1",
+      "artifactSha256": "6dc5ac72b74c18e773ea4ad1314254438fe582f9d95ca807019ee33e6ea599a3"
+    },
+    {
+      "id": "wf-generic-attachments",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.review-2/wf-generic-attachments.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "3b0a24e8b491686724b31cc4a3c7d4655b89a9253c0e10e7fad6aac56ae74be9",
+      "artifactSha256": "3534e96cce2677711ffb894eff0b5ede5acad8b0ab9a05121e826200010d69f8"
+    },
+    {
+      "id": "att-governance",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "651f46f12b952e27963ea785b613acb1baa3ac0def8be09a5ad6f58a72a7589e",
+      "artifactSha256": "b8188afdb35d8d719c03057d66c3280e5630dc7611a260b8f68fad88b865086f"
+    },
+    {
+      "id": "att-punch",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.review-2/att-punch.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "434acda2f0e75a69945c8c1f54631d1fa8d7774cee0499389534d43dea14e303",
+      "artifactSha256": "ab2f46737b4bfcb1005d307ff660208e02542098d1b0560380bc66fbe10cc895"
+    },
+    {
+      "id": "leave-governance",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "5956cc379cc6143ad812756c26debf69ac5e893395be843d5372dcb37a8c7775",
+      "artifactSha256": "8d1cb97f38c13adc8438408aae748635a4e5b759f5521372ff8e8cbee50fa5bd"
+    },
+    {
+      "id": "im-delivery",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-delivery/im-delivery.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "f73af50919882e76c6a807e75a236ddcfa96fc7f023153fc3625aab23c109953",
+      "artifactSha256": "42ee3890d2b580c5e522337d3b6746be42e86c3d4908b93824a506246f4daff8"
+    },
+    {
+      "id": "im-groups",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-groups/im-groups.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "b5d2ad128244481834c87779b867f7525df3a34444fa8e78695f050a8d96b57e",
+      "artifactSha256": "c3bae517784b39f7042e30d7a746c65ea453ebdba12e5ffb426e29ca490db263"
+    },
+    {
+      "id": "im-outbox",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "36ebdf470801090708e6d1dee42f00e5f2cca3992a7f500539959320e88a169e",
+      "artifactSha256": "2232f731d05a14816bab1d8f5df7a18494ab4bd52c9565e349491ad2d4d353f5"
+    },
+    {
+      "id": "agent-release",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "1c36c2a183c150d94e4d85dd37590c7b7997ac0d953b9c5e3a078081e80d3f12",
+      "artifactSha256": "8dc47560e79c0a5af1ece85b61c3b40d20f53a2551268d4fcdd014019a6473b3"
+    },
+    {
+      "id": "agent-tools",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "31a7ade2d1110af385910ceae34da59757d850f4a8c6e37771f2fca5c1ce77b4",
+      "artifactSha256": "9074ac6619f70b0f70f3887cfc35ca8f7c456e8ef757d501d990ef8799266ab4"
+    },
+    {
+      "id": "agent-conversation",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-conversation.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-conversation.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-agent-conversation/agent-conversation.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "bb01636cec1d32fd0af3d383d35522ac0b47824cd73635db34ad57576a95216d",
+      "artifactSha256": "21a9f135b39a0ad8fc78cb4418e252b699fa8528942a19b1b124cd785b2aead6"
+    },
+    {
+      "id": "knowledge-documents",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "cfc2e8e12bd94ce4230476491489e7c52f39e69a9a42193233118732a843ab46",
+      "artifactSha256": "335f0628c77ebed43097462bf217256af7f796a44cd7f55f78e67a2f20e156e7"
+    },
+    {
+      "id": "rag-qa",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/rag-qa.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/rag-qa.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-rag-qa/rag-qa.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "e97a073a25dfb90b12dd97b6cf4d25b204b9370a7f51921720a976a6383bc2e8",
+      "artifactSha256": "8944111ee16e051d47eedd1f4af34987a1acb10ef22e4ede5871a1cf056c3cb6"
+    },
+    {
+      "id": "ai-provider-health",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.candidate.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "e82884d99d97d92c662a3c398901723e90c66027b68ceaa9c5f2b0e9dbf32d5f",
+      "artifactSha256": "7f69273ed2788260af67dbd0a812992474374d6074bc59c45f990525a5791593"
+    },
+    {
+      "id": "F01",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F01.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F01.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/f01.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "a0d9667dbcaeb518c76821af1786788c0e25f2939a443f07057b39db65077eb5",
+      "artifactSha256": "b90f617c21bc9065627cdb60e6e6cb9072b7ec89c918acf3a57c2bb356b9a989"
+    },
+    {
+      "id": "F02",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F02.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F02.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/f02.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "4aae5dad9eab672b9f60702b95ee9caddfecee0003cb547d742267753c6a3c17",
+      "artifactSha256": "97768f585209fc402e4329e7a9bd933af83cf5cef7b6c5b67016b5cae60c9134"
+    },
+    {
+      "id": "F03",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F03.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F03.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/f03.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "b18af9d268268027ccb01afc5566e4e057e4d65c50c1e6b3e923583ad8fc81fc",
+      "artifactSha256": "8462ee86044ccd26c330d363da66e0a3bb7d3ad2c7d2a88654ca3742088e1aaf"
+    },
+    {
+      "id": "F04",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F04.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F04.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/f04.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "a1bd6912357dba14b4074d57ec8308a27d97ae214b140c3e24a3afc28b5be59a",
+      "artifactSha256": "e0a2e8afc2cc831dba46db9307a72cc674d7cf29717779be1f9a9e5119a5d743"
+    },
+    {
+      "id": "F05",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F05.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/F05.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/f05.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "9645a5301aa9370c9b9598eb70af65d5ec67890960f74fd5924faf25b18db4c6",
+      "artifactSha256": "b8ec6d7be0709cfc291e83c18c70d5f53228bdaf9f927fbae6786876839f4db5"
+    },
+    {
+      "id": "P01",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P01.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P01.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/p01.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "8732b5380e583d7e8014d9c95d042587b6e13748eab126b543e50f42283af2c0",
+      "artifactSha256": "45c8008b475dd4a53f494642ba4e9a2f22699a6e50141495c416bfd538025112"
+    },
+    {
+      "id": "P02",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P02.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P02.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/p02.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "763a1f304d3f4cf96002b19f17c23a1f906cc57ee600a527e5f632323bc34f1f",
+      "artifactSha256": "131f6a86bf08bfadb0d7593fc90fc17c20ef1867d905874de6fbd75d325afca6"
+    },
+    {
+      "id": "P03",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P03.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P03.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/p03.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "f3c5eb1c7b03000d3b78ec5c9a5f5dcc78215e37d74df61d19e7a886b28f0253",
+      "artifactSha256": "e5180f10a7c05081860b510a051820c879a2e3a016ccf5044434fff683ed2f50"
+    },
+    {
+      "id": "P04",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P04.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P04.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/p04.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "3108583a98be38790017baacf083ee704a4f2cb148d82604f02f6dd11d178a5d",
+      "artifactSha256": "51b832270e680c986d4defbf28069bf243b93b6462fe5d840a39ca311bfdc052"
+    },
+    {
+      "id": "W01",
+      "candidate": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/W01.json",
+      "html": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/W01.html",
+      "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/w01.finalize-summary.json",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidateSha256": "b7cca1a58ccc7486dac89ae46db305b45c494855cdd7083583bf5368077f390f",
+      "artifactSha256": "782cd401cdc63ed4cf84eafaad36353990a50c69b3c73368f85bce75b6f7f9dc"
+    }
+  ],
+  "errors": [],
+  "summary": "Workflow artifacts: 36 passed, 0 failed"
+}

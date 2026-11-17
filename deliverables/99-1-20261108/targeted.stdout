@@ -1,0 +1,125 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 91 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 527 source files with javac [debug release 17] to target/classes
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 114 source files with javac [debug release 17] to target/test-classes
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.auth.AdminPermissionWebTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:14:41.923+08:00  INFO [] 34201 --- [background-preinit] o.h.validator.internal.util.Version      : HV000001: Hibernate Validator 8.0.1.Final
+2026-11-08T20:14:41.937+08:00  INFO [] 34201 --- [main] c.w.auth.AdminPermissionWebTest          : Starting AdminPermissionWebTest using Java 17.0.18 with PID 34201 (started by sailtrack in /Users/sailtrack/工程文件/java_web/workforce-hub/server)
+2026-11-08T20:14:41.938+08:00 DEBUG [] 34201 --- [main] c.w.auth.AdminPermissionWebTest          : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:14:41.938+08:00  INFO [] 34201 --- [main] c.w.auth.AdminPermissionWebTest          : The following 1 profile is active: "api"
+2026-11-08T20:14:42.992+08:00  INFO [] 34201 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@22f80e36, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@3c98981e, org.springframework.security.web.context.SecurityContextHolderFilter@7e8c58fd, org.springframework.security.web.header.HeaderWriterFilter@3bda1f0, org.springframework.web.filter.CorsFilter@6dcee890, org.springframework.security.web.csrf.CsrfFilter@53079ae6, com.workforcehub.auth.security.UserTypePathFilter@713e49c3, com.workforcehub.auth.security.AdminPermissionFilter@13d5606c, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@780c0, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@1b3bb287, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@6bf54260, org.springframework.security.web.session.SessionManagementFilter@73e399cc, org.springframework.security.web.access.ExceptionTranslationFilter@36ecf9f6, org.springframework.security.web.access.intercept.AuthorizationFilter@4b5aa48b]
+2026-11-08T20:14:43.116+08:00 DEBUG [] 34201 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:14:43.117+08:00 DEBUG [] 34201 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:14:43.120+08:00  INFO [] 34201 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:14:43.120+08:00  INFO [] 34201 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:14:43.120+08:00  INFO [] 34201 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:14:43.164+08:00  INFO [] 34201 --- [main] c.w.auth.AdminPermissionWebTest          : Started AdminPermissionWebTest in 1.454 seconds (process running for 1.991)
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.937 s -- in com.workforcehub.auth.AdminPermissionWebTest
+[INFO] Running com.workforcehub.auth.AdminPermissionFilterTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.workforcehub.auth.AdminPermissionFilterTest
+[INFO] Running com.workforcehub.auth.AdminPermissionRouteMatrixTest
+Admin route matrix: 163 method/path mappings covered
+[INFO] Tests run: 165, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.307 s -- in com.workforcehub.auth.AdminPermissionRouteMatrixTest
+[INFO] Running com.workforcehub.plugin.AdminPluginManagementWebTest
+2026-11-08T20:14:43.823+08:00  WARN [] 34201 --- [main] lowableLiquibaseEnvironmentPostProcessor : Liquibase has not been explicitly enabled or disabled. Overriding default from Spring Boot from `true` to `false`. Flowable pulls in Liquibase, but does not use the Spring Boot configuration for it. If you are using it you would need to set `spring.liquibase.enabled` to `true` by yourself
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:14:43.827+08:00  INFO [] 34201 --- [main] c.w.plugin.AdminPluginManagementWebTest  : Starting AdminPluginManagementWebTest using Java 17.0.18 with PID 34201 (started by sailtrack in /Users/sailtrack/工程文件/java_web/workforce-hub/server)
+2026-11-08T20:14:43.827+08:00 DEBUG [] 34201 --- [main] c.w.plugin.AdminPluginManagementWebTest  : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:14:43.827+08:00  INFO [] 34201 --- [main] c.w.plugin.AdminPluginManagementWebTest  : The following 1 profile is active: "api"
+2026-11-08T20:14:43.943+08:00  INFO [] 34201 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@6222a343, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@228c854f, org.springframework.security.web.context.SecurityContextHolderFilter@50d02417, org.springframework.security.web.header.HeaderWriterFilter@1e4f8430, org.springframework.web.filter.CorsFilter@47c019d7, org.springframework.security.web.csrf.CsrfFilter@2518245b, com.workforcehub.auth.security.UserTypePathFilter@7861a433, com.workforcehub.auth.security.AdminPermissionFilter@f2e28c7, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@53425450, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@314e240c, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@494e7290, org.springframework.security.web.session.SessionManagementFilter@340ef431, org.springframework.security.web.access.ExceptionTranslationFilter@45c8db36, org.springframework.security.web.access.intercept.AuthorizationFilter@230383a7]
+2026-11-08T20:14:43.964+08:00 DEBUG [] 34201 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:14:43.964+08:00 DEBUG [] 34201 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:14:43.964+08:00  INFO [] 34201 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:14:43.964+08:00  INFO [] 34201 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:14:43.964+08:00  INFO [] 34201 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:14:43.968+08:00  INFO [] 34201 --- [main] c.w.plugin.AdminPluginManagementWebTest  : Started AdminPluginManagementWebTest in 0.173 seconds (process running for 2.796)
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.254 s -- in com.workforcehub.plugin.AdminPluginManagementWebTest
+[INFO] Running com.workforcehub.plugin.PluginGatewaySecurityTest
+2026-11-08T20:14:44.053+08:00  WARN [] 34201 --- [main] lowableLiquibaseEnvironmentPostProcessor : Liquibase has not been explicitly enabled or disabled. Overriding default from Spring Boot from `true` to `false`. Flowable pulls in Liquibase, but does not use the Spring Boot configuration for it. If you are using it you would need to set `spring.liquibase.enabled` to `true` by yourself
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:14:44.056+08:00  INFO [] 34201 --- [main] c.w.plugin.PluginGatewaySecurityTest     : Starting PluginGatewaySecurityTest using Java 17.0.18 with PID 34201 (started by sailtrack in /Users/sailtrack/工程文件/java_web/workforce-hub/server)
+2026-11-08T20:14:44.056+08:00 DEBUG [] 34201 --- [main] c.w.plugin.PluginGatewaySecurityTest     : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:14:44.056+08:00  INFO [] 34201 --- [main] c.w.plugin.PluginGatewaySecurityTest     : The following 1 profile is active: "api"
+2026-11-08T20:14:44.215+08:00  INFO [] 34201 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@52e296c0, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@1d77762f, org.springframework.security.web.context.SecurityContextHolderFilter@57082d16, org.springframework.security.web.header.HeaderWriterFilter@42cf08a1, org.springframework.web.filter.CorsFilter@7e2bd635, org.springframework.security.web.csrf.CsrfFilter@53785d1a, com.workforcehub.auth.security.UserTypePathFilter@3c79be0f, com.workforcehub.auth.security.AdminPermissionFilter@7aeb7bd6, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@ae2227, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@3a1eb893, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@5c0bacaa, org.springframework.security.web.session.SessionManagementFilter@46092840, org.springframework.security.web.access.ExceptionTranslationFilter@75d454a4, org.springframework.security.web.access.intercept.AuthorizationFilter@23ac3788]
+2026-11-08T20:14:44.237+08:00 DEBUG [] 34201 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:14:44.237+08:00 DEBUG [] 34201 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:14:44.237+08:00 DEBUG [] 34201 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:14:44.237+08:00  INFO [] 34201 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:14:44.237+08:00  INFO [] 34201 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:14:44.238+08:00  INFO [] 34201 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:14:44.243+08:00  INFO [] 34201 --- [main] c.w.plugin.PluginGatewaySecurityTest     : Started PluginGatewaySecurityTest in 0.2 seconds (process running for 3.071)
+2026-11-08T20:14:44.270+08:00 ERROR [] 34201 --- [main] c.w.p.c.PluginGatewayController          : 网关异常: errorType=java.lang.IllegalStateException
+2026-11-08T20:14:44.372+08:00 ERROR [] 34201 --- [main] c.w.p.c.PluginGatewayController          : 插件动作网关失败: pluginId=hello-plugin, actionCode=hello.greet, errorType=java.lang.AssertionError
+2026-11-08T20:14:44.406+08:00 DEBUG [] 34201 --- [main] c.w.p.c.PluginGatewayController          : 权限校验失败: pluginId=hello-plugin, actionCode=hello.greet, reason=动作未授权
+2026-11-08T20:14:44.446+08:00 DEBUG [] 34201 --- [main] c.w.p.c.PluginGatewayController          : 权限校验失败: pluginId=hello-plugin, actionCode=hello.greet, reason=调用身份无效
+2026-11-08T20:14:44.449+08:00 ERROR [] 34201 --- [main] c.w.p.c.PluginGatewayController          : 插件动作执行失败: pluginId=hello-plugin, actionCode=hello.greet, errorType=java.lang.RuntimeException
+[INFO] Tests run: 47, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.416 s -- in com.workforcehub.plugin.PluginGatewaySecurityTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 252, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  11.361 s
+[INFO] Finished at: 2026-11-08T20:14:44+08:00
+[INFO] ------------------------------------------------------------------------

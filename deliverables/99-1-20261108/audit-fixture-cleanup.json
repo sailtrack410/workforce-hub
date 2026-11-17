@@ -1,0 +1,8 @@
+{
+  "runtime": "/tmp/workforce-991-audit-2vmxwuvk",
+  "mysql_exit": 0,
+  "redis_exit": 0,
+  "mysql_port_closed": true,
+  "redis_port_closed": true,
+  "scope": "Only processes created for this run were stopped"
+}

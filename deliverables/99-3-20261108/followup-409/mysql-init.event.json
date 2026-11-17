@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld",
+    "--no-defaults",
+    "--initialize-insecure",
+    "--basedir=/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+    "--datadir=/tmp/workforce-993-mysql-vrpbk4lz/data"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/mysql-init.stdout",
+  "stderr": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/mysql-init.stderr"
+}

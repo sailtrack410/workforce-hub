@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "subtask": {
+      "agent_task_status": 1,
+      "completed_at": "0",
+      "created_at": "1794139488142",
+      "creator": {
+        "id": "ou_358d547a8defe93637e1aa4046adde44",
+        "type": "user"
+      },
+      "dependencies": [],
+      "description": "编号：100-15 / AT-02；优先级：P2；类型：新问题\n\n验证状态：静态确认，既有结果可能陈旧。尚未修复，待复现/整改/验收。\n\n触发条件：当天已按默认班次生成日结果后，再首次创建当天个人排班\n\n影响：createSchedule只存排班，日结果维持旧班次，直到另一打卡、审批或重算触发\n\n证据与边界：创建直接返回；修改则显式检查日结果存在并重算。未动态创建排班。\n\n修复方向：创建排班成功后，与修改路径一致地对已有日结果重算。\n\n验收条件：默认班次已有结果，创建不同班次后，同一请求结束时shiftId、时长与异常立即更新。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:238\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:252\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:262\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:285",
+      "extra": "",
+      "guid": "6dffb94b-4d16-411a-9812-8713bd4f2c57",
+      "is_milestone": false,
+      "mode": 2,
+      "origin": {
+        "href": {
+          "title": "sailtrack 飞书 CLI",
+          "url": ""
+        },
+        "platform_i18n_name": {
+          "de_de": "sailtrack 飞书 CLI",
+          "en_us": "sailtrack 飞书 CLI",
+          "es_es": "sailtrack 飞书 CLI",
+          "fr_fr": "sailtrack 飞书 CLI",
+          "it_it": "sailtrack 飞书 CLI",
+          "ja_jp": "sailtrack 飞书 CLI",
+          "ko_kr": "sailtrack 飞书 CLI",
+          "ru_ru": "sailtrack 飞书 CLI",
+          "th_th": "sailtrack 飞书 CLI",
+          "zh_cn": "sailtrack 飞书 CLI",
+          "zh_hk": "sailtrack 飞书 CLI",
+          "zh_tw": "sailtrack 飞书 CLI"
+        }
+      },
+      "parent_task_guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+      "repeat_rule": "",
+      "source": 7,
+      "status": "todo",
+      "subtask_count": 0,
+      "summary": "[P2][100-15][新问题] 首次创建排班不刷新既有考勤结果",
+      "task_id": "t100056",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ],
+      "updated_at": "1794139488175",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=6dffb94b-4d16-411a-9812-8713bd4f2c57\u0026suite_entity_num=t100056"
+    }
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+
+> workforce-hub-admin-web@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.6 /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-web-20261108/candidate/admin-web
+
+
+ Test Files  16 passed (16)
+      Tests  88 passed (88)
+   Start at  21:17:29
+   Duration  779ms (transform 574ms, setup 0ms, import 1.13s, tests 260ms, environment 4ms)
+

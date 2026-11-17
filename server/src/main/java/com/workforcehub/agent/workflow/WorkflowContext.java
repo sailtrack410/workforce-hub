@@ -8,10 +8,20 @@ public class WorkflowContext {
 
     private final ObjectMapper objectMapper;
     private final ObjectNode variables;
+    private final Long operatorUserId;
 
     public WorkflowContext(ObjectMapper objectMapper) {
+        this(objectMapper, null);
+    }
+
+    public WorkflowContext(ObjectMapper objectMapper, Long operatorUserId) {
         this.objectMapper = objectMapper;
         this.variables = objectMapper.createObjectNode();
+        this.operatorUserId = operatorUserId;
+    }
+
+    public Long operatorUserId() {
+        return operatorUserId;
     }
 
     public void put(String key, Object value) {

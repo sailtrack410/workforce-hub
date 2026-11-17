@@ -1,0 +1,425 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ workforce-hub ---
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 92 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 534 source files with javac [debug release 17] to target/classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 3 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 126 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[14,35] 无法将类 com.workforcehub.agent.workflow.WorkflowContext中的构造器 WorkflowContext应用到给定类型;
+  需要: com.fasterxml.jackson.databind.ObjectMapper
+  找到:    com.fasterxml.jackson.databind.ObjectMapper,long
+  原因: 实际参数列表和形式参数列表长度不同
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[18,33] 找不到符号
+  符号:   方法 operatorUserId()
+  位置: 类型为com.workforcehub.agent.workflow.WorkflowContext的变量 context
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[22,33] 找不到符号
+  符号:   方法 operatorUserId()
+  位置: 类型为com.workforcehub.agent.workflow.WorkflowContext的变量 context
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[31,27] 找不到符号
+  符号:   方法 operatorUserId()
+  位置: 类型为com.workforcehub.agent.workflow.WorkflowContext的变量 context
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[117,31] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[119,30] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[120,31] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[136,30] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[137,31] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[138,45] 找不到符号
+  符号:   方法 searchChunksForEmployee(long,long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[145,45] 找不到符号
+  符号:   方法 searchChunksForEmployee(long,long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[153,31] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[155,25] 找不到符号
+  符号:   方法 searchRowsForEmployee(long,long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[193,31] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[19,32] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[20,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[21,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[22,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[29,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[32,32] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[33,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[40,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[45,36] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[46,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[55,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[58,32] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[59,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[61,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[64,32] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[66,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[75,36] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[76,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[78,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[80,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[91,36] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[93,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[95,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[105,41] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[113,32] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[115,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[117,32] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[119,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[127,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[129,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[131,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[141,40] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[145,41] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[148,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[150,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[153,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[155,37] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[159,33] 找不到符号
+  符号:   方法 canReadSpace(long,long)
+  位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[52,56] 找不到符号
+  符号:   方法 searchRowsForEmployee(<nulltype>,long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[71,49] 找不到符号
+  符号:   方法 searchChunksForEmployee(long,long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[73,78] 找不到符号
+  符号:   方法 searchRowsForEmployee(long,long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[88,56] 找不到符号
+  符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[90,56] 找不到符号
+  符号:   方法 searchChunksForAdmin(long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[92,74] 找不到符号
+  符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[99,40] 找不到符号
+  符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[101,49] 找不到符号
+  符号:   方法 searchChunksForAdmin(long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[108,56] 找不到符号
+  符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[110,56] 找不到符号
+  符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+  位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[INFO] 62 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  8.086 s
+[INFO] Finished at: 2026-11-08T21:51:37+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:testCompile (default-testCompile) on project workforce-hub: Compilation failure: Compilation failure: 
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[14,35] 无法将类 com.workforcehub.agent.workflow.WorkflowContext中的构造器 WorkflowContext应用到给定类型;
+[ERROR]   需要: com.fasterxml.jackson.databind.ObjectMapper
+[ERROR]   找到:    com.fasterxml.jackson.databind.ObjectMapper,long
+[ERROR]   原因: 实际参数列表和形式参数列表长度不同
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[18,33] 找不到符号
+[ERROR]   符号:   方法 operatorUserId()
+[ERROR]   位置: 类型为com.workforcehub.agent.workflow.WorkflowContext的变量 context
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[22,33] 找不到符号
+[ERROR]   符号:   方法 operatorUserId()
+[ERROR]   位置: 类型为com.workforcehub.agent.workflow.WorkflowContext的变量 context
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java:[31,27] 找不到符号
+[ERROR]   符号:   方法 operatorUserId()
+[ERROR]   位置: 类型为com.workforcehub.agent.workflow.WorkflowContext的变量 context
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[117,31] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[119,30] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[120,31] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[136,30] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[137,31] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[138,45] 找不到符号
+[ERROR]   符号:   方法 searchChunksForEmployee(long,long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[145,45] 找不到符号
+[ERROR]   符号:   方法 searchChunksForEmployee(long,long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[153,31] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[155,25] 找不到符号
+[ERROR]   符号:   方法 searchRowsForEmployee(long,long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java:[193,31] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[19,32] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[20,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[21,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[22,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[29,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[32,32] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[33,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[40,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[45,36] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[46,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[55,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[58,32] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[59,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[61,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[64,32] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[66,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[75,36] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[76,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[78,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[80,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[91,36] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[93,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[95,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[105,41] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[113,32] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[115,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[117,32] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[119,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[127,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[129,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[131,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[141,40] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[145,41] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[148,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[150,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[153,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[155,37] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java:[159,33] 找不到符号
+[ERROR]   符号:   方法 canReadSpace(long,long)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.repository.RagflowRepository的变量 repository
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[52,56] 找不到符号
+[ERROR]   符号:   方法 searchRowsForEmployee(<nulltype>,long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[71,49] 找不到符号
+[ERROR]   符号:   方法 searchChunksForEmployee(long,long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[73,78] 找不到符号
+[ERROR]   符号:   方法 searchRowsForEmployee(long,long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[88,56] 找不到符号
+[ERROR]   符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[90,56] 找不到符号
+[ERROR]   符号:   方法 searchChunksForAdmin(long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[92,74] 找不到符号
+[ERROR]   符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[99,40] 找不到符号
+[ERROR]   符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[101,49] 找不到符号
+[ERROR]   符号:   方法 searchChunksForAdmin(long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[108,56] 找不到符号
+[ERROR]   符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/source/server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java:[110,56] 找不到符号
+[ERROR]   符号:   方法 searchRowsForAdmin(long,java.lang.String,int)
+[ERROR]   位置: 类型为com.workforcehub.ragflow.service.RagflowKnowledgeSearchService的变量 search
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

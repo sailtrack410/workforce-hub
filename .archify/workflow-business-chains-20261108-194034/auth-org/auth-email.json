@@ -1,0 +1,257 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "邮箱绑定与找回密码",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-email.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "当前员工端与后端入口"
+    },
+    {
+      "id": "code",
+      "label": "邮件与验证码"
+    },
+    {
+      "id": "account",
+      "label": "账号写入"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "resetui",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "找回页发送验证码",
+      "sublabel": "当前错误调用登录发码",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 458,
+          "end_line": 474
+        }
+      ]
+    },
+    {
+      "id": "send",
+      "lane": "code",
+      "col": 1,
+      "type": "backend",
+      "label": "发出LOGIN码",
+      "sublabel": "登录名／邮箱解析",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 93,
+          "end_line": 107
+        }
+      ]
+    },
+    {
+      "id": "redis",
+      "lane": "code",
+      "col": 2,
+      "type": "database",
+      "label": "按用途存储",
+      "sublabel": "五分钟码／六十秒重发锁",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java",
+          "line": 54,
+          "end_line": 81
+        }
+      ]
+    },
+    {
+      "id": "smtp",
+      "lane": "code",
+      "col": 3,
+      "type": "external",
+      "label": "SMTP发送邮件",
+      "sublabel": "失败清验证码与锁",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java",
+          "line": 73,
+          "end_line": 84
+        }
+      ]
+    },
+    {
+      "id": "submit",
+      "lane": "ui",
+      "col": 3,
+      "type": "frontend",
+      "label": "提交密码重置",
+      "sublabel": "邮箱＋码＋新密码",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 485,
+          "end_line": 501
+        }
+      ]
+    },
+    {
+      "id": "reset",
+      "lane": "account",
+      "col": 4,
+      "type": "security",
+      "label": "验证重置用途",
+      "sublabel": "仅接受RESET_PASSWORD",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 121,
+          "end_line": 133
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "account",
+      "col": 5,
+      "type": "security",
+      "label": "用途不匹配拒绝",
+      "sublabel": "未另发正确用途码时失败",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 121,
+          "end_line": 128
+        }
+      ]
+    },
+    {
+      "id": "bind",
+      "lane": "ui",
+      "col": 1,
+      "type": "frontend",
+      "label": "绑定邮箱请求",
+      "sublabel": "员工会话＋BIND码",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 89,
+          "end_line": 108
+        }
+      ]
+    },
+    {
+      "id": "unique",
+      "lane": "account",
+      "col": 1,
+      "type": "security",
+      "label": "核验绑定与唯一性",
+      "sublabel": "核销BIND码后查邮箱占用",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 94,
+          "end_line": 113
+        }
+      ]
+    },
+    {
+      "id": "write",
+      "lane": "account",
+      "col": 2,
+      "type": "database",
+      "label": "更新邮箱或密码",
+      "sublabel": "邮箱验证时间／密码时间",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 111,
+          "end_line": 133
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "resetui",
+      "to": "send",
+      "role": "main"
+    },
+    {
+      "from": "send",
+      "to": "redis",
+      "role": "main"
+    },
+    {
+      "from": "redis",
+      "to": "smtp",
+      "role": "main"
+    },
+    {
+      "from": "smtp",
+      "to": "submit",
+      "role": "main"
+    },
+    {
+      "from": "submit",
+      "to": "reset",
+      "role": "main"
+    },
+    {
+      "from": "reset",
+      "to": "reject",
+      "label": "LOGIN码",
+      "role": "error"
+    },
+    {
+      "from": "reset",
+      "to": "write",
+      "label": "正确用途码",
+      "role": "branch"
+    },
+    {
+      "from": "bind",
+      "to": "unique",
+      "role": "main"
+    },
+    {
+      "from": "unique",
+      "to": "write",
+      "role": "main"
+    }
+  ],
+  "mainPath": [
+    "resetui",
+    "send",
+    "redis",
+    "smtp",
+    "submit",
+    "reset",
+    "reject"
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "当前入口断点",
+      "items": [
+        "AUTH-02：当前employee找回页发LOGIN码，重置接口验证RESET_PASSWORD，正常操作无法闭环。",
+        "旧useEmployeeAuthFlow调用sendPasswordResetCode，不能代替当前路由入口的证明。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "并发与体验",
+      "items": [
+        "AUTH-03：verifyCode采用GET后DELETE，成功核销不是原子操作；并发风险为静态推导。",
+        "绑定占用检查发生在验证码核销后；冲突时用户需要重新取码。"
+      ]
+    }
+  ]
+}

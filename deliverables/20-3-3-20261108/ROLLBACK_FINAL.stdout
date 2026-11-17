@@ -1,0 +1,350 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 91 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 527 source files with javac [debug release 17] to target/classes
+[INFO] /private/tmp/workforce-quota-2033-transaction/rollback/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/tmp/workforce-quota-2033-transaction/rollback/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-quota-2033-transaction/rollback/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 112 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/tmp/workforce-quota-2033-transaction/rollback/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-quota-2033-transaction/rollback/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/tmp/workforce-quota-2033-transaction/rollback/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/tmp/workforce-quota-2033-transaction/rollback/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.file.FileQuotaConcurrencyTest
+DATABASE=8.4.7
+RACE results=[SUCCESS, SUCCESS]
+RACE results=[SUCCESS, SUCCESS]
+RACE results=[SUCCESS, CannotAcquireLockException:PreparedStatementCallback; SQL [INSERT INTO sys_storage_usage
+    (id, scope_type, scope_id, used_bytes, cache_used_bytes, file_count)
+VALUES
+    (?, ?, ?, ?, 0, ?)
+ON DUPLICATE KEY UPDATE
+    used_bytes = used_bytes + VALUES(used_bytes),
+    file_count = file_count + VALUES(file_count)
+]; Deadlock found when trying to get lock; try restarting transaction]
+RACE results=[SUCCESS, SUCCESS]
+RACE results=[SUCCESS, SUCCESS]
+RACE results=[SUCCESS, SUCCESS]
+RACE results=[SUCCESS, SUCCESS]
+RACE results=[SUCCESS, SUCCESS]
+RACE results=[SUCCESS, SUCCESS]
+[ERROR] Tests run: 15, Failures: 9, Errors: 0, Skipped: 0, Time elapsed: 3.302 s <<< FAILURE! -- in com.workforcehub.file.FileQuotaConcurrencyTest
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.concurrentCopiesRespectPersonalQuota -- Time elapsed: 1.013 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [EmployeeFileResponse(attachmentRefId=1881292710257623041, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:19, updatedAt=2026-11-08T20:22:19), EmployeeFileResponse(attachmentRefId=1881292710257623040, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:19, updatedAt=2026-11-08T20:22:19)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.concurrentCopiesRespectPersonalQuota(FileQuotaConcurrencyTest.java:145)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.adminConfirmationAndGroupConfirmationUseGlobalOnly -- Time elapsed: 0.217 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292710883622912, fileObjectId=1881292710879428608, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292710881525760, fileObjectId=1881292710878380032, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.adminConfirmationAndGroupConfirmationUseGlobalOnly(FileQuotaConcurrencyTest.java:191)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.differentUploadsWithFirstLedgerCreationRespectPersonalQuota(int)[1] -- Time elapsed: 0.086 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected type, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.CannotAcquireLockException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertInstanceOf.assertInstanceOf(AssertInstanceOf.java:49)
+	at org.junit.jupiter.api.AssertInstanceOf.assertInstanceOf(AssertInstanceOf.java:31)
+	at org.junit.jupiter.api.Assertions.assertInstanceOf(Assertions.java:3583)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:310)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.differentUploadsWithFirstLedgerCreationRespectPersonalQuota(FileQuotaConcurrencyTest.java:116)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.differentUploadsWithFirstLedgerCreationRespectPersonalQuota(int)[2] -- Time elapsed: 0.060 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292711066075137, fileObjectId=1881292711065026560, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292711067123712, fileObjectId=1881292711066075136, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.differentUploadsWithFirstLedgerCreationRespectPersonalQuota(FileQuotaConcurrencyTest.java:116)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.differentUsersCompeteForGlobalQuotaWithoutLeakingPersonalReservations(int)[1] -- Time elapsed: 0.162 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292711241187328, fileObjectId=1881292711239090177, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292711242235904, fileObjectId=1881292711239090176, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.differentUsersCompeteForGlobalQuotaWithoutLeakingPersonalReservations(FileQuotaConcurrencyTest.java:131)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.differentUsersCompeteForGlobalQuotaWithoutLeakingPersonalReservations(int)[2] -- Time elapsed: 0.079 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292711310393344, fileObjectId=1881292711309344769, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292711310393345, fileObjectId=1881292711309344768, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.differentUsersCompeteForGlobalQuotaWithoutLeakingPersonalReservations(FileQuotaConcurrencyTest.java:131)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.concurrentCopiesAcrossUsersRespectGlobalQuota -- Time elapsed: 0.050 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [EmployeeFileResponse(attachmentRefId=1881292711385890816, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:20, updatedAt=2026-11-08T20:22:20), EmployeeFileResponse(attachmentRefId=1881292711385890817, fileObjectId=12, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=102, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:20, updatedAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.concurrentCopiesAcrossUsersRespectGlobalQuota(FileQuotaConcurrencyTest.java:160)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.deduplicatedTicketAndCopyShareTheSameCapacityGate -- Time elapsed: 0.144 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [UploadTicketResponse(uploadTicketId=1881292711894450176, ticketNo=UP1881292711894450176, deduplicated=true, attachmentRefId=1881292711903887360, storageProvider=LOCAL, bucketName=null, objectKey=source-11, uploadUrl=null, headers={}, expireAt=null), EmployeeFileResponse(attachmentRefId=1881292711890255872, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:20, updatedAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.deduplicatedTicketAndCopyShareTheSameCapacityGate(FileQuotaConcurrencyTest.java:235)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.file.FileQuotaConcurrencyTest.confirmationAndCopyShareTheSameCapacityGate -- Time elapsed: 0.138 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292712047542273, fileObjectId=1881292712046493696, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:21), EmployeeFileResponse(attachmentRefId=1881292712045445120, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:21, updatedAt=2026-11-08T20:22:21)] ==> expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:166)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:664)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.race(FileQuotaConcurrencyTest.java:308)
+	at com.workforcehub.file.FileQuotaConcurrencyTest.confirmationAndCopyShareTheSameCapacityGate(FileQuotaConcurrencyTest.java:173)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   FileQuotaConcurrencyTest.adminConfirmationAndGroupConfirmationUseGlobalOnly:191->race:308 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292710883622912, fileObjectId=1881292710879428608, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292710881525760, fileObjectId=1881292710878380032, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+[ERROR]   FileQuotaConcurrencyTest.concurrentCopiesAcrossUsersRespectGlobalQuota:160->race:308 余量只容一份时必须恰一成功: [EmployeeFileResponse(attachmentRefId=1881292711385890816, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:20, updatedAt=2026-11-08T20:22:20), EmployeeFileResponse(attachmentRefId=1881292711385890817, fileObjectId=12, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=102, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:20, updatedAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+[ERROR]   FileQuotaConcurrencyTest.concurrentCopiesRespectPersonalQuota:145->race:308 余量只容一份时必须恰一成功: [EmployeeFileResponse(attachmentRefId=1881292710257623041, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:19, updatedAt=2026-11-08T20:22:19), EmployeeFileResponse(attachmentRefId=1881292710257623040, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:19, updatedAt=2026-11-08T20:22:19)] ==> expected: <1> but was: <2>
+[ERROR]   FileQuotaConcurrencyTest.confirmationAndCopyShareTheSameCapacityGate:173->race:308 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292712047542273, fileObjectId=1881292712046493696, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:21), EmployeeFileResponse(attachmentRefId=1881292712045445120, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:21, updatedAt=2026-11-08T20:22:21)] ==> expected: <1> but was: <2>
+[ERROR]   FileQuotaConcurrencyTest.deduplicatedTicketAndCopyShareTheSameCapacityGate:235->race:308 余量只容一份时必须恰一成功: [UploadTicketResponse(uploadTicketId=1881292711894450176, ticketNo=UP1881292711894450176, deduplicated=true, attachmentRefId=1881292711903887360, storageProvider=LOCAL, bucketName=null, objectKey=source-11, uploadUrl=null, headers={}, expireAt=null), EmployeeFileResponse(attachmentRefId=1881292711890255872, fileObjectId=11, ownerType=PERSONAL_FILE, ownerTypeName=个人文件, ownerId=null, folderId=null, originalFileName=source.txt, displayName=source 副本.txt, uploaderType=USER, uploaderTypeName=员工, uploaderId=101, mimeType=text/plain, fileSize=10, scanStatus=PENDING, scanStatusName=检测中, deletedAt=null, purgeAfter=null, createdAt=2026-11-08T20:22:20, updatedAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+[ERROR]   FileQuotaConcurrencyTest.differentUploadsWithFirstLedgerCreationRespectPersonalQuota:116->race:310 Unexpected type, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.CannotAcquireLockException>
+[ERROR]   FileQuotaConcurrencyTest.differentUploadsWithFirstLedgerCreationRespectPersonalQuota:116->race:308 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292711066075137, fileObjectId=1881292711065026560, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292711067123712, fileObjectId=1881292711066075136, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+[ERROR]   FileQuotaConcurrencyTest.differentUsersCompeteForGlobalQuotaWithoutLeakingPersonalReservations:131->race:308 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292711241187328, fileObjectId=1881292711239090177, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292711242235904, fileObjectId=1881292711239090176, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+[ERROR]   FileQuotaConcurrencyTest.differentUsersCompeteForGlobalQuotaWithoutLeakingPersonalReservations:131->race:308 余量只容一份时必须恰一成功: [AttachmentRefResponse(attachmentRefId=1881292711310393344, fileObjectId=1881292711309344769, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000001, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20), AttachmentRefResponse(attachmentRefId=1881292711310393345, fileObjectId=1881292711309344768, displayName=fixture.txt, mimeType=text/plain, fileSize=10, contentSha256=0000000000000000000000000000000000000000000000000000000000000002, deduplicated=false, scanStatus=PENDING, scanStatusName=检测中, createdAt=2026-11-08T20:22:20)] ==> expected: <1> but was: <2>
+[INFO] 
+[ERROR] Tests run: 15, Failures: 9, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  13.497 s
+[INFO] Finished at: 2026-11-08T20:22:21+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.1.2:test (default-test) on project workforce-hub: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /private/tmp/workforce-quota-2033-transaction/rollback/server/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

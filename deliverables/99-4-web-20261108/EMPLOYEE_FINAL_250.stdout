@@ -1,0 +1,13 @@
+
+> workforce-hub-employee-web@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.5 /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-web-20261108/candidate/employee-web
+
+
+ Test Files  36 passed (36)
+      Tests  250 passed (250)
+   Start at  21:20:07
+   Duration  1.82s (transform 1.68s, setup 0ms, import 4.96s, tests 1.75s, environment 15ms)
+

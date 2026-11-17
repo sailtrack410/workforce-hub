@@ -1,0 +1,249 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "通用OA提交与审批附件下载",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "submit",
+      "label": "通用OA提交"
+    },
+    {
+      "id": "attachment",
+      "label": "附件绑定与授权"
+    },
+    {
+      "id": "download",
+      "label": "票据执行"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "api",
+      "lane": "submit",
+      "col": 0,
+      "type": "backend",
+      "label": "通用OA API",
+      "sublabel": "processCode与表单对象",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 266,
+          "end_line": 276
+        }
+      ]
+    },
+    {
+      "id": "save",
+      "lane": "submit",
+      "col": 1,
+      "type": "backend",
+      "label": "保存申请和明细",
+      "sublabel": "表单压缩为JSON",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 277,
+          "end_line": 298
+        }
+      ]
+    },
+    {
+      "id": "bind",
+      "lane": "submit",
+      "col": 2,
+      "type": "backend",
+      "label": "绑定附件",
+      "sublabel": "去重并创建审批引用",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 844,
+          "end_line": 858
+        }
+      ]
+    },
+    {
+      "id": "gate",
+      "lane": "submit",
+      "col": 3,
+      "type": "backend",
+      "label": "AI可选路由",
+      "sublabel": "有任务预审，否则人工",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 301,
+          "end_line": 319
+        }
+      ]
+    },
+    {
+      "id": "approval",
+      "lane": "submit",
+      "col": 4,
+      "type": "backend",
+      "label": "人工审批结算",
+      "sublabel": "通用OA无假期扣减",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 740,
+          "end_line": 778
+        }
+      ]
+    },
+    {
+      "id": "owner",
+      "lane": "attachment",
+      "col": 1,
+      "type": "security",
+      "label": "个人文件核验",
+      "sublabel": "本人上传、未删、非FAILED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 861,
+          "end_line": 873
+        }
+      ]
+    },
+    {
+      "id": "ticket",
+      "lane": "attachment",
+      "col": 3,
+      "type": "backend",
+      "label": "参与人申请票据",
+      "sublabel": "SINGLE＋十分钟有效期",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 640,
+          "end_line": 663
+        }
+      ]
+    },
+    {
+      "id": "claim",
+      "lane": "download",
+      "col": 3,
+      "type": "security",
+      "label": "重验并认领票据",
+      "sublabel": "本人、有效、参与范围",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 685,
+          "end_line": 705
+        }
+      ]
+    },
+    {
+      "id": "object",
+      "lane": "download",
+      "col": 4,
+      "type": "cloud",
+      "label": "读取存储对象",
+      "sublabel": "provider加载桶与key",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 705,
+          "end_line": 707
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "lane": "download",
+      "col": 5,
+      "type": "backend",
+      "label": "返回文件并审计",
+      "sublabel": "记录执行成功",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 708,
+          "end_line": 717
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "api",
+      "to": "save"
+    },
+    {
+      "from": "bind",
+      "to": "gate"
+    },
+    {
+      "from": "gate",
+      "to": "approval"
+    },
+    {
+      "from": "ticket",
+      "to": "claim"
+    },
+    {
+      "from": "claim",
+      "to": "object"
+    },
+    {
+      "from": "object",
+      "to": "audit"
+    },
+    {
+      "from": "save",
+      "to": "owner"
+    },
+    {
+      "from": "owner",
+      "to": "bind",
+      "label": "通过"
+    },
+    {
+      "from": "bind",
+      "to": "ticket",
+      "label": "参与人下载"
+    }
+  ],
+  "mainPath": [
+    "api",
+    "save",
+    "owner",
+    "bind",
+    "gate",
+    "approval"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "授权与失效",
+      "items": [
+        "发票据与执行下载均检查申请参与人；执行时再核对文件及扫描状态。",
+        "票据只支持SINGLE；非本人、已用、过期、无权限或文件删除均拒绝。",
+        "安全扫描当前只拒绝FAILED，并非仅允许PASSED；扫描执行语义由文件链路说明。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "优化",
+      "items": [
+        "通用表单目前仅校验JSON对象，没有按模板formSchema做字段约束。",
+        "应复用已发布模板表单校验，拒绝缺必填项和错误类型，再打通当前员工入口。",
+        "票据认领后存储读取失败的重试语义需由文件链路统一验证。"
+      ]
+    }
+  ]
+}

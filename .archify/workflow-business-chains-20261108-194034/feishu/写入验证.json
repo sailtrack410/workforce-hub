@@ -1,0 +1,254 @@
+{
+  "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0",
+  "tasklist_url": "https://applink.feishu.cn/client/todo/task_list?guid=42105db4-d930-4d71-8dab-c86576536eb0",
+  "parent_guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+  "parent_url": "https://applink.feishu.cn/client/todo/detail?guid=927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+  "subtasks": [
+    {
+      "review_id": "100-01",
+      "guid": "378e275e-863d-4152-a2ee-effd931f5ed0",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=378e275e-863d-4152-a2ee-effd931f5ed0&suite_entity_num=t100037",
+      "summary": "[P1][100-01][新问题] 当前登录页面未完整处理邮箱认证待续状态",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-02",
+      "guid": "b4ed4994-ba4f-4679-ba43-50665c300144",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=b4ed4994-ba4f-4679-ba43-50665c300144&suite_entity_num=t100038",
+      "summary": "[P1][100-02][新问题] 找回密码错误发送LOGIN用途验证码",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-04",
+      "guid": "feef3801-c971-4e96-a5b2-9bdbd859b4bb",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=feef3801-c971-4e96-a5b2-9bdbd859b4bb&suite_entity_num=t100039",
+      "summary": "[P1][100-04][新问题] 并发注册可重复消费单次邀请码",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-10",
+      "guid": "aeceb873-910f-4841-911a-add25871fc10",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=aeceb873-910f-4841-911a-add25871fc10&suite_entity_num=t100040",
+      "summary": "[P1][100-10][新问题] 当前员工申请入口未接通提交链",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-11",
+      "guid": "1d958a31-ce79-46ce-870a-0f69275990c5",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=1d958a31-ce79-46ce-870a-0f69275990c5&suite_entity_num=t100041",
+      "summary": "[P1][100-11][新问题] 余额调整重试不复用幂等键",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-16",
+      "guid": "c2429944-9c73-44be-9863-7e1959519c46",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=c2429944-9c73-44be-9863-7e1959519c46&suite_entity_num=t100042",
+      "summary": "[P1][100-16][新问题] 知识工具检索未执行空间ACL",
+      "status": "todo"
+    },
+    {
+      "review_id": "20/3-3",
+      "guid": "d218effd-c29c-441e-9fc7-134f36be97b6",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=d218effd-c29c-441e-9fc7-134f36be97b6&suite_entity_num=t100043",
+      "summary": "[P1][20/3-3][既有风险] 并发配额检查与实际占额分离",
+      "status": "todo"
+    },
+    {
+      "review_id": "99-1",
+      "guid": "44e97d39-f938-449b-95f3-87b075ca9649",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=44e97d39-f938-449b-95f3-87b075ca9649&suite_entity_num=t100044",
+      "summary": "[P1][99-1][既有风险] 未知管理路由默认放行",
+      "status": "todo"
+    },
+    {
+      "review_id": "99-2",
+      "guid": "81e62079-5016-4737-8ed9-329168e7d942",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=81e62079-5016-4737-8ed9-329168e7d942&suite_entity_num=t100045",
+      "summary": "[P1][99-2][既有风险] 停用撤权未统一失效旧会话",
+      "status": "todo"
+    },
+    {
+      "review_id": "99-3",
+      "guid": "67d36331-97d7-427d-a310-f87556f3c107",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=67d36331-97d7-427d-a310-f87556f3c107&suite_entity_num=t100046",
+      "summary": "[P1][99-3][既有风险] 可变假种破坏在途余额结算",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-03",
+      "guid": "59dae90d-d7a9-4123-bd8d-0f384b30b9fd",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=59dae90d-d7a9-4123-bd8d-0f384b30b9fd&suite_entity_num=t100047",
+      "summary": "[P2][100-03][新问题] 邮箱验证码比较与核销非原子",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-05",
+      "guid": "866b278a-a08f-4de1-8f2d-3fce030f69cf",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=866b278a-a08f-4de1-8f2d-3fce030f69cf&suite_entity_num=t100048",
+      "summary": "[P2][100-05][新问题] 注册短信及前端提交仍为演示或占位",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-06",
+      "guid": "d29f6336-9dd4-423c-8a7f-d695ffd1e7b4",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=d29f6336-9dd4-423c-8a7f-d695ffd1e7b4&suite_entity_num=t100049",
+      "summary": "[P2][100-06][新问题] 后台邮件渠道与认证发信配置分离",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-07",
+      "guid": "9d687ca2-e319-46d0-8465-5ff90439126d",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=9d687ca2-e319-46d0-8465-5ff90439126d&suite_entity_num=t100050",
+      "summary": "[P2][100-07][新问题] 独立验证码登录入口不符合后端密码二验契约",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-08",
+      "guid": "d667c90b-b98c-496e-b68b-f0528af9b169",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=d667c90b-b98c-496e-b68b-f0528af9b169&suite_entity_num=t100051",
+      "summary": "[P2][100-08][新问题] 字典标签缓存只在当前JVM失效",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-09",
+      "guid": "cc83dc8f-0c3f-4395-a8f9-b76dd2fb2ee9",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=cc83dc8f-0c3f-4395-a8f9-b76dd2fb2ee9&suite_entity_num=t100052",
+      "summary": "[P2][100-09][新问题] 手机号输入清空未转化为实际清除",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-12",
+      "guid": "07b7103b-6788-4fc5-b2e9-9c468f0fcd29",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=07b7103b-6788-4fc5-b2e9-9c468f0fcd29&suite_entity_num=t100053",
+      "summary": "[P2][100-12][新问题] 工作台显示固定打卡时间",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-13",
+      "guid": "c78ca6a9-2ba4-40e1-9779-787bb6a7929c",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=c78ca6a9-2ba4-40e1-9779-787bb6a7929c&suite_entity_num=t100054",
+      "summary": "[P2][100-13][新问题] AI预审中撤回按钮与后端资格不一致",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-14",
+      "guid": "1a5fa065-4b39-4ca0-8a22-24c916305b65",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=1a5fa065-4b39-4ca0-8a22-24c916305b65&suite_entity_num=t100055",
+      "summary": "[P2][100-14][新问题] 通用OA未执行所选模板表单约束",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-15",
+      "guid": "6dffb94b-4d16-411a-9812-8713bd4f2c57",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=6dffb94b-4d16-411a-9812-8713bd4f2c57&suite_entity_num=t100056",
+      "summary": "[P2][100-15][新问题] 首次创建排班不刷新既有考勤结果",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-17",
+      "guid": "384ebbe7-cfb8-48a6-bc91-4b8be3529c5f",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=384ebbe7-cfb8-48a6-bc91-4b8be3529c5f&suite_entity_num=t100057",
+      "summary": "[P2][100-17][新问题] DAG工具执行跳过配置的人审门禁",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-18",
+      "guid": "959f6588-06e3-490e-bf04-4e2f46057426",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=959f6588-06e3-490e-bf04-4e2f46057426&suite_entity_num=t100058",
+      "summary": "[P2][100-18][新问题] 草稿部分路径自动获得流程测试证明",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-19",
+      "guid": "5ec03b55-fe69-4d5e-b41f-2af9de1d5a69",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=5ec03b55-fe69-4d5e-b41f-2af9de1d5a69&suite_entity_num=t100059",
+      "summary": "[P2][100-19][新问题] 异步任务提交后缺少持久认领恢复",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-20",
+      "guid": "5cad070d-1de9-444a-b3f0-a7c42f1bf61e",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=5cad070d-1de9-444a-b3f0-a7c42f1bf61e&suite_entity_num=t100060",
+      "summary": "[P2][100-20][新问题] 文档入库并发缺少作业代次隔离",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-21",
+      "guid": "857f2d54-70de-468a-ab27-79c8438a92b6",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=857f2d54-70de-468a-ab27-79c8438a92b6&suite_entity_num=t100061",
+      "summary": "[P2][100-21][新问题] 跨库入库发布缺少完整版本切换",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-22",
+      "guid": "26871316-9380-42e0-b1b6-17c700155c07",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=26871316-9380-42e0-b1b6-17c700155c07&suite_entity_num=t100062",
+      "summary": "[P2][100-22][新问题] 知识重排配置未进入执行链",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-23",
+      "guid": "0f3b7684-67d4-41e8-8674-808f33d84cf3",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=0f3b7684-67d4-41e8-8674-808f33d84cf3&suite_entity_num=t100063",
+      "summary": "[P2][100-23][新问题] 新消息卡片动作仍为占位",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-24",
+      "guid": "22e5992d-27ec-4cc0-9c66-36d09d176dde",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=22e5992d-27ec-4cc0-9c66-36d09d176dde&suite_entity_num=t100064",
+      "summary": "[P2][100-24][新问题] 新消息页附件下载使用错误业务票据入口",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-25",
+      "guid": "03d0c359-42e3-4be0-9969-d1729b3f5f0a",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=03d0c359-42e3-4be0-9969-d1729b3f5f0a&suite_entity_num=t100065",
+      "summary": "[P2][100-25][新问题] “我的申请”混用待办审批数据",
+      "status": "todo"
+    },
+    {
+      "review_id": "100-26",
+      "guid": "22aa91e9-996f-47f7-b605-3a69ed8df609",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=22aa91e9-996f-47f7-b605-3a69ed8df609&suite_entity_num=t100066",
+      "summary": "[P2][100-26][新问题] 新工作台缺少插件宿主入口",
+      "status": "todo"
+    },
+    {
+      "review_id": "99-4",
+      "guid": "22f180a6-89ff-4a16-94a5-61bd16ecf88a",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=22f180a6-89ff-4a16-94a5-61bd16ecf88a&suite_entity_num=t100067",
+      "summary": "[P2][99-4][既有风险] 请假计算固定时段与取整口径",
+      "status": "todo"
+    },
+    {
+      "review_id": "99-5",
+      "guid": "bd955dc8-7c59-4ce7-8d04-39ec09ae777e",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=bd955dc8-7c59-4ce7-8d04-39ec09ae777e&suite_entity_num=t100068",
+      "summary": "[P2][99-5][既有风险] ID生成器跨实例唯一性未保证",
+      "status": "todo"
+    },
+    {
+      "review_id": "PLUGIN-E",
+      "guid": "d8c524c5-9cdd-46a2-800f-9a98fbb08097",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=d8c524c5-9cdd-46a2-800f-9a98fbb08097&suite_entity_num=t100069",
+      "summary": "[P2][PLUGIN-E][优化建议] 重要插件事件增加可恢复投递账本",
+      "status": "todo"
+    },
+    {
+      "review_id": "PLUGIN-U",
+      "guid": "4dda5b62-c202-440e-a4a4-2f0b2c76dd03",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=4dda5b62-c202-440e-a4a4-2f0b2c76dd03&suite_entity_num=t100070",
+      "summary": "[P2][PLUGIN-U][优化建议] 插件动作未知结果增加人工核对恢复",
+      "status": "todo"
+    }
+  ],
+  "counts": {
+    "new": 26,
+    "existing": 6,
+    "suggestions": 2,
+    "total_subtasks": 34,
+    "list_total": 35
+  },
+  "result": "34/34 children: correct list, parent, todo state, exact summary and description; remote list/subtask queries match"
+}

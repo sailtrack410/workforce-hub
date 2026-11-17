@@ -1,0 +1,86 @@
+
+> workforce-hub-admin-web@0.1.0 build
+> vue-tsc --noEmit && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1744 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                    0.55 kB │ gzip:  0.35 kB
+dist/assets/auth-hero-admin-CI6kBA4N.jpg         165.29 kB
+dist/assets/EnterpriseView-DwFDopDx.css            0.08 kB │ gzip:  0.10 kB
+dist/assets/PermissionView-DjlMSxAp.css            0.14 kB │ gzip:  0.12 kB
+dist/assets/AdminConfirmDialog-C8G9PZLo.css        0.48 kB │ gzip:  0.23 kB
+dist/assets/AdminUserPicker-CM4GOfnb.css           0.49 kB │ gzip:  0.25 kB
+dist/assets/DictView-DzfLoh38.css                  0.52 kB │ gzip:  0.26 kB
+dist/assets/AdminIconAvatar-DoW-AFO7.css           0.65 kB │ gzip:  0.27 kB
+dist/assets/AdminFilterBar-Bj-0R66t.css            0.66 kB │ gzip:  0.31 kB
+dist/assets/AdminCompactList-BdsMRo0q.css          0.70 kB │ gzip:  0.30 kB
+dist/assets/PositionView-Dh5yzbvu.css              0.72 kB │ gzip:  0.33 kB
+dist/assets/AdminSkeleton-C67ejfn2.css             0.74 kB │ gzip:  0.38 kB
+dist/assets/AdminDetailList-63a6JvgH.css           0.77 kB │ gzip:  0.35 kB
+dist/assets/AdminMetricStrip-apsPMmZq.css          0.92 kB │ gzip:  0.43 kB
+dist/assets/DepartmentView-CICd2RkO.css            1.23 kB │ gzip:  0.45 kB
+dist/assets/LeaveTypeView-BrloHWw1.css             1.27 kB │ gzip:  0.48 kB
+dist/assets/AdminDialog-sNXxC0D6.css               1.29 kB │ gzip:  0.55 kB
+dist/assets/AdminPagination-BaYWjj9-.css           1.44 kB │ gzip:  0.46 kB
+dist/assets/AdminTable-BzuZVNYL.css                1.91 kB │ gzip:  0.73 kB
+dist/assets/AuditLogView-BDCFDgXI.css              2.22 kB │ gzip:  0.62 kB
+dist/assets/LeaveGovernanceView-PQktq0ur.css       2.45 kB │ gzip:  0.75 kB
+dist/assets/AgentTasksView-BrTxCeOr.css            2.47 kB │ gzip:  0.72 kB
+dist/assets/DashboardView-CxYCSgM0.css             2.99 kB │ gzip:  0.87 kB
+dist/assets/AgentConfigView-B2ECmr2b.css           2.99 kB │ gzip:  0.77 kB
+dist/assets/AttendanceView-CB1JrbQ0.css            3.25 kB │ gzip:  0.92 kB
+dist/assets/RoleView-B5w8qmGM.css                  3.43 kB │ gzip:  0.90 kB
+dist/assets/WorkflowGovernanceView-FXXPdVHc.css    3.68 kB │ gzip:  0.84 kB
+dist/assets/LoginView-CnQ0pKDq.css                 4.39 kB │ gzip:  1.09 kB
+dist/assets/AdminShell-DBGwosXx.css                4.81 kB │ gzip:  1.22 kB
+dist/assets/ImOutboxGovernanceView-BzMSwBeg.css    5.27 kB │ gzip:  1.04 kB
+dist/assets/PluginManagementView-ms7BzMGj.css      6.54 kB │ gzip:  1.43 kB
+dist/assets/UserView-DjOD0EPR.css                  6.65 kB │ gzip:  1.57 kB
+dist/assets/FileCleanupView-93Zy2_bI.css           9.46 kB │ gzip:  1.79 kB
+dist/assets/RagflowView-BGZ68QHI.css              10.19 kB │ gzip:  2.07 kB
+dist/assets/index-BiKp8F7Q.css                    10.19 kB │ gzip:  3.05 kB
+dist/assets/SettingsView-ZGzwLrGd.css             12.45 kB │ gzip:  2.22 kB
+dist/assets/AgentDagView-CAKDB_x8.css             28.66 kB │ gzip:  4.62 kB
+dist/assets/validation-OdUUesE5.js                 0.35 kB │ gzip:  0.36 kB
+dist/assets/AdminMetricStrip-DsJDZ5Bc.js           0.45 kB │ gzip:  0.32 kB
+dist/assets/AdminCompactList-DWjtO-Sy.js           0.45 kB │ gzip:  0.34 kB
+dist/assets/AdminDetailList-DVEcRuyI.js            0.63 kB │ gzip:  0.43 kB
+dist/assets/AdminFilterBar-zIfuoEmn.js             0.65 kB │ gzip:  0.47 kB
+dist/assets/AdminIconAvatar-Bwho6Zd0.js            0.70 kB │ gzip:  0.46 kB
+dist/assets/AdminSkeleton-DeVGCV0-.js              1.18 kB │ gzip:  0.59 kB
+dist/assets/AdminConfirmDialog-Cm8ThBbn.js         1.79 kB │ gzip:  0.90 kB
+dist/assets/AdminPagination-DknH_oz4.js            1.80 kB │ gzip:  0.98 kB
+dist/assets/AdminUserPicker-IYEOJswy.js            2.46 kB │ gzip:  1.32 kB
+dist/assets/AdminTable-C9qo4LUy.js                 2.60 kB │ gzip:  1.25 kB
+dist/assets/AdminDialog-DUVKb6In.js                2.60 kB │ gzip:  1.26 kB
+dist/assets/LoginView-DQuCLnIY.js                  3.04 kB │ gzip:  1.58 kB
+dist/assets/DashboardView-CX078P9a.js              3.08 kB │ gzip:  1.61 kB
+dist/assets/AdminShell-CtZQtAjJ.js                 4.20 kB │ gzip:  2.05 kB
+dist/assets/PositionView-LjGDqNdq.js               4.25 kB │ gzip:  2.09 kB
+dist/assets/PermissionView-BAT9Ci5J.js             4.40 kB │ gzip:  2.09 kB
+dist/assets/EnterpriseView-DYqz6B7G.js             4.73 kB │ gzip:  2.43 kB
+dist/assets/DepartmentView-nRmEPGL4.js             5.05 kB │ gzip:  2.54 kB
+dist/assets/DictView-RPgUJAuD.js                   6.25 kB │ gzip:  2.83 kB
+dist/assets/LeaveGovernanceView-BJeg9bYD.js        6.50 kB │ gzip:  3.01 kB
+dist/assets/LeaveTypeView--uphc62o.js              6.84 kB │ gzip:  2.90 kB
+dist/assets/AuditLogView-DZ7yNz8e.js               7.23 kB │ gzip:  3.28 kB
+dist/assets/format-DokPIhht.js                     7.75 kB │ gzip:  3.76 kB
+dist/assets/AgentTasksView-Bvqi5eZA.js            11.61 kB │ gzip:  4.60 kB
+dist/assets/RoleView-DDyH4rMg.js                  12.00 kB │ gzip:  4.48 kB
+dist/assets/ImOutboxGovernanceView-CJ9C1bpq.js    12.25 kB │ gzip:  4.81 kB
+dist/assets/AgentConfigView-Bw71kZip.js           12.80 kB │ gzip:  4.57 kB
+dist/assets/FileCleanupView-CMgSpdsB.js           15.60 kB │ gzip:  5.88 kB
+dist/assets/WorkflowGovernanceView-DRESnR3r.js    17.76 kB │ gzip:  6.01 kB
+dist/assets/UserView-zm5jvu7P.js                  19.63 kB │ gzip:  7.08 kB
+dist/assets/AttendanceView-fPRsvhkJ.js            20.68 kB │ gzip:  5.74 kB
+dist/assets/index-DCOCc2N9.js                     25.15 kB │ gzip:  7.94 kB
+dist/assets/PluginManagementView-Dxw_Iw_d.js      25.16 kB │ gzip:  8.72 kB
+dist/assets/SettingsView-DM-Tr5L_.js              31.44 kB │ gzip:  9.38 kB
+dist/assets/vendor-icons-BRtlDJZ_.js              33.40 kB │ gzip:  6.60 kB
+dist/assets/RagflowView-BN3lzRO3.js               44.43 kB │ gzip: 13.27 kB
+dist/assets/AgentDagView-sesA5whG.js              74.26 kB │ gzip: 21.78 kB
+dist/assets/vendor-vue-Bawfu8t9.js               100.70 kB │ gzip: 39.24 kB
+✓ built in 1.64s

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.candidate.json",
+    "sha256": "94bd5c36c2494d36b94abf3487d1278ca0a6f4503c0dfbb6eb15056dd26a2ecb",
+    "bytes": 5628
+  },
+  "artifact": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.html",
+    "sha256": "0da5b6afd4eecbe6ae6c3a328f613df2b806d8cf7d114d8cf2529b9cbf99ae5a",
+    "bytes": 820929
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.finalize.json",
+    "summaryReceipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.finalize-summary.json",
+    "browserCheckReceipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.3.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-08T11:33:45.718Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2559,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

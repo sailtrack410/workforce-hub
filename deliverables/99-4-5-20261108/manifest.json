@@ -1,0 +1,155 @@
+{
+  "head": "9667f659e46a3c83273a7dc813e1ccd4073f1a03",
+  "target": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "files": {
+    "admin-web/src/utils/format.test.ts": {
+      "baseline": null,
+      "modified": "86b78b8086f16eef418ec364b7e36d2014aec906458b24a8a0afda0cbe8684f7"
+    },
+    "admin-web/src/utils/format.ts": {
+      "baseline": "21598e4b91a26cb064d7c148a343ef512ae3c870736280a0f11c2e6adeadedac",
+      "modified": "03cd9cd0f06c57ce69271fb57c6ccc8095beb7608e9174869d6a0a90b4999f36"
+    },
+    "employee-web/src/api/employee.test.ts": {
+      "baseline": "e45161856d24139bb71570cb74b5a1a821a2cf86a3c0c5e091a551d4b648f895",
+      "modified": "01db2addefe04dec10dc167655f9aa18f373bd1db5107307c5ae80d13ee10c14"
+    },
+    "employee-web/src/api/employee.ts": {
+      "baseline": "f5760703f7dbbcc226de47787a562f358ed34f09faaa26f2916a84ed5f8bc1ec",
+      "modified": "91a7001dd056604fc58dc0174a01bdf836d92d5e28bf96fdb19703e534d6b990"
+    },
+    "employee-web/src/api/types.ts": {
+      "baseline": "c693f82aed731ee8537513a26da7ba8b05aea4a059caa0084a9cbae924553461",
+      "modified": "e701604bc59bb65433ff1c7f1102ce37f5eac91dd30e6a48fe2523b2e4fb7c9b"
+    },
+    "employee-web/src/composables/useWorkbenchState.test.ts": {
+      "baseline": "363dc2206bb7b0c467021eab3282b7f41e8e69a6c13993aaac6767cea3906e76",
+      "modified": "baa2fc778ac3e8bf70623df4867577b487877e5aa7719103b2ab7594f0ea114f"
+    },
+    "employee-web/src/composables/useWorkbenchState.ts": {
+      "baseline": "29141f7b292c37a889a20babc8c830b10ef3906c47d73670ace98dc8a7efc86e",
+      "modified": "a2ce126a0f8425ba8c7f2354e736ad57f4b84e516eecb569ac70716aaf62598d"
+    },
+    "employee-web/src/utils/employee-format.test.ts": {
+      "baseline": "bc035392472aa0d915f2bdc4242cab032bae0cb9568e74390f82d09d08c52464",
+      "modified": "d88aa3bca5576a1f0d6fe8cb9624f18a71ba9ec6a424bca0c434cf502d21e032"
+    },
+    "employee-web/src/utils/employee-format.ts": {
+      "baseline": "96acbbe4585977a8226cdaef0a8cece960463d7cad2aa1a0ac5d199170c885bb",
+      "modified": "76ebdd89cb55b648ee5b6010fece0e641e3826690fc4d74ad7f4cb8357e2d888"
+    },
+    "server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java": {
+      "baseline": "d07507c0c2dfcde1c52fbc33b13ecabde621a019ddc5bbd0535e80bf60123f23",
+      "modified": "030c24165f34f06b7d345f9aa7cc2bcd04a7984f4b2dc06ea887eadd1b1ac5f1"
+    },
+    "server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java": {
+      "baseline": null,
+      "modified": "6c1757f1b287b7be9fd5da66c207a1535aeffbe4207752a020251dbc0cfbd04f"
+    },
+    "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java": {
+      "baseline": "b30368c18430d6122a4653c393ddc6f32f48e54dfb061ff46db904658addb38c",
+      "modified": "47d8e10fc6386aa098209149cbaaf99940cbd771fd26c1f7aea692476a0305e8"
+    },
+    "server/src/main/java/com/workforcehub/common/util/DatabaseIdGenerator.java": {
+      "baseline": null,
+      "modified": "389ccce0558311ba9479cd3ce9e818420e02f9093f5806abee35cc0f9f8cf9d2"
+    },
+    "server/src/main/java/com/workforcehub/common/util/IdGenerator.java": {
+      "baseline": "ec5813ad5664b6952698c35e2c6a8811259080ecfeb62ee934538aeb34ddedaf",
+      "modified": "2ab7e9026dae7c3ce38bd348664b433947c237c12088f345bff2dc2d37242a38"
+    },
+    "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java": {
+      "baseline": "91c33af1d64da9c80325ef4c69d7980567eac49bc7983d1f0ecf02e20c17e467",
+      "modified": "c157065870f1d3809532167791bf2c06cedaa5f01fca60aaabd534517435d0f4"
+    },
+    "server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java": {
+      "baseline": null,
+      "modified": "37a36496af074266874acf4c1064e801df05ef1bbc099478ab8495c2a3107d53"
+    },
+    "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java": {
+      "baseline": "e5f46c9f21266623ec991804e1f267dd28dbc4f523c0954d051a2515ea1eb790",
+      "modified": "ac46899d32a0cedfbf6e952ad7ecaef707199404a998ea5e1e92940f7f42c31b"
+    },
+    "server/src/main/java/db/migration/V70__create_durable_id_sequence.java": {
+      "baseline": null,
+      "modified": "6cbdc826f1fe19dd300a95c3e31a117e068b9f39798753013fd1010fde968c6e"
+    },
+    "server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java": {
+      "baseline": null,
+      "modified": "73712409d2ea0a573d3473b9fb165fe750a66fcf260ca5aea05404e864f07e03"
+    },
+    "server/src/test/java/com/workforcehub/common/util/IdGeneratorMysqlTest.java": {
+      "baseline": null,
+      "modified": "bc95dc14efb07e3ef78c3c5a5295bbad98cccba804f4230962d177bda15ff5b6"
+    },
+    "server/src/test/java/com/workforcehub/common/util/IdGeneratorProcessProbe.java": {
+      "baseline": null,
+      "modified": "c59891433aa4085f9ff3fce7fe72305c5ba53a4d9f582eab128a2ce6f8382741"
+    },
+    "server/src/test/java/com/workforcehub/common/util/IdGeneratorTest.java": {
+      "baseline": null,
+      "modified": "bc63f41472ee2af03ebe779d22291557661a1eab526b0a9bd0d131c4080d544c"
+    },
+    "server/src/test/java/com/workforcehub/common/util/StandaloneIdGeneratorExtension.java": {
+      "baseline": null,
+      "modified": "f8bfc1f46bf9298bb8d8ec428f9d4ecbed4fa24dc88d8e83e22ec4dcd8608b44"
+    },
+    "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": {
+      "baseline": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd",
+      "modified": "605438107fafbc9d410556f04182fd471ad84d7e5a36dae5f212a1947027edf5"
+    },
+    "server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java": {
+      "baseline": "efddad036854a3c26fdcc3bfad07ed2503e9f4fe5c85393e00f8c58b640a382a",
+      "modified": "173d3f53e5560528dd46b47c98e41a264825a19f5181d5bd81ba150d1872ad24"
+    },
+    "server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java": {
+      "baseline": "27c6d25f4268c4c83a167e1f061dc26e4f8a357f21709b39e72e270dfdf1f72b",
+      "modified": "7a75bfef48b8b520e2bb172fbe90f637697e6753db2946f40b97899f600da4ab"
+    },
+    "server/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension": {
+      "baseline": null,
+      "modified": "7e82dc88f536c408961ac1b3f2526a6f5458950195c6fdf95914796673a85e0c"
+    },
+    "server/src/test/resources/junit-platform.properties": {
+      "baseline": null,
+      "modified": "fed9d00b0973a7a0427415f51244b1e68bcd26b1059d6d7d9063b838553162e9"
+    }
+  },
+  "artifact_events": [
+    {
+      "label": "RECONSTRUCT",
+      "command": [
+        "git",
+        "apply",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-5-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-9945-artifacts-rnljg7mr",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "ROLLBACK",
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-5-20261108/ROLLBACK.sh",
+        "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-9945-artifacts-rnljg7mr"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-9945-artifacts-rnljg7mr",
+      "exit": 0,
+      "stdout": "ROLLBACK: pristine bytes restored; added files removed\n",
+      "stderr": ""
+    },
+    {
+      "label": "REAPPLY",
+      "command": [
+        "git",
+        "apply",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-5-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-9945-artifacts-rnljg7mr",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

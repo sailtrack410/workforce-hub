@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "subtask": {
+      "agent_task_status": 1,
+      "completed_at": "0",
+      "created_at": "1794139468012",
+      "creator": {
+        "id": "ou_358d547a8defe93637e1aa4046adde44",
+        "type": "user"
+      },
+      "dependencies": [],
+      "description": "编号：100-10 / WF-01；优先级：P1；类型：新问题\n\n验证状态：静态确认，入口未接通。尚未修复，待复现/整改/验收。\n\n触发条件：员工在当前审批中心选择请假、费用、加班或用印新申请\n\n影响：仅提示表单即将上线，不调用提交接口；旧WorkbenchSection不能视作当前入口能力\n\n证据与边界：当前路由使用hub/ApprovalsView；pickCreateType只有showToast，无表单提交。未点真实页面。\n\n修复方向：在当前工作台和审批路由接入请假、补卡与通用OA表单、附件和提交后状态跳转。\n\n验收条件：通过当前入口提交各类申请，每次只新增一条；余额不足、无上级、附件越权均显示真实错误。\n\n代码/文档位置：\nemployee-web/src/router/index.ts:46\nemployee-web/src/router/index.ts:78\nemployee-web/src/hub/views/ApprovalsView.vue:232",
+      "extra": "",
+      "guid": "aeceb873-910f-4841-911a-add25871fc10",
+      "is_milestone": false,
+      "mode": 2,
+      "origin": {
+        "href": {
+          "title": "sailtrack 飞书 CLI",
+          "url": ""
+        },
+        "platform_i18n_name": {
+          "de_de": "sailtrack 飞书 CLI",
+          "en_us": "sailtrack 飞书 CLI",
+          "es_es": "sailtrack 飞书 CLI",
+          "fr_fr": "sailtrack 飞书 CLI",
+          "it_it": "sailtrack 飞书 CLI",
+          "ja_jp": "sailtrack 飞书 CLI",
+          "ko_kr": "sailtrack 飞书 CLI",
+          "ru_ru": "sailtrack 飞书 CLI",
+          "th_th": "sailtrack 飞书 CLI",
+          "zh_cn": "sailtrack 飞书 CLI",
+          "zh_hk": "sailtrack 飞书 CLI",
+          "zh_tw": "sailtrack 飞书 CLI"
+        }
+      },
+      "parent_task_guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+      "repeat_rule": "",
+      "source": 7,
+      "status": "todo",
+      "subtask_count": 0,
+      "summary": "[P1][100-10][新问题] 当前员工申请入口未接通提交链",
+      "task_id": "t100040",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ],
+      "updated_at": "1794139468072",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=aeceb873-910f-4841-911a-add25871fc10\u0026suite_entity_num=t100040"
+    }
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

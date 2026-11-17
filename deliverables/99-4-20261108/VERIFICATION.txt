@@ -1,0 +1,236 @@
+TARGET=/Users/sailtrack/工程文件/java_web/workforce-hub
+GOAL=99-4 shared employee schedule/calendar work intervals; exact work-minute measurement
+CHANGED_SYMBOLS=WorkflowService.calculateLeaveDurationMinutes; WorkflowService.validateLeaveRequest; AttendanceService.resolveWorkPeriods; AttendanceService.recalculateDailyResult; EmployeeWorkflowController.leaveDuration
+RULE=STANDARD weekdays by default; explicit calendar-day flags override; explicit schedules override default weekend only without calendar-day flag; split shift segments exclude breaks; use exact work minutes, no 240-minute rounding; overlapping adjacent shifts rejected
+ACCEPTANCE=Sunday=0; afternoon=300; cross-day=120; isolated regression 11 tests zero failures/errors
+
+[BASELINE]
+INPUTS=SUNDAY 2026-05-10T09:00:00..2026-05-10T18:00:00; AFTERNOON 2026-05-07T13:00:00..2026-05-07T18:00:00; CROSS_DAY 2026-05-07T17:00:00..2026-05-08T10:00:00
+COMMAND_EXECUTION={
+  "command": [
+    "mvn",
+    "-q",
+    "-Dtest=LeaveDurationEvidenceTest",
+    "test"
+  ],
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-4-_y6f_p81/server",
+  "source_tree": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/baseline",
+  "exit": 0
+}
+
+EXIT_STATUS=0
+STDOUT_LITERAL_BEGIN
+SUNDAY durationMinutes=480
+AFTERNOON durationMinutes=480
+CROSS_DAY durationMinutes=240
+
+STDOUT_LITERAL_END
+STDERR_LITERAL_BEGIN
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+STDERR_LITERAL_END
+
+[MODIFIED]
+INPUTS=SUNDAY 2026-05-10T09:00:00..2026-05-10T18:00:00; AFTERNOON 2026-05-07T13:00:00..2026-05-07T18:00:00; CROSS_DAY 2026-05-07T17:00:00..2026-05-08T10:00:00
+COMMAND_EXECUTION={
+  "command": [
+    "mvn",
+    "-q",
+    "-Dtest=LeaveDurationEvidenceTest",
+    "test"
+  ],
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-4-usudui3u/server",
+  "source_tree": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/modified",
+  "exit": 0
+}
+
+EXIT_STATUS=0
+STDOUT_LITERAL_BEGIN
+SUNDAY durationMinutes=0
+AFTERNOON durationMinutes=300
+CROSS_DAY durationMinutes=120
+
+STDOUT_LITERAL_END
+STDERR_LITERAL_BEGIN
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+STDERR_LITERAL_END
+
+[ROLLBACK]
+INPUTS=SUNDAY 2026-05-10T09:00:00..2026-05-10T18:00:00; AFTERNOON 2026-05-07T13:00:00..2026-05-07T18:00:00; CROSS_DAY 2026-05-07T17:00:00..2026-05-08T10:00:00
+COMMAND_EXECUTION={
+  "command": [
+    "mvn",
+    "-q",
+    "-Dtest=LeaveDurationEvidenceTest",
+    "test"
+  ],
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-4-ah6ip5l4/server",
+  "source_tree": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/rollback-copy",
+  "exit": 0
+}
+
+EXIT_STATUS=0
+STDOUT_LITERAL_BEGIN
+SUNDAY durationMinutes=480
+AFTERNOON durationMinutes=480
+CROSS_DAY durationMinutes=240
+
+STDOUT_LITERAL_END
+STDERR_LITERAL_BEGIN
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+STDERR_LITERAL_END
+
+[ROLLBACK_EXEC]
+COMMAND_EXECUTION=["/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/ROLLBACK.sh", "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/rollback-copy"]
+
+EXIT_STATUS=0
+STDOUT_LITERAL_BEGIN
+
+STDOUT_LITERAL_END
+STDERR_LITERAL_BEGIN
+
+STDERR_LITERAL_END
+
+[REAPPLY]
+COMMAND_EXECUTION={
+  "command": [
+    "patch",
+    "-p1",
+    "-i",
+    "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/DIFF_FILE.patch"
+  ],
+  "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/rollback-copy"
+}
+
+EXIT_STATUS=0
+STDOUT_LITERAL_BEGIN
+patching file 'server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java'
+patching file 'server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java'
+patching file 'server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java'
+patching file 'server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java'
+patching file 'server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java'
+patching file 'server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java'
+patching file 'server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java'
+patching file 'server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java'
+patching file 'server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java'
+patching file 'server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java'
+
+STDOUT_LITERAL_END
+STDERR_LITERAL_BEGIN
+
+STDERR_LITERAL_END
+
+RESTORED_HASH_EQUALS_ORIGINAL=true
+REAPPLIED_HASH_EQUALS_MODIFIED=true
+BASELINE_FILE_HASHES={
+  "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java": "b30368c18430d6122a4653c393ddc6f32f48e54dfb061ff46db904658addb38c",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java": "d07507c0c2dfcde1c52fbc33b13ecabde621a019ddc5bbd0535e80bf60123f23",
+  "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java": "e5f46c9f21266623ec991804e1f267dd28dbc4f523c0954d051a2515ea1eb790",
+  "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java": "91c33af1d64da9c80325ef4c69d7980567eac49bc7983d1f0ecf02e20c17e467",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java": null,
+  "server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java": null,
+  "server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java": null,
+  "server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java": "efddad036854a3c26fdcc3bfad07ed2503e9f4fe5c85393e00f8c58b640a382a",
+  "server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java": "27c6d25f4268c4c83a167e1f061dc26e4f8a357f21709b39e72e270dfdf1f72b",
+  "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd"
+}
+
+MODIFIED_FILE_HASHES={
+  "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java": "47d8e10fc6386aa098209149cbaaf99940cbd771fd26c1f7aea692476a0305e8",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java": "030c24165f34f06b7d345f9aa7cc2bcd04a7984f4b2dc06ea887eadd1b1ac5f1",
+  "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java": "ac46899d32a0cedfbf6e952ad7ecaef707199404a998ea5e1e92940f7f42c31b",
+  "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java": "c157065870f1d3809532167791bf2c06cedaa5f01fca60aaabd534517435d0f4",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java": "6c1757f1b287b7be9fd5da66c207a1535aeffbe4207752a020251dbc0cfbd04f",
+  "server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java": "37a36496af074266874acf4c1064e801df05ef1bbc099478ab8495c2a3107d53",
+  "server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java": "73712409d2ea0a573d3473b9fb165fe750a66fcf260ca5aea05404e864f07e03",
+  "server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java": "173d3f53e5560528dd46b47c98e41a264825a19f5181d5bd81ba150d1872ad24",
+  "server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java": "7a75bfef48b8b520e2bb172fbe90f637697e6753db2946f40b97899f600da4ab",
+  "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "605438107fafbc9d410556f04182fd471ad84d7e5a36dae5f212a1947027edf5"
+}
+
+ROLLBACK_FILE_HASHES={
+  "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java": "b30368c18430d6122a4653c393ddc6f32f48e54dfb061ff46db904658addb38c",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java": "d07507c0c2dfcde1c52fbc33b13ecabde621a019ddc5bbd0535e80bf60123f23",
+  "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java": "e5f46c9f21266623ec991804e1f267dd28dbc4f523c0954d051a2515ea1eb790",
+  "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java": "91c33af1d64da9c80325ef4c69d7980567eac49bc7983d1f0ecf02e20c17e467",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java": null,
+  "server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java": null,
+  "server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java": null,
+  "server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java": "efddad036854a3c26fdcc3bfad07ed2503e9f4fe5c85393e00f8c58b640a382a",
+  "server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java": "27c6d25f4268c4c83a167e1f061dc26e4f8a357f21709b39e72e270dfdf1f72b",
+  "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd"
+}
+
+[REGRESSION]
+COMMAND=JAVA_HOME=/Users/sailtrack/Library/Java/JavaVirtualMachines/ms-17.0.18/Contents/Home mvn -Dtest=LeaveWorkingTimeTest test
+EXIT_STATUS=0
+STDOUT_LITERAL_BEGIN
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 92 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 534 source files with javac [debug release 17] to target/classes
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 3 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 120 source files with javac [debug release 17] to target/test-classes
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.attendance.LeaveWorkingTimeTest
+21:22:55.661 [main] INFO org.hibernate.validator.internal.util.Version -- HV000001: Hibernate Validator 8.0.1.Final
+21:22:55.962 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+21:22:55.962 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+21:22:55.964 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.123 s -- in com.workforcehub.attendance.LeaveWorkingTimeTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  16.006 s
+[INFO] Finished at: 2026-11-08T21:22:56+08:00
+[INFO] ------------------------------------------------------------------------
+
+STDOUT_LITERAL_END
+STDERR_LITERAL_BEGIN
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+STDERR_LITERAL_END
+[RETAINED_PROBE_FIXTURE_ERROR]
+Original MODIFIED probe used Mockito default Boolean false instead of nullable calendar override; yielded 0/0/0 with process exit 0. Corrected probe explicitly returns null for absent overrides before final BASELINE/MODIFIED/ROLLBACK runs. This error was in evidence fixture, not production calculation.
+[ROLE_PATHS]
+/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/MODIFIED_FILE.tar.gz
+/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/DIFF_FILE.patch
+/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/VERIFICATION.txt
+/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/ROLLBACK.sh

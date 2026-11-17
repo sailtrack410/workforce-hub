@@ -1,0 +1,12 @@
+{
+  "command": [
+    "mvn",
+    "-B",
+    "-Dquota.mysql.url=jdbc:mysql://127.0.0.1:57961/quota_2033_test?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true",
+    "test"
+  ],
+  "cwd": "/tmp/workforce-991-audit-jia90rso/snapshot/server",
+  "exit": 1,
+  "stdout": "audit-full.stdout",
+  "stderr": "audit-full.stderr"
+}

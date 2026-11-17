@@ -1,0 +1,443 @@
+--- a/server/src/main/java/com/workforcehub/common/util/IdGenerator.java
++++ b/server/src/main/java/com/workforcehub/common/util/IdGenerator.java
+@@ -1,24 +1,31 @@
+ package com.workforcehub.common.util;
+ 
+-import java.util.concurrent.atomic.AtomicLong;
++import java.util.LinkedHashMap;
++import java.util.function.LongSupplier;
+ 
+ // 简化版雪花 ID：时间戳左移 20 位 + 自增序列，单机每毫秒可生成约 100 万个 ID
++// 上行为历史实现说明；现使用共享数据库持久号段，不再依赖时间戳或单机序列。
+ public final class IdGenerator {
+ 
+-    private static final AtomicLong LAST_ID = new AtomicLong(System.currentTimeMillis() << 20);
++    // 生产号段由共享数据库持久分配，禁止在初始化失败时退回单机算法。
++    private static final LinkedHashMap<Object, LongSupplier> GENERATORS = new LinkedHashMap<>();
+ 
+     private IdGenerator() {
+     }
+ 
+-    public static long nextId() {
+-        long now = System.currentTimeMillis() << 20;
+-        while (true) {
+-            long current = LAST_ID.get();
+-            long next = Math.max(now, current + 1);
+-            if (LAST_ID.compareAndSet(current, next)) {
+-                return next;
+-            }
+-        }
++    static synchronized void register(Object owner, LongSupplier generator) {
++        GENERATORS.put(owner, generator);
++    }
++
++    static synchronized void unregister(Object owner) {
++        GENERATORS.remove(owner);
++    }
++
++    public static synchronized long nextId() {
++        LongSupplier generator = null;
++        for (LongSupplier active : GENERATORS.values()) generator = active;
++        if (generator == null) throw new IllegalStateException("ID generator database is not initialized");
++        return generator.getAsLong();
+     }
+ 
+     public static String nextIdString() {
+--- /dev/null
++++ b/server/src/main/java/com/workforcehub/common/util/DatabaseIdGenerator.java
+@@ -0,0 +1,92 @@
++package com.workforcehub.common.util;
++
++import com.zaxxer.hikari.HikariConfig;
++import com.zaxxer.hikari.HikariDataSource;
++import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
++import org.springframework.jdbc.datasource.AbstractDriverBasedDataSource;
++import org.springframework.stereotype.Component;
++
++import javax.sql.DataSource;
++import java.sql.SQLException;
++
++@Component
++@DependsOnDatabaseInitialization
++public final class DatabaseIdGenerator implements AutoCloseable {
++    private static final long BLOCK_SIZE = 1000;
++    private final DataSource dataSource;
++    private final HikariDataSource dedicatedPool;
++    private long next;
++    private long end;
++    private boolean closed;
++
++    public DatabaseIdGenerator(DataSource dataSource) {
++        if (dataSource instanceof HikariDataSource pooled) {
++            // 业务事务可能耗尽业务池；发号必须使用独立小池，不能等待业务连接释放。
++            var config = new HikariConfig();
++            pooled.copyStateTo(config);
++            config.setPoolName(pooled.getPoolName() + "-ids");
++            config.setMaximumPoolSize(1);
++            config.setMinimumIdle(0);
++            config.setRegisterMbeans(false);
++            config.setReadOnly(false);
++            dedicatedPool = new HikariDataSource(config);
++            this.dataSource = dedicatedPool;
++        } else if (dataSource instanceof AbstractDriverBasedDataSource) {
++            dedicatedPool = null;
++            this.dataSource = dataSource;
++        } else {
++            throw new IllegalArgumentException("ID generator requires Hikari or an unpooled driver data source");
++        }
++        IdGenerator.register(this, this::nextId);
++    }
++
++    public synchronized long nextId() {
++        if (closed) throw new IllegalStateException("ID generator is closed");
++        if (next == end) reserve();
++        return ++next;
++    }
++
++    private void reserve() {
++        // 不使用线程绑定的业务连接，号段必须先独立提交才能交付，业务回滚不能回收已发 ID。
++        try (var connection = dataSource.getConnection()) {
++            connection.setAutoCommit(false);
++            try {
++                long start;
++                try (var statement = connection.prepareStatement(
++                    "SELECT high_watermark FROM sys_id_sequence WHERE sequence_name = 'global' FOR UPDATE");
++                     var rows = statement.executeQuery()) {
++                    if (!rows.next()) throw new SQLException("Global ID sequence is missing");
++                    start = rows.getLong(1);
++                }
++                if (start < 0 || start > Long.MAX_VALUE - BLOCK_SIZE) {
++                    throw new SQLException("Global ID sequence is exhausted or invalid");
++                }
++                try (var statement = connection.prepareStatement(
++                    "UPDATE sys_id_sequence SET high_watermark = ? WHERE sequence_name = 'global'")) {
++                    statement.setLong(1, start + BLOCK_SIZE);
++                    if (statement.executeUpdate() != 1) throw new SQLException("Global ID sequence is missing");
++                }
++                connection.commit();
++                next = start;
++                end = start + BLOCK_SIZE;
++            } catch (SQLException failure) {
++                try { connection.rollback(); } catch (SQLException rollback) { failure.addSuppressed(rollback); }
++                throw failure;
++            }
++        } catch (SQLException failure) {
++            throw new IllegalStateException("Cannot reserve durable IDs", failure);
++        }
++    }
++
++    @Override
++    public void close() {
++        // 与静态入口采用相同锁顺序，防止关闭上下文和发号发生死锁。
++        synchronized (IdGenerator.class) {
++            synchronized (this) {
++                closed = true;
++                IdGenerator.unregister(this);
++                if (dedicatedPool != null) dedicatedPool.close();
++            }
++        }
++    }
++}
+--- /dev/null
++++ b/server/src/main/java/db/migration/V70__create_durable_id_sequence.java
+@@ -0,0 +1,38 @@
++package db.migration;
++
++import org.flywaydb.core.api.migration.BaseJavaMigration;
++import org.flywaydb.core.api.migration.Context;
++
++import java.util.ArrayList;
++
++public class V70__create_durable_id_sequence extends BaseJavaMigration {
++    @Override
++    public void migrate(Context context) throws Exception {
++        var connection = context.getConnection();
++        long watermark = 1L << 62;
++        var columns = new ArrayList<String[]>();
++        try (var statement = connection.prepareStatement(
++            "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS "
++                + "WHERE TABLE_SCHEMA = DATABASE() AND DATA_TYPE = 'bigint' AND COLUMN_KEY = 'PRI'");
++             var rows = statement.executeQuery()) {
++            while (rows.next()) columns.add(new String[]{rows.getString(1), rows.getString(2)});
++        }
++        // 升级时停用旧发号实例；扫描历史主键，避免时钟异常产生过的旧 ID 与新序列重叠。
++        for (var column : columns) {
++            String table = column[0].replace("`", "``");
++            String name = column[1].replace("`", "``");
++            try (var statement = connection.createStatement();
++                 var rows = statement.executeQuery("SELECT MAX(`" + name + "`) FROM `" + table + "`")) {
++                if (rows.next()) watermark = Math.max(watermark, rows.getLong(1));
++            }
++        }
++        try (var statement = connection.createStatement()) {
++            statement.execute("CREATE TABLE sys_id_sequence (sequence_name VARCHAR(32) NOT NULL PRIMARY KEY, "
++                + "high_watermark BIGINT NOT NULL) ENGINE=InnoDB");
++        }
++        try (var statement = connection.prepareStatement("INSERT INTO sys_id_sequence VALUES ('global', ?)")) {
++            statement.setLong(1, watermark);
++            statement.executeUpdate();
++        }
++    }
++}
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/IdGeneratorTest.java
+@@ -0,0 +1,117 @@
++package com.workforcehub.common.util;
++
++import com.zaxxer.hikari.HikariConfig;
++import com.zaxxer.hikari.HikariDataSource;
++import org.junit.jupiter.api.*;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DataSourceTransactionManager;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.transaction.support.TransactionTemplate;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++@Tag("durable-id")
++class IdGeneratorTest {
++    private DriverManagerDataSource source;
++    private JdbcTemplate jdbc;
++
++    @BeforeEach
++    void setup() {
++        source = new DriverManagerDataSource("jdbc:h2:mem:sequence_" + java.util.UUID.randomUUID()
++            + ";DB_CLOSE_DELAY=-1", "sa", "");
++        jdbc = new JdbcTemplate(source);
++        jdbc.execute("CREATE TABLE sys_id_sequence(sequence_name VARCHAR(32) PRIMARY KEY, high_watermark BIGINT)");
++        jdbc.update("INSERT INTO sys_id_sequence VALUES('global', ?)", 1L << 62);
++    }
++
++    @AfterEach void cleanup() { jdbc.execute("SHUTDOWN"); }
++
++    @Test void uninitializedAndClosedGeneratorsFailWithoutFallback() throws Exception {
++        try (var isolated = new java.net.URLClassLoader(new java.net.URL[]{
++            IdGenerator.class.getProtectionDomain().getCodeSource().getLocation()}, null)) {
++            var isolatedType = Class.forName(IdGenerator.class.getName(), true, isolated);
++            var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
++                () -> isolatedType.getMethod("nextId").invoke(null));
++            assertInstanceOf(IllegalStateException.class, failure.getCause());
++        }
++        var generator = new DatabaseIdGenerator(source);
++        generator.close();
++        assertThrows(IllegalStateException.class, generator::nextId);
++    }
++
++    @Test void independentInstancesAndRestartNeverRecycleCommittedRanges() {
++        long first;
++        try (var one = new DatabaseIdGenerator(source); var two = new DatabaseIdGenerator(source)) {
++            first = one.nextId();
++            assertEquals(first + 1000, two.nextId());
++            assertEquals(first + 1, one.nextId());
++        }
++        try (var restarted = new DatabaseIdGenerator(source)) {
++            assertEquals(first + 2000, restarted.nextId());
++        }
++    }
++
++    @Test void businessRollbackCannotRecycleAllocatedIds() {
++        long[] allocated = new long[1];
++        try (var generator = new DatabaseIdGenerator(source)) {
++            new TransactionTemplate(new DataSourceTransactionManager(source)).executeWithoutResult(status -> {
++                allocated[0] = IdGenerator.nextId();
++                status.setRollbackOnly();
++            });
++        }
++        try (var restarted = new DatabaseIdGenerator(source)) {
++            assertTrue(restarted.nextId() > allocated[0]);
++        }
++    }
++
++    @Test void closingNewestContextRestoresPreviousAndPreservesStringContract() {
++        try (var one = new DatabaseIdGenerator(source)) {
++            long first = IdGenerator.nextId();
++            try (var two = new DatabaseIdGenerator(source)) {
++                assertTrue(IdGenerator.nextId() >= first + 1000);
++            }
++            assertEquals(Long.toString(first + 1), IdGenerator.nextIdString());
++        }
++    }
++
++    @Test void missingSequenceAndDatabaseErrorsFailWithoutFallback() {
++        jdbc.update("DELETE FROM sys_id_sequence");
++        try (var generator = new DatabaseIdGenerator(source)) {
++            assertThrows(IllegalStateException.class, IdGenerator::nextId);
++            jdbc.execute("DROP TABLE sys_id_sequence");
++            assertThrows(IllegalStateException.class, IdGenerator::nextId);
++        }
++    }
++
++    @Test void exhaustionNeverWrapsToNegativeIds() {
++        jdbc.update("UPDATE sys_id_sequence SET high_watermark=?", Long.MAX_VALUE - 999);
++        try (var generator = new DatabaseIdGenerator(source)) {
++            assertThrows(IllegalStateException.class, IdGenerator::nextId);
++            assertEquals(Long.MAX_VALUE - 999,
++                jdbc.queryForObject("SELECT high_watermark FROM sys_id_sequence", Long.class));
++        }
++    }
++
++    @Test void exhaustedSingleConnectionBusinessPoolCannotBlockIdReservation() {
++        var config = new HikariConfig();
++        config.setJdbcUrl(source.getUrl());
++        config.setUsername("sa");
++        config.setPassword("");
++        config.setMaximumPoolSize(1);
++        config.setMinimumIdle(0);
++        config.setConnectionTimeout(500);
++        try (var business = new HikariDataSource(config)) {
++            long[] allocated = new long[1];
++            try (var generator = new DatabaseIdGenerator(business)) {
++                new TransactionTemplate(new DataSourceTransactionManager(business)).executeWithoutResult(status -> {
++                    allocated[0] = assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), IdGenerator::nextId);
++                    assertEquals(1, business.getHikariPoolMXBean().getActiveConnections());
++                    status.setRollbackOnly();
++                });
++            }
++            try (var restarted = new DatabaseIdGenerator(business)) {
++                assertTrue(restarted.nextId() > allocated[0]);
++            }
++        }
++    }
++}
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/IdGeneratorMysqlTest.java
+@@ -0,0 +1,68 @@
++package com.workforcehub.common.util;
++
++import com.zaxxer.hikari.HikariConfig;
++import com.zaxxer.hikari.HikariDataSource;
++import db.migration.V70__create_durable_id_sequence;
++import org.flywaydb.core.Flyway;
++import org.junit.jupiter.api.*;
++import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
++import org.springframework.context.annotation.AnnotationConfigApplicationContext;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DataSourceTransactionManager;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.transaction.support.TransactionTemplate;
++
++import javax.sql.DataSource;
++import java.util.concurrent.Executors;
++import static org.junit.jupiter.api.Assertions.*;
++
++@Tag("durable-id")
++@EnabledIfSystemProperty(named = "id.mysql.url", matches = "jdbc:mysql://127\\.0\\.0\\.1:[0-9]+/id_995_test\\?.*")
++class IdGeneratorMysqlTest {
++    @Test void migrationSpringLifecycleConcurrencyAndBusinessRollback() throws Exception {
++        var source = new DriverManagerDataSource(System.getProperty("id.mysql.url"), "root", "");
++        var jdbc = new JdbcTemplate(source);
++        jdbc.execute("DROP TABLE IF EXISTS flyway_schema_history, sys_id_sequence, legacy_ids");
++        jdbc.execute("CREATE TABLE legacy_ids(id BIGINT PRIMARY KEY) ENGINE=InnoDB");
++        jdbc.update("INSERT INTO legacy_ids VALUES (?)", 6_000_000_000_000_000_000L);
++        Flyway.configure().dataSource(source).locations(new String[0]).baselineOnMigrate(true)
++            .javaMigrations(new V70__create_durable_id_sequence()).load().migrate();
++        assertEquals(6_000_000_000_000_000_000L,
++            jdbc.queryForObject("SELECT high_watermark FROM sys_id_sequence", Long.class));
++        var config = new HikariConfig();
++        config.setDataSource(source);
++        config.setMaximumPoolSize(1);
++        config.setMinimumIdle(0);
++        config.setConnectionTimeout(500);
++        DatabaseIdGenerator springGenerator;
++        try (var business = new HikariDataSource(config); var context = new AnnotationConfigApplicationContext()) {
++            context.registerBean(DataSource.class, () -> business);
++            context.scan("com.workforcehub.common.util");
++            context.refresh();
++            springGenerator = context.getBean(DatabaseIdGenerator.class);
++            assertNotNull(springGenerator);
++            var ids = java.util.concurrent.ConcurrentHashMap.<Long>newKeySet();
++            var executor = Executors.newFixedThreadPool(8);
++            try {
++                var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
++                for (int thread = 0; thread < 8; thread++) futures.add(executor.submit(() -> {
++                    for (int i = 0; i < 2500; i++) assertTrue(ids.add(IdGenerator.nextId()));
++                }));
++                for (var future : futures) future.get(30, java.util.concurrent.TimeUnit.SECONDS);
++            } finally { executor.shutdownNow(); }
++            assertEquals(20000, ids.size());
++            long[] rolledBack = new long[1];
++            new TransactionTemplate(new DataSourceTransactionManager(business)).executeWithoutResult(status -> {
++                rolledBack[0] = assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), IdGenerator::nextId);
++                assertEquals(1, business.getHikariPoolMXBean().getActiveConnections());
++                status.setRollbackOnly();
++            });
++            try (var restarted = new DatabaseIdGenerator(source)) {
++                assertTrue(restarted.nextId() > rolledBack[0]);
++            }
++            assertTrue(IdGenerator.nextId() > 6_000_000_000_000_000_000L);
++        }
++        assertThrows(IllegalStateException.class, springGenerator::nextId);
++        System.out.println("MYSQL_MIGRATION_LEGACY_MAX=6000000000000000000; SPRING_THREADS=8; UNIQUE_IDS=20000; BUSINESS_POOL_CAPACITY=1; BUSINESS_POOL_OCCUPIED=1; ID_RESERVATION=success; BUSINESS_ROLLBACK=durable; CONTEXT_CLOSE=fail-closed");
++    }
++}
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/IdGeneratorProcessProbe.java
+@@ -0,0 +1,18 @@
++package com.workforcehub.common.util;
++
++import org.springframework.context.annotation.AnnotationConfigApplicationContext;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import javax.sql.DataSource;
++
++public final class IdGeneratorProcessProbe {
++    public static void main(String[] args) {
++        // This intentionally uses production component discovery rather than the standalone JUnit fixture.
++        try (var context = new AnnotationConfigApplicationContext()) {
++            context.registerBean(DataSource.class, () -> new DriverManagerDataSource(args[0], "root", ""));
++            context.scan("com.workforcehub.common.util");
++            context.refresh();
++            int count = Integer.parseInt(args[1]);
++            for (int index = 0; index < count; index++) System.out.println("ID=" + IdGenerator.nextId());
++        }
++    }
++}
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/StandaloneIdGeneratorExtension.java
+@@ -0,0 +1,39 @@
++package com.workforcehub.common.util;
++
++import org.junit.jupiter.api.extension.AfterAllCallback;
++import org.junit.jupiter.api.extension.BeforeAllCallback;
++import org.junit.jupiter.api.extension.ExtensionContext;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.junit.platform.commons.support.AnnotationSupport;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.test.context.junit.jupiter.SpringExtension;
++
++/** Only standalone unit tests receive a private fixture; Spring tests must wire the production bean. */
++public class StandaloneIdGeneratorExtension implements BeforeAllCallback, AfterAllCallback {
++    @Override
++    public void beforeAll(ExtensionContext context) {
++        boolean spring = AnnotationSupport.findRepeatableAnnotations(context.getRequiredTestClass(), ExtendWith.class)
++            .stream().flatMap(annotation -> java.util.Arrays.stream(annotation.value()))
++            .anyMatch(SpringExtension.class::equals);
++        if (spring || context.getTags().contains("durable-id")) return;
++        var source = new DriverManagerDataSource("jdbc:h2:mem:ids_" + java.util.UUID.randomUUID()
++            + ";DB_CLOSE_DELAY=-1", "sa", "");
++        var jdbc = new JdbcTemplate(source);
++        jdbc.execute("CREATE TABLE sys_id_sequence(sequence_name VARCHAR(32) PRIMARY KEY, high_watermark BIGINT)");
++        jdbc.update("INSERT INTO sys_id_sequence VALUES('global', ?)", 1L << 62);
++        var store = context.getStore(ExtensionContext.Namespace.create(getClass(), context.getUniqueId()));
++        store.put("jdbc", jdbc);
++        store.put("generator", new DatabaseIdGenerator(source));
++    }
++
++    @Override
++    public void afterAll(ExtensionContext context) {
++        var store = context.getStore(ExtensionContext.Namespace.create(getClass(), context.getUniqueId()));
++        var generator = store.remove("generator", DatabaseIdGenerator.class);
++        if (generator != null) {
++            generator.close();
++            store.remove("jdbc", JdbcTemplate.class).execute("SHUTDOWN");
++        }
++    }
++}
+--- /dev/null
++++ b/server/src/test/resources/junit-platform.properties
+@@ -0,0 +1 @@
++junit.jupiter.extensions.autodetection.enabled=true
+--- /dev/null
++++ b/server/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension
+@@ -0,0 +1 @@
++com.workforcehub.common.util.StandaloneIdGeneratorExtension

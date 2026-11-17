@@ -18,6 +18,7 @@ export interface MessageScrollAnchor {
   top: number;
   messageId: string;
   offset: number;
+  atBottom: boolean;
 }
 
 export function kindOf(conversation: ImConversationSummaryResponse): ConversationView['kind'] {
@@ -60,7 +61,6 @@ export const useImStore = defineStore('hw-im', {
     messagesByConversation: {} as Record<string, ImMessageResponse[]>,
     detailsByConversation: {} as Record<string, ImConversationDetailResponse>,
     activeConversationId: readActiveConversationId(),
-    scrollPositions: {} as Record<string, MessageScrollAnchor>,
     loadingConversations: {} as Record<string, boolean>,
     sending: false,
   }),

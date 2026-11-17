@@ -1,0 +1,73 @@
+{
+  "events": [
+    {
+      "label": "BASELINE",
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/RUN_PROBE.sh",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/baseline/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+      "stdout": "input=POST /api/admin/im/outbox-events/dispatch; permissions=[]\nfilterChainInvoked=true; mockResponseStatus=200\nbody=\nboundary=filter probe only; no HTTP business success claimed\n",
+      "stderr": "注: 由于在类路径中发现了一个或多个处理程序，因此启用了\n  批注处理。未来发行版的 javac 可能会禁用批注处理，\n  除非至少按名称指定了一个处理程序 (-processor)，\n  或指定了搜索路径 (--processor-path, --processor-module-path)，\n  或显式启用了批注处理 (-proc:only, -proc:full)。\n  可使用 -Xlint:-options 隐藏此消息。\n  可使用 -proc:none 禁用批注处理。\n注: org.pf4j.processor.ExtensionAnnotationProcessor init\n注: Options {}\n注: Processing @org.pf4j.Extension\n注: Processing @org.pf4j.Extension\n注: Processing @org.pf4j.Extension\n",
+      "exit": 0
+    },
+    {
+      "label": "MODIFIED",
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/RUN_PROBE.sh",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/modified/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+      "stdout": "input=POST /api/admin/im/outbox-events/dispatch; permissions=[]\nfilterChainInvoked=false; mockResponseStatus=403\nbody={\"code\":100403,\"message\":\"无权限访问\",\"data\":null,\"requestId\":null}\nboundary=filter probe only; no HTTP business success claimed\n",
+      "stderr": "注: 由于在类路径中发现了一个或多个处理程序，因此启用了\n  批注处理。未来发行版的 javac 可能会禁用批注处理，\n  除非至少按名称指定了一个处理程序 (-processor)，\n  或指定了搜索路径 (--processor-path, --processor-module-path)，\n  或显式启用了批注处理 (-proc:only, -proc:full)。\n  可使用 -Xlint:-options 隐藏此消息。\n  可使用 -proc:none 禁用批注处理。\n注: org.pf4j.processor.ExtensionAnnotationProcessor init\n注: Options {}\n注: Processing @org.pf4j.Extension\n注: Processing @org.pf4j.Extension\n注: Processing @org.pf4j.Extension\n",
+      "exit": 0
+    },
+    {
+      "label": "ROLLBACK-script",
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/ROLLBACK.sh",
+        "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review99-1-rollback-qjt8hryw/AdminPermissionFilter.java"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+      "stdout": "restored pristine AdminPermissionFilter.java\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "label": "ROLLBACK",
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/RUN_PROBE.sh",
+        "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review99-1-rollback-qjt8hryw/AdminPermissionFilter.java"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+      "stdout": "input=POST /api/admin/im/outbox-events/dispatch; permissions=[]\nfilterChainInvoked=true; mockResponseStatus=200\nbody=\nboundary=filter probe only; no HTTP business success claimed\n",
+      "stderr": "注: 由于在类路径中发现了一个或多个处理程序，因此启用了\n  批注处理。未来发行版的 javac 可能会禁用批注处理，\n  除非至少按名称指定了一个处理程序 (-processor)，\n  或指定了搜索路径 (--processor-path, --processor-module-path)，\n  或显式启用了批注处理 (-proc:only, -proc:full)。\n  可使用 -Xlint:-options 隐藏此消息。\n  可使用 -proc:none 禁用批注处理。\n注: org.pf4j.processor.ExtensionAnnotationProcessor init\n注: Options {}\n注: Processing @org.pf4j.Extension\n注: Processing @org.pf4j.Extension\n注: Processing @org.pf4j.Extension\n",
+      "exit": 0
+    },
+    {
+      "label": "PATCH",
+      "command": [
+        "git",
+        "apply",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review99-1-patch-i_he_zc0",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    }
+  ],
+  "restored_hash": "f0d6336c2c3d8345a7fefd4c66a52de46fa58a0efeadda212c109d087d5d9d40",
+  "baseline_hash": "f0d6336c2c3d8345a7fefd4c66a52de46fa58a0efeadda212c109d087d5d9d40",
+  "roles": {
+    "MODIFIED_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/modified/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java",
+    "DIFF_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch",
+    "VERIFICATION": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/VERIFICATION.txt",
+    "ROLLBACK": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/ROLLBACK.sh"
+  },
+  "patch_check": "6/6 reconstruction matches delivered modified snapshot",
+  "live_filter_matches_delivered": true,
+  "live_differences_from_delivered": [
+    "server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java"
+  ]
+}

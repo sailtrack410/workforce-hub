@@ -1,0 +1,35 @@
+{
+  "issue": "99-3",
+  "roles": {
+    "MODIFIED_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/MODIFIED_FILE.tar.gz",
+    "DIFF_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/DIFF_FILE.patch",
+    "VERIFICATION": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/VERIFICATION.txt",
+    "ROLLBACK": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh"
+  },
+  "archive_count": 6,
+  "live_differences": [],
+  "rollback": {
+    "command": [
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh",
+      "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-final-review-99-3-ckytyuaz"
+    ],
+    "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+    "stdout": "ROLLBACK_HASHES_MATCH_ORIGINAL=4/4; NEW_FILES_REMOVED=2/2\n",
+    "stderr": "",
+    "exit": 0,
+    "baseline_hashes_matched": 4,
+    "new_files_removed": 2
+  },
+  "reapply": {
+    "command": [
+      "git",
+      "apply",
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/DIFF_FILE.patch"
+    ],
+    "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-final-review-99-3-ckytyuaz",
+    "stdout": "",
+    "stderr": "",
+    "exit": 0,
+    "matching_hashes": 6
+  }
+}

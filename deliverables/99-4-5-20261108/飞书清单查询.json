@@ -1,0 +1,228 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "has_more": false,
+    "items": [
+      {
+        "completed_at": "0",
+        "guid": "4dda5b62-c202-440e-a4a4-2f0b2c76dd03",
+        "subtask_count": 0,
+        "summary": "[P2][PLUGIN-U][优化建议] 插件动作未知结果增加人工核对恢复"
+      },
+      {
+        "completed_at": "0",
+        "guid": "d8c524c5-9cdd-46a2-800f-9a98fbb08097",
+        "subtask_count": 0,
+        "summary": "[P2][PLUGIN-E][优化建议] 重要插件事件增加可恢复投递账本"
+      },
+      {
+        "completed_at": "0",
+        "guid": "bd955dc8-7c59-4ce7-8d04-39ec09ae777e",
+        "subtask_count": 0,
+        "summary": "[P2][99-5][既有风险] ID生成器跨实例唯一性未保证"
+      },
+      {
+        "completed_at": "0",
+        "guid": "22f180a6-89ff-4a16-94a5-61bd16ecf88a",
+        "subtask_count": 0,
+        "summary": "[P2][99-4][既有风险] 请假计算固定时段与取整口径"
+      },
+      {
+        "completed_at": "0",
+        "guid": "22aa91e9-996f-47f7-b605-3a69ed8df609",
+        "subtask_count": 0,
+        "summary": "[P2][100-26][新问题] 新工作台缺少插件宿主入口"
+      },
+      {
+        "completed_at": "0",
+        "guid": "03d0c359-42e3-4be0-9969-d1729b3f5f0a",
+        "subtask_count": 0,
+        "summary": "[P2][100-25][新问题] “我的申请”混用待办审批数据"
+      },
+      {
+        "completed_at": "0",
+        "guid": "22e5992d-27ec-4cc0-9c66-36d09d176dde",
+        "subtask_count": 0,
+        "summary": "[P2][100-24][新问题] 新消息页附件下载使用错误业务票据入口"
+      },
+      {
+        "completed_at": "0",
+        "guid": "0f3b7684-67d4-41e8-8674-808f33d84cf3",
+        "subtask_count": 0,
+        "summary": "[P2][100-23][新问题] 新消息卡片动作仍为占位"
+      },
+      {
+        "completed_at": "0",
+        "guid": "26871316-9380-42e0-b1b6-17c700155c07",
+        "subtask_count": 0,
+        "summary": "[P2][100-22][新问题] 知识重排配置未进入执行链"
+      },
+      {
+        "completed_at": "0",
+        "guid": "857f2d54-70de-468a-ab27-79c8438a92b6",
+        "subtask_count": 0,
+        "summary": "[P2][100-21][新问题] 跨库入库发布缺少完整版本切换"
+      },
+      {
+        "completed_at": "0",
+        "guid": "5cad070d-1de9-444a-b3f0-a7c42f1bf61e",
+        "subtask_count": 0,
+        "summary": "[P2][100-20][新问题] 文档入库并发缺少作业代次隔离"
+      },
+      {
+        "completed_at": "0",
+        "guid": "5ec03b55-fe69-4d5e-b41f-2af9de1d5a69",
+        "subtask_count": 0,
+        "summary": "[P2][100-19][新问题] 异步任务提交后缺少持久认领恢复"
+      },
+      {
+        "completed_at": "0",
+        "guid": "959f6588-06e3-490e-bf04-4e2f46057426",
+        "subtask_count": 0,
+        "summary": "[P2][100-18][新问题] 草稿部分路径自动获得流程测试证明"
+      },
+      {
+        "completed_at": "0",
+        "guid": "384ebbe7-cfb8-48a6-bc91-4b8be3529c5f",
+        "subtask_count": 0,
+        "summary": "[P2][100-17][新问题] DAG工具执行跳过配置的人审门禁"
+      },
+      {
+        "completed_at": "0",
+        "guid": "6dffb94b-4d16-411a-9812-8713bd4f2c57",
+        "subtask_count": 0,
+        "summary": "[P2][100-15][新问题] 首次创建排班不刷新既有考勤结果"
+      },
+      {
+        "completed_at": "0",
+        "guid": "1a5fa065-4b39-4ca0-8a22-24c916305b65",
+        "subtask_count": 0,
+        "summary": "[P2][100-14][新问题] 通用OA未执行所选模板表单约束"
+      },
+      {
+        "completed_at": "0",
+        "guid": "c78ca6a9-2ba4-40e1-9779-787bb6a7929c",
+        "subtask_count": 0,
+        "summary": "[P2][100-13][新问题] AI预审中撤回按钮与后端资格不一致"
+      },
+      {
+        "completed_at": "0",
+        "guid": "07b7103b-6788-4fc5-b2e9-9c468f0fcd29",
+        "subtask_count": 0,
+        "summary": "[P2][100-12][新问题] 工作台显示固定打卡时间"
+      },
+      {
+        "completed_at": "0",
+        "guid": "cc83dc8f-0c3f-4395-a8f9-b76dd2fb2ee9",
+        "subtask_count": 0,
+        "summary": "[P2][100-09][新问题] 手机号输入清空未转化为实际清除"
+      },
+      {
+        "completed_at": "0",
+        "guid": "d667c90b-b98c-496e-b68b-f0528af9b169",
+        "subtask_count": 0,
+        "summary": "[P2][100-08][新问题] 字典标签缓存只在当前JVM失效"
+      },
+      {
+        "completed_at": "0",
+        "guid": "9d687ca2-e319-46d0-8465-5ff90439126d",
+        "subtask_count": 0,
+        "summary": "[P2][100-07][新问题] 独立验证码登录入口不符合后端密码二验契约"
+      },
+      {
+        "completed_at": "0",
+        "guid": "d29f6336-9dd4-423c-8a7f-d695ffd1e7b4",
+        "subtask_count": 0,
+        "summary": "[P2][100-06][新问题] 后台邮件渠道与认证发信配置分离"
+      },
+      {
+        "completed_at": "0",
+        "guid": "866b278a-a08f-4de1-8f2d-3fce030f69cf",
+        "subtask_count": 0,
+        "summary": "[P2][100-05][新问题] 注册短信及前端提交仍为演示或占位"
+      },
+      {
+        "completed_at": "0",
+        "guid": "59dae90d-d7a9-4123-bd8d-0f384b30b9fd",
+        "subtask_count": 0,
+        "summary": "[P2][100-03][新问题] 邮箱验证码比较与核销非原子"
+      },
+      {
+        "completed_at": "1794142735000",
+        "guid": "67d36331-97d7-427d-a310-f87556f3c107",
+        "subtask_count": 0,
+        "summary": "[P1][99-3][既有风险] 可变假种破坏在途余额结算"
+      },
+      {
+        "completed_at": "1794142734000",
+        "guid": "81e62079-5016-4737-8ed9-329168e7d942",
+        "subtask_count": 0,
+        "summary": "[P1][99-2][既有风险] 停用撤权未统一失效旧会话"
+      },
+      {
+        "completed_at": "1794142732000",
+        "guid": "44e97d39-f938-449b-95f3-87b075ca9649",
+        "subtask_count": 0,
+        "summary": "[P1][99-1][既有风险] 未知管理路由默认放行"
+      },
+      {
+        "completed_at": "1794142731000",
+        "guid": "d218effd-c29c-441e-9fc7-134f36be97b6",
+        "subtask_count": 0,
+        "summary": "[P1][20/3-3][既有风险] 并发配额检查与实际占额分离"
+      },
+      {
+        "completed_at": "0",
+        "guid": "c2429944-9c73-44be-9863-7e1959519c46",
+        "subtask_count": 0,
+        "summary": "[P1][100-16][新问题] 知识工具检索未执行空间ACL"
+      },
+      {
+        "completed_at": "0",
+        "guid": "1d958a31-ce79-46ce-870a-0f69275990c5",
+        "subtask_count": 0,
+        "summary": "[P1][100-11][新问题] 余额调整重试不复用幂等键"
+      },
+      {
+        "completed_at": "0",
+        "guid": "aeceb873-910f-4841-911a-add25871fc10",
+        "subtask_count": 0,
+        "summary": "[P1][100-10][新问题] 当前员工申请入口未接通提交链"
+      },
+      {
+        "completed_at": "0",
+        "guid": "feef3801-c971-4e96-a5b2-9bdbd859b4bb",
+        "subtask_count": 0,
+        "summary": "[P1][100-04][新问题] 并发注册可重复消费单次邀请码"
+      },
+      {
+        "completed_at": "0",
+        "guid": "b4ed4994-ba4f-4679-ba43-50665c300144",
+        "subtask_count": 0,
+        "summary": "[P1][100-02][新问题] 找回密码错误发送LOGIN用途验证码"
+      },
+      {
+        "completed_at": "0",
+        "guid": "378e275e-863d-4152-a2ee-effd931f5ed0",
+        "subtask_count": 0,
+        "summary": "[P1][100-01][新问题] 当前登录页面未完整处理邮箱认证待续状态"
+      },
+      {
+        "completed_at": "0",
+        "guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+        "subtask_count": 34,
+        "summary": "Workforce｜第100审业务链路问题整改与验收"
+      }
+    ],
+    "page_token": ""
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

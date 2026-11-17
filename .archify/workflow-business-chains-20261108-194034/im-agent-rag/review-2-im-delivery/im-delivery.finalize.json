@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "workflow",
+  "quality": "showcase",
+  "startedAt": "2026-11-08T11:47:28.745Z",
+  "specification": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.candidate.json",
+    "sha256": "e17ce44b5a8986239b206c48ca57dce0415f20d42d736c7344cbf58648937bce",
+    "bytes": 7020
+  },
+  "artifact": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.html",
+    "sha256": "257fbbcef894a06737d873a86451a5e358687e0d960ca5a1622f565f6db1ea5a",
+    "bytes": 827802
+  },
+  "stages": {
+    "validate": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": null,
+      "command": [
+        "/opt/homebrew/Cellar/node@24/24.15.0/bin/node",
+        "/Users/sailtrack/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "workflow",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.candidate.json",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "deliver",
+        "receiptId": "aa3dbce9-fbdd-4962-8b91-13cc5d6f69a9",
+        "stage": "render",
+        "type": "workflow",
+        "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.candidate.json",
+        "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.html",
+        "error": "Workflow layout validation failed:\n- [composition/ambiguous-corridor] showcase workflow edges[9] \"download\" -> \"sync\" shares a 186px corridor with edges[11] \"recall\" -> \"sync\" at [616.4, 420] -> [802.4, 420] (segments 1 and 1; minimum 8px) — adjust route/via, bias, or channel coordinates so unrelated edges do not visually merge.\n- [composition/arrowhead-collision] workflow arrows \"download->sync\" and \"recall->sync\" overlap at their destination (clearance 0px; minimum 9.799999999999999px).",
+        "diagnostics": [
+          {
+            "code": "composition/ambiguous-corridor",
+            "severity": "error",
+            "message": "[composition/ambiguous-corridor] showcase workflow edges[9] \"download\" -> \"sync\" shares a 186px corridor with edges[11] \"recall\" -> \"sync\" at [616.4, 420] -> [802.4, 420] (segments 1 and 1; minimum 8px) — adjust route/via, bias, or channel coordinates so unrelated edges do not visually merge.",
+            "subject": {
+              "diagramType": "workflow",
+              "collection": "edges",
+              "index": 9,
+              "from": "download",
+              "to": "sync"
+            },
+            "evidence": {
+              "otherRelationship": {
+                "diagramType": "workflow",
+                "collection": "edges",
+                "index": 11,
+                "from": "recall",
+                "to": "sync"
+              },
+              "overlapLengthPx": 186,
+              "minimumPx": 8,
+              "from": [
+                616.4,
+                420
+              ],
+              "to": [
+                802.4,
+                420
+              ],
+              "segmentIndex": 1,
+              "otherSegmentIndex": 1
+            },
+            "supportedFixes": [
+              "adjust route/via, bias, or channel coordinates so unrelated edges do not visually merge"
+            ]
+          },
+          {
+            "code": "composition/arrowhead-collision",
+            "severity": "error",
+            "message": "[composition/arrowhead-collision] workflow arrows \"download->sync\" and \"recall->sync\" overlap at their destination (clearance 0px; minimum 9.799999999999999px).",
+            "subject": {
+              "diagramType": "workflow",
+              "edge": "download->sync",
+              "from": "download",
+              "to": "sync"
+            },
+            "evidence": {
+              "otherEdge": "recall->sync",
+              "distancePx": 0,
+              "minimumPx": 9.799999999999999
+            },
+            "supportedFixes": [
+              "use separate destination sides or ports with clearance for both arrow markers"
+            ]
+          }
+        ],
+        "provenance": "failed",
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      },
+      "execution": "embedded-in-deliver"
+    },
+    "deliver": {
+      "status": "not-run",
+      "execution": "blocked-by-validate"
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "composition/ambiguous-corridor",
+      "severity": "error",
+      "message": "[composition/ambiguous-corridor] showcase workflow edges[9] \"download\" -> \"sync\" shares a 186px corridor with edges[11] \"recall\" -> \"sync\" at [616.4, 420] -> [802.4, 420] (segments 1 and 1; minimum 8px) — adjust route/via, bias, or channel coordinates so unrelated edges do not visually merge.",
+      "subject": {
+        "diagramType": "workflow",
+        "collection": "edges",
+        "index": 9,
+        "from": "download",
+        "to": "sync"
+      },
+      "evidence": {
+        "otherRelationship": {
+          "diagramType": "workflow",
+          "collection": "edges",
+          "index": 11,
+          "from": "recall",
+          "to": "sync"
+        },
+        "overlapLengthPx": 186,
+        "minimumPx": 8,
+        "from": [
+          616.4,
+          420
+        ],
+        "to": [
+          802.4,
+          420
+        ],
+        "segmentIndex": 1,
+        "otherSegmentIndex": 1
+      },
+      "supportedFixes": [
+        "adjust route/via, bias, or channel coordinates so unrelated edges do not visually merge"
+      ]
+    },
+    {
+      "code": "composition/arrowhead-collision",
+      "severity": "error",
+      "message": "[composition/arrowhead-collision] workflow arrows \"download->sync\" and \"recall->sync\" overlap at their destination (clearance 0px; minimum 9.799999999999999px).",
+      "subject": {
+        "diagramType": "workflow",
+        "edge": "download->sync",
+        "from": "download",
+        "to": "sync"
+      },
+      "evidence": {
+        "otherEdge": "recall->sync",
+        "distancePx": 0,
+        "minimumPx": 9.799999999999999
+      },
+      "supportedFixes": [
+        "use separate destination sides or ports with clearance for both arrow markers"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/review-2-im-delivery/im-delivery.finalize.json",
+    "summaryReceipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/review-2-im-delivery/im-delivery.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "validate",
+  "finishedAt": "2026-11-08T11:47:29.095Z",
+  "durationMs": 350,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.3.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-08T11:33:45.718Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

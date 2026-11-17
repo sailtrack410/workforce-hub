@@ -1,0 +1,32 @@
+[
+  {
+    "label": "MYSQL",
+    "command": [
+      "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqladmin",
+      "--no-defaults",
+      "--socket=/tmp/workforce-quota-2033-runtime/mysql.sock",
+      "-uroot",
+      "shutdown"
+    ],
+    "owned_process": "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld --no-defaults --basedir=/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64 --datadir=/tmp/workforce-quota-2033-runtime/data --bind-address=127.0.0.1 --port=23383 --socket=/tmp/workforce-quota-2033-runtime/mysql.sock --pid-file=/tmp/workforce-quota-2033-runtime/mysql.pid --log-error=/tmp/workforce-quota-2033-runtime/mysql.log --mysqlx=OFF --daemonize",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "label": "REDIS",
+    "command": [
+      "/opt/homebrew/bin/redis-cli",
+      "-h",
+      "127.0.0.1",
+      "-p",
+      "23384",
+      "shutdown",
+      "nosave"
+    ],
+    "owned_process": "/opt/homebrew/bin/redis-server 127.0.0.1:23384",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

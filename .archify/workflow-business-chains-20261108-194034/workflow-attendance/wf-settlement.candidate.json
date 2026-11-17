@@ -1,0 +1,288 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "人工审批、驳回与撤回结算",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "approval",
+      "label": "审批人处理"
+    },
+    {
+      "id": "reject",
+      "label": "驳回补偿"
+    },
+    {
+      "id": "withdraw",
+      "label": "申请人撤回"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ui",
+      "lane": "approval",
+      "col": 0,
+      "type": "frontend",
+      "label": "审批中心操作",
+      "sublabel": "同意／填写原因驳回",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 170,
+          "end_line": 205
+        }
+      ]
+    },
+    {
+      "id": "lock",
+      "lane": "approval",
+      "col": 1,
+      "type": "security",
+      "label": "锁申请核验处理人",
+      "sublabel": "Flowable assignee匹配",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 725,
+          "end_line": 736
+        }
+      ]
+    },
+    {
+      "id": "deduct",
+      "lane": "approval",
+      "col": 2,
+      "type": "backend",
+      "label": "请假通过结算",
+      "sublabel": "冻结余额转正式扣减",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 740,
+          "end_line": 754
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "lane": "approval",
+      "col": 3,
+      "type": "backend",
+      "label": "完成任务与业务",
+      "sublabel": "记录动作并关闭待办",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 767,
+          "end_line": 778
+        }
+      ]
+    },
+    {
+      "id": "recalc",
+      "lane": "approval",
+      "col": 4,
+      "type": "backend",
+      "label": "重算请假日期",
+      "sublabel": "逐日刷新考勤结果",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 779,
+          "end_line": 782
+        }
+      ]
+    },
+    {
+      "id": "event",
+      "lane": "approval",
+      "col": 5,
+      "type": "messagebus",
+      "label": "提交后发布完成事件",
+      "sublabel": "WorkflowCompletedEvent",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 794,
+          "end_line": 805
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "lane": "reject",
+      "col": 2,
+      "type": "backend",
+      "label": "请假驳回补偿",
+      "sublabel": "释放冻结后REJECTED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 763,
+          "end_line": 765
+        }
+      ]
+    },
+    {
+      "id": "rejectdone",
+      "lane": "reject",
+      "col": 3,
+      "type": "backend",
+      "label": "结束驳回申请",
+      "sublabel": "完成任务与待办",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 767,
+          "end_line": 778
+        }
+      ]
+    },
+    {
+      "id": "withdrawui",
+      "lane": "withdraw",
+      "col": 0,
+      "type": "frontend",
+      "label": "申请人撤回",
+      "sublabel": "说明后提交请求",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 209,
+          "end_line": 229
+        }
+      ]
+    },
+    {
+      "id": "ownership",
+      "lane": "withdraw",
+      "col": 1,
+      "type": "security",
+      "label": "核验本人和状态",
+      "sublabel": "仅IN_APPROVAL",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 593,
+          "end_line": 601
+        }
+      ]
+    },
+    {
+      "id": "unfreeze",
+      "lane": "withdraw",
+      "col": 2,
+      "type": "backend",
+      "label": "释放请假冻结",
+      "sublabel": "删除Flowable实例",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 602,
+          "end_line": 614
+        }
+      ]
+    },
+    {
+      "id": "withdrawn",
+      "lane": "withdraw",
+      "col": 3,
+      "type": "backend",
+      "label": "WITHDRAWN",
+      "sublabel": "动作留痕并关闭待办",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 605,
+          "end_line": 617
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "ui",
+      "to": "lock"
+    },
+    {
+      "from": "lock",
+      "to": "deduct",
+      "label": "同意"
+    },
+    {
+      "from": "deduct",
+      "to": "finish"
+    },
+    {
+      "from": "finish",
+      "to": "recalc"
+    },
+    {
+      "from": "recalc",
+      "to": "event"
+    },
+    {
+      "from": "lock",
+      "to": "release",
+      "label": "驳回",
+      "role": "branch"
+    },
+    {
+      "from": "release",
+      "to": "rejectdone"
+    },
+    {
+      "from": "withdrawui",
+      "to": "ownership"
+    },
+    {
+      "from": "ownership",
+      "to": "unfreeze"
+    },
+    {
+      "from": "unfreeze",
+      "to": "withdrawn"
+    },
+    {
+      "from": "rejectdone",
+      "to": "event",
+      "label": "驳回完成"
+    }
+  ],
+  "mainPath": [
+    "ui",
+    "lock",
+    "deduct",
+    "finish",
+    "recalc",
+    "event"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "结算与兼容",
+      "items": [
+        "DEDUCT／UNFREEZE使用requestId派生幂等key并核对指纹。",
+        "历史无冻结流水可降级扣可用余额；驳回与撤回时无冻结流水直接跳过。",
+        "失败抛错触发事务回滚；未动态验证数据库与Flowable共事务效果。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "优化",
+      "items": [
+        "页面撤回资格应按状态控制，或明确支持预审中取消。",
+        "内置单步审批结束后直接完成业务；引入多级BPMN需同步改造任务推进与待办生成。"
+      ]
+    }
+  ]
+}

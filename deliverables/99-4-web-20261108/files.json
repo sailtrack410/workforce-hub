@@ -1,0 +1,11 @@
+[
+  "employee-web/src/api/types.ts",
+  "employee-web/src/api/employee.ts",
+  "employee-web/src/api/employee.test.ts",
+  "employee-web/src/composables/useWorkbenchState.ts",
+  "employee-web/src/composables/useWorkbenchState.test.ts",
+  "employee-web/src/utils/employee-format.ts",
+  "employee-web/src/utils/employee-format.test.ts",
+  "admin-web/src/utils/format.ts",
+  "admin-web/src/utils/format.test.ts"
+]

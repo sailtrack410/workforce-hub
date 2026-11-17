@@ -1,0 +1,257 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "请假提交、冻结与AI预审回调",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "submit",
+      "label": "后端提交入口"
+    },
+    {
+      "id": "review",
+      "label": "预审与人工转交"
+    },
+    {
+      "id": "exception",
+      "label": "异常与页面缺口"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "api",
+      "lane": "submit",
+      "col": 0,
+      "type": "backend",
+      "label": "提交请假API",
+      "sublabel": "当前页面表单未接",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java",
+          "line": 59,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "submit",
+      "col": 1,
+      "type": "security",
+      "label": "校验申请",
+      "sublabel": "时段、时长、假种、余额",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 900,
+          "end_line": 915
+        }
+      ]
+    },
+    {
+      "id": "freeze",
+      "lane": "submit",
+      "col": 2,
+      "type": "backend",
+      "label": "保存并冻结余额",
+      "sublabel": "申请、明细、附件同事务",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 157,
+          "end_line": 183
+        }
+      ]
+    },
+    {
+      "id": "trigger",
+      "lane": "submit",
+      "col": 3,
+      "type": "backend",
+      "label": "触发可选AI",
+      "sublabel": "无可用触发器则跳过",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 402,
+          "end_line": 417
+        }
+      ]
+    },
+    {
+      "id": "pending",
+      "lane": "submit",
+      "col": 4,
+      "type": "backend",
+      "label": "等待AI结果",
+      "sublabel": "PENDING_REVIEW",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 185,
+          "end_line": 195
+        }
+      ]
+    },
+    {
+      "id": "callback",
+      "lane": "submit",
+      "col": 5,
+      "type": "backend",
+      "label": "锁申请并核对任务",
+      "sublabel": "状态＋taskId＋无实例",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 370,
+          "end_line": 398
+        }
+      ]
+    },
+    {
+      "id": "human",
+      "lane": "review",
+      "col": 5,
+      "type": "backend",
+      "label": "启动人工审批",
+      "sublabel": "原模板＋当前直属上级",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 383,
+          "end_line": 399
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "review",
+      "col": 4,
+      "type": "backend",
+      "label": "拒绝或超时",
+      "sublabel": "释放冻结并结束申请",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 333,
+          "end_line": 361
+        }
+      ]
+    },
+    {
+      "id": "ui",
+      "lane": "exception",
+      "col": 0,
+      "type": "frontend",
+      "label": "新申请按钮",
+      "sublabel": "只显示表单即将上线",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 232,
+          "end_line": 241
+        }
+      ]
+    },
+    {
+      "id": "bad",
+      "lane": "exception",
+      "col": 1,
+      "type": "security",
+      "label": "提交事务回滚",
+      "sublabel": "无上级或余额不足",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 151,
+          "end_line": 155
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "api",
+      "to": "validate"
+    },
+    {
+      "from": "validate",
+      "to": "freeze"
+    },
+    {
+      "from": "freeze",
+      "to": "trigger"
+    },
+    {
+      "from": "trigger",
+      "to": "pending",
+      "label": "有任务"
+    },
+    {
+      "from": "pending",
+      "to": "callback",
+      "label": "回调",
+      "role": "async"
+    },
+    {
+      "from": "callback",
+      "to": "human",
+      "label": "通过／转人工"
+    },
+    {
+      "from": "callback",
+      "to": "reject",
+      "label": "拒绝／超时",
+      "role": "error"
+    },
+    {
+      "from": "trigger",
+      "to": "human",
+      "label": "无AI"
+    },
+    {
+      "from": "validate",
+      "to": "bad",
+      "label": "失败",
+      "role": "error"
+    }
+  ],
+  "mainPath": [
+    "api",
+    "validate",
+    "freeze",
+    "trigger",
+    "pending",
+    "callback",
+    "human"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "余额与回调约束",
+      "items": [
+        "FREEZE以requestId构建幂等key，行锁内可用余额转冻结余额。",
+        "AI通过不会自动批准；仍创建Flowable直属上级任务。",
+        "AI拒绝、超时均走REJECTED并释放冻结；内部任务执行由Agent链路单独说明。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "已知问题与边界",
+      "items": [
+        "沿用99-3：假种停用或扣减模式改变会影响后续结算。",
+        "沿用99-4：固定9—12／13—18并按240分钟向上取整。",
+        "预审未结束时页面仍显示撤回，后端只允许IN_APPROVAL。"
+      ]
+    }
+  ]
+}

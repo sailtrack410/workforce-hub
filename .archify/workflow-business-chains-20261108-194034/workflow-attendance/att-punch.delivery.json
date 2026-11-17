@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "db6d57fc-95bc-4efd-a750-064ae247d565",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.candidate.json",
+  "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.html",
+  "specification": {
+    "sha256": "434acda2f0e75a69945c8c1f54631d1fa8d7774cee0499389534d43dea14e303",
+    "bytes": 5626
+  },
+  "artifact": {
+    "sha256": "ab2f46737b4bfcb1005d307ff660208e02542098d1b0560380bc66fbe10cc895",
+    "bytes": 821043
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "command": "python3 .archify/workflow-business-chains-20261108-194034/auth-org/finish.py",
+  "kind": "静态源码契约核验；未启动应用，未调用真实业务API/SMTP/短信/数据库/Redis",
+  "stdout": [
+    "current-reset-uses-login-purpose-entry: PASS",
+    "backend-reset-requires-reset-password: PASS",
+    "current-page-omits-binding-pending: PASS",
+    "email-verification-is-get-delete: PASS",
+    "invite-consumption-ignores-row-count: PASS",
+    "register-is-placeholder: PASS",
+    "Static contracts: 6 passed, 0 failed",
+    "Workflow finalize: 9 passed, 0 failed"
+  ],
+  "stderr": "",
+  "exit_status": 0,
+  "baseline_revision": "38d829167042dc26efd7af502ce623c976d6e224"
+}

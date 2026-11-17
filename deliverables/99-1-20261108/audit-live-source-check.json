@@ -1,0 +1,6 @@
+{
+  "changed_since_snapshot": [
+    "server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java"
+  ],
+  "head": "38d829167042dc26efd7af502ce623c976d6e224"
+}

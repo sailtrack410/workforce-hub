@@ -1,0 +1,94 @@
+{
+  "fixture": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x",
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server",
+  "command": [
+    "mvn",
+    "-B",
+    "-Dstyle.color=never",
+    "-Dquota.mysql.url=jdbc:mysql://127.0.0.1:59340/quota_2033_test?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true",
+    "clean",
+    "test"
+  ],
+  "mysql_port": 59340,
+  "redis_port": 59341,
+  "sensitive_environment": "Only self-generated disposable fixture value; not persisted",
+  "events": [
+    {
+      "label": "数据库初始化",
+      "command": [
+        "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld",
+        "--no-defaults",
+        "--initialize-insecure",
+        "--basedir=/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+        "--datadir=/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/data"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "数据库启动",
+      "command": [
+        "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld",
+        "--no-defaults",
+        "--basedir=/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+        "--datadir=/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/data",
+        "--bind-address=127.0.0.1",
+        "--port=59340",
+        "--socket=/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/mysql.sock",
+        "--pid-file=/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/mysql.pid",
+        "--log-error=/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/mysql.log",
+        "--mysqlx=OFF",
+        "--daemonize"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "Redis启动",
+      "command": [
+        "/opt/homebrew/bin/redis-server",
+        "--bind",
+        "127.0.0.1",
+        "--port",
+        "59341",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--dir",
+        "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x",
+        "--pidfile",
+        "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/redis.pid",
+        "--logfile",
+        "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/redis.log",
+        "--daemonize",
+        "yes"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "Redis关闭",
+      "command": [
+        "/opt/homebrew/bin/redis-cli",
+        "-h",
+        "127.0.0.1",
+        "-p",
+        "59341",
+        "shutdown",
+        "nosave"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "数据库关闭",
+      "command": [
+        "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqladmin",
+        "--no-defaults",
+        "--socket=/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-source-review-db-nb9hrc_x/mysql.sock",
+        "-uroot",
+        "shutdown"
+      ],
+      "exit": 0
+    }
+  ],
+  "exit": 1,
+  "owned_fixture_stopped": true
+}

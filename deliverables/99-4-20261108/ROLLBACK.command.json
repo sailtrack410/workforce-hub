@@ -1,0 +1,11 @@
+{
+  "command": [
+    "mvn",
+    "-q",
+    "-Dtest=LeaveDurationEvidenceTest",
+    "test"
+  ],
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-4-ah6ip5l4/server",
+  "source_tree": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/rollback-copy",
+  "exit": 0
+}

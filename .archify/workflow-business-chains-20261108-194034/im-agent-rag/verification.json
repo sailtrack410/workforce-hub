@@ -1,0 +1,124 @@
+{
+  "chains": [
+    {
+      "id": "im-delivery",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "f73af50919882e76c6a807e75a236ddcfa96fc7f023153fc3625aab23c109953",
+      "html_sha256": "42ee3890d2b580c5e522337d3b6746be42e86c3d4908b93824a506246f4daff8",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-delivery/im-delivery.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "im-groups",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "b5d2ad128244481834c87779b867f7525df3a34444fa8e78695f050a8d96b57e",
+      "html_sha256": "c3bae517784b39f7042e30d7a746c65ea453ebdba12e5ffb426e29ca490db263",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-groups/im-groups.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "im-outbox",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "36ebdf470801090708e6d1dee42f00e5f2cca3992a7f500539959320e88a169e",
+      "html_sha256": "2232f731d05a14816bab1d8f5df7a18494ab4bd52c9565e349491ad2d4d353f5",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "agent-release",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "1c36c2a183c150d94e4d85dd37590c7b7997ac0d953b9c5e3a078081e80d3f12",
+      "html_sha256": "8dc47560e79c0a5af1ece85b61c3b40d20f53a2551268d4fcdd014019a6473b3",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "agent-tools",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "31a7ade2d1110af385910ceae34da59757d850f4a8c6e37771f2fca5c1ce77b4",
+      "html_sha256": "9074ac6619f70b0f70f3887cfc35ca8f7c456e8ef757d501d990ef8799266ab4",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "agent-conversation",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "bb01636cec1d32fd0af3d383d35522ac0b47824cd73635db34ad57576a95216d",
+      "html_sha256": "21a9f135b39a0ad8fc78cb4418e252b699fa8528942a19b1b124cd785b2aead6",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-agent-conversation/agent-conversation.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "knowledge-documents",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "cfc2e8e12bd94ce4230476491489e7c52f39e69a9a42193233118732a843ab46",
+      "html_sha256": "335f0628c77ebed43097462bf217256af7f796a44cd7f55f78e67a2f20e156e7",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "rag-qa",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "e97a073a25dfb90b12dd97b6cf4d25b204b9370a7f51921720a976a6383bc2e8",
+      "html_sha256": "8944111ee16e051d47eedd1f4af34987a1acb10ef22e4ede5871a1cf056c3cb6",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-rag-qa/rag-qa.finalize-summary.json",
+      "visual_review": "not-requested"
+    },
+    {
+      "id": "ai-provider-health",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "candidate_sha256": "e82884d99d97d92c662a3c398901723e90c66027b68ceaa9c5f2b0e9dbf32d5f",
+      "html_sha256": "7f69273ed2788260af67dbd0a812992474374d6074bc59c45f990525a5791593",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.finalize-summary.json",
+      "visual_review": "not-requested"
+    }
+  ],
+  "count": 9,
+  "business_tests": "not-run; static review only",
+  "application_processes": "not-started-or-stopped"
+}

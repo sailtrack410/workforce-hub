@@ -1,0 +1,12 @@
+{
+  "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java": "b30368c18430d6122a4653c393ddc6f32f48e54dfb061ff46db904658addb38c",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java": "d07507c0c2dfcde1c52fbc33b13ecabde621a019ddc5bbd0535e80bf60123f23",
+  "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java": "e5f46c9f21266623ec991804e1f267dd28dbc4f523c0954d051a2515ea1eb790",
+  "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java": "91c33af1d64da9c80325ef4c69d7980567eac49bc7983d1f0ecf02e20c17e467",
+  "server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java": null,
+  "server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java": null,
+  "server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java": null,
+  "server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java": "efddad036854a3c26fdcc3bfad07ed2503e9f4fe5c85393e00f8c58b640a382a",
+  "server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java": "27c6d25f4268c4c83a167e1f061dc26e4f8a357f21709b39e72e270dfdf1f72b",
+  "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd"
+}

@@ -1,0 +1,41 @@
+[
+  {
+    "role": "BASELINE",
+    "processes": 15,
+    "ids": 27000,
+    "unique": 5400,
+    "duplicates": 21600,
+    "clocks": [
+      "frozen",
+      "backward",
+      "forward"
+    ],
+    "mysql_restarts": 3
+  },
+  {
+    "role": "MODIFIED",
+    "processes": 15,
+    "ids": 27000,
+    "unique": 27000,
+    "duplicates": 0,
+    "clocks": [
+      "frozen",
+      "backward",
+      "forward"
+    ],
+    "mysql_restarts": 3
+  },
+  {
+    "role": "ROLLBACK",
+    "processes": 15,
+    "ids": 27000,
+    "unique": 5400,
+    "duplicates": 21600,
+    "clocks": [
+      "frozen",
+      "backward",
+      "forward"
+    ],
+    "mysql_restarts": 3
+  }
+]

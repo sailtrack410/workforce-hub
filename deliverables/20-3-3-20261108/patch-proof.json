@@ -1,0 +1,12 @@
+{
+  "command": [
+    "patch",
+    "-p1",
+    "-i",
+    "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/20-3-3-20261108/DIFF_FILE.patch"
+  ],
+  "cwd": "/tmp/workforce-quota-2033-patch-proof",
+  "exit_status": 0,
+  "patch_reconstructs_modified": true,
+  "modified_archive_hashes_match": true
+}

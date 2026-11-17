@@ -1,0 +1,271 @@
+package com.workforcehub.support;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.ResultMatcher;
+
+import javax.sql.DataSource;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
+
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
+/**
+ * 本地集成测试支撑基类
+ * - 统一注入本地 MySQL / Redis 连接参数
+ * - 在测试开始前装载 module-org 冒烟种子数据
+ */
+@Import(CsrfMockMvcTestConfiguration.class)
+public abstract class LocalIntegrationTestSupport {
+
+    private static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
+    private static final long MIN_SAFE_INTEGER = -9_007_199_254_740_991L;
+
+    private static final String MYSQL_URL_TEMPLATE =
+        "jdbc:mysql://%s:%s/%s?useUnicode=true&characterEncoding=UTF-8"
+            + "&connectionCollation=utf8mb4_0900_ai_ci&serverTimezone=Asia/Shanghai"
+            + "&useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true";
+    private static final String FLOWABLE_TEST_EXCLUDES = String.join(",",
+        "org.flowable.spring.boot.actuate.info.FlowableInfoAutoConfiguration",
+        "org.flowable.spring.boot.EndpointAutoConfiguration",
+        "org.flowable.spring.boot.RestApiAutoConfiguration",
+        "org.flowable.spring.boot.app.AppEngineServicesAutoConfiguration",
+        "org.flowable.spring.boot.app.AppEngineAutoConfiguration",
+        "org.flowable.spring.boot.ProcessEngineServicesAutoConfiguration",
+        "org.flowable.spring.boot.ProcessEngineAutoConfiguration",
+        "org.flowable.spring.boot.FlowableJpaAutoConfiguration",
+        "org.flowable.spring.boot.dmn.DmnEngineAutoConfiguration",
+        "org.flowable.spring.boot.dmn.DmnEngineServicesAutoConfiguration",
+        "org.flowable.spring.boot.idm.IdmEngineAutoConfiguration",
+        "org.flowable.spring.boot.idm.IdmEngineServicesAutoConfiguration",
+        "org.flowable.spring.boot.eventregistry.EventRegistryAutoConfiguration",
+        "org.flowable.spring.boot.eventregistry.EventRegistryServicesAutoConfiguration",
+        "org.flowable.spring.boot.cmmn.CmmnEngineAutoConfiguration",
+        "org.flowable.spring.boot.cmmn.CmmnEngineServicesAutoConfiguration",
+        "org.flowable.spring.boot.ldap.FlowableLdapAutoConfiguration",
+        "org.flowable.spring.boot.FlowableSecurityAutoConfiguration"
+    );
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @DynamicPropertySource
+    static void registerProperties(DynamicPropertyRegistry registry) {
+        // 主机/端口/账号统一走 TestEnv（JVM 环境变量 → 仓库 .env）：测试库与部署库同源，
+        // 换设备只需同步 .env；测试固定用独立 workforce_hub_test 库，不碰主库数据。
+        registry.add("spring.datasource.url", () -> String.format(
+            MYSQL_URL_TEMPLATE,
+            TestEnv.get("TEST_DB_HOST", TestEnv.get("DB_HOST", "localhost")),
+            TestEnv.get("TEST_DB_PORT", TestEnv.get("DB_PORT", "3306")),
+            env("TEST_DB_NAME", "workforce_hub_test")
+        ));
+        registry.add("spring.datasource.username", () -> TestEnv.get("TEST_DB_USER", TestEnv.get("DB_USER", "root")));
+        // 数据库口令只从环境变量/.env 读取，无兜底：缺失即失败，避免真实凭证入库
+        registry.add("spring.datasource.password", () -> TestEnv.require("TEST_DB_PASSWORD", "DB_PASSWORD"));
+        registry.add("spring.data.redis.host", () -> TestEnv.get("TEST_REDIS_HOST", TestEnv.get("REDIS_HOST", "localhost")));
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
+        registry.add("spring.datasource.hikari.minimum-idle", () -> "0");
+        registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
+        registry.add("spring.data.redis.port", () -> TestEnv.get("TEST_REDIS_PORT", TestEnv.get("REDIS_PORT", "6379")));
+        registry.add("spring.data.redis.password", () -> TestEnv.get("TEST_REDIS_PASSWORD", TestEnv.get("REDIS_PASSWORD", "")));
+        registry.add("spring.session.redis.namespace", LocalIntegrationTestSupport::testSessionRedisNamespace);
+        registry.add("workforce.auth.redis-key-prefix", LocalIntegrationTestSupport::testAuthRedisKeyPrefix);
+        registry.add("spring.autoconfigure.exclude", LocalIntegrationTestSupport::resolveAutoConfigurationExcludes);
+        registry.add("workforce.workflow.enabled", () -> "false");
+        registry.add("workforce.file.local-root", () -> env("TEST_FILE_LOCAL_ROOT", "target/test-file-storage"));
+        registry.add("workforce.auth.email-verify.enabled", () -> env(
+            "TEST_WORKFORCE_AUTH_EMAIL_VERIFY_ENABLED",
+            System.getProperty("test.workforce.auth.email-verify.enabled", "false")
+        ));
+        registry.add("spring.mail.host", () -> env("MAIL_HOST", "localhost"));
+        registry.add("spring.mail.port", () -> env("MAIL_PORT", "1025"));
+        registry.add("management.health.mail.enabled", () -> "false");
+        registry.add("logging.level.com.workforcehub", () -> "info");
+        registry.add("workforce.agent.model.enabled", () -> env(
+            "TEST_WORKFORCE_AGENT_MODEL_ENABLED",
+            System.getProperty("test.workforce.agent.model.enabled", "false")
+        ));
+        registry.add("workforce.agent.timeout-scan.enabled", () -> "false");
+        registry.add("workforce.im.outbox.dispatcher.enabled", () -> "false");
+    }
+
+    @BeforeEach
+    void seedDatabase() {
+        resetRedisState();
+        resetBusinessTables();
+        ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
+        populator.setSqlScriptEncoding("UTF-8");
+        populator.addScript(resolveSeedScript());
+        DatabasePopulatorUtils.execute(populator, dataSource);
+    }
+
+    protected ResultMatcher jsonLong(String expression, long expected) {
+        return jsonPath(expression).value(jsonLongValue(expected));
+    }
+
+    protected Object jsonLongValue(long value) {
+        if (value >= MIN_SAFE_INTEGER && value <= MAX_SAFE_INTEGER) {
+            return value;
+        }
+        return String.valueOf(value);
+    }
+
+    private void resetRedisState() {
+        deleteKeys(testSessionRedisNamespace() + "*");
+        deleteKeys(testAuthRedisKeyPrefix() + "auth:login:fail:*");
+        deleteKeys(testAuthRedisKeyPrefix() + "auth:email:*");
+    }
+
+    private void resetBusinessTables() {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
+        try {
+            jdbcTemplate.execute("DELETE FROM sys_download_ticket");
+            jdbcTemplate.execute("DELETE FROM sys_file_cleanup_job_detail");
+            jdbcTemplate.execute("DELETE FROM sys_file_cleanup_job_run");
+            deleteIfExists(jdbcTemplate, "agt_task_timeout_job_run");
+            deleteIfExists(jdbcTemplate, "sys_job_lock");
+            deleteIfExists(jdbcTemplate, "im_event_outbox");
+            deleteIfExists(jdbcTemplate, "ops_alert_resolution");
+            deleteIfExists(jdbcTemplate, "ops_alert_rule");
+            deleteIfExists(jdbcTemplate, "ops_alert_channel");
+            deleteIfExists(jdbcTemplate, "notify_channel_config");
+            jdbcTemplate.execute("DELETE FROM sys_audit_log");
+            jdbcTemplate.execute("DELETE FROM sys_storage_usage");
+            jdbcTemplate.execute("DELETE FROM sys_storage_quota_policy");
+            jdbcTemplate.execute("DELETE FROM sys_upload_ticket");
+            deleteIfExists(jdbcTemplate, "sys_file_folder");
+            jdbcTemplate.execute("DELETE FROM sys_attachment_ref");
+            jdbcTemplate.execute("DELETE FROM sys_file_object");
+            jdbcTemplate.execute("DELETE FROM sys_todo_item");
+            deleteIfExists(jdbcTemplate, "wf_request_attachment");
+            jdbcTemplate.execute("DELETE FROM wf_task_action");
+            jdbcTemplate.execute("DELETE FROM wf_cc_record");
+            jdbcTemplate.execute("DELETE FROM wf_urge_record");
+            jdbcTemplate.execute("DELETE FROM wf_req_leave");
+            jdbcTemplate.execute("DELETE FROM wf_req_timeoff");
+            jdbcTemplate.execute("DELETE FROM wf_req_overtime");
+            jdbcTemplate.execute("DELETE FROM wf_req_clock_correction");
+            jdbcTemplate.execute("DELETE FROM wf_req_hr_change");
+            jdbcTemplate.execute("DELETE FROM wf_request");
+            jdbcTemplate.execute("DELETE FROM wf_template_version");
+            jdbcTemplate.execute("DELETE FROM wf_template");
+            jdbcTemplate.execute("DELETE FROM wf_process_type");
+            jdbcTemplate.execute("DELETE FROM att_exception");
+            jdbcTemplate.execute("DELETE FROM att_daily_result");
+            jdbcTemplate.execute("DELETE FROM att_punch_record");
+            jdbcTemplate.execute("DELETE FROM att_schedule");
+            jdbcTemplate.execute("DELETE FROM att_group_member");
+            jdbcTemplate.execute("DELETE FROM att_group");
+            jdbcTemplate.execute("DELETE FROM att_shift_segment");
+            jdbcTemplate.execute("DELETE FROM att_shift");
+            jdbcTemplate.execute("DELETE FROM att_work_calendar_day");
+            jdbcTemplate.execute("DELETE FROM att_work_calendar");
+            jdbcTemplate.execute("DELETE FROM lv_account_txn");
+            jdbcTemplate.execute("DELETE FROM lv_account");
+            jdbcTemplate.execute("DELETE FROM lv_type_policy");
+            jdbcTemplate.execute("DELETE FROM lv_policy");
+            jdbcTemplate.execute("DELETE FROM lv_type");
+            jdbcTemplate.execute("DELETE FROM hr_employee_event");
+            jdbcTemplate.execute("DELETE FROM im_message");
+            jdbcTemplate.execute("DELETE FROM im_group_profile");
+            jdbcTemplate.execute("DELETE FROM im_conversation_member");
+            jdbcTemplate.execute("DELETE FROM im_conversation");
+            jdbcTemplate.execute("DELETE FROM agt_tool_call_log");
+            jdbcTemplate.execute("DELETE FROM agt_audit_log");
+            jdbcTemplate.execute("DELETE FROM agt_task");
+            jdbcTemplate.execute("DELETE FROM agt_trigger");
+            jdbcTemplate.execute("DELETE FROM agt_knowledge_binding");
+            jdbcTemplate.execute("DELETE FROM agt_agent_acl");
+            jdbcTemplate.execute("DELETE FROM agt_agent_tool");
+            jdbcTemplate.execute("DELETE FROM agt_agent_version");
+            jdbcTemplate.execute("DELETE FROM agt_tool");
+            jdbcTemplate.execute("DELETE FROM agt_agent");
+            deleteIfExists(jdbcTemplate, "kb_chunk_manifest");
+            deleteIfExists(jdbcTemplate, "kb_ingest_job");
+            deleteIfExists(jdbcTemplate, "kb_document");
+            deleteIfExists(jdbcTemplate, "kb_space_acl");
+            deleteIfExists(jdbcTemplate, "kb_space");
+            jdbcTemplate.execute("DELETE FROM auth_user_account");
+            jdbcTemplate.execute("DELETE FROM emp_user_preference");
+            jdbcTemplate.execute("DELETE FROM org_department_leader");
+            jdbcTemplate.execute("DELETE FROM org_user");
+            jdbcTemplate.execute("DELETE FROM org_position");
+            jdbcTemplate.execute("DELETE FROM org_department");
+            jdbcTemplate.execute("DELETE FROM admin_user_role");
+            jdbcTemplate.execute("DELETE FROM admin_role_permission");
+            jdbcTemplate.execute("DELETE FROM admin_user");
+            jdbcTemplate.execute("DELETE FROM admin_role");
+            jdbcTemplate.execute("DELETE FROM admin_permission");
+        } finally {
+            jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+        }
+    }
+
+    private void deleteIfExists(JdbcTemplate jdbcTemplate, String tableName) {
+        Integer count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+            """, Integer.class, tableName);
+        if (count != null && count > 0) {
+            jdbcTemplate.execute("DELETE FROM " + tableName);
+        }
+    }
+
+    private static Resource resolveSeedScript() {
+        Path cwd = Path.of(System.getProperty("user.dir"));
+        Path modulePath = cwd.resolve("scripts/sql/seed_module_org_smoke_data.sql");
+        if (Files.exists(modulePath)) {
+            return new FileSystemResource(modulePath);
+        }
+
+        Path repoPath = cwd.resolve("server/scripts/sql/seed_module_org_smoke_data.sql");
+        if (Files.exists(repoPath)) {
+            return new FileSystemResource(repoPath);
+        }
+
+        throw new IllegalStateException("未找到 module-org 冒烟种子脚本");
+    }
+
+    private static String env(String key, String defaultValue) {
+        String value = System.getenv(key);
+        return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private static String resolveAutoConfigurationExcludes() {
+        String existing = env("SPRING_AUTOCONFIGURE_EXCLUDE", "");
+        if (existing.isBlank()) {
+            return FLOWABLE_TEST_EXCLUDES;
+        }
+        return existing + "," + FLOWABLE_TEST_EXCLUDES;
+    }
+
+    private static String testSessionRedisNamespace() {
+        return "workforce:test:session:" + env("TEST_DB_NAME", "workforce_hub_test");
+    }
+
+    private static String testAuthRedisKeyPrefix() {
+        return "workforce:test:auth:" + env("TEST_DB_NAME", "workforce_hub_test") + ":";
+    }
+
+    private void deleteKeys(String pattern) {
+        Set<String> keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+    }
+}

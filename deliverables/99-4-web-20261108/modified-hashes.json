@@ -1,0 +1,11 @@
+{
+  "employee-web/src/api/types.ts": "e701604bc59bb65433ff1c7f1102ce37f5eac91dd30e6a48fe2523b2e4fb7c9b",
+  "employee-web/src/api/employee.ts": "91a7001dd056604fc58dc0174a01bdf836d92d5e28bf96fdb19703e534d6b990",
+  "employee-web/src/api/employee.test.ts": "01db2addefe04dec10dc167655f9aa18f373bd1db5107307c5ae80d13ee10c14",
+  "employee-web/src/composables/useWorkbenchState.ts": "a2ce126a0f8425ba8c7f2354e736ad57f4b84e516eecb569ac70716aaf62598d",
+  "employee-web/src/composables/useWorkbenchState.test.ts": "baa2fc778ac3e8bf70623df4867577b487877e5aa7719103b2ab7594f0ea114f",
+  "employee-web/src/utils/employee-format.ts": "76ebdd89cb55b648ee5b6010fece0e641e3826690fc4d74ad7f4cb8357e2d888",
+  "employee-web/src/utils/employee-format.test.ts": "d88aa3bca5576a1f0d6fe8cb9624f18a71ba9ec6a424bca0c434cf502d21e032",
+  "admin-web/src/utils/format.ts": "03cd9cd0f06c57ce69271fb57c6ccc8095beb7608e9174869d6a0a90b4999f36",
+  "admin-web/src/utils/format.test.ts": "86b78b8086f16eef418ec364b7e36d2014aec906458b24a8a0afda0cbe8684f7"
+}

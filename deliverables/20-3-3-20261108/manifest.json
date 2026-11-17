@@ -1,0 +1,34 @@
+{
+  "server/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java": {
+    "baseline": "346f11fbee118564eb90335a129c7d6b1619f1a88c603b9b865c10187ea1ce65",
+    "modified": "208a5f094f73a315ad480caf3966d00bf59e76618e9d6849ec9e001b66efdeb4"
+  },
+  "server/src/main/java/com/workforcehub/file/service/FileQuotaPolicyService.java": {
+    "baseline": "7cf5fed8927cf73c05eead11562bfe9d453dc039cd5e803336ee498053a58102",
+    "modified": "4041c88c506e63036263612e4396da561741b4840a9a4770ddbb5db87bce87b8"
+  },
+  "server/src/main/java/com/workforcehub/file/service/FileQueryService.java": {
+    "baseline": "87c37879fd51e1d22ca29493801fc595998a81f5446e5e8ecbef768d46f99686",
+    "modified": "b7e83860bd4d54932de35b3d2b0e4bff277f782b7faf36cabc335c8236e9c019"
+  },
+  "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java": {
+    "baseline": "246647f858251e54211a1a2b02b4c7d56da4259836ba3560d90ede2755306482",
+    "modified": "8ff059abc83299b05dfb650daf42d45b5accd08b2e3fbd6b3d2a36b7fe56587b"
+  },
+  "server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java": {
+    "baseline": "fdfb63e9771e165b137b594e5f039894690af9b8cc8c510e7e40ff52831be46f",
+    "modified": "b5f7117101be7de0672d267751914c13b8730af9b4521564adc1e95ba7851076"
+  },
+  "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java": {
+    "baseline": "25d512a88e96df41a2eaa046789139a9a5e77cbb7774ac0fd759959b04b9aaec",
+    "modified": "5ce84ae39977de5004bb82520ff5d812702201f46cf852be787aeb8e8b11c4a3"
+  },
+  "server/src/main/java/com/workforcehub/file/service/FileCleanupDatabaseStageService.java": {
+    "baseline": "49880e1b4fef40240b9caa2ea40814c6a8dfdf302ef6e540ab31da4024cc6752",
+    "modified": "593536fd089bcf94faf91900b75576e8f30ef457a6ed15516882dd3088e0aa1f"
+  },
+  "server/src/test/java/com/workforcehub/file/FileQuotaConcurrencyTest.java": {
+    "baseline": null,
+    "modified": "3d4b243ba619ea1a65bef533f136ced3fe81d570395a9dbed3383a5f88e75ac3"
+  }
+}

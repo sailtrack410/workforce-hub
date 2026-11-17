@@ -1,0 +1,18 @@
+{
+  "references": {
+    "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/复核-final-执行.json": {
+      "sha256": "49995edc66376fd95ec0bee7c40eb05b5b4fc9d51d7d3df697191f697e67810e",
+      "parsed_type": "dict"
+    },
+    "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/来源复核-最终统计.json": {
+      "sha256": "6a3a399d1a3d44e3ee6f106d13bc577f1c28d901656c06819ace03dfa83df4c2",
+      "parsed_type": "dict"
+    }
+  },
+  "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/复核-final-full.stdout",
+  "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/复核-final-full.stderr",
+  "observed_statistics": "[WARNING] Tests run: 1229, Failures: 0, Errors: 0, Skipped: 2",
+  "build": "BUILD SUCCESS",
+  "source_reported_exit": 0,
+  "note": "Read supplied independent-review files; no additional full test run."
+}

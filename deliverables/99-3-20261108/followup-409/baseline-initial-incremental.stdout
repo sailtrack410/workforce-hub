@@ -1,0 +1,1237 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 92 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 530 source files with javac [debug release 17] to target/classes
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 115 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.leave.LeaveSettlementTransactionTest
+SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=MODE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=MODE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=INACTIVE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=DELETED outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=WITHDRAWN available=1440 frozen=0
+[ERROR] Tests run: 32, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 1.224 s <<< FAILURE! -- in com.workforcehub.leave.LeaveSettlementTransactionTest
+[ERROR] com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[1] -- Time elapsed: 0.034 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(LeaveSettlementTransactionTest.java:234)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:762)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at com.workforcehub.leave.service.LeaveService.consumeFrozenForWorkflowApproval(LeaveService.java:323)
+	at jdk.internal.reflect.GeneratedMethodAccessor18.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.consumeFrozenForWorkflowApproval(<generated>)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.settle(LeaveSettlementTransactionTest.java:85)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.lambda$terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict$7(LeaveSettlementTransactionTest.java:234)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 35 more
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.index.Index.getDuplicateKeyException(Index.java:523)
+	at org.h2.mvstore.db.MVSecondaryIndex.checkUnique(MVSecondaryIndex.java:223)
+	at org.h2.mvstore.db.MVSecondaryIndex.add(MVSecondaryIndex.java:184)
+	at org.h2.mvstore.db.MVTable.addRow(MVTable.java:517)
+	at org.h2.command.dml.Insert.insertRows(Insert.java:174)
+	at org.h2.command.dml.Insert.update(Insert.java:135)
+	at org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+	at org.h2.command.CommandContainer.update(CommandContainer.java:139)
+	at org.h2.command.Command.executeUpdate(Command.java:304)
+	at org.h2.command.Command.executeUpdate(Command.java:248)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 57 more
+
+[ERROR] com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[2] -- Time elapsed: 0.015 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(LeaveSettlementTransactionTest.java:234)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:762)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:REJECTED' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at com.workforcehub.leave.service.LeaveService.releaseFrozenForWorkflowTerminal(LeaveService.java:381)
+	at jdk.internal.reflect.GeneratedMethodAccessor17.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.releaseFrozenForWorkflowTerminal(<generated>)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.settle(LeaveSettlementTransactionTest.java:86)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.lambda$terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict$7(LeaveSettlementTransactionTest.java:234)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 35 more
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:REJECTED' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.index.Index.getDuplicateKeyException(Index.java:523)
+	at org.h2.mvstore.db.MVSecondaryIndex.checkUnique(MVSecondaryIndex.java:223)
+	at org.h2.mvstore.db.MVSecondaryIndex.add(MVSecondaryIndex.java:184)
+	at org.h2.mvstore.db.MVTable.addRow(MVTable.java:517)
+	at org.h2.command.dml.Insert.insertRows(Insert.java:174)
+	at org.h2.command.dml.Insert.update(Insert.java:135)
+	at org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+	at org.h2.command.CommandContainer.update(CommandContainer.java:139)
+	at org.h2.command.Command.executeUpdate(Command.java:304)
+	at org.h2.command.Command.executeUpdate(Command.java:248)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 57 more
+
+[ERROR] com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(String)[3] -- Time elapsed: 0.014 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:67)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict(LeaveSettlementTransactionTest.java:234)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:762)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.stream.ReferencePipeline$7$1.accept(ReferencePipeline.java:276)
+	at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+Caused by: org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:WITHDRAWN' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at com.workforcehub.leave.service.LeaveService.releaseFrozenForWorkflowTerminal(LeaveService.java:381)
+	at jdk.internal.reflect.GeneratedMethodAccessor17.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.releaseFrozenForWorkflowTerminal(<generated>)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.settle(LeaveSettlementTransactionTest.java:86)
+	at com.workforcehub.leave.LeaveSettlementTransactionTest.lambda$terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict$7(LeaveSettlementTransactionTest.java:234)
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53)
+	... 35 more
+Caused by: org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException: Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.LV_ACCOUNT_TXN(SOURCE_TXN_KEY NULLS FIRST) VALUES ( /* 99 */ 'WORKFLOW_REQUEST:10:UNFREEZE:WITHDRAWN' )"; SQL statement:
+INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?) [23505-232]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:520)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.index.Index.getDuplicateKeyException(Index.java:523)
+	at org.h2.mvstore.db.MVSecondaryIndex.checkUnique(MVSecondaryIndex.java:223)
+	at org.h2.mvstore.db.MVSecondaryIndex.add(MVSecondaryIndex.java:184)
+	at org.h2.mvstore.db.MVTable.addRow(MVTable.java:517)
+	at org.h2.command.dml.Insert.insertRows(Insert.java:174)
+	at org.h2.command.dml.Insert.update(Insert.java:135)
+	at org.h2.command.dml.DataChangeStatement.update(DataChangeStatement.java:74)
+	at org.h2.command.CommandContainer.update(CommandContainer.java:139)
+	at org.h2.command.Command.executeUpdate(Command.java:304)
+	at org.h2.command.Command.executeUpdate(Command.java:248)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdateInternal(JdbcPreparedStatement.java:213)
+	at org.h2.jdbc.JdbcPreparedStatement.executeUpdate(JdbcPreparedStatement.java:172)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 57 more
+
+[INFO] Running com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+20:48:47.757 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest]: ModuleLeaveWorkflowIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+20:48:47.804 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:48:48.018+08:00  INFO [] 45407 --- [background-preinit] o.h.validator.internal.util.Version      : HV000001: Hibernate Validator 8.0.1.Final
+2026-11-08T20:48:48.020+08:00  INFO [] 45407 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Starting ModuleLeaveWorkflowIntegrationTest using Java 17.0.18 with PID 45407 (started by sailtrack in /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server)
+2026-11-08T20:48:48.021+08:00 DEBUG [] 45407 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:48:48.021+08:00  INFO [] 45407 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : The following 1 profile is active: "api"
+2026-11-08T20:48:48.864+08:00  INFO [] 45407 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:48:48.865+08:00  INFO [] 45407 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:48:48.893+08:00  INFO [] 45407 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 23 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:48:49.078+08:00  INFO [] 45407 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-11-08T20:48:49.172+08:00  INFO [] 45407 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-11-08T20:48:49.208+08:00  INFO [] 45407 --- [main] o.f.c.internal.license.VersionPrinter    : Flyway Community Edition 9.22.3 by Redgate
+2026-11-08T20:48:49.208+08:00  INFO [] 45407 --- [main] o.f.c.internal.license.VersionPrinter    : See release notes here: https://rd.gt/416ObMi
+2026-11-08T20:48:49.208+08:00  INFO [] 45407 --- [main] o.f.c.internal.license.VersionPrinter    : 
+2026-11-08T20:48:49.226+08:00  INFO [] 45407 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:62826/workforce_993_test (MySQL 8.4)
+2026-11-08T20:48:49.234+08:00  WARN [] 45407 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:48:49.263+08:00  INFO [] 45407 --- [main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `workforce_993_test`.`flyway_schema_history` does not exist yet
+2026-11-08T20:48:49.265+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 67 migrations (execution time 00:00.026s)
+2026-11-08T20:48:49.274+08:00  INFO [] 45407 --- [main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `workforce_993_test`.`flyway_schema_history` ...
+2026-11-08T20:48:49.292+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_993_test`: << Empty Schema >>
+2026-11-08T20:48:49.320+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "1 - init schema"
+2026-11-08T20:48:49.503+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "2 - enhance file center schema"
+2026-11-08T20:48:49.551+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "3 - link attachment to upload ticket"
+2026-11-08T20:48:49.565+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "4 - harden file center idempotency"
+2026-11-08T20:48:49.597+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "5 - add file upload policy"
+2026-11-08T20:48:49.613+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "6 - align file upload policy owner type comment"
+2026-11-08T20:48:49.624+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "7 - add admin file upload policy"
+2026-11-08T20:48:49.638+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "8 - add file cleanup job records"
+2026-11-08T20:48:49.662+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "9 - add workflow request attachment"
+2026-11-08T20:48:49.678+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "10 - add workflow agent pre review task id"
+2026-11-08T20:48:49.705+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "11 - init flowable process schema"
+2026-11-08T20:48:49.708+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: PROCEDURE workforce_993_test.wfh_init_flowable_process_schema_if_needed does not exist (SQL State: 42000 - Error Code: 1305)
+2026-11-08T20:48:50.408+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "12 - add agent timeout job records"
+2026-11-08T20:48:50.427+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "13 - add im message client idempotency"
+2026-11-08T20:48:50.446+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "14 - add im event outbox"
+2026-11-08T20:48:50.458+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "15 - add employee profile avatar and preferences"
+2026-11-08T20:48:50.475+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "16 - extend employee preferences"
+2026-11-08T20:48:50.481+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:48:50.482+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:48:50.482+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:48:50.482+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:48:50.491+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "17 - add employee upload owner type policies"
+2026-11-08T20:48:50.500+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "18 - add im group file upload policy"
+2026-11-08T20:48:50.509+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "19 - add agent workflow trace"
+2026-11-08T20:48:50.521+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "20 - add llm model table"
+2026-11-08T20:48:50.530+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "21 - add agent version test gate"
+2026-11-08T20:48:50.546+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "22 - add agent version label"
+2026-11-08T20:48:50.558+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "23 - ragflow admin foundation"
+2026-11-08T20:48:50.595+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "24 - ragflow documents and model config"
+2026-11-08T20:48:50.612+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "25 - ragflow global model setting"
+2026-11-08T20:48:50.627+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "26 - ragflow model endpoint and key"
+2026-11-08T20:48:50.639+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "27 - ragflow separate model endpoints"
+2026-11-08T20:48:50.649+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "28 - ragflow ingest status and chunk unique"
+2026-11-08T20:48:50.664+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "29 - employee file folders"
+2026-11-08T20:48:50.682+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "30 - agent avatar attachment"
+2026-11-08T20:48:50.697+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "31 - add im message user action"
+2026-11-08T20:48:50.707+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "32 - seed admin rbac permissions"
+2026-11-08T20:48:50.711+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.711+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.711+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.711+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.711+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.711+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.713+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.713+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.713+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.713+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.715+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.716+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.716+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.724+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "33 - add attendance punch daily unique"
+2026-11-08T20:48:50.751+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "34 - add workflow step config"
+2026-11-08T20:48:50.755+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.762+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "35 - add ops alert closure"
+2026-11-08T20:48:50.773+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.773+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.773+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.776+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.776+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.776+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.776+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.776+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.776+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.776+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.784+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "36 - agent failure code and ops indexes"
+2026-11-08T20:48:50.801+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "37 - seed builtin workflow definitions"
+2026-11-08T20:48:50.803+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.803+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.803+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.803+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.804+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.804+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.804+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.804+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.805+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.811+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "38 - add ct friend"
+2026-11-08T20:48:50.820+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "39 - seed standard leave types"
+2026-11-08T20:48:50.827+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "40 - add ops alert tables"
+2026-11-08T20:48:50.828+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Table 'ops_alert_channel' already exists (SQL State: 42S01 - Error Code: 1050)
+2026-11-08T20:48:50.828+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Table 'ops_alert_rule' already exists (SQL State: 42S01 - Error Code: 1050)
+2026-11-08T20:48:50.829+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Table 'ops_alert_resolution' already exists (SQL State: 42S01 - Error Code: 1050)
+2026-11-08T20:48:50.834+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "41 - add notify channel config"
+2026-11-08T20:48:50.838+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.838+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.838+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.838+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.844+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "42 - seed notification channel permission"
+2026-11-08T20:48:50.844+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.844+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.844+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.844+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.844+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.844+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.845+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.852+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "43 - extend ai model base"
+2026-11-08T20:48:50.871+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "44 - add ai provider and model features"
+2026-11-08T20:48:50.890+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "45 - ensure demo admin super admin role"
+2026-11-08T20:48:50.900+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "46 - restore super admin role and permissions"
+2026-11-08T20:48:50.910+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "47 - allow kb space inherit global ragflow settings"
+2026-11-08T20:48:50.931+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "48 - freeze kb space vector settings"
+2026-11-08T20:48:50.942+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "49 - seed oa workflow templates"
+2026-11-08T20:48:50.943+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_993_test.seed_company_policy_kb' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:48:50.944+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_993_test.seed_oa_workflow_templates' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:48:50.946+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.946+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.946+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.946+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.946+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.947+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.947+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.947+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.947+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.947+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.948+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.955+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "50 - add generic oa request detail"
+2026-11-08T20:48:50.968+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "51 - seed more oa workflow templates"
+2026-11-08T20:48:50.969+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_993_test.seed_company_policy_kb' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:48:50.970+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_993_test.seed_more_oa_workflow_templates' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:48:50.971+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.971+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.971+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.971+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.971+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.972+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.972+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.972+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.972+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.972+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.973+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:50.980+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "52 - add plugin tables"
+2026-11-08T20:48:51.000+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "53 - add plugin call permission"
+2026-11-08T20:48:51.001+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.001+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.001+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.001+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.001+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.001+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.002+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.009+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "54 - add plugin event subscription"
+2026-11-08T20:48:51.021+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "55 - add plugin operation idempotency"
+2026-11-08T20:48:51.030+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "56 - repair plugin call permission id"
+2026-11-08T20:48:51.039+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "57 - align ops alert schema"
+2026-11-08T20:48:51.056+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "58 - add sys dict"
+2026-11-08T20:48:51.061+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.061+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.061+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.061+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.069+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "59 - add plugin config version"
+2026-11-08T20:48:51.079+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "60 - add plugin manage permission"
+2026-11-08T20:48:51.087+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "61 - add plugin action idempotency"
+2026-11-08T20:48:51.097+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "62 - index plugin dependency reverse lookup"
+2026-11-08T20:48:51.108+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "63 - seed brand login taglines"
+2026-11-08T20:48:51.109+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.109+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.109+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.109+08:00  WARN [] 45407 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:48:51.116+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "64 - seed demo leave accounts"
+2026-11-08T20:48:51.128+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "66 - hub web api requirements"
+2026-11-08T20:48:51.148+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "67 - add admin operations permissions"
+2026-11-08T20:48:51.157+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_993_test` to version "69 - snapshot leave balance mode"
+2026-11-08T20:48:51.168+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Successfully applied 67 migrations to schema `workforce_993_test`, now at version v69 (execution time 00:01.318s)
+2026-11-08T20:48:51.801+08:00  INFO [] 45407 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:48:51.801+08:00  INFO [] 45407 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:48:51.802+08:00  INFO [] 45407 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:48:52.289+08:00  INFO [] 45407 --- [main] o.f.engine.impl.ProcessEngineImpl        : ProcessEngine default created
+2026-11-08T20:48:52.303+08:00  INFO [] 45407 --- [main] o.f.e.impl.cmd.ValidateV5EntitiesCmd     : Total of v5 deployments found: 0
+2026-11-08T20:48:52.540+08:00  INFO [] 45407 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:48:52.562+08:00  INFO [] 45407 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@6a10f47a, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@2f474e6f, org.springframework.security.web.context.SecurityContextHolderFilter@537e8a15, org.springframework.security.web.header.HeaderWriterFilter@5e3c3c3d, org.springframework.web.filter.CorsFilter@6fcafcfe, org.springframework.security.web.csrf.CsrfFilter@b70ad7a, com.workforcehub.auth.security.SessionValidityFilter@2d6161b9, com.workforcehub.auth.security.UserTypePathFilter@39153b05, com.workforcehub.auth.security.AdminPermissionFilter@70b67841, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@19a71722, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@5e30ea7c, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@561f013f, org.springframework.security.web.session.SessionManagementFilter@20c048cc, org.springframework.security.web.access.ExceptionTranslationFilter@42530cd6, org.springframework.security.web.access.intercept.AuthorizationFilter@2cbd35f2]
+2026-11-08T20:48:52.775+08:00 DEBUG [] 45407 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:48:52.775+08:00 DEBUG [] 45407 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:48:52.775+08:00 DEBUG [] 45407 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:48:52.775+08:00 DEBUG [] 45407 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:48:52.775+08:00 DEBUG [] 45407 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:48:52.776+08:00  INFO [] 45407 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:48:52.776+08:00  INFO [] 45407 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:48:52.776+08:00  INFO [] 45407 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:48:52.847+08:00  INFO [] 45407 --- [main] o.f.s.c.DefaultAutoDeploymentStrategy    : Deploying resources [file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/borrow-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/business-trip-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/certificate-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/clock-correction-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/expense-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/leave-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/overtime-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/project-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/purchase-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/seal-manager-approval.bpmn20.xml]] for engine org.flowable.engine.impl.ProcessEngineImpl@21826d78 deployment name hint SpringBootAutoDeployment
+2026-11-08T20:48:53.061+08:00  INFO [] 45407 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Started ModuleLeaveWorkflowIntegrationTest in 5.216 seconds (process running for 6.925)
+2026-11-08T20:48:53.088+08:00  INFO [] 45407 --- [main] c.w.plugin.runtime.PluginManagerService  : 恢复 0 个可用插件
+2026-11-08T20:48:54.096+08:00 DEBUG [92339d1e63684d75b6598c1e4427dc7f] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:54.103+08:00  INFO [92339d1e63684d75b6598c1e4427dc7f] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=8c5a3249-c05c-493f-819e-fae77e428ad7
+2026-11-08T20:48:54.322+08:00  WARN [9e618c7abc0a4c459788466d26e9b8e1] 45407 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=400, code=100400, message=假期余额不足
+2026-11-08T20:48:54.474+08:00 DEBUG [3f408616cd844d72b1f16d2fcfaa0acb] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:54.476+08:00  INFO [3f408616cd844d72b1f16d2fcfaa0acb] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=f28995a8-d061-4a57-a163-9d6ce6fe45d6
+2026-11-08T20:48:54.541+08:00 DEBUG [06d13ea31109485cb116394c81ba6901] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:54.544+08:00  INFO [06d13ea31109485cb116394c81ba6901] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=2363ce4a-d6f2-445a-8f24-cc8f24a9e698
+2026-11-08T20:48:54.904+08:00 DEBUG [2c640476353d4266a5d77beab3ef8b06] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:54.907+08:00  INFO [2c640476353d4266a5d77beab3ef8b06] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=d03cf619-310a-4d7e-9511-d1f6804141ab
+2026-11-08T20:48:54.985+08:00 DEBUG [ec1ac1d695c04b879903d4630eb922cb] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:54.988+08:00  INFO [ec1ac1d695c04b879903d4630eb922cb] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=1dbe9b82-05eb-484e-a817-87aa24d41f73
+2026-11-08T20:48:55.259+08:00 DEBUG [10681a7d73434de590fc6bf2a9029ef9] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:55.262+08:00  INFO [10681a7d73434de590fc6bf2a9029ef9] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=aae33651-61a7-4abf-87c7-6b7fc272db65
+2026-11-08T20:48:55.337+08:00 DEBUG [c13e099f23ce4558a8b85dfa12eaa111] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:55.340+08:00  INFO [c13e099f23ce4558a8b85dfa12eaa111] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=c1a71db4-2552-477f-8e02-6f6a6e3332d8
+2026-11-08T20:48:55.390+08:00 ERROR [7fe5f0cf7ec0470ba7b3b66add3bb46a] 45407 --- [main] c.w.c.exception.GlobalExceptionHandler   : 系统异常
+org.springframework.dao.DuplicateKeyException: PreparedStatementCallback; SQL [INSERT INTO lv_account_txn
+    (id, account_id, txn_type, change_minutes, balance_after,
+     source_type, source_id, source_txn_key, effective_at)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+]; Duplicate entry 'WORKFLOW_REQUEST:1881294383718858753' for key 'lv_account_txn.uk_source_txn_key'
+	at org.springframework.jdbc.support.SQLExceptionSubclassTranslator.doTranslate(SQLExceptionSubclassTranslator.java:95)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:970)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1014)
+	at org.springframework.jdbc.core.JdbcTemplate.update(JdbcTemplate.java:1024)
+	at com.workforcehub.leave.repository.LeaveRepository.insertAccountTxn(LeaveRepository.java:404)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.dao.support.PersistenceExceptionTranslationInterceptor.invoke(PersistenceExceptionTranslationInterceptor.java:137)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.repository.LeaveRepository$$SpringCGLIB$$0.insertAccountTxn(<generated>)
+	at com.workforcehub.leave.service.LeaveService.consumeFrozenForWorkflowApproval(LeaveService.java:323)
+	at jdk.internal.reflect.GeneratedMethodAccessor18.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.leave.service.LeaveService$$SpringCGLIB$$0.consumeFrozenForWorkflowApproval(<generated>)
+	at com.workforcehub.workflow.service.WorkflowService.completeManagerTask(WorkflowService.java:748)
+	at com.workforcehub.workflow.service.WorkflowService.approveTask(WorkflowService.java:584)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:354)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:123)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:392)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(CglibAopProxy.java:768)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:720)
+	at com.workforcehub.workflow.service.WorkflowService$$SpringCGLIB$$0.approveTask(<generated>)
+	at com.workforcehub.workflow.controller.EmployeeWorkflowController.approveTask(EmployeeWorkflowController.java:124)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:255)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:188)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:926)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:831)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:165)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:108)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.ObservationFilterChainDecorator$FilterObservation$SimpleFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:479)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:340)
+	at org.springframework.security.web.ObservationFilterChainDecorator.lambda$wrapSecured$0(ObservationFilterChainDecorator.java:82)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:128)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:100)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.AdminPermissionFilter.doFilterInternal(AdminPermissionFilter.java:263)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.UserTypePathFilter.doFilterInternal(UserTypePathFilter.java:71)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.SessionValidityFilter.doFilterInternal(SessionValidityFilter.java:58)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.csrf.CsrfFilter.doFilterInternal(CsrfFilter.java:131)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$0(ObservationFilterChainDecorator.java:323)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:224)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.servlet.handler.HandlerMappingIntrospector.lambda$createCacheFilter$3(HandlerMappingIntrospector.java:195)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74)
+	at org.springframework.security.config.annotation.web.configuration.WebMvcSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebMvcSecurityConfiguration.java:230)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.session.web.http.SessionRepositoryFilter.doFilterInternal(SessionRepositoryFilter.java:142)
+	at org.springframework.session.web.http.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:82)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:101)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:101)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:109)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at com.workforcehub.common.config.RequestIdFilter.doFilterInternal(RequestIdFilter.java:46)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:201)
+	at com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint(ModuleLeaveWorkflowIntegrationTest.java:153)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:728)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:218)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:214)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:139)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: java.sql.SQLIntegrityConstraintViolationException: Duplicate entry 'WORKFLOW_REQUEST:1881294383718858753' for key 'lv_account_txn.uk_source_txn_key'
+	at com.mysql.cj.jdbc.exceptions.SQLError.createSQLException(SQLError.java:118)
+	at com.mysql.cj.jdbc.exceptions.SQLExceptionsMapping.translateException(SQLExceptionsMapping.java:122)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeInternal(ClientPreparedStatement.java:912)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeUpdateInternal(ClientPreparedStatement.java:1054)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeUpdateInternal(ClientPreparedStatement.java:1003)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeLargeUpdate(ClientPreparedStatement.java:1312)
+	at com.mysql.cj.jdbc.ClientPreparedStatement.executeUpdate(ClientPreparedStatement.java:988)
+	at com.zaxxer.hikari.pool.ProxyPreparedStatement.executeUpdate(ProxyPreparedStatement.java:61)
+	at com.zaxxer.hikari.pool.HikariProxyPreparedStatement.executeUpdate(HikariProxyPreparedStatement.java)
+	at org.springframework.jdbc.core.JdbcTemplate.lambda$update$2(JdbcTemplate.java:975)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658)
+	... 271 common frames omitted
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"72", X-CSRF-TOKEN:"9e761578-93ae-4dfb-9949-79c1a84f8bb2"]
+             Body = {
+  "loginName": "zhangsan.employee",
+  "password": "Employee@123456"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.auth.controller.EmployeeAuthController
+           Method = com.workforcehub.auth.controller.EmployeeAuthController#login(LoginRequest, HttpServletRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"10681a7d73434de590fc6bf2a9029ef9", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=YWFlMzM2NTEtNjFhNy00YWJmLTg3YzctNmI3ZmMyNzJkYjY1; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"userId":2003,"userType":"USER","displayName":"张三","loginName":"zhangsan.employee","requiresEmailCode":false,"maskedEmail":null,"requiresEmailBinding":false},"requestId":"10681a7d73434de590fc6bf2a9029ef9"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@44acc838 name = 'SESSION', value = 'YWFlMzM2NTEtNjFhNy00YWJmLTg3YzctNmI3ZmMyNzJkYjY1', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"67", X-CSRF-TOKEN:"65ee1cb5-5c03-4605-b586-37a34aa7a146"]
+             Body = {
+  "loginName": "lisi.manager",
+  "password": "Employee@123456"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.auth.controller.EmployeeAuthController
+           Method = com.workforcehub.auth.controller.EmployeeAuthController#login(LoginRequest, HttpServletRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"c13e099f23ce4558a8b85dfa12eaa111", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=YzFhNzFkYjQtMjU1Mi00NzdmLThlMDItNmY2YTZlMzMzMmQ4; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"userId":2002,"userType":"USER","displayName":"李四","loginName":"lisi.manager","requiresEmailCode":false,"maskedEmail":null,"requiresEmailBinding":false},"requestId":"c13e099f23ce4558a8b85dfa12eaa111"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@5afa5d7 name = 'SESSION', value = 'YzFhNzFkYjQtMjU1Mi00NzdmLThlMDItNmY2YTZlMzMzMmQ4', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/workflow/leave-requests
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"162", Cookie:"SESSION=YWFlMzM2NTEtNjFhNy00YWJmLTg3YzctNmI3ZmMyNzJkYjY1", X-CSRF-TOKEN:"00706d2d-c49d-4ad3-bb4f-d013b85e1586"]
+             Body = {
+  "leaveTypeId": 9401,
+  "startAt": "2026-05-07 09:00:00",
+  "endAt": "2026-05-07 18:00:00",
+  "durationMinutes": 480,
+  "reason": "家中有事请假一天"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.workflow.controller.EmployeeWorkflowController
+           Method = com.workforcehub.workflow.controller.EmployeeWorkflowController#submitLeaveRequest(LeaveRequestCreateRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"8be04068002e42829780a939112206bb", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"requestId":"1881294383718858753","requestNo":"WF-LEAVE-20261108204855-1881294383718858752","status":"IN_APPROVAL","statusName":"审批中","flowableProcessInstanceId":"c20c80cb-db72-11f1-928d-66b27383b455","agentTaskId":null},"requestId":"8be04068002e42829780a939112206bb"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/employee/workflow/tasks/c20ca7e3-db72-11f1-928d-66b27383b455/approve
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"47", Cookie:"SESSION=YzFhNzFkYjQtMjU1Mi00NzdmLThlMDItNmY2YTZlMzMzMmQ4", X-CSRF-TOKEN:"340e6153-a70d-4317-8913-791efcf71495"]
+             Body = {
+  "comment": "同意，请安排好交接"
+}
+
+    Session Attrs = {}
+
+Handler:
+             Type = com.workforcehub.workflow.controller.EmployeeWorkflowController
+           Method = com.workforcehub.workflow.controller.EmployeeWorkflowController#approveTask(String, WorkflowTaskApproveRequest)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = org.springframework.dao.DuplicateKeyException
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 500
+    Error message = null
+          Headers = [X-Request-Id:"7fe5f0cf7ec0470ba7b3b66add3bb46a", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json
+             Body = {"code":100500,"message":"系统内部错误","data":null,"requestId":"7fe5f0cf7ec0470ba7b3b66add3bb46a"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+2026-11-08T20:48:55.509+08:00 DEBUG [ee29a2aa35f540d88956261d3fb50384] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:55.511+08:00  INFO [ee29a2aa35f540d88956261d3fb50384] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=7a3831b3-5db9-41ae-a9db-a2618b53dbb6
+2026-11-08T20:48:55.654+08:00 DEBUG [61aae8fb5e4a4eb1aa4a06c2faaf14a7] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:55.657+08:00  INFO [61aae8fb5e4a4eb1aa4a06c2faaf14a7] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=701b1a36-9fdd-46ff-b162-96f0f1ce5ba7
+2026-11-08T20:48:55.725+08:00 DEBUG [d4aba6eae73c4e5d83de7a93e051e846] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:55.727+08:00  INFO [d4aba6eae73c4e5d83de7a93e051e846] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=529d62bb-53e8-4d80-9738-42c88c32abec
+2026-11-08T20:48:55.936+08:00 DEBUG [27fa4c35e48b43548b024f22e1852e6f] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:55.938+08:00  INFO [27fa4c35e48b43548b024f22e1852e6f] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=ae64191d-7e9c-4ada-a325-fa073569833d
+2026-11-08T20:48:56.001+08:00 DEBUG [2159a8d7ecaa43998b593b96e3891ea5] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:56.004+08:00  INFO [2159a8d7ecaa43998b593b96e3891ea5] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=fabd8ee2-f281-4021-92c4-7ac3ad720d34
+2026-11-08T20:48:56.339+08:00 DEBUG [d67abb1511c94c778a9bbe531d93adad] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:56.343+08:00  INFO [d67abb1511c94c778a9bbe531d93adad] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=2acf8ca1-97d9-43eb-a682-0d1f44929865
+2026-11-08T20:48:56.518+08:00 DEBUG [15f278809afd41548b17a4532999c50e] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:56.521+08:00  INFO [15f278809afd41548b17a4532999c50e] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=3d00a14b-9d37-4c0a-8f2c-5ca1b0dc08ec
+2026-11-08T20:48:56.708+08:00 DEBUG [27a0dfd8475d426b851650ef843f6e32] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:56.710+08:00  INFO [27a0dfd8475d426b851650ef843f6e32] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=332f4249-ba42-4e39-9521-a77649e62a0b
+2026-11-08T20:48:56.783+08:00 DEBUG [4a164730da9e40529831b5a79054bfc0] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:56.786+08:00  INFO [4a164730da9e40529831b5a79054bfc0] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=f744333c-e0f1-458f-b4fb-16a90307e540
+MYSQL_ORIGINAL_NO_DEDUCT current=DEDUCT outcome=APPROVED available=960 frozen=0 deduct_txns=0
+2026-11-08T20:48:56.964+08:00 DEBUG [5bbd73632d22442286c8199162ca7886] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:56.966+08:00  INFO [5bbd73632d22442286c8199162ca7886] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=1fd448c2-b90a-4ce0-9fec-2883a43266ec
+2026-11-08T20:48:56.977+08:00  WARN [9dfbb9b7ed5a46879ae822b1f5e96ebc] 45407 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=400, code=100400, message=假期余额不足
+2026-11-08T20:48:57.093+08:00 DEBUG [ba783442225d45c2874911b5b9779354] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.096+08:00  INFO [ba783442225d45c2874911b5b9779354] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=dac27f53-9ee8-4b12-be32-b98fb855ba77
+2026-11-08T20:48:57.166+08:00 DEBUG [10da9b388aa8433397df974d8dd7a6f4] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.168+08:00  INFO [10da9b388aa8433397df974d8dd7a6f4] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=4b4c6467-719c-4f78-8f73-452ae36d7622
+2026-11-08T20:48:57.323+08:00 DEBUG [bc98d3be8a6f4eb0b6a2d82498e6175d] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.325+08:00  INFO [bc98d3be8a6f4eb0b6a2d82498e6175d] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=c81f2c7a-b107-49fb-af53-7da79452f16e
+2026-11-08T20:48:57.484+08:00 DEBUG [6e49ef116bed4cb5b688e59dfe111b4e] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.486+08:00  INFO [6e49ef116bed4cb5b688e59dfe111b4e] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=1233dd13-4382-4156-a504-d88bbc142647
+2026-11-08T20:48:57.557+08:00 DEBUG [44849b1909fc437da24ee31b7b55d41e] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.559+08:00  INFO [44849b1909fc437da24ee31b7b55d41e] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=d3ee4f77-93f2-4a8c-a759-f304d1104eb5
+MYSQL_CONFIGURATION change=MODE outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:48:57.759+08:00 DEBUG [1f052b2744db4f378fee0701006ab5e6] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.762+08:00  INFO [1f052b2744db4f378fee0701006ab5e6] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=ed0cc5fd-1556-413a-b331-69f9f801c066
+2026-11-08T20:48:57.838+08:00 DEBUG [3ef47ebd2aed42c3ada5f8d336db09d0] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.840+08:00  INFO [3ef47ebd2aed42c3ada5f8d336db09d0] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=e9066bc8-3b1a-426b-a5ef-5a6430c83bf3
+MYSQL_CONFIGURATION change=MODE outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:48:57.993+08:00 DEBUG [f4f142ef65b0441db22a6070b7f65447] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:57.995+08:00  INFO [f4f142ef65b0441db22a6070b7f65447] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=d8faca68-d58a-47cf-846f-066e4c86b50c
+2026-11-08T20:48:58.062+08:00 DEBUG [deb66c7e38cf4798a7928be3cb44cd51] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.063+08:00  INFO [deb66c7e38cf4798a7928be3cb44cd51] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=52bb3a67-d1ea-45c3-bbb5-705c515ee430
+MYSQL_CONFIGURATION change=MODE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+2026-11-08T20:48:58.251+08:00 DEBUG [78537b684147422ca9b4d16982dde0f4] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.254+08:00  INFO [78537b684147422ca9b4d16982dde0f4] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=a092595b-0c66-4f15-84f6-ce4983e9a9cc
+2026-11-08T20:48:58.324+08:00 DEBUG [95949d37f53f451ea7c0b97e9eff6d66] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.327+08:00  INFO [95949d37f53f451ea7c0b97e9eff6d66] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=ded087c3-908c-4ff8-979e-507ff432de20
+MYSQL_CONFIGURATION change=INACTIVE outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:48:58.486+08:00 DEBUG [e91f7405b17e421ab3b5b67c24304ba2] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.488+08:00  INFO [e91f7405b17e421ab3b5b67c24304ba2] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=0eb432ab-ef3e-4181-a92a-5b46c50e4eca
+2026-11-08T20:48:58.553+08:00 DEBUG [d6abcc95e1c5440d97110b9d51d5c0bd] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.555+08:00  INFO [d6abcc95e1c5440d97110b9d51d5c0bd] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=12b7f6fb-716a-436e-8ee6-f1f7e1b9191f
+MYSQL_CONFIGURATION change=INACTIVE outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:48:58.680+08:00 DEBUG [8760bdbca5fd429b828eaf639bfe2cd5] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.682+08:00  INFO [8760bdbca5fd429b828eaf639bfe2cd5] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=f909ff65-8460-43fe-9b05-2ca16d4c0e93
+2026-11-08T20:48:58.748+08:00 DEBUG [c85a75b7544c4e8ca878ca56b15829c4] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.749+08:00  INFO [c85a75b7544c4e8ca878ca56b15829c4] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=a8705844-5f61-47f5-9d9f-b68672488ffd
+MYSQL_CONFIGURATION change=INACTIVE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+2026-11-08T20:48:58.892+08:00 DEBUG [0f6a0db8bb0b44cd81a9eca60bff0fbc] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.894+08:00  INFO [0f6a0db8bb0b44cd81a9eca60bff0fbc] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=104aba96-1911-4dd2-b9cf-58f25a02d1c8
+2026-11-08T20:48:58.966+08:00 DEBUG [59b17c257904404e9e766e3abf0a9e02] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:58.968+08:00  INFO [59b17c257904404e9e766e3abf0a9e02] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=f1939434-9559-4084-8431-1c6d5860133b
+MYSQL_CONFIGURATION change=DELETED outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:48:59.130+08:00 DEBUG [08ad5a2119154ae0b6c2b88796204633] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:59.133+08:00  INFO [08ad5a2119154ae0b6c2b88796204633] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=a08e77b0-9291-45bf-b383-690a68fd7310
+2026-11-08T20:48:59.199+08:00 DEBUG [1b6034322c554195b59200bd169f6c95] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:59.201+08:00  INFO [1b6034322c554195b59200bd169f6c95] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=c9032b67-ba09-4664-b52c-161bd566afb5
+MYSQL_CONFIGURATION change=DELETED outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:48:59.337+08:00 DEBUG [620724f6cc3c48299de8928f8ffd5fe6] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:59.339+08:00  INFO [620724f6cc3c48299de8928f8ffd5fe6] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=4289d705-4e46-4471-825b-7ef31721f46f
+2026-11-08T20:48:59.405+08:00 DEBUG [120f34d802b2422f81f88f3e31565c71] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:48:59.407+08:00  INFO [120f34d802b2422f81f88f3e31565c71] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=f94f7f7e-b16f-4f07-bff8-6c755494b7cd
+MYSQL_CONFIGURATION change=DELETED outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+[ERROR] Tests run: 21, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 11.72 s <<< FAILURE! -- in com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+[ERROR] com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint -- Time elapsed: 0.276 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<409> but was:<500>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint(ModuleLeaveWorkflowIntegrationTest.java:161)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[INFO] Running com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+2026-11-08T20:48:59.463+08:00  INFO [] 45407 --- [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.workforcehub.leave.ModuleLeaveApiIntegrationTest]: ModuleLeaveApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-11-08T20:48:59.465+08:00  INFO [] 45407 --- [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+2026-11-08T20:48:59.484+08:00  WARN [] 45407 --- [main] lowableLiquibaseEnvironmentPostProcessor : Liquibase has not been explicitly enabled or disabled. Overriding default from Spring Boot from `true` to `false`. Flowable pulls in Liquibase, but does not use the Spring Boot configuration for it. If you are using it you would need to set `spring.liquibase.enabled` to `true` by yourself
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:48:59.488+08:00  INFO [] 45407 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Starting ModuleLeaveApiIntegrationTest using Java 17.0.18 with PID 45407 (started by sailtrack in /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server)
+2026-11-08T20:48:59.488+08:00 DEBUG [] 45407 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:48:59.489+08:00  INFO [] 45407 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : The following 1 profile is active: "api"
+2026-11-08T20:48:59.671+08:00  INFO [] 45407 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:48:59.671+08:00  INFO [] 45407 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:48:59.684+08:00  INFO [] 45407 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 12 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:48:59.723+08:00  INFO [] 45407 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-11-08T20:48:59.725+08:00  INFO [] 45407 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-11-08T20:48:59.732+08:00  INFO [] 45407 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:62826/workforce_993_test (MySQL 8.4)
+2026-11-08T20:48:59.733+08:00  WARN [] 45407 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:48:59.750+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 67 migrations (execution time 00:00.015s)
+2026-11-08T20:48:59.752+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_993_test`: 69
+2026-11-08T20:48:59.752+08:00  INFO [] 45407 --- [main] o.f.core.internal.command.DbMigrate      : Schema `workforce_993_test` is up to date. No migration necessary.
+2026-11-08T20:48:59.845+08:00  INFO [] 45407 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:48:59.845+08:00  INFO [] 45407 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:48:59.845+08:00  INFO [] 45407 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:48:59.927+08:00  INFO [] 45407 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:48:59.932+08:00  INFO [] 45407 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@941f50a, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@6a544178, org.springframework.security.web.context.SecurityContextHolderFilter@1a0a6827, org.springframework.security.web.header.HeaderWriterFilter@76fa6d23, org.springframework.web.filter.CorsFilter@4f61a404, org.springframework.security.web.csrf.CsrfFilter@2b96dc3e, com.workforcehub.auth.security.SessionValidityFilter@41539ee7, com.workforcehub.auth.security.UserTypePathFilter@69ec3204, com.workforcehub.auth.security.AdminPermissionFilter@17d428b0, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@121c7f9c, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@37aa9b89, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@33e54876, org.springframework.security.web.session.SessionManagementFilter@76033d9, org.springframework.security.web.access.ExceptionTranslationFilter@44498af0, org.springframework.security.web.access.intercept.AuthorizationFilter@78508503]
+2026-11-08T20:48:59.986+08:00 DEBUG [] 45407 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:48:59.986+08:00 DEBUG [] 45407 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:48:59.986+08:00 DEBUG [] 45407 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:48:59.986+08:00 DEBUG [] 45407 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:48:59.986+08:00 DEBUG [] 45407 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:48:59.986+08:00  INFO [] 45407 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:48:59.986+08:00  INFO [] 45407 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:48:59.986+08:00  INFO [] 45407 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:49:00.002+08:00  INFO [] 45407 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Started ModuleLeaveApiIntegrationTest in 0.534 seconds (process running for 13.865)
+2026-11-08T20:49:00.003+08:00  INFO [] 45407 --- [main] c.w.plugin.runtime.PluginManagerService  : 恢复 0 个可用插件
+2026-11-08T20:49:00.173+08:00 DEBUG [e8e102dc994f420aa8869c1fe93598cd] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:49:00.175+08:00  INFO [e8e102dc994f420aa8869c1fe93598cd] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=d83d4ceb-1161-49bb-b5b5-a73d60213d90
+2026-11-08T20:49:00.322+08:00 DEBUG [0524763e57de4aa482d5ff970a58762a] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:49:00.323+08:00  INFO [0524763e57de4aa482d5ff970a58762a] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=e4bab16a-80da-4cad-a0d5-9891386dd1a6
+2026-11-08T20:49:00.446+08:00 DEBUG [aabcfbb4fc10447eb7fa1314a365f6a9] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:49:00.448+08:00  INFO [aabcfbb4fc10447eb7fa1314a365f6a9] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=b4326f4f-9c25-4f44-af3d-f8ba05d2d7ed
+2026-11-08T20:49:00.580+08:00 DEBUG [e35111adb7ef4bfe92bcd3009e534a2d] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:49:00.582+08:00  INFO [e35111adb7ef4bfe92bcd3009e534a2d] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=5ba9c115-a951-421d-8b45-450f2c4dff7b
+2026-11-08T20:49:00.687+08:00 DEBUG [b20ec5f2ab0240d0bb02bfc6491e356e] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:49:00.690+08:00  INFO [b20ec5f2ab0240d0bb02bfc6491e356e] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=f86b8793-38a2-4542-a2ad-ac5731184f23
+2026-11-08T20:49:00.718+08:00  WARN [5c7ea3814f2c43d49c299a2a5434dbeb] 45407 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:49:00.723+08:00  WARN [3129b65bc7c44a32ac27d7847f93eb89] 45407 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:49:00.730+08:00  WARN [ac620708a3e049d6a12ab813138b4fde] 45407 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:49:00.824+08:00 DEBUG [3946c9e43b6849d29345f780d542b3d2] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:49:00.826+08:00  INFO [3946c9e43b6849d29345f780d542b3d2] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=a4224528-ee59-4a83-b18e-e7df60c6f667
+2026-11-08T20:49:00.906+08:00 DEBUG [382bba48f08a43c4992d16a7ad1955f8] 45407 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:49:00.908+08:00  INFO [382bba48f08a43c4992d16a7ad1955f8] 45407 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=e176316a-86ac-4750-8f03-8a6ba89df3ac
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.457 s -- in com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict:234 Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+[ERROR]   LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict:234 Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+[ERROR]   LeaveSettlementTransactionTest.terminalKeyOccupiedByUnrelatedTransactionMustReportFingerprintConflict:234 Unexpected exception type thrown, expected: <com.workforcehub.common.exception.BizException> but was: <org.springframework.dao.DuplicateKeyException>
+[ERROR]   ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint:161 Status expected:<409> but was:<500>
+[INFO] 
+[ERROR] Tests run: 58, Failures: 4, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  25.065 s
+[INFO] Finished at: 2026-11-08T20:49:01+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.1.2:test (default-test) on project workforce-hub: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

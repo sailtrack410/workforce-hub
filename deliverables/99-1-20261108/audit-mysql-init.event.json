@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld",
+    "--no-defaults",
+    "--initialize-insecure",
+    "--basedir=/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+    "--datadir=/tmp/workforce-991-audit-2vmxwuvk/data"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "audit-mysql-init.stdout",
+  "stderr": "audit-mysql-init.stderr"
+}

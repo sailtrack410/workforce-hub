@@ -1,0 +1,235 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "知识检索、提示编排与问答返回",
+    "locale": "zh-CN",
+    "output": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/rag-qa.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "业务入口与结果"
+    },
+    {
+      "id": "core",
+      "label": "服务执行与落库"
+    },
+    {
+      "id": "recover",
+      "label": "分支、异常与恢复",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "agentuse",
+    "tool",
+    "config",
+    "vector",
+    "title",
+    "answer"
+  ],
+  "nodes": [
+    {
+      "id": "agentuse",
+      "lane": "entry",
+      "col": 0,
+      "type": "security",
+      "label": "员工可用Agent",
+      "sublabel": "已发布ACTIVE与use ACL",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 494,
+          "end_line": 503
+        }
+      ]
+    },
+    {
+      "id": "tool",
+      "lane": "core",
+      "col": 1,
+      "type": "backend",
+      "label": "知识检索工具",
+      "sublabel": "绑定校验；spaceId/query",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java",
+          "line": 69,
+          "end_line": 93
+        }
+      ]
+    },
+    {
+      "id": "config",
+      "lane": "core",
+      "col": 2,
+      "type": "backend",
+      "label": "解析有效知识配置",
+      "sublabel": "空间覆盖或继承全局",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+          "line": 44,
+          "end_line": 50
+        }
+      ]
+    },
+    {
+      "id": "vector",
+      "lane": "core",
+      "col": 3,
+      "type": "database",
+      "label": "向量TopK检索",
+      "sublabel": "相似度阈值；active",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 54,
+          "end_line": 86
+        }
+      ]
+    },
+    {
+      "id": "title",
+      "lane": "core",
+      "col": 4,
+      "type": "backend",
+      "label": "过滤与补文档标题",
+      "sublabel": "只保留存在的文档",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+          "line": 54,
+          "end_line": 60
+        }
+      ]
+    },
+    {
+      "id": "answer",
+      "lane": "entry",
+      "col": 5,
+      "type": "backend",
+      "label": "模型生成问答回复",
+      "sublabel": "工具输出进入上下文",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java",
+          "line": 219,
+          "end_line": 253
+        }
+      ]
+    },
+    {
+      "id": "unavailable",
+      "lane": "recover",
+      "col": 3,
+      "type": "security",
+      "label": "检索不可用",
+      "sublabel": "向量未配置返回422",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 107,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "aclmissing",
+      "lane": "recover",
+      "col": 1,
+      "type": "security",
+      "label": "空间ACL未消费",
+      "sublabel": "操作者未传入检索服务",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+          "line": 30,
+          "end_line": 60
+        }
+      ]
+    },
+    {
+      "id": "adminsearch",
+      "lane": "recover",
+      "col": 2,
+      "type": "backend",
+      "label": "管理员搜索测试",
+      "sublabel": "相同检索链；返回命中",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 342,
+          "end_line": 351
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "agentuse",
+      "to": "tool"
+    },
+    {
+      "from": "tool",
+      "to": "config"
+    },
+    {
+      "from": "config",
+      "to": "vector",
+      "label": "查询Embedding"
+    },
+    {
+      "from": "vector",
+      "to": "title"
+    },
+    {
+      "from": "title",
+      "to": "answer",
+      "label": "命中上下文"
+    },
+    {
+      "from": "vector",
+      "to": "unavailable",
+      "label": "未配置",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "tool",
+      "to": "aclmissing",
+      "label": "权限缺口",
+      "role": "branch"
+    },
+    {
+      "from": "adminsearch",
+      "to": "config",
+      "label": "测试"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "范围与实现",
+      "items": [
+        "Agent已授权工具检索知识空间，查询嵌入、向量阈值过滤、补标题并进入模型提示。",
+        "员工问答通过Agent及IM显示；employee-web新页知识卡动作仅“即将上线”；管理端searchTest返回命中，不等同问答端到端实测。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常与恢复",
+      "items": [
+        "Agent use ACL与知识空间read ACL不同；当前检索签名没有操作者参数。",
+        "空命中会传空工具结果，是否拒答由Agent提示配置决定；未见统一引用可信校验。"
+      ]
+    }
+  ]
+}

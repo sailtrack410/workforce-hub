@@ -1,0 +1,16 @@
+
+> workforce-hub-employee-web@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.5 /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-web-20261108/candidate/employee-web
+
+ ❯ src/core/plugin-runtime-security.test.ts (4 tests | 2 failed) 5ms
+     × Nginx 对员工端和管理端文档启用最小 CSP 2ms
+     × Nginx 限制插件网关请求体并覆盖最长动作等待时间 0ms
+
+ Test Files  1 failed | 36 passed (37)
+      Tests  2 failed | 249 passed (251)
+   Start at  21:17:27
+   Duration  1.38s (transform 1.32s, setup 0ms, import 3.68s, tests 973ms, environment 11ms)
+

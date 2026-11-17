@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/opt/homebrew/bin/redis-server",
+    "--bind",
+    "127.0.0.1",
+    "--port",
+    "62827",
+    "--save",
+    "",
+    "--appendonly",
+    "no",
+    "--dir",
+    "/tmp/workforce-993-mysql-vrpbk4lz",
+    "--daemonize",
+    "yes",
+    "--pidfile",
+    "/tmp/workforce-993-mysql-vrpbk4lz/redis.pid",
+    "--logfile",
+    "/tmp/workforce-993-mysql-vrpbk4lz/redis.log"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/redis-start.stdout",
+  "stderr": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/redis-start.stderr"
+}

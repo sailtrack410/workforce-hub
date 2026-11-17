@@ -1,0 +1,22 @@
+{
+  "MODIFIED_FILE": {
+    "path": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-5-20261108/MODIFIED_FILE.tar.gz",
+    "size": 6027,
+    "sha256": "fcba3a67304d89a2cdf3b07e3866e0215191c5fa4972ce2ff4cec0f8b6bbdced"
+  },
+  "DIFF_FILE": {
+    "path": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-5-20261108/DIFF_FILE.patch",
+    "size": 21265,
+    "sha256": "df18b8dbf1a4c70c9c85c76b9eed84c3a09eba40e2be3fd8095fe0aae7cc686c"
+  },
+  "VERIFICATION": {
+    "path": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-5-20261108/VERIFICATION.txt",
+    "size": 3371708,
+    "sha256": "c8e2220429601efd0984f88c655e448f3924444742527978fbb30b0da3cf7d84"
+  },
+  "ROLLBACK": {
+    "path": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-5-20261108/ROLLBACK.sh",
+    "size": 1754,
+    "sha256": "2a1fb97cb6f3818199c5ca28a46fe4e2a54567fbd25d32471b2d3d0d3569b72f"
+  }
+}

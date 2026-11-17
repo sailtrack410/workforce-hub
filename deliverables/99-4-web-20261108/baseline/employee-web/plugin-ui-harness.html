@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>插件工作台浏览器验收</title>
+    <style>
+      :root {
+        --harness-bg: #f3f6fb;
+        --harness-surface: #ffffff;
+        --harness-border: #d9e1ec;
+        --harness-primary: #2563eb;
+        --harness-text: #172033;
+        --harness-muted: #64748b;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--harness-bg);
+        color: var(--harness-text);
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+      .sidebar {
+        padding: 28px 20px;
+        background: var(--harness-surface);
+        border-right: 1px solid var(--harness-border);
+      }
+      .brand { margin-bottom: 34px; font-size: 18px; font-weight: 700; }
+      .nav-item { padding: 11px 14px; border-radius: 10px; color: var(--harness-muted); }
+      .nav-item.active { background: var(--harness-primary); color: var(--harness-surface); }
+      .main { padding: 48px; }
+      .eyebrow { color: var(--harness-primary); font-size: 13px; font-weight: 700; letter-spacing: .08em; }
+      h1 { margin: 8px 0 10px; font-size: 30px; }
+      .subtitle { margin: 0 0 26px; color: var(--harness-muted); }
+      .plugin-card {
+        min-height: 280px;
+        padding: 28px;
+        background: var(--harness-surface);
+        border: 1px solid var(--harness-border);
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgb(15 23 42 / 8%);
+      }
+      .hello-plugin { font-size: 22px; font-weight: 700; }
+      @media (max-width: 700px) {
+        .shell { grid-template-columns: 120px 1fr; }
+        .sidebar { padding: 22px 10px; }
+        .brand { margin-bottom: 24px; font-size: 15px; }
+        .nav-item { padding: 10px; font-size: 13px; }
+        .main { padding: 28px 20px; }
+        h1 { font-size: 25px; }
+        .plugin-card { min-height: 190px; padding: 22px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">Workforce Hub</div>
+        <div class="nav-item">消息</div>
+        <div class="nav-item active">Hello Plugin</div>
+      </aside>
+      <main class="main">
+        <div class="eyebrow">PLUGIN WORKBENCH</div>
+        <h1>Hello Plugin</h1>
+        <p class="subtitle">真实 IIFE、SRI 与 Host SDK 挂载验证</p>
+        <section id="app" class="plugin-card"></section>
+      </main>
+    </div>
+    <script type="module">
+      import { createApp, h } from 'vue';
+      import { createPinia, setActivePinia } from 'pinia';
+      import { initHostSdk } from '/src/core/host-sdk.ts';
+      import { loadPlugin } from '/src/core/plugin-loader.ts';
+      import { usePluginsStore } from '/src/stores/plugins.ts';
+      import PluginWorkbenchHost from '/src/components/plugins/PluginWorkbenchHost.vue';
+
+      const integrity = 'sha384-c527zMMh7jwa0gTNl9fI1Mg5xEqGXyEFnTFCcjr7fokaoyPHzkIY7kC9f13c4zUQ';
+      initHostSdk();
+      await loadPlugin('hello-plugin', integrity);
+
+      const pinia = createPinia();
+      setActivePinia(pinia);
+      const plugins = usePluginsStore();
+      plugins.manifest = [{
+        id: 'hello-plugin',
+        name: 'Hello Plugin',
+        entry: '/plugins/hello-plugin/index.js',
+        integrity,
+      }];
+      plugins.loadedIds = ['hello-plugin'];
+
+      createApp({
+        render: () => h(PluginWorkbenchHost, { pluginId: 'hello-plugin' }),
+      }).use(pinia).mount('#app');
+    </script>
+  </body>
+</html>

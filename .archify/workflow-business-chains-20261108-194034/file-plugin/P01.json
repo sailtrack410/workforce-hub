@@ -1,0 +1,255 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "插件安装与生命周期：校验、启停、卸载",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/P01.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "upload",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "上传插件与签名",
+      "sublabel": "限制包体，保存临时文件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/AdminPluginManagementService.java",
+          "line": 53,
+          "end_line": 77
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "验证签名与版本",
+      "sublabel": "快照校验，拒绝重复安装",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 293,
+          "end_line": 313
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 340,
+          "end_line": 355
+        }
+      ]
+    },
+    {
+      "id": "install",
+      "lane": "main",
+      "col": 2,
+      "type": "database",
+      "label": "加载与迁移",
+      "sublabel": "迁移后保存 INSTALLED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 359,
+          "end_line": 391
+        }
+      ]
+    },
+    {
+      "id": "enable",
+      "lane": "main",
+      "col": 3,
+      "type": "backend",
+      "label": "启用并开门",
+      "sublabel": "依赖检查，启动后写ACTIVE",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 614,
+          "end_line": 656
+        }
+      ]
+    },
+    {
+      "id": "drain",
+      "lane": "main",
+      "col": 4,
+      "type": "security",
+      "label": "停用先关门排空",
+      "sublabel": "依赖检查，拒绝新动作",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 690,
+          "end_line": 707
+        }
+      ]
+    },
+    {
+      "id": "stop",
+      "lane": "main",
+      "col": 5,
+      "type": "backend",
+      "label": "停止或卸载",
+      "sublabel": "STOPPED / UNINSTALLED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 709,
+          "end_line": 725
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 734,
+          "end_line": 793
+        }
+      ]
+    },
+    {
+      "id": "restore",
+      "lane": "branch",
+      "col": 2,
+      "type": "backend",
+      "label": "服务启动恢复插件",
+      "sublabel": "复核快照及依赖顺序",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 71,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "rollback",
+      "lane": "branch",
+      "col": 3,
+      "type": "backend",
+      "label": "安装或启用补偿",
+      "sublabel": "卸载未保存实例或回退启动",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 392,
+          "end_line": 434
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 638,
+          "end_line": 651
+        }
+      ]
+    },
+    {
+      "id": "error",
+      "lane": "failure",
+      "col": 4,
+      "type": "security",
+      "label": "保持入口关闭",
+      "sublabel": "排空超时需运维恢复",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginManagerService.java",
+          "line": 703,
+          "end_line": 725
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "upload",
+      "to": "verify"
+    },
+    {
+      "id": "e1",
+      "from": "verify",
+      "to": "install",
+      "label": "通过"
+    },
+    {
+      "id": "e2",
+      "from": "install",
+      "to": "enable",
+      "label": "启用"
+    },
+    {
+      "id": "e3",
+      "from": "enable",
+      "to": "drain",
+      "label": "停用或卸载"
+    },
+    {
+      "id": "e4",
+      "from": "drain",
+      "to": "stop",
+      "label": "排空成功"
+    },
+    {
+      "id": "e5",
+      "from": "restore",
+      "to": "enable",
+      "label": "原状态需运行"
+    },
+    {
+      "id": "e6",
+      "from": "install",
+      "to": "rollback",
+      "label": "安装失败"
+    },
+    {
+      "id": "e7",
+      "from": "enable",
+      "to": "rollback",
+      "label": "写状态失败"
+    },
+    {
+      "id": "e8",
+      "from": "drain",
+      "to": "error",
+      "label": "超时或停止失败"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "admin-web 插件管理页可上传签名包、启用停用卸载；不支持上传覆盖既有ID。",
+        "签名快照、版本兼容、Flyway迁移、PF4J、依赖、排空与错误恢复。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "优化：安装迁移与安装记录不是一个可回滚外部事务；失败时应说明已执行迁移与人工恢复步骤。",
+        "插件运行在宿主进程内，签名是来源校验，图中不声称沙箱隔离。"
+      ]
+    }
+  ]
+}

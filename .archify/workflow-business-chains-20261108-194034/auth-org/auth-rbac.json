@@ -1,0 +1,216 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "管理员角色配置与接口鉴权",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "管理端"
+    },
+    {
+      "id": "rbac",
+      "label": "角色配置事务"
+    },
+    {
+      "id": "enforce",
+      "label": "加载与鉴权"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "roleui",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "角色与权限配置",
+      "sublabel": "ADMIN_RBAC_MANAGE",
+      "sources": [
+        {
+          "path": "admin-web/src/router/index.ts",
+          "line": 52,
+          "end_line": 62
+        }
+      ]
+    },
+    {
+      "id": "role",
+      "lane": "rbac",
+      "col": 1,
+      "type": "database",
+      "label": "保存角色",
+      "sublabel": "编码唯一／状态校验",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/RbacService.java",
+          "line": 68,
+          "end_line": 106
+        }
+      ]
+    },
+    {
+      "id": "permission",
+      "lane": "rbac",
+      "col": 2,
+      "type": "database",
+      "label": "替换角色权限",
+      "sublabel": "校验ID后删旧插新",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/RbacService.java",
+          "line": 109,
+          "end_line": 123
+        }
+      ]
+    },
+    {
+      "id": "assign",
+      "lane": "ui",
+      "col": 2,
+      "type": "frontend",
+      "label": "分配管理员角色",
+      "sublabel": "管理端角色API",
+      "sources": [
+        {
+          "path": "admin-web/src/api/admin.ts",
+          "line": 190,
+          "end_line": 196
+        }
+      ]
+    },
+    {
+      "id": "guard",
+      "lane": "rbac",
+      "col": 3,
+      "type": "security",
+      "label": "保留活跃超级管理员",
+      "sublabel": "拒改内置超级角色",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/RbacService.java",
+          "line": 269,
+          "end_line": 307
+        }
+      ]
+    },
+    {
+      "id": "save",
+      "lane": "rbac",
+      "col": 4,
+      "type": "database",
+      "label": "替换管理员角色",
+      "sublabel": "同事务写关联表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/RbacService.java",
+          "line": 149,
+          "end_line": 163
+        }
+      ]
+    },
+    {
+      "id": "load",
+      "lane": "enforce",
+      "col": 4,
+      "type": "security",
+      "label": "登录加载权限快照",
+      "sublabel": "角色与权限进UserDetails",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/security/AdminUserDetailsService.java",
+          "line": 28,
+          "end_line": 44
+        }
+      ]
+    },
+    {
+      "id": "filter",
+      "lane": "enforce",
+      "col": 5,
+      "type": "security",
+      "label": "后台请求权限匹配",
+      "sublabel": "匹配路径使用认证权限",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java",
+          "line": 66,
+          "end_line": 92
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "roleui",
+      "to": "role",
+      "role": "main"
+    },
+    {
+      "from": "role",
+      "to": "permission",
+      "role": "main"
+    },
+    {
+      "from": "permission",
+      "to": "assign",
+      "role": "main"
+    },
+    {
+      "from": "assign",
+      "to": "guard",
+      "role": "main"
+    },
+    {
+      "from": "guard",
+      "to": "save",
+      "role": "main"
+    },
+    {
+      "from": "save",
+      "to": "load",
+      "label": "后续登录",
+      "role": "main"
+    },
+    {
+      "from": "load",
+      "to": "filter",
+      "role": "main"
+    }
+  ],
+  "mainPath": [
+    "roleui",
+    "role",
+    "permission",
+    "assign",
+    "guard",
+    "save",
+    "load",
+    "filter"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "操作边界",
+      "items": [
+        "权限和角色通过替换关联表更新；禁止修改内置超级角色，禁止移除最后活跃超级管理员。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "沿用既有记录",
+      "items": [
+        "99-1：未配置映射的后台路径默认放行。",
+        "99-2：Session持有权限快照，角色调整后即时失效未闭环。"
+      ]
+    }
+  ]
+}

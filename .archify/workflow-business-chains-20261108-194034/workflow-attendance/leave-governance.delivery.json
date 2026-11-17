@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "811e541f-3728-4a7b-8ac0-223ce61253a3",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.candidate.json",
+  "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.html",
+  "specification": {
+    "sha256": "5956cc379cc6143ad812756c26debf69ac5e893395be843d5372dcb37a8c7775",
+    "bytes": 5014
+  },
+  "artifact": {
+    "sha256": "8d1cb97f38c13adc8438408aae748635a4e5b759f5521372ff8e8cbee50fa5bd",
+    "bytes": 818782
+  }
+}

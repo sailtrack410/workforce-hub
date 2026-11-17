@@ -1,0 +1,46 @@
+ M "docs/\345\256\241\346\237\245/\350\257\264\346\230\216.md"
+ M server/pom.xml
+ M server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java
+ M server/src/main/java/com/workforcehub/auth/security/EmployeeUserDetailsService.java
+ M server/src/main/java/com/workforcehub/common/config/SecurityConfig.java
+ M server/src/main/java/com/workforcehub/file/service/FileCleanupDatabaseStageService.java
+ M server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java
+ M server/src/main/java/com/workforcehub/file/service/FileQueryService.java
+ M server/src/main/java/com/workforcehub/file/service/FileQuotaPolicyService.java
+ M server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java
+ M server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java
+ M server/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java
+ M server/src/main/java/com/workforcehub/im/websocket/ImWebSocketHandler.java
+ M server/src/main/java/com/workforcehub/im/websocket/ImWebSocketHandshakeInterceptor.java
+ M server/src/main/java/com/workforcehub/im/websocket/ImWebSocketSessionRegistry.java
+ M server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java
+ M server/src/main/java/com/workforcehub/leave/service/LeaveService.java
+ M server/src/test/java/com/workforcehub/attendance/ModuleAttendanceApiIntegrationTest.java
+ M server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java
+ M server/src/test/java/com/workforcehub/im/ModuleImApiIntegrationTest.java
+ M server/src/test/java/com/workforcehub/im/ModuleImOutboxIntegrationTest.java
+ M server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java
+ M server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java
+ M server/src/test/java/com/workforcehub/plugin/AdminPluginManagementWebTest.java
+ M server/src/test/java/com/workforcehub/plugin/EmployeePluginListIntegrationTest.java
+ M server/src/test/java/com/workforcehub/plugin/PluginGatewayPermissionMatrixIntegrationTest.java
+ M server/src/test/java/com/workforcehub/plugin/PluginGatewaySecurityTest.java
+ M server/src/test/java/com/workforcehub/plugin/PluginManagerServiceIntegrationTest.java
+?? .archify/
+?? deliverables/20-3-3-20261108/
+?? deliverables/99-1-20261108/
+?? deliverables/99-2-20261108/
+?? deliverables/99-3-20261108/
+?? "docs/\345\256\241\346\237\245/\347\254\254100\345\256\241_\345\205\250\344\270\232\345\212\241\351\223\276\350\267\257\346\265\201\347\250\213\345\233\276\344\270\216\344\274\230\345\214\226\350\256\260\345\275\225.md"
+?? "docs/\345\256\241\346\237\245/\347\254\25499\345\256\241_\351\241\271\347\233\256\347\273\223\346\236\204\344\270\216\346\240\270\345\277\203\351\200\273\350\276\221\351\243\216\351\231\251\350\256\260\345\275\225.md"
+?? server/src/main/java/com/workforcehub/auth/security/SessionValidityFilter.java
+?? server/src/main/java/com/workforcehub/auth/security/SessionValidityService.java
+?? server/src/main/java/com/workforcehub/im/websocket/ImWebSocketAuthentication.java
+?? server/src/main/resources/db/migration/V67__add_admin_operations_permissions.sql
+?? server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql
+?? server/src/test/java/com/workforcehub/auth/AdminPermissionRouteMatrixTest.java
+?? server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java
+?? server/src/test/java/com/workforcehub/auth/SessionValidityRequestChainTest.java
+?? server/src/test/java/com/workforcehub/file/FileQuotaConcurrencyTest.java
+?? server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java
+?? server/src/test/resources/

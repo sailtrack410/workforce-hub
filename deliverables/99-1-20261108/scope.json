@@ -1,0 +1,9 @@
+[
+  "server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java",
+  "server/src/main/resources/db/migration/V67__add_admin_operations_permissions.sql",
+  "server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java",
+  "server/src/test/java/com/workforcehub/auth/AdminPermissionRouteMatrixTest.java",
+  "server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java",
+  "server/src/test/resources/security/admin-permission-matrix.tsv",
+  "server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java"
+]

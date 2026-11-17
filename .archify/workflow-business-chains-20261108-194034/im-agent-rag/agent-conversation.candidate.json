@@ -1,0 +1,248 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "会话触发Agent、异步执行与结果回写",
+    "locale": "zh-CN",
+    "output": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-conversation.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "业务入口与结果"
+    },
+    {
+      "id": "core",
+      "label": "服务执行与落库"
+    },
+    {
+      "id": "recover",
+      "label": "分支、异常与恢复",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "usertext",
+    "task",
+    "schedule",
+    "run",
+    "writeback",
+    "reply"
+  ],
+  "nodes": [
+    {
+      "id": "usertext",
+      "lane": "entry",
+      "col": 0,
+      "type": "backend",
+      "label": "绑定Agent的文本",
+      "sublabel": "USER且TEXT触发",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImAgentConversationService.java",
+          "line": 165,
+          "end_line": 185
+        }
+      ]
+    },
+    {
+      "id": "task",
+      "lane": "core",
+      "col": 1,
+      "type": "database",
+      "label": "新事务创建任务",
+      "sublabel": "持久PENDING和审计",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 76,
+          "end_line": 108
+        }
+      ]
+    },
+    {
+      "id": "schedule",
+      "lane": "core",
+      "col": 2,
+      "type": "messagebus",
+      "label": "提交后内存调度",
+      "sublabel": "Executor执行回调",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 111,
+          "end_line": 123
+        }
+      ]
+    },
+    {
+      "id": "run",
+      "lane": "core",
+      "col": 3,
+      "type": "backend",
+      "label": "DAG或单轮模型",
+      "sublabel": "短事务置RUNNING后调用",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 127,
+          "end_line": 184
+        }
+      ]
+    },
+    {
+      "id": "writeback",
+      "lane": "core",
+      "col": 4,
+      "type": "database",
+      "label": "成功结果同事务回写",
+      "sublabel": "任务成功+IM消息",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 187,
+          "end_line": 200
+        }
+      ]
+    },
+    {
+      "id": "reply",
+      "lane": "entry",
+      "col": 5,
+      "type": "messagebus",
+      "label": "Agent消息与事件",
+      "sublabel": "task幂等键；更新seq",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImAgentConversationService.java",
+          "line": 109,
+          "end_line": 161
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "lane": "recover",
+      "col": 3,
+      "type": "backend",
+      "label": "失败任务与系统消息",
+      "sublabel": "失败回写异常只记日志",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 207,
+          "end_line": 225
+        }
+      ]
+    },
+    {
+      "id": "triggerfail",
+      "lane": "recover",
+      "col": 1,
+      "type": "backend",
+      "label": "触发失败系统消息",
+      "sublabel": "助手不可用或创建失败",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImAgentConversationService.java",
+          "line": 188,
+          "end_line": 214
+        }
+      ]
+    },
+    {
+      "id": "recoverygap",
+      "lane": "recover",
+      "col": 2,
+      "type": "database",
+      "label": "运行恢复缺口",
+      "sublabel": "超时扫描仅等待确认",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/repository/AgentTaskTimeoutRepository.java",
+          "line": 28,
+          "end_line": 38
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "usertext",
+      "to": "task",
+      "label": "消息提交后",
+      "role": "async",
+      "variant": "dashed"
+    },
+    {
+      "from": "task",
+      "to": "schedule"
+    },
+    {
+      "from": "schedule",
+      "to": "run",
+      "label": "进程内",
+      "role": "async",
+      "variant": "dashed"
+    },
+    {
+      "from": "run",
+      "to": "writeback",
+      "label": "成功"
+    },
+    {
+      "from": "writeback",
+      "to": "reply"
+    },
+    {
+      "from": "run",
+      "to": "failed",
+      "label": "异常",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "failed",
+      "to": "reply",
+      "label": "失败消息"
+    },
+    {
+      "from": "usertext",
+      "to": "triggerfail",
+      "label": "触发异常",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "schedule",
+      "to": "recoverygap",
+      "label": "进程中断",
+      "role": "error",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "范围与实现",
+      "items": [
+        "提交后的Agent任务创建、进程内调度、DAG/模型执行、结果写回IM与失败卡片。",
+        "employee-web新/hub/messages与独立hub-web均展示Agent消息；employee-web新页知识卡/流程卡动作仅toast，后端回复成功不表示卡片动作可执行。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常与恢复",
+      "items": [
+        "任务表持久化不等于调度持久化；未找到PENDING/RUNNING扫描恢复入口。",
+        "回复按agent-task幂等；请求idempotencyKey不在此图中宣称已经持久去重。"
+      ]
+    }
+  ]
+}

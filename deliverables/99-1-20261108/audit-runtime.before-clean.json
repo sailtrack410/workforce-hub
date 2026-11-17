@@ -1,0 +1,21 @@
+{
+  "runtime": "/tmp/workforce-991-audit-jia90rso",
+  "mysql_home": "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+  "mysql_port": 57961,
+  "redis_port": 57962,
+  "snapshot": "/tmp/workforce-991-audit-jia90rso/snapshot",
+  "boundary": "new datadir and own loopback processes; no actual .env; generated fixture credentials only",
+  "owned_mysql_pid": 42671,
+  "owned_mysql_command": [
+    "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld",
+    "--no-defaults",
+    "--basedir=/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+    "--datadir=/tmp/workforce-991-audit-jia90rso/data",
+    "--bind-address=127.0.0.1",
+    "--port=57961",
+    "--socket=/tmp/workforce-991-audit-jia90rso/mysql.sock",
+    "--pid-file=/tmp/workforce-991-audit-jia90rso/mysql.pid",
+    "--log-error=/tmp/workforce-991-audit-jia90rso/mysql.log",
+    "--mysqlx=OFF"
+  ]
+}

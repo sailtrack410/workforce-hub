@@ -1,0 +1,18 @@
+{
+  "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/MODIFIED_FILE.tar.gz": {
+    "sha256": "ca69408b2847dda6e7fe518e0c7dece3f36d14e2a7834357747009585c3d8266",
+    "bytes": 13663
+  },
+  "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/DIFF_FILE.patch": {
+    "sha256": "5531d8f7388cf217f56c9dbbe8b5f664c05f993d92e5590570d9ae699540bc90",
+    "bytes": 26069
+  },
+  "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/VERIFICATION.txt": {
+    "sha256": "6cf2def00b821213120b3cbbda235e8215e2f060dac14ab8d1299c268b6f852e",
+    "bytes": 11665667
+  },
+  "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh": {
+    "sha256": "a7f237a93a0380fd33f7eccb10f9fe13b6f1c820660aa5e6fb8c0367684ff56c",
+    "bytes": 15976
+  }
+}

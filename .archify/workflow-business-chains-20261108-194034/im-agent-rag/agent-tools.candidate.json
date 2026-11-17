@@ -1,0 +1,253 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "工具任务、人审确认与超时取消",
+    "locale": "zh-CN",
+    "output": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "业务入口与结果"
+    },
+    {
+      "id": "core",
+      "label": "服务执行与落库"
+    },
+    {
+      "id": "recover",
+      "label": "分支、异常与恢复",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "request",
+    "mode",
+    "waiting",
+    "confirm",
+    "execute",
+    "done"
+  ],
+  "nodes": [
+    {
+      "id": "request",
+      "lane": "entry",
+      "col": 0,
+      "type": "backend",
+      "label": "员工创建任务",
+      "sublabel": "校验已发布与use ACL",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 518,
+          "end_line": 535
+        }
+      ]
+    },
+    {
+      "id": "mode",
+      "lane": "core",
+      "col": 1,
+      "type": "security",
+      "label": "计算审批模式",
+      "sublabel": "仅显式toolCalls参与",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 531,
+          "end_line": 552
+        }
+      ]
+    },
+    {
+      "id": "waiting",
+      "lane": "core",
+      "col": 2,
+      "type": "database",
+      "label": "等待人工确认",
+      "sublabel": "24小时；工具日志待确认",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 560,
+          "end_line": 573
+        }
+      ]
+    },
+    {
+      "id": "confirm",
+      "lane": "core",
+      "col": 3,
+      "type": "security",
+      "label": "所属员工确认",
+      "sublabel": "锁任务；检查状态与期限",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 605,
+          "end_line": 627
+        }
+      ]
+    },
+    {
+      "id": "execute",
+      "lane": "core",
+      "col": 4,
+      "type": "backend",
+      "label": "调用工具写结果",
+      "sublabel": "成功或BizException失败",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 625,
+          "end_line": 635
+        }
+      ]
+    },
+    {
+      "id": "done",
+      "lane": "entry",
+      "col": 5,
+      "type": "database",
+      "label": "任务终态和审计",
+      "sublabel": "SUCCEEDED或FAILED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 629,
+          "end_line": 636
+        }
+      ]
+    },
+    {
+      "id": "cancel",
+      "lane": "recover",
+      "col": 3,
+      "type": "backend",
+      "label": "拒绝或主动取消",
+      "sublabel": "REJECTED或CANCELLED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 608,
+          "end_line": 649
+        }
+      ]
+    },
+    {
+      "id": "timeout",
+      "lane": "recover",
+      "col": 2,
+      "type": "backend",
+      "label": "超时扫描取消",
+      "sublabel": "分布式锁；条件更新",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/scheduler/AgentTaskTimeoutJobService.java",
+          "line": 117,
+          "end_line": 191
+        }
+      ]
+    },
+    {
+      "id": "dag",
+      "lane": "recover",
+      "col": 1,
+      "type": "backend",
+      "label": "DAG直接执行工具",
+      "sublabel": "未检查REQUIRE_CONFIRM",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java",
+          "line": 161,
+          "end_line": 184
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "request",
+      "to": "mode"
+    },
+    {
+      "from": "mode",
+      "to": "waiting",
+      "label": "需确认"
+    },
+    {
+      "from": "waiting",
+      "to": "confirm",
+      "label": "未过期"
+    },
+    {
+      "from": "confirm",
+      "to": "execute",
+      "label": "同意"
+    },
+    {
+      "from": "execute",
+      "to": "done"
+    },
+    {
+      "from": "mode",
+      "to": "execute",
+      "label": "AUTO"
+    },
+    {
+      "from": "confirm",
+      "to": "cancel",
+      "label": "拒绝",
+      "role": "branch"
+    },
+    {
+      "from": "waiting",
+      "to": "cancel",
+      "label": "主动取消",
+      "role": "branch"
+    },
+    {
+      "from": "waiting",
+      "to": "timeout",
+      "label": "到期",
+      "role": "async",
+      "variant": "dashed"
+    },
+    {
+      "from": "mode",
+      "to": "dag",
+      "label": "DAG分支",
+      "role": "branch"
+    },
+    {
+      "from": "dag",
+      "to": "done",
+      "label": "直接执行"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "范围与实现",
+      "items": [
+        "显式工具调用的人审、恢复执行、拒绝取消、超时扫描及DAG分支差异。",
+        "员工任务确认/取消API已实现；DAG APPROVAL是提示节点，不代表持久人审暂停。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常与恢复",
+      "items": [
+        "显式工具调用有持久化人审；DAG工具路径没有等价审批门禁。",
+        "超时扫描只取消WAITING_HUMAN_CONFIRM，不恢复PENDING/RUNNING。"
+      ]
+    }
+  ]
+}

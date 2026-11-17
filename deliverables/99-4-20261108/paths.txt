@@ -1,0 +1,10 @@
+server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java
+server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java
+server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java
+server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java
+server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java
+server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java
+server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java
+server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java
+server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java
+server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java

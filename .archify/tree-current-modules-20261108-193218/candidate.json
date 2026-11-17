@@ -1,0 +1,2887 @@
+{
+  "schema_version": 1,
+  "diagram_type": "tree",
+  "meta": {
+    "title": "Workforce Hub 各端模块与功能",
+    "locale": "zh-CN",
+    "output": ".archify/tree-current-modules-20261108-193218/current-modules.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    },
+    "views": [
+      {
+        "id": "admin-view",
+        "label": "管理端",
+        "focus": [
+          "admin"
+        ],
+        "note": "按实际后台页面与调用梳理"
+      },
+      {
+        "id": "employee-view",
+        "label": "员工端",
+        "focus": [
+          "employee"
+        ],
+        "note": "新壳、原员工壳和旧组件分别标注"
+      },
+      {
+        "id": "hub-view",
+        "label": "独立画布端",
+        "focus": [
+          "hub"
+        ],
+        "note": "占位页面不计为已完成业务"
+      },
+      {
+        "id": "server-view",
+        "label": "后端能力",
+        "focus": [
+          "server"
+        ],
+        "note": "接口存在不等于各端均已接入"
+      },
+      {
+        "id": "platform-view",
+        "label": "共享与插件",
+        "focus": [
+          "platform"
+        ],
+        "note": "工程与扩展能力"
+      }
+    ]
+  },
+  "layout": {
+    "direction": "right",
+    "nodeW": 152,
+    "nodeMaxW": 240,
+    "gapX": 36,
+    "gapY": 26
+  },
+  "nodes": [
+    {
+      "id": "workforce",
+      "label": "Workforce Hub",
+      "sublabel": "各端模块与功能 · 源码快照 2026-11-08",
+      "sources": [
+        {
+          "path": "pom.xml",
+          "line": 1,
+          "end_line": 17
+        },
+        {
+          "path": "admin-web/src/router/index.ts",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "label": "管理端",
+      "parent": "workforce",
+      "sublabel": "admin-web · 页面与接口调用已存在",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AdminShell.vue",
+          "line": 36,
+          "end_line": 75
+        }
+      ]
+    },
+    {
+      "id": "admin-dashboard",
+      "label": "运营概览",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DashboardView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-dashboard-1",
+      "label": "运行摘要",
+      "parent": "admin-dashboard",
+      "sublabel": "AI 任务指标、假种数量、存储摘要",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DashboardView.vue",
+          "line": 22,
+          "end_line": 61
+        }
+      ]
+    },
+    {
+      "id": "admin-org",
+      "label": "组织与人员",
+      "parent": "admin",
+      "sublabel": "部门、岗位、人员三个页面",
+      "sources": [
+        {
+          "path": "admin-web/src/views/UserView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-org-1",
+      "label": "部门树",
+      "parent": "admin-org",
+      "sublabel": "创建、编辑部门与负责人",
+      "sources": [
+        {
+          "path": "admin-web/src/views/UserView.vue",
+          "line": 224,
+          "end_line": 263
+        }
+      ]
+    },
+    {
+      "id": "admin-org-2",
+      "label": "人员档案",
+      "parent": "admin-org",
+      "sublabel": "创建员工、查询与查看详情",
+      "sources": [
+        {
+          "path": "admin-web/src/views/UserView.vue",
+          "line": 200,
+          "end_line": 239
+        }
+      ]
+    },
+    {
+      "id": "admin-org-3",
+      "label": "组织架构",
+      "parent": "admin-org",
+      "sublabel": "树形组织、部门归属、人员关系",
+      "sources": [
+        {
+          "path": "admin-web/src/views/UserView.vue",
+          "line": 185,
+          "end_line": 224
+        }
+      ]
+    },
+    {
+      "id": "admin-org-position",
+      "label": "岗位维护",
+      "parent": "admin-org",
+      "sublabel": "创建、编辑、分类与启停状态",
+      "sources": [
+        {
+          "path": "admin-web/src/views/PositionView.vue",
+          "line": 66,
+          "end_line": 105
+        },
+        {
+          "path": "admin-web/src/views/DepartmentView.vue",
+          "line": 73,
+          "end_line": 112
+        }
+      ]
+    },
+    {
+      "id": "admin-attendance",
+      "label": "考勤管理",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AttendanceView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-attendance-1",
+      "label": "考勤规则",
+      "parent": "admin-attendance",
+      "sublabel": "创建日历、班次和打卡窗口",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AttendanceView.vue",
+          "line": 200,
+          "end_line": 239
+        }
+      ]
+    },
+    {
+      "id": "admin-attendance-2",
+      "label": "考勤归属",
+      "parent": "admin-attendance",
+      "sublabel": "考勤组、成员、生效区间与宽限",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AttendanceView.vue",
+          "line": 236,
+          "end_line": 275
+        }
+      ]
+    },
+    {
+      "id": "admin-attendance-3",
+      "label": "排班与结果",
+      "parent": "admin-attendance",
+      "sublabel": "创建或修改排班、查询每日结果",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AttendanceView.vue",
+          "line": 288,
+          "end_line": 327
+        }
+      ]
+    },
+    {
+      "id": "admin-leave",
+      "label": "假期管理",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/LeaveGovernanceView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-leave-1",
+      "label": "余额治理",
+      "parent": "admin-leave",
+      "sublabel": "按员工与假种筛选、调整余额",
+      "sources": [
+        {
+          "path": "admin-web/src/views/LeaveGovernanceView.vue",
+          "line": 87,
+          "end_line": 126
+        }
+      ]
+    },
+    {
+      "id": "admin-leave-types",
+      "label": "假种维护",
+      "parent": "admin-leave",
+      "sublabel": "创建、编辑、删除、扣减模式与状态",
+      "sources": [
+        {
+          "path": "admin-web/src/views/LeaveTypeView.vue",
+          "line": 85,
+          "end_line": 124
+        },
+        {
+          "path": "admin-web/src/views/LeaveTypeView.vue",
+          "line": 109,
+          "end_line": 148
+        }
+      ]
+    },
+    {
+      "id": "admin-workflow",
+      "label": "审批治理",
+      "parent": "admin",
+      "sublabel": "后台治理；业务审批在员工端",
+      "sources": [
+        {
+          "path": "admin-web/src/views/WorkflowGovernanceView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-workflow-1",
+      "label": "申请查询",
+      "parent": "admin-workflow",
+      "sublabel": "筛选申请、详情、附件元数据与动作记录",
+      "sources": [
+        {
+          "path": "admin-web/src/views/WorkflowGovernanceView.vue",
+          "line": 159,
+          "end_line": 198
+        }
+      ]
+    },
+    {
+      "id": "admin-workflow-2",
+      "label": "模板管理",
+      "parent": "admin-workflow",
+      "sublabel": "流程类型、模板和草稿版本",
+      "sources": [
+        {
+          "path": "admin-web/src/views/WorkflowGovernanceView.vue",
+          "line": 195,
+          "end_line": 234
+        }
+      ]
+    },
+    {
+      "id": "admin-workflow-3",
+      "label": "版本发布",
+      "parent": "admin-workflow",
+      "sublabel": "表单与规则配置、版本比较、发布",
+      "sources": [
+        {
+          "path": "admin-web/src/views/WorkflowGovernanceView.vue",
+          "line": 286,
+          "end_line": 325
+        }
+      ]
+    },
+    {
+      "id": "admin-agents",
+      "label": "AI 助手",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentConfigView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-agents-1",
+      "label": "助手管理",
+      "parent": "admin-agents",
+      "sublabel": "创建、编辑、启用、停用与删除",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentConfigView.vue",
+          "line": 102,
+          "end_line": 141
+        }
+      ]
+    },
+    {
+      "id": "admin-agents-dag",
+      "label": "工作流编排",
+      "parent": "admin-agents",
+      "sublabel": "节点编辑、模型和知识库配置",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentDagView.vue",
+          "line": 230,
+          "end_line": 269
+        }
+      ]
+    },
+    {
+      "id": "admin-agents-versions",
+      "label": "版本与测试",
+      "parent": "admin-agents",
+      "sublabel": "草稿版本、校验、试运行与发布",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentDagView.vue",
+          "line": 290,
+          "end_line": 329
+        }
+      ]
+    },
+    {
+      "id": "admin-agents-acl",
+      "label": "访问授权",
+      "parent": "admin-agents",
+      "sublabel": "按主体授予助手访问权限",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentDagView.vue",
+          "line": 348,
+          "end_line": 387
+        }
+      ]
+    },
+    {
+      "id": "admin-agent-tasks",
+      "label": "AI 任务",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentTasksView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-agent-tasks-1",
+      "label": "任务监控",
+      "parent": "admin-agent-tasks",
+      "sublabel": "任务列表、指标和失败汇总",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentTasksView.vue",
+          "line": 64,
+          "end_line": 103
+        }
+      ]
+    },
+    {
+      "id": "admin-agent-tasks-2",
+      "label": "执行追踪",
+      "parent": "admin-agent-tasks",
+      "sublabel": "任务详情、工具调用和审计",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentTasksView.vue",
+          "line": 97,
+          "end_line": 136
+        }
+      ]
+    },
+    {
+      "id": "admin-agent-tasks-3",
+      "label": "超时治理",
+      "parent": "admin-agent-tasks",
+      "sublabel": "手动扫描与扫描批次记录",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AgentTasksView.vue",
+          "line": 117,
+          "end_line": 156
+        }
+      ]
+    },
+    {
+      "id": "admin-rag",
+      "label": "知识库",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/RagflowView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-rag-1",
+      "label": "空间与权限",
+      "parent": "admin-rag",
+      "sublabel": "创建、配置、删除空间及访问控制",
+      "sources": [
+        {
+          "path": "admin-web/src/views/RagflowView.vue",
+          "line": 383,
+          "end_line": 422
+        }
+      ]
+    },
+    {
+      "id": "admin-rag-2",
+      "label": "文档入库",
+      "parent": "admin-rag",
+      "sublabel": "上传、下载、重新解析与删除",
+      "sources": [
+        {
+          "path": "admin-web/src/views/RagflowView.vue",
+          "line": 535,
+          "end_line": 574
+        }
+      ]
+    },
+    {
+      "id": "admin-rag-3",
+      "label": "检索配置",
+      "parent": "admin-rag",
+      "sublabel": "全局模型、空间配置和检索测试",
+      "sources": [
+        {
+          "path": "admin-web/src/views/RagflowView.vue",
+          "line": 698,
+          "end_line": 737
+        }
+      ]
+    },
+    {
+      "id": "admin-models",
+      "label": "AI 基座",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/SettingsView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-models-1",
+      "label": "服务商管理",
+      "parent": "admin-models",
+      "sublabel": "创建、编辑、删除、连通测试与模型发现",
+      "sources": [
+        {
+          "path": "admin-web/src/views/SettingsView.vue",
+          "line": 259,
+          "end_line": 298
+        }
+      ]
+    },
+    {
+      "id": "admin-models-2",
+      "label": "模型管理",
+      "parent": "admin-models",
+      "sublabel": "模型能力、测试、默认模型与启停状态",
+      "sources": [
+        {
+          "path": "admin-web/src/views/SettingsView.vue",
+          "line": 428,
+          "end_line": 467
+        }
+      ]
+    },
+    {
+      "id": "admin-file",
+      "label": "文件空间",
+      "parent": "admin",
+      "sublabel": "当前页面以查询与清理为主",
+      "sources": [
+        {
+          "path": "admin-web/src/views/FileCleanupView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-file-1",
+      "label": "企业文件目录",
+      "parent": "admin-file",
+      "sublabel": "按来源、员工、状态等筛选元数据",
+      "sources": [
+        {
+          "path": "admin-web/src/views/FileCleanupView.vue",
+          "line": 81,
+          "end_line": 120
+        }
+      ]
+    },
+    {
+      "id": "admin-file-2",
+      "label": "容量与清理",
+      "parent": "admin-file",
+      "sublabel": "存储摘要、清理预演与正式清理",
+      "sources": [
+        {
+          "path": "admin-web/src/views/FileCleanupView.vue",
+          "line": 161,
+          "end_line": 200
+        }
+      ]
+    },
+    {
+      "id": "admin-rbac",
+      "label": "角色与权限",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/RoleView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-rbac-1",
+      "label": "角色维护",
+      "parent": "admin-rbac",
+      "sublabel": "创建、编辑、删除与分配权限点",
+      "sources": [
+        {
+          "path": "admin-web/src/views/RoleView.vue",
+          "line": 121,
+          "end_line": 160
+        }
+      ]
+    },
+    {
+      "id": "admin-rbac-2",
+      "label": "管理员授权",
+      "parent": "admin-rbac",
+      "sublabel": "分配管理员角色",
+      "sources": [
+        {
+          "path": "admin-web/src/views/RoleView.vue",
+          "line": 175,
+          "end_line": 214
+        }
+      ]
+    },
+    {
+      "id": "admin-rbac-catalog",
+      "label": "权限点目录",
+      "parent": "admin-rbac",
+      "sublabel": "查询权限点、筛选及角色关联",
+      "sources": [
+        {
+          "path": "admin-web/src/views/PermissionView.vue",
+          "line": 59,
+          "end_line": 98
+        }
+      ]
+    },
+    {
+      "id": "admin-plugin",
+      "label": "插件管理",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/PluginManagementView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-plugin-1",
+      "label": "安装与生命周期",
+      "parent": "admin-plugin",
+      "sublabel": "上传插件、启用、停用和卸载",
+      "sources": [
+        {
+          "path": "admin-web/src/views/PluginManagementView.vue",
+          "line": 250,
+          "end_line": 289
+        }
+      ]
+    },
+    {
+      "id": "admin-plugin-2",
+      "label": "插件详情",
+      "parent": "admin-plugin",
+      "sublabel": "依赖、状态、诊断信息与配置",
+      "sources": [
+        {
+          "path": "admin-web/src/views/PluginManagementView.vue",
+          "line": 205,
+          "end_line": 244
+        }
+      ]
+    },
+    {
+      "id": "admin-plugin-3",
+      "label": "配置治理",
+      "parent": "admin-plugin",
+      "sublabel": "类型化配置的查询、新增、编辑和删除",
+      "sources": [
+        {
+          "path": "admin-web/src/views/PluginManagementView.vue",
+          "line": 362,
+          "end_line": 401
+        }
+      ]
+    },
+    {
+      "id": "admin-outbox",
+      "label": "消息投递",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/ImOutboxGovernanceView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-outbox-1",
+      "label": "投递观测",
+      "parent": "admin-outbox",
+      "sublabel": "摘要、失败汇总、事件与审计",
+      "sources": [
+        {
+          "path": "admin-web/src/views/ImOutboxGovernanceView.vue",
+          "line": 65,
+          "end_line": 104
+        }
+      ]
+    },
+    {
+      "id": "admin-outbox-2",
+      "label": "投递处理",
+      "parent": "admin-outbox",
+      "sublabel": "单条重试、批量重试和手动投递",
+      "sources": [
+        {
+          "path": "admin-web/src/views/ImOutboxGovernanceView.vue",
+          "line": 145,
+          "end_line": 184
+        }
+      ]
+    },
+    {
+      "id": "admin-system",
+      "label": "系统设置",
+      "parent": "admin",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DictView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "admin-system-1",
+      "label": "数据字典",
+      "parent": "admin-system",
+      "sublabel": "字典类型与条目增删改查",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DictView.vue",
+          "line": 111,
+          "end_line": 150
+        }
+      ]
+    },
+    {
+      "id": "admin-system-brand",
+      "label": "企业设置",
+      "parent": "admin-system",
+      "sublabel": "当前为登录标语、轮播顺序及启停",
+      "sources": [
+        {
+          "path": "admin-web/src/views/EnterpriseView.vue",
+          "line": 82,
+          "end_line": 121
+        }
+      ]
+    },
+    {
+      "id": "admin-system-email",
+      "label": "通知渠道",
+      "parent": "admin-system",
+      "sublabel": "当前页面配置邮件渠道并发送测试",
+      "sources": [
+        {
+          "path": "admin-web/src/views/SettingsView.vue",
+          "line": 593,
+          "end_line": 632
+        }
+      ]
+    },
+    {
+      "id": "admin-system-audit",
+      "label": "审计日志",
+      "parent": "admin-system",
+      "sublabel": "分页筛选、详情与请求记录",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AuditLogView.vue",
+          "line": 72,
+          "end_line": 111
+        }
+      ]
+    },
+    {
+      "id": "admin-system-auth",
+      "label": "管理员认证",
+      "parent": "admin-system",
+      "sublabel": "登录、会话、权限导航和退出",
+      "sources": [
+        {
+          "path": "admin-web/src/views/LoginView.vue",
+          "line": 25,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "employee",
+      "label": "员工端",
+      "parent": "workforce",
+      "sublabel": "employee-web · 新画布页面与原员工壳并存",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 19,
+          "end_line": 58
+        }
+      ]
+    },
+    {
+      "id": "emp-auth",
+      "label": "登录与账号",
+      "parent": "employee",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-auth-1",
+      "label": "账号登录",
+      "parent": "emp-auth",
+      "sublabel": "密码、邮箱验证码相关校验与登录流程",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 342,
+          "end_line": 381
+        }
+      ]
+    },
+    {
+      "id": "emp-auth-2",
+      "label": "找回密码",
+      "parent": "emp-auth",
+      "sublabel": "发送验证码、校验和重置密码",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 485,
+          "end_line": 512
+        }
+      ]
+    },
+    {
+      "id": "emp-auth-3",
+      "label": "未开放入口",
+      "parent": "emp-auth",
+      "sublabel": "微信扫码、短信注册仍为提示或演示",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 389,
+          "end_line": 428
+        }
+      ]
+    },
+    {
+      "id": "emp-workbench",
+      "label": "工作台",
+      "parent": "employee",
+      "sublabel": "当前入口 /hub/workbench",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-workbench-1",
+      "label": "汇总卡片",
+      "parent": "emp-workbench",
+      "sublabel": "出勤、假期余额、审批待办、消息未读",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 73,
+          "end_line": 112
+        }
+      ]
+    },
+    {
+      "id": "emp-workbench-2",
+      "label": "业务展示",
+      "parent": "emp-workbench",
+      "sublabel": "周出勤图、假期卡、待办记录",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 95,
+          "end_line": 134
+        }
+      ]
+    },
+    {
+      "id": "emp-workbench-3",
+      "label": "部分入口未接",
+      "parent": "emp-workbench",
+      "sublabel": "快捷申请、补卡、提问按钮待接；打卡时间有固定值",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 86,
+          "end_line": 125
+        }
+      ]
+    },
+    {
+      "id": "emp-message",
+      "label": "消息协同",
+      "parent": "employee",
+      "sublabel": "当前入口 /hub/messages",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-message-1",
+      "label": "会话与消息",
+      "parent": "emp-message",
+      "sublabel": "私聊、群聊、助手会话、发送文本",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 188,
+          "end_line": 227
+        }
+      ]
+    },
+    {
+      "id": "emp-message-2",
+      "label": "消息操作",
+      "parent": "emp-message",
+      "sublabel": "复制、引用、撤回和删除",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 272,
+          "end_line": 311
+        }
+      ]
+    },
+    {
+      "id": "emp-message-3",
+      "label": "附件与群管理",
+      "parent": "emp-message",
+      "sublabel": "附件发送下载、群资料、成员增补与退群",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 446,
+          "end_line": 485
+        }
+      ]
+    },
+    {
+      "id": "emp-message-4",
+      "label": "卡片操作待接",
+      "parent": "emp-message",
+      "sublabel": "知识卡、流程卡的按钮仍为提示",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 340,
+          "end_line": 379
+        }
+      ]
+    },
+    {
+      "id": "emp-approval",
+      "label": "审批中心",
+      "parent": "employee",
+      "sublabel": "当前入口 /hub/approvals",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-approval-1",
+      "label": "列表与筛选",
+      "parent": "emp-approval",
+      "sublabel": "待我审批、我发起、搜索、分页",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 66,
+          "end_line": 105
+        }
+      ]
+    },
+    {
+      "id": "emp-approval-2",
+      "label": "审批动作",
+      "parent": "emp-approval",
+      "sublabel": "同意、驳回、申请撤回及原因填写",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 172,
+          "end_line": 211
+        }
+      ]
+    },
+    {
+      "id": "emp-approval-3",
+      "label": "待接功能",
+      "parent": "emp-approval",
+      "sublabel": "发起表单、抄送列表、AI 预审统计",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 240,
+          "end_line": 279
+        }
+      ]
+    },
+    {
+      "id": "emp-files",
+      "label": "个人文件",
+      "parent": "employee",
+      "sublabel": "入口 /files；收藏与最近访问含本地记录",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/FilesSection.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-files-1",
+      "label": "文件目录",
+      "parent": "emp-files",
+      "sublabel": "文件夹创建、浏览、筛选、移动与复制",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/FilesSection.vue",
+          "line": 386,
+          "end_line": 425
+        }
+      ]
+    },
+    {
+      "id": "emp-files-2",
+      "label": "文件操作",
+      "parent": "emp-files",
+      "sublabel": "上传、预览、下载和移入回收站",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/FilesSection.vue",
+          "line": 441,
+          "end_line": 480
+        }
+      ]
+    },
+    {
+      "id": "emp-files-3",
+      "label": "快捷视图",
+      "parent": "emp-files",
+      "sublabel": "最近访问、收藏和文件分类",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/FilesSection.vue",
+          "line": 245,
+          "end_line": 284
+        }
+      ]
+    },
+    {
+      "id": "emp-files-trash",
+      "label": "回收站处理",
+      "parent": "emp-files",
+      "sublabel": "恢复与彻底删除已有组合逻辑",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/useFileUpload.ts",
+          "line": 250,
+          "end_line": 289
+        },
+        {
+          "path": "employee-web/src/composables/useFileUpload.ts",
+          "line": 266,
+          "end_line": 305
+        }
+      ]
+    },
+    {
+      "id": "emp-contacts",
+      "label": "通讯录",
+      "parent": "employee",
+      "sublabel": "入口 /contacts",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/ContactsSection.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-contacts-1",
+      "label": "组织与人员",
+      "parent": "emp-contacts",
+      "sublabel": "部门树、人员资料、关系分类",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/ContactsSection.vue",
+          "line": 316,
+          "end_line": 355
+        }
+      ]
+    },
+    {
+      "id": "emp-contacts-2",
+      "label": "好友操作",
+      "parent": "emp-contacts",
+      "sublabel": "添加、删除、接受申请与进入私聊",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/ContactsSection.vue",
+          "line": 339,
+          "end_line": 378
+        }
+      ]
+    },
+    {
+      "id": "emp-agents",
+      "label": "AI 助手目录",
+      "parent": "employee",
+      "sublabel": "入口 /agents；顶栏 Agent 仍跳消息",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/AgentsSection.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-agents-1",
+      "label": "助手发现",
+      "parent": "emp-agents",
+      "sublabel": "查询可用助手、筛选和详情",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/AgentsSection.vue",
+          "line": 57,
+          "end_line": 96
+        }
+      ]
+    },
+    {
+      "id": "emp-agents-2",
+      "label": "助手会话",
+      "parent": "emp-agents",
+      "sublabel": "发起或进入已有助手对话",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/AgentsSection.vue",
+          "line": 93,
+          "end_line": 132
+        }
+      ]
+    },
+    {
+      "id": "emp-settings",
+      "label": "个人设置",
+      "parent": "employee",
+      "sublabel": "入口 /settings",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-settings-1",
+      "label": "个人资料",
+      "parent": "emp-settings",
+      "sublabel": "手机号、头像、邮箱绑定及密码修改",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 289,
+          "end_line": 328
+        }
+      ]
+    },
+    {
+      "id": "emp-settings-2",
+      "label": "外观与通知",
+      "parent": "emp-settings",
+      "sublabel": "在线状态、主题色、字号、气泡和通知偏好",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 475,
+          "end_line": 514
+        }
+      ]
+    },
+    {
+      "id": "emp-settings-3",
+      "label": "个人概览",
+      "parent": "emp-settings",
+      "sublabel": "考勤与假期摘要、账号退出",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 152,
+          "end_line": 191
+        }
+      ]
+    },
+    {
+      "id": "emp-legacy",
+      "label": "旧版与扩展组件",
+      "parent": "employee",
+      "sublabel": "保留源码；不等同当前路由可达",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/WorkbenchSection.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "emp-legacy-1",
+      "label": "旧业务工作台",
+      "parent": "emp-legacy",
+      "sublabel": "请假、补卡、通用 OA 申请表单代码",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/WorkbenchSection.vue",
+          "line": 797,
+          "end_line": 836
+        }
+      ]
+    },
+    {
+      "id": "emp-legacy-2",
+      "label": "接入状态",
+      "parent": "emp-legacy",
+      "sublabel": "旧工作台路由已重定向；不算当前表单入口",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/WorkbenchSection.vue",
+          "line": 736,
+          "end_line": 775
+        }
+      ]
+    },
+    {
+      "id": "emp-legacy-plugins",
+      "label": "插件宿主代码",
+      "parent": "emp-legacy",
+      "sublabel": "可见插件清单、脚本加载与组件注册",
+      "sources": [
+        {
+          "path": "employee-web/src/stores/plugins.ts",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "employee-web/src/core/plugin-loader.ts",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "employee-web/src/core/host-sdk.ts",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "hub",
+      "label": "独立画布端",
+      "parent": "workforce",
+      "sublabel": "hub-web · 与 employee-web/hub 不是同一工程",
+      "sources": [
+        {
+          "path": "hub-web/src/router/index.ts",
+          "line": 11,
+          "end_line": 23
+        }
+      ]
+    },
+    {
+      "id": "hub-auth",
+      "label": "认证页面",
+      "parent": "hub",
+      "sources": [
+        {
+          "path": "hub-web/src/views/AuthView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "hub-auth-1",
+      "label": "密码登录",
+      "parent": "hub-auth",
+      "sublabel": "账号密码登录、个人信息加载",
+      "sources": [
+        {
+          "path": "hub-web/src/views/AuthView.vue",
+          "line": 75,
+          "end_line": 114
+        }
+      ]
+    },
+    {
+      "id": "hub-auth-2",
+      "label": "待接入口",
+      "parent": "hub-auth",
+      "sublabel": "验证码登录、短信注册未接通",
+      "sources": [
+        {
+          "path": "hub-web/src/views/AuthView.vue",
+          "line": 95,
+          "end_line": 134
+        }
+      ]
+    },
+    {
+      "id": "hub-workbench",
+      "label": "工作台",
+      "parent": "hub",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "hub-workbench-1",
+      "label": "考勤看板",
+      "parent": "hub-workbench",
+      "sublabel": "真实首末打卡、周出勤、今日排班",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 122,
+          "end_line": 161
+        }
+      ]
+    },
+    {
+      "id": "hub-workbench-2",
+      "label": "业务摘要",
+      "parent": "hub-workbench",
+      "sublabel": "假期余额、我的申请、待办与未读消息",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 55,
+          "end_line": 94
+        }
+      ]
+    },
+    {
+      "id": "hub-workbench-3",
+      "label": "下班打卡",
+      "parent": "hub-workbench",
+      "sublabel": "调用打卡接口并刷新看板",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 128,
+          "end_line": 167
+        }
+      ]
+    },
+    {
+      "id": "hub-workbench-4",
+      "label": "通知与入口",
+      "parent": "hub-workbench",
+      "sublabel": "通知已读；申请表单和快捷提问待接",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 208,
+          "end_line": 247
+        }
+      ]
+    },
+    {
+      "id": "hub-message",
+      "label": "消息中心",
+      "parent": "hub",
+      "sources": [
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "hub-message-1",
+      "label": "聊天与附件",
+      "parent": "hub-message",
+      "sublabel": "私聊、群聊、助手会话、文本与文件",
+      "sources": [
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 189,
+          "end_line": 228
+        }
+      ]
+    },
+    {
+      "id": "hub-message-2",
+      "label": "消息操作",
+      "parent": "hub-message",
+      "sublabel": "复制、引用、转发、撤回与删除",
+      "sources": [
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 305,
+          "end_line": 344
+        }
+      ]
+    },
+    {
+      "id": "hub-message-3",
+      "label": "群设置",
+      "parent": "hub-message",
+      "sublabel": "群资料、加减成员、退群和会话偏好",
+      "sources": [
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 434,
+          "end_line": 473
+        }
+      ]
+    },
+    {
+      "id": "hub-message-4",
+      "label": "群协作",
+      "parent": "hub-message",
+      "sublabel": "公告、群文件、群昵称与清空记录",
+      "sources": [
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 798,
+          "end_line": 837
+        }
+      ]
+    },
+    {
+      "id": "hub-message-5",
+      "label": "文件与联系人",
+      "parent": "hub-message",
+      "sublabel": "云文件转发、好友备注",
+      "sources": [
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 727,
+          "end_line": 766
+        }
+      ]
+    },
+    {
+      "id": "hub-placeholder",
+      "label": "独立页面占位",
+      "parent": "hub",
+      "sublabel": "审批、我的考勤、Agent 三条路由均指向占位页",
+      "sources": [
+        {
+          "path": "hub-web/src/router/index.ts",
+          "line": 1,
+          "end_line": 23
+        },
+        {
+          "path": "hub-web/src/views/PlaceholderView.vue",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "hub-missing",
+      "label": "无独立导航页面",
+      "parent": "hub",
+      "sublabel": "个人文件、通讯录、设置没有独立路由",
+      "sources": [
+        {
+          "path": "hub-web/src/router/index.ts",
+          "line": 1,
+          "end_line": 23
+        }
+      ]
+    },
+    {
+      "id": "server",
+      "label": "后端能力",
+      "parent": "workforce",
+      "sublabel": "server · 接口与服务已存在，不代表每个前端均已接入",
+      "sources": [
+        {
+          "path": "server/pom.xml",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-auth",
+      "label": "认证与注册",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/EmployeeAuthController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/AdminAuthController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/PublicRegistrationController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-auth-op-1",
+      "label": "员工登录",
+      "parent": "srv-auth",
+      "sublabel": "发送登录验证码；员工登出；查询当前员工信息",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/EmployeeAuthController.java",
+          "line": 40,
+          "end_line": 68
+        }
+      ]
+    },
+    {
+      "id": "srv-auth-op-2",
+      "label": "发送邮箱验证码",
+      "parent": "srv-auth",
+      "sublabel": "绑定邮箱；重置密码",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/EmployeeAuthController.java",
+          "line": 66,
+          "end_line": 86
+        }
+      ]
+    },
+    {
+      "id": "srv-auth-op-3",
+      "label": "管理员登录",
+      "parent": "srv-auth",
+      "sublabel": "管理员登出；查询当前管理员信息",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/AdminAuthController.java",
+          "line": 30,
+          "end_line": 49
+        }
+      ]
+    },
+    {
+      "id": "srv-auth-op-4",
+      "label": "发送注册短信验证码",
+      "parent": "srv-auth",
+      "sublabel": "员工自助注册",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/PublicRegistrationController.java",
+          "line": 35,
+          "end_line": 49
+        }
+      ]
+    },
+    {
+      "id": "srv-rbac",
+      "label": "后台角色权限",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/AdminRbacController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-rbac-op-1",
+      "label": "查询权限列表",
+      "parent": "srv-rbac",
+      "sublabel": "查询角色列表；创建角色；查询角色详情",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/AdminRbacController.java",
+          "line": 39,
+          "end_line": 65
+        }
+      ]
+    },
+    {
+      "id": "srv-rbac-op-2",
+      "label": "更新角色",
+      "parent": "srv-rbac",
+      "sublabel": "删除角色；分配角色权限；查询管理员用户列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/AdminRbacController.java",
+          "line": 63,
+          "end_line": 92
+        }
+      ]
+    },
+    {
+      "id": "srv-rbac-op-3",
+      "label": "查询管理员用户角色",
+      "parent": "srv-rbac",
+      "sublabel": "分配管理员用户角色",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/AdminRbacController.java",
+          "line": 90,
+          "end_line": 102
+        }
+      ]
+    },
+    {
+      "id": "srv-org",
+      "label": "组织与档案",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/AdminOrgController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/EmployeeOrgController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/EmployeePreferenceController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-org-op-1",
+      "label": "查询部门树",
+      "parent": "srv-org",
+      "sublabel": "创建部门；更新部门；删除部门",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/AdminOrgController.java",
+          "line": 50,
+          "end_line": 78
+        }
+      ]
+    },
+    {
+      "id": "srv-org-op-2",
+      "label": "查询岗位列表",
+      "parent": "srv-org",
+      "sublabel": "创建岗位；更新岗位；分页查询员工列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/AdminOrgController.java",
+          "line": 79,
+          "end_line": 107
+        }
+      ]
+    },
+    {
+      "id": "srv-org-op-3",
+      "label": "查询组织架构成员列表",
+      "parent": "srv-org",
+      "sublabel": "创建员工；更新员工；查询员工详情",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/AdminOrgController.java",
+          "line": 105,
+          "end_line": 133
+        }
+      ]
+    },
+    {
+      "id": "srv-org-op-4",
+      "label": "查询员工直属上级",
+      "parent": "srv-org",
+      "sublabel": "查询员工直属下属；更新员工用工状态；保存员工登录账号",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/AdminOrgController.java",
+          "line": 131,
+          "end_line": 158
+        }
+      ]
+    },
+    {
+      "id": "srv-org-op-5",
+      "label": "查询个人档案",
+      "parent": "srv-org",
+      "sublabel": "更新个人档案；查询我的直属上级；查询我的下属",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/EmployeeOrgController.java",
+          "line": 32,
+          "end_line": 58
+        }
+      ]
+    },
+    {
+      "id": "srv-org-op-6",
+      "label": "查询我的同事",
+      "parent": "srv-org",
+      "sublabel": "接口定义",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/EmployeeOrgController.java",
+          "line": 56,
+          "end_line": 61
+        }
+      ]
+    },
+    {
+      "id": "srv-org-op-7",
+      "label": "查询员工偏好设置",
+      "parent": "srv-org",
+      "sublabel": "更新员工偏好设置",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/controller/EmployeePreferenceController.java",
+          "line": 29,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-attendance",
+      "label": "考勤与排班",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/controller/AdminAttendanceController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/controller/EmployeeAttendanceController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-attendance-op-1",
+      "label": "创建考勤日历",
+      "parent": "srv-attendance",
+      "sublabel": "查询考勤日历列表；创建考勤班次；查询考勤班次列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/controller/AdminAttendanceController.java",
+          "line": 45,
+          "end_line": 73
+        }
+      ]
+    },
+    {
+      "id": "srv-attendance-op-2",
+      "label": "创建考勤组",
+      "parent": "srv-attendance",
+      "sublabel": "查询考勤组列表；添加考勤组成员；查询考勤组成员列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/controller/AdminAttendanceController.java",
+          "line": 71,
+          "end_line": 99
+        }
+      ]
+    },
+    {
+      "id": "srv-attendance-op-3",
+      "label": "创建考勤排班",
+      "parent": "srv-attendance",
+      "sublabel": "查询考勤排班列表；更新考勤排班；查询每日考勤结果",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/controller/AdminAttendanceController.java",
+          "line": 97,
+          "end_line": 126
+        }
+      ]
+    },
+    {
+      "id": "srv-attendance-op-4",
+      "label": "员工打卡",
+      "parent": "srv-attendance",
+      "sublabel": "查询个人每日考勤结果；查询个人排班区间；查询个人考勤异常",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/controller/EmployeeAttendanceController.java",
+          "line": 36,
+          "end_line": 62
+        }
+      ]
+    },
+    {
+      "id": "srv-attendance-op-5",
+      "label": "查询团队每日考勤结果",
+      "parent": "srv-attendance",
+      "sublabel": "接口定义",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/controller/EmployeeAttendanceController.java",
+          "line": 60,
+          "end_line": 68
+        }
+      ]
+    },
+    {
+      "id": "srv-leave",
+      "label": "假期账户",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/controller/AdminLeaveController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/controller/EmployeeLeaveController.java",
+          "line": 1,
+          "end_line": 39
+        }
+      ]
+    },
+    {
+      "id": "srv-leave-op-1",
+      "label": "查询假期类型列表",
+      "parent": "srv-leave",
+      "sublabel": "查询假期账户列表；创建假期类型；更新假期类型",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/controller/AdminLeaveController.java",
+          "line": 37,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "srv-leave-op-2",
+      "label": "删除假期类型",
+      "parent": "srv-leave",
+      "sublabel": "调整假期余额",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/controller/AdminLeaveController.java",
+          "line": 63,
+          "end_line": 75
+        }
+      ]
+    },
+    {
+      "id": "srv-leave-op-3",
+      "label": "查询我的假期账户",
+      "parent": "srv-leave",
+      "sublabel": "查询假期类型列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/controller/EmployeeLeaveController.java",
+          "line": 28,
+          "end_line": 39
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow",
+      "label": "审批引擎与申请",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/AdminWorkflowController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-op-1",
+      "label": "创建流程类型",
+      "parent": "srv-workflow",
+      "sublabel": "分页查询审批请求；查询审批请求详情；查询请求可用操作",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/AdminWorkflowController.java",
+          "line": 45,
+          "end_line": 73
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-op-2",
+      "label": "查询流程类型列表",
+      "parent": "srv-workflow",
+      "sublabel": "创建流程模板；查询流程模板列表；创建模板版本",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/AdminWorkflowController.java",
+          "line": 71,
+          "end_line": 98
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-op-3",
+      "label": "查询模板版本列表",
+      "parent": "srv-workflow",
+      "sublabel": "发布模板版本",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/AdminWorkflowController.java",
+          "line": 98,
+          "end_line": 111
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-op-4",
+      "label": "提交请假申请",
+      "parent": "srv-workflow",
+      "sublabel": "提交补卡申请；提交通用审批申请；查询我发起的审批统计",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java",
+          "line": 59,
+          "end_line": 88
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-op-5",
+      "label": "分页查询抄送我的审批",
+      "parent": "srv-workflow",
+      "sublabel": "标记抄送已读；查询本周AI预审统计；查询我的待办任务",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java",
+          "line": 86,
+          "end_line": 116
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-op-6",
+      "label": "分页查询我的审批请求",
+      "parent": "srv-workflow",
+      "sublabel": "审批通过任务；驳回审批任务；撤回审批请求",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java",
+          "line": 114,
+          "end_line": 142
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-op-7",
+      "label": "查询我的审批请求详情",
+      "parent": "srv-workflow",
+      "sublabel": "查询请求可用操作；创建附件下载票据；下载审批附件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java",
+          "line": 141,
+          "end_line": 167
+        }
+      ]
+    },
+    {
+      "id": "srv-im",
+      "label": "消息与群协作",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/AdminImOutboxController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-1",
+      "label": "查询会话列表",
+      "parent": "srv-im",
+      "sublabel": "发起私聊会话；创建群聊会话；发起 Agent 会话",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 69,
+          "end_line": 101
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-2",
+      "label": "查询会话详情",
+      "parent": "srv-im",
+      "sublabel": "查询群成员列表；查询群资料；查询群文件列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 101,
+          "end_line": 127
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-3",
+      "label": "创建群文件下载凭证",
+      "parent": "srv-im",
+      "sublabel": "群文件移入回收站；更新群资料；添加群成员",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 125,
+          "end_line": 166
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-4",
+      "label": "移除群成员",
+      "parent": "srv-im",
+      "sublabel": "退出群聊；解散群聊；查询消息列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 167,
+          "end_line": 197
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-5",
+      "label": "发送消息",
+      "parent": "srv-im",
+      "sublabel": "编辑消息；撤回消息；翻译消息",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 197,
+          "end_line": 227
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-6",
+      "label": "转发消息",
+      "parent": "srv-im",
+      "sublabel": "收藏消息；设置消息提醒；删除消息",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 226,
+          "end_line": 261
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-7",
+      "label": "创建消息附件下载凭证",
+      "parent": "srv-im",
+      "sublabel": "下载附件；更新已读位置；查询群公告列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 260,
+          "end_line": 298
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-8",
+      "label": "发布群公告",
+      "parent": "srv-im",
+      "sublabel": "设置本群昵称；清空当前用户视角的聊天记录；更新会话设置",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/EmployeeImController.java",
+          "line": 296,
+          "end_line": 328
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-9",
+      "label": "分页查询 Outbox 事件",
+      "parent": "srv-im",
+      "sublabel": "查询 Outbox 投递摘要；查询 Outbox 失败汇总；分页查询 Outbox 审计日志",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/AdminImOutboxController.java",
+          "line": 41,
+          "end_line": 67
+        }
+      ]
+    },
+    {
+      "id": "srv-im-op-10",
+      "label": "批量重试 Outbox 事件",
+      "parent": "srv-im",
+      "sublabel": "手动投递到期事件；查询 Outbox 事件详情；重试单条 Outbox 事件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/controller/AdminImOutboxController.java",
+          "line": 65,
+          "end_line": 91
+        }
+      ]
+    },
+    {
+      "id": "srv-contact",
+      "label": "好友与通讯录",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/controller/EmployeeContactController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-contact-op-1",
+      "label": "查询好友列表",
+      "parent": "srv-contact",
+      "sublabel": "查询好友请求列表；添加好友；发送好友请求",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/controller/EmployeeContactController.java",
+          "line": 39,
+          "end_line": 67
+        }
+      ]
+    },
+    {
+      "id": "srv-contact-op-2",
+      "label": "接受好友请求",
+      "parent": "srv-contact",
+      "sublabel": "删除好友；修改好友备注；查询部门树",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/controller/EmployeeContactController.java",
+          "line": 67,
+          "end_line": 92
+        }
+      ]
+    },
+    {
+      "id": "srv-file",
+      "label": "文件与存储",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/AdminFileController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/EmployeeFileController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-1",
+      "label": "分页查询企业文件",
+      "parent": "srv-file",
+      "sublabel": "分页查询回收站文件；创建上传凭证；确认文件上传",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/AdminFileController.java",
+          "line": 81,
+          "end_line": 117
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-2",
+      "label": "查询存储摘要",
+      "parent": "srv-file",
+      "sublabel": "创建下载凭证；下载文件；文件移入回收站",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/AdminFileController.java",
+          "line": 115,
+          "end_line": 143
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-3",
+      "label": "恢复回收站文件",
+      "parent": "srv-file",
+      "sublabel": "彻底删除文件；执行文件清理任务；查询配额策略列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/AdminFileController.java",
+          "line": 142,
+          "end_line": 169
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-4",
+      "label": "创建配额策略",
+      "parent": "srv-file",
+      "sublabel": "更新配额策略",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/AdminFileController.java",
+          "line": 167,
+          "end_line": 179
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-5",
+      "label": "分页查询我的文件",
+      "parent": "srv-file",
+      "sublabel": "分页查询回收站文件；浏览文件目录；查询文件夹列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/EmployeeFileController.java",
+          "line": 76,
+          "end_line": 106
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-6",
+      "label": "创建文件夹",
+      "parent": "srv-file",
+      "sublabel": "创建上传凭证；确认文件上传；查询个人配额",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/EmployeeFileController.java",
+          "line": 104,
+          "end_line": 130
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-7",
+      "label": "创建下载凭证",
+      "parent": "srv-file",
+      "sublabel": "移动文件；复制文件；下载文件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/EmployeeFileController.java",
+          "line": 128,
+          "end_line": 157
+        }
+      ]
+    },
+    {
+      "id": "srv-file-op-8",
+      "label": "文件移入回收站",
+      "parent": "srv-file",
+      "sublabel": "恢复回收站文件；彻底删除文件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/controller/EmployeeFileController.java",
+          "line": 156,
+          "end_line": 175
+        }
+      ]
+    },
+    {
+      "id": "srv-agent",
+      "label": "智能体与模型",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentTaskController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/EmployeeAgentController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-1",
+      "label": "分页查询 Agent 列表",
+      "parent": "srv-agent",
+      "sublabel": "创建 Agent；查询 Agent 详情；更新 Agent",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 60,
+          "end_line": 88
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-2",
+      "label": "删除 Agent",
+      "parent": "srv-agent",
+      "sublabel": "查询 Agent 版本列表；查询 Agent 工具列表；查询 Agent ACL 列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 87,
+          "end_line": 114
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-3",
+      "label": "校验 Agent 工作流配置",
+      "parent": "srv-agent",
+      "sublabel": "创建 Agent 版本；更新 Agent 版本；创建 Agent 工具",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 112,
+          "end_line": 140
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-4",
+      "label": "绑定工具到版本",
+      "parent": "srv-agent",
+      "sublabel": "授予 Agent ACL 权限；发布 Agent 版本；停用 Agent",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 138,
+          "end_line": 166
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-5",
+      "label": "启用 Agent",
+      "parent": "srv-agent",
+      "sublabel": "查询 AI 服务商列表；创建 AI 服务商；更新 AI 服务商",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 164,
+          "end_line": 192
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-6",
+      "label": "删除 AI 服务商",
+      "parent": "srv-agent",
+      "sublabel": "测试 AI 服务商连通性；查询服务商可用模型；查询 LLM 模型列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 191,
+          "end_line": 218
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-7",
+      "label": "创建 LLM 模型",
+      "parent": "srv-agent",
+      "sublabel": "测试模型草稿连通性；更新 LLM 模型；删除 LLM 模型",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 216,
+          "end_line": 243
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-8",
+      "label": "测试模型连通性",
+      "parent": "srv-agent",
+      "sublabel": "Agent 试运行；运行 Agent 工作流",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentController.java",
+          "line": 242,
+          "end_line": 261
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-9",
+      "label": "分页查询 Agent 任务",
+      "parent": "srv-agent",
+      "sublabel": "查询 Agent 任务指标；查询任务失败汇总；分页查询超时扫描记录",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentTaskController.java",
+          "line": 45,
+          "end_line": 71
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-10",
+      "label": "查询 Agent 任务详情",
+      "parent": "srv-agent",
+      "sublabel": "查询任务工具调用记录；查询任务审计记录；手动触发任务超时扫描",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/AdminAgentTaskController.java",
+          "line": 70,
+          "end_line": 94
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-op-11",
+      "label": "查询员工可用 Agent",
+      "parent": "srv-agent",
+      "sublabel": "创建 Agent 任务",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/EmployeeAgentController.java",
+          "line": 34,
+          "end_line": 46
+        }
+      ]
+    },
+    {
+      "id": "srv-rag",
+      "label": "知识库检索",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/controller/AdminRagflowController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-rag-op-1",
+      "label": "查询知识库全局设置",
+      "parent": "srv-rag",
+      "sublabel": "更新知识库全局设置；分页查询知识库空间；创建知识库空间",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/controller/AdminRagflowController.java",
+          "line": 54,
+          "end_line": 82
+        }
+      ]
+    },
+    {
+      "id": "srv-rag-op-2",
+      "label": "创建知识库文件上传票据",
+      "parent": "srv-rag",
+      "sublabel": "确认知识库文件上传；查询知识库空间详情；更新知识库空间",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/controller/AdminRagflowController.java",
+          "line": 80,
+          "end_line": 108
+        }
+      ]
+    },
+    {
+      "id": "srv-rag-op-3",
+      "label": "删除知识库空间",
+      "parent": "srv-rag",
+      "sublabel": "查询空间访问控制列表；保存空间访问控制；查询空间文档列表",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/controller/AdminRagflowController.java",
+          "line": 107,
+          "end_line": 135
+        }
+      ]
+    },
+    {
+      "id": "srv-rag-op-4",
+      "label": "添加知识库文档",
+      "parent": "srv-rag",
+      "sublabel": "重新解析知识库文档；删除知识库文档；知识库检索测试",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/controller/AdminRagflowController.java",
+          "line": 133,
+          "end_line": 163
+        }
+      ]
+    },
+    {
+      "id": "srv-system",
+      "label": "系统与通知",
+      "parent": "server",
+      "sublabel": "后端接口清单",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminSystemController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminDictController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminAlertController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-system-op-1",
+      "label": "查询角色列表",
+      "parent": "srv-system",
+      "sublabel": "查询权限列表；分页查询审计日志",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminSystemController.java",
+          "line": 32,
+          "end_line": 49
+        }
+      ]
+    },
+    {
+      "id": "srv-system-op-2",
+      "label": "查询字典类型列表",
+      "parent": "srv-system",
+      "sublabel": "查询字典条目列表；创建字典条目；更新字典条目",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminDictController.java",
+          "line": 35,
+          "end_line": 62
+        }
+      ]
+    },
+    {
+      "id": "srv-system-op-3",
+      "label": "删除字典条目",
+      "parent": "srv-system",
+      "sublabel": "接口定义",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminDictController.java",
+          "line": 61,
+          "end_line": 67
+        }
+      ]
+    },
+    {
+      "id": "srv-system-op-4",
+      "label": "查询活跃告警列表",
+      "parent": "srv-system",
+      "sublabel": "查询告警渠道列表；创建告警渠道；更新告警规则",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminAlertController.java",
+          "line": 33,
+          "end_line": 59
+        }
+      ]
+    },
+    {
+      "id": "srv-system-op-5",
+      "label": "创建告警处理记录",
+      "parent": "srv-system",
+      "sublabel": "分页查询告警处理记录",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminAlertController.java",
+          "line": 57,
+          "end_line": 70
+        }
+      ]
+    },
+    {
+      "id": "srv-system-notifications",
+      "label": "通知与品牌",
+      "parent": "srv-system",
+      "sublabel": "通知列表、未读数、标记已读、邮件渠道与登录标语",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/EmployeeNotificationController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/AdminNotificationChannelController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/controller/PublicBrandingController.java",
+          "line": 1,
+          "end_line": 33
+        }
+      ]
+    },
+    {
+      "id": "srv-agent-confirm",
+      "label": "人工确认",
+      "parent": "srv-agent",
+      "sublabel": "确认或取消员工智能体任务",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/EmployeeAgentTaskController.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-auth-sms",
+      "label": "短信通道边界",
+      "parent": "srv-auth",
+      "sublabel": "注册接口存在；短信发送实现仍是演示模式",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 89,
+          "end_line": 104
+        }
+      ]
+    },
+    {
+      "id": "srv-file-storage",
+      "label": "存储实现",
+      "parent": "srv-file",
+      "sublabel": "本地文件与 MinIO 存储提供器",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/storage/LocalStorageProvider.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/storage/MinioStorageProvider.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-im-websocket",
+      "label": "实时消息投递",
+      "parent": "srv-im",
+      "sublabel": "WebSocket 推送与数据库 Outbox 派发",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketPushService.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketOutboxDispatcher.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "srv-workflow-engine",
+      "label": "流程与结算",
+      "parent": "srv-workflow",
+      "sublabel": "Flowable 人工审批、AI 预审、冻结及结算联动",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 149,
+          "end_line": 188
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 721,
+          "end_line": 760
+        }
+      ]
+    },
+    {
+      "id": "platform",
+      "label": "共享与插件平台",
+      "parent": "workforce",
+      "sublabel": "工程基础能力；非独立业务端",
+      "sources": [
+        {
+          "path": "pom.xml",
+          "line": 1,
+          "end_line": 17
+        }
+      ]
+    },
+    {
+      "id": "platform-http",
+      "label": "共享 HTTP 客户端",
+      "parent": "platform",
+      "sources": [
+        {
+          "path": "shared-web/api-http.ts",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "platform-http-1",
+      "label": "请求协议",
+      "parent": "platform-http",
+      "sublabel": "查询参数、响应信封、错误与请求标识",
+      "sources": [
+        {
+          "path": "shared-web/api-http.ts",
+          "line": 4,
+          "end_line": 43
+        }
+      ]
+    },
+    {
+      "id": "platform-http-2",
+      "label": "身份与精度",
+      "parent": "platform-http",
+      "sublabel": "CSRF 引导、Cookie 与大整数保护",
+      "sources": [
+        {
+          "path": "shared-web/api-http.ts",
+          "line": 60,
+          "end_line": 99
+        }
+      ]
+    },
+    {
+      "id": "platform-plugin",
+      "label": "后端插件运行时",
+      "parent": "platform",
+      "sublabel": "插件安装、依赖、配置、动作网关与领域事件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/controller/admin/AdminPluginController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/controller/PluginGatewayController.java",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "platform-sdk",
+      "label": "插件 SDK",
+      "parent": "platform",
+      "sublabel": "生命周期、动作契约、宿主服务、配置与事件接口",
+      "sources": [
+        {
+          "path": "plugin-sdk/src/main/java/com/workforcehub/plugin/sdk/PluginContext.java",
+          "line": 1,
+          "end_line": 15
+        },
+        {
+          "path": "plugin-sdk/src/main/java/com/workforcehub/plugin/sdk/WorkforcePlugin.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "platform-demo",
+      "label": "示例插件",
+      "parent": "platform",
+      "sublabel": "hello-plugin 提供插件接入示例",
+      "sources": [
+        {
+          "path": "plugins/hello-plugin/src/main/java/com/workforcehub/plugin/hello/HelloActionHandler.java",
+          "line": 1,
+          "end_line": 40
+        }
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "阅读方式",
+      "items": [
+        "这是按端、模块、功能划分的思维导图，连线表示包含关系。",
+        "用顶部视图、搜索、节点目录定位；分支可展开或收起。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "实现状态",
+      "items": [
+        "已接接口表示源码存在页面调用，本轮未做运行验收。",
+        "占位、未接、演示和旧版组件均已在对应分支标注。",
+        "后端分支列出接口能力，未宣称每个前端都有对应页面。"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "源码快照",
+      "items": [
+        "固定到提交 38d829167042，日期 2026-11-08。",
+        "工作区另有本次会话的第99审文档与索引改动，未用作已提交源码证据。",
+        "管理端企业设置当前主要是登录标语；员工主管属于员工身份增强能力。"
+      ]
+    }
+  ]
+}

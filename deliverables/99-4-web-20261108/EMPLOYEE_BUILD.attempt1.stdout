@@ -1,0 +1,6 @@
+
+> workforce-hub-employee-web@0.1.0 build
+> vue-tsc --noEmit && vite build
+
+src/api/employee.ts(120,130): error TS2322: Type 'LeaveDurationQuery' is not assignable to type 'QueryParams'.
+  Index signature for type 'string' is missing in type 'LeaveDurationQuery'.

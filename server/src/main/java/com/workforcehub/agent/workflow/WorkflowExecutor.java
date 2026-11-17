@@ -78,7 +78,7 @@ public class WorkflowExecutor {
             throw new BizException(400, "工作流配置无效: " + String.join("; ", validation.messages()));
         }
         WorkflowDefinition definition = workflowParser.parse(version.workflowConfigJson());
-        WorkflowContext context = new WorkflowContext(objectMapper);
+        WorkflowContext context = new WorkflowContext(objectMapper, currentUserId);
         JsonNode input = normalizeInput(readJson(StringUtils.hasText(inputPayloadJson) ? inputPayloadJson : "{}"));
         if (currentUserId != null && input instanceof ObjectNode inputObject) {
             // 仅在客户端未提供时注入；input.userId 保留客户端值，数据源/工具层各自做授权校验
@@ -153,9 +153,9 @@ public class WorkflowExecutor {
     }
 
     // 从工作流上下文取服务端注入的任务归属人；取不到返回 null，由工具层按"不强制"兜底（仅管理端试运行场景）
+    // 知识检索的空操作者必须另外通过管理端身份/权限校验；模板变量不得替换真实操作者。
     private Long operatorUserId(WorkflowContext context) {
-        JsonNode userId = context.get("currentUserId");
-        return userId == null || userId.isNull() ? null : userId.asLong();
+        return context.operatorUserId();
     }
 
     private String executeToolNode(Long taskId,

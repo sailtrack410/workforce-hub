@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.org.mapper.OrgDirectoryMapper">
+
+    <sql id="ValidAvatarAttachmentRefColumn">
+        CASE WHEN avatar_ref.id IS NULL OR avatar_file.id IS NULL THEN NULL ELSE u.avatar_attachment_ref_id END AS avatarAttachmentRefId
+    </sql>
+
+    <sql id="ValidAvatarJoin">
+        LEFT JOIN sys_attachment_ref avatar_ref
+            ON avatar_ref.id = u.avatar_attachment_ref_id
+           AND avatar_ref.owner_type = 'USER_AVATAR'
+           AND avatar_ref.uploader_type = 'USER'
+           AND avatar_ref.uploader_id = u.id
+           AND avatar_ref.deleted_at IS NULL
+           AND avatar_ref.is_deleted = 0
+        LEFT JOIN sys_file_object avatar_file
+            ON avatar_file.id = avatar_ref.file_object_id
+           AND avatar_file.is_deleted = 0
+    </sql>
+
+    <select id="selectDepartmentTreeNodes" resultType="com.workforcehub.org.dto.OrgDepartmentTreeNodeResponse">
+        SELECT
+            d.id AS id,
+            d.parent_id AS parentId,
+            d.tree_path AS treePath,
+            d.dept_code AS deptCode,
+            d.dept_name AS deptName,
+            d.dept_type AS deptType,
+            d.dept_level AS deptLevel,
+            d.leader_user_id AS leaderUserId,
+            u.real_name AS leaderName,
+            d.status AS status
+        FROM org_department d
+        LEFT JOIN org_user u
+            ON u.id = d.leader_user_id
+           AND u.is_deleted = 0
+        WHERE d.is_deleted = 0
+        ORDER BY d.dept_level ASC, d.dept_name ASC, d.id ASC
+    </select>
+
+    <select id="selectDepartmentSummaryById" resultType="com.workforcehub.org.dto.OrgDepartmentSummaryResponse">
+        SELECT
+            d.id AS id,
+            d.parent_id AS parentId,
+            d.tree_path AS treePath,
+            d.dept_code AS deptCode,
+            d.dept_name AS deptName,
+            d.dept_type AS deptType,
+            d.dept_level AS deptLevel,
+            d.leader_user_id AS leaderUserId,
+            u.real_name AS leaderName,
+            d.status AS status
+        FROM org_department d
+        LEFT JOIN org_user u
+            ON u.id = d.leader_user_id
+           AND u.is_deleted = 0
+        WHERE d.id = #{deptId}
+          AND d.is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <sql id="UserPageFromWhere">
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        LEFT JOIN emp_user_preference pref
+            ON pref.user_id = u.id
+        <include refid="ValidAvatarJoin"/>
+        WHERE u.is_deleted = 0
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                u.employee_no LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.real_name LIKE CONCAT('%', #{query.keyword}, '%')
+                OR u.mobile LIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.deptId != null">
+            AND u.primary_dept_id = #{query.deptId}
+        </if>
+        <if test="query.employmentStatus != null and query.employmentStatus != ''">
+            AND u.employment_status = #{query.employmentStatus}
+        </if>
+        <if test="query.managerUserId != null">
+            AND u.manager_user_id = #{query.managerUserId}
+        </if>
+    </sql>
+
+    <select id="selectUserPage" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            <include refid="ValidAvatarAttachmentRefColumn"/>,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            COALESCE(pref.signature, '') AS signature,
+            COALESCE(pref.presence_status, 'ONLINE') AS presenceStatus
+        <include refid="UserPageFromWhere"/>
+        ORDER BY u.updated_at DESC, u.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countUserPage" resultType="long">
+        SELECT COUNT(*)
+        <include refid="UserPageFromWhere"/>
+    </select>
+
+    <select id="selectUsersForOrgChart" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            <include refid="ValidAvatarAttachmentRefColumn"/>,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            COALESCE(pref.signature, '') AS signature,
+            COALESCE(pref.presence_status, 'ONLINE') AS presenceStatus
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        LEFT JOIN emp_user_preference pref
+            ON pref.user_id = u.id
+        <include refid="ValidAvatarJoin"/>
+        WHERE u.is_deleted = 0
+        ORDER BY d.dept_level ASC, d.dept_name ASC, u.real_name ASC, u.id ASC
+    </select>
+
+    <select id="selectUserSummaryById" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            <include refid="ValidAvatarAttachmentRefColumn"/>,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            COALESCE(pref.signature, '') AS signature,
+            COALESCE(pref.presence_status, 'ONLINE') AS presenceStatus
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        LEFT JOIN emp_user_preference pref
+            ON pref.user_id = u.id
+        <include refid="ValidAvatarJoin"/>
+        WHERE u.id = #{userId}
+          AND u.is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectUserDetailById" resultType="com.workforcehub.org.dto.OrgUserDetailResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            u.gender AS gender,
+            u.mobile AS mobile,
+            a.email AS email,
+            <include refid="ValidAvatarAttachmentRefColumn"/>,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            u.hire_date AS hireDate,
+            u.regularized_at AS regularizedAt,
+            u.service_start_date AS serviceStartDate,
+            u.annual_leave_start_date AS annualLeaveStartDate,
+            u.work_location AS workLocation
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        LEFT JOIN auth_user_account a
+            ON a.user_id = u.id
+           AND a.is_deleted = 0
+        <include refid="ValidAvatarJoin"/>
+        WHERE u.id = #{userId}
+          AND u.is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectColleaguesByDept" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            <include refid="ValidAvatarAttachmentRefColumn"/>,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            COALESCE(pref.signature, '') AS signature,
+            COALESCE(pref.presence_status, 'ONLINE') AS presenceStatus
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        LEFT JOIN emp_user_preference pref
+            ON pref.user_id = u.id
+        <include refid="ValidAvatarJoin"/>
+        WHERE u.primary_dept_id = #{deptId}
+          AND u.id &lt;&gt; #{currentUserId}
+          AND u.is_deleted = 0
+          AND u.employment_status &lt;&gt; 'OFFBOARDED'
+        ORDER BY u.real_name ASC, u.id ASC
+    </select>
+
+    <select id="selectDirectSubordinates" resultType="com.workforcehub.org.dto.OrgUserSummaryResponse">
+        SELECT
+            u.id AS userId,
+            u.employee_no AS employeeNo,
+            u.real_name AS realName,
+            <include refid="ValidAvatarAttachmentRefColumn"/>,
+            u.primary_dept_id AS primaryDeptId,
+            d.dept_name AS primaryDeptName,
+            u.position_id AS positionId,
+            p.position_name AS positionName,
+            u.manager_user_id AS managerUserId,
+            m.real_name AS managerName,
+            u.employment_status AS employmentStatus,
+            u.status AS status,
+            COALESCE(pref.signature, '') AS signature,
+            COALESCE(pref.presence_status, 'ONLINE') AS presenceStatus
+        FROM org_user u
+        LEFT JOIN org_department d
+            ON d.id = u.primary_dept_id
+           AND d.is_deleted = 0
+        LEFT JOIN org_position p
+            ON p.id = u.position_id
+           AND p.is_deleted = 0
+        LEFT JOIN org_user m
+            ON m.id = u.manager_user_id
+           AND m.is_deleted = 0
+        LEFT JOIN emp_user_preference pref
+            ON pref.user_id = u.id
+        <include refid="ValidAvatarJoin"/>
+        WHERE u.manager_user_id = #{managerUserId}
+          AND u.is_deleted = 0
+        ORDER BY u.real_name ASC, u.id ASC
+    </select>
+
+    <select id="countUsersByDept" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM org_user u
+        WHERE u.primary_dept_id = #{deptId}
+          AND u.is_deleted = 0
+          AND u.employment_status &lt;&gt; 'OFFBOARDED'
+    </select>
+
+</mapper>

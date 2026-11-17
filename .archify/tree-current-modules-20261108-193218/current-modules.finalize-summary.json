@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "tree",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/tree-current-modules-20261108-193218/candidate.json",
+    "sha256": "b950ec4ce15728a81bb712f5a2c302ba7ae916b3e3b1bc7222a4196cc7d0bfff",
+    "bytes": 77545
+  },
+  "artifact": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/tree-current-modules-20261108-193218/current-modules.html",
+    "sha256": "f2f798eaba1631649dd639d778cf88a533fdec3c1e18eb5d3a6581fa3e654e68",
+    "bytes": 1230727
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/tree-current-modules-20261108-193218/current-modules.finalize.json",
+    "summaryReceipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/tree-current-modules-20261108-193218/current-modules.finalize-summary.json",
+    "browserCheckReceipt": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/tree-current-modules-20261108-193218/current-modules.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.3.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-08T11:33:45.718Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 6624,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

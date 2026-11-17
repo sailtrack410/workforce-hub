@@ -1,0 +1,22 @@
+{
+  "command": [
+    "mvn",
+    "-B",
+    "-Dtest=AdminPluginLifecycleAuditIntegrationTest",
+    "test"
+  ],
+  "cwd": "/tmp/workforce-quota-2033-suite/server",
+  "quota_sources": "BASELINE",
+  "source_hashes": {
+    "server/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java": "346f11fbee118564eb90335a129c7d6b1619f1a88c603b9b865c10187ea1ce65",
+    "server/src/main/java/com/workforcehub/file/service/FileQuotaPolicyService.java": "7cf5fed8927cf73c05eead11562bfe9d453dc039cd5e803336ee498053a58102",
+    "server/src/main/java/com/workforcehub/file/service/FileQueryService.java": "87c37879fd51e1d22ca29493801fc595998a81f5446e5e8ecbef768d46f99686",
+    "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java": "246647f858251e54211a1a2b02b4c7d56da4259836ba3560d90ede2755306482",
+    "server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java": "fdfb63e9771e165b137b594e5f039894690af9b8cc8c510e7e40ff52831be46f",
+    "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java": "25d512a88e96df41a2eaa046789139a9a5e77cbb7774ac0fd759959b04b9aaec",
+    "server/src/main/java/com/workforcehub/file/service/FileCleanupDatabaseStageService.java": "49880e1b4fef40240b9caa2ea40814c6a8dfdf302ef6e540ab31da4024cc6752"
+  },
+  "exit_status": 1,
+  "stdout": "unrelated-baseline.stdout",
+  "stderr": "unrelated-baseline.stderr"
+}

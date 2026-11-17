@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+    "status": "todo",
+    "summary": "Workforce｜第100审业务链路问题整改与验收",
+    "url": "https://applink.feishu.cn/client/todo/detail?guid=927c6dcf-d86e-4b6f-a215-ba6ebda14b16"
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

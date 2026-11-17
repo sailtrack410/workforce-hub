@@ -1,0 +1,268 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "文件上传：票据、秒传与确认",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/F01.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "request",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "选择文件",
+      "sublabel": "摘要、大小、归属",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/usePersonalFileTransfer.ts",
+          "line": 27,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "guard",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "校验策略配额",
+      "sublabel": "归属、目录、格式",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java",
+          "line": 77,
+          "end_line": 94
+        }
+      ]
+    },
+    {
+      "id": "ticket",
+      "lane": "main",
+      "col": 2,
+      "type": "database",
+      "label": "创建待上传票据",
+      "sublabel": "PENDING 与到期时间",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java",
+          "line": 189,
+          "end_line": 228
+        }
+      ]
+    },
+    {
+      "id": "upload",
+      "lane": "main",
+      "col": 3,
+      "type": "cloud",
+      "label": "写入对象存储",
+      "sublabel": "存储方提供上传目标",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/usePersonalFileTransfer.ts",
+          "line": 125,
+          "end_line": 143
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "lane": "main",
+      "col": 4,
+      "type": "security",
+      "label": "确认并核验对象",
+      "sublabel": "上传者、归属、摘要",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java",
+          "line": 67,
+          "end_line": 100
+        }
+      ]
+    },
+    {
+      "id": "persist",
+      "lane": "main",
+      "col": 5,
+      "type": "database",
+      "label": "附件引用与记账",
+      "sublabel": "CONFIRMED，提交后事件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java",
+          "line": 114,
+          "end_line": 145
+        }
+      ]
+    },
+    {
+      "id": "existing",
+      "lane": "branch",
+      "col": 1,
+      "type": "database",
+      "label": "复用已有票据",
+      "sublabel": "相同客户端请求编号",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java",
+          "line": 81,
+          "end_line": 84
+        }
+      ]
+    },
+    {
+      "id": "dedup",
+      "lane": "branch",
+      "col": 3,
+      "type": "database",
+      "label": "同上传者秒传",
+      "sublabel": "新引用、增加用量",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadTicketService.java",
+          "line": 95,
+          "end_line": 128
+        }
+      ]
+    },
+    {
+      "id": "cleanup",
+      "lane": "failure",
+      "col": 5,
+      "type": "backend",
+      "label": "重复对象延迟清理",
+      "sublabel": "明细进入清理账本",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java",
+          "line": 139,
+          "end_line": 142
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java",
+          "line": 307,
+          "end_line": 328
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "failure",
+      "col": 4,
+      "type": "security",
+      "label": "拒绝确认或回滚",
+      "sublabel": "超时、摘要或归属不符",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java",
+          "line": 70,
+          "end_line": 100
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "request",
+      "to": "guard"
+    },
+    {
+      "id": "e1",
+      "from": "guard",
+      "to": "ticket",
+      "label": "未复用"
+    },
+    {
+      "id": "e2",
+      "from": "ticket",
+      "to": "upload"
+    },
+    {
+      "id": "e3",
+      "from": "upload",
+      "to": "verify"
+    },
+    {
+      "id": "e4",
+      "from": "verify",
+      "to": "persist",
+      "label": "通过"
+    },
+    {
+      "id": "e5",
+      "from": "guard",
+      "to": "existing",
+      "label": "重复请求"
+    },
+    {
+      "id": "e6",
+      "from": "guard",
+      "to": "dedup",
+      "label": "同上传者已有对象"
+    },
+    {
+      "id": "e7",
+      "from": "dedup",
+      "to": "persist",
+      "label": "已确认引用",
+      "route": "outside-right",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "e8",
+      "from": "persist",
+      "to": "cleanup",
+      "label": "存在重复对象"
+    },
+    {
+      "id": "e9",
+      "from": "verify",
+      "to": "reject",
+      "label": "校验失败",
+      "labelDy": 40
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "employee-web 文件页可用；HTTP目标直传对象存储，LOCAL目标由Vite开发桥接写入，生产需部署有效上传通道。",
+        "个人文件、头像、审批及群附件、后台与知识文档共用上传基础；业务归属分别校验。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "FILE-Q：配额读取与用量累加分离；并发确认/复制可同时通过余量检查，属于历史并发治理项的具体复核。",
+        "clientRequestId 可返回原票据；调用方重试应复用同一编号。秒传仍按逻辑引用计费，不等于物理空间用量。"
+      ]
+    }
+  ]
+}

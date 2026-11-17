@@ -1,0 +1,254 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "插件动作网关：权限、幂等与结果重放",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/P02.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "entry",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "提交插件动作",
+      "sublabel": "参数与幂等键",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/controller/PluginGatewayController.java",
+          "line": 85,
+          "end_line": 106
+        }
+      ]
+    },
+    {
+      "id": "guard",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "来源与授权检查",
+      "sublabel": "ACTIVE 且守卫可获取",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/controller/PluginGatewayController.java",
+          "line": 92,
+          "end_line": 131
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "main",
+      "col": 2,
+      "type": "security",
+      "label": "校验动作和参数",
+      "sublabel": "幂等声明、键格式",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/controller/PluginGatewayController.java",
+          "line": 170,
+          "end_line": 213
+        }
+      ]
+    },
+    {
+      "id": "claim",
+      "lane": "main",
+      "col": 3,
+      "type": "database",
+      "label": "占用请求范围",
+      "sublabel": "插件、动作、调用者、键",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 90,
+          "end_line": 105
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 172,
+          "end_line": 217
+        }
+      ]
+    },
+    {
+      "id": "execute",
+      "lane": "main",
+      "col": 4,
+      "type": "backend",
+      "label": "执行插件处理器",
+      "sublabel": "副作用由插件契约保证",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 108,
+          "end_line": 134
+        }
+      ]
+    },
+    {
+      "id": "complete",
+      "lane": "main",
+      "col": 5,
+      "type": "database",
+      "label": "保存可重放响应",
+      "sublabel": "COMPLETED 与审计",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 136,
+          "end_line": 161
+        }
+      ]
+    },
+    {
+      "id": "replay",
+      "lane": "branch",
+      "col": 3,
+      "type": "database",
+      "label": "重放或返回冲突",
+      "sublabel": "同参重放，异参或在途409",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 198,
+          "end_line": 217
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/controller/PluginGatewayController.java",
+          "line": 231,
+          "end_line": 237
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "lane": "branch",
+      "col": 4,
+      "type": "database",
+      "label": "可重试结果释放占用",
+      "sublabel": "再次请求可执行",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 131,
+          "end_line": 133
+        }
+      ]
+    },
+    {
+      "id": "unknown",
+      "lane": "failure",
+      "col": 5,
+      "type": "security",
+      "label": "异常保留占用",
+      "sublabel": "副作用结果不明，防止重放执行",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 117,
+          "end_line": 129
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 151,
+          "end_line": 157
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "entry",
+      "to": "guard"
+    },
+    {
+      "id": "e1",
+      "from": "guard",
+      "to": "validate",
+      "label": "通过"
+    },
+    {
+      "id": "e2",
+      "from": "validate",
+      "to": "claim"
+    },
+    {
+      "id": "e3",
+      "from": "claim",
+      "to": "execute",
+      "label": "新占用"
+    },
+    {
+      "id": "e4",
+      "from": "execute",
+      "to": "complete",
+      "label": "非重试结果"
+    },
+    {
+      "id": "e5",
+      "from": "claim",
+      "to": "replay",
+      "label": "已有记录"
+    },
+    {
+      "id": "e6",
+      "from": "execute",
+      "to": "release",
+      "label": "retryable"
+    },
+    {
+      "id": "e7",
+      "from": "execute",
+      "to": "unknown",
+      "label": "抛错或空响应"
+    },
+    {
+      "id": "e8",
+      "from": "complete",
+      "to": "unknown",
+      "label": "响应处理异常"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "Host SDK 调用后端插件网关；HTTP仅开放声明幂等的动作，必须携带Idempotency-Key。",
+        "来源检查、上下文、三重授权、生命周期守卫、参数校验、请求占用及审计。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "PLUGIN-U：异常保留IN_PROGRESS避免重复副作用，但缺少显式人工核对/恢复入口，长期同键请求只能409。此项属于恢复能力建议，不能用自动过期后重跑代替。",
+        "优化：提供查看占用、核对结果、经授权完成或释放的管理流程，保留审计。"
+      ]
+    }
+  ]
+}

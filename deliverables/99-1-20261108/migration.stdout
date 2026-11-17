@@ -1,0 +1,2 @@
+SQLite fixture: 3 permissions active; SUPER_ADMIN grants only; existing IDs preserved; rerun idempotent
+Boundary: exact SQL executed on SQLite fixture; MySQL/Flyway deployment not verified

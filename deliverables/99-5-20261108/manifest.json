@@ -1,0 +1,38 @@
+{
+  "server/src/main/java/com/workforcehub/common/util/IdGenerator.java": {
+    "baseline": "ec5813ad5664b6952698c35e2c6a8811259080ecfeb62ee934538aeb34ddedaf",
+    "modified": "2ab7e9026dae7c3ce38bd348664b433947c237c12088f345bff2dc2d37242a38"
+  },
+  "server/src/main/java/com/workforcehub/common/util/DatabaseIdGenerator.java": {
+    "baseline": null,
+    "modified": "389ccce0558311ba9479cd3ce9e818420e02f9093f5806abee35cc0f9f8cf9d2"
+  },
+  "server/src/main/java/db/migration/V70__create_durable_id_sequence.java": {
+    "baseline": null,
+    "modified": "6cbdc826f1fe19dd300a95c3e31a117e068b9f39798753013fd1010fde968c6e"
+  },
+  "server/src/test/java/com/workforcehub/common/util/IdGeneratorTest.java": {
+    "baseline": null,
+    "modified": "bc63f41472ee2af03ebe779d22291557661a1eab526b0a9bd0d131c4080d544c"
+  },
+  "server/src/test/java/com/workforcehub/common/util/IdGeneratorMysqlTest.java": {
+    "baseline": null,
+    "modified": "bc95dc14efb07e3ef78c3c5a5295bbad98cccba804f4230962d177bda15ff5b6"
+  },
+  "server/src/test/java/com/workforcehub/common/util/IdGeneratorProcessProbe.java": {
+    "baseline": null,
+    "modified": "c59891433aa4085f9ff3fce7fe72305c5ba53a4d9f582eab128a2ce6f8382741"
+  },
+  "server/src/test/java/com/workforcehub/common/util/StandaloneIdGeneratorExtension.java": {
+    "baseline": null,
+    "modified": "f8bfc1f46bf9298bb8d8ec428f9d4ecbed4fa24dc88d8e83e22ec4dcd8608b44"
+  },
+  "server/src/test/resources/junit-platform.properties": {
+    "baseline": null,
+    "modified": "fed9d00b0973a7a0427415f51244b1e68bcd26b1059d6d7d9063b838553162e9"
+  },
+  "server/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension": {
+    "baseline": null,
+    "modified": "7e82dc88f536c408961ac1b3f2526a6f5458950195c6fdf95914796673a85e0c"
+  }
+}

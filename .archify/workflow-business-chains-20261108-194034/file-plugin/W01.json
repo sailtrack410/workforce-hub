@@ -1,0 +1,289 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "工作台聚合：各端数据读取与业务跳转",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/W01.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "employee-web 新工作台"
+    },
+    {
+      "id": "branch",
+      "label": "hub-web 独立画布工作台"
+    },
+    {
+      "id": "failure",
+      "label": "admin-web 管理首页"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "er",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "员工端工作台",
+      "sublabel": "当前新工作台入口",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 27,
+          "end_line": 32
+        }
+      ]
+    },
+    {
+      "id": "el",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": "并发读取四类数据",
+      "sublabel": "考勤、假期、待办、会话",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 176,
+          "end_line": 183
+        }
+      ]
+    },
+    {
+      "id": "ep",
+      "lane": "main",
+      "col": 3,
+      "type": "frontend",
+      "label": "组装卡片与指标",
+      "sublabel": "仅写入读取成功的数据",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 184,
+          "end_line": 187
+        },
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 73,
+          "end_line": 88
+        }
+      ]
+    },
+    {
+      "id": "et",
+      "lane": "main",
+      "col": 5,
+      "type": "frontend",
+      "label": "显示与业务跳转",
+      "sublabel": "我的申请却使用待办列表",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 141,
+          "end_line": 150
+        },
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 165,
+          "end_line": 173
+        }
+      ]
+    },
+    {
+      "id": "hr",
+      "lane": "branch",
+      "col": 0,
+      "type": "frontend",
+      "label": "独立画布工作台",
+      "sublabel": "另一套Vue应用",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 55,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "hl",
+      "lane": "branch",
+      "col": 1,
+      "type": "backend",
+      "label": "并发读取七类数据",
+      "sublabel": "含本人申请、排班和通知",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 55,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "hp",
+      "lane": "branch",
+      "col": 3,
+      "type": "frontend",
+      "label": "部分成功逐卡显示",
+      "sublabel": "失败保留初始空值",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 65,
+          "end_line": 75
+        }
+      ]
+    },
+    {
+      "id": "ht",
+      "lane": "branch",
+      "col": 5,
+      "type": "frontend",
+      "label": "展示与通知操作",
+      "sublabel": "本人申请、通知全部已读",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 184,
+          "end_line": 215
+        }
+      ]
+    },
+    {
+      "id": "ar",
+      "lane": "failure",
+      "col": 0,
+      "type": "frontend",
+      "label": "管理后台首页",
+      "sublabel": "管理指标读取",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DashboardView.vue",
+          "line": 22,
+          "end_line": 29
+        }
+      ]
+    },
+    {
+      "id": "al",
+      "lane": "failure",
+      "col": 1,
+      "type": "backend",
+      "label": "并发读取三类指标",
+      "sublabel": "AI任务、假种、存储",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DashboardView.vue",
+          "line": 25,
+          "end_line": 29
+        }
+      ]
+    },
+    {
+      "id": "ap",
+      "lane": "failure",
+      "col": 3,
+      "type": "frontend",
+      "label": "全部成功才赋值",
+      "sublabel": "Promise.all 失败统一报错",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DashboardView.vue",
+          "line": 30,
+          "end_line": 36
+        }
+      ]
+    },
+    {
+      "id": "at",
+      "lane": "failure",
+      "col": 5,
+      "type": "frontend",
+      "label": "指标卡与错误提示",
+      "sublabel": "读取结束取消loading",
+      "sources": [
+        {
+          "path": "admin-web/src/views/DashboardView.vue",
+          "line": 33,
+          "end_line": 40
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "er",
+      "to": "el"
+    },
+    {
+      "id": "e1",
+      "from": "el",
+      "to": "ep",
+      "label": "allSettled"
+    },
+    {
+      "id": "e2",
+      "from": "ep",
+      "to": "et"
+    },
+    {
+      "id": "e3",
+      "from": "hr",
+      "to": "hl"
+    },
+    {
+      "id": "e4",
+      "from": "hl",
+      "to": "hp",
+      "label": "allSettled"
+    },
+    {
+      "id": "e5",
+      "from": "hp",
+      "to": "ht"
+    },
+    {
+      "id": "e6",
+      "from": "ar",
+      "to": "al"
+    },
+    {
+      "id": "e7",
+      "from": "al",
+      "to": "ap",
+      "label": "all"
+    },
+    {
+      "id": "e8",
+      "from": "ap",
+      "to": "at"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "employee-web /hub/workbench；独立hub-web /workbench；admin-web /dashboard。",
+        "三个前端分别聚合已有业务API，不是一个共用工作台；失败与空数据的表现需要区分。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "WORKBENCH-D：employee“我的申请”用workflow.todos映射，混淆本人发起和待本人处理；应改用本人requests。打卡硬编码时间沿用AT-01。",
+        "优化：部分接口失败应显示失败/重试，避免空列表被解释为零待办、零通知；独立hub出勤率以周一至周五作分母，需统一排班日历口径。"
+      ]
+    }
+  ]
+}

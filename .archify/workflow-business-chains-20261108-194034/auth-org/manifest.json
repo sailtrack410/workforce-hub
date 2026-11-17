@@ -1,0 +1,414 @@
+{
+  "chains": [
+    {
+      "id": "auth-login",
+      "title": "登录、失败锁定与会话退出",
+      "scope": "管理员/员工密码认证、邮箱门禁、Redis锁定、Session轮换、退出",
+      "frontend_status": "admin-web 实接；employee-web 当前新登录页缺绑定分支；独立hub-web未处理二验",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-login.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-login.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-login.finalize-summary.json",
+      "summary": "管理员不走员工邮箱二验；员工已绑邮箱用LOGIN码，未绑邮箱用BIND码。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "auth-email",
+      "title": "邮箱绑定与找回密码",
+      "scope": "验证码发信、用途隔离、绑定唯一性、密码重置与当前入口错误",
+      "frontend_status": "后端能力齐；employee-web当前找回页错误发送LOGIN码；旧composable发送RESET_PASSWORD码",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-email.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-email.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-email.finalize-summary.json",
+      "summary": "AUTH-02：当前employee找回页发LOGIN码，重置接口验证RESET_PASSWORD，正常操作无法闭环。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "auth-register",
+      "title": "邀请注册与短信演示边界",
+      "scope": "公开发码、邀请码部门、注册事务、核销、回到登录",
+      "frontend_status": "employee-web和独立hub-web注册均为占位；公开后端可直接调用；无管理端邀请码生成入口",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-register.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-register.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-register.finalize-summary.json",
+      "summary": "短信为SMS-DEMO，前端注册没有真正提交；注册成功返回userId和loginName，不自动登录。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "org-lifecycle",
+      "title": "组织维护、员工入转离与账号停用",
+      "scope": "部门树路径、岗位、员工档案、状态机、账号禁用及领域事件",
+      "frontend_status": "admin-web 部门/岗位/员工实接；employee-web查询组织；独立hub-web查询组织档案",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.finalize-summary.json",
+      "summary": "待入职→试用/在职→待离职→离职；待离职可回试用/在职，离职不可迁出。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "auth-rbac",
+      "title": "管理员角色配置与接口鉴权",
+      "scope": "角色CRUD、权限分配、管理员角色、超级管理员保留、Session权限",
+      "frontend_status": "admin-web角色与权限页实接；员工端不具备后台RBAC管理入口",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.finalize-summary.json",
+      "summary": "权限和角色通过替换关联表更新；禁止修改内置超级角色，禁止移除最后活跃超级管理员。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "contacts-friends",
+      "title": "通讯录好友申请、接受、备注与移除",
+      "scope": "员工好友列表、双向申请自动接受、双向ACTIVE、单方备注、双向删除",
+      "frontend_status": "employee-web通讯录实接；独立hub-web API仅见备注更新，联系人主要源于组织",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.finalize-summary.json",
+      "summary": "接受好友申请后形成双向ACTIVE；备注只更新本人方向；移除同时删除两个方向。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "system-dict-brand",
+      "title": "数据字典维护与品牌配置发布",
+      "scope": "字典CRUD、标签缓存、审计、公开品牌读取、当前登录页接线",
+      "frontend_status": "admin-web字典和企业品牌维护实接；当前employee与独立hub登录页使用固定内容",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.finalize-summary.json",
+      "summary": "品牌配置已落sys_dict并有公开读取服务；当前新员工登录页与独立hub页展示固定品牌内容。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "system-operations",
+      "title": "站内通知、邮件测试、告警处理与审计",
+      "scope": "三条独立运维能力：通知读取、SMTP测试、告警聚合处置；共享审计查询",
+      "frontend_status": "admin-web设置/审计实接；告警仅后端入口；独立hub工作台与顶栏已消费通知API",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/system-operations.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/system-operations.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/system-operations.finalize-summary.json",
+      "summary": "站内通知、邮件测试、告警聚合为独立流程，图中未连接为自动投递链。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    },
+    {
+      "id": "employee-personal",
+      "title": "个人档案、头像、偏好、密码与退出",
+      "scope": "姓名组织只读、手机修改、头像上传、偏好同步、验证码改密、确认退出",
+      "frontend_status": "employee-web /settings实接；独立hub未发现同等个人设置页面，不混同旧壳与独立工程",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.finalize-summary.json",
+      "summary": "个人自管字段仅手机号与头像；设置、偏好、密码、退出分别执行业务操作。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUTH-01",
+      "severity": "P1",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "默认开启邮箱二验，首次使用未绑定邮箱的员工账号；或独立hub-web用户需要二验",
+      "impact": "employee当前页未处理requiresEmailBinding，显示成功后跳转但无Session；独立hub把待二验响应保存为user，前后端认证状态不一致。",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 10
+        },
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 370
+        },
+        {
+          "path": "employee-web/src/stores/session.ts",
+          "line": 81
+        },
+        {
+          "path": "hub-web/src/stores/session.ts",
+          "line": 65
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 187
+        }
+      ],
+      "evidence": "当前路由指向HubAuthView；新页只检查requiresEmailCode。employee store同时识别两种待验证响应并不设置user；独立hub store直接赋值。后端两种pending返回发生于写Session之前。",
+      "fix": "当前登录页消费两种pending状态并接通绑定流程；独立hub共用相同认证状态判定。",
+      "acceptance": "分别用已绑定、未绑定账号验证：pending时无已登录状态；完成BIND/LOGIN后me成功。"
+    },
+    {
+      "id": "AUTH-02",
+      "severity": "P1",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "从当前employee /login页面进入忘记密码，发送验证码后提交重置",
+      "impact": "发出LOGIN码，重置要求RESET_PASSWORD；未另发正确用途码时始终失败。",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 467
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 105
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 122
+        },
+        {
+          "path": "employee-web/src/stores/session.ts",
+          "line": 147
+        }
+      ],
+      "evidence": "sendResetCode直接调用employeeApi.auth.sendLoginCode；LoginService按LOGIN发码；AccountService.resetPassword按RESET_PASSWORD核验。正确的sendPasswordResetCode存在但当前页未调用。",
+      "fix": "当前找回页调用session.sendPasswordResetCode(email)。",
+      "acceptance": "从实际/login路由发RESET_PASSWORD码；使用该码重置成功，LOGIN码不可重置。"
+    },
+    {
+      "id": "AUTH-03",
+      "severity": "P2",
+      "status": "静态并发推导，未运行Redis竞争验证",
+      "trigger": "两个并发请求以同一邮箱、用途和正确验证码进入verifyCode",
+      "impact": "GET/DELETE分离允许两请求先读到相同码并均返回true；不保证一次性核销。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java",
+          "line": 91
+        }
+      ],
+      "evidence": "代码顺序为GET→比较→DELETE→true；错误码仅返回false，无尝试次数限制。此项为静态并发推导，未对真实Redis压测。",
+      "fix": "用Redis Lua执行比较与删除，并为邮箱/用途设置有限校验尝试次数。",
+      "acceptance": "真实Redis并发核验同一码仅一次成功；错误尝试达到阈值后失效，重发/用途隔离仍正确。"
+    },
+    {
+      "id": "AUTH-04",
+      "severity": "P1",
+      "status": "静态并发推导，未运行数据库竞争验证",
+      "trigger": "两个不同手机号同时提交同一个有效邀请码，各持各自有效短信码",
+      "impact": "两个事务可能先读到同一邀请码并各建账号；后者核销UPDATE影响0行也返回成功，单次邀请码可被复用。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 70
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java",
+          "line": 67
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java",
+          "line": 81
+        }
+      ],
+      "evidence": "邀请码SELECT无行锁；markInviteUsed返回void且忽略条件UPDATE影响行数；service无核销成功判断。此项为静态事务交错推导，未运行MySQL并发复现。",
+      "fix": "锁定邀请码行或原子领取并校验更新恰为1行，失败回滚员工和账号创建。",
+      "acceptance": "两个手机号并发消费同一邀请码恰一成功，另一返回业务冲突且无孤立员工/账号。"
+    },
+    {
+      "id": "AUTH-05",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "调用公开短信注册发码接口，或用户在当前注册页点击发送短信",
+      "impact": "后端只演示日志发送且明文记录手机号与验证码；当前employee页面仅本地“已发送”，未调用后端。真实注册交付缺口明确。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 39
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 89
+        },
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 410
+        },
+        {
+          "path": "hub-web/src/views/AuthView.vue",
+          "line": 111
+        }
+      ],
+      "evidence": "公开服务生成/持久化码后sendSms仅log.info；当前employee sendSmsCode仅设置sent与倒计时，独立hub仅toast。服务内未见频控。",
+      "fix": "前端接实际发码/注册接口；生产接短信网关并移除验证码日志，添加现有Redis能力实现的发送频控。",
+      "acceptance": "供应商接收成功才显示已发送；失败可重试；日志不含验证码；单位时间重复请求被限制；注册成功后明确转登录。"
+    },
+    {
+      "id": "AUTH-06",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "管理员保存并测试EMAIL_DEFAULT，期望认证邮件使用该配置",
+      "impact": "测试可成功但登录/绑定/找回邮件仍走注入JavaMailSender配置，数据库渠道保存不影响认证码发送。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 63
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 172
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java",
+          "line": 36
+        }
+      ],
+      "evidence": "渠道测试新建JavaMailSenderImpl使用请求/数据库参数；EmailCodeService注入JavaMailSender且未查询NotificationChannelRepository。未发送真实SMTP邮件。",
+      "fix": "将认证邮件明确接到已保存邮件渠道，或把配置页面标明只管理测试渠道并提供实际认证渠道状态。",
+      "acceptance": "更改保存的渠道后，通过实际/login触发认证邮件使用相同配置；断开渠道时两条链均给一致错误。"
+    },
+    {
+      "id": "AUTH-07",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "直接切换当前employee登录页到验证码登录，不先输入密码",
+      "impact": "提交伪密码email-code:<code>，后端先执行密码认证；合法验证码不能构成独立登录。重复失败还可能消耗登录尝试。",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 356
+        },
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 365
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 120
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 160
+        }
+      ],
+      "evidence": "密码为空时前端合成字符串；后端先provider.authenticate，再进入邮箱二验；这是二因素登录而非验证码独立登录。",
+      "fix": "将验证码入口限定为密码认证后的二验步骤；保留密码后再提交验证码。",
+      "acceptance": "新会话无法只凭验证码登录；密码通过后进入二验并成功，不产生伪密码认证失败。switchLoginMode只改视图与状态、不清密码，因此保留原密码的密码后二验路径不在此缺陷范围。"
+    },
+    {
+      "id": "AUTH-08",
+      "severity": "P2",
+      "status": "静态多实例推导，待验证",
+      "trigger": "在实例A修改字典，实例B已缓存该类型标签",
+      "impact": "仅本机缓存失效，其他实例继续展示旧标签，直到缓存重建/进程重启。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 35
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 107
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 137
+        }
+      ],
+      "evidence": "ConcurrentHashMap按类型缓存，无TTL；写操作labelCache.remove仅当前JVM。未运行双JVM验证。",
+      "fix": "当前规模优先去除该轻量标签缓存或加短TTL；按实际部署验收跨实例一致性。",
+      "acceptance": "A修改后B在约定窗口读取新标签；禁用/删除同样刷新。"
+    },
+    {
+      "id": "AUTH-09",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "个人设置将已有手机号清空后保存",
+      "impact": "页面显示手机号已更新，但请求传null，后端跳过写入，实际手机号保持原值。",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 296
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgDirectoryService.java",
+          "line": 205
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/org/dto/UpdateEmployeeProfileRequest.java",
+          "line": 14
+        }
+      ],
+      "evidence": "前端mobile || null；后端仅request.getMobile()!=null时trim并更新。后端空串可清空，前端恰将其转换成null。仅静态追踪，未真实保存。",
+      "fix": "将清空语义统一：前端发送空字符串，或后端明确区分字段缺失与null清空。",
+      "acceptance": "已有手机号清空保存后重新加载为null，非空手机号仍可正常更新。"
+    }
+  ]
+}

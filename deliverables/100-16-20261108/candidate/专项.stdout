@@ -1,0 +1,82 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 92 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 534 source files with javac [debug release 17] to target/classes
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 3 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 125 source files with javac [debug release 17] to target/test-classes
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/src/test/java/com/workforcehub/plugin/runtime/DefaultEventServiceTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/src/test/java/com/workforcehub/plugin/runtime/DefaultEventServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.agent.AgentToolKnowledgeAuthorizationTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.877 s -- in com.workforcehub.agent.AgentToolKnowledgeAuthorizationTest
+[INFO] Running com.workforcehub.agent.workflow.WorkflowContextOperatorTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.workforcehub.agent.workflow.WorkflowContextOperatorTest
+[INFO] Running com.workforcehub.ragflow.service.RagflowKnowledgeSearchAuthorizationTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.070 s -- in com.workforcehub.ragflow.service.RagflowKnowledgeSearchAuthorizationTest
+[INFO] Running com.workforcehub.ragflow.service.RagflowKnowledgeAccessRepositoryTest
+[ERROR] Tests run: 10, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.111 s <<< FAILURE! -- in com.workforcehub.ragflow.service.RagflowKnowledgeAccessRepositoryTest
+[ERROR] com.workforcehub.ragflow.service.RagflowKnowledgeAccessRepositoryTest.departmentAndPositionOwnershipUseCurrentActiveOrganizationalObject -- Time elapsed: 0.008 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: DEPARTMENT ==> expected: <true> but was: <false>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:63)
+	at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:36)
+	at org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:214)
+	at com.workforcehub.ragflow.service.RagflowKnowledgeAccessRepositoryTest.departmentAndPositionOwnershipUseCurrentActiveOrganizationalObject(RagflowKnowledgeAccessRepositoryTest.java:75)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   RagflowKnowledgeAccessRepositoryTest.departmentAndPositionOwnershipUseCurrentActiveOrganizationalObject:75 DEPARTMENT ==> expected: <true> but was: <false>
+[INFO] 
+[ERROR] Tests run: 24, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  10.280 s
+[INFO] Finished at: 2026-11-08T21:45:36+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.1.2:test (default-test) on project workforce-hub: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/candidate/server/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -1,0 +1,145 @@
+{
+  "target": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "issue": "99-3",
+  "changed_symbols": [
+    "wf_req_leave.balance_mode_snapshot",
+    "LeaveService.freezeForWorkflowSubmission",
+    "LeaveService.consumeFrozenForWorkflowApproval",
+    "LeaveService.releaseFrozenForWorkflowTerminal"
+  ],
+  "manifest": {
+    "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": {
+      "baseline_sha256": "6cd973d9bc8f8b3a87511a1a7cb3f422856fc0283ed92e00e579f1e382f997d4",
+      "modified_sha256": "71d747e6a4ba2b3007572ea830919ffb856657c6edde9349b03173b382e4b6dd"
+    },
+    "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": {
+      "baseline_sha256": "e1ecfe234d5c2fc329476cbc86ed13c039491eec330faf041a57d4e937f54d6a",
+      "modified_sha256": "ffdc616105782bedfb186e8287dd6e1c160fd9092a052b5eb5b633b0566830d4"
+    },
+    "server/pom.xml": {
+      "baseline_sha256": "79269d1ee66ac035a0e544e4f2d245ce38dbb4dcfdf3b5b755ea2311d2e3a7a9",
+      "modified_sha256": "08169b8df3551e160dec94f0d00eeb65a02801b79bcb3aeb9cf53ce3b1bfdc9c"
+    },
+    "server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql": {
+      "baseline_sha256": null,
+      "modified_sha256": "527652c223dcee356b02a51a59261bf1fd8bf2452fb27c7b79d4ab9e1c99d236"
+    },
+    "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": {
+      "baseline_sha256": null,
+      "modified_sha256": "1783db4931c11d38ad423b447817d7c34e85f2d93da04e16bd908248777e32e9"
+    }
+  },
+  "test_input": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/MODIFIED_FILE/server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java",
+    "sha256": "1783db4931c11d38ad423b447817d7c34e85f2d93da04e16bd908248777e32e9"
+  },
+  "runs": [
+    {
+      "role": "BASELINE",
+      "command": [
+        "mvn",
+        "-Dtest=LeaveSettlementTransactionTest",
+        "test"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/baseline-run/server",
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/baseline.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/baseline.stderr",
+      "exit": 1,
+      "statistics": "[ERROR] Tests run: 29, Failures: 9, Errors: 12, Skipped: 0",
+      "observed_balances": [
+        "SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=REJECTED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=WITHDRAWN available=960 frozen=480"
+      ]
+    },
+    {
+      "role": "MODIFIED",
+      "command": [
+        "mvn",
+        "-Dtest=LeaveSettlementTransactionTest",
+        "test"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/modified-run/server",
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/modified.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/modified.stderr",
+      "exit": 0,
+      "statistics": "[INFO] Tests run: 29, Failures: 0, Errors: 0, Skipped: 0",
+      "observed_balances": [
+        "SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=0",
+        "SETTLEMENT change=MODE outcome=REJECTED available=1440 frozen=0",
+        "SETTLEMENT change=MODE outcome=WITHDRAWN available=1440 frozen=0",
+        "SETTLEMENT change=INACTIVE outcome=APPROVED available=960 frozen=0",
+        "SETTLEMENT change=INACTIVE outcome=REJECTED available=1440 frozen=0",
+        "SETTLEMENT change=INACTIVE outcome=WITHDRAWN available=1440 frozen=0",
+        "SETTLEMENT change=DELETED outcome=APPROVED available=960 frozen=0",
+        "SETTLEMENT change=DELETED outcome=REJECTED available=1440 frozen=0",
+        "SETTLEMENT change=DELETED outcome=WITHDRAWN available=1440 frozen=0"
+      ]
+    },
+    {
+      "role": "ROLLBACK",
+      "command": [
+        "mvn",
+        "-Dtest=LeaveSettlementTransactionTest",
+        "test"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback-run/server",
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback.stderr",
+      "exit": 1,
+      "statistics": "[ERROR] Tests run: 29, Failures: 9, Errors: 12, Skipped: 0",
+      "observed_balances": [
+        "SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=REJECTED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=WITHDRAWN available=960 frozen=480"
+      ]
+    }
+  ],
+  "rollback": {
+    "command": [
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh",
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback-run"
+    ],
+    "exit": 0,
+    "restored_hashes": {
+      "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": "6cd973d9bc8f8b3a87511a1a7cb3f422856fc0283ed92e00e579f1e382f997d4",
+      "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": "e1ecfe234d5c2fc329476cbc86ed13c039491eec330faf041a57d4e937f54d6a",
+      "server/pom.xml": "79269d1ee66ac035a0e544e4f2d245ce38dbb4dcfdf3b5b755ea2311d2e3a7a9",
+      "server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql": null,
+      "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": null
+    },
+    "stdout": "ROLLBACK_HASHES_MATCH_ORIGINAL=3/3; NEW_FILES_REMOVED=2/2\n",
+    "stderr": "",
+    "harness_note": "Pristine hashes checked first. Then the identical regression test and H2-only test POM dependency were installed in the disposable restored checkout, matching BASELINE test input. The two production source files remain byte-identical to the originals."
+  },
+  "patch_verification": {
+    "command": [
+      "patch",
+      "-p1",
+      "-d",
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/patch-reconstruction-final"
+    ],
+    "stdin": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/DIFF_FILE.patch",
+    "exit": 0,
+    "matches": "5/5"
+  },
+  "full_run": {
+    "command": [
+      "mvn",
+      "test"
+    ],
+    "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/full-run/server",
+    "exit": 1,
+    "statistics": "[ERROR] Tests run: 1208, Failures: 0, Errors: 491, Skipped: 12",
+    "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/full.stdout",
+    "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/full.stderr",
+    "root_causes": "462 ApplicationContext failure threshold exceeded after initial context failure\n26 Caused by: java.lang.IllegalStateException: 缺少数据库口令：请在仓库根目录 .env 配置 DB_PASSWORD（或 TEST_DB_PASSWORD），不要把真实凭证写入代码\n3 Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.workforcehub.auth.security.SessionValidityFilter' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}\n",
+    "scope": "Isolated source snapshot; ongoing parallel-session changes are not included after snapshot creation."
+  },
+  "limitations": [
+    "H2 MySQL compatibility mode verifies JDBC locks/transactions; actual MySQL/Flyway deployment and Flowable end-to-end configuration-change matrix were not run.",
+    "Historical requests with neither snapshot nor original FREEZE cannot prove submission policy; approval returns 409 without changing any balance, rejection/withdrawal with no freeze do not manufacture movements.",
+    "Full suite is not passing: missing test DB credentials and SessionValidityFilter bean errors in unrelated tests of the concurrent source snapshot.",
+    "No application process was started/stopped/killed; no Git commit/push; no Feishu completion status was changed."
+  ]
+}

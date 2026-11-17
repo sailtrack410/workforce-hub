@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/opt/homebrew/bin/redis-server",
+    "--bind",
+    "127.0.0.1",
+    "--port",
+    "62971",
+    "--save",
+    "",
+    "--appendonly",
+    "no",
+    "--dir",
+    "/tmp/wfh-99-2-integration-bbls4p52",
+    "--daemonize",
+    "yes",
+    "--pidfile",
+    "/tmp/wfh-99-2-integration-bbls4p52/redis.pid",
+    "--logfile",
+    "/tmp/wfh-99-2-integration-bbls4p52/redis.log"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "integration-redis-start.stdout",
+  "stderr": "integration-redis-start.stderr"
+}

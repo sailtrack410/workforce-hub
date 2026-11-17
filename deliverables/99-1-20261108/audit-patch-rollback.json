@@ -1,0 +1,52 @@
+{
+  "events": [
+    {
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/tmp/workforce-991-final-patch-y_0p_84r",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/tmp/workforce-991-final-patch-y_0p_84r",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/ROLLBACK.sh",
+        "/tmp/workforce-991-final-patch-y_0p_84r"
+      ],
+      "cwd": "/tmp/workforce-991-final-patch-y_0p_84r",
+      "stdout": "restored pristine 99-1 source files\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/DIFF_FILE.patch"
+      ],
+      "cwd": "/tmp/workforce-991-final-patch-y_0p_84r",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    }
+  ],
+  "reconstruct": "7/7 hashes match",
+  "rollback": "3 original files restored; 4 new files absent",
+  "reapplied": "7/7 hashes match",
+  "boundary": "Original six-file diff plus only new lifecycle audit fixture changes; excludes concurrent 99-2 test-slice adaptation"
+}

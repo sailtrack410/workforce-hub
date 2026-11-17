@@ -1,0 +1,32 @@
+[
+  {
+    "ok": true,
+    "task": {
+      "completed_at": "1794144823000",
+      "guid": "22f180a6-89ff-4a16-94a5-61bd16ecf88a",
+      "status": "done",
+      "summary": "[P2][99-4][既有风险] 请假计算固定时段与取整口径",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "task": {
+      "completed_at": "1794144825000",
+      "guid": "bd955dc8-7c59-4ce7-8d04-39ec09ae777e",
+      "status": "done",
+      "summary": "[P2][99-5][既有风险] ID生成器跨实例唯一性未保证",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ]
+    }
+  }
+]

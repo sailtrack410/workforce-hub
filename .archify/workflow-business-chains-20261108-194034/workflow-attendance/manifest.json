@@ -1,0 +1,290 @@
+{
+  "chains": [
+    {
+      "id": "wf-template",
+      "title": "审批模板版本创建与发布",
+      "scope": "流程类型→模板→草稿JSON→绑定Flowable精确版本→旧版归档→新申请选版",
+      "frontend_status": "admin-web /workflow 路由可达；版本发布调用真实接口",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.finalize-summary.json",
+      "summary": "发布绑定精确Flowable定义；业务申请固定所选模板版本。"
+    },
+    {
+      "id": "wf-leave-ai",
+      "title": "请假提交、冻结与AI预审回调",
+      "scope": "请假API→校验时长与余额→事务冻结→可选AI→人工或驳回释放",
+      "frontend_status": "employee-web 新申请仅toast，旧WorkbenchSection未被当前工作台路由挂载；图中API入口为后端能力",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.finalize-summary.json",
+      "summary": "AI回调进入人工或拒绝补偿；发起表单在当前员工路由尚未接通。"
+    },
+    {
+      "id": "wf-settlement",
+      "title": "人工审批、驳回与撤回结算",
+      "scope": "任务处理人授权→请假扣减或释放→Flowable结束→考勤重算；申请人撤回",
+      "frontend_status": "employee-web /hub/approvals 同意、驳回、撤回接真实API；hub-web独立审批页为Placeholder",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.review-2/wf-settlement.finalize-summary.json",
+      "summary": "同意扣冻结、驳回与撤回释放；人工同意和驳回均发布WorkflowCompletedEvent。"
+    },
+    {
+      "id": "wf-correction",
+      "title": "缺卡补卡审批与考勤恢复",
+      "scope": "补卡API→同日时点校验→直属上级审批→虚拟MANUAL打卡→重算",
+      "frontend_status": "当前employee-web新工作台未提供可提交补卡表单；后端API和审批处理可用",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.finalize-summary.json",
+      "summary": "补卡为缺失记录补入，未实现已有打卡的时间更正。"
+    },
+    {
+      "id": "wf-generic-attachments",
+      "title": "通用OA提交与审批附件下载",
+      "scope": "通用表单保存→个人附件转审批引用→可选预审→人工审批；参与人票据下载",
+      "frontend_status": "employee-web当前新建费用等类型仅toast；后端通用OA及附件API存在",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.review-2/wf-generic-attachments.finalize-summary.json",
+      "summary": "附件从本人个人文件复制为审批引用；下载执行会重新授权并消费票据。"
+    },
+    {
+      "id": "att-governance",
+      "title": "考勤日历、班次、成员与排班变更",
+      "scope": "管理配置→有效考勤组→成员区间锁→排班创建/修改→已有日结果重算",
+      "frontend_status": "admin-web /attendance 路由真实配置接口；employee-web读取排班",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.finalize-summary.json",
+      "summary": "成员加入有数据库用户行锁；排班修改可同步刷新既有日结果。"
+    },
+    {
+      "id": "att-punch",
+      "title": "员工打卡、日结果与异常协调",
+      "scope": "hub真实OUT→服务端当前时钟→同日类型去重→规则/请假计算→异常增删与提交后事件",
+      "frontend_status": "hub-web工作台OUT真实提交；其attendance独立页为Placeholder；employee-web时间展示有硬编码",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.review-2/att-punch.finalize-summary.json",
+      "summary": "打卡后同步计算日结果；异常只在新增时发布事件。"
+    },
+    {
+      "id": "leave-governance",
+      "title": "假种治理与管理员余额调整",
+      "scope": "假种CRUD→员工/假种有效性→外部key指纹幂等→账户行锁→非负余额→ADJUST流水",
+      "frontend_status": "admin-web /leave 与 /leave-types 路由可达，余额调整真实调用",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.finalize-summary.json",
+      "summary": "后端有幂等指纹与行锁，但管理页面重试不会保留同一业务key。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "WF-01",
+      "severity": "P1",
+      "status": "静态确认，入口未接通",
+      "trigger": "员工在当前审批中心选择请假、费用、加班或用印新申请",
+      "impact": "仅提示表单即将上线，不调用提交接口；旧WorkbenchSection不能视作当前入口能力",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 46
+        },
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 78
+        },
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 232
+        }
+      ],
+      "evidence": "当前路由使用hub/ApprovalsView；pickCreateType只有showToast，无表单提交。未点真实页面。",
+      "fix": "在当前工作台和审批路由接入请假、补卡与通用OA表单、附件和提交后状态跳转。",
+      "acceptance": "通过当前入口提交各类申请，每次只新增一条；余额不足、无上级、附件越权均显示真实错误。"
+    },
+    {
+      "id": "LV-01",
+      "severity": "P1",
+      "status": "静态确认，未动态复现",
+      "trigger": "余额调整已提交，但响应丢失或请求报错后管理员重试同一次调整",
+      "impact": "每次提交生成新的Date.now幂等key，服务端把重试当作新业务，可能重复调整",
+      "sources": [
+        {
+          "path": "admin-web/src/views/LeaveGovernanceView.vue",
+          "line": 87
+        },
+        {
+          "path": "admin-web/src/views/LeaveGovernanceView.vue",
+          "line": 99
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 104
+        }
+      ],
+      "evidence": "后端按sourceTxnKey查询流水并核对指纹；前端每次submitAdjustment均生成新key。未模拟响应丢失。",
+      "fix": "同一编辑意图保留稳定key，重试复用；成功确认或明确新建调整时再换key。",
+      "acceptance": "服务端提交成功后丢弃首次响应，再重试，同一ADJUST流水只有一条且余额只变一次；同key不同参数拒绝。"
+    },
+    {
+      "id": "AT-01",
+      "severity": "P2",
+      "status": "静态确认，展示可信性缺口",
+      "trigger": "employee-web工作台当天workMinutes大于0或达到480分钟",
+      "impact": "页面显示固定08:57或18:00，可能与真实首末打卡时间不一致",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 85
+        },
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 86
+        },
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 88
+        }
+      ],
+      "evidence": "punchIn按workMinutes真假选择08:57；punchOut按480阈值选择18:00。hub-web独立工作台则读取实际firstPunchAt/lastPunchAt。",
+      "fix": "格式化日结果firstPunchAt/lastPunchAt；空值显示未打卡。",
+      "acceptance": "输入实际09:12和18:37，分别显示09:12和18:37；只有时长不能凭空产生打卡时间。"
+    },
+    {
+      "id": "WF-02",
+      "severity": "P2",
+      "status": "静态确认，操作资格不一致",
+      "trigger": "未结束的PENDING_REVIEW申请在页面点击撤回",
+      "impact": "前端按!finishedAt显示撤回，后端只接受IN_APPROVAL，操作会被拒绝，冻结仍等待预审终态",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 367
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 599
+        }
+      ],
+      "evidence": "预审请求未finishedAt；withdrawRequest非IN_APPROVAL抛400。未动态提交撤销。",
+      "fix": "按后端允许状态显示撤回；若产品要求预审可取消，补任务取消、状态锁和冻结释放。",
+      "acceptance": "预审中不显示不可用操作；本人IN_APPROVAL可撤回一次并释放冻结；终态和非本人拒绝。"
+    },
+    {
+      "id": "WF-03",
+      "severity": "P2",
+      "status": "静态确认，模板约束未执行",
+      "trigger": "generic-requests提交JSON对象，但漏模板必填字段或类型错误",
+      "impact": "仅验证对象结构，未按模板formSchema做字段校验，错误业务数据可进入审批",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 266
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 292
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 924
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 120
+        }
+      ],
+      "evidence": "版本保存formSchemaJson；通用提交只检查isObject，然后直接压缩保存。未动态提交非法请求。",
+      "fix": "按选定已发布版本校验必填、类型、长度和枚举，并返回字段错误。",
+      "acceptance": "缺字段、错误类型、越界枚举返回400且无新增申请；正确请求可提交，版本更新不改变在途基准。"
+    },
+    {
+      "id": "AT-02",
+      "severity": "P2",
+      "status": "静态确认，既有结果可能陈旧",
+      "trigger": "当天已按默认班次生成日结果后，再首次创建当天个人排班",
+      "impact": "createSchedule只存排班，日结果维持旧班次，直到另一打卡、审批或重算触发",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 238
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 252
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 262
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 285
+        }
+      ],
+      "evidence": "创建直接返回；修改则显式检查日结果存在并重算。未动态创建排班。",
+      "fix": "创建排班成功后，与修改路径一致地对已有日结果重算。",
+      "acceptance": "默认班次已有结果，创建不同班次后，同一请求结束时shiftId、时长与异常立即更新。"
+    },
+    {
+      "id": "99-3",
+      "severity": "P1",
+      "status": "既有问题，沿用第99审编号",
+      "trigger": "冻结后停用、删除假种或更改balanceMode",
+      "impact": "终态重新读取当前有效假种/模式，可能阻断结算或跳过冻结处理",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 68
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 85
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 212
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 262
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 326
+        }
+      ],
+      "evidence": "冻结、扣减、释放均重新getActiveLeaveTypeOrThrow且按当前NO_DEDUCT跳过；仅引用既有问题，非新发现。",
+      "fix": "提交时固定结算策略，或依据原冻结流水驱动终态结算；停用不影响在途请求。",
+      "acceptance": "冻结后改模式/状态，再批准、驳回或撤回，按原规则归零冻结且重复请求不二次结算。"
+    },
+    {
+      "id": "99-4",
+      "severity": "P2",
+      "status": "既有问题，沿用第99审编号",
+      "trigger": "非固定9-12/13-18班次、休息日或小于半天请假",
+      "impact": "固定工作区间和240分钟取整可能与真实排班不一致",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 904
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 930
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 942
+        }
+      ],
+      "evidence": "逐日套固定工作时段，按HALF_DAY_MINUTES向上取整；仅引用第99审，不算新发现。",
+      "fix": "请假计算统一消费有效日历、排班与假种计量规则。",
+      "acceptance": "非标准班次、节假日、跨日和半天边界都与实际规则一致，冻结和扣减同基准。"
+    }
+  ]
+}

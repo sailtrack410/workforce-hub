@@ -1,0 +1,13 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "test",
+    "--",
+    "src/composables/useWorkbenchState.test.ts",
+    "src/api/employee.test.ts",
+    "src/utils/employee-format.test.ts"
+  ],
+  "cwd": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-4-web-20261108/candidate/employee-web",
+  "exit_status": 0
+}

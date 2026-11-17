@@ -1,0 +1,210 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "缺卡补卡审批与考勤恢复",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "normal",
+      "label": "补卡审批"
+    },
+    {
+      "id": "recovery",
+      "label": "异常与补偿"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "api",
+      "lane": "normal",
+      "col": 0,
+      "type": "backend",
+      "label": "提交补卡API",
+      "sublabel": "日期、缺失类型与时点",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java",
+          "line": 66,
+          "end_line": 71
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "normal",
+      "col": 1,
+      "type": "security",
+      "label": "校验同日与上级",
+      "sublabel": "规范化ON／OFF类型",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 217,
+          "end_line": 244
+        }
+      ]
+    },
+    {
+      "id": "human",
+      "lane": "normal",
+      "col": 2,
+      "type": "backend",
+      "label": "创建人工审批",
+      "sublabel": "固定模板版本并建待办",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 245,
+          "end_line": 261
+        }
+      ]
+    },
+    {
+      "id": "approve",
+      "lane": "normal",
+      "col": 3,
+      "type": "backend",
+      "label": "上级同意",
+      "sublabel": "处理人授权并取补卡明细",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 725,
+          "end_line": 761
+        }
+      ]
+    },
+    {
+      "id": "manual",
+      "lane": "normal",
+      "col": 4,
+      "type": "backend",
+      "label": "写MANUAL打卡",
+      "sublabel": "按用户、时点、类型查重",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 444,
+          "end_line": 467
+        }
+      ]
+    },
+    {
+      "id": "recalc",
+      "lane": "normal",
+      "col": 5,
+      "type": "backend",
+      "label": "重算并完成",
+      "sublabel": "日结果与异常重新协调",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 468,
+          "end_line": 478
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "recovery",
+      "col": 3,
+      "type": "backend",
+      "label": "驳回或撤回",
+      "sublabel": "不写入补卡记录",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 763,
+          "end_line": 778
+        }
+      ]
+    },
+    {
+      "id": "conflict",
+      "lane": "recovery",
+      "col": 4,
+      "type": "security",
+      "label": "同日同类型限制",
+      "sublabel": "不同时间仍受唯一键约束",
+      "sources": [
+        {
+          "path": "server/src/main/resources/db/migration/V33__add_attendance_punch_daily_unique.sql",
+          "line": 1,
+          "end_line": 5
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "api",
+      "to": "validate"
+    },
+    {
+      "from": "validate",
+      "to": "human"
+    },
+    {
+      "from": "human",
+      "to": "approve"
+    },
+    {
+      "from": "approve",
+      "to": "manual",
+      "label": "通过"
+    },
+    {
+      "from": "manual",
+      "to": "recalc"
+    },
+    {
+      "from": "approve",
+      "to": "reject",
+      "label": "驳回",
+      "role": "branch"
+    },
+    {
+      "from": "manual",
+      "to": "conflict",
+      "label": "已有同类型",
+      "role": "error"
+    }
+  ],
+  "mainPath": [
+    "api",
+    "validate",
+    "human",
+    "approve",
+    "manual",
+    "recalc"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "补卡边界",
+      "items": [
+        "补卡提交直接进入人工审批，没有调用AI预审。",
+        "通过后仍核验员工能否打卡；精确同时间记录已存在则不重复插入。",
+        "同日同类型不同时间已有记录不支持覆盖：应返回明确业务冲突，不能把它画成更正已有打卡。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常恢复",
+      "items": [
+        "补卡、业务状态与重算位于审批事务内，异常会抛出回滚。",
+        "建议在提交及通过时统一按日期＋类型检查缺卡，避免审批末端才触发唯一键。",
+        "仅静态证据；未提交真实补卡或触发冲突。"
+      ]
+    }
+  ]
+}

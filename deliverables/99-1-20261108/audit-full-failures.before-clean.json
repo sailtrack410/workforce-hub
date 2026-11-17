@@ -1,0 +1,104 @@
+[
+  {
+    "class": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest",
+    "test": "disabledAdminUserShouldDenyExistingSession",
+    "type": "failure",
+    "message": "Status expected:<403> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest",
+    "test": "deletedAdminPluginCallPermissionShouldDenyExistingSession",
+    "type": "failure",
+    "message": "Status expected:<403> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest",
+    "test": "inactiveAdminPluginCallPermissionShouldDenyExistingSession",
+    "type": "failure",
+    "message": "Status expected:<403> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.im.ModuleImApiIntegrationTest",
+    "test": "offboardedEmployeeShouldNotSendMessageWithOldSession",
+    "type": "failure",
+    "message": "Status expected:<403> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.EmployeePluginListIntegrationTest",
+    "test": "invalidOrgUserReturnsEmpty",
+    "type": "failure",
+    "message": "Status expected:<200> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "shouldPersistExposeAndRestoreTrustedDependencyGraph",
+    "type": "failure",
+    "message": "expected: <200> but was: <401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpLifecycleShouldDrainAndUnloadRealPlugin",
+    "type": "failure",
+    "message": "expected: <200> but was: <401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpShouldKeepPluginRecoverableWhenClassLoaderCloseFails",
+    "type": "failure",
+    "message": "expected: <500> but was: <401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpShouldUninstallInstalledPluginWithoutStartingIt",
+    "type": "failure",
+    "message": "expected: <200> but was: <401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpUploadShouldRejectInvalidSignatureWithoutResidue",
+    "type": "failure",
+    "message": "expected: <422> but was: <401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpUploadShouldInstallSignedJarAndRejectSameIdReplacement",
+    "type": "failure",
+    "message": "expected: <200> but was: <401>"
+  },
+  {
+    "class": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest",
+    "test": "workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint",
+    "type": "failure",
+    "message": "Status expected:<409> but was:<500>"
+  },
+  {
+    "class": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest",
+    "test": "legacyFailedResultShouldRemainDisplayedAsFailure",
+    "type": "failure",
+    "message": "Status expected:<200> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest",
+    "test": "unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText",
+    "type": "failure",
+    "message": "Status expected:<500> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest",
+    "test": "blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields",
+    "type": "failure",
+    "message": "Status expected:<409> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest",
+    "test": "successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames",
+    "type": "failure",
+    "message": "Status expected:<200> but was:<401>"
+  },
+  {
+    "class": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest",
+    "test": "offboardedEmployeeShouldNotPunchWithExistingSession",
+    "type": "failure",
+    "message": "Status expected:<403> but was:<401>"
+  }
+]

@@ -1,0 +1,207 @@
+import type { EntityId } from '@/api';
+
+export type AgentPreReviewCheck = {
+  name: string;
+  result: string;
+  status: string;
+};
+
+export type AgentPreReviewDecision = {
+  decision: string;
+  conclusion: string;
+  reason: string;
+  suggestion: string;
+  riskLevel: string;
+  reviewMode: string;
+  checks: AgentPreReviewCheck[];
+};
+
+export function displayField(value: unknown) {
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string' && value.trim()) return value;
+  return '-';
+}
+
+// 后端返回的术语对用户不友好，统一替换成前端展示用语
+export function humanizeText(value?: string | null) {
+  if (!value) return '';
+  return value
+    .replace(/Agent预审/g, 'AI 预审')
+    .replace(/Agent任务/g, 'AI 任务')
+    .replace(/Agent会话/g, 'AI 会话')
+    .replace(/Agent 不存在/g, 'AI 助手不存在')
+    .replace(/Agent不存在/g, 'AI 助手不存在')
+    .replace(/IM会话/g, '消息会话')
+    .replace(/IM 会话/g, '消息会话')
+    .replace(/Agent/g, 'AI 助手');
+}
+
+export function employmentStatusLabel(status?: string | null) {
+  if (status === 'ACTIVE' || status === 'IN_SERVICE') return '在职';
+  if (status === 'DISABLED') return '停用';
+  if (status === 'RESIGNED') return '离职';
+  return status ? '其他状态' : '-';
+}
+
+export function percentage(value: number, max: number) {
+  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
+}
+
+export function statusText(status: string) {
+  if (status === 'PENDING') return '待处理';
+  if (status === 'PENDING_REVIEW') return '待预审';
+  if (status === 'OPEN') return '待处理';
+  if (status === 'DONE') return '已完成';
+  if (status === 'IN_APPROVAL') return '审批中';
+  if (status === 'ABNORMAL') return '异常';
+  if (status === 'NORMAL') return '正常';
+  if (status === 'REST') return '休息';
+  if (status === 'ACTIVE') return '正常';
+  if (status === 'READY') return '就绪';
+  if (status === 'PASSED') return '已通过';
+  if (status === 'FAILED') return '未通过';
+  if (status === 'APPROVED') return '已通过';
+  if (status === 'REJECTED') return '已驳回';
+  if (status === 'WITHDRAWN') return '已撤回';
+  if (status === 'NO_RULE') return '未排班';
+  if (status === 'LEAVE') return '请假';
+  if (status === 'EXPIRED') return '已过期';
+  return status ? '其他状态' : '-';
+}
+
+export function agentTypeLabel(type?: string | null) {
+  if (type === 'QA') return '问答助手';
+  if (type === 'WORKFLOW') return '流程助手';
+  return type ? 'AI 助手' : '-';
+}
+
+export function identityModeLabel(mode?: string | null) {
+  if (mode === 'SYSTEM_IDENTITY') return '系统身份';
+  if (mode === 'USER_IDENTITY') return '员工身份';
+  return mode ? '通用身份' : '-';
+}
+
+export function riskLevelLabel(level?: string | null) {
+  if (level === 'HIGH' || level === '高') return '高风险';
+  if (level === 'MEDIUM' || level === '中') return '中风险';
+  if (level === 'LOW' || level === '低') return '低风险';
+  if (level === 'READONLY') return '低风险';
+  return level ? '风险待确认' : '';
+}
+
+export function reviewModeLabel(mode?: string | null) {
+  if (mode === 'AUTO') return '自动审核';
+  if (mode === 'MANUAL' || mode === 'HUMAN') return '人工复核';
+  return mode ? '审核方式待确认' : '';
+}
+
+// 后端存分钟数，前端按 8h/天 展示
+export function minutesToDayLabel(minutes?: number | null) {
+  const safeMinutes = Math.max(0, Number(minutes ?? 0));
+  const days = safeMinutes / 480;
+  return `${Number.isInteger(days) ? days.toFixed(0) : days.toFixed(1)} 天`;
+}
+
+export function formatDateTime(value?: string | null) {
+  if (!value) return '-';
+  return value.replace('T', ' ').slice(0, 16);
+}
+
+export function toApiDateTime(value: string) {
+  return value ? `${value.replace('T', ' ')}:00`.slice(0, 19) : '';
+}
+
+export function bizTypeLabel(type?: string | null) {
+  if (type === 'LEAVE') return '请假';
+  if (type === 'CLOCK_CORRECTION') return '补卡';
+  if (type === 'EXPENSE') return '费用报销';
+  if (type === 'BUSINESS_TRIP') return '出差';
+  if (type === 'OVERTIME') return '加班';
+  if (type === 'SEAL') return '用章';
+  if (type === 'PURCHASE') return '采购';
+  if (type === 'CERTIFICATE') return '证明开具';
+  if (type === 'BORROW') return '备用金借款';
+  if (type === 'PROJECT') return '项目立项';
+  return type ? '其他业务' : '-';
+}
+
+export function punchTypeLabel(type?: string | null) {
+  if (type === 'ON_DUTY') return '上班';
+  if (type === 'OFF_DUTY') return '下班';
+  return type ? '打卡类型' : '-';
+}
+
+export function actionTypeLabel(type?: string | null) {
+  if (type === 'APPROVE') return '通过';
+  if (type === 'REJECT') return '驳回';
+  if (type === 'WITHDRAW') return '撤回';
+  if (type === 'AGENT_PRE_REVIEW') return 'AI 预审';
+  return type ? '审批操作' : '-';
+}
+
+// 解析 AI 预审的 JSON 结果，兼容后端字段名变化（suggestion/recommendation）
+export function parseAgentPreReviewDecision(value?: string | null): AgentPreReviewDecision | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const decision = textValue(parsed.decision);
+    const approved = decision === 'APPROVED';
+    return {
+      decision,
+      conclusion: textValue(parsed.conclusion) || (approved ? '建议进入直属上级审批' : ''),
+      reason: textValue(parsed.reason),
+      suggestion: textValue(parsed.suggestion ?? parsed.recommendation)
+        || (approved ? '建议直属上级核对请假时段、假期余额、工作交接和必要附件后审批' : ''),
+      riskLevel: textValue(parsed.riskLevel),
+      reviewMode: textValue(parsed.reviewMode),
+      checks: Array.isArray(parsed.checks) ? parsed.checks.map((item) => {
+        const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+        return {
+          name: textValue(row.name),
+          result: textValue(row.result ?? row.message),
+          status: textValue(row.status),
+        };
+      }).filter((item) => item.name || item.result || item.status) : [],
+    };
+  } catch {
+    return {
+      decision: '',
+      conclusion: '',
+      reason: value,
+      suggestion: '',
+      riskLevel: '',
+      reviewMode: '',
+      checks: [],
+    };
+  }
+}
+
+function textValue(value: unknown) {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+export function entityIdListFromText(value: string): EntityId[] {
+  return value
+    .split(/[,，\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function toneOfConversation(tone: string) {
+  if (tone === 'green') return 'success';
+  if (tone === 'amber') return 'warning';
+  if (tone === 'red') return 'danger';
+  if (tone === 'gray') return 'neutral';
+  return 'primary';
+}
+
+export function toneOfStatus(status: string) {
+  if (['PENDING', 'OPEN', 'IN_APPROVAL', 'ABNORMAL'].includes(status)) return 'warning';
+  if (['ACTIVE', 'READY', 'APPROVED', 'DONE'].includes(status)) return 'success';
+  if (['REJECTED', 'EXPIRED'].includes(status)) return 'danger';
+  return 'neutral';
+}

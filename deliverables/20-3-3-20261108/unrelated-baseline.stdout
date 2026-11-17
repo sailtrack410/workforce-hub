@@ -1,0 +1,715 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] Downloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-clean-plugin/3.3.2/maven-clean-plugin-3.3.2.pom
+[INFO] Downloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-clean-plugin/3.3.2/maven-clean-plugin-3.3.2.pom (5.3 kB at 22 kB/s)
+[INFO] Downloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-clean-plugin/3.3.2/maven-clean-plugin-3.3.2.jar
+[INFO] Downloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-clean-plugin/3.3.2/maven-clean-plugin-3.3.2.jar (36 kB at 199 kB/s)
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ workforce-hub ---
+[INFO] Deleting /private/tmp/workforce-quota-2033-suite/server/target
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 91 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 527 source files with javac [debug release 17] to target/classes
+[INFO] /private/tmp/workforce-quota-2033-suite/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/tmp/workforce-quota-2033-suite/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-quota-2033-suite/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 112 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/tmp/workforce-quota-2033-suite/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-quota-2033-suite/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/tmp/workforce-quota-2033-suite/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/tmp/workforce-quota-2033-suite/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest
+20:29:11.624 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest]: AdminPluginLifecycleAuditIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+20:29:11.689 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:29:11.866+08:00  INFO [] 40609 --- [background-preinit] o.h.validator.internal.util.Version      : HV000001: Hibernate Validator 8.0.1.Final
+2026-11-08T20:29:11.886+08:00  INFO [] 40609 --- [main] AdminPluginLifecycleAuditIntegrationTest : Starting AdminPluginLifecycleAuditIntegrationTest using Java 17.0.18 with PID 40609 (started by sailtrack in /private/tmp/workforce-quota-2033-suite/server)
+2026-11-08T20:29:11.887+08:00 DEBUG [] 40609 --- [main] AdminPluginLifecycleAuditIntegrationTest : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:29:11.887+08:00  INFO [] 40609 --- [main] AdminPluginLifecycleAuditIntegrationTest : The following 1 profile is active: "api"
+2026-11-08T20:29:12.416+08:00  INFO [] 40609 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:29:12.417+08:00  INFO [] 40609 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:29:12.439+08:00  INFO [] 40609 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 18 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:29:13.107+08:00  INFO [] 40609 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-11-08T20:29:13.187+08:00  INFO [] 40609 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-11-08T20:29:13.228+08:00  INFO [] 40609 --- [main] o.f.c.internal.license.VersionPrinter    : Flyway Community Edition 9.22.3 by Redgate
+2026-11-08T20:29:13.228+08:00  INFO [] 40609 --- [main] o.f.c.internal.license.VersionPrinter    : See release notes here: https://rd.gt/416ObMi
+2026-11-08T20:29:13.228+08:00  INFO [] 40609 --- [main] o.f.c.internal.license.VersionPrinter    : 
+2026-11-08T20:29:13.238+08:00  INFO [] 40609 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:23383/workforce_hub_2033_test (MySQL 8.4)
+2026-11-08T20:29:13.243+08:00  WARN [] 40609 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:29:13.286+08:00  INFO [] 40609 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 66 migrations (execution time 00:00.039s)
+2026-11-08T20:29:13.292+08:00  INFO [] 40609 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_hub_2033_test`: 67
+2026-11-08T20:29:13.293+08:00  INFO [] 40609 --- [main] o.f.core.internal.command.DbMigrate      : Schema `workforce_hub_2033_test` is up to date. No migration necessary.
+2026-11-08T20:29:13.990+08:00  INFO [] 40609 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:29:13.990+08:00  INFO [] 40609 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:29:13.992+08:00  INFO [] 40609 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:29:14.322+08:00  INFO [] 40609 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:29:14.351+08:00  INFO [] 40609 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@458f1355, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@4bfd9e3a, org.springframework.security.web.context.SecurityContextHolderFilter@3c21bab4, org.springframework.security.web.header.HeaderWriterFilter@707004b6, org.springframework.web.filter.CorsFilter@562a4bac, org.springframework.security.web.csrf.CsrfFilter@57b4967e, com.workforcehub.auth.security.UserTypePathFilter@6f7e5e11, com.workforcehub.auth.security.AdminPermissionFilter@4d82ded2, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@3fbf4614, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@64ca0be0, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@56c45636, org.springframework.security.web.session.SessionManagementFilter@667c2066, org.springframework.security.web.access.ExceptionTranslationFilter@1ee1c0cc, org.springframework.security.web.access.intercept.AuthorizationFilter@763d7eef]
+2026-11-08T20:29:14.587+08:00 DEBUG [] 40609 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:29:14.587+08:00 DEBUG [] 40609 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:29:14.587+08:00 DEBUG [] 40609 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:29:14.587+08:00 DEBUG [] 40609 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:29:14.587+08:00 DEBUG [] 40609 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:29:14.587+08:00  INFO [] 40609 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:29:14.587+08:00  INFO [] 40609 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:29:14.588+08:00  INFO [] 40609 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:29:14.676+08:00  INFO [] 40609 --- [main] AdminPluginLifecycleAuditIntegrationTest : Started AdminPluginLifecycleAuditIntegrationTest in 2.946 seconds (process running for 3.323)
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/admin/system/audit-logs
+       Parameters = {actionType=[PLUGIN_DISABLED], targetType=[PLUGIN]}
+          Headers = [X-CSRF-TOKEN:"6f8d6824-f0ee-45aa-a849-f8a23c86bafc"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@6793a49c, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 403
+    Error message = null
+          Headers = [X-Request-Id:"6165d025c4214e6fbb95efb22d6db828", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100403,"message":"无权限访问","data":null,"requestId":"6165d025c4214e6fbb95efb22d6db828"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+2026-11-08T20:29:15.015+08:00 ERROR [a4ba3b40089740189f007ea8c3217be7] 40609 --- [main] c.w.c.exception.GlobalExceptionHandler   : 系统异常
+java.lang.IllegalStateException: private lifecycle exception text
+	at com.workforcehub.plugin.runtime.PluginManagerService.disable(PluginManagerService.java:691)
+	at com.workforcehub.plugin.runtime.AdminPluginManagementService.disable(AdminPluginManagementService.java:165)
+	at com.workforcehub.plugin.controller.admin.AdminPluginController.disable(AdminPluginController.java:51)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:255)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:188)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:926)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:831)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014)
+	at org.springframework.web.servlet.FrameworkServlet.doPut(FrameworkServlet.java:925)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:593)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:165)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:108)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.ObservationFilterChainDecorator$FilterObservation$SimpleFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:479)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:340)
+	at org.springframework.security.web.ObservationFilterChainDecorator.lambda$wrapSecured$0(ObservationFilterChainDecorator.java:82)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:128)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:100)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.AdminPermissionFilter.doFilterInternal(AdminPermissionFilter.java:288)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at com.workforcehub.auth.security.UserTypePathFilter.doFilterInternal(UserTypePathFilter.java:71)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.csrf.CsrfFilter.doFilterInternal(CsrfFilter.java:131)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$0(ObservationFilterChainDecorator.java:323)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:224)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.servlet.handler.HandlerMappingIntrospector.lambda$createCacheFilter$3(HandlerMappingIntrospector.java:195)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74)
+	at org.springframework.security.config.annotation.web.configuration.WebMvcSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebMvcSecurityConfiguration.java:230)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.session.web.http.SessionRepositoryFilter.doFilterInternal(SessionRepositoryFilter.java:142)
+	at org.springframework.session.web.http.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:82)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:101)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:101)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:109)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at com.workforcehub.common.config.RequestIdFilter.doFilterInternal(RequestIdFilter.java:46)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:151)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:132)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:201)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText(AdminPluginLifecycleAuditIntegrationTest.java:136)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:728)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:218)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:214)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:139)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin/disable
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"927569f6-38b3-4706-a140-f77fe5e481c8", "927569f6-38b3-4706-a140-f77fe5e481c8"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@1f0eabb8, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = com.workforcehub.plugin.controller.admin.AdminPluginController
+           Method = com.workforcehub.plugin.controller.admin.AdminPluginController#disable(String)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = java.lang.IllegalStateException
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 500
+    Error message = null
+          Headers = [X-Request-Id:"a4ba3b40089740189f007ea8c3217be7", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=ZmJhYTJmNGMtZTk0OC00OTI1LTlmNjktNmIxMTMwNDZjNjk3; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":100500,"message":"系统内部错误","data":null,"requestId":"a4ba3b40089740189f007ea8c3217be7"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@7c441f09 name = 'SESSION', value = 'ZmJhYTJmNGMtZTk0OC00OTI1LTlmNjktNmIxMTMwNDZjNjk3', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/admin/system/audit-logs
+       Parameters = {actionType=[PLUGIN_DISABLED], targetType=[PLUGIN]}
+          Headers = [X-CSRF-TOKEN:"52aceeef-5b57-418f-bcce-296cccf4ec85"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@6fbdee75, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 403
+    Error message = null
+          Headers = [X-Request-Id:"245189317dc043f4b0adafb4b83d2649", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100403,"message":"无权限访问","data":null,"requestId":"245189317dc043f4b0adafb4b83d2649"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+2026-11-08T20:29:15.095+08:00  WARN [1eb049cf237b475cb1b3edb9bfaaabcb] 40609 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=当前插件状态不允许启用
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin/enable
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"934f372d-fbc0-4896-a3f1-dac4244117df", "934f372d-fbc0-4896-a3f1-dac4244117df"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@3d07c7aa, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = com.workforcehub.plugin.controller.admin.AdminPluginController
+           Method = com.workforcehub.plugin.controller.admin.AdminPluginController#enable(String)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = com.workforcehub.common.exception.BizException
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 409
+    Error message = null
+          Headers = [X-Request-Id:"1eb049cf237b475cb1b3edb9bfaaabcb", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=MDgxOWIxYTMtOGIwNi00MWI1LWJlNGYtY2QyMjJmOWY1MjQ5; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":100409,"message":"当前插件状态不允许启用","data":null,"requestId":"1eb049cf237b475cb1b3edb9bfaaabcb"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@11e7d01 name = 'SESSION', value = 'MDgxOWIxYTMtOGIwNi00MWI1LWJlNGYtY2QyMjJmOWY1MjQ5', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/admin/system/audit-logs
+       Parameters = {actionType=[PLUGIN_ENABLED], targetType=[PLUGIN]}
+          Headers = [X-CSRF-TOKEN:"eb4bc628-207e-4f9d-8a89-b7d568efb531"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@2c0a3798, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 403
+    Error message = null
+          Headers = [X-Request-Id:"bef69d97a5b749b088010c9eb197ab81", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100403,"message":"无权限访问","data":null,"requestId":"bef69d97a5b749b088010c9eb197ab81"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin/enable
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"776b43eb-4c9f-4762-96e2-64a36c66e652", "776b43eb-4c9f-4762-96e2-64a36c66e652"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@3e680b29, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = com.workforcehub.plugin.controller.admin.AdminPluginController
+           Method = com.workforcehub.plugin.controller.admin.AdminPluginController#enable(String)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"bcedbc78d36942639f57a9e4d36d3a7c", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=OTk2OWU3M2ItZWY0OS00ZGVkLWI2OTctMzU0YTU2ZTkzYTli; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"id":"lifecycle-audit-plugin","name":"Lifecycle Audit Plugin","description":null,"version":"1.0.0","sdkVersion":"0.1.0","minHostVersion":null,"maxHostVersion":null,"javaVersion":"17","type":"FUNCTIONAL","status":"ACTIVE","frontendEntry":null,"provider":null,"dependencies":[],"installedAt":"2026-07-30T10:00:00","updatedAt":null},"requestId":"bcedbc78d36942639f57a9e4d36d3a7c"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@3952be1b name = 'SESSION', value = 'OTk2OWU3M2ItZWY0OS00ZGVkLWI2OTctMzU0YTU2ZTkzYTli', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin/disable
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"8f3a4656-cd4f-4fb9-929b-1b329f10fb32", "8f3a4656-cd4f-4fb9-929b-1b329f10fb32"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@2460c928, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = com.workforcehub.plugin.controller.admin.AdminPluginController
+           Method = com.workforcehub.plugin.controller.admin.AdminPluginController#disable(String)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"12687a20429f49f697d10cab08c0fc45", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=MGU0ZjQ2NmItNmI3Ny00MTgzLThjNjUtNzI1ZjRmMzMwMzIw; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"id":"lifecycle-audit-plugin","name":"Lifecycle Audit Plugin","description":null,"version":"1.0.0","sdkVersion":"0.1.0","minHostVersion":null,"maxHostVersion":null,"javaVersion":"17","type":"FUNCTIONAL","status":"STOPPED","frontendEntry":null,"provider":null,"dependencies":[],"installedAt":"2026-07-30T10:00:00","updatedAt":null},"requestId":"12687a20429f49f697d10cab08c0fc45"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@3d10a00a name = 'SESSION', value = 'MGU0ZjQ2NmItNmI3Ny00MTgzLThjNjUtNzI1ZjRmMzMwMzIw', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = DELETE
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"e4c8a59e-8cd1-4eb4-9176-6e70fa8c5676", "e4c8a59e-8cd1-4eb4-9176-6e70fa8c5676"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@342686f4, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = com.workforcehub.plugin.controller.admin.AdminPluginController
+           Method = com.workforcehub.plugin.controller.admin.AdminPluginController#uninstall(String)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [X-Request-Id:"e26160f8cf354dfbb85cef685139e00c", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY", Set-Cookie:"SESSION=OWE0YjExMTEtZjhlNC00ZGNlLTk2OWMtYzdhZTUxMDkzODZm; Path=/; HttpOnly; SameSite=Lax"]
+     Content type = application/json
+             Body = {"code":0,"message":"ok","data":{"id":"lifecycle-audit-plugin","name":"Lifecycle Audit Plugin","description":null,"version":"1.0.0","sdkVersion":"0.1.0","minHostVersion":null,"maxHostVersion":null,"javaVersion":"17","type":"FUNCTIONAL","status":"UNINSTALLED","frontendEntry":null,"provider":null,"dependencies":[],"installedAt":"2026-07-30T10:00:00","updatedAt":null},"requestId":"e26160f8cf354dfbb85cef685139e00c"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = [[MockCookie@7dc88f5c name = 'SESSION', value = 'OWE0YjExMTEtZjhlNC00ZGNlLTk2OWMtYzdhZTUxMDkzODZm', comment = [null], domain = [null], maxAge = -1, path = '/', secure = false, version = 0, httpOnly = true]]
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/admin/system/audit-logs
+       Parameters = {actionType=[PLUGIN_ENABLED], targetType=[PLUGIN]}
+          Headers = [X-CSRF-TOKEN:"9197d6dd-c870-43cb-8b93-4af64c0e53a0"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@4d01a100, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 403
+    Error message = null
+          Headers = [X-Request-Id:"142f24d399e745148ef9af647a3eb75c", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100403,"message":"无权限访问","data":null,"requestId":"142f24d399e745148ef9af647a3eb75c"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+[ERROR] Tests run: 4, Failures: 4, Errors: 0, Skipped: 0, Time elapsed: 3.582 s <<< FAILURE! -- in com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.legacyFailedResultShouldRemainDisplayedAsFailure -- Time elapsed: 0.248 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<403>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.assertAuditDisplay(AdminPluginLifecycleAuditIntegrationTest.java:194)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.legacyFailedResultShouldRemainDisplayedAsFailure(AdminPluginLifecycleAuditIntegrationTest.java:159)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText -- Time elapsed: 0.106 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<403>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.assertAuditDisplay(AdminPluginLifecycleAuditIntegrationTest.java:194)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText(AdminPluginLifecycleAuditIntegrationTest.java:146)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields -- Time elapsed: 0.035 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<403>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.assertAuditDisplay(AdminPluginLifecycleAuditIntegrationTest.java:194)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields(AdminPluginLifecycleAuditIntegrationTest.java:127)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames -- Time elapsed: 0.045 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<403>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.assertAuditDisplay(AdminPluginLifecycleAuditIntegrationTest.java:194)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames(AdminPluginLifecycleAuditIntegrationTest.java:109)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields:127->assertAuditDisplay:194 Status expected:<200> but was:<403>
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.legacyFailedResultShouldRemainDisplayedAsFailure:159->assertAuditDisplay:194 Status expected:<200> but was:<403>
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames:109->assertAuditDisplay:194 Status expected:<200> but was:<403>
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText:146->assertAuditDisplay:194 Status expected:<200> but was:<403>
+[INFO] 
+[ERROR] Tests run: 4, Failures: 4, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  10.855 s
+[INFO] Finished at: 2026-11-08T20:29:15+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.1.2:test (default-test) on project workforce-hub: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /private/tmp/workforce-quota-2033-suite/server/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

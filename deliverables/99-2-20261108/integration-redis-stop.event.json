@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/opt/homebrew/bin/redis-cli",
+    "-h",
+    "127.0.0.1",
+    "-p",
+    "62971",
+    "shutdown",
+    "nosave"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "integration-redis-stop.stdout",
+  "stderr": "integration-redis-stop.stderr"
+}

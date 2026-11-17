@@ -1,0 +1,216 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ workforce-hub ---
+[INFO] Deleting /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/target
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] Copying 70 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 530 source files with javac [debug release 17] to target/classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 115 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server/src/test/java/com/workforcehub/plugin/repository/PluginEventSubscriptionRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.auth.AdminPermissionWebTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:38:04.167+08:00  INFO 42585 --- [           main] c.w.auth.AdminPermissionWebTest          : Starting AdminPermissionWebTest using Java 17.0.18 with PID 42585 (started by sailtrack in /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server)
+2026-11-08T20:38:04.168+08:00  INFO 42585 --- [           main] c.w.auth.AdminPermissionWebTest          : No active profile set, falling back to 1 default profile: "default"
+2026-11-08T20:38:05.157+08:00  INFO 42585 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@7e3d168e, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@149b53fa, org.springframework.security.web.context.SecurityContextHolderFilter@6d35ff7b, org.springframework.security.web.header.HeaderWriterFilter@1b19712f, org.springframework.web.filter.CorsFilter@73be4cdd, org.springframework.security.web.csrf.CsrfFilter@47b4ac83, com.workforcehub.auth.security.SessionValidityFilter@751686aa, com.workforcehub.auth.security.UserTypePathFilter@638977e0, com.workforcehub.auth.security.AdminPermissionFilter@2dc3ece8, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@4e9e0c6, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@1a819901, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@2c1a8529, org.springframework.security.web.session.SessionManagementFilter@510e4d79, org.springframework.security.web.access.ExceptionTranslationFilter@6dc9a56e, org.springframework.security.web.access.intercept.AuthorizationFilter@73dbe25]
+2026-11-08T20:38:05.289+08:00  INFO 42585 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:05.289+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:05.289+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:05.325+08:00  INFO 42585 --- [           main] c.w.auth.AdminPermissionWebTest          : Started AdminPermissionWebTest in 1.282 seconds (process running for 1.737)
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.716 s -- in com.workforcehub.auth.AdminPermissionWebTest
+[INFO] Running com.workforcehub.auth.AdminPermissionFilterTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.workforcehub.auth.AdminPermissionFilterTest
+[INFO] Running com.workforcehub.auth.SessionValidityRequestChainTest
+2026-11-08T20:38:05.715+08:00  INFO 42585 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@2faae7f6, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@673a5aa7, org.springframework.security.web.context.SecurityContextHolderFilter@3c717ef2, org.springframework.security.web.header.HeaderWriterFilter@73e63b4d, org.springframework.web.filter.CorsFilter@1443539, org.springframework.security.web.csrf.CsrfFilter@1104ad6a, com.workforcehub.auth.security.SessionValidityFilter@5b160208, com.workforcehub.auth.security.UserTypePathFilter@237bdbcb, com.workforcehub.auth.security.AdminPermissionFilter@16a15261, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@7ca0b05e, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@3e5ed0d4, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@36ec4071, org.springframework.security.web.session.SessionManagementFilter@8aafd70, org.springframework.security.web.access.ExceptionTranslationFilter@54d2887a, org.springframework.security.web.access.intercept.AuthorizationFilter@56f19f36]
+2026-11-08T20:38:05.763+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:05.763+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:05.763+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:05.956+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=90
+2026-11-08T20:38:05.975+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:05.975+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:05.975+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:06.150+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=91
+2026-11-08T20:38:06.153+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:06.153+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:06.153+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:06.272+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=92
+2026-11-08T20:38:06.329+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=93
+2026-11-08T20:38:06.332+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:06.332+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:06.332+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:06.445+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=94
+2026-11-08T20:38:06.503+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=95
+2026-11-08T20:38:06.504+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:06.504+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:06.504+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:06.614+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=96
+2026-11-08T20:38:06.616+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:06.616+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:06.617+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:38:06.725+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=97
+2026-11-08T20:38:06.780+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=98
+2026-11-08T20:38:06.848+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=99
+2026-11-08T20:38:06.850+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:06.850+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:06.851+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:06.964+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=100
+2026-11-08T20:38:07.072+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=101
+2026-11-08T20:38:07.073+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.073+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.073+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:07.183+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=102
+2026-11-08T20:38:07.185+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.185+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.185+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:07.293+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=103
+2026-11-08T20:38:07.350+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=104
+2026-11-08T20:38:07.352+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.352+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.353+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:38:07.460+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=105
+2026-11-08T20:38:07.462+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.462+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.462+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:07.571+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=106
+2026-11-08T20:38:07.573+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.573+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.573+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:07.681+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=107
+2026-11-08T20:38:07.735+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=108
+2026-11-08T20:38:07.737+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.737+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.737+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:07.844+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=109
+2026-11-08T20:38:07.846+08:00  WARN 42585 --- [           main] c.w.auth.service.LoginService            : 账号已禁用 userType=USER loginName=fixture.employee
+2026-11-08T20:38:07.847+08:00  WARN 42585 --- [           main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=403, code=100403, message=账号已被禁用，请联系管理员
+2026-11-08T20:38:07.849+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.849+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.849+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:07.969+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=110
+2026-11-08T20:38:07.971+08:00  WARN 42585 --- [           main] c.w.auth.service.LoginService            : 账号已锁定 userType=USER loginName=fixture.employee
+2026-11-08T20:38:07.971+08:00  WARN 42585 --- [           main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=423, code=100423, message=账号已锁定，请联系管理员
+2026-11-08T20:38:07.973+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:07.973+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:07.973+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:08.086+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=111
+2026-11-08T20:38:08.088+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:08.088+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:08.088+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:08.210+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=112
+2026-11-08T20:38:08.243+08:00  INFO 42585 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@4f0f56f5, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@6edb093f, org.springframework.security.web.context.SecurityContextHolderFilter@11e75942, org.springframework.security.web.header.HeaderWriterFilter@c0cb9c2, org.springframework.web.filter.CorsFilter@7f5c4ff8, org.springframework.security.web.csrf.CsrfFilter@23a78d2e, com.workforcehub.auth.security.SessionValidityFilter@7692c0e9, com.workforcehub.auth.security.UserTypePathFilter@431f8830, com.workforcehub.auth.security.AdminPermissionFilter@75bbe39d, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@23c61c1b, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@4a6d6308, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@6805415d, org.springframework.security.web.session.SessionManagementFilter@eb66b47, org.springframework.security.web.access.ExceptionTranslationFilter@20724c21, org.springframework.security.web.access.intercept.AuthorizationFilter@5cbaafbd]
+2026-11-08T20:38:08.247+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:08.247+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:08.247+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:08.250+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:08.250+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:08.250+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:08.365+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=114
+2026-11-08T20:38:08.367+08:00  INFO 42585 --- [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:08.367+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:08.367+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:08.477+08:00  INFO 42585 --- [           main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=115
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.867 s -- in com.workforcehub.auth.SessionValidityRequestChainTest
+[INFO] Running com.workforcehub.auth.AdminPermissionRouteMatrixTest
+Admin route matrix: 163 method/path mappings covered
+[INFO] Tests run: 165, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.204 s -- in com.workforcehub.auth.AdminPermissionRouteMatrixTest
+[INFO] Running com.workforcehub.plugin.AdminPluginManagementWebTest
+2026-11-08T20:38:08.695+08:00  WARN 42585 --- [           main] lowableLiquibaseEnvironmentPostProcessor : Liquibase has not been explicitly enabled or disabled. Overriding default from Spring Boot from `true` to `false`. Flowable pulls in Liquibase, but does not use the Spring Boot configuration for it. If you are using it you would need to set `spring.liquibase.enabled` to `true` by yourself
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:38:08.697+08:00  INFO 42585 --- [           main] c.w.plugin.AdminPluginManagementWebTest  : Starting AdminPluginManagementWebTest using Java 17.0.18 with PID 42585 (started by sailtrack in /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server)
+2026-11-08T20:38:08.697+08:00  INFO 42585 --- [           main] c.w.plugin.AdminPluginManagementWebTest  : No active profile set, falling back to 1 default profile: "default"
+2026-11-08T20:38:08.765+08:00  INFO 42585 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@4104b585, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@ac3739d, org.springframework.security.web.context.SecurityContextHolderFilter@6b5e8b3a, org.springframework.security.web.header.HeaderWriterFilter@4a6c3720, org.springframework.web.filter.CorsFilter@6dad684f, org.springframework.security.web.csrf.CsrfFilter@62f47cac, com.workforcehub.auth.security.SessionValidityFilter@572c50b6, com.workforcehub.auth.security.UserTypePathFilter@33606f4b, com.workforcehub.auth.security.AdminPermissionFilter@222ebd21, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@3c657771, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@171b82ea, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@24c7563b, org.springframework.security.web.session.SessionManagementFilter@2a8e93db, org.springframework.security.web.access.ExceptionTranslationFilter@7845f53d, org.springframework.security.web.access.intercept.AuthorizationFilter@564d9ec2]
+2026-11-08T20:38:08.774+08:00  INFO 42585 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:08.774+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:08.775+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:38:08.776+08:00  INFO 42585 --- [           main] c.w.plugin.AdminPluginManagementWebTest  : Started AdminPluginManagementWebTest in 0.087 seconds (process running for 5.188)
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.135 s -- in com.workforcehub.plugin.AdminPluginManagementWebTest
+[INFO] Running com.workforcehub.plugin.PluginGatewaySecurityTest
+2026-11-08T20:38:08.830+08:00  WARN 42585 --- [           main] lowableLiquibaseEnvironmentPostProcessor : Liquibase has not been explicitly enabled or disabled. Overriding default from Spring Boot from `true` to `false`. Flowable pulls in Liquibase, but does not use the Spring Boot configuration for it. If you are using it you would need to set `spring.liquibase.enabled` to `true` by yourself
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:38:08.832+08:00  INFO 42585 --- [           main] c.w.plugin.PluginGatewaySecurityTest     : Starting PluginGatewaySecurityTest using Java 17.0.18 with PID 42585 (started by sailtrack in /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-review-gfolu00w/server)
+2026-11-08T20:38:08.832+08:00  INFO 42585 --- [           main] c.w.plugin.PluginGatewaySecurityTest     : No active profile set, falling back to 1 default profile: "default"
+2026-11-08T20:38:08.920+08:00  INFO 42585 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@54d93fce, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@3f4b9792, org.springframework.security.web.context.SecurityContextHolderFilter@6e8fa647, org.springframework.security.web.header.HeaderWriterFilter@5d852761, org.springframework.web.filter.CorsFilter@8c6a7db, org.springframework.security.web.csrf.CsrfFilter@3eb814dd, com.workforcehub.auth.security.SessionValidityFilter@5d95c7c2, com.workforcehub.auth.security.UserTypePathFilter@40afa4f1, com.workforcehub.auth.security.AdminPermissionFilter@233b5c71, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@12eb281f, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@6621ab0c, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@1e7edfb2, org.springframework.security.web.session.SessionManagementFilter@106f566b, org.springframework.security.web.access.ExceptionTranslationFilter@58c48b92, org.springframework.security.web.access.intercept.AuthorizationFilter@1fb947f6]
+2026-11-08T20:38:08.930+08:00  INFO 42585 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:08.930+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:08.930+08:00  INFO 42585 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-11-08T20:38:08.933+08:00  INFO 42585 --- [           main] c.w.plugin.PluginGatewaySecurityTest     : Started PluginGatewaySecurityTest in 0.107 seconds (process running for 5.345)
+2026-11-08T20:38:08.953+08:00 ERROR 42585 --- [           main] c.w.p.c.PluginGatewayController          : 网关异常: errorType=java.lang.IllegalStateException
+2026-11-08T20:38:09.009+08:00 ERROR 42585 --- [           main] c.w.p.c.PluginGatewayController          : 插件动作网关失败: pluginId=hello-plugin, actionCode=hello.greet, errorType=java.lang.AssertionError
+2026-11-08T20:38:09.064+08:00 ERROR 42585 --- [           main] c.w.p.c.PluginGatewayController          : 插件动作执行失败: pluginId=hello-plugin, actionCode=hello.greet, errorType=java.lang.RuntimeException
+[INFO] Tests run: 47, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.246 s -- in com.workforcehub.plugin.PluginGatewaySecurityTest
+[INFO] Running com.workforcehub.leave.LeaveSettlementTransactionTest
+SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=MODE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=MODE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=INACTIVE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=DELETED outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=WITHDRAWN available=1440 frozen=0
+[INFO] Tests run: 29, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.480 s -- in com.workforcehub.leave.LeaveSettlementTransactionTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 299, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  13.068 s
+[INFO] Finished at: 2026-11-08T20:38:09+08:00
+[INFO] ------------------------------------------------------------------------

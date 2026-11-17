@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "subtask": {
+      "agent_task_status": 1,
+      "completed_at": "0",
+      "created_at": "1794139490891",
+      "creator": {
+        "id": "ou_358d547a8defe93637e1aa4046adde44",
+        "type": "user"
+      },
+      "dependencies": [],
+      "description": "编号：100-18 / IAR-03；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：创建含内嵌工具调用的DAG草稿，或将非DAG草稿更新为DAG，随后直接发布。\n\n影响：部分路径未实际试运行即获得workflow_test_signature/workflow_tested_at，弱化“当前版本完成一次流程测试”的发布门禁。\n\n证据与边界：createVersion与旧配置转DAG直接调用updateAgentVersionWorkflowTest；该方法写签名和NOW()。publish只比较签名。仓库测试契约明确“后台发布DAG Agent前必须完成一次当前版本流程测试”，但该测试覆盖simpleWorkflow，非自动签名例外。\n\n修复方向：只有成功试运行入口写测试签名/时间；创建、更新、工具绑定/关键引用变更均清空测试证明；兼容迁移标记与真实测试结果分字段。\n\n验收条件：两类自动签名分支在未试运行时发布400；失败试运行仍不能发布；成功且配置相同可发布；改配置或工具绑定后必须重测。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:319\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:350\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:444\nserver/src/main/java/com/workforcehub/agent/repository/AgentRepository.java:105\nserver/src/test/java/com/workforcehub/agent/ModuleAgentApiIntegrationTest.java:240",
+      "extra": "",
+      "guid": "959f6588-06e3-490e-bf04-4e2f46057426",
+      "is_milestone": false,
+      "mode": 2,
+      "origin": {
+        "href": {
+          "title": "sailtrack 飞书 CLI",
+          "url": ""
+        },
+        "platform_i18n_name": {
+          "de_de": "sailtrack 飞书 CLI",
+          "en_us": "sailtrack 飞书 CLI",
+          "es_es": "sailtrack 飞书 CLI",
+          "fr_fr": "sailtrack 飞书 CLI",
+          "it_it": "sailtrack 飞书 CLI",
+          "ja_jp": "sailtrack 飞书 CLI",
+          "ko_kr": "sailtrack 飞书 CLI",
+          "ru_ru": "sailtrack 飞书 CLI",
+          "th_th": "sailtrack 飞书 CLI",
+          "zh_cn": "sailtrack 飞书 CLI",
+          "zh_hk": "sailtrack 飞书 CLI",
+          "zh_tw": "sailtrack 飞书 CLI"
+        }
+      },
+      "parent_task_guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+      "repeat_rule": "",
+      "source": 7,
+      "status": "todo",
+      "subtask_count": 0,
+      "summary": "[P2][100-18][新问题] 草稿部分路径自动获得流程测试证明",
+      "task_id": "t100058",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ],
+      "updated_at": "1794139491109",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=959f6588-06e3-490e-bf04-4e2f46057426\u0026suite_entity_num=t100058"
+    }
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

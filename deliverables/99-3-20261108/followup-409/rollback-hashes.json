@@ -1,0 +1,6 @@
+{
+  "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": "71d747e6a4ba2b3007572ea830919ffb856657c6edde9349b03173b382e4b6dd",
+  "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": "ffdc616105782bedfb186e8287dd6e1c160fd9092a052b5eb5b633b0566830d4",
+  "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": "c3c00f1df73b632ac267470e52c78e8d413787a0c3f86e3920dfd66dfb539695",
+  "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd"
+}

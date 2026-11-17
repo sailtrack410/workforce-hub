@@ -1,0 +1,4 @@
+input=POST /api/admin/im/outbox-events/dispatch; permissions=[]
+filterChainInvoked=true; mockResponseStatus=200
+body=
+boundary=filter probe only; no HTTP business success claimed

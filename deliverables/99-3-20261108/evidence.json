@@ -1,0 +1,989 @@
+{
+  "target": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "issue": "99-3",
+  "changed_symbols": [
+    "wf_req_leave.balance_mode_snapshot",
+    "LeaveService.freezeForWorkflowSubmission",
+    "LeaveService.consumeFrozenForWorkflowApproval",
+    "LeaveService.releaseFrozenForWorkflowTerminal"
+  ],
+  "manifest": {
+    "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": {
+      "baseline_sha256": "6cd973d9bc8f8b3a87511a1a7cb3f422856fc0283ed92e00e579f1e382f997d4",
+      "modified_sha256": "86bd368fd6580d3a3ef108a4b571aff10126aad1a4eee545d80f590d5976d128"
+    },
+    "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": {
+      "baseline_sha256": "e1ecfe234d5c2fc329476cbc86ed13c039491eec330faf041a57d4e937f54d6a",
+      "modified_sha256": "0d01c77494aa3bd013b3d0895cffa91f5124ef6cf0d3fce8cef3b3824e46c5c4"
+    },
+    "server/pom.xml": {
+      "baseline_sha256": "79269d1ee66ac035a0e544e4f2d245ce38dbb4dcfdf3b5b755ea2311d2e3a7a9",
+      "modified_sha256": "08169b8df3551e160dec94f0d00eeb65a02801b79bcb3aeb9cf53ce3b1bfdc9c"
+    },
+    "server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql": {
+      "baseline_sha256": null,
+      "modified_sha256": "527652c223dcee356b02a51a59261bf1fd8bf2452fb27c7b79d4ab9e1c99d236"
+    },
+    "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": {
+      "baseline_sha256": null,
+      "modified_sha256": "c3c00f1df73b632ac267470e52c78e8d413787a0c3f86e3920dfd66dfb539695"
+    },
+    "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": {
+      "baseline_sha256": "19ad71b932c9c1ced44f316719bcb1f1608478b1ba391b971217d227b2d5fdde",
+      "modified_sha256": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd"
+    }
+  },
+  "test_input": {
+    "path": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/MODIFIED_FILE/server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java",
+    "sha256": "1783db4931c11d38ad423b447817d7c34e85f2d93da04e16bd908248777e32e9"
+  },
+  "runs": [
+    {
+      "role": "BASELINE",
+      "command": [
+        "mvn",
+        "-Dtest=LeaveSettlementTransactionTest",
+        "test"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/baseline-run/server",
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/baseline.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/baseline.stderr",
+      "exit": 1,
+      "statistics": "[ERROR] Tests run: 29, Failures: 9, Errors: 12, Skipped: 0",
+      "observed_balances": [
+        "SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=REJECTED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=WITHDRAWN available=960 frozen=480"
+      ]
+    },
+    {
+      "role": "MODIFIED",
+      "command": [
+        "mvn",
+        "-Dtest=LeaveSettlementTransactionTest",
+        "test"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/modified-run/server",
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/modified.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/modified.stderr",
+      "exit": 0,
+      "statistics": "[INFO] Tests run: 29, Failures: 0, Errors: 0, Skipped: 0",
+      "observed_balances": [
+        "SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=0",
+        "SETTLEMENT change=MODE outcome=REJECTED available=1440 frozen=0",
+        "SETTLEMENT change=MODE outcome=WITHDRAWN available=1440 frozen=0",
+        "SETTLEMENT change=INACTIVE outcome=APPROVED available=960 frozen=0",
+        "SETTLEMENT change=INACTIVE outcome=REJECTED available=1440 frozen=0",
+        "SETTLEMENT change=INACTIVE outcome=WITHDRAWN available=1440 frozen=0",
+        "SETTLEMENT change=DELETED outcome=APPROVED available=960 frozen=0",
+        "SETTLEMENT change=DELETED outcome=REJECTED available=1440 frozen=0",
+        "SETTLEMENT change=DELETED outcome=WITHDRAWN available=1440 frozen=0"
+      ]
+    },
+    {
+      "role": "ROLLBACK",
+      "command": [
+        "mvn",
+        "-Dtest=LeaveSettlementTransactionTest",
+        "test"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback-run/server",
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback.stderr",
+      "exit": 1,
+      "statistics": "[ERROR] Tests run: 29, Failures: 9, Errors: 12, Skipped: 0",
+      "observed_balances": [
+        "SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=REJECTED available=960 frozen=480",
+        "SETTLEMENT change=MODE outcome=WITHDRAWN available=960 frozen=480"
+      ]
+    }
+  ],
+  "rollback": {
+    "command": [
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh",
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback-run"
+    ],
+    "exit": 0,
+    "restored_hashes": {
+      "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": "6cd973d9bc8f8b3a87511a1a7cb3f422856fc0283ed92e00e579f1e382f997d4",
+      "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": "e1ecfe234d5c2fc329476cbc86ed13c039491eec330faf041a57d4e937f54d6a",
+      "server/pom.xml": "79269d1ee66ac035a0e544e4f2d245ce38dbb4dcfdf3b5b755ea2311d2e3a7a9",
+      "server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql": null,
+      "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": null
+    },
+    "stdout": "ROLLBACK_HASHES_MATCH_ORIGINAL=3/3; NEW_FILES_REMOVED=2/2\n",
+    "stderr": "",
+    "harness_note": "Pristine hashes checked first. Then the identical regression test and H2-only test POM dependency were installed in the disposable restored checkout, matching BASELINE test input. The two production source files remain byte-identical to the originals."
+  },
+  "patch_verification": {
+    "command": [
+      "patch",
+      "-p1",
+      "-d",
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/patch-reconstruction-final"
+    ],
+    "stdin": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/DIFF_FILE.patch",
+    "exit": 0,
+    "matches": "5/5"
+  },
+  "full_run": {
+    "command": [
+      "mvn",
+      "test"
+    ],
+    "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/full-run/server",
+    "exit": 1,
+    "statistics": "[ERROR] Tests run: 1208, Failures: 0, Errors: 491, Skipped: 12",
+    "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/full.stdout",
+    "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/full.stderr",
+    "root_causes": "462 ApplicationContext failure threshold exceeded after initial context failure\n26 Caused by: java.lang.IllegalStateException: 缺少数据库口令：请在仓库根目录 .env 配置 DB_PASSWORD（或 TEST_DB_PASSWORD），不要把真实凭证写入代码\n3 Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.workforcehub.auth.security.SessionValidityFilter' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}\n",
+    "scope": "Isolated source snapshot; ongoing parallel-session changes are not included after snapshot creation."
+  },
+  "limitations": [
+    "H2 MySQL compatibility mode verifies JDBC locks/transactions; actual MySQL/Flyway deployment and Flowable end-to-end configuration-change matrix were not run.",
+    "Historical requests with neither snapshot nor original FREEZE cannot prove submission policy; approval returns 409 without changing any balance, rejection/withdrawal with no freeze do not manufacture movements.",
+    "Full suite is not passing: missing test DB credentials and SessionValidityFilter bean errors in unrelated tests of the concurrent source snapshot.",
+    "No application process was started/stopped/killed; no Git commit/push; no Feishu completion status was changed."
+  ],
+  "original_manifest": {
+    "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": {
+      "baseline_sha256": "6cd973d9bc8f8b3a87511a1a7cb3f422856fc0283ed92e00e579f1e382f997d4",
+      "modified_sha256": "71d747e6a4ba2b3007572ea830919ffb856657c6edde9349b03173b382e4b6dd"
+    },
+    "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": {
+      "baseline_sha256": "e1ecfe234d5c2fc329476cbc86ed13c039491eec330faf041a57d4e937f54d6a",
+      "modified_sha256": "ffdc616105782bedfb186e8287dd6e1c160fd9092a052b5eb5b633b0566830d4"
+    },
+    "server/pom.xml": {
+      "baseline_sha256": "79269d1ee66ac035a0e544e4f2d245ce38dbb4dcfdf3b5b755ea2311d2e3a7a9",
+      "modified_sha256": "08169b8df3551e160dec94f0d00eeb65a02801b79bcb3aeb9cf53ce3b1bfdc9c"
+    },
+    "server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql": {
+      "baseline_sha256": null,
+      "modified_sha256": "527652c223dcee356b02a51a59261bf1fd8bf2452fb27c7b79d4ab9e1c99d236"
+    },
+    "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": {
+      "baseline_sha256": null,
+      "modified_sha256": "1783db4931c11d38ad423b447817d7c34e85f2d93da04e16bd908248777e32e9"
+    }
+  },
+  "latest_result": "99-3 follow-up 409 fixed; real MySQL/Redis full clean test successful; pending source review",
+  "followup_409": {
+    "cause": "getWorkflowSettlement filtered out a foreign ADMIN/ADJUST row occupying the globally unique source_txn_key; subsequent insert raised DuplicateKeyException and HTTP 500.",
+    "fix": "Include the exact source_txn_key in the locking settlement lookup, while retaining cross-terminal lookup and existing fingerprint validation; no exception assertion relaxed.",
+    "runs": [
+      {
+        "command": [
+          "mvn",
+          "-B",
+          "-Dstyle.color=never",
+          "-Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleLeaveApiIntegrationTest,LeaveSettlementTransactionTest",
+          "clean",
+          "test"
+        ],
+        "cwd": "/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server",
+        "exit": 1,
+        "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/baseline.stdout",
+        "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/baseline.stderr",
+        "role": "BASELINE",
+        "statistics": "[ERROR] Tests run: 58, Failures: 4, Errors: 0, Skipped: 0",
+        "business_observations": [
+          "MYSQL_ORIGINAL_NO_DEDUCT current=DEDUCT outcome=APPROVED available=960 frozen=0 deduct_txns=0",
+          "MYSQL_CONFIGURATION change=MODE outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=MODE outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=MODE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1"
+        ],
+        "fingerprint_http": 500
+      },
+      {
+        "command": [
+          "mvn",
+          "-B",
+          "-Dstyle.color=never",
+          "-Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleLeaveApiIntegrationTest,LeaveSettlementTransactionTest",
+          "clean",
+          "test"
+        ],
+        "cwd": "/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server",
+        "exit": 0,
+        "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/modified.stdout",
+        "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/modified.stderr",
+        "role": "MODIFIED",
+        "statistics": "[INFO] Tests run: 58, Failures: 0, Errors: 0, Skipped: 0",
+        "business_observations": [
+          "MYSQL_FINGERPRINT_CONFLICT http=409 available=900 frozen=480 status=IN_APPROVAL",
+          "MYSQL_ORIGINAL_NO_DEDUCT current=DEDUCT outcome=APPROVED available=960 frozen=0 deduct_txns=0",
+          "MYSQL_CONFIGURATION change=MODE outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=MODE outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=MODE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1"
+        ],
+        "fingerprint_http": 409
+      },
+      {
+        "command": [
+          "mvn",
+          "-B",
+          "-Dstyle.color=never",
+          "-Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleLeaveApiIntegrationTest,LeaveSettlementTransactionTest",
+          "clean",
+          "test"
+        ],
+        "cwd": "/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server",
+        "exit": 1,
+        "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/rollback.stdout",
+        "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/rollback.stderr",
+        "role": "ROLLBACK",
+        "statistics": "[ERROR] Tests run: 58, Failures: 4, Errors: 0, Skipped: 0",
+        "business_observations": [
+          "MYSQL_ORIGINAL_NO_DEDUCT current=DEDUCT outcome=APPROVED available=960 frozen=0 deduct_txns=0",
+          "MYSQL_CONFIGURATION change=MODE outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=MODE outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=MODE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=INACTIVE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=APPROVED available=480 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=REJECTED available=960 frozen=0 terminal_txns=1",
+          "MYSQL_CONFIGURATION change=DELETED outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1"
+        ],
+        "fingerprint_http": 500
+      }
+    ],
+    "identical_test_inputs": {
+      "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": "c3c00f1df73b632ac267470e52c78e8d413787a0c3f86e3920dfd66dfb539695",
+      "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd"
+    },
+    "rollback_source_hashes": {
+      "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": "71d747e6a4ba2b3007572ea830919ffb856657c6edde9349b03173b382e4b6dd",
+      "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": "ffdc616105782bedfb186e8287dd6e1c160fd9092a052b5eb5b633b0566830d4",
+      "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": "c3c00f1df73b632ac267470e52c78e8d413787a0c3f86e3920dfd66dfb539695",
+      "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "77eb42368dc81544ff61f972dfb1abc7ef96c5d712268d1e9841bc9ab1f446cd"
+    },
+    "cumulative_rollback": {
+      "command": [
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/cumulative-rollback"
+      ],
+      "exit": 0,
+      "restored_hashes": {
+        "server/src/main/java/com/workforcehub/leave/service/LeaveService.java": "6cd973d9bc8f8b3a87511a1a7cb3f422856fc0283ed92e00e579f1e382f997d4",
+        "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java": "e1ecfe234d5c2fc329476cbc86ed13c039491eec330faf041a57d4e937f54d6a",
+        "server/pom.xml": "79269d1ee66ac035a0e544e4f2d245ce38dbb4dcfdf3b5b755ea2311d2e3a7a9",
+        "server/src/main/resources/db/migration/V69__snapshot_leave_balance_mode.sql": null,
+        "server/src/test/java/com/workforcehub/leave/LeaveSettlementTransactionTest.java": null,
+        "server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java": "19ad71b932c9c1ced44f316719bcb1f1608478b1ba391b971217d227b2d5fdde"
+      }
+    },
+    "patch": {
+      "command": [
+        "patch",
+        "-p1",
+        "-d",
+        "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/patch-reconstruction"
+      ],
+      "exit": 0,
+      "matches": "6/6"
+    },
+    "migration_observed": "Fresh owned MySQL 8.4 bootstrap applied V69, literal first-run stdout retained in baseline-initial-incremental.stdout.",
+    "known_harness_issue": "Initial rollback source hashes restored correctly, but Maven reused already compiled modified classes because restored source timestamps predated class timestamps. Its 58-pass result is invalid as a rollback behavior check. Preserved all initial outputs; rerun BASELINE/MODIFIED/ROLLBACK with identical clean test commands.\n",
+    "root": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+    "full_run": {
+      "command": [
+        "mvn",
+        "-B",
+        "-Dstyle.color=never",
+        "-Dquota.mysql.url=jdbc:mysql://127.0.0.1:62826/quota_2033_test?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true",
+        "clean",
+        "test"
+      ],
+      "cwd": "/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server",
+      "exit": 0,
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/full.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/full.stderr",
+      "statistics": "[WARNING] Tests run: 1229, Failures: 0, Errors: 0, Skipped: 2",
+      "build": "BUILD SUCCESS"
+    },
+    "skipped": [
+      {
+        "class": "com.workforcehub.auth.ModuleAuthMailSmtpSmokeTest",
+        "test": "realSmtpShouldSendBindEmailCode",
+        "reason": "Environment variable [MAIL_SMOKE_ENABLED] does not exist"
+      },
+      {
+        "class": "com.workforcehub.agent.AgentModelClientRealLlmSmokeTest",
+        "test": "realOpenAiCompatibleModelShouldReplyThroughSpringAi",
+        "reason": "Environment variable [AGENT_MODEL_SMOKE_ENABLED] does not exist"
+      }
+    ],
+    "test_statistics": {
+      "com.workforcehub.plugin.sdk.service.EventServiceTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.repository.PluginEventSubscriptionRepositoryTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.AdminPermissionFilterTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.ragflow.RagflowAdminServiceVectorSettingsTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.leave.ModuleLeaveApiIntegrationTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginParamValidatorTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.scheduler.AiProviderHealthCheckJobServiceTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.workflow.ModuleWorkflowAdminApiIntegrationTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginAttendanceExceptionEventListenerTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.AdminPluginManagementServiceTest": {
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginGatewayRequestSizeFilterTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.file.ModuleFileStorageProviderIntegrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.im.ModuleImOutboxIntegrationTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.service.WorkflowAgentPreReviewTriggerServiceTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.file.ModuleFileApiIntegrationTest": {
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginManagerServiceTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.ModuleAgentTaskTimeoutRepositoryBoundaryTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.im.ModuleImGroupIntegrationTest": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginConfigServiceTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.ragflow.RagflowVectorDisabledIntegrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginAuditServiceTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginPermissionServiceTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.sdk.InvocationContextBinderTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.SessionValidityRequestChainTest": {
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginCallPermissionMigrationIntegrationTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.workflow.TemplateResolverTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.DefaultPluginConfigTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.sdk.ActionDescriptorTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginManagerLifecycleSafetyTest": {
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.ModuleAgentApiIntegrationTest": {
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginFileUploadedEventListenerTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginWorkflowCompletedEventListenerTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.sdk.WorkforcePluginLifecycleTest": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginResourceLifecycleTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.org.ModuleOrgApiIntegrationTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginLifecycleGuardTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.im.ModuleImApiIntegrationTest": {
+        "tests": 54,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.AgentModelClientSpringAiTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.sdk.DomainEventTest": {
+        "tests": 36,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.file.FileQuotaConcurrencyTest": {
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginEmployeeLifecycleEventListenerTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.DefaultEventServiceTest": {
+        "tests": 35,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.EmployeePluginListIntegrationTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginManagerServiceIntegrationTest": {
+        "tests": 26,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.GlobalCsrfIntegrationTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginGatewayCsrfIntegrationTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest": {
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.service.AgentServiceAiProviderHealthCheckTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginEventEndToEndIntegrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginSignatureVerifierTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.leave.LeaveSettlementTransactionTest": {
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.sdk.ServiceResultTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.HostServiceRegistryTest": {
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.AdminPluginConfigIntegrationTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginManagerSignatureSafetyTest": {
+        "tests": 50,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.AdminAuditLogApiIntegrationTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.BizExceptionContractTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.ModuleAuthMailSmtpSmokeTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      "com.workforcehub.plugin.AdminPluginManagementWebTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.AdminNotificationChannelIntegrationTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.AgentModelClientRealLlmSmokeTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      "com.workforcehub.plugin.runtime.PluginConfigCipherTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginEventDispatcherTest": {
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.file.ModuleFileServiceBoundaryTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.AdminPermissionRouteMatrixTest": {
+        "tests": 165,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.service.AiModelHealthCheckServiceTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginFlywayMigratorTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginGatewaySecurityTest": {
+        "tests": 47,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.DefaultPluginContextTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.WorkforcePluginManagerTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.repository.PluginOperationIdempotencyRepositoryTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginDomainEventAdapterTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest": {
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginLifecycleTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.AdminAlertIntegrationTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.ragflow.AdminRagflowControllerTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginManagePermissionMigrationIntegrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest": {
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginMultipartLimitServletIntegrationTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest": {
+        "tests": 23,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.file.ModuleFileCleanupIntegrationTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.repository.PluginConfigRepositoryTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.event.DomainEventPublisherTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.AdminPermissionWebTest": {
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.AdminDictIntegrationTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.JacksonLongIdSerializationTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginGatewayTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.org.ModuleOrgWriteApiIntegrationTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.common.ApplicationConfigContractTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.workflow.WorkflowValidatorTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.ModuleAuthApiIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.file.ModuleFileAdminApiIntegrationTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.runtime.PluginVersionServiceTest": {
+        "tests": 59,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.auth.ModuleRbacApiIntegrationTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.plugin.PluginMemoryGrowthIntegrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest": {
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "remaining_limits": [
+      "Real external SMTP and LLM smoke tests remain skipped by their existing opt-in conditions.",
+      "Production environment not deployed; simultaneous settlement stress remains covered by H2, while the MySQL/Flowable matrix covers real terminal execution and repeated settlement."
+    ],
+    "runtime": {
+      "runtime": "/tmp/workforce-993-mysql-vrpbk4lz",
+      "mysql_home": "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+      "mysql_port": 62826,
+      "redis_port": 62827,
+      "snapshot": "/tmp/workforce-993-mysql-vrpbk4lz/snapshot",
+      "boundary": "Owned new datadir and free loopback ports; no real .env or credentials",
+      "owned_fixture_stopped": true
+    }
+  },
+  "source_final_review": {
+    "references": {
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/复核-final-执行.json": {
+        "sha256": "49995edc66376fd95ec0bee7c40eb05b5b4fc9d51d7d3df697191f697e67810e",
+        "parsed_type": "dict"
+      },
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/来源复核-最终统计.json": {
+        "sha256": "6a3a399d1a3d44e3ee6f106d13bc577f1c28d901656c06819ace03dfa83df4c2",
+        "parsed_type": "dict"
+      }
+    },
+    "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/复核-final-full.stdout",
+    "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-1-20261108/复核-final-full.stderr",
+    "observed_statistics": "[WARNING] Tests run: 1229, Failures: 0, Errors: 0, Skipped: 2",
+    "build": "BUILD SUCCESS",
+    "source_reported_exit": 0,
+    "note": "Read supplied independent-review files; no additional full test run."
+  }
+}

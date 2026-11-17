@@ -1,0 +1,18 @@
+{
+  "base_commit": "38d829167042dc26efd7af502ce623c976d6e224",
+  "scope": [
+    "server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java",
+    "server/src/main/resources/db/migration/V67__add_admin_operations_permissions.sql",
+    "server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java",
+    "server/src/test/java/com/workforcehub/auth/AdminPermissionRouteMatrixTest.java",
+    "server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java",
+    "server/src/test/resources/security/admin-permission-matrix.tsv"
+  ],
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-only-5ldq7v80/server",
+  "isolation": "HEAD plus only 99-1 scope; no real .env or inherited credentials",
+  "supplemental_baseline_paths": [
+    "plugins/hello-plugin/src",
+    "plugin-sdk/src",
+    "plugin-sdk/pom.xml"
+  ]
+}

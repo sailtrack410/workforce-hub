@@ -1,0 +1,12 @@
+{
+  "command": [
+    "mvn",
+    "-B",
+    "-Dtest=AdminPluginLifecycleAuditIntegrationTest",
+    "test"
+  ],
+  "cwd": "/tmp/workforce-991-audit-jia90rso/snapshot/server",
+  "exit": 1,
+  "stdout": "audit-baseline.stdout",
+  "stderr": "audit-baseline.stderr"
+}

@@ -1,0 +1,9 @@
+{
+  "runtime": "/tmp/workforce-993-mysql-vrpbk4lz",
+  "mysql_home": "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+  "mysql_port": 62826,
+  "redis_port": 62827,
+  "snapshot": "/tmp/workforce-993-mysql-vrpbk4lz/snapshot",
+  "boundary": "Owned new datadir and free loopback ports; no real .env or credentials",
+  "owned_fixture_stopped": true
+}

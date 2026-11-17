@@ -1,0 +1,220 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "文件回收站：删除、恢复与彻底清除",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/F04.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "entry",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "移入回收站",
+      "sublabel": "个人接口仅个人文件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 49,
+          "end_line": 60
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 240,
+          "end_line": 246
+        }
+      ]
+    },
+    {
+      "id": "trash",
+      "lane": "main",
+      "col": 1,
+      "type": "database",
+      "label": "标记回收状态",
+      "sublabel": "保留三十天，用量不释放",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 59,
+          "end_line": 76
+        }
+      ]
+    },
+    {
+      "id": "choose",
+      "lane": "main",
+      "col": 2,
+      "type": "frontend",
+      "label": "选择恢复或清除",
+      "sublabel": "恢复须在保留期内",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 79,
+          "end_line": 94
+        }
+      ]
+    },
+    {
+      "id": "purge",
+      "lane": "main",
+      "col": 3,
+      "type": "database",
+      "label": "彻底清除引用",
+      "sublabel": "条件更新避免重复执行",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 113,
+          "end_line": 135
+        }
+      ]
+    },
+    {
+      "id": "usage",
+      "lane": "main",
+      "col": 4,
+      "type": "database",
+      "label": "释放逻辑用量",
+      "sublabel": "个人与企业账本",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 136,
+          "end_line": 138
+        }
+      ]
+    },
+    {
+      "id": "schedule",
+      "lane": "main",
+      "col": 5,
+      "type": "backend",
+      "label": "等待物理清理",
+      "sublabel": "无活跃引用，延迟七天",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 255,
+          "end_line": 261
+        }
+      ]
+    },
+    {
+      "id": "restore",
+      "lane": "branch",
+      "col": 3,
+      "type": "database",
+      "label": "恢复可见引用",
+      "sublabel": "复核配额，不重复计费",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 90,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "failure",
+      "col": 2,
+      "type": "security",
+      "label": "拒绝恢复或清除",
+      "sublabel": "过期、已清除、未先回收",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 84,
+          "end_line": 94
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileLifecycleService.java",
+          "line": 118,
+          "end_line": 134
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "entry",
+      "to": "trash"
+    },
+    {
+      "id": "e1",
+      "from": "trash",
+      "to": "choose"
+    },
+    {
+      "id": "e2",
+      "from": "choose",
+      "to": "purge",
+      "label": "彻底清除"
+    },
+    {
+      "id": "e3",
+      "from": "purge",
+      "to": "usage"
+    },
+    {
+      "id": "e4",
+      "from": "usage",
+      "to": "schedule"
+    },
+    {
+      "id": "e5",
+      "from": "choose",
+      "to": "restore",
+      "label": "恢复"
+    },
+    {
+      "id": "e6",
+      "from": "choose",
+      "to": "reject",
+      "label": "状态不允许"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "employee-web 文件页接入删除恢复清除；管理端当前页面主要为目录和清理任务，后端治理能力更多。",
+        "个人文件和后台文件分别限定归属；删除只隐藏，彻底清除才释放逻辑用量。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "删除、彻底清除、物理删除是三种状态；流程和容量展示应保持一致。",
+        "优化：管理端补全已存在的文件生命周期入口，沿用第98审入口断层记录。"
+      ]
+    }
+  ]
+}

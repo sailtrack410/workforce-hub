@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqladmin",
+    "--no-defaults",
+    "--socket=/tmp/wfh-99-2-integration-bbls4p52/mysql.sock",
+    "-uroot",
+    "shutdown"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "integration-mysql-stop.stdout",
+  "stderr": "integration-mysql-stop.stderr"
+}

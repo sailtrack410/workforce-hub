@@ -1,0 +1,234 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "员工打卡、日结果与异常协调",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "punch",
+      "label": "打卡与计算"
+    },
+    {
+      "id": "branch",
+      "label": "规则与请假分支"
+    },
+    {
+      "id": "result",
+      "label": "结果与异常"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ui",
+      "lane": "punch",
+      "col": 0,
+      "type": "frontend",
+      "label": "工作台下班打卡",
+      "sublabel": "hub-web发送OUT",
+      "sources": [
+        {
+          "path": "hub-web/src/views/WorkbenchView.vue",
+          "line": 127,
+          "end_line": 138
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "punch",
+      "col": 1,
+      "type": "security",
+      "label": "服务端打卡核验",
+      "sublabel": "员工状态＋当天类型排重",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 300,
+          "end_line": 309
+        }
+      ]
+    },
+    {
+      "id": "write",
+      "lane": "punch",
+      "col": 2,
+      "type": "backend",
+      "label": "写入打卡记录",
+      "sublabel": "使用服务端Clock时间",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 305,
+          "end_line": 323
+        }
+      ]
+    },
+    {
+      "id": "resolve",
+      "lane": "punch",
+      "col": 3,
+      "type": "backend",
+      "label": "解析当日规则",
+      "sublabel": "个人排班覆盖组班次",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 472,
+          "end_line": 490
+        }
+      ]
+    },
+    {
+      "id": "calculate",
+      "lane": "punch",
+      "col": 4,
+      "type": "backend",
+      "label": "计算日结果",
+      "sublabel": "迟到、早退、缺勤、时长",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 517,
+          "end_line": 556
+        }
+      ]
+    },
+    {
+      "id": "upsert",
+      "lane": "punch",
+      "col": 5,
+      "type": "backend",
+      "label": "保存日结果",
+      "sublabel": "NORMAL或ABNORMAL",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 539,
+          "end_line": 557
+        }
+      ]
+    },
+    {
+      "id": "norule",
+      "lane": "branch",
+      "col": 3,
+      "type": "backend",
+      "label": "无有效考勤组",
+      "sublabel": "写NO_RULE并清理异常",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 473,
+          "end_line": 478
+        }
+      ]
+    },
+    {
+      "id": "leave",
+      "lane": "branch",
+      "col": 4,
+      "type": "backend",
+      "label": "批准请假全覆盖",
+      "sublabel": "写LEAVE并清理异常",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 488,
+          "end_line": 514
+        }
+      ]
+    },
+    {
+      "id": "exceptions",
+      "lane": "result",
+      "col": 5,
+      "type": "messagebus",
+      "label": "协调异常并发布",
+      "sublabel": "仅新增异常提交后发事件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 590,
+          "end_line": 634
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "ui",
+      "to": "validate"
+    },
+    {
+      "from": "validate",
+      "to": "write"
+    },
+    {
+      "from": "write",
+      "to": "resolve"
+    },
+    {
+      "from": "resolve",
+      "to": "calculate",
+      "label": "有规则"
+    },
+    {
+      "from": "calculate",
+      "to": "upsert"
+    },
+    {
+      "from": "resolve",
+      "to": "norule",
+      "label": "无规则",
+      "role": "branch"
+    },
+    {
+      "from": "resolve",
+      "to": "leave",
+      "label": "全覆盖",
+      "role": "branch"
+    },
+    {
+      "from": "upsert",
+      "to": "exceptions"
+    }
+  ],
+  "mainPath": [
+    "ui",
+    "validate",
+    "write",
+    "resolve",
+    "calculate",
+    "upsert",
+    "exceptions"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "异常补偿",
+      "items": [
+        "重算按异常类型协调：已消失删除、描述变化更新、缺少类型新增。",
+        "正常打卡当天同类型只允许一次；数据库唯一键防并发重复。",
+        "请假通过和补卡通过也调用同一重算入口。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "界面与规则缺口",
+      "items": [
+        "employee-web工作台用workMinutes推导08:57／18:00，不能作为真实打卡时间。",
+        "班次保存打卡窗口，但punch未依据窗口判断；明确是否仅记录还是强制限制。",
+        "未运行真实打卡；图示为静态调用与写入关系。"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "test"
+  ],
+  "cwd": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-4-web-20261108/candidate/admin-web",
+  "exit_status": 0
+}

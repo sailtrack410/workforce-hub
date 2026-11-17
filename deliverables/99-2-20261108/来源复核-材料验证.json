@@ -1,0 +1,33 @@
+{
+  "issue": "99-2",
+  "roles": {
+    "MODIFIED_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-2-20261108/MODIFIED_FILE.tar",
+    "DIFF_FILE": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-2-20261108/DIFF_FILE.patch",
+    "VERIFICATION": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-2-20261108/VERIFICATION.txt",
+    "ROLLBACK": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-2-20261108/ROLLBACK.sh"
+  },
+  "archive_file_count": 14,
+  "live_differences": [],
+  "rollback": {
+    "command": [
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-2-20261108/ROLLBACK.sh",
+      "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-source-review-99-2-0zr0bmqt"
+    ],
+    "stdout": "ROLLBACK restored pristine 99-2 files; unrelated paths preserved\n",
+    "stderr": "",
+    "exit": 0,
+    "baseline_hashes_matched": 10,
+    "new_files_removed": 4
+  },
+  "patch": {
+    "command": [
+      "git",
+      "apply",
+      "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-2-20261108/DIFF_FILE.patch"
+    ],
+    "stdout": "",
+    "stderr": "",
+    "exit": 0,
+    "reconstructed_hashes_matched": 14
+  }
+}

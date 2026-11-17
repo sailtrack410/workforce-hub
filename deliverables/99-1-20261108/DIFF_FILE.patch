@@ -1,0 +1,1091 @@
+diff --git a/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java b/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java
+--- a/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java
++++ b/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java
+@@ -10,13 +10,18 @@
+ import jakarta.servlet.http.HttpServletRequest;
+ import jakarta.servlet.http.HttpServletResponse;
+ import org.springframework.http.MediaType;
++import org.springframework.security.authentication.AnonymousAuthenticationToken;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.security.core.GrantedAuthority;
+ import org.springframework.security.core.context.SecurityContextHolder;
+ import org.springframework.stereotype.Component;
+ import org.springframework.web.filter.OncePerRequestFilter;
++import org.springframework.http.server.PathContainer;
++import org.springframework.web.util.pattern.PathPattern;
++import org.springframework.web.util.pattern.PathPatternParser;
+ 
+ import java.io.IOException;
++import java.util.Arrays;
+ import java.util.List;
+ import java.util.Set;
+ 
+@@ -30,22 +35,217 @@
+ public class AdminPermissionFilter extends OncePerRequestFilter {
+ 
+     private static final String ADMIN_PREFIX = "/api/admin/";
+-    private static final List<PathPermission> PATH_PERMISSIONS = List.of(
+-        new PathPermission("/api/admin/rbac/", "ADMIN_RBAC_MANAGE"),
+-        new PathPermission("/api/admin/departments", "ADMIN_ORG_MANAGE"),
+-        new PathPermission("/api/admin/positions", "ADMIN_ORG_MANAGE"),
+-        new PathPermission("/api/admin/users", "ADMIN_ORG_MANAGE"),
+-        new PathPermission("/api/admin/attendance/", "ADMIN_ATTENDANCE_MANAGE"),
+-        new PathPermission("/api/admin/leave/", "ADMIN_LEAVE_MANAGE"),
+-        new PathPermission("/api/admin/workflow/", "ADMIN_WORKFLOW_MANAGE"),
+-        new PathPermission("/api/admin/agent-tasks", "ADMIN_AGENT_TASK_MANAGE"),
+-        new PathPermission("/api/admin/agents/", "ADMIN_AGENT_MANAGE"),
+-        new PathPermission("/api/admin/files/", "ADMIN_FILE_MANAGE"),
+-        new PathPermission("/api/admin/ragflow/", "ADMIN_RAGFLOW_MANAGE"),
+-        new PathPermission("/api/admin/notification-channels", "ADMIN_NOTIFICATION_CHANNEL_MANAGE"),
+-        new PathPermission("/api/admin/dicts", "ADMIN_DICT_MANAGE"),
+-        new PathPermission("/api/admin/plugins", "ADMIN_PLUGIN_MANAGE")
+-    );
++    // 只授权已声明的方法和路由，避免新增接口继承宽泛前缀而静默放行。
++    private static final List<PathPermission> PATH_PERMISSIONS = java.util.stream.Stream.of(
++        paths("ADMIN_AGENT_MANAGE", "GET",
++            "/api/admin/agents",
++            "/api/admin/agents/{agentId}",
++            "/api/admin/agents/{agentId}/versions",
++            "/api/admin/agents/tools",
++            "/api/admin/agents/{agentId}/acl",
++            "/api/admin/agents/ai-providers",
++            "/api/admin/agents/ai-providers/{providerId}/models",
++            "/api/admin/agents/llm-models"),
++        paths("ADMIN_AGENT_MANAGE", "POST",
++            "/api/admin/agents",
++            "/api/admin/agents/workflows/validate",
++            "/api/admin/agents/{agentId}/versions",
++            "/api/admin/agents/tools",
++            "/api/admin/agents/versions/{versionId}/tools",
++            "/api/admin/agents/{agentId}/acl",
++            "/api/admin/agents/versions/{versionId}/publish",
++            "/api/admin/agents/{agentId}/disable",
++            "/api/admin/agents/{agentId}/enable",
++            "/api/admin/agents/ai-providers",
++            "/api/admin/agents/ai-providers/{providerId}/test",
++            "/api/admin/agents/llm-models",
++            "/api/admin/agents/llm-models/test",
++            "/api/admin/agents/llm-models/{modelId}/test",
++            "/api/admin/agents/trial-run",
++            "/api/admin/agents/workflow-run"),
++        paths("ADMIN_AGENT_MANAGE", "PUT",
++            "/api/admin/agents/{agentId}",
++            "/api/admin/agents/versions/{versionId}",
++            "/api/admin/agents/ai-providers/{providerId}",
++            "/api/admin/agents/llm-models/{modelId}"),
++        paths("ADMIN_AGENT_MANAGE", "DELETE",
++            "/api/admin/agents/{agentId}",
++            "/api/admin/agents/ai-providers/{providerId}",
++            "/api/admin/agents/llm-models/{modelId}"),
++        paths("ADMIN_AGENT_TASK_MANAGE", "GET",
++            "/api/admin/agent-tasks",
++            "/api/admin/agent-tasks/metrics",
++            "/api/admin/agent-tasks/failure-summary",
++            "/api/admin/agent-tasks/timeout-scan-runs",
++            "/api/admin/agent-tasks/{taskId}",
++            "/api/admin/agent-tasks/{taskId}/tool-calls",
++            "/api/admin/agent-tasks/{taskId}/audits"),
++        paths("ADMIN_AGENT_TASK_MANAGE", "POST",
++            "/api/admin/agent-tasks/timeout-scan"),
++        paths("ADMIN_ATTENDANCE_MANAGE", "POST",
++            "/api/admin/attendance/calendars",
++            "/api/admin/attendance/shifts",
++            "/api/admin/attendance/groups",
++            "/api/admin/attendance/groups/{groupId}/members",
++            "/api/admin/attendance/schedules"),
++        paths("ADMIN_ATTENDANCE_MANAGE", "GET",
++            "/api/admin/attendance/calendars",
++            "/api/admin/attendance/shifts",
++            "/api/admin/attendance/groups",
++            "/api/admin/attendance/groups/{groupId}/members",
++            "/api/admin/attendance/schedules",
++            "/api/admin/attendance/daily-results"),
++        paths("ADMIN_ATTENDANCE_MANAGE", "PUT",
++            "/api/admin/attendance/schedules/{scheduleId}"),
++        paths("ADMIN_RBAC_MANAGE", "GET",
++            "/api/admin/rbac/permissions",
++            "/api/admin/rbac/roles",
++            "/api/admin/rbac/roles/{roleId}",
++            "/api/admin/rbac/admin-users",
++            "/api/admin/rbac/admin-users/{adminUserId}/roles",
++            "/api/admin/system/roles",
++            "/api/admin/roles",
++            "/api/admin/system/permissions",
++            "/api/admin/permissions"),
++        paths("ADMIN_RBAC_MANAGE", "POST",
++            "/api/admin/rbac/roles"),
++        paths("ADMIN_RBAC_MANAGE", "PUT",
++            "/api/admin/rbac/roles/{roleId}",
++            "/api/admin/rbac/roles/{roleId}/permissions",
++            "/api/admin/rbac/admin-users/{adminUserId}/roles"),
++        paths("ADMIN_RBAC_MANAGE", "DELETE",
++            "/api/admin/rbac/roles/{roleId}"),
++        paths("ADMIN_FILE_MANAGE", "GET",
++            "/api/admin/files",
++            "/api/admin/files/recycle-bin",
++            "/api/admin/files/storage-summary",
++            "/api/admin/files/download/{ticketNo}",
++            "/api/admin/files/quota-policies"),
++        paths("ADMIN_FILE_MANAGE", "POST",
++            "/api/admin/files/upload-tickets",
++            "/api/admin/files/confirm-upload",
++            "/api/admin/files/{attachmentRefId}/download-tickets",
++            "/api/admin/files/{attachmentRefId}/trash",
++            "/api/admin/files/{attachmentRefId}/restore",
++            "/api/admin/files/cleanup-jobs/run",
++            "/api/admin/files/quota-policies"),
++        paths("ADMIN_FILE_MANAGE", "DELETE",
++            "/api/admin/files/{attachmentRefId}"),
++        paths("ADMIN_FILE_MANAGE", "PUT",
++            "/api/admin/files/quota-policies/{policyId}"),
++        paths("ADMIN_IM_OUTBOX_MANAGE", "GET",
++            "/api/admin/im/outbox-events",
++            "/api/admin/im/outbox-events/summary",
++            "/api/admin/im/outbox-events/failure-summary",
++            "/api/admin/im/outbox-events/audits",
++            "/api/admin/im/outbox-events/{eventId}"),
++        paths("ADMIN_IM_OUTBOX_MANAGE", "POST",
++            "/api/admin/im/outbox-events/batch-retry",
++            "/api/admin/im/outbox-events/dispatch",
++            "/api/admin/im/outbox-events/{eventId}/retry"),
++        paths("ADMIN_LEAVE_MANAGE", "GET",
++            "/api/admin/leave/types",
++            "/api/admin/leave/accounts"),
++        paths("ADMIN_LEAVE_MANAGE", "POST",
++            "/api/admin/leave/types",
++            "/api/admin/leave/accounts/adjustments"),
++        paths("ADMIN_LEAVE_MANAGE", "PUT",
++            "/api/admin/leave/types/{leaveTypeId}"),
++        paths("ADMIN_LEAVE_MANAGE", "DELETE",
++            "/api/admin/leave/types/{leaveTypeId}"),
++        paths("ADMIN_ORG_MANAGE", "GET",
++            "/api/admin/departments/tree",
++            "/api/admin/positions",
++            "/api/admin/users",
++            "/api/admin/users/org-chart",
++            "/api/admin/users/{userId}",
++            "/api/admin/users/{userId}/manager",
++            "/api/admin/users/{userId}/subordinates"),
++        paths("ADMIN_ORG_MANAGE", "POST",
++            "/api/admin/departments",
++            "/api/admin/positions",
++            "/api/admin/users"),
++        paths("ADMIN_ORG_MANAGE", "PUT",
++            "/api/admin/departments/{deptId}",
++            "/api/admin/positions/{positionId}",
++            "/api/admin/users/{userId}",
++            "/api/admin/users/{userId}/employment-status",
++            "/api/admin/users/{userId}/account"),
++        paths("ADMIN_ORG_MANAGE", "DELETE",
++            "/api/admin/departments/{deptId}"),
++        paths("ADMIN_PLUGIN_MANAGE", "GET",
++            "/api/admin/plugins/{pluginId}/config",
++            "/api/admin/plugins"),
++        paths("ADMIN_PLUGIN_MANAGE", "PUT",
++            "/api/admin/plugins/{pluginId}/config/{configKey}",
++            "/api/admin/plugins/{pluginId}/enable",
++            "/api/admin/plugins/{pluginId}/disable"),
++        paths("ADMIN_PLUGIN_MANAGE", "DELETE",
++            "/api/admin/plugins/{pluginId}/config/{configKey}",
++            "/api/admin/plugins/{pluginId}"),
++        paths("ADMIN_PLUGIN_MANAGE", "POST",
++            "/api/admin/plugins/upload"),
++        paths("ADMIN_RAGFLOW_MANAGE", "GET",
++            "/api/admin/ragflow/settings",
++            "/api/admin/ragflow/spaces",
++            "/api/admin/ragflow/spaces/{spaceId}",
++            "/api/admin/ragflow/spaces/{spaceId}/acl",
++            "/api/admin/ragflow/spaces/{spaceId}/documents"),
++        paths("ADMIN_RAGFLOW_MANAGE", "PUT",
++            "/api/admin/ragflow/settings",
++            "/api/admin/ragflow/spaces/{spaceId}",
++            "/api/admin/ragflow/spaces/{spaceId}/acl"),
++        paths("ADMIN_RAGFLOW_MANAGE", "POST",
++            "/api/admin/ragflow/spaces",
++            "/api/admin/ragflow/files/upload-tickets",
++            "/api/admin/ragflow/files/confirm-upload",
++            "/api/admin/ragflow/spaces/{spaceId}/documents",
++            "/api/admin/ragflow/spaces/{spaceId}/documents/{documentId}/reingest",
++            "/api/admin/ragflow/spaces/{spaceId}/search-test"),
++        paths("ADMIN_RAGFLOW_MANAGE", "DELETE",
++            "/api/admin/ragflow/spaces/{spaceId}",
++            "/api/admin/ragflow/spaces/{spaceId}/documents/{documentId}"),
++        paths("ADMIN_ALERT_MANAGE", "GET",
++            "/api/admin/alerts",
++            "/api/admin/alerts/channels",
++            "/api/admin/alerts/resolutions"),
++        paths("ADMIN_ALERT_MANAGE", "POST",
++            "/api/admin/alerts/channels",
++            "/api/admin/alerts/{alertCode}/resolutions"),
++        paths("ADMIN_ALERT_MANAGE", "PUT",
++            "/api/admin/alerts/rules/{alertCode}"),
++        paths("ADMIN_DICT_MANAGE", "GET",
++            "/api/admin/dicts/types",
++            "/api/admin/dicts"),
++        paths("ADMIN_DICT_MANAGE", "POST",
++            "/api/admin/dicts"),
++        paths("ADMIN_DICT_MANAGE", "PUT",
++            "/api/admin/dicts/{id}"),
++        paths("ADMIN_DICT_MANAGE", "DELETE",
++            "/api/admin/dicts/{id}"),
++        paths("ADMIN_NOTIFICATION_CHANNEL_MANAGE", "GET",
++            "/api/admin/notification-channels",
++            "/api/admin/notification-channels/{channelCode}"),
++        paths("ADMIN_NOTIFICATION_CHANNEL_MANAGE", "PUT",
++            "/api/admin/notification-channels/{channelCode}"),
++        paths("ADMIN_NOTIFICATION_CHANNEL_MANAGE", "POST",
++            "/api/admin/notification-channels/{channelCode}/test"),
++        paths("ADMIN_AUDIT_LOG_VIEW", "GET",
++            "/api/admin/system/audit-logs",
++            "/api/admin/audit-logs"),
++        paths("ADMIN_WORKFLOW_MANAGE", "POST",
++            "/api/admin/workflow/process-types",
++            "/api/admin/workflow/templates",
++            "/api/admin/workflow/templates/{templateId}/versions",
++            "/api/admin/workflow/template-versions/{versionId}/publish"),
++        paths("ADMIN_WORKFLOW_MANAGE", "GET",
++            "/api/admin/workflow/requests",
++            "/api/admin/workflow/requests/{requestId}",
++            "/api/admin/workflow/requests/{requestId}/actions",
++            "/api/admin/workflow/process-types",
++            "/api/admin/workflow/templates",
++            "/api/admin/workflow/templates/{templateId}/versions")
++    ).flatMap(List::stream).toList();
+ 
+     private final ObjectMapper objectMapper;
+ 
+@@ -58,30 +258,32 @@
+                                     HttpServletResponse response,
+                                     FilterChain filterChain) throws ServletException, IOException {
+         String uri = resolve(request);
+-        if (!uri.startsWith(ADMIN_PREFIX) || uri.startsWith("/api/admin/auth/")) {
++        if (!(uri.equals("/api/admin") || uri.startsWith(ADMIN_PREFIX))
++            || ("POST".equals(request.getMethod()) && uri.equals("/api/admin/auth/login"))) {
+             filterChain.doFilter(request, response);
+             return;
+         }
+ 
+-        String requiredPermission = requiredPermission(uri);
+-        if (requiredPermission == null) {
++        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
++        // 未登录请求交由 SecurityConfig 的认证入口统一返回 401。
++        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+             filterChain.doFilter(request, response);
+             return;
+         }
+-
+-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+-        if (auth == null || !(auth.getPrincipal() instanceof WfhUserDetails user)) {
+-            filterChain.doFilter(request, response);
+-            return;
+-        }
++        String requiredPermission = requiredPermission(request.getMethod(), uri);
++        boolean authenticatedEndpoint = (("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()))
++                && uri.equals("/api/admin/auth/me"))
++            || ("POST".equals(request.getMethod()) && uri.equals("/api/admin/auth/logout"));
+         Set<String> authorities = auth.getAuthorities().stream()
+             .map(GrantedAuthority::getAuthority)
+             .collect(java.util.stream.Collectors.toSet());
+-        boolean superAdmin = user instanceof AdminUserDetails admin
++        boolean superAdmin = auth.getPrincipal() instanceof AdminUserDetails admin
+             && AdminPermissionService.hasSuperAdminRole(admin.getRoleCodes());
+         if (auth.isAuthenticated()
++            && auth.getPrincipal() instanceof WfhUserDetails user
+             && user.getUserType() == UserType.ADMIN
+-            && (authorities.contains(requiredPermission) || superAdmin)) {
++            && (authenticatedEndpoint
++                || (requiredPermission != null && (authorities.contains(requiredPermission) || superAdmin)))) {
+             filterChain.doFilter(request, response);
+             return;
+         }
+@@ -92,20 +294,22 @@
+         objectMapper.writeValue(response.getWriter(), R.fail(BusinessErrorCode.FORBIDDEN.code(), "无权限访问"));
+     }
+ 
+-    private String requiredPermission(String uri) {
++    private String requiredPermission(String method, String uri) {
++        // Spring MVC 的 GET 路由也接受 HEAD；其余方法必须显式声明。
++        String effectiveMethod = "HEAD".equals(method) ? "GET" : method;
++        PathContainer path = PathContainer.parsePath(uri, PathContainer.Options.create('/', false));
+         return PATH_PERMISSIONS.stream()
+-            .filter(item -> matchesPath(uri, item.pathPrefix()))
++            .filter(item -> item.method().equals(effectiveMethod) && item.pattern().matches(path))
+             .map(PathPermission::permissionCode)
+             .findFirst()
+             .orElse(null);
+     }
+ 
+-    private boolean matchesPath(String uri, String prefix) {
+-        String normalized = prefix.endsWith("/")
+-            ? prefix.substring(0, prefix.length() - 1)
+-            : prefix;
+-        return uri.equals(normalized) || uri.startsWith(normalized + "/");
++    private static List<PathPermission> paths(String permission, String method, String... patterns) {
++        return Arrays.stream(patterns)
++            .map(pattern -> new PathPermission(method, PathPatternParser.defaultInstance.parse(pattern), permission))
++            .toList();
+     }
+ 
+-    private record PathPermission(String pathPrefix, String permissionCode) {}
++    private record PathPermission(String method, PathPattern pattern, String permissionCode) {}
+ }
+diff --git a/server/src/main/resources/db/migration/V67__add_admin_operations_permissions.sql b/server/src/main/resources/db/migration/V67__add_admin_operations_permissions.sql
+new file mode 100644
+--- /dev/null
++++ b/server/src/main/resources/db/migration/V67__add_admin_operations_permissions.sql
+@@ -0,0 +1,117 @@
++-- 99-1：补齐后台运营权限，仅给超级管理员绑定；其他角色由管理员明确授权。
++UPDATE admin_permission
++SET perm_name = '告警管理',
++    module_code = 'ALERT',
++    action_code = 'MANAGE',
++    status = 'ACTIVE',
++    updated_by = NULL,
++    is_deleted = 0
++WHERE perm_code = 'ADMIN_ALERT_MANAGE';
++
++INSERT INTO admin_permission (
++    id, perm_code, perm_name, module_code, action_code, status, created_by, updated_by, is_deleted
++)
++SELECT seq.next_id, 'ADMIN_ALERT_MANAGE', '告警管理',
++       'ALERT', 'MANAGE', 'ACTIVE', NULL, NULL, 0
++FROM (
++    SELECT COALESCE(MAX(id), 7000) + 1 AS next_id
++    FROM admin_permission
++) seq
++WHERE NOT EXISTS (
++    SELECT 1 FROM admin_permission WHERE perm_code = 'ADMIN_ALERT_MANAGE'
++);
++
++INSERT INTO admin_role_permission (id, role_id, permission_id, created_by)
++SELECT seq.next_id, r.id, p.id, NULL
++FROM admin_role r
++JOIN admin_permission p ON p.perm_code = 'ADMIN_ALERT_MANAGE'
++CROSS JOIN (
++    SELECT COALESCE(MAX(id), 6100) + 1 AS next_id
++    FROM admin_role_permission
++) seq
++WHERE r.role_code = 'SUPER_ADMIN'
++  AND r.is_deleted = 0
++  AND NOT EXISTS (
++      SELECT 1
++      FROM admin_role_permission existing
++      WHERE existing.role_id = r.id
++        AND existing.permission_id = p.id
++  );
++
++UPDATE admin_permission
++SET perm_name = 'IM投递治理',
++    module_code = 'IM_OUTBOX',
++    action_code = 'MANAGE',
++    status = 'ACTIVE',
++    updated_by = NULL,
++    is_deleted = 0
++WHERE perm_code = 'ADMIN_IM_OUTBOX_MANAGE';
++
++INSERT INTO admin_permission (
++    id, perm_code, perm_name, module_code, action_code, status, created_by, updated_by, is_deleted
++)
++SELECT seq.next_id, 'ADMIN_IM_OUTBOX_MANAGE', 'IM投递治理',
++       'IM_OUTBOX', 'MANAGE', 'ACTIVE', NULL, NULL, 0
++FROM (
++    SELECT COALESCE(MAX(id), 7000) + 1 AS next_id
++    FROM admin_permission
++) seq
++WHERE NOT EXISTS (
++    SELECT 1 FROM admin_permission WHERE perm_code = 'ADMIN_IM_OUTBOX_MANAGE'
++);
++
++INSERT INTO admin_role_permission (id, role_id, permission_id, created_by)
++SELECT seq.next_id, r.id, p.id, NULL
++FROM admin_role r
++JOIN admin_permission p ON p.perm_code = 'ADMIN_IM_OUTBOX_MANAGE'
++CROSS JOIN (
++    SELECT COALESCE(MAX(id), 6100) + 1 AS next_id
++    FROM admin_role_permission
++) seq
++WHERE r.role_code = 'SUPER_ADMIN'
++  AND r.is_deleted = 0
++  AND NOT EXISTS (
++      SELECT 1
++      FROM admin_role_permission existing
++      WHERE existing.role_id = r.id
++        AND existing.permission_id = p.id
++  );
++
++UPDATE admin_permission
++SET perm_name = '审计日志查询',
++    module_code = 'AUDIT_LOG',
++    action_code = 'VIEW',
++    status = 'ACTIVE',
++    updated_by = NULL,
++    is_deleted = 0
++WHERE perm_code = 'ADMIN_AUDIT_LOG_VIEW';
++
++INSERT INTO admin_permission (
++    id, perm_code, perm_name, module_code, action_code, status, created_by, updated_by, is_deleted
++)
++SELECT seq.next_id, 'ADMIN_AUDIT_LOG_VIEW', '审计日志查询',
++       'AUDIT_LOG', 'VIEW', 'ACTIVE', NULL, NULL, 0
++FROM (
++    SELECT COALESCE(MAX(id), 7000) + 1 AS next_id
++    FROM admin_permission
++) seq
++WHERE NOT EXISTS (
++    SELECT 1 FROM admin_permission WHERE perm_code = 'ADMIN_AUDIT_LOG_VIEW'
++);
++
++INSERT INTO admin_role_permission (id, role_id, permission_id, created_by)
++SELECT seq.next_id, r.id, p.id, NULL
++FROM admin_role r
++JOIN admin_permission p ON p.perm_code = 'ADMIN_AUDIT_LOG_VIEW'
++CROSS JOIN (
++    SELECT COALESCE(MAX(id), 6100) + 1 AS next_id
++    FROM admin_role_permission
++) seq
++WHERE r.role_code = 'SUPER_ADMIN'
++  AND r.is_deleted = 0
++  AND NOT EXISTS (
++      SELECT 1
++      FROM admin_role_permission existing
++      WHERE existing.role_id = r.id
++        AND existing.permission_id = p.id
++  );
+diff --git a/server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java b/server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java
+--- a/server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java
++++ b/server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java
+@@ -88,7 +88,7 @@
+     }
+ 
+     @Test
+-    void similarPrefixShouldNotBeTreatedAsPluginApi() throws Exception {
++    void similarPrefixShouldBeDeniedAsUndeclaredAdminApi() throws Exception {
+         AdminPermissionFilter filter = new AdminPermissionFilter(new ObjectMapper());
+         authenticate(List.of(), List.of());
+         MockHttpServletRequest request = new MockHttpServletRequest(
+@@ -98,8 +98,8 @@
+ 
+         filter.doFilter(request, response, (servletRequest, servletResponse) -> called.set(true));
+ 
+-        assertTrue(called.get());
+-        assertEquals(200, response.getStatus());
++        assertFalse(called.get());
++        assertEquals(403, response.getStatus());
+     }
+ 
+     @Test
+diff --git a/server/src/test/java/com/workforcehub/auth/AdminPermissionRouteMatrixTest.java b/server/src/test/java/com/workforcehub/auth/AdminPermissionRouteMatrixTest.java
+new file mode 100644
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/auth/AdminPermissionRouteMatrixTest.java
+@@ -0,0 +1,130 @@
++package com.workforcehub.auth;
++
++import com.fasterxml.jackson.databind.ObjectMapper;
++import com.workforcehub.auth.security.AdminPermissionFilter;
++import com.workforcehub.auth.security.AdminUserDetails;
++import org.junit.jupiter.api.AfterEach;
++import org.junit.jupiter.api.DynamicTest;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.TestFactory;
++import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
++import org.springframework.core.io.ClassPathResource;
++import org.springframework.core.type.filter.AnnotationTypeFilter;
++import org.springframework.mock.web.MockHttpServletRequest;
++import org.springframework.mock.web.MockHttpServletResponse;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.security.core.context.SecurityContextHolder;
++import org.springframework.stereotype.Controller;
++import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
++import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
++
++import java.lang.reflect.Method;
++import java.nio.charset.StandardCharsets;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++import java.util.concurrent.atomic.AtomicBoolean;
++import java.util.stream.Stream;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++
++class AdminPermissionRouteMatrixTest {
++
++    @AfterEach
++    void clearContext() {
++        SecurityContextHolder.clearContext();
++    }
++
++    private List<String> matrix() throws Exception {
++        return new ClassPathResource("security/admin-permission-matrix.tsv")
++            .getContentAsString(StandardCharsets.UTF_8).lines()
++            .filter(line -> !line.isBlank() && !line.startsWith("#")).toList();
++    }
++
++    @Test
++    void matrixMustExactlyCoverEveryActualAdminRouteAndMethod() throws Exception {
++        var scanner = new ClassPathScanningCandidateComponentProvider(false);
++        scanner.addIncludeFilter(new AnnotationTypeFilter(Controller.class));
++        var introspector = new MappingIntrospector();
++        Set<String> actual = new HashSet<>();
++        for (var bean : scanner.findCandidateComponents("com.workforcehub")) {
++            Class<?> type = Class.forName(bean.getBeanClassName());
++            for (Method method : type.getDeclaredMethods()) {
++                RequestMappingInfo info = introspector.mapping(method, type);
++                if (info == null) {
++                    continue;
++                }
++                for (String path : info.getPatternValues()) {
++                    if (path.equals("/api/admin") || path.startsWith("/api/admin/")) {
++                        assertFalse(info.getMethodsCondition().isEmpty(), "Explicit HTTP method required: " + path);
++                        for (var verb : info.getMethodsCondition().getMethods()) {
++                            actual.add(verb.name() + " " + path);
++                        }
++                    }
++                }
++            }
++        }
++        List<String> rows = matrix();
++        Set<String> declared = new HashSet<>();
++        rows.forEach(row -> declared.add(row.substring(0, row.lastIndexOf('\t')).replace('\t', ' ')));
++        assertEquals(rows.size(), declared.size(), "Duplicate matrix route");
++        assertEquals(actual, declared, "Every new/changed admin mapping needs an explicit matrix policy");
++        System.out.println("Admin route matrix: " + actual.size() + " method/path mappings covered");
++    }
++
++    @TestFactory
++    Stream<DynamicTest> everyRouteMustEnforceItsDeclaredPermission() throws Exception {
++        return matrix().stream().map(row -> DynamicTest.dynamicTest(row, () -> {
++            String[] fields = row.split("\t");
++            String method = fields[0];
++            String path = fields[1].replaceAll("\\{[^}]+}", "123");
++            String policy = fields[2];
++            boolean common = policy.equals("LOGIN") || policy.equals("AUTHENTICATED");
++            assertAccess(method, path, List.of(), List.of(), common);
++            assertAccess(method, path, List.of(), List.of("UNRELATED_PERMISSION"), common);
++            assertAccess(method, path, List.of(), List.of(policy), true);
++            assertAccess(method, path, List.of("SUPER_ADMIN"), List.of(), true);
++            if (method.equals("GET")) {
++                assertAccess("HEAD", path, List.of(), List.of(), common);
++                assertAccess("HEAD", path, List.of(), List.of(policy), true);
++            }
++            assertAccess("TRACE", path, List.of("SUPER_ADMIN"), List.of(policy), false);
++        }));
++    }
++
++    @Test
++    void undeclaredRoutesAndMethodsMustNotInheritAnyBypass() throws Exception {
++        for (String path : List.of("/api/admin", "/api/admin/unknown", "/api/admin/auth/new-action",
++                "/api/admin/plugins-evil/config", "/api/admin/alerts/unknown/deep",
++                "/api/admin/system/audit-logs/unknown")) {
++            assertAccess("GET", path, List.of(), List.of(), false);
++            assertAccess("GET", path, List.of("SUPER_ADMIN"), List.of(), false);
++        }
++        assertAccess("POST", "/api/admin/auth/me", List.of("SUPER_ADMIN"), List.of(), false);
++        assertAccess("DELETE", "/api/admin/alerts", List.of(), List.of("ADMIN_ALERT_MANAGE"), false);
++        assertAccess("GET", "/api/%61dmin/alerts", List.of(), List.of(), false);
++        assertAccess("GET", "/api/admin/system/audit-logs;fixture=1", List.of(), List.of(), false);
++    }
++
++    private void assertAccess(String method, String path, List<String> roles, List<String> permissions,
++                              boolean expected) throws Exception {
++        var user = new AdminUserDetails(1L, "fixture", "unused", "fixture", "ACTIVE", roles, permissions);
++        SecurityContextHolder.getContext().setAuthentication(
++            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
++        var response = new MockHttpServletResponse();
++        var called = new AtomicBoolean();
++        new AdminPermissionFilter(new ObjectMapper()).doFilter(new MockHttpServletRequest(method, path), response,
++            (request, result) -> called.set(true));
++        assertEquals(expected, called.get(), method + " " + path + " roles=" + roles + " permissions=" + permissions);
++        if (!expected) {
++            assertEquals(403, response.getStatus());
++        }
++    }
++
++    private static class MappingIntrospector extends RequestMappingHandlerMapping {
++        RequestMappingInfo mapping(Method method, Class<?> type) {
++            return getMappingForMethod(method, type);
++        }
++    }
++}
+diff --git a/server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java b/server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java
+new file mode 100644
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java
+@@ -0,0 +1,187 @@
++package com.workforcehub.auth;
++
++import com.workforcehub.auth.controller.AdminAuthController;
++import com.workforcehub.auth.dto.CurrentUserResponse;
++import com.workforcehub.auth.security.AdminPermissionFilter;
++import com.workforcehub.auth.security.AdminUserDetails;
++import com.workforcehub.auth.security.AdminUserDetailsService;
++import com.workforcehub.auth.security.EmployeeUserDetails;
++import com.workforcehub.auth.security.EmployeeUserDetailsService;
++import com.workforcehub.auth.security.UserTypePathFilter;
++import com.workforcehub.auth.service.AccountService;
++import com.workforcehub.auth.service.LoginService;
++import com.workforcehub.common.config.SecurityConfig;
++import com.workforcehub.im.controller.AdminImOutboxController;
++import com.workforcehub.im.dto.AdminImOutboxDispatchResponse;
++import com.workforcehub.im.service.ImOutboxAdminService;
++import com.workforcehub.system.controller.AdminAlertController;
++import com.workforcehub.system.controller.AdminSystemController;
++import com.workforcehub.system.service.AdminAlertService;
++import com.workforcehub.system.service.AdminSystemService;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.MethodSource;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
++import org.springframework.boot.test.mock.mockito.MockBean;
++import org.springframework.http.HttpMethod;
++import org.springframework.http.MediaType;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.test.context.ContextConfiguration;
++import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.request.RequestPostProcessor;
++
++import java.util.List;
++import java.util.stream.Stream;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.mockito.Mockito.clearInvocations;
++import static org.mockito.Mockito.mockingDetails;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.verifyNoInteractions;
++import static org.mockito.Mockito.when;
++import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
++import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++@WebMvcTest({AdminAlertController.class, AdminImOutboxController.class, AdminSystemController.class,
++    AdminAuthController.class})
++@ContextConfiguration(classes = {AdminAlertController.class, AdminImOutboxController.class,
++    AdminSystemController.class, AdminAuthController.class, SecurityConfig.class,
++    UserTypePathFilter.class, AdminPermissionFilter.class})
++class AdminPermissionWebTest {
++
++    @Autowired private MockMvc mvc;
++    @MockBean private AdminAlertService alerts;
++    @MockBean private ImOutboxAdminService outbox;
++    @MockBean private AdminSystemService system;
++    @MockBean private LoginService login;
++    @MockBean private AccountService account;
++    @MockBean(name = "employeeUserDetailsService") private EmployeeUserDetailsService employees;
++    @MockBean(name = "adminUserDetailsService") private AdminUserDetailsService admins;
++
++    record Endpoint(String method, String path, String permission, String body, String serviceMethod) {}
++
++    static Stream<Endpoint> previouslyUnmappedEndpoints() {
++        return Stream.of(
++            new Endpoint("GET", "/api/admin/alerts", "ADMIN_ALERT_MANAGE", "", "listActiveAlerts"),
++            new Endpoint("GET", "/api/admin/alerts/channels", "ADMIN_ALERT_MANAGE", "", "listChannels"),
++            new Endpoint("POST", "/api/admin/alerts/channels", "ADMIN_ALERT_MANAGE",
++                "{\"channelCode\":\"FIXTURE\",\"channelName\":\"fixture\",\"channelType\":\"IN_APP\"}", "createChannel"),
++            new Endpoint("PUT", "/api/admin/alerts/rules/FIXTURE", "ADMIN_ALERT_MANAGE",
++                "{\"enabled\":true,\"notifyEnabled\":false,\"cooldownMinutes\":0}", "updateRule"),
++            new Endpoint("POST", "/api/admin/alerts/FIXTURE/resolutions", "ADMIN_ALERT_MANAGE",
++                "{\"actionType\":\"RESOLVE\"}", "createResolution"),
++            new Endpoint("GET", "/api/admin/alerts/resolutions", "ADMIN_ALERT_MANAGE", "", "pageResolutions"),
++            new Endpoint("GET", "/api/admin/im/outbox-events", "ADMIN_IM_OUTBOX_MANAGE", "", "pageOutboxEvents"),
++            new Endpoint("GET", "/api/admin/im/outbox-events/summary", "ADMIN_IM_OUTBOX_MANAGE", "", "summarizeOutboxEvents"),
++            new Endpoint("GET", "/api/admin/im/outbox-events/failure-summary", "ADMIN_IM_OUTBOX_MANAGE", "", "listOutboxFailureSummary"),
++            new Endpoint("GET", "/api/admin/im/outbox-events/audits", "ADMIN_IM_OUTBOX_MANAGE", "", "pageOutboxAudits"),
++            new Endpoint("POST", "/api/admin/im/outbox-events/batch-retry", "ADMIN_IM_OUTBOX_MANAGE",
++                "{\"eventIds\":[1]}", "batchRetryOutboxEvents"),
++            new Endpoint("POST", "/api/admin/im/outbox-events/dispatch", "ADMIN_IM_OUTBOX_MANAGE",
++                "{\"batchSize\":7}", "dispatchDueEvents"),
++            new Endpoint("GET", "/api/admin/im/outbox-events/1", "ADMIN_IM_OUTBOX_MANAGE", "", "getOutboxEvent"),
++            new Endpoint("POST", "/api/admin/im/outbox-events/1/retry", "ADMIN_IM_OUTBOX_MANAGE", "", "retryOutboxEvent"),
++            new Endpoint("GET", "/api/admin/system/roles", "ADMIN_RBAC_MANAGE", "", "listRoles"),
++            new Endpoint("GET", "/api/admin/roles", "ADMIN_RBAC_MANAGE", "", "listRoles"),
++            new Endpoint("GET", "/api/admin/system/permissions", "ADMIN_RBAC_MANAGE", "", "listPermissions"),
++            new Endpoint("GET", "/api/admin/permissions", "ADMIN_RBAC_MANAGE", "", "listPermissions"),
++            new Endpoint("GET", "/api/admin/system/audit-logs", "ADMIN_AUDIT_LOG_VIEW", "", "pageAuditLogs"),
++            new Endpoint("GET", "/api/admin/audit-logs", "ADMIN_AUDIT_LOG_VIEW", "", "pageAuditLogs")
++        );
++    }
++
++    @ParameterizedTest
++    @MethodSource("previouslyUnmappedEndpoints")
++    void deniedRequestsMustNeverReachBusinessAndExplicitPermissionMustReachExpectedHandler(Endpoint endpoint)
++            throws Exception {
++        Object service = endpoint.path().contains("/alerts") ? alerts
++            : endpoint.path().contains("/im/") ? outbox : system;
++        Class<?> controller = service == alerts ? AdminAlertController.class
++            : service == outbox ? AdminImOutboxController.class : AdminSystemController.class;
++        for (List<String> permissions : List.of(List.<String>of(), List.of("UNRELATED_PERMISSION"))) {
++            mvc.perform(request(HttpMethod.valueOf(endpoint.method()), endpoint.path())
++                    .with(admin(List.of(), permissions)).with(csrf())
++                    .contentType(MediaType.APPLICATION_JSON).content(endpoint.body()))
++                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value(100403));
++            verifyNoInteractions(alerts, outbox, system);
++        }
++        for (List<String> roles : List.of(List.<String>of(), List.of("SUPER_ADMIN"))) {
++            mvc.perform(request(HttpMethod.valueOf(endpoint.method()), endpoint.path())
++                    .with(admin(roles, roles.isEmpty() ? List.of(endpoint.permission()) : List.of())).with(csrf())
++                    .contentType(MediaType.APPLICATION_JSON).content(endpoint.body()))
++                .andExpect(status().isOk()).andExpect(handler().handlerType(controller))
++                .andExpect(jsonPath("$.code").value(0));
++            assertEquals(1, mockingDetails(service).getInvocations().stream()
++                .filter(invocation -> invocation.getMethod().getName().equals(endpoint.serviceMethod())).count());
++            clearInvocations(alerts, outbox, system);
++        }
++    }
++
++    @Test
++    void dispatchResponseMustComeFromRealControllerAndExplicitServiceInvocation() throws Exception {
++        when(outbox.dispatchDueEvents(7)).thenReturn(AdminImOutboxDispatchResponse.of(7, 3));
++        mvc.perform(post("/api/admin/im/outbox-events/dispatch").with(csrf())
++                .with(admin(List.of(), List.of("ADMIN_IM_OUTBOX_MANAGE")))
++                .contentType(MediaType.APPLICATION_JSON).content("{\"batchSize\":7}"))
++            .andExpect(status().isOk()).andExpect(jsonPath("$.data.requestedBatchSize").value(7))
++            .andExpect(jsonPath("$.data.dispatchedCount").value(3));
++        verify(outbox).dispatchDueEvents(7);
++    }
++
++    @Test
++    void unknownRouteAndWrongMethodMustBeDeniedEvenForSuperAdmin() throws Exception {
++        mvc.perform(get("/api/admin/new-business").with(admin(List.of("SUPER_ADMIN"), List.of())))
++            .andExpect(status().isForbidden());
++        mvc.perform(post("/api/admin/system/audit-logs").with(csrf())
++                .with(admin(List.of("SUPER_ADMIN"), List.of())))
++            .andExpect(status().isForbidden());
++        mvc.perform(get("/api/admin/auth/new-business").with(admin(List.of("SUPER_ADMIN"), List.of())))
++            .andExpect(status().isForbidden());
++        verifyNoInteractions(alerts, outbox, system, account, login);
++    }
++
++    @Test
++    void anonymousMustRemain401AndEmployeeMustRemain403() throws Exception {
++        mvc.perform(get("/api/admin/alerts")).andExpect(status().isUnauthorized());
++        var employee = new EmployeeUserDetails(2L, 2L, "fixture", "unused", "fixture", "ACTIVE");
++        mvc.perform(get("/api/admin/auth/me").with(authentication(
++                new UsernamePasswordAuthenticationToken(employee, null, employee.getAuthorities()))))
++            .andExpect(status().isForbidden());
++        verifyNoInteractions(alerts, outbox, system, account, login);
++    }
++
++    @Test
++    void authenticatedAdminMustAccessOnlyExplicitCommonEndpoints() throws Exception {
++        var current = new CurrentUserResponse();
++        current.setDisplayName("fixture-current-admin");
++        when(account.getCurrentUser()).thenReturn(current);
++        mvc.perform(get("/api/admin/auth/me").with(admin(List.of(), List.of())))
++            .andExpect(status().isOk()).andExpect(jsonPath("$.data.displayName").value("fixture-current-admin"));
++        verify(account).getCurrentUser();
++        mvc.perform(post("/api/admin/auth/logout").with(admin(List.of(), List.of())).with(csrf()))
++            .andExpect(status().isOk());
++        verify(login).logout(org.mockito.ArgumentMatchers.any());
++        mvc.perform(get("/api/admin/auth/me")).andExpect(status().isUnauthorized());
++        mvc.perform(post("/api/admin/auth/logout").with(csrf())).andExpect(status().isUnauthorized());
++    }
++
++    @Test
++    void anonymousLoginMustReachExistingControllerWithCsrf() throws Exception {
++        mvc.perform(post("/api/admin/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
++                .content("{\"loginName\":\"fixture\",\"password\":\"fixture-password\"}"))
++            .andExpect(status().isOk()).andExpect(handler().handlerType(AdminAuthController.class));
++        verify(login).loginAdmin(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
++    }
++
++    private RequestPostProcessor admin(List<String> roles, List<String> permissions) {
++        var user = new AdminUserDetails(1L, "fixture", "unused", "fixture", "ACTIVE", roles, permissions);
++        return authentication(new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
++    }
++}
+diff --git a/server/src/test/resources/security/admin-permission-matrix.tsv b/server/src/test/resources/security/admin-permission-matrix.tsv
+new file mode 100644
+--- /dev/null
++++ b/server/src/test/resources/security/admin-permission-matrix.tsv
+@@ -0,0 +1,164 @@
++# METHOD	PATH	POLICY
++DELETE	/api/admin/agents/ai-providers/{providerId}	ADMIN_AGENT_MANAGE
++DELETE	/api/admin/agents/llm-models/{modelId}	ADMIN_AGENT_MANAGE
++DELETE	/api/admin/agents/{agentId}	ADMIN_AGENT_MANAGE
++DELETE	/api/admin/departments/{deptId}	ADMIN_ORG_MANAGE
++DELETE	/api/admin/dicts/{id}	ADMIN_DICT_MANAGE
++DELETE	/api/admin/files/{attachmentRefId}	ADMIN_FILE_MANAGE
++DELETE	/api/admin/leave/types/{leaveTypeId}	ADMIN_LEAVE_MANAGE
++DELETE	/api/admin/plugins/{pluginId}	ADMIN_PLUGIN_MANAGE
++DELETE	/api/admin/plugins/{pluginId}/config/{configKey}	ADMIN_PLUGIN_MANAGE
++DELETE	/api/admin/ragflow/spaces/{spaceId}	ADMIN_RAGFLOW_MANAGE
++DELETE	/api/admin/ragflow/spaces/{spaceId}/documents/{documentId}	ADMIN_RAGFLOW_MANAGE
++DELETE	/api/admin/rbac/roles/{roleId}	ADMIN_RBAC_MANAGE
++GET	/api/admin/agent-tasks	ADMIN_AGENT_TASK_MANAGE
++GET	/api/admin/agent-tasks/failure-summary	ADMIN_AGENT_TASK_MANAGE
++GET	/api/admin/agent-tasks/metrics	ADMIN_AGENT_TASK_MANAGE
++GET	/api/admin/agent-tasks/timeout-scan-runs	ADMIN_AGENT_TASK_MANAGE
++GET	/api/admin/agent-tasks/{taskId}	ADMIN_AGENT_TASK_MANAGE
++GET	/api/admin/agent-tasks/{taskId}/audits	ADMIN_AGENT_TASK_MANAGE
++GET	/api/admin/agent-tasks/{taskId}/tool-calls	ADMIN_AGENT_TASK_MANAGE
++GET	/api/admin/agents	ADMIN_AGENT_MANAGE
++GET	/api/admin/agents/ai-providers	ADMIN_AGENT_MANAGE
++GET	/api/admin/agents/ai-providers/{providerId}/models	ADMIN_AGENT_MANAGE
++GET	/api/admin/agents/llm-models	ADMIN_AGENT_MANAGE
++GET	/api/admin/agents/tools	ADMIN_AGENT_MANAGE
++GET	/api/admin/agents/{agentId}	ADMIN_AGENT_MANAGE
++GET	/api/admin/agents/{agentId}/acl	ADMIN_AGENT_MANAGE
++GET	/api/admin/agents/{agentId}/versions	ADMIN_AGENT_MANAGE
++GET	/api/admin/alerts	ADMIN_ALERT_MANAGE
++GET	/api/admin/alerts/channels	ADMIN_ALERT_MANAGE
++GET	/api/admin/alerts/resolutions	ADMIN_ALERT_MANAGE
++GET	/api/admin/attendance/calendars	ADMIN_ATTENDANCE_MANAGE
++GET	/api/admin/attendance/daily-results	ADMIN_ATTENDANCE_MANAGE
++GET	/api/admin/attendance/groups	ADMIN_ATTENDANCE_MANAGE
++GET	/api/admin/attendance/groups/{groupId}/members	ADMIN_ATTENDANCE_MANAGE
++GET	/api/admin/attendance/schedules	ADMIN_ATTENDANCE_MANAGE
++GET	/api/admin/attendance/shifts	ADMIN_ATTENDANCE_MANAGE
++GET	/api/admin/audit-logs	ADMIN_AUDIT_LOG_VIEW
++GET	/api/admin/auth/me	AUTHENTICATED
++GET	/api/admin/departments/tree	ADMIN_ORG_MANAGE
++GET	/api/admin/dicts	ADMIN_DICT_MANAGE
++GET	/api/admin/dicts/types	ADMIN_DICT_MANAGE
++GET	/api/admin/files	ADMIN_FILE_MANAGE
++GET	/api/admin/files/download/{ticketNo}	ADMIN_FILE_MANAGE
++GET	/api/admin/files/quota-policies	ADMIN_FILE_MANAGE
++GET	/api/admin/files/recycle-bin	ADMIN_FILE_MANAGE
++GET	/api/admin/files/storage-summary	ADMIN_FILE_MANAGE
++GET	/api/admin/im/outbox-events	ADMIN_IM_OUTBOX_MANAGE
++GET	/api/admin/im/outbox-events/audits	ADMIN_IM_OUTBOX_MANAGE
++GET	/api/admin/im/outbox-events/failure-summary	ADMIN_IM_OUTBOX_MANAGE
++GET	/api/admin/im/outbox-events/summary	ADMIN_IM_OUTBOX_MANAGE
++GET	/api/admin/im/outbox-events/{eventId}	ADMIN_IM_OUTBOX_MANAGE
++GET	/api/admin/leave/accounts	ADMIN_LEAVE_MANAGE
++GET	/api/admin/leave/types	ADMIN_LEAVE_MANAGE
++GET	/api/admin/notification-channels	ADMIN_NOTIFICATION_CHANNEL_MANAGE
++GET	/api/admin/notification-channels/{channelCode}	ADMIN_NOTIFICATION_CHANNEL_MANAGE
++GET	/api/admin/permissions	ADMIN_RBAC_MANAGE
++GET	/api/admin/plugins	ADMIN_PLUGIN_MANAGE
++GET	/api/admin/plugins/{pluginId}/config	ADMIN_PLUGIN_MANAGE
++GET	/api/admin/positions	ADMIN_ORG_MANAGE
++GET	/api/admin/ragflow/settings	ADMIN_RAGFLOW_MANAGE
++GET	/api/admin/ragflow/spaces	ADMIN_RAGFLOW_MANAGE
++GET	/api/admin/ragflow/spaces/{spaceId}	ADMIN_RAGFLOW_MANAGE
++GET	/api/admin/ragflow/spaces/{spaceId}/acl	ADMIN_RAGFLOW_MANAGE
++GET	/api/admin/ragflow/spaces/{spaceId}/documents	ADMIN_RAGFLOW_MANAGE
++GET	/api/admin/rbac/admin-users	ADMIN_RBAC_MANAGE
++GET	/api/admin/rbac/admin-users/{adminUserId}/roles	ADMIN_RBAC_MANAGE
++GET	/api/admin/rbac/permissions	ADMIN_RBAC_MANAGE
++GET	/api/admin/rbac/roles	ADMIN_RBAC_MANAGE
++GET	/api/admin/rbac/roles/{roleId}	ADMIN_RBAC_MANAGE
++GET	/api/admin/roles	ADMIN_RBAC_MANAGE
++GET	/api/admin/system/audit-logs	ADMIN_AUDIT_LOG_VIEW
++GET	/api/admin/system/permissions	ADMIN_RBAC_MANAGE
++GET	/api/admin/system/roles	ADMIN_RBAC_MANAGE
++GET	/api/admin/users	ADMIN_ORG_MANAGE
++GET	/api/admin/users/org-chart	ADMIN_ORG_MANAGE
++GET	/api/admin/users/{userId}	ADMIN_ORG_MANAGE
++GET	/api/admin/users/{userId}/manager	ADMIN_ORG_MANAGE
++GET	/api/admin/users/{userId}/subordinates	ADMIN_ORG_MANAGE
++GET	/api/admin/workflow/process-types	ADMIN_WORKFLOW_MANAGE
++GET	/api/admin/workflow/requests	ADMIN_WORKFLOW_MANAGE
++GET	/api/admin/workflow/requests/{requestId}	ADMIN_WORKFLOW_MANAGE
++GET	/api/admin/workflow/requests/{requestId}/actions	ADMIN_WORKFLOW_MANAGE
++GET	/api/admin/workflow/templates	ADMIN_WORKFLOW_MANAGE
++GET	/api/admin/workflow/templates/{templateId}/versions	ADMIN_WORKFLOW_MANAGE
++POST	/api/admin/agent-tasks/timeout-scan	ADMIN_AGENT_TASK_MANAGE
++POST	/api/admin/agents	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/ai-providers	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/ai-providers/{providerId}/test	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/llm-models	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/llm-models/test	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/llm-models/{modelId}/test	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/tools	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/trial-run	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/versions/{versionId}/publish	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/versions/{versionId}/tools	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/workflow-run	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/workflows/validate	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/{agentId}/acl	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/{agentId}/disable	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/{agentId}/enable	ADMIN_AGENT_MANAGE
++POST	/api/admin/agents/{agentId}/versions	ADMIN_AGENT_MANAGE
++POST	/api/admin/alerts/channels	ADMIN_ALERT_MANAGE
++POST	/api/admin/alerts/{alertCode}/resolutions	ADMIN_ALERT_MANAGE
++POST	/api/admin/attendance/calendars	ADMIN_ATTENDANCE_MANAGE
++POST	/api/admin/attendance/groups	ADMIN_ATTENDANCE_MANAGE
++POST	/api/admin/attendance/groups/{groupId}/members	ADMIN_ATTENDANCE_MANAGE
++POST	/api/admin/attendance/schedules	ADMIN_ATTENDANCE_MANAGE
++POST	/api/admin/attendance/shifts	ADMIN_ATTENDANCE_MANAGE
++POST	/api/admin/auth/login	LOGIN
++POST	/api/admin/auth/logout	AUTHENTICATED
++POST	/api/admin/departments	ADMIN_ORG_MANAGE
++POST	/api/admin/dicts	ADMIN_DICT_MANAGE
++POST	/api/admin/files/cleanup-jobs/run	ADMIN_FILE_MANAGE
++POST	/api/admin/files/confirm-upload	ADMIN_FILE_MANAGE
++POST	/api/admin/files/quota-policies	ADMIN_FILE_MANAGE
++POST	/api/admin/files/upload-tickets	ADMIN_FILE_MANAGE
++POST	/api/admin/files/{attachmentRefId}/download-tickets	ADMIN_FILE_MANAGE
++POST	/api/admin/files/{attachmentRefId}/restore	ADMIN_FILE_MANAGE
++POST	/api/admin/files/{attachmentRefId}/trash	ADMIN_FILE_MANAGE
++POST	/api/admin/im/outbox-events/batch-retry	ADMIN_IM_OUTBOX_MANAGE
++POST	/api/admin/im/outbox-events/dispatch	ADMIN_IM_OUTBOX_MANAGE
++POST	/api/admin/im/outbox-events/{eventId}/retry	ADMIN_IM_OUTBOX_MANAGE
++POST	/api/admin/leave/accounts/adjustments	ADMIN_LEAVE_MANAGE
++POST	/api/admin/leave/types	ADMIN_LEAVE_MANAGE
++POST	/api/admin/notification-channels/{channelCode}/test	ADMIN_NOTIFICATION_CHANNEL_MANAGE
++POST	/api/admin/plugins/upload	ADMIN_PLUGIN_MANAGE
++POST	/api/admin/positions	ADMIN_ORG_MANAGE
++POST	/api/admin/ragflow/files/confirm-upload	ADMIN_RAGFLOW_MANAGE
++POST	/api/admin/ragflow/files/upload-tickets	ADMIN_RAGFLOW_MANAGE
++POST	/api/admin/ragflow/spaces	ADMIN_RAGFLOW_MANAGE
++POST	/api/admin/ragflow/spaces/{spaceId}/documents	ADMIN_RAGFLOW_MANAGE
++POST	/api/admin/ragflow/spaces/{spaceId}/documents/{documentId}/reingest	ADMIN_RAGFLOW_MANAGE
++POST	/api/admin/ragflow/spaces/{spaceId}/search-test	ADMIN_RAGFLOW_MANAGE
++POST	/api/admin/rbac/roles	ADMIN_RBAC_MANAGE
++POST	/api/admin/users	ADMIN_ORG_MANAGE
++POST	/api/admin/workflow/process-types	ADMIN_WORKFLOW_MANAGE
++POST	/api/admin/workflow/template-versions/{versionId}/publish	ADMIN_WORKFLOW_MANAGE
++POST	/api/admin/workflow/templates	ADMIN_WORKFLOW_MANAGE
++POST	/api/admin/workflow/templates/{templateId}/versions	ADMIN_WORKFLOW_MANAGE
++PUT	/api/admin/agents/ai-providers/{providerId}	ADMIN_AGENT_MANAGE
++PUT	/api/admin/agents/llm-models/{modelId}	ADMIN_AGENT_MANAGE
++PUT	/api/admin/agents/versions/{versionId}	ADMIN_AGENT_MANAGE
++PUT	/api/admin/agents/{agentId}	ADMIN_AGENT_MANAGE
++PUT	/api/admin/alerts/rules/{alertCode}	ADMIN_ALERT_MANAGE
++PUT	/api/admin/attendance/schedules/{scheduleId}	ADMIN_ATTENDANCE_MANAGE
++PUT	/api/admin/departments/{deptId}	ADMIN_ORG_MANAGE
++PUT	/api/admin/dicts/{id}	ADMIN_DICT_MANAGE
++PUT	/api/admin/files/quota-policies/{policyId}	ADMIN_FILE_MANAGE
++PUT	/api/admin/leave/types/{leaveTypeId}	ADMIN_LEAVE_MANAGE
++PUT	/api/admin/notification-channels/{channelCode}	ADMIN_NOTIFICATION_CHANNEL_MANAGE
++PUT	/api/admin/plugins/{pluginId}/config/{configKey}	ADMIN_PLUGIN_MANAGE
++PUT	/api/admin/plugins/{pluginId}/disable	ADMIN_PLUGIN_MANAGE
++PUT	/api/admin/plugins/{pluginId}/enable	ADMIN_PLUGIN_MANAGE
++PUT	/api/admin/positions/{positionId}	ADMIN_ORG_MANAGE
++PUT	/api/admin/ragflow/settings	ADMIN_RAGFLOW_MANAGE
++PUT	/api/admin/ragflow/spaces/{spaceId}	ADMIN_RAGFLOW_MANAGE
++PUT	/api/admin/ragflow/spaces/{spaceId}/acl	ADMIN_RAGFLOW_MANAGE
++PUT	/api/admin/rbac/admin-users/{adminUserId}/roles	ADMIN_RBAC_MANAGE
++PUT	/api/admin/rbac/roles/{roleId}	ADMIN_RBAC_MANAGE
++PUT	/api/admin/rbac/roles/{roleId}/permissions	ADMIN_RBAC_MANAGE
++PUT	/api/admin/users/{userId}	ADMIN_ORG_MANAGE
++PUT	/api/admin/users/{userId}/account	ADMIN_ORG_MANAGE
++PUT	/api/admin/users/{userId}/employment-status	ADMIN_ORG_MANAGE
+diff --git a/server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java b/server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java
+--- a/server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java
++++ b/server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java
+@@ -3,6 +3,7 @@
+ import com.fasterxml.jackson.databind.JsonNode;
+ import com.fasterxml.jackson.databind.ObjectMapper;
+ import com.workforcehub.auth.security.AdminUserDetails;
++import com.workforcehub.auth.security.AdminUserDetailsService;
+ import com.workforcehub.plugin.repository.PluginRow;
+ import com.workforcehub.plugin.repository.PluginStatus;
+ import com.workforcehub.plugin.runtime.PluginManagerService;
+@@ -47,6 +48,7 @@
+ 
+     private static final String PLUGIN_ID = "lifecycle-audit-plugin";
+     private static final long ADMIN_ID = 9_001L;
++    private static final long AUDIT_READER_ID = 9_002L;
+ 
+     @Autowired
+     private MockMvc mockMvc;
+@@ -57,6 +59,9 @@
+     @Autowired
+     private ObjectMapper objectMapper;
+ 
++    @Autowired
++    private AdminUserDetailsService adminUserDetailsService;
++
+     @MockBean
+     private PluginManagerService pluginManagerService;
+ 
+@@ -64,6 +69,34 @@
+ 
+     @BeforeEach
+     void configureLifecycleManager() {
++        // 请求身份必须与数据库授权一致，避免会话有效性校验先于业务权限校验返回 401。
++        jdbcTemplate.update("""
++            INSERT INTO admin_user (id, username, password_hash, display_name, status)
++            VALUES (?, 'plugin.audit.admin', 'fixture-unused', '插件管理员', 'ACTIVE'),
++                   (?, 'plugin.audit.reader', 'fixture-unused', '审计查看员', 'ACTIVE')
++            """, ADMIN_ID, AUDIT_READER_ID);
++        jdbcTemplate.update("""
++            INSERT INTO admin_role (id, role_code, role_name, status)
++            VALUES (?, 'PLUGIN_AUDIT_OPERATOR', '插件管理测试角色', 'ACTIVE'),
++                   (?, 'PLUGIN_AUDIT_READER', '审计查看测试角色', 'ACTIVE')
++            """, ADMIN_ID, AUDIT_READER_ID);
++        jdbcTemplate.update("""
++            INSERT INTO admin_permission (id, perm_code, perm_name, module_code, action_code, status)
++            SELECT 9003, 'ADMIN_AUDIT_LOG_VIEW', '审计日志查询', 'AUDIT_LOG', 'VIEW', 'ACTIVE'
++            WHERE NOT EXISTS (SELECT 1 FROM admin_permission WHERE perm_code = 'ADMIN_AUDIT_LOG_VIEW')
++            """);
++        jdbcTemplate.update("""
++            INSERT INTO admin_role_permission (id, role_id, permission_id)
++            SELECT ?, ?, id FROM admin_permission WHERE perm_code = 'ADMIN_PLUGIN_MANAGE'
++            """, ADMIN_ID, ADMIN_ID);
++        jdbcTemplate.update("""
++            INSERT INTO admin_role_permission (id, role_id, permission_id)
++            SELECT ?, ?, id FROM admin_permission WHERE perm_code = 'ADMIN_AUDIT_LOG_VIEW'
++            """, AUDIT_READER_ID, AUDIT_READER_ID);
++        jdbcTemplate.update("""
++            INSERT INTO admin_user_role (id, admin_user_id, role_id)
++            VALUES (?, ?, ?), (?, ?, ?)
++            """, ADMIN_ID, ADMIN_ID, ADMIN_ID, AUDIT_READER_ID, AUDIT_READER_ID, AUDIT_READER_ID);
+         reset(pluginManagerService);
+         pluginStatus.set(PluginStatus.INSTALLED);
+         when(pluginManagerService.getPlugin(PLUGIN_ID))
+@@ -159,6 +192,24 @@
+         assertAuditDisplay("PLUGIN_DISABLED", "停用插件", "失败");
+     }
+ 
++    @Test
++    void pluginManagementPermissionMustNotGrantAuditReadAccess() throws Exception {
++        assertEquals(List.of("ADMIN_PLUGIN_MANAGE"),
++            ((AdminUserDetails) adminUserDetailsService.loadUserByUsername("plugin.audit.admin")).getPermissionCodes());
++        assertEquals(List.of("ADMIN_AUDIT_LOG_VIEW"),
++            ((AdminUserDetails) adminUserDetailsService.loadUserByUsername("plugin.audit.reader")).getPermissionCodes());
++
++        mockMvc.perform(put("/api/admin/plugins/{pluginId}/enable", PLUGIN_ID)
++                .with(admin()).with(csrf().asHeader()))
++            .andExpect(status().isOk());
++        mockMvc.perform(get("/api/admin/system/audit-logs")
++                .with(admin()).param("targetType", "PLUGIN"))
++            .andExpect(status().isForbidden())
++            .andExpect(jsonPath("$.code").value(100403));
++        assertAuditDisplay("PLUGIN_ENABLED", "启用插件", "成功");
++        System.out.println("AUDIT_AUTHORIZATION plugin-only=403; database-audit-reader=200; persisted-audit=1");
++    }
++
+     private void assertAudit(
+             AuditRow audit,
+             String actionType,
+@@ -188,7 +239,7 @@
+ 
+     private void assertAuditDisplay(String actionType, String actionName, String resultName) throws Exception {
+         mockMvc.perform(get("/api/admin/system/audit-logs")
+-                .with(admin())
++                .with(admin("plugin.audit.reader"))
+                 .param("actionType", actionType)
+                 .param("targetType", "PLUGIN"))
+             .andExpect(status().isOk())
+@@ -216,15 +267,11 @@
+     }
+ 
+     private RequestPostProcessor admin() {
+-        AdminUserDetails principal = new AdminUserDetails(
+-            ADMIN_ID,
+-            "plugin.audit.admin",
+-            "unused",
+-            "插件审计管理员",
+-            "ACTIVE",
+-            List.of(),
+-            List.of("ADMIN_PLUGIN_MANAGE")
+-        );
++        return admin("plugin.audit.admin");
++    }
++
++    private RequestPostProcessor admin(String username) {
++        AdminUserDetails principal = (AdminUserDetails) adminUserDetailsService.loadUserByUsername(username);
+         return authentication(UsernamePasswordAuthenticationToken.authenticated(
+             principal,
+             null,

@@ -1,0 +1,221 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "文件下载：鉴权、单次票据与二进制返回",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/F02.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "select",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "请求下载或预览",
+      "sublabel": "SINGLE / INLINE",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/useFileUpload.ts",
+          "line": 210,
+          "end_line": 226
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "复核附件访问权",
+      "sublabel": "个人上传者或头像预览",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 51,
+          "end_line": 68
+        }
+      ]
+    },
+    {
+      "id": "ticket",
+      "lane": "main",
+      "col": 2,
+      "type": "database",
+      "label": "签发短期票据",
+      "sublabel": "ACTIVE，十分钟",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 70,
+          "end_line": 89
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "lane": "main",
+      "col": 3,
+      "type": "security",
+      "label": "执行时再次鉴权",
+      "sublabel": "申请人、有效期、删除态",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 104,
+          "end_line": 129
+        }
+      ]
+    },
+    {
+      "id": "read",
+      "lane": "main",
+      "col": 4,
+      "type": "cloud",
+      "label": "装载存储资源",
+      "sublabel": "异常不消费正常票据",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 131,
+          "end_line": 132
+        }
+      ]
+    },
+    {
+      "id": "claim",
+      "lane": "main",
+      "col": 5,
+      "type": "database",
+      "label": "原子消费并返回",
+      "sublabel": "ACTIVE → USED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 133,
+          "end_line": 136
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/DownloadTicketExecutionService.java",
+          "line": 22,
+          "end_line": 29
+        }
+      ]
+    },
+    {
+      "id": "expired",
+      "lane": "branch",
+      "col": 3,
+      "type": "database",
+      "label": "过期独立落库",
+      "sublabel": "ACTIVE → EXPIRED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/DownloadTicketExecutionService.java",
+          "line": 32,
+          "end_line": 37
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "failure",
+      "col": 4,
+      "type": "security",
+      "label": "拒绝或重新申请",
+      "sublabel": "越权、已用、删除、过期",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 107,
+          "end_line": 128
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "select",
+      "to": "auth"
+    },
+    {
+      "id": "e1",
+      "from": "auth",
+      "to": "ticket",
+      "label": "允许"
+    },
+    {
+      "id": "e2",
+      "from": "ticket",
+      "to": "check"
+    },
+    {
+      "id": "e3",
+      "from": "check",
+      "to": "read",
+      "label": "有效"
+    },
+    {
+      "id": "e4",
+      "from": "read",
+      "to": "claim"
+    },
+    {
+      "id": "e5",
+      "from": "check",
+      "to": "expired",
+      "label": "已过期"
+    },
+    {
+      "id": "e6",
+      "from": "expired",
+      "to": "reject"
+    },
+    {
+      "id": "e7",
+      "from": "check",
+      "to": "reject",
+      "label": "非法或已使用"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "employee-web 文件页支持预览和下载；管理端通用下载仅支持限定归属。",
+        "个人文件/头像走通用票据；审批、会话附件必须走各自业务授权。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "下载票据在返回资源时已消费，不能承诺客户端下载完成；网络中断需重新申请票据。",
+        "优化：将业务附件下载入口与个人文件入口保持清晰，监控存储失败和重新签票频率。"
+      ]
+    }
+  ]
+}

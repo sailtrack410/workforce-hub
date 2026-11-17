@@ -1,0 +1,19 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/composables/99-4-duration.probe.test.ts > uses 180 scheduled morning minutes for the same 09:00-12:00 input
+AssertionError: expected '240' to be '180' // Object.is equality
+
+Expected: "180"
+Received: "240"
+
+ ❯ src/composables/99-4-duration.probe.test.ts:19:49
+     17|   await nextTick();
+     18|   console.log(`INPUT=2026-05-07T09:00/2026-05-07T12:00; SERVER_MINUTES…
+     19|   expect(state.leaveForm.value.durationMinutes).toBe('180');
+       |                                                 ^
+     20| });
+     21|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

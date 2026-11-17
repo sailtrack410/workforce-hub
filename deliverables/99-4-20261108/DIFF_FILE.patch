@@ -1,0 +1,793 @@
+--- a/server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java
++++ b/server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java
+@@ -24,6 +24,7 @@
+ import com.workforcehub.attendance.repository.AttendanceRepository;
+ import com.workforcehub.attendance.repository.AttendanceScheduleRow;
+ import com.workforcehub.attendance.repository.AttendanceShiftRow;
++import com.workforcehub.attendance.repository.AttendanceWorkPeriod;
+ import com.workforcehub.attendance.repository.PunchRecordRow;
+ import com.workforcehub.common.event.DomainEventPublisher;
+ import com.workforcehub.common.event.attendance.AttendanceExceptionCreatedEvent;
+@@ -96,6 +97,60 @@
+         this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
+         this.transactionTemplate = transactionTemplate;
+         this.domainEventPublisher = domainEventPublisher;
++    }
++
++    @Transactional
++    public int calculateLeaveDurationMinutes(Long userId, LocalDateTime startAt, LocalDateTime endAt) {
++        if (startAt == null || endAt == null || !endAt.isAfter(startAt)) {
++            throw new BizException(400, "结束时间必须晚于开始时间");
++        }
++        if (startAt.getSecond() != 0 || startAt.getNano() != 0 || endAt.getSecond() != 0 || endAt.getNano() != 0) {
++            throw new BizException(400, "请假时间必须精确到整分钟");
++        }
++        if (startAt.plusDays(366).isBefore(endAt)) {
++            throw new BizException(400, "请假跨度不能超过366天");
++        }
++        int minutes = 0;
++        LocalDateTime previousEnd = null;
++        // 前一天的跨日班次可能覆盖申请开始时间。
++        for (LocalDate date = startAt.toLocalDate().minusDays(1); date.atStartOfDay().isBefore(endAt); date = date.plusDays(1)) {
++            AttendanceGroupRow group = attendanceRepository.getEffectiveGroupForUpdate(userId, date);
++            if (group == null) {
++                if (!date.isBefore(startAt.toLocalDate()) && date.atStartOfDay().isBefore(endAt)) {
++                    throw new BizException(400, "请假期间未配置有效考勤组");
++                }
++                continue;
++            }
++            AttendanceScheduleRow schedule = attendanceRepository.getActiveSchedule(userId, date);
++            for (AttendanceWorkPeriod period : resolveWorkPeriods(date, group, schedule)) {
++                int overlap = period.overlapMinutes(startAt, endAt);
++                if (overlap == 0) continue;
++                LocalDateTime from = period.startAt().isAfter(startAt) ? period.startAt() : startAt;
++                if (previousEnd != null && from.isBefore(previousEnd)) {
++                    throw new BizException(400, "员工相邻排班工作时段重叠，请调整排班");
++                }
++                previousEnd = period.endAt().isBefore(endAt) ? period.endAt() : endAt;
++                minutes = Math.addExact(minutes, overlap);
++            }
++        }
++        return minutes;
++    }
++
++    private List<AttendanceWorkPeriod> resolveWorkPeriods(LocalDate date, AttendanceGroupRow group, AttendanceScheduleRow schedule) {
++        Long calendarId = schedule != null && schedule.calendarId() != null ? schedule.calendarId() : group.calendarId();
++        AttendanceCalendarRow calendar = attendanceRepository.getCalendarOrThrow(calendarId);
++        if (!STATUS_ACTIVE.equals(calendar.status())) throw new BizException(400, "工作日历已停用");
++        Boolean workday = attendanceRepository.findCalendarWorkday(calendarId, date);
++        if (Boolean.FALSE.equals(workday) || (workday == null && schedule == null && date.getDayOfWeek().getValue() > 5)) {
++            return List.of();
++        }
++        Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
++        if (shiftId == null) throw new BizException(400, "未配置有效班次");
++        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
++        if (!STATUS_ACTIVE.equals(shift.status())) throw new BizException(400, "班次已停用");
++        List<AttendanceWorkPeriod> periods = attendanceRepository.listShiftWorkPeriods(shiftId, date);
++        if (periods.isEmpty()) throw new BizException(400, "班次未配置工作时段");
++        return periods;
+     }
+ 
+     @Transactional(rollbackFor = Exception.class)
+@@ -439,6 +494,21 @@
+         recalculateDailyResult(userId, workDate);
+     }
+ 
++    @Transactional(rollbackFor = Exception.class)
++    public void recalculateDailyResultsForApprovedLeave(Long userId, LocalDateTime startAt, LocalDateTime endAt) {
++        LocalDate firstDate = startAt.toLocalDate();
++        LocalDate previousDate = firstDate.minusDays(1);
++        AttendanceGroupRow previousGroup = attendanceRepository.getEffectiveGroupForUpdate(userId, previousDate);
++        if (previousGroup != null && resolveWorkPeriods(previousDate, previousGroup,
++                attendanceRepository.getActiveSchedule(userId, previousDate)).stream()
++                .anyMatch(period -> period.overlapMinutes(startAt, endAt) > 0)) {
++            firstDate = previousDate;
++        }
++        for (LocalDate date = firstDate; date.atStartOfDay().isBefore(endAt); date = date.plusDays(1)) {
++            recalculateDailyResult(userId, date);
++        }
++    }
++
+     // 补卡审批通过后，插入虚拟打卡记录并重算当天考勤
+     @Transactional(rollbackFor = Exception.class)
+     public void applyApprovedClockCorrection(Long userId,
+@@ -482,19 +552,30 @@
+         Long scheduleId = schedule == null ? null : schedule.scheduleId();
+         // 没有特殊排班就用考勤组的默认班次
+         Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
+-        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
+-        LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
+-        LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
++        List<AttendanceWorkPeriod> periods = resolveWorkPeriods(workDate, group, schedule);
++        if (periods.isEmpty()) {
++            AttendanceDailyResultRow row = upsertDailyResult(userId, workDate, scheduleId, group.groupId(), shiftId,
++                "REST", 0, 0, 0, 0, false);
++            rebuildExceptions(row, 0, 0, 0);
++            return attendanceRepository.getDailyResult(userId, workDate);
++        }
++        LocalDateTime expectedStart = periods.get(0).startAt();
++        LocalDateTime expectedEnd = periods.get(periods.size() - 1).endAt();
++        boolean crossDay = expectedEnd.toLocalDate().isAfter(workDate);
++        LocalDateTime firstPunchAt = crossDay
++            ? attendanceRepository.getPunchAtInPeriod(userId, workDate.atStartOfDay(), expectedEnd, PUNCH_TYPE_ON_DUTY)
++            : attendanceRepository.getFirstPunchAt(userId, workDate);
++        LocalDateTime lastPunchAt = crossDay
++            ? attendanceRepository.getPunchAtInPeriod(userId, expectedStart, expectedEnd.toLocalDate().plusDays(1).atStartOfDay(), PUNCH_TYPE_OFF_DUTY)
++            : attendanceRepository.getLastPunchAt(userId, workDate);
+         // 获取当天已审批通过的请假时段，用于抵扣迟到/早退/缺勤
+-        List<ApprovedLeavePeriod> approvedLeavePeriods =
+-            leaveService.listApprovedLeavePeriodsOnDate(userId, workDate);
+-        int requiredWorkMinutes = minutesBetween(shift.startTime(), shift.endTime());
+-        int approvedLeaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(
+-            approvedLeavePeriods,
+-            workDate,
+-            shift.startTime(),
+-            shift.endTime()
+-        );
++        List<ApprovedLeavePeriod> approvedLeavePeriods = new ArrayList<>(leaveService.listApprovedLeavePeriodsOnDate(userId, workDate));
++        if (expectedEnd.toLocalDate().isAfter(workDate)) {
++            approvedLeavePeriods.addAll(leaveService.listApprovedLeavePeriodsOnDate(userId, expectedEnd.toLocalDate()));
++        }
++        int requiredWorkMinutes = periods.stream().mapToInt(AttendanceWorkPeriod::minutes).sum();
++        int approvedLeaveCoveredMinutes = periods.stream().mapToInt(period ->
++            calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, period.startAt(), period.endAt())).sum();
+         // 请假覆盖了全部应出勤时间，直接标记为请假状态
+         if (approvedLeaveCoveredMinutes >= requiredWorkMinutes) {
+             AttendanceDailyResultRow row = upsertDailyResult(
+@@ -514,29 +595,31 @@
+             return attendanceRepository.getDailyResult(userId, workDate);
+         }
+ 
+-        int lateMinutes = calculateLateMinutes(
+-            firstPunchAt,
+-            workDate,
+-            shift.startTime(),
+-            group.lateGraceMinutes(),
+-            approvedLeavePeriods
+-        );
+-        int earlyLeaveMinutes = calculateEarlyLeaveMinutes(
+-            lastPunchAt,
+-            workDate,
+-            shift.endTime(),
+-            group.earlyLeaveGraceMinutes(),
+-            approvedLeavePeriods
+-        );
+-        int absenceMinutes = calculateAbsenceMinutes(
+-            firstPunchAt,
+-            lastPunchAt,
+-            workDate,
+-            shift.startTime(),
+-            shift.endTime(),
+-            approvedLeavePeriods
+-        );
+-        int workMinutes = calculateWorkMinutes(firstPunchAt, lastPunchAt);
++        int lateMinutes = 0;
++        int earlyLeaveMinutes = 0;
++        int absenceMinutes = 0;
++        int workMinutes = 0;
++        int missingHalfMinutes = requiredWorkMinutes / 2;
++        int precedingMinutes = 0;
++        for (AttendanceWorkPeriod period : periods) {
++            LocalDateTime lateStart = expectedStart.plusMinutes(group.lateGraceMinutes());
++            LocalDateTime earlyEnd = expectedEnd.minusMinutes(group.earlyLeaveGraceMinutes());
++            if (firstPunchAt != null) {
++                lateMinutes += uncoveredWorkMinutes(period, lateStart, firstPunchAt, approvedLeavePeriods);
++            }
++            if (lastPunchAt != null) {
++                earlyLeaveMinutes += uncoveredWorkMinutes(period, lastPunchAt, earlyEnd, approvedLeavePeriods);
++            }
++            if (firstPunchAt == null && lastPunchAt == null) {
++                absenceMinutes += period.minutes() - calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, period.startAt(), period.endAt());
++            } else if (firstPunchAt == null || lastPunchAt == null) {
++                int from = firstPunchAt == null ? 0 : Math.max(0, missingHalfMinutes - precedingMinutes);
++                int to = firstPunchAt == null ? Math.min(period.minutes(), missingHalfMinutes - precedingMinutes) : period.minutes();
++                if (to > from) absenceMinutes += uncoveredWorkMinutes(period, period.startAt().plusMinutes(from), period.startAt().plusMinutes(to), approvedLeavePeriods);
++            }
++            if (firstPunchAt != null && lastPunchAt != null) workMinutes += period.overlapMinutes(firstPunchAt, lastPunchAt);
++            precedingMinutes += period.minutes();
++        }
+         boolean exceptionFlag = lateMinutes > 0 || earlyLeaveMinutes > 0 || absenceMinutes > 0;
+         String resultStatus = exceptionFlag ? RESULT_ABNORMAL : RESULT_NORMAL;
+ 
+@@ -635,6 +718,14 @@
+         }
+     }
+ 
++    private int uncoveredWorkMinutes(AttendanceWorkPeriod period, LocalDateTime start, LocalDateTime end,
++                                     List<ApprovedLeavePeriod> leaves) {
++        LocalDateTime from = start.isAfter(period.startAt()) ? start : period.startAt();
++        LocalDateTime to = end.isBefore(period.endAt()) ? end : period.endAt();
++        if (!to.isAfter(from)) return 0;
++        return period.overlapMinutes(from, to) - calculateApprovedLeaveCoveredMinutes(leaves, from, to);
++    }
++
+     private int calculateLateMinutes(LocalDateTime firstPunchAt,
+                                      LocalDate workDate,
+                                      LocalTime startTime,
+@@ -978,6 +1069,7 @@
+         if (RESULT_ABNORMAL.equals(value)) return "异常";
+         if (RESULT_NO_RULE.equals(value)) return "未设置规则";
+         if (RESULT_LEAVE.equals(value)) return "请假";
++        if ("REST".equals(value)) return "休息";
+         return "未知结果";
+     }
+ 
+--- a/server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java
++++ b/server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java
+@@ -94,6 +94,50 @@
+             """,
+             this::mapCalendar
+         );
++    }
++
++    public Boolean findCalendarWorkday(Long calendarId, LocalDate workDate) {
++        List<Boolean> days = jdbcTemplate.query("""
++            SELECT is_workday FROM att_work_calendar_day
++            WHERE calendar_id = ? AND work_date = ?
++            """, (rs, rowNum) -> rs.getBoolean("is_workday"), calendarId, workDate);
++        return days.isEmpty() ? null : days.get(0);
++    }
++
++    public List<AttendanceWorkPeriod> listShiftWorkPeriods(Long shiftId, LocalDate workDate) {
++        List<LocalTime[]> segments = jdbcTemplate.query("""
++            SELECT start_time, end_time FROM att_shift_segment
++            WHERE shift_id = ? ORDER BY segment_no, id
++            """, (rs, rowNum) -> new LocalTime[]{rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime()}, shiftId);
++        List<AttendanceWorkPeriod> periods = new ArrayList<>();
++        LocalDate segmentDate = workDate;
++        LocalDateTime previousStart = null;
++        for (LocalTime[] segment : segments) {
++            LocalDateTime start = segmentDate.atTime(segment[0]);
++            if (previousStart != null && start.isBefore(previousStart)) {
++                segmentDate = segmentDate.plusDays(1);
++                start = segmentDate.atTime(segment[0]);
++            }
++            LocalDateTime end = segmentDate.atTime(segment[1]);
++            if (!end.isAfter(start)) end = end.plusDays(1);
++            if (!periods.isEmpty() && start.isBefore(periods.get(periods.size() - 1).endAt())) {
++                throw new BizException(400, "班次工作时段重叠，请调整班次");
++            }
++            periods.add(new AttendanceWorkPeriod(start, end));
++            previousStart = start;
++        }
++        return periods;
++    }
++
++    public LocalDateTime getPunchAtInPeriod(Long userId, LocalDateTime startAt, LocalDateTime endAt, String punchType) {
++        List<LocalDateTime> punches = jdbcTemplate.query("""
++            SELECT punch_at FROM att_punch_record
++            WHERE user_id = ? AND punch_at >= ? AND punch_at <= ?
++              AND punch_type = ? AND status = 'NORMAL'
++            ORDER BY punch_at
++            """, (rs, rowNum) -> rs.getTimestamp("punch_at").toLocalDateTime(), userId, startAt, endAt, punchType);
++        if (punches.isEmpty()) return null;
++        return "ON_DUTY".equals(punchType) ? punches.get(0) : punches.get(punches.size() - 1);
+     }
+ 
+     public boolean existsShiftCode(String shiftCode) {
+--- a/server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java
++++ b/server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java
+@@ -24,6 +24,7 @@
+ import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
+ import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
+ import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
++import com.workforcehub.workflow.dto.LeaveDurationResponse;
+ import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
+ import com.workforcehub.workflow.dto.WorkflowGenericDetailResponse;
+ import com.workforcehub.workflow.dto.WorkflowLeaveDetailResponse;
+@@ -62,10 +63,8 @@
+ import org.springframework.transaction.annotation.Transactional;
+ import org.springframework.util.StringUtils;
+ 
+-import java.time.Duration;
+ import java.time.LocalDate;
+ import java.time.LocalDateTime;
+-import java.time.LocalTime;
+ import java.time.format.DateTimeFormatter;
+ import java.util.HashMap;
+ import java.util.LinkedHashSet;
+@@ -101,11 +100,6 @@
+         "BORROW",
+         "PROJECT"
+     );
+-    private static final long HALF_DAY_MINUTES = 240L;
+-    private static final LocalTime WORK_START = LocalTime.of(9, 0);
+-    private static final LocalTime LUNCH_BREAK_START = LocalTime.of(12, 0);
+-    private static final LocalTime LUNCH_BREAK_END = LocalTime.of(13, 0);
+-    private static final LocalTime WORK_END = LocalTime.of(18, 0);
+     private static final DateTimeFormatter REQUEST_NO_TIME_FORMATTER =
+         DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+ 
+@@ -827,12 +821,7 @@
+ 
+     // 请假审批通过后，重新计算请假期间每天的考勤结果
+     private void recalculateAttendanceForApprovedLeave(Long userId, WorkflowLeaveDetailRow leaveDetail) {
+-        LocalDate workDate = leaveDetail.startAt().toLocalDate();
+-        LocalDate endDate = leaveDetail.endAt().toLocalDate();
+-        while (!workDate.isAfter(endDate)) {
+-            attendanceService.recalculateDailyResultForExternalEvent(userId, workDate);
+-            workDate = workDate.plusDays(1);
+-        }
++        attendanceService.recalculateDailyResultsForApprovedLeave(userId, leaveDetail.startAt(), leaveDetail.endAt());
+     }
+ 
+     private void ensureRequestParticipant(Long requestId, Long userId) {
+@@ -901,7 +890,10 @@
+         if (!request.getEndAt().isAfter(request.getStartAt())) {
+             throw new BizException(400, "结束时间必须晚于开始时间");
+         }
+-        long actualDurationMinutes = roundLeaveDurationMinutes(calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt()));
++        long actualDurationMinutes = calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt());
++        if (actualDurationMinutes <= 0) {
++            throw new BizException(400, "请假期间没有应出勤工作时间");
++        }
+         if (actualDurationMinutes != request.getDurationMinutes()) {
+             throw new BizException(400, "请假时长与开始结束时间不一致");
+         }
+@@ -927,35 +919,13 @@
+         }
+     }
+ 
++    @Transactional
++    public LeaveDurationResponse previewLeaveDuration(LocalDateTime startAt, LocalDateTime endAt) {
++        return new LeaveDurationResponse(Math.toIntExact(calculateLeaveDurationMinutes(startAt, endAt)));
++    }
++
+     private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
+-        long durationMinutes = 0;
+-        LocalDate currentDate = startAt.toLocalDate();
+-        LocalDate endDate = endAt.toLocalDate();
+-        while (!currentDate.isAfter(endDate)) {
+-            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(WORK_START), currentDate.atTime(LUNCH_BREAK_START));
+-            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(LUNCH_BREAK_END), currentDate.atTime(WORK_END));
+-            currentDate = currentDate.plusDays(1);
+-        }
+-        return durationMinutes;
+-    }
+-
+-    private long roundLeaveDurationMinutes(long durationMinutes) {
+-        if (durationMinutes <= 0) {
+-            return 0;
+-        }
+-        return ((durationMinutes + HALF_DAY_MINUTES - 1) / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
+-    }
+-
+-    private long overlapMinutes(LocalDateTime rangeStart,
+-                                LocalDateTime rangeEnd,
+-                                LocalDateTime segmentStart,
+-                                LocalDateTime segmentEnd) {
+-        LocalDateTime overlapStart = rangeStart.isAfter(segmentStart) ? rangeStart : segmentStart;
+-        LocalDateTime overlapEnd = rangeEnd.isBefore(segmentEnd) ? rangeEnd : segmentEnd;
+-        if (!overlapEnd.isAfter(overlapStart)) {
+-            return 0;
+-        }
+-        return Duration.between(overlapStart, overlapEnd).toMinutes();
++        return attendanceService.calculateLeaveDurationMinutes(CurrentUserHolder.requireUserId(), startAt, endAt);
+     }
+ 
+     private WorkflowTodoResponse toTodoResponse(WorkflowTodoRow row) {
+--- a/server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java
++++ b/server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java
+@@ -9,6 +9,7 @@
+ import com.workforcehub.file.dto.DownloadTicketResponse;
+ import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
+ import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
++import com.workforcehub.workflow.dto.LeaveDurationResponse;
+ import com.workforcehub.workflow.dto.WorkflowRequestCreateResponse;
+ import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
+ import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
+@@ -37,6 +38,8 @@
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
++import java.time.LocalDateTime;
++import org.springframework.format.annotation.DateTimeFormat;
+ 
+ /**
+  * 员工端审批流程接口。
+@@ -54,6 +57,14 @@
+                                       FileDownloadResponseFactory downloadResponseFactory) {
+         this.workflowService = workflowService;
+         this.downloadResponseFactory = downloadResponseFactory;
++    }
++
++    @Operation(summary = "计算请假工作时长", operationId = "previewLeaveDuration")
++    @GetMapping("/leave-duration")
++    public R<LeaveDurationResponse> leaveDuration(
++            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startAt,
++            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endAt) {
++        return R.ok(workflowService.previewLeaveDuration(startAt, endAt));
+     }
+ 
+     @Operation(summary = "提交请假申请", operationId = "submitLeaveRequest")
+--- /dev/null
++++ b/server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java
+@@ -0,0 +1,16 @@
++package com.workforcehub.attendance.repository;
++
++import java.time.Duration;
++import java.time.LocalDateTime;
++
++public record AttendanceWorkPeriod(LocalDateTime startAt, LocalDateTime endAt) {
++    public int overlapMinutes(LocalDateTime start, LocalDateTime end) {
++        LocalDateTime from = startAt.isAfter(start) ? startAt : start;
++        LocalDateTime to = endAt.isBefore(end) ? endAt : end;
++        return to.isAfter(from) ? Math.toIntExact(Duration.between(from, to).toMinutes()) : 0;
++    }
++
++    public int minutes() {
++        return Math.toIntExact(Duration.between(startAt, endAt).toMinutes());
++    }
++}
+--- /dev/null
++++ b/server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java
+@@ -0,0 +1,4 @@
++package com.workforcehub.workflow.dto;
++
++public record LeaveDurationResponse(int durationMinutes) {
++}
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java
+@@ -0,0 +1,200 @@
++package com.workforcehub.attendance;
++
++import com.workforcehub.attendance.repository.*;
++import com.workforcehub.attendance.service.AttendanceService;
++import com.workforcehub.auth.security.WfhUserDetails;
++import com.workforcehub.common.exception.BizException;
++import com.workforcehub.leave.repository.ApprovedLeavePeriod;
++import com.workforcehub.leave.service.LeaveService;
++import com.workforcehub.workflow.controller.EmployeeWorkflowController;
++import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
++import com.workforcehub.workflow.repository.WorkflowRepository;
++import com.workforcehub.workflow.service.WorkflowService;
++import org.junit.jupiter.api.*;
++import org.springframework.beans.factory.ObjectProvider;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.security.core.context.SecurityContextHolder;
++import org.springframework.test.web.servlet.setup.MockMvcBuilders;
++
++import java.lang.reflect.InvocationTargetException;
++import java.time.*;
++import java.util.*;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.*;
++import static org.mockito.Mockito.*;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++class LeaveWorkingTimeTest {
++    JdbcTemplate jdbc;
++    AttendanceRepository repository;
++    AttendanceService attendance;
++    LeaveService leave;
++    WorkflowService workflow;
++
++    @BeforeEach
++    void setup() {
++        jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:working_" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""));
++        jdbc.execute("CREATE TABLE org_user(id BIGINT, employee_no VARCHAR, real_name VARCHAR)");
++        jdbc.execute("CREATE TABLE att_work_calendar(id BIGINT, calendar_code VARCHAR, calendar_name VARCHAR, calendar_type VARCHAR, status VARCHAR, is_deleted INT DEFAULT 0)");
++        jdbc.execute("CREATE TABLE att_work_calendar_day(id BIGINT, calendar_id BIGINT, work_date DATE, is_workday INT)");
++        jdbc.execute("CREATE TABLE att_shift(id BIGINT, shift_code VARCHAR, shift_name VARCHAR, status VARCHAR, is_deleted INT DEFAULT 0)");
++        jdbc.execute("CREATE TABLE att_shift_segment(id BIGINT, shift_id BIGINT, segment_no INT, start_time TIME, end_time TIME, on_duty_punch_start TIME, on_duty_punch_end TIME, off_duty_punch_start TIME, off_duty_punch_end TIME)");
++        jdbc.execute("CREATE TABLE att_group(id BIGINT, group_code VARCHAR, group_name VARCHAR, calendar_id BIGINT, default_shift_id BIGINT, late_grace_minutes INT DEFAULT 0, early_leave_grace_minutes INT DEFAULT 0, status VARCHAR, is_deleted INT DEFAULT 0)");
++        jdbc.execute("CREATE TABLE att_group_member(id BIGINT, group_id BIGINT, user_id BIGINT, effective_from DATE, effective_to DATE, status VARCHAR)");
++        jdbc.execute("CREATE TABLE att_schedule(id BIGINT, user_id BIGINT, work_date DATE, shift_id BIGINT, calendar_id BIGINT, schedule_source VARCHAR, status VARCHAR)");
++        jdbc.execute("CREATE TABLE att_punch_record(user_id BIGINT, punch_at TIMESTAMP, punch_type VARCHAR, status VARCHAR)");
++        jdbc.update("INSERT INTO att_work_calendar VALUES(2,'C','C','STANDARD','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift VALUES(3,'S','S','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'09:00:00','12:00:00'),(2,3,2,'13:00:00','18:00:00')");
++        jdbc.update("INSERT INTO att_group(id,group_code,group_name,calendar_id,default_shift_id,status) VALUES(4,'G','G',2,3,'ACTIVE')");
++        jdbc.update("INSERT INTO att_group_member VALUES(5,4,1,'2026-01-01',NULL,'ACTIVE')");
++        repository = spy(new AttendanceRepository(jdbc));
++        leave = mock(LeaveService.class);
++        ObjectProvider<Clock> clocks = mock(ObjectProvider.class);
++        when(clocks.getIfAvailable(any())).thenReturn(Clock.systemUTC());
++        attendance = new AttendanceService(repository, leave, clocks, null, null);
++        WorkflowRepository workflows = mock(WorkflowRepository.class);
++        when(workflows.existsActiveLeaveType(2L)).thenReturn(true);
++        workflow = new WorkflowService(workflows,null,null,null,null,null,leave,attendance,null,null,null);
++        WfhUserDetails principal = mock(WfhUserDetails.class);
++        when(principal.getUserId()).thenReturn(1L);
++        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,List.of()));
++    }
++
++    @AfterEach
++    void close() { SecurityContextHolder.clearContext(); jdbc.execute("SHUTDOWN"); }
++
++    int minutes(String start, String end) { return attendance.calculateLeaveDurationMinutes(1L, LocalDateTime.parse(start), LocalDateTime.parse(end)); }
++
++    @Test
++    void actualMinutesExcludeLunchAndMeasureUnequalHalfDays() {
++        assertEquals(480,minutes("2026-05-07T09:00", "2026-05-07T18:00"));
++        assertEquals(180,minutes("2026-05-07T09:00", "2026-05-07T12:00"));
++        assertEquals(300,minutes("2026-05-07T13:00", "2026-05-07T18:00"));
++        assertEquals(0,minutes("2026-05-07T12:00", "2026-05-07T13:00"));
++        assertEquals(120,minutes("2026-05-07T17:00", "2026-05-08T10:00"));
++    }
++
++    @Test
++    void calendarHolidaysAndMakeupDaysOverrideStandardWeek() {
++        assertEquals(0,minutes("2026-05-10T09:00", "2026-05-10T18:00"));
++        jdbc.update("INSERT INTO att_work_calendar_day VALUES(1,2,'2026-05-07',0),(2,2,'2026-05-10',1)");
++        assertEquals(0,minutes("2026-05-07T09:00", "2026-05-07T18:00"));
++        assertEquals(480,minutes("2026-05-10T09:00", "2026-05-10T18:00"));
++    }
++
++    @Test
++    void explicitScheduleUsesItsOwnShiftAndCalendar() {
++        jdbc.update("INSERT INTO att_shift VALUES(6,'ALT','ALT','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(3,6,1,'10:00','14:00'),(4,6,2,'15:00','19:00')");
++        jdbc.update("INSERT INTO att_work_calendar VALUES(7,'ALT','ALT','STANDARD','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_schedule VALUES(8,1,'2026-05-10',6,7,'MANUAL','ACTIVE')");
++        assertEquals(420,minutes("2026-05-10T10:00", "2026-05-10T18:00"));
++        jdbc.update("INSERT INTO att_work_calendar_day VALUES(9,7,'2026-05-10',0)");
++        assertEquals(0,minutes("2026-05-10T10:00", "2026-05-10T19:00"));
++    }
++
++    @Test
++    void overnightShiftIncludesPreviousWorkDateAndMidnightBreak() {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','02:00'),(2,3,2,'03:00','06:00')");
++        assertEquals(420,minutes("2026-05-08T22:00", "2026-05-09T06:00"));
++        assertEquals(240,minutes("2026-05-09T01:00", "2026-05-09T06:00"));
++        assertEquals(0,minutes("2026-05-09T02:00", "2026-05-09T03:00"));
++    }
++
++    @Test
++    void midnightEndDoesNotRequireNextDaysConfiguration() {
++        jdbc.update("INSERT INTO att_schedule VALUES(8,1,'2026-05-08',999,2,'MANUAL','ACTIVE')");
++        assertEquals(60,minutes("2026-05-07T17:00", "2026-05-08T00:00"));
++    }
++
++    @Test
++    void overlappingAdjacentWorkDatesAreRejectedBeforeChargingLeave() {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','06:00')");
++        jdbc.update("INSERT INTO att_shift VALUES(6,'ALT','ALT','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(2,6,1,'05:00','13:00')");
++        jdbc.update("INSERT INTO att_schedule VALUES(8,1,'2026-05-09',6,2,'MANUAL','ACTIVE')");
++        BizException error = assertThrows(BizException.class,()->minutes("2026-05-08T22:00", "2026-05-09T07:00"));
++        assertEquals("员工相邻排班工作时段重叠，请调整排班",error.getMessage());
++    }
++
++    @Test
++    void invalidOrUnconfiguredPeriodsFailExplicitly() {
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00", "2026-05-07T09:00"));
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00:01", "2026-05-07T11:00"));
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00", "2027-05-09T10:00"));
++        jdbc.update("DELETE FROM att_group_member");
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00", "2026-05-07T11:00"));
++    }
++
++    @Test
++    void previewIsAuthenticatedAndSubmissionRecalculatesRatherThanTrustingClient() throws Exception {
++        MockMvcBuilders.standaloneSetup(new EmployeeWorkflowController(workflow,null)).build()
++            .perform(get("/api/employee/workflow/leave-duration").param("startAt","2026-05-07T13:00:00").param("endAt","2026-05-07T18:00:00"))
++            .andExpect(status().isOk()).andExpect(jsonPath("$.data.durationMinutes").value(300));
++        var validate = WorkflowService.class.getDeclaredMethod("validateLeaveRequest", LeaveRequestCreateRequest.class);
++        validate.setAccessible(true);
++        LeaveRequestCreateRequest request = new LeaveRequestCreateRequest();
++        request.setStartAt(LocalDateTime.parse("2026-05-07T13:00")); request.setEndAt(LocalDateTime.parse("2026-05-07T18:00"));
++        request.setLeaveTypeId(2L); request.setDurationMinutes(300);
++        validate.invoke(workflow,request);
++        verify(leave).ensureLeaveRequestBalance(1L,2L,300);
++        request.setDurationMinutes(480);
++        assertInstanceOf(BizException.class, assertThrows(InvocationTargetException.class,()->validate.invoke(workflow,request)).getCause());
++        request.setStartAt(LocalDateTime.parse("2026-05-10T09:00")); request.setEndAt(LocalDateTime.parse("2026-05-10T18:00")); request.setDurationMinutes(0);
++        assertInstanceOf(BizException.class, assertThrows(InvocationTargetException.class,()->validate.invoke(workflow,request)).getCause());
++        SecurityContextHolder.clearContext();
++        assertThrows(BizException.class,()->workflow.previewLeaveDuration(request.getStartAt(),request.getEndAt()));
++    }
++
++    @Test
++    void dailyAttendanceUsesSamePeriodsForWorkAbsenceAndApprovedLeave() throws Exception {
++        doReturn(null).when(repository).getDailyResult(anyLong(),any());
++        doReturn(null).when(repository).getDailyResultForUpdate(anyLong(),any());
++        doReturn(List.of()).when(repository).listExceptionsByDailyResultId(any());
++        doNothing().when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        var row = mock(AttendanceDailyResultRow.class);
++        when(row.dailyResultId()).thenReturn(100L);
++        doReturn(row).when(repository).getDailyResultForUpdate(anyLong(),any());
++        when(leave.listApprovedLeavePeriodsOnDate(eq(1L),any())).thenReturn(List.of(new ApprovedLeavePeriod(LocalDateTime.parse("2026-05-07T09:00"),LocalDateTime.parse("2026-05-07T10:00"))));
++        var recalc = AttendanceService.class.getDeclaredMethod("recalculateDailyResult",Long.class,LocalDate.class); recalc.setAccessible(true);
++        // Avoid publishing exceptions; verify the real computed upsert before rebuilding exceptions.
++        doThrow(new IllegalStateException("observed")).when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-07")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),any(),isNull(),eq(4L),eq(3L),eq("ABNORMAL"),eq(0),eq(0),eq(420),eq(0),eq(true),any());
++        jdbc.update("INSERT INTO att_punch_record VALUES(1,'2026-05-07 06:00:00','ON_DUTY','NORMAL'),(1,'2026-05-07 21:00:00','OFF_DUTY','NORMAL')");
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-07")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),any(),isNull(),eq(4L),eq(3L),eq("NORMAL"),eq(0),eq(0),eq(0),eq(480),eq(false),any());
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-10")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),any(),isNull(),eq(4L),eq(3L),eq("REST"),eq(0),eq(0),eq(0),eq(0),eq(false),any());
++    }
++
++    @Test
++    void overnightDailyAttendanceFindsNextDayPunchAndExcludesBreak() throws Exception {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','02:00'),(2,3,2,'03:00','06:00')");
++        jdbc.update("INSERT INTO att_punch_record VALUES(1,'2026-05-08 21:30:00','ON_DUTY','NORMAL'),(1,'2026-05-09 06:30:00','OFF_DUTY','NORMAL')");
++        doThrow(new IllegalStateException("observed")).when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        var recalc = AttendanceService.class.getDeclaredMethod("recalculateDailyResult",Long.class,LocalDate.class); recalc.setAccessible(true);
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-08")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),eq(LocalDate.parse("2026-05-08")),isNull(),eq(4L),eq(3L),eq("NORMAL"),eq(0),eq(0),eq(0),eq(420),eq(false),any());
++    }
++
++    @Test
++    void afterMidnightApprovalRecalculatesPreviousWorkDate() {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','02:00'),(2,3,2,'03:00','06:00')");
++        var start = LocalDateTime.parse("2026-05-09T01:00");
++        var end = LocalDateTime.parse("2026-05-09T06:00");
++        when(leave.listApprovedLeavePeriodsOnDate(eq(1L),any())).thenReturn(List.of(new ApprovedLeavePeriod(start,end)));
++        doThrow(new IllegalStateException("observed")).when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        assertThrows(IllegalStateException.class,()->attendance.recalculateDailyResultsForApprovedLeave(1L,start,end));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),eq(LocalDate.parse("2026-05-08")),isNull(),eq(4L),eq(3L),eq("ABNORMAL"),eq(0),eq(0),eq(180),eq(0),eq(true),any());
++    }
++}
+--- a/server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java
++++ b/server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java
+@@ -104,6 +104,12 @@
+         populator.setSqlScriptEncoding("UTF-8");
+         populator.addScript(resolveSeedScript());
+         DatabasePopulatorUtils.execute(populator, dataSource);
++        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
++        jdbc.update("INSERT INTO att_work_calendar(id,calendar_code,calendar_name,calendar_type,status) VALUES(9801,'CAL_WORKFLOW_BASE','审批计时日历','STANDARD','ACTIVE')");
++        jdbc.update("INSERT INTO att_shift(id,shift_code,shift_name,status) VALUES(9802,'SHIFT_WORKFLOW_BASE','审批计时班次','ACTIVE')");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(9803,9802,1,'09:00:00','12:00:00'),(9806,9802,2,'13:00:00','18:00:00')");
++        jdbc.update("INSERT INTO att_group(id,group_code,group_name,calendar_id,default_shift_id,status) VALUES(9804,'GROUP_WORKFLOW_BASE','审批计时考勤组',9801,9802,'ACTIVE')");
++        jdbc.update("INSERT INTO att_group_member(id,group_id,user_id,effective_from,source_type,status) VALUES(9805,9804,2003,'2000-01-01','MANUAL','ACTIVE')");
+     }
+ 
+     protected ResultMatcher jsonLong(String expression, long expected) {
+--- a/server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java
++++ b/server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java
+@@ -248,7 +248,7 @@
+             .andExpect(jsonPath("$.data", hasSize(1)))
+             .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"))
+             .andExpect(jsonPath("$.data[0].exceptionFlag").value(false))
+-            .andExpect(jsonPath("$.data[0].workMinutes").value(540));
++            .andExpect(jsonPath("$.data[0].workMinutes").value(480));
+     }
+ 
+     @Test
+@@ -553,8 +553,8 @@
+     }
+ 
+     @Test
+-    @DisplayName("请假时长按半天向上取整")
+-    void leaveRequestShouldRoundUpToHalfDay() throws Exception {
++    @DisplayName("跨日请假按实际工作分钟累计")
++    void leaveRequestShouldUseActualWorkingMinutes() throws Exception {
+         Cookie employeeSession = loginEmployee();
+         Long annualLeaveTypeId = seedWorkflowAndLeaveType();
+ 
+@@ -566,8 +566,8 @@
+                       "leaveTypeId": %d,
+                       "startAt": "2026-05-07 17:00:00",
+                       "endAt": "2026-05-08 10:00:00",
+-                      "durationMinutes": 240,
+-                      "reason": "半天起算"
++                      "durationMinutes": 120,
++                      "reason": "跨日两小时"
+                     }
+                     """.formatted(annualLeaveTypeId)))
+             .andExpect(status().isOk())
+@@ -1268,10 +1268,13 @@
+                  on_duty_punch_start, on_duty_punch_end,
+                  off_duty_punch_start, off_duty_punch_end)
+             VALUES
+-                (9703, 9702, 1, '09:00:00', '18:00:00',
++                (9703, 9702, 1, '09:00:00', '12:00:00',
+                  '08:00:00', '10:00:00',
+-                 '17:00:00', '19:00:00')
++                 '17:00:00', '19:00:00'),
++                (9706, 9702, 2, '13:00:00', '18:00:00',
++                 '12:00:00', '14:00:00', '17:00:00', '19:00:00')
+             """);
++        jdbcTemplate.update("INSERT INTO att_work_calendar_day(id,calendar_id,work_date,day_type,is_workday) VALUES(9707,9701,'2026-05-16','WORKDAY',1)");
+         jdbcTemplate.update("""
+             INSERT INTO att_group
+                 (id, group_code, group_name, calendar_id, default_shift_id,
+--- a/server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java
++++ b/server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java
+@@ -269,7 +269,7 @@
+             leaveTypeId,
+             "2026-05-07 09:00:00",
+             "2026-05-07 10:00:00",
+-            240,
++            60,
+             "上午临时请假一小时"
+         );
+         approveManagerTask(managerSession, scenario.managerTask().getId());
+@@ -282,7 +282,7 @@
+             .andExpect(jsonPath("$.code").value(0))
+             .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+             .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
+-            .andExpect(jsonPath("$.data[0].absenceMinutes").value(480));
++            .andExpect(jsonPath("$.data[0].absenceMinutes").value(420));
+ 
+         assertEquals(1L, attendanceExceptionCount());
+     }
+@@ -301,15 +301,15 @@
+                     leaveTypeId,
+                     "2026-05-07 17:00:00",
+                     "2026-05-08 10:00:00",
+-                    240,
++                    120,
+                     "跨天请假"
+                 )))
+             .andExpect(status().isOk())
+             .andExpect(jsonPath("$.code").value(0))
+             .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"));
+ 
+-        assertEquals(720, availableMinutes(leaveTypeId));
+-        assertEquals(240, frozenMinutes(leaveTypeId));
++        assertEquals(840, availableMinutes(leaveTypeId));
++        assertEquals(120, frozenMinutes(leaveTypeId));
+     }
+ 
+     @Test
+@@ -326,7 +326,7 @@
+             leaveTypeId,
+             "2026-05-07 09:00:00",
+             "2026-05-07 10:00:00",
+-            240,
++            60,
+             "上午临时请假一小时"
+         );
+         approveManagerTask(managerSession, firstScenario.managerTask().getId());
+@@ -335,7 +335,7 @@
+             leaveTypeId,
+             "2026-05-07 09:30:00",
+             "2026-05-07 10:30:00",
+-            240,
++            60,
+             "继续请假一小时"
+         );
+         approveManagerTask(managerSession, secondScenario.managerTask().getId());
+@@ -348,7 +348,7 @@
+             .andExpect(jsonPath("$.code").value(0))
+             .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+             .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
+-            .andExpect(jsonPath("$.data[0].absenceMinutes").value(450));
++            .andExpect(jsonPath("$.data[0].absenceMinutes").value(390));
+ 
+         assertEquals(1L, attendanceExceptionCount());
+     }
+@@ -367,7 +367,7 @@
+             leaveTypeId,
+             "2026-05-07 09:00:00",
+             "2026-05-07 10:00:00",
+-            240,
++            60,
+             "上午请假一小时"
+         );
+         approveManagerTask(managerSession, morningScenario.managerTask().getId());
+@@ -376,7 +376,7 @@
+             leaveTypeId,
+             "2026-05-07 17:00:00",
+             "2026-05-07 18:00:00",
+-            240,
++            60,
+             "下午请假一小时"
+         );
+         approveManagerTask(managerSession, eveningScenario.managerTask().getId());
+@@ -609,9 +609,11 @@
+                  on_duty_punch_start, on_duty_punch_end,
+                  off_duty_punch_start, off_duty_punch_end)
+             VALUES
+-                (9603, 9602, 1, '09:00:00', '18:00:00',
++                (9603, 9602, 1, '09:00:00', '12:00:00',
+                  '08:00:00', '10:00:00',
+-                 '17:00:00', '19:00:00')
++                 '17:00:00', '19:00:00'),
++                (9606, 9602, 2, '13:00:00', '18:00:00',
++                 '12:00:00', '14:00:00', '17:00:00', '19:00:00')
+             """);
+         jdbcTemplate.update("""
+             INSERT INTO att_group

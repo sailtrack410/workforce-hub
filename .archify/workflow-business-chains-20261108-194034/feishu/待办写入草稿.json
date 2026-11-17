@@ -1,0 +1,491 @@
+{
+  "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0",
+  "parent": {
+    "summary": "Workforce｜第100审业务链路问题整改与验收",
+    "description": "范围：36条业务链路的架构与流程审查。\n待办：26项本轮新问题（6项P1、20项P2）＋6项既有风险跟进＋2项优化建议，共34项。\n执行顺序：权限/会话/邀请码 → 默认入口与下载契约 → 余额/容量/考勤一致性 → Agent及RAG可靠性 → 展示、配置与插件。\n每项先确认复现条件，再修复并按验收条件留证。问题尚未修复；第100审以静态源码追踪为主，未执行真实业务HTTP/数据库复现，历史验证仅在对应条目说明。\n优化建议须先确认产品交付承诺。\n依据：docs/审查/第100审_全业务链路流程图与优化记录.md；历史项沿用第99审及20/3-3编号。",
+    "client_token": "b218311d-7ffa-55bf-90af-f27600436eb8",
+    "tasklists": [
+      {
+        "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+      }
+    ]
+  },
+  "items": [
+    {
+      "review_id": "100-01",
+      "category": "新问题",
+      "data": {
+        "summary": "[P1][100-01][新问题] 当前登录页面未完整处理邮箱认证待续状态",
+        "description": "编号：100-01 / AUTH-01；优先级：P1；类型：新问题\n\n验证状态：静态确认，未执行真实业务调用。尚未修复，待复现/整改/验收。\n\n触发条件：默认开启邮箱二验，首次使用未绑定邮箱的员工账号；或独立hub-web用户需要二验\n\n影响：employee当前页未处理requiresEmailBinding，显示成功后跳转但无Session；独立hub把待二验响应保存为user，前后端认证状态不一致。\n\n证据与边界：当前路由指向HubAuthView；新页只检查requiresEmailCode。employee store同时识别两种待验证响应并不设置user；独立hub store直接赋值。后端两种pending返回发生于写Session之前。\n\n修复方向：当前登录页消费两种pending状态并接通绑定流程；独立hub共用相同认证状态判定。\n\n验收条件：分别用已绑定、未绑定账号验证：pending时无已登录状态；完成BIND/LOGIN后me成功。\n\n代码/文档位置：\nemployee-web/src/router/index.ts:10\nemployee-web/src/hub/views/AuthView.vue:370\nemployee-web/src/stores/session.ts:81\nhub-web/src/stores/session.ts:65\nserver/src/main/java/com/workforcehub/auth/service/LoginService.java:187",
+        "client_token": "ce5db1fe-2a58-5c1b-b681-e09c43e16cb1",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-02",
+      "category": "新问题",
+      "data": {
+        "summary": "[P1][100-02][新问题] 找回密码错误发送LOGIN用途验证码",
+        "description": "编号：100-02 / AUTH-02；优先级：P1；类型：新问题\n\n验证状态：静态确认，未执行真实业务调用。尚未修复，待复现/整改/验收。\n\n触发条件：从当前employee /login页面进入忘记密码，发送验证码后提交重置\n\n影响：发出LOGIN码，重置要求RESET_PASSWORD；未另发正确用途码时始终失败。\n\n证据与边界：sendResetCode直接调用employeeApi.auth.sendLoginCode；LoginService按LOGIN发码；AccountService.resetPassword按RESET_PASSWORD核验。正确的sendPasswordResetCode存在但当前页未调用。\n\n修复方向：当前找回页调用session.sendPasswordResetCode(email)。\n\n验收条件：从实际/login路由发RESET_PASSWORD码；使用该码重置成功，LOGIN码不可重置。\n\n代码/文档位置：\nemployee-web/src/hub/views/AuthView.vue:467\nserver/src/main/java/com/workforcehub/auth/service/LoginService.java:105\nserver/src/main/java/com/workforcehub/auth/service/AccountService.java:122\nemployee-web/src/stores/session.ts:147",
+        "client_token": "e2fbc3e9-de9f-5e48-afb1-cdb665ae261d",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-04",
+      "category": "新问题",
+      "data": {
+        "summary": "[P1][100-04][新问题] 并发注册可重复消费单次邀请码",
+        "description": "编号：100-04 / AUTH-04；优先级：P1；类型：新问题\n\n验证状态：静态并发推导，未运行数据库竞争验证。尚未修复，待复现/整改/验收。\n\n触发条件：两个不同手机号同时提交同一个有效邀请码，各持各自有效短信码\n\n影响：两个事务可能先读到同一邀请码并各建账号；后者核销UPDATE影响0行也返回成功，单次邀请码可被复用。\n\n证据与边界：邀请码SELECT无行锁；markInviteUsed返回void且忽略条件UPDATE影响行数；service无核销成功判断。此项为静态事务交错推导，未运行MySQL并发复现。\n\n修复方向：锁定邀请码行或原子领取并校验更新恰为1行，失败回滚员工和账号创建。\n\n验收条件：两个手机号并发消费同一邀请码恰一成功，另一返回业务冲突且无孤立员工/账号。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java:70\nserver/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java:67\nserver/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java:81",
+        "client_token": "cbc196df-3d46-543c-8768-b8114e4d25e0",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-10",
+      "category": "新问题",
+      "data": {
+        "summary": "[P1][100-10][新问题] 当前员工申请入口未接通提交链",
+        "description": "编号：100-10 / WF-01；优先级：P1；类型：新问题\n\n验证状态：静态确认，入口未接通。尚未修复，待复现/整改/验收。\n\n触发条件：员工在当前审批中心选择请假、费用、加班或用印新申请\n\n影响：仅提示表单即将上线，不调用提交接口；旧WorkbenchSection不能视作当前入口能力\n\n证据与边界：当前路由使用hub/ApprovalsView；pickCreateType只有showToast，无表单提交。未点真实页面。\n\n修复方向：在当前工作台和审批路由接入请假、补卡与通用OA表单、附件和提交后状态跳转。\n\n验收条件：通过当前入口提交各类申请，每次只新增一条；余额不足、无上级、附件越权均显示真实错误。\n\n代码/文档位置：\nemployee-web/src/router/index.ts:46\nemployee-web/src/router/index.ts:78\nemployee-web/src/hub/views/ApprovalsView.vue:232",
+        "client_token": "6646a269-89e3-56f9-8898-d007441d3e17",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-11",
+      "category": "新问题",
+      "data": {
+        "summary": "[P1][100-11][新问题] 余额调整重试不复用幂等键",
+        "description": "编号：100-11 / LV-01；优先级：P1；类型：新问题\n\n验证状态：静态确认，未动态复现。尚未修复，待复现/整改/验收。\n\n触发条件：余额调整已提交，但响应丢失或请求报错后管理员重试同一次调整\n\n影响：每次提交生成新的Date.now幂等key，服务端把重试当作新业务，可能重复调整\n\n证据与边界：后端按sourceTxnKey查询流水并核对指纹；前端每次submitAdjustment均生成新key。未模拟响应丢失。\n\n修复方向：同一编辑意图保留稳定key，重试复用；成功确认或明确新建调整时再换key。\n\n验收条件：服务端提交成功后丢弃首次响应，再重试，同一ADJUST流水只有一条且余额只变一次；同key不同参数拒绝。\n\n代码/文档位置：\nadmin-web/src/views/LeaveGovernanceView.vue:87\nadmin-web/src/views/LeaveGovernanceView.vue:99\nserver/src/main/java/com/workforcehub/leave/service/LeaveService.java:104",
+        "client_token": "9e6aae56-b153-549c-aafe-0b22fde33b23",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-16",
+      "category": "新问题",
+      "data": {
+        "summary": "[P1][100-16][新问题] 知识工具检索未执行空间ACL",
+        "description": "编号：100-16 / IAR-01；优先级：P1；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：有Agent使用权限的员工通过已绑定KNOWLEDGE_SEARCH_CHUNKS查询其无read权限的知识空间。\n\n影响：Agent use授权不能替代知识空间ACL，PRIVATE/部门范围配置可能不约束该工具读链；实际返回取决于配置与文档内容。\n\n证据与边界：Controller直接进入AgentService；上层只检查Agent use。工具对payload.userId作组织授权，但知识工具只传spaceId/query/topK；searchRows无操作者参数，向量SQL仅space_id、is_active和score。kb_space_acl仅在管理端保存/读取，不参与该读链。\n\n修复方向：在知识检索服务统一传入真实操作者，强制空间ACTIVE、visibility及read/manage ACL；管理员测试明确单独受控；文档检索与问答共用同一授权决策。\n\n验收条件：同一私有空间：空间所有者/已授权员工能命中，无read权限但有Agent use权限者收到403；跨部门、ACL撤销及停用空间同测；不得仅在UI隐藏。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/agent/controller/EmployeeAgentController.java:40\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:518\nserver/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java:86\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java:44\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java:60\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java:361",
+        "client_token": "b8433bed-829f-5865-8216-5dbd3e99b482",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "20/3-3",
+      "category": "既有风险",
+      "data": {
+        "summary": "[P1][20/3-3][既有风险] 并发配额检查与实际占额分离",
+        "description": "编号：20/3-3 / 20/3-3；优先级：P1；类型：既有风险\n\n验证状态：历史问题具体复核；静态事务交错推导。尚未修复，待复现/整改/验收。\n\n触发条件：两个不同上传确认或复制事务在同一用户/全局池余量仅容一份时并发执行。\n\n影响：两次可先读到相同已用量并通过校验，之后分别累加，最终超出容量限制。此项延续第20审3-3并发配额治理项，不新增重复编号。\n\n证据与边界：usedBytes是普通SELECT；ensurePersonalQuota/GlobalQuota先比较；increaseUsage后续单独累加且SQL没有quota条件。V4规范化scope_key已解决NULL唯一性，不能重报那个已修模型问题。未跑真实数据库并发。\n\n修复方向：在同事务内按固定顺序锁定作用域用量并校验占额，或条件更新原子占额；覆盖首次创建账本行及多作用域冲突。\n\n验收条件：余量只容一份时并发两次确认/复制仅一成功，另一返回容量错误，拒绝事务无多余引用；重试与回滚不重复占额。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/file/service/FileQuotaPolicyService.java:197\nserver/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java:19\nserver/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java:45\nserver/src/main/java/com/workforcehub/file/service/FileQueryService.java:225\nserver/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java:99",
+        "client_token": "18638461-c04f-5354-9789-32bd706b2e7c",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "99-1",
+      "category": "既有风险",
+      "data": {
+        "summary": "[P1][99-1][既有风险] 未知管理路由默认放行",
+        "description": "编号：99-1；优先级：P1；类型：既有风险\n\n状态：引用第99审已归档证据，未重新执行历史探针；尚未修复。\n\n问题位置：`server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java:33`、`:66`；`AdminAlertController`、`AdminImOutboxController`、`AdminSystemController`\n\n触发条件：已登录管理员没有业务权限，访问未进入 `PATH_PERMISSIONS` 的后台路由。\n\n失败路径与影响：`requiredPermission` 返回空时直接继续过滤链。告警规则、Outbox 投递、系统审计日志等接口缺少对应的权限映射；检查到的 Controller/Service 没有补充同等权限限制。\n\n证据与边界：实际执行过滤器：空权限管理员访问假期路径被拦截，而三类遗漏路径继续执行过滤链。这里的 `status=200` 是 Mock 响应默认状态，证明过滤器放行，不代表真实 HTTP 接口已执行成功。\n\n优化方案：后台业务路由默认拒绝未声明权限的请求，显式补齐权限映射，并增加覆盖所有后台路由的权限矩阵检查。\n\n修复验收：空权限管理员访问遗漏接口返回 403；获得对应权限后才允许执行；超级管理员行为符合既有契约。",
+        "client_token": "293613f0-ae27-579c-8d16-5bcc6815ef19",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "99-2",
+      "category": "既有风险",
+      "data": {
+        "summary": "[P1][99-2][既有风险] 停用撤权未统一失效旧会话",
+        "description": "编号：99-2；优先级：P1；类型：既有风险\n\n状态：引用第99审已归档证据，未重新执行历史探针；尚未修复。\n\n问题位置：`server/src/main/java/com/workforcehub/org/service/OrgManagementService.java:772`；`auth/service/LoginService.java:209`；`auth/service/RbacService.java`；`auth/security/AdminPermissionFilter.java:77`、`UserTypePathFilter.java`\n\n触发条件：用户已登录，随后被停用、离职或撤销管理员权限。\n\n失败路径与影响：认证对象写入 Session；停用或撤权更新数据库，却未见统一清除会话或重新核验权限的机制。过滤器继续使用原身份、角色和权限，旧会话对缺少额外状态校验的接口仍保留访问能力。\n\n证据与边界：静态检查确认了数据库更新、Session 保存和过滤器使用旧权限的路径；本轮没有运行真实数据库上的停用/撤权后请求复现。打卡等另有状态检查的接口不能据此认定同样受影响。\n\n优化方案：统一账号和权限变更后的会话失效机制，或通过认证版本校验拒绝旧会话，同时覆盖已建立的长连接。\n\n修复验收：停用、离职、撤权后，原 Session 和相关长连接不再保留已撤销能力。",
+        "client_token": "284a7b99-1503-5e52-b9f1-ca6eae9ac10b",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "99-3",
+      "category": "既有风险",
+      "data": {
+        "summary": "[P1][99-3][既有风险] 可变假种破坏在途余额结算",
+        "description": "编号：99-3 / 99-3；优先级：P1；类型：既有风险\n\n验证状态：既有问题，沿用第99审编号。尚未修复，待复现/整改/验收。\n\n触发条件：冻结后停用、删除假种或更改balanceMode\n\n影响：终态重新读取当前有效假种/模式，可能阻断结算或跳过冻结处理\n\n证据与边界：冻结、扣减、释放均重新getActiveLeaveTypeOrThrow且按当前NO_DEDUCT跳过；仅引用既有问题，非新发现。\n\n修复方向：提交时固定结算策略，或依据原冻结流水驱动终态结算；停用不影响在途请求。\n\n验收条件：冻结后改模式/状态，再批准、驳回或撤回，按原规则归零冻结且重复请求不二次结算。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/leave/service/LeaveService.java:68\nserver/src/main/java/com/workforcehub/leave/service/LeaveService.java:85\nserver/src/main/java/com/workforcehub/leave/service/LeaveService.java:212\nserver/src/main/java/com/workforcehub/leave/service/LeaveService.java:262\nserver/src/main/java/com/workforcehub/leave/service/LeaveService.java:326",
+        "client_token": "3378f1bb-e8c2-5240-a052-54f459445743",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-03",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-03][新问题] 邮箱验证码比较与核销非原子",
+        "description": "编号：100-03 / AUTH-03；优先级：P2；类型：新问题\n\n验证状态：静态并发推导，未运行Redis竞争验证。尚未修复，待复现/整改/验收。\n\n触发条件：两个并发请求以同一邮箱、用途和正确验证码进入verifyCode\n\n影响：GET/DELETE分离允许两请求先读到相同码并均返回true；不保证一次性核销。\n\n证据与边界：代码顺序为GET→比较→DELETE→true；错误码仅返回false，无尝试次数限制。此项为静态并发推导，未对真实Redis压测。\n\n修复方向：用Redis Lua执行比较与删除，并为邮箱/用途设置有限校验尝试次数。\n\n验收条件：真实Redis并发核验同一码仅一次成功；错误尝试达到阈值后失效，重发/用途隔离仍正确。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/auth/service/EmailCodeService.java:91",
+        "client_token": "d69b7802-a3df-5b72-9074-800abcb88439",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-05",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-05][新问题] 注册短信及前端提交仍为演示或占位",
+        "description": "编号：100-05 / AUTH-05；优先级：P2；类型：新问题\n\n验证状态：静态确认，未执行真实业务调用。尚未修复，待复现/整改/验收。\n\n触发条件：调用公开短信注册发码接口，或用户在当前注册页点击发送短信\n\n影响：后端只演示日志发送且明文记录手机号与验证码；当前employee页面仅本地“已发送”，未调用后端。真实注册交付缺口明确。\n\n证据与边界：公开服务生成/持久化码后sendSms仅log.info；当前employee sendSmsCode仅设置sent与倒计时，独立hub仅toast。服务内未见频控。\n\n修复方向：前端接实际发码/注册接口；生产接短信网关并移除验证码日志，添加现有Redis能力实现的发送频控。\n\n验收条件：供应商接收成功才显示已发送；失败可重试；日志不含验证码；单位时间重复请求被限制；注册成功后明确转登录。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java:39\nserver/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java:89\nemployee-web/src/hub/views/AuthView.vue:410\nhub-web/src/views/AuthView.vue:111",
+        "client_token": "5b7cc218-37ef-5585-abf0-7d74b98b93d4",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-06",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-06][新问题] 后台邮件渠道与认证发信配置分离",
+        "description": "编号：100-06 / AUTH-06；优先级：P2；类型：新问题\n\n验证状态：静态确认，未执行真实业务调用。尚未修复，待复现/整改/验收。\n\n触发条件：管理员保存并测试EMAIL_DEFAULT，期望认证邮件使用该配置\n\n影响：测试可成功但登录/绑定/找回邮件仍走注入JavaMailSender配置，数据库渠道保存不影响认证码发送。\n\n证据与边界：渠道测试新建JavaMailSenderImpl使用请求/数据库参数；EmailCodeService注入JavaMailSender且未查询NotificationChannelRepository。未发送真实SMTP邮件。\n\n修复方向：将认证邮件明确接到已保存邮件渠道，或把配置页面标明只管理测试渠道并提供实际认证渠道状态。\n\n验收条件：更改保存的渠道后，通过实际/login触发认证邮件使用相同配置；断开渠道时两条链均给一致错误。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/system/service/NotificationChannelService.java:63\nserver/src/main/java/com/workforcehub/system/service/NotificationChannelService.java:172\nserver/src/main/java/com/workforcehub/auth/service/EmailCodeService.java:36",
+        "client_token": "b93cc214-5fa7-5654-850e-a04a1c9d8100",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-07",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-07][新问题] 独立验证码登录入口不符合后端密码二验契约",
+        "description": "编号：100-07 / AUTH-07；优先级：P2；类型：新问题\n\n验证状态：静态确认，未执行真实业务调用。尚未修复，待复现/整改/验收。\n\n触发条件：直接切换当前employee登录页到验证码登录，不先输入密码\n\n影响：提交伪密码email-code:<code>，后端先执行密码认证；合法验证码不能构成独立登录。重复失败还可能消耗登录尝试。\n\n证据与边界：密码为空时前端合成字符串；后端先provider.authenticate，再进入邮箱二验；这是二因素登录而非验证码独立登录。\n\n修复方向：将验证码入口限定为密码认证后的二验步骤；保留密码后再提交验证码。\n\n验收条件：新会话无法只凭验证码登录；密码通过后进入二验并成功，不产生伪密码认证失败。switchLoginMode只改视图与状态、不清密码，因此保留原密码的密码后二验路径不在此缺陷范围。\n\n代码/文档位置：\nemployee-web/src/hub/views/AuthView.vue:356\nemployee-web/src/hub/views/AuthView.vue:365\nserver/src/main/java/com/workforcehub/auth/service/LoginService.java:120\nserver/src/main/java/com/workforcehub/auth/service/LoginService.java:160",
+        "client_token": "65152d36-1a4e-5569-acb6-c898c4213aee",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-08",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-08][新问题] 字典标签缓存只在当前JVM失效",
+        "description": "编号：100-08 / AUTH-08；优先级：P2；类型：新问题\n\n验证状态：静态多实例推导，待验证。尚未修复，待复现/整改/验收。\n\n触发条件：在实例A修改字典，实例B已缓存该类型标签\n\n影响：仅本机缓存失效，其他实例继续展示旧标签，直到缓存重建/进程重启。\n\n证据与边界：ConcurrentHashMap按类型缓存，无TTL；写操作labelCache.remove仅当前JVM。未运行双JVM验证。\n\n修复方向：当前规模优先去除该轻量标签缓存或加短TTL；按实际部署验收跨实例一致性。\n\n验收条件：A修改后B在约定窗口读取新标签；禁用/删除同样刷新。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/system/service/AdminDictService.java:35\nserver/src/main/java/com/workforcehub/system/service/AdminDictService.java:107\nserver/src/main/java/com/workforcehub/system/service/AdminDictService.java:137",
+        "client_token": "9d224762-9c5e-533b-985b-f4c90338026c",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-09",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-09][新问题] 手机号输入清空未转化为实际清除",
+        "description": "编号：100-09 / AUTH-09；优先级：P2；类型：新问题\n\n验证状态：静态确认，未执行真实业务调用。尚未修复，待复现/整改/验收。\n\n触发条件：个人设置将已有手机号清空后保存\n\n影响：页面显示手机号已更新，但请求传null，后端跳过写入，实际手机号保持原值。\n\n证据与边界：前端mobile || null；后端仅request.getMobile()!=null时trim并更新。后端空串可清空，前端恰将其转换成null。仅静态追踪，未真实保存。\n\n修复方向：将清空语义统一：前端发送空字符串，或后端明确区分字段缺失与null清空。\n\n验收条件：已有手机号清空保存后重新加载为null，非空手机号仍可正常更新。\n\n代码/文档位置：\nemployee-web/src/views/sections/SettingsSection.vue:296\nserver/src/main/java/com/workforcehub/org/service/OrgDirectoryService.java:205\nserver/src/main/java/com/workforcehub/org/dto/UpdateEmployeeProfileRequest.java:14",
+        "client_token": "3d46decd-1dbc-570c-a42e-5d45c19e1441",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-12",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-12][新问题] 工作台显示固定打卡时间",
+        "description": "编号：100-12 / AT-01；优先级：P2；类型：新问题\n\n验证状态：静态确认，展示可信性缺口。尚未修复，待复现/整改/验收。\n\n触发条件：employee-web工作台当天workMinutes大于0或达到480分钟\n\n影响：页面显示固定08:57或18:00，可能与真实首末打卡时间不一致\n\n证据与边界：punchIn按workMinutes真假选择08:57；punchOut按480阈值选择18:00。hub-web独立工作台则读取实际firstPunchAt/lastPunchAt。\n\n修复方向：格式化日结果firstPunchAt/lastPunchAt；空值显示未打卡。\n\n验收条件：输入实际09:12和18:37，分别显示09:12和18:37；只有时长不能凭空产生打卡时间。\n\n代码/文档位置：\nemployee-web/src/hub/views/WorkbenchView.vue:85\nemployee-web/src/hub/views/WorkbenchView.vue:86\nemployee-web/src/hub/views/WorkbenchView.vue:88",
+        "client_token": "c1b93780-b7aa-5023-a5d6-542da6a09b10",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-13",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-13][新问题] AI预审中撤回按钮与后端资格不一致",
+        "description": "编号：100-13 / WF-02；优先级：P2；类型：新问题\n\n验证状态：静态确认，操作资格不一致。尚未修复，待复现/整改/验收。\n\n触发条件：未结束的PENDING_REVIEW申请在页面点击撤回\n\n影响：前端按!finishedAt显示撤回，后端只接受IN_APPROVAL，操作会被拒绝，冻结仍等待预审终态\n\n证据与边界：预审请求未finishedAt；withdrawRequest非IN_APPROVAL抛400。未动态提交撤销。\n\n修复方向：按后端允许状态显示撤回；若产品要求预审可取消，补任务取消、状态锁和冻结释放。\n\n验收条件：预审中不显示不可用操作；本人IN_APPROVAL可撤回一次并释放冻结；终态和非本人拒绝。\n\n代码/文档位置：\nemployee-web/src/hub/views/ApprovalsView.vue:367\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowService.java:599",
+        "client_token": "c7d41463-fcc2-5bfa-b7ba-3c203ce4bc95",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-14",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-14][新问题] 通用OA未执行所选模板表单约束",
+        "description": "编号：100-14 / WF-03；优先级：P2；类型：新问题\n\n验证状态：静态确认，模板约束未执行。尚未修复，待复现/整改/验收。\n\n触发条件：generic-requests提交JSON对象，但漏模板必填字段或类型错误\n\n影响：仅验证对象结构，未按模板formSchema做字段校验，错误业务数据可进入审批\n\n证据与边界：版本保存formSchemaJson；通用提交只检查isObject，然后直接压缩保存。未动态提交非法请求。\n\n修复方向：按选定已发布版本校验必填、类型、长度和枚举，并返回字段错误。\n\n验收条件：缺字段、错误类型、越界枚举返回400且无新增申请；正确请求可提交，版本更新不改变在途基准。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowService.java:266\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowService.java:292\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowService.java:924\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java:120",
+        "client_token": "fbfba95f-bba3-55d9-84b8-7af08b818ea6",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-15",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-15][新问题] 首次创建排班不刷新既有考勤结果",
+        "description": "编号：100-15 / AT-02；优先级：P2；类型：新问题\n\n验证状态：静态确认，既有结果可能陈旧。尚未修复，待复现/整改/验收。\n\n触发条件：当天已按默认班次生成日结果后，再首次创建当天个人排班\n\n影响：createSchedule只存排班，日结果维持旧班次，直到另一打卡、审批或重算触发\n\n证据与边界：创建直接返回；修改则显式检查日结果存在并重算。未动态创建排班。\n\n修复方向：创建排班成功后，与修改路径一致地对已有日结果重算。\n\n验收条件：默认班次已有结果，创建不同班次后，同一请求结束时shiftId、时长与异常立即更新。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:238\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:252\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:262\nserver/src/main/java/com/workforcehub/attendance/service/AttendanceService.java:285",
+        "client_token": "5ef097cf-7333-5e2f-b148-5d8f1e1cb48c",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-17",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-17][新问题] DAG工具执行跳过配置的人审门禁",
+        "description": "编号：100-17 / IAR-02；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：DAG TOOL或节点toolCalls绑定REQUIRE_CONFIRM，员工创建任务时request.toolCalls为空，或由会话触发DAG。\n\n影响：配置要求的人审被跳过，工具日志直接标APPROVED；当前实现的SPI为查询且CONNECTOR返回501，因此不声称已有写业务被执行。\n\n证据与边界：人审计算仅遍历外部preparedToolCalls。DAG执行器检查绑定存在后直接调用execute，并记录APPROVED；执行器与validator未检查approvalMode。APPROVAL节点也被分派到executePromptNode，不是持久化人工等待。\n\n修复方向：将审批判断收口到工具执行边界；DAG遇需确认工具持久化节点/参数/版本快照，WAITING_HUMAN_CONFIRM后暂停，确认时从该节点恢复，未批准不得落APPROVED。\n\n验收条件：相同REQUIRE_CONFIRM绑定分别经显式工具、DAG TOOL、内嵌toolCalls、会话触发时均先等待；拒绝/超时不执行；重复确认只执行一次；AUTO保持直通。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:531\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:537\nserver/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java:161\nserver/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java:313\nserver/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java:50\nserver/src/main/java/com/workforcehub/agent/workflow/WorkflowValidator.java:49",
+        "client_token": "3c9a54d3-fea0-505d-a85d-1fc734694b1a",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-18",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-18][新问题] 草稿部分路径自动获得流程测试证明",
+        "description": "编号：100-18 / IAR-03；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：创建含内嵌工具调用的DAG草稿，或将非DAG草稿更新为DAG，随后直接发布。\n\n影响：部分路径未实际试运行即获得workflow_test_signature/workflow_tested_at，弱化“当前版本完成一次流程测试”的发布门禁。\n\n证据与边界：createVersion与旧配置转DAG直接调用updateAgentVersionWorkflowTest；该方法写签名和NOW()。publish只比较签名。仓库测试契约明确“后台发布DAG Agent前必须完成一次当前版本流程测试”，但该测试覆盖simpleWorkflow，非自动签名例外。\n\n修复方向：只有成功试运行入口写测试签名/时间；创建、更新、工具绑定/关键引用变更均清空测试证明；兼容迁移标记与真实测试结果分字段。\n\n验收条件：两类自动签名分支在未试运行时发布400；失败试运行仍不能发布；成功且配置相同可发布；改配置或工具绑定后必须重测。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:319\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:350\nserver/src/main/java/com/workforcehub/agent/service/AgentService.java:444\nserver/src/main/java/com/workforcehub/agent/repository/AgentRepository.java:105\nserver/src/test/java/com/workforcehub/agent/ModuleAgentApiIntegrationTest.java:240",
+        "client_token": "f5fd248e-fec7-5f0e-83f6-76be1ecb3f17",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-19",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-19][新问题] 异步任务提交后缺少持久认领恢复",
+        "description": "编号：100-19 / IAR-04；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：Agent或知识入库事务已提交，但进程在Executor投递前/执行中退出，或线程池拒绝任务。\n\n影响：任务/作业记录仍在表中，可停留PENDING/RUNNING；当前范围未发现自动重新认领/恢复入口，现有人工确认超时扫描不覆盖它们。\n\n证据与边界：两类任务提交后仅调用进程内Executor。超时SQL限定WAITING_HUMAN_CONFIRM；ragflow目录中ingest调用仅scheduleIngest。记录持久化已存在，问题是执行投递/恢复，不是数据库任务丢失。\n\n修复方向：使用现有任务表实现带租约的待执行认领，保存可恢复输入及重试次数；入库作业亦以表状态调度，定义运行中超时和人工重试边界。\n\n验收条件：在提交后投递前及执行中分别终止可控测试worker；重启后同作业被恢复且消息/切片无重复；拒绝执行可查询、可重试且不永久显示处理中。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java:111\nserver/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java:164\nserver/src/main/java/com/workforcehub/agent/repository/AgentTaskTimeoutRepository.java:28\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java:287",
+        "client_token": "cbe47317-e039-5c41-bc9f-4228e3fb1142",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-20",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-20][新问题] 文档入库并发缺少作业代次隔离",
+        "description": "编号：100-20 / IAR-05；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：同一文档两次reingest并发，或删除与已运行ingest交错。\n\n影响：旧作业仍可覆盖新作业文档状态/清单，已删除文档仍可能新增向量；查询有已删标题过滤，不据此声称删除后必定可读。\n\n证据与边界：reingest每次创建新作业并改latest指向；运行/成功/失败UPDATE仅WHERE document.id，不约束latest_ingest_job_id或is_deleted；replaceChunks按document整删；PG replaceDocumentVectors亦按document先停旧向量。\n\n修复方向：按文档租约串行，或在发布结果时比较latest_ingest_job_id与未删除状态；先写作业独立代次，成功后原子切换有效代次，失效作业仅清理自己的结果。\n\n验收条件：控制旧作业晚于新作业完成，最终清单/向量/状态均来自新作业；删除后旧作业完成不得重新激活；重复回调幂等。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java:263\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:308\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:318\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:334\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:352\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java:79",
+        "client_token": "6157af1f-0e09-5b89-b090-9e1906cce437",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-21",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-21][新问题] 跨库入库发布缺少完整版本切换",
+        "description": "编号：100-21 / IAR-06；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：重入库写PG向量后MySQL清单失败，或向量插入中途失败。\n\n影响：向量与清单跨库非原子，旧向量先停用且部分新向量可能可见；MySQL作业FAILED不能保证检索仍使用完整旧版本。\n\n证据与边界：replaceDocumentVectors先UPDATE旧向量is_active=false，再逐条insert active新向量；完成后才调用MySQL replaceChunks/markIngestSuccess。search不连接MySQL作业成功状态，只按space与active。\n\n修复方向：按jobId写不可见新代次，完整写入后切换已发布代次；失败删除该job向量并保留旧代次，增加跨库对账修复。\n\n验收条件：在第N条向量插入与MySQL清单阶段分别注入失败，查询保持上一完整版本且不出现半批内容；重试成功后再切换，清理只影响失败job。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java:35\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java:79\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:334\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java:60",
+        "client_token": "c29af1f9-8b1a-5673-9e61-856cdb770948",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-22",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-22][新问题] 知识重排配置未进入执行链",
+        "description": "编号：100-22 / IAR-07；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：知识空间启用rerank并配置重排模型后进行搜索测试或Agent检索。\n\n影响：配置面存在重排选项，但当前有效配置及检索链未调用重排，排序仍为向量距离；属于功能闭环缺口。\n\n证据与边界：空间更新保存rerankEnabled/provider/model/modelId；RagflowEffectiveConfig解析仅Embedding、chunk、topK与threshold，searchRows直接返回向量排序且未调用rerank客户端。\n\n修复方向：在TopN向量候选后接受控重排并返回实际生效标记，或在接通前禁止可保存的启用选项，避免配置与执行不一致。\n\n验收条件：启用后测试替身断言真实调用重排且返回重排顺序；停用无重排调用；重排超时有明确降级状态与结果，不静默假装生效。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java:193\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowConfigResolver.java:10\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java:44\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java:75",
+        "client_token": "47c3cad0-a15c-5c53-9a1a-5553d2ba12fb",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-23",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-23][新问题] 新消息卡片动作仍为占位",
+        "description": "编号：100-23 / IAR-08；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：用户在employee-web新入口点击知识卡/流程卡动作，或期待旧MessagesSection已有操作出现在新页。\n\n影响：卡片只显示toast而未执行动作；新旧页面和独立hub-web能力不一致，后台能力存在不能作为新入口交付证明。\n\n证据与边界：新路由/hub/messages指向src/hub/views/MessagesView，旧/messages重定向。新页handleKnowledgeAction/handleProcessAction仅“即将上线”；新页群编辑只改名+加人+退群，独立hub-web已有移除成员API。\n\n修复方向：以新入口逐项登记能力，接通卡片动作的真实业务API/路由；未实现动作隐藏或禁用，避免只toast假闭环；群治理按当前产品要求补齐。\n\n验收条件：从默认入口操作卡片，观察对应业务请求/落库或正确路由；失败可恢复且有错误。新页公告/移除成员等是否交付单独列证，不以旧页测试替代。\n\n代码/文档位置：\nemployee-web/src/router/index.ts:35\nemployee-web/src/router/index.ts:60\nemployee-web/src/hub/views/MessagesView.vue:339\nemployee-web/src/hub/views/MessagesView.vue:446\nhub-web/src/views/MessagesView.vue:553",
+        "client_token": "8de5e668-1972-559b-bbb3-98aa275a1234",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-24",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-24][新问题] 新消息页附件下载使用错误业务票据入口",
+        "description": "编号：100-24 / IAR-09；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：在employee-web新/hub/messages上传并发送附件，再点击附件打开；从个人文件转发到消息也一样。\n\n影响：消息发送成功且展示附件，但打开走个人文件票据，被IM_MESSAGE归属限制拒绝403；属于下载契约错配，不是越权。\n\n证据与边界：上传ownerType=IM_MESSAGE_PENDING；发送时不论源ownerType均复制为IM_MESSAGE引用，消息响应从IM_MESSAGE列表返回新refId；前端保留此refId后交给employeeApi.files.createDownloadTicket。FileDownloadService仅允许PERSONAL_FILE/USER_AVATAR，因此该请求确定不匹配契约。\n\n修复方向：新页openAttachment使用会话ID、消息ID、附件refId调用IM专用下载票据API，并使用其downloadUrl；消息/群文件/个人文件分别使用对应入口。\n\n验收条件：上传发送后发送方和正常成员可打开；退出群/被移除、撤回、过期和已用票据均按IM规则拒绝。网络失败保留附件可重试。\n\n代码/文档位置：\nemployee-web/src/composables/usePersonalFileTransfer.ts:109\nemployee-web/src/hub/views/MessagesView.vue:317\nserver/src/main/java/com/workforcehub/im/repository/ImRepository.java:357\nserver/src/main/java/com/workforcehub/im/service/ImService.java:824\nemployee-web/src/stores/im.ts:697\nemployee-web/src/hub/views/MessagesView.vue:329\nserver/src/main/java/com/workforcehub/file/service/FileDownloadService.java:219",
+        "client_token": "f7d9bfc6-32b9-50fa-8e0a-882f5d8ff71c",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-25",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-25][新问题] “我的申请”混用待办审批数据",
+        "description": "编号：100-25 / WORKBENCH-D；优先级：P2；类型：新问题\n\n验证状态：静态源码确认；未动态业务复现。尚未修复，待复现/整改/验收。\n\n触发条件：员工进入当前employee-web工作台查看“我的申请”。\n\n影响：workflow.todos返回待本人处理项，页面将其当成本人申请展示，归属和进度语义错误。\n\n证据与边界：myRequests直接从todos.value映射；没有查询本人requests。独立hub-web有单独requests查询，不能证明employee新页正确。\n\n修复方向：查询本人requests，待办继续单独展示；两类卡片使用各自状态与时间。\n\n验收条件：A发起给B审批：A的我的申请可见该单，B的待办可见该单，B的我的申请不得把该单当作本人发起。\n\n代码/文档位置：\nemployee-web/src/hub/views/WorkbenchView.vue:142\nemployee-web/src/hub/views/WorkbenchView.vue:181",
+        "client_token": "fb82f0a5-bb6d-5570-853d-0e80b75cea71",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "100-26",
+      "category": "新问题",
+      "data": {
+        "summary": "[P2][100-26][新问题] 新工作台缺少插件宿主入口",
+        "description": "编号：100-26 / PLUGIN-F；优先级：P2；类型：新问题\n\n验证状态：静态源码确认；未动态业务复现。尚未修复，待复现/整改/验收。\n\n触发条件：员工使用当前/hub/workbench，希望进入已授权的UI插件。\n\n影响：后端可见清单、loader和旧PluginWorkbenchHost均存在，但当前工作台路由未挂载旧WorkbenchSection，无法据这些代码认定用户已可打开插件。\n\n证据与边界：当前路由指向hub/WorkbenchView；旧workbench路由重定向。旧壳某些路由仍会加载插件清单，问题限定为当前新工作台的渲染入口，不宣称插件后端不可用。\n\n修复方向：在当前新工作台提供授权插件入口并挂载已有宿主组件；以当前入口重新验收SRI、卸载和失败重试。\n\n验收条件：从默认登录路径进入工作台，能打开授权UI插件；不可见插件无入口且网关仍拒绝，加载失败可恢复。\n\n代码/文档位置：\nemployee-web/src/router/index.ts:27\nemployee-web/src/router/index.ts:78\nemployee-web/src/views/sections/WorkbenchSection.vue:943\nemployee-web/src/stores/plugins.ts:17",
+        "client_token": "32d78421-6fe9-50e0-8aac-848e984d8bca",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "99-4",
+      "category": "既有风险",
+      "data": {
+        "summary": "[P2][99-4][既有风险] 请假计算固定时段与取整口径",
+        "description": "编号：99-4 / 99-4；优先级：P2；类型：既有风险\n\n验证状态：既有问题，沿用第99审编号。尚未修复，待复现/整改/验收。\n\n触发条件：非固定9-12/13-18班次、休息日或小于半天请假\n\n影响：固定工作区间和240分钟取整可能与真实排班不一致\n\n证据与边界：逐日套固定工作时段，按HALF_DAY_MINUTES向上取整；仅引用第99审，不算新发现。\n\n修复方向：请假计算统一消费有效日历、排班与假种计量规则。\n\n验收条件：非标准班次、节假日、跨日和半天边界都与实际规则一致，冻结和扣减同基准。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowService.java:904\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowService.java:930\nserver/src/main/java/com/workforcehub/workflow/service/WorkflowService.java:942",
+        "client_token": "a8e4709f-9bb5-5ab5-b24c-e71815a467a8",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "99-5",
+      "category": "既有风险",
+      "data": {
+        "summary": "[P2][99-5][既有风险] ID生成器跨实例唯一性未保证",
+        "description": "编号：99-5；优先级：P2；类型：既有风险\n\n状态：引用第99审已归档证据，未重新执行历史探针；尚未修复。\n\n问题位置：`server/src/main/java/com/workforcehub/common/util/IdGenerator.java:8`、`:13`\n\n触发条件：两个独立应用实例在重叠时间生成 ID，并写入同一张业务表。\n\n失败路径与影响：时间戳左移与 JVM 内 `AtomicLong` 只能保证单实例内唯一，没有节点标识或共享序列；跨实例可产生相同主键，导致写入失败。\n\n证据与边界：两个独立类加载器各加载真实生成器，隔离其静态状态，并发各生成 100000 个 ID，本次交集为 88262。该方式模拟独立实例状态，不是实际双 JVM 或数据库压测；重复数量随运行时序变化，不是固定断言。\n\n优化方案：使用具有明确跨实例唯一性保证的 ID 分配方案，并验证节点身份及重启行为。\n\n修复验收：独立进程并发生成、重启与时钟异常场景均不产生重复业务主键。",
+        "client_token": "ab333df4-af09-5d35-84d4-b9e54f87190f",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "PLUGIN-E",
+      "category": "优化建议",
+      "data": {
+        "summary": "[P2][PLUGIN-E][优化建议] 重要插件事件增加可恢复投递账本",
+        "description": "编号：PLUGIN-E / PLUGIN-E；优先级：P2；类型：优化建议\n\n验证状态：优化建议；未动态注入队列故障。尚未修复，待复现/整改/验收。\n\n触发条件：业务事务已提交后进程退出、回调队列满或处理器返回失败。\n\n影响：当前事件提交后进程内发布，有界队列拒绝明确丢弃；回调失败/可重试只日志和尽力审计，没有持久投递重试。当前实现是尽力交付，是否升级取决于插件业务承诺。\n\n证据与边界：代码明确日志“队列已满，已丢弃”，不把它伪装为现有可靠消息能力；本项作为能力优化，不等同已发生丢单事故。\n\n修复方向：对影响业务结果的事件用持久投递记录与消费幂等；查询型/提示型事件可继续尽力交付但明确契约。\n\n验收条件：队列拒绝与重启后待投递记录仍可查询并重试；消费重复不产生重复业务结果。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/common/event/DomainEventPublisher.java:27\nserver/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java:93\nserver/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java:185",
+        "client_token": "51289311-bd10-5a0b-a95d-2bbc3559ddbd",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    },
+    {
+      "review_id": "PLUGIN-U",
+      "category": "优化建议",
+      "data": {
+        "summary": "[P2][PLUGIN-U][优化建议] 插件动作未知结果增加人工核对恢复",
+        "description": "编号：PLUGIN-U / PLUGIN-U；优先级：P2；类型：优化建议\n\n验证状态：优化建议；保留现有防重安全语义。尚未修复，待复现/整改/验收。\n\n触发条件：处理器已经占用幂等键后异常、返回空值或响应无法序列化。\n\n影响：保留IN_PROGRESS防止重复副作用是合理保护；但同键后续持续409，当前清理只删过期COMPLETED，缺少显式人工核对与完成/释放入口。\n\n证据与边界：已有测试覆盖异常保持占用，故不建议简单自动超时删除；需让真实未知结果可见、可审计恢复。\n\n修复方向：增加占用状态查询和经授权的结果核对、完成/释放流程；沿用原幂等范围与审计，不盲目重跑。\n\n验收条件：处理器完成外部副作用后模拟响应失败，经人工核对记录结果，再次同键可重放且不再执行业务。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java:117\nserver/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java:211\nserver/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyCleanupJob.java:29",
+        "client_token": "df3d517d-099c-57f7-8fa7-8e7a648cf086",
+        "tasklists": [
+          {
+            "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+          }
+        ]
+      }
+    }
+  ]
+}

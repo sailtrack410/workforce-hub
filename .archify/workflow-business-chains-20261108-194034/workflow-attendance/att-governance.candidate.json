@@ -1,0 +1,211 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "考勤日历、班次、成员与排班变更",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "config",
+      "label": "管理端配置"
+    },
+    {
+      "id": "schedule",
+      "label": "成员与排班"
+    },
+    {
+      "id": "exception",
+      "label": "约束与重算"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ui",
+      "lane": "config",
+      "col": 0,
+      "type": "frontend",
+      "label": "考勤治理页面",
+      "sublabel": "日历、班次、考勤组",
+      "sources": [
+        {
+          "path": "admin-web/src/views/AttendanceView.vue",
+          "line": 200,
+          "end_line": 254
+        }
+      ]
+    },
+    {
+      "id": "calendar",
+      "lane": "config",
+      "col": 1,
+      "type": "backend",
+      "label": "创建日历与班次",
+      "sublabel": "班次不支持跨天",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 101,
+          "end_line": 148
+        }
+      ]
+    },
+    {
+      "id": "group",
+      "lane": "config",
+      "col": 2,
+      "type": "backend",
+      "label": "创建考勤组",
+      "sublabel": "启用日历、默认班次",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 158,
+          "end_line": 183
+        }
+      ]
+    },
+    {
+      "id": "member",
+      "lane": "schedule",
+      "col": 2,
+      "type": "backend",
+      "label": "添加有效期成员",
+      "sublabel": "用户行锁＋区间排重",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 192,
+          "end_line": 235
+        }
+      ]
+    },
+    {
+      "id": "schedule",
+      "lane": "schedule",
+      "col": 3,
+      "type": "backend",
+      "label": "创建个人排班",
+      "sublabel": "同日存在则拒绝",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 238,
+          "end_line": 262
+        }
+      ]
+    },
+    {
+      "id": "update",
+      "lane": "schedule",
+      "col": 4,
+      "type": "backend",
+      "label": "修改原排班",
+      "sublabel": "锁排班与员工后更新",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 265,
+          "end_line": 284
+        }
+      ]
+    },
+    {
+      "id": "recalc",
+      "lane": "schedule",
+      "col": 5,
+      "type": "backend",
+      "label": "已有日结果重算",
+      "sublabel": "不存在日结果则只改班",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 285,
+          "end_line": 288
+        }
+      ]
+    },
+    {
+      "id": "conflict",
+      "lane": "exception",
+      "col": 2,
+      "type": "security",
+      "label": "区间或规则冲突",
+      "sublabel": "停用、重叠均拒绝",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 208,
+          "end_line": 222
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "ui",
+      "to": "calendar"
+    },
+    {
+      "from": "calendar",
+      "to": "group"
+    },
+    {
+      "from": "group",
+      "to": "member"
+    },
+    {
+      "from": "member",
+      "to": "schedule"
+    },
+    {
+      "from": "schedule",
+      "to": "update"
+    },
+    {
+      "from": "update",
+      "to": "recalc"
+    },
+    {
+      "from": "member",
+      "to": "conflict",
+      "label": "重叠",
+      "role": "error"
+    }
+  ],
+  "mainPath": [
+    "ui",
+    "calendar",
+    "group",
+    "member",
+    "schedule",
+    "update",
+    "recalc"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "规则选择",
+      "items": [
+        "日结果先按日期取有效考勤组，再以有效个人排班覆盖默认班次。",
+        "新增排班不触发既有日结果重算；修改排班仅当日结果已存在时重算。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "优化",
+      "items": [
+        "工作日历目前保存名称与类型，重算核心未据日历工作日／节假日分支判断。",
+        "建议明确休息日规则后增加日历日期配置与重算触发，避免周末按默认班次判断。",
+        "仅静态证据；不把配置存在视为节假日规则已执行。"
+      ]
+    }
+  ]
+}

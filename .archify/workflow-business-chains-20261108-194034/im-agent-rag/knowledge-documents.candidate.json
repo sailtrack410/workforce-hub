@@ -1,0 +1,265 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "知识空间ACL与文档入库生命周期",
+    "locale": "zh-CN",
+    "output": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "业务入口与结果"
+    },
+    {
+      "id": "core",
+      "label": "服务执行与落库"
+    },
+    {
+      "id": "recover",
+      "label": "分支、异常与恢复",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "space",
+    "attach",
+    "job",
+    "parse",
+    "vectors",
+    "success"
+  ],
+  "nodes": [
+    {
+      "id": "space",
+      "lane": "entry",
+      "col": 0,
+      "type": "backend",
+      "label": "创建空间并授权",
+      "sublabel": "探测Embedding维度",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 134,
+          "end_line": 173
+        }
+      ]
+    },
+    {
+      "id": "attach",
+      "lane": "core",
+      "col": 1,
+      "type": "security",
+      "label": "校验知识库附件",
+      "sublabel": "归属、删除状态、重复",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 214,
+          "end_line": 245
+        }
+      ]
+    },
+    {
+      "id": "job",
+      "lane": "core",
+      "col": 2,
+      "type": "database",
+      "label": "持久文档和入库作业",
+      "sublabel": "绑定latest_ingest_job",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 231,
+          "end_line": 255
+        }
+      ]
+    },
+    {
+      "id": "parse",
+      "lane": "core",
+      "col": 3,
+      "type": "backend",
+      "label": "提交后解析分块",
+      "sublabel": "OCR/Tika/UTF-8",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java",
+          "line": 64,
+          "end_line": 83
+        }
+      ]
+    },
+    {
+      "id": "vectors",
+      "lane": "core",
+      "col": 4,
+      "type": "database",
+      "label": "写向量与切片清单",
+      "sublabel": "先PG后MySQL；非原子",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java",
+          "line": 79,
+          "end_line": 84
+        }
+      ]
+    },
+    {
+      "id": "success",
+      "lane": "entry",
+      "col": 5,
+      "type": "database",
+      "label": "完成状态与计数",
+      "sublabel": "SUCCESS；刷新空间",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 352,
+          "end_line": 367
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "lane": "recover",
+      "col": 3,
+      "type": "backend",
+      "label": "FAILED与友好错误",
+      "sublabel": "原始异常保留服务日志",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java",
+          "line": 85,
+          "end_line": 90
+        }
+      ]
+    },
+    {
+      "id": "reingest",
+      "lane": "recover",
+      "col": 2,
+      "type": "backend",
+      "label": "人工重新入库",
+      "sublabel": "新作业替换latest指向",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 263,
+          "end_line": 284
+        }
+      ]
+    },
+    {
+      "id": "delete",
+      "lane": "recover",
+      "col": 4,
+      "type": "backend",
+      "label": "删除空间或文档",
+      "sublabel": "软删除并停用向量",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 309,
+          "end_line": 339
+        }
+      ]
+    },
+    {
+      "id": "acl",
+      "lane": "recover",
+      "col": 0,
+      "type": "security",
+      "label": "保存空间ACL",
+      "sublabel": "ROLE/部门/岗位；read/manage",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 354,
+          "end_line": 374
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "space",
+      "to": "attach"
+    },
+    {
+      "from": "attach",
+      "to": "job"
+    },
+    {
+      "from": "job",
+      "to": "parse",
+      "label": "提交后",
+      "role": "async",
+      "variant": "dashed"
+    },
+    {
+      "from": "parse",
+      "to": "vectors",
+      "label": "解析成功"
+    },
+    {
+      "from": "vectors",
+      "to": "success"
+    },
+    {
+      "from": "parse",
+      "to": "failed",
+      "label": "解析/模型异常",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "failed",
+      "to": "reingest",
+      "label": "修复后"
+    },
+    {
+      "from": "reingest",
+      "to": "parse",
+      "label": "新作业",
+      "role": "async",
+      "variant": "dashed"
+    },
+    {
+      "from": "success",
+      "to": "delete",
+      "label": "删除",
+      "role": "branch"
+    },
+    {
+      "from": "space",
+      "to": "acl",
+      "label": "授权",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "范围与实现",
+      "items": [
+        "空间创建/模型维度、ACL保存、附件校验、异步入库、重入库与软删除。",
+        "admin-web知识库具备空间、文档、ACL与检索测试入口；ACL保存不代表所有读取链已执行ACL。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常与恢复",
+      "items": [
+        "入库作业先持久化，执行仍依赖提交后Executor，缺少重启恢复证据。",
+        "重入库未按latest作业代次隔离；删除期间已有作业仍可能后写向量。"
+      ]
+    }
+  ]
+}

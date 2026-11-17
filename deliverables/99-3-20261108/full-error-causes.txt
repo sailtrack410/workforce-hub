@@ -1,0 +1,3 @@
+462 ApplicationContext failure threshold exceeded after initial context failure
+26 Caused by: java.lang.IllegalStateException: 缺少数据库口令：请在仓库根目录 .env 配置 DB_PASSWORD（或 TEST_DB_PASSWORD），不要把真实凭证写入代码
+3 Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.workforcehub.auth.security.SessionValidityFilter' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}

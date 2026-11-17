@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/ROLLBACK.sh",
+    "/tmp/workforce-991-audit-jia90rso/snapshot/server/src/test/java/com/workforcehub/plugin/AdminPluginLifecycleAuditIntegrationTest.java"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "audit-rollback-script.stdout",
+  "stderr": "audit-rollback-script.stderr"
+}

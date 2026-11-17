@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "2b568a63-31ff-48c3-a64d-cfc819b2e6d5",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.candidate.json",
+  "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.html",
+  "specification": {
+    "sha256": "b5d2ad128244481834c87779b867f7525df3a34444fa8e78695f050a8d96b57e",
+    "bytes": 6114
+  },
+  "artifact": {
+    "sha256": "c3bae517784b39f7042e30d7a746c65ea453ebdba12e5ffb426e29ca490db263",
+    "bytes": 824765
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "4442ae05-bea3-4bd5-9735-47e04ac8591b",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.json",
+  "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.html",
+  "specification": {
+    "sha256": "2c1955d08dbe5f8a4720f48701477653a768e48c4412435a8cd3f57c25a9f85b",
+    "bytes": 4798
+  },
+  "artifact": {
+    "sha256": "af9fa322b4ef8607ffdeac0bb46594e7cdbb191d91e9e37d3ff8b48c9ba10fec",
+    "bytes": 818125
+  }
+}

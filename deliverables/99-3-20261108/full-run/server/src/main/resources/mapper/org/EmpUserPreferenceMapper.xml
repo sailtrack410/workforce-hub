@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.org.mapper.EmpUserPreferenceMapper">
+
+    <resultMap id="BaseResultMap" type="com.workforcehub.org.domain.EmpUserPreference">
+        <id column="user_id" property="userId"/>
+        <result column="theme" property="theme"/>
+        <result column="message_density" property="messageDensity"/>
+        <result column="list_width" property="listWidth"/>
+        <result column="signature" property="signature"/>
+        <result column="presence_status" property="presenceStatus"/>
+        <result column="notif_sound" property="notifSound"/>
+        <result column="notif_desktop" property="notifDesktop"/>
+        <result column="notif_mention_only" property="notifMentionOnly"/>
+        <result column="notif_unread_badge" property="notifUnreadBadge"/>
+        <result column="accent_color" property="accentColor"/>
+        <result column="font_scale" property="fontScale"/>
+        <result column="bubble_style" property="bubbleStyle"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM emp_user_preference
+        WHERE user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO emp_user_preference
+            (user_id, theme, message_density, list_width, signature, presence_status,
+             notif_sound, notif_desktop, notif_mention_only, notif_unread_badge,
+             accent_color, font_scale, bubble_style)
+        VALUES
+            (#{userId}, #{theme}, #{messageDensity}, #{listWidth}, #{signature}, #{presenceStatus},
+             #{notifSound}, #{notifDesktop}, #{notifMentionOnly}, #{notifUnreadBadge},
+             #{accentColor}, #{fontScale}, #{bubbleStyle})
+    </insert>
+
+    <update id="updateById">
+        UPDATE emp_user_preference
+        SET theme = #{theme},
+            message_density = #{messageDensity},
+            list_width = #{listWidth},
+            signature = #{signature},
+            presence_status = #{presenceStatus},
+            notif_sound = #{notifSound},
+            notif_desktop = #{notifDesktop},
+            notif_mention_only = #{notifMentionOnly},
+            notif_unread_badge = #{notifUnreadBadge},
+            accent_color = #{accentColor},
+            font_scale = #{fontScale},
+            bubble_style = #{bubbleStyle},
+            updated_at = NOW()
+        WHERE user_id = #{userId}
+    </update>
+
+</mapper>

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "mvn",
+    "-B",
+    "-Dstyle.color=never",
+    "-Dtest=ModuleAttendanceApiIntegrationTest#offboardedEmployeeShouldNotPunchWithExistingSession,ModuleImApiIntegrationTest#offboardedEmployeeShouldNotSendMessageWithOldSession,PluginGatewayPermissionMatrixIntegrationTest,EmployeePluginListIntegrationTest,PluginManagerServiceIntegrationTest,SessionValidityRequestChainTest,AdminPermissionFilterTest,AdminPermissionRouteMatrixTest,AdminPermissionWebTest,AdminPluginManagementWebTest,PluginGatewaySecurityTest",
+    "clean",
+    "test"
+  ],
+  "cwd": "/tmp/wfh-99-2-integration-bbls4p52/snapshot/server",
+  "exit": 0,
+  "stdout": "integration-modified.stdout",
+  "stderr": "integration-modified.stderr"
+}

@@ -74,7 +74,7 @@ cd employee-web && npm install && npm run dev   # 员工端
 
 - [docs/说明.md](docs/说明.md) — 文档总索引（产品、架构、接口、部署、开发日志）
 - [docs/部署与交付/部署与初始化.md](docs/部署与交付/部署与初始化.md) — 部署手册
-- [PROJECT_INTRO.md](PROJECT_INTRO.md) — 完整项目介绍（创新点、竞品对比、部署方案）
+- [docs/产品与业务/项目介绍.md](docs/产品与业务/项目介绍.md) — 完整项目介绍（创新点、竞品对比、部署方案）
 
 ## 许可证
 

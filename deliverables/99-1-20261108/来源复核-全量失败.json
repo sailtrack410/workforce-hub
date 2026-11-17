@@ -1,0 +1,163 @@
+[
+  {
+    "class": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest",
+    "test": "disabledAdminUserShouldDenyExistingSession",
+    "kind": "failure",
+    "message": "Status expected:<403> but was:<401>",
+    "detail": "java.lang.AssertionError: Status expected:<403> but was:<401>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.assertGatewayForbidden(PluginGatewayPermissionMatrixIntegrationTest.java:377)\n\tat com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.disabledAdminUserShouldDenyExistingSession(PluginGatewayPermissionMatrixIntegrationTest.java:331)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest",
+    "test": "deletedAdminPluginCallPermissionShouldDenyExistingSession",
+    "kind": "failure",
+    "message": "Status expected:<403> but was:<401>",
+    "detail": "java.lang.AssertionError: Status expected:<403> but was:<401>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.assertGatewayForbidden(PluginGatewayPermissionMatrixIntegrationTest.java:377)\n\tat com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.deletedAdminPluginCallPermissionShouldDenyExistingSession(PluginGatewayPermissionMatrixIntegrationTest.java:321)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest",
+    "test": "inactiveAdminPluginCallPermissionShouldDenyExistingSession",
+    "kind": "failure",
+    "message": "Status expected:<403> but was:<401>",
+    "detail": "java.lang.AssertionError: Status expected:<403> but was:<401>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.assertGatewayForbidden(PluginGatewayPermissionMatrixIntegrationTest.java:377)\n\tat com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.inactiveAdminPluginCallPermissionShouldDenyExistingSession(PluginGatewayPermissionMatrixIntegrationTest.java:309)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.im.ModuleImApiIntegrationTest",
+    "test": "offboardedEmployeeShouldNotSendMessageWithOldSession",
+    "kind": "failure",
+    "message": "Status expected:<403> but was:<401>",
+    "detail": "java.lang.AssertionError: Status expected:<403> but was:<401>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.im.ModuleImApiIntegrationTest.offboardedEmployeeShouldNotSendMessageWithOldSession(ModuleImApiIntegrationTest.java:500)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.im.ModuleImApiIntegrationTest",
+    "test": "imDagAgentShouldRouteByIntentPort",
+    "kind": "failure",
+    "message": "JSON path \"$.data.success\" expected:<true> but was:<false>",
+    "detail": "java.lang.AssertionError: JSON path \"$.data.success\" expected:<true> but was:<false>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.util.JsonPathExpectationsHelper.assertValue(JsonPathExpectationsHelper.java:123)\n\tat org.springframework.test.web.servlet.result.JsonPathResultMatchers.lambda$value$2(JsonPathResultMatchers.java:111)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.im.ModuleImApiIntegrationTest.createWorkflowAgentVersion(ModuleImApiIntegrationTest.java:2584)\n\tat com.workforcehub.im.ModuleImApiIntegrationTest.createPublishedWorkflowAgent(ModuleImApiIntegrationTest.java:2508)\n\tat com.workforcehub.im.ModuleImApiIntegrationTest.imDagAgentShouldRouteByIntentPort(ModuleImApiIntegrationTest.java:741)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.im.ModuleImApiIntegrationTest",
+    "test": "agentModelMissingConfigShouldFailTaskAndWriteSystemMessage",
+    "kind": "failure",
+    "message": "expected: <AI模型配置缺失> but was: <AI模型服务未启用>",
+    "detail": "org.opentest4j.AssertionFailedError: expected: <AI模型配置缺失> but was: <AI模型服务未启用>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)\n\tat com.workforcehub.im.ModuleImApiIntegrationTest.agentModelMissingConfigShouldFailTaskAndWriteSystemMessage(ModuleImApiIntegrationTest.java:969)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.im.ModuleImApiIntegrationTest",
+    "test": "employeeShouldTranslateConversationMessage",
+    "kind": "failure",
+    "message": "Status expected:<200> but was:<502>",
+    "detail": "java.lang.AssertionError: Status expected:<200> but was:<502>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldTranslateConversationMessage(ModuleImApiIntegrationTest.java:370)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.im.ModuleImApiIntegrationTest",
+    "test": "authorizedEmployeeShouldStartAgentConversationAndReceiveAgentReply",
+    "kind": "failure",
+    "message": "JSON path \"$.data[1].senderType\" expected:<AGENT> but was:<SYSTEM>",
+    "detail": "java.lang.AssertionError: JSON path \"$.data[1].senderType\" expected:<AGENT> but was:<SYSTEM>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.util.JsonPathExpectationsHelper.assertValue(JsonPathExpectationsHelper.java:123)\n\tat org.springframework.test.web.servlet.result.JsonPathResultMatchers.lambda$value$2(JsonPathResultMatchers.java:111)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.im.ModuleImApiIntegrationTest.authorizedEmployeeShouldStartAgentConversationAndReceiveAgentReply(ModuleImApiIntegrationTest.java:630)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.EmployeePluginListIntegrationTest",
+    "test": "invalidOrgUserReturnsEmpty",
+    "kind": "failure",
+    "message": "Status expected:<200> but was:<401>",
+    "detail": "java.lang.AssertionError: Status expected:<200> but was:<401>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.plugin.EmployeePluginListIntegrationTest.invalidOrgUserReturnsEmpty(EmployeePluginListIntegrationTest.java:184)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "shouldPersistExposeAndRestoreTrustedDependencyGraph",
+    "kind": "failure",
+    "message": "expected: <200> but was: <401>",
+    "detail": "org.opentest4j.AssertionFailedError: expected: <200> but was: <401>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)\n\tat com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldPersistExposeAndRestoreTrustedDependencyGraph(PluginManagerServiceIntegrationTest.java:383)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpLifecycleShouldDrainAndUnloadRealPlugin",
+    "kind": "failure",
+    "message": "expected: <200> but was: <401>",
+    "detail": "org.opentest4j.AssertionFailedError: expected: <200> but was: <401>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)\n\tat com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpLifecycleShouldDrainAndUnloadRealPlugin(PluginManagerServiceIntegrationTest.java:1453)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpShouldKeepPluginRecoverableWhenClassLoaderCloseFails",
+    "kind": "failure",
+    "message": "expected: <500> but was: <401>",
+    "detail": "org.opentest4j.AssertionFailedError: expected: <500> but was: <401>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)\n\tat com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpShouldKeepPluginRecoverableWhenClassLoaderCloseFails(PluginManagerServiceIntegrationTest.java:1415)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpShouldUninstallInstalledPluginWithoutStartingIt",
+    "kind": "failure",
+    "message": "expected: <200> but was: <401>",
+    "detail": "org.opentest4j.AssertionFailedError: expected: <200> but was: <401>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)\n\tat com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpShouldUninstallInstalledPluginWithoutStartingIt(PluginManagerServiceIntegrationTest.java:1372)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpUploadShouldRejectInvalidSignatureWithoutResidue",
+    "kind": "failure",
+    "message": "expected: <422> but was: <401>",
+    "detail": "org.opentest4j.AssertionFailedError: expected: <422> but was: <401>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)\n\tat com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpUploadShouldRejectInvalidSignatureWithoutResidue(PluginManagerServiceIntegrationTest.java:1339)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest",
+    "test": "adminHttpUploadShouldInstallSignedJarAndRejectSameIdReplacement",
+    "kind": "failure",
+    "message": "expected: <200> but was: <401>",
+    "detail": "org.opentest4j.AssertionFailedError: expected: <200> but was: <401>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)\n\tat com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpUploadShouldInstallSignedJarAndRejectSameIdReplacement(PluginManagerServiceIntegrationTest.java:1273)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.plugin.PluginEventEndToEndIntegrationTest",
+    "test": "employeeHireShouldReachRealPf4jSubscriber",
+    "kind": "failure",
+    "message": "测试插件编译失败 ==> expected: <0> but was: <2>",
+    "detail": "org.opentest4j.AssertionFailedError: 测试插件编译失败 ==> expected: <0> but was: <2>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:563)\n\tat com.workforcehub.plugin.PluginEventEndToEndIntegrationTest.buildPluginJar(PluginEventEndToEndIntegrationTest.java:262)\n\tat com.workforcehub.plugin.PluginEventEndToEndIntegrationTest.employeeHireShouldReachRealPf4jSubscriber(PluginEventEndToEndIntegrationTest.java:115)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest",
+    "test": "workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint",
+    "kind": "failure",
+    "message": "Status expected:<409> but was:<500>",
+    "detail": "java.lang.AssertionError: Status expected:<409> but was:<500>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint(ModuleLeaveWorkflowIntegrationTest.java:155)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest",
+    "test": "loginRequiresEmailCodeWhenAccountHasEmail",
+    "kind": "failure",
+    "message": "JSON path \"$.data.requiresEmailCode\" expected:<true> but was:<false>",
+    "detail": "java.lang.AssertionError: JSON path \"$.data.requiresEmailCode\" expected:<true> but was:<false>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.util.JsonPathExpectationsHelper.assertValue(JsonPathExpectationsHelper.java:123)\n\tat org.springframework.test.web.servlet.result.JsonPathResultMatchers.lambda$value$2(JsonPathResultMatchers.java:111)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginRequiresEmailCodeWhenAccountHasEmail(ModuleAuthEmailVerifyIntegrationTest.java:81)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest",
+    "test": "loginWithoutBoundEmailShouldRequireEmailBinding",
+    "kind": "failure",
+    "message": "JSON path \"$.data.requiresEmailBinding\" expected:<true> but was:<false>",
+    "detail": "java.lang.AssertionError: JSON path \"$.data.requiresEmailBinding\" expected:<true> but was:<false>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.util.JsonPathExpectationsHelper.assertValue(JsonPathExpectationsHelper.java:123)\n\tat org.springframework.test.web.servlet.result.JsonPathResultMatchers.lambda$value$2(JsonPathResultMatchers.java:111)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginWithoutBoundEmailShouldRequireEmailBinding(ModuleAuthEmailVerifyIntegrationTest.java:192)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest",
+    "test": "loginWithInvalidEmailCodeShouldFail",
+    "kind": "failure",
+    "message": "Status expected:<401> but was:<200>",
+    "detail": "java.lang.AssertionError: Status expected:<401> but was:<200>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginWithInvalidEmailCodeShouldFail(ModuleAuthEmailVerifyIntegrationTest.java:166)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest",
+    "test": "loginWithEmailCodeShouldIssueSession",
+    "kind": "failure",
+    "message": "登录验证码应已生成 ==> expected: not <null>",
+    "detail": "org.opentest4j.AssertionFailedError: 登录验证码应已生成 ==> expected: not <null>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertNotNull.failNull(AssertNotNull.java:49)\n\tat org.junit.jupiter.api.AssertNotNull.assertNotNull(AssertNotNull.java:35)\n\tat org.junit.jupiter.api.Assertions.assertNotNull(Assertions.java:312)\n\tat com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginWithEmailCodeShouldIssueSession(ModuleAuthEmailVerifyIntegrationTest.java:133)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest",
+    "test": "sendLoginCodeShouldAcceptLoginNameAndEmail",
+    "kind": "failure",
+    "message": "No value at JSON path \"$.data.maskedEmail\"",
+    "detail": "java.lang.AssertionError: No value at JSON path \"$.data.maskedEmail\"\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:37)\n\tat org.springframework.test.util.AssertionErrors.assertTrue(AssertionErrors.java:70)\n\tat org.springframework.test.util.JsonPathExpectationsHelper.assertExistsAndReturn(JsonPathExpectationsHelper.java:328)\n\tat org.springframework.test.util.JsonPathExpectationsHelper.exists(JsonPathExpectationsHelper.java:190)\n\tat org.springframework.test.web.servlet.result.JsonPathResultMatchers.lambda$exists$3(JsonPathResultMatchers.java:123)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.sendLoginCodeShouldAcceptLoginNameAndEmail(ModuleAuthEmailVerifyIntegrationTest.java:100)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  },
+  {
+    "class": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest",
+    "test": "offboardedEmployeeShouldNotPunchWithExistingSession",
+    "kind": "failure",
+    "message": "Status expected:<403> but was:<401>",
+    "detail": "java.lang.AssertionError: Status expected:<403> but was:<401>\n\tat org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)\n\tat org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)\n\tat org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)\n\tat org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)\n\tat com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.offboardedEmployeeShouldNotPunchWithExistingSession(ModuleAttendanceApiIntegrationTest.java:794)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1511)\n"
+  }
+]

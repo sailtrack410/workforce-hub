@@ -75,3 +75,10 @@ __pycache__/
 hub-web/node_modules/
 hub-web/dist/
 hub-web/desktop-dist/
+
+# 过程性文档不入库（审查记录、开发日志、规划清单、本地联调、AIGC 代码审查），仅本地保留
+docs/审查/
+docs/开发日志/
+docs/开发规划/
+docs/本地联调/
+docs/人工智能生成内容审查/

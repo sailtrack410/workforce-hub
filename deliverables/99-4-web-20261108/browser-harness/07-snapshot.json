@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/Users/sailtrack/.codex/skills/playwright/scripts/playwright_cli.sh",
+    "-s=99-4-web-proof",
+    "--raw",
+    "snapshot"
+  ],
+  "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "exit_status": 0,
+  "stdout": "- main [ref=e3]:\n  - generic [ref=e4]:\n    - text: 99-4 · 浏览器受控 API 测试页\n    - heading \"请假排班计时\" [level=1] [ref=e5]\n    - paragraph [ref=e6]: 真实前端 composable 与格式函数；预览接口受控返回 180 分钟，未连接业务后端。\n  - generic [ref=e7]:\n    - heading \"员工端请假预览\" [level=2] [ref=e8]\n    - generic [ref=e9]:\n      - generic [ref=e10]: 开始时间\n      - textbox \"开始时间\" [ref=e11]: 2026-05-07T09:00\n    - generic [ref=e12]:\n      - generic [ref=e13]: 结束时间\n      - textbox \"结束时间\" [active] [ref=e14]: 2026-05-07T12:00\n    - generic [ref=e15]:\n      - generic [ref=e16]: 请假时长\n      - status \"请假时长\" [ref=e17]: 180 分钟\n    - status\n  - generic [ref=e18]:\n    - heading \"排班状态\" [level=2] [ref=e19]\n    - generic [ref=e20]:\n      - term [ref=e21]: 员工端 REST\n      - definition [ref=e22]: 休息\n      - term [ref=e23]: 管理端 REST\n      - definition [ref=e24]: 休息\n  - generic [ref=e25]:\n    - heading \"受控接口记录\" [level=2] [ref=e26]\n    - code [ref=e27]: GET /api/employee/workflow/leave-duration\n    - generic [ref=e28]: \"{ \\\"startAt\\\": \\\"2026-05-07T09:00:00\\\", \\\"endAt\\\": \\\"2026-05-07T12:00:00\\\" }\"\n    - code [ref=e29]: \"{ \\\"durationMinutes\\\": 180 }\"\n",
+  "stderr": ""
+}

@@ -1,0 +1,240 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "登录、失败锁定与会话退出",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-login.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "前端入口"
+    },
+    {
+      "id": "auth",
+      "label": "认证与门禁"
+    },
+    {
+      "id": "state",
+      "label": "会话与终态"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "form",
+      "lane": "entry",
+      "col": 0,
+      "type": "frontend",
+      "label": "提交登录",
+      "sublabel": "管理端／员工端",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 78,
+          "end_line": 86
+        }
+      ]
+    },
+    {
+      "id": "lock",
+      "lane": "auth",
+      "col": 0,
+      "type": "security",
+      "label": "检查失败锁定",
+      "sublabel": "按输入登录名计数",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AuthLockService.java",
+          "line": 39,
+          "end_line": 54
+        }
+      ]
+    },
+    {
+      "id": "provider",
+      "lane": "auth",
+      "col": 1,
+      "type": "security",
+      "label": "账号密码认证",
+      "sublabel": "状态与密码校验",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 120,
+          "end_line": 156
+        }
+      ]
+    },
+    {
+      "id": "mail",
+      "lane": "auth",
+      "col": 2,
+      "type": "security",
+      "label": "员工邮箱门禁",
+      "sublabel": "启用时要求二验或绑定",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 160,
+          "end_line": 199
+        }
+      ]
+    },
+    {
+      "id": "pending",
+      "lane": "entry",
+      "col": 2,
+      "type": "frontend",
+      "label": "等待邮箱资料",
+      "sublabel": "不签发会话",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 165,
+          "end_line": 196
+        }
+      ]
+    },
+    {
+      "id": "session",
+      "lane": "state",
+      "col": 3,
+      "type": "database",
+      "label": "轮换会话",
+      "sublabel": "废旧Session写认证上下文",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 202,
+          "end_line": 220
+        }
+      ]
+    },
+    {
+      "id": "me",
+      "lane": "entry",
+      "col": 4,
+      "type": "frontend",
+      "label": "加载当前账号",
+      "sublabel": "管理端补全权限",
+      "sources": [
+        {
+          "path": "admin-web/src/stores/session.ts",
+          "line": 55,
+          "end_line": 69
+        }
+      ]
+    },
+    {
+      "id": "logout",
+      "lane": "state",
+      "col": 5,
+      "type": "security",
+      "label": "退出并清上下文",
+      "sublabel": "Session失效",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 254,
+          "end_line": 260
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "lane": "state",
+      "col": 1,
+      "type": "security",
+      "label": "失败累计与拒绝",
+      "sublabel": "五次后锁定窗口",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AuthLockService.java",
+          "line": 15,
+          "end_line": 25
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "form",
+      "to": "lock",
+      "role": "main"
+    },
+    {
+      "from": "lock",
+      "to": "provider",
+      "label": "未锁定",
+      "role": "main"
+    },
+    {
+      "from": "provider",
+      "to": "mail",
+      "label": "凭证通过",
+      "role": "main"
+    },
+    {
+      "from": "provider",
+      "to": "failed",
+      "label": "凭证失败",
+      "role": "error"
+    },
+    {
+      "from": "mail",
+      "to": "pending",
+      "label": "资料缺失",
+      "role": "branch"
+    },
+    {
+      "from": "mail",
+      "to": "session",
+      "label": "验证完成",
+      "role": "main"
+    },
+    {
+      "from": "session",
+      "to": "me",
+      "role": "main"
+    },
+    {
+      "from": "me",
+      "to": "logout",
+      "role": "main"
+    }
+  ],
+  "mainPath": [
+    "form",
+    "lock",
+    "provider",
+    "mail",
+    "session",
+    "me",
+    "logout"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "实际行为",
+      "items": [
+        "管理员不走员工邮箱二验；员工已绑邮箱用LOGIN码，未绑邮箱用BIND码。",
+        "旧会话销毁后创建新会话；last_login_at更新失败不阻断登录。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "缺口与既有问题",
+      "items": [
+        "AUTH-01：当前employee新页漏处理requiresEmailBinding；独立hub-web漏处理两种待验证响应。",
+        "99-2：停用／撤权后已签发Session的失效问题沿用既有记录。"
+      ]
+    }
+  ]
+}

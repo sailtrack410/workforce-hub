@@ -1,0 +1,139 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] Copying 89 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 530 source files with javac [debug release 17] to target/classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] skip non existing resourceDirectory /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 115 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/test/java/com/workforcehub/plugin/runtime/PluginPermissionServiceTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-qf047yrd/src/test/java/com/workforcehub/plugin/runtime/PluginPermissionServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.auth.SessionValidityRequestChainTest
+20:17:39.993 [main] INFO org.hibernate.validator.internal.util.Version -- HV000001: Hibernate Validator 8.0.1.Final
+20:17:40.192 [main] INFO org.springframework.security.web.DefaultSecurityFilterChain -- Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@144ee8a7, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@52b32b70, org.springframework.security.web.context.SecurityContextHolderFilter@2e1add6f, org.springframework.security.web.header.HeaderWriterFilter@41143873, org.springframework.web.filter.CorsFilter@18c820d2, org.springframework.security.web.csrf.CsrfFilter@77ecdc2b, com.workforcehub.auth.security.SessionValidityFilter@3d3930fe, com.workforcehub.auth.security.UserTypePathFilter@5e51ec2e, com.workforcehub.auth.security.AdminPermissionFilter@15f2a43f, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@43786627, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@1d6f77d7, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@4c65d8e3, org.springframework.security.web.session.SessionManagementFilter@8bc0696, org.springframework.security.web.access.ExceptionTranslationFilter@50df37eb, org.springframework.security.web.access.intercept.AuthorizationFilter@30eedaa4]
+20:17:40.453 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:40.453 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:40.454 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+20:17:40.829 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=1
+20:17:40.890 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:40.891 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:40.891 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:41.092 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=2
+20:17:41.097 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:41.097 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:41.098 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+20:17:41.223 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=3
+20:17:41.289 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=4
+20:17:41.294 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:41.294 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:41.294 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:41.429 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=5
+20:17:41.510 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=6
+20:17:41.517 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:41.517 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:41.517 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:41.668 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=7
+20:17:41.671 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:41.671 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:41.672 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+20:17:41.805 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=8
+20:17:41.873 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=9
+20:17:41.947 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=10
+20:17:41.950 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:41.950 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:41.950 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:42.083 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=11
+20:17:42.208 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=12
+20:17:42.211 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:42.211 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:42.211 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:42.344 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=13
+20:17:42.347 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:42.347 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:42.348 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:42.483 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=14
+20:17:42.556 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=15
+20:17:42.573 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:42.573 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:42.573 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:42.707 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=16
+20:17:42.716 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:42.716 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:42.716 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:42.861 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=17
+20:17:42.867 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:42.867 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:42.867 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:43.025 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=18
+20:17:43.100 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=19
+20:17:43.105 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:43.106 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:43.106 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:43.245 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=20
+20:17:43.249 [main] WARN com.workforcehub.auth.service.LoginService -- 账号已禁用 userType=USER loginName=fixture.employee
+20:17:43.251 [main] WARN com.workforcehub.common.exception.GlobalExceptionHandler -- 业务异常: httpStatus=403, code=100403, message=账号已被禁用，请联系管理员
+20:17:43.254 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:43.254 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:43.255 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+20:17:43.393 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=21
+20:17:43.396 [main] WARN com.workforcehub.auth.service.LoginService -- 账号已锁定 userType=USER loginName=fixture.employee
+20:17:43.396 [main] WARN com.workforcehub.common.exception.GlobalExceptionHandler -- 业务异常: httpStatus=423, code=100423, message=账号已锁定，请联系管理员
+20:17:43.400 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:43.400 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:43.400 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:43.534 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=22
+20:17:43.538 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:43.538 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:43.538 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:43.677 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=ADMIN userId=101 loginName=fixture.admin sessionId=23
+20:17:43.757 [main] INFO org.springframework.security.web.DefaultSecurityFilterChain -- Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@5ddf5118, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@7b9d1a4, org.springframework.security.web.context.SecurityContextHolderFilter@33f2cf82, org.springframework.security.web.header.HeaderWriterFilter@1b9c716f, org.springframework.web.filter.CorsFilter@fcd3a6f, org.springframework.security.web.csrf.CsrfFilter@3601549f, com.workforcehub.auth.security.SessionValidityFilter@7845ee8a, com.workforcehub.auth.security.UserTypePathFilter@5f35370b, com.workforcehub.auth.security.AdminPermissionFilter@16c8e9b8, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@bea283b, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@73852720, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@7030b74c, org.springframework.security.web.session.SessionManagementFilter@f6bc75c, org.springframework.security.web.access.ExceptionTranslationFilter@5b2c7186, org.springframework.security.web.access.intercept.AuthorizationFilter@7ae0a26]
+20:17:43.767 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:43.767 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:43.767 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:43.776 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:43.776 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:43.778 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+20:17:43.915 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=25
+20:17:43.918 [main] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+20:17:43.918 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+20:17:43.918 [main] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+20:17:44.059 [main] INFO com.workforcehub.auth.service.LoginService -- 登录成功 userType=USER userId=201 loginName=fixture.employee sessionId=26
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.001 s -- in com.workforcehub.auth.SessionValidityRequestChainTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  20.694 s
+[INFO] Finished at: 2026-11-08T20:17:44+08:00
+[INFO] ------------------------------------------------------------------------

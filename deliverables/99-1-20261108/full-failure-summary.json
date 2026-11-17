@@ -1,0 +1,55 @@
+{
+  "categories": {
+    "context skipped after earlier startup failure": 384,
+    "missing isolated database password": 26,
+    "编译失败 ==> expected: <0> but was: <2>": 7,
+    "hello-plugin 源码编译失败 ==> expected: <0> but was: <2>": 2
+  },
+  "other_failures": [
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceTest.shouldTrackMultipleStatusTransitions",
+      "type": "failure",
+      "reason": "编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceTest.shouldInstallPluginAndTrackStatus",
+      "type": "failure",
+      "reason": "编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceTest.shouldHandlePluginWithoutMigration",
+      "type": "failure",
+      "reason": "编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginLifecycleTest.shouldLoadStartStopAndUnloadPluginWithHostContext",
+      "type": "failure",
+      "reason": "hello-plugin 源码编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginLifecycleTest.shouldReleaseHostAndPf4jReferencesAfterUnload",
+      "type": "failure",
+      "reason": "hello-plugin 源码编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayTest.shouldNotCallActionAfterUninstall",
+      "type": "failure",
+      "reason": "编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayTest.shouldCallActionSuccessfully",
+      "type": "failure",
+      "reason": "编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayTest.shouldNotCallActionWhenPluginStopped",
+      "type": "failure",
+      "reason": "编译失败 ==> expected: <0> but was: <2>"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayTest.shouldReturnCorrectActionDescriptor",
+      "type": "failure",
+      "reason": "编译失败 ==> expected: <0> but was: <2>"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "mvn",
+    "-B",
+    "-Dstyle.color=never",
+    "-Dtest=ModuleLeaveWorkflowIntegrationTest,ModuleLeaveApiIntegrationTest,LeaveSettlementTransactionTest",
+    "test"
+  ],
+  "cwd": "/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server",
+  "exit": 0,
+  "stdout": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/rollback.stdout",
+  "stderr": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/rollback.stderr"
+}

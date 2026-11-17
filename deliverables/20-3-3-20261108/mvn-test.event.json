@@ -1,0 +1,13 @@
+{
+  "cwd": "/tmp/workforce-quota-2033-suite/server",
+  "command": [
+    "mvn",
+    "-B",
+    "-Dquota.mysql.url=jdbc:mysql://127.0.0.1:23383/quota_2033_test?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true",
+    "test"
+  ],
+  "exit_status": 1,
+  "stdout": "mvn-test.stdout",
+  "stderr": "mvn-test.stderr",
+  "environment": "Generated disposable MySQL/Redis fixture; clean environment, no .env"
+}

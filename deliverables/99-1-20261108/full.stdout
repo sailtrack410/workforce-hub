@@ -1,0 +1,58 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 91 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 530 source files with javac [debug release 17] to target/classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 115 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/test/java/com/workforcehub/support/WorkflowFlowableTestConfiguration.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/test/java/com/workforcehub/plugin/runtime/DefaultEventServiceTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/test/java/com/workforcehub/plugin/runtime/DefaultEventServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/test/java/com/workforcehub/file/FileQuotaConcurrencyTest.java:[90,19] 无法将类 com.workforcehub.file.service.FileUploadTicketService中的构造器 FileUploadTicketService应用到给定类型;
+  需要: org.springframework.jdbc.core.JdbcTemplate,com.workforcehub.file.storage.StorageProviderRegistry,com.workforcehub.file.config.FileStorageProperties,com.fasterxml.jackson.databind.ObjectMapper,com.workforcehub.file.service.StorageUsageLedgerService,com.workforcehub.file.repository.FileObjectRepository,com.workforcehub.file.repository.AttachmentRefRepository,com.workforcehub.file.service.FileQuotaPolicyService,com.workforcehub.file.service.FileUploadRules,com.workforcehub.common.audit.AuditLogWriter,com.workforcehub.common.event.DomainEventPublisher
+  找到:    org.springframework.jdbc.core.JdbcTemplate,com.workforcehub.file.storage.StorageProviderRegistry,com.workforcehub.file.config.FileStorageProperties,com.workforcehub.file.service.StorageUsageLedgerService,com.workforcehub.file.repository.FileObjectRepository,com.workforcehub.file.repository.AttachmentRefRepository,com.workforcehub.file.service.FileQuotaPolicyService,com.workforcehub.file.service.FileUploadRules,com.workforcehub.common.audit.AuditLogWriter,com.workforcehub.common.event.DomainEventPublisher
+  原因: 实际参数列表和形式参数列表长度不同
+[INFO] 1 error
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  12.514 s
+[INFO] Finished at: 2026-11-08T20:15:13+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:testCompile (default-testCompile) on project workforce-hub: Compilation failure
+[ERROR] /private/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server/src/test/java/com/workforcehub/file/FileQuotaConcurrencyTest.java:[90,19] 无法将类 com.workforcehub.file.service.FileUploadTicketService中的构造器 FileUploadTicketService应用到给定类型;
+[ERROR]   需要: org.springframework.jdbc.core.JdbcTemplate,com.workforcehub.file.storage.StorageProviderRegistry,com.workforcehub.file.config.FileStorageProperties,com.fasterxml.jackson.databind.ObjectMapper,com.workforcehub.file.service.StorageUsageLedgerService,com.workforcehub.file.repository.FileObjectRepository,com.workforcehub.file.repository.AttachmentRefRepository,com.workforcehub.file.service.FileQuotaPolicyService,com.workforcehub.file.service.FileUploadRules,com.workforcehub.common.audit.AuditLogWriter,com.workforcehub.common.event.DomainEventPublisher
+[ERROR]   找到:    org.springframework.jdbc.core.JdbcTemplate,com.workforcehub.file.storage.StorageProviderRegistry,com.workforcehub.file.config.FileStorageProperties,com.workforcehub.file.service.StorageUsageLedgerService,com.workforcehub.file.repository.FileObjectRepository,com.workforcehub.file.repository.AttachmentRefRepository,com.workforcehub.file.service.FileQuotaPolicyService,com.workforcehub.file.service.FileUploadRules,com.workforcehub.common.audit.AuditLogWriter,com.workforcehub.common.event.DomainEventPublisher
+[ERROR]   原因: 实际参数列表和形式参数列表长度不同
+[ERROR] 
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

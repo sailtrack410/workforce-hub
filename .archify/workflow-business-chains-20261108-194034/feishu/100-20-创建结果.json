@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "subtask": {
+      "agent_task_status": 1,
+      "completed_at": "0",
+      "created_at": "1794139493351",
+      "creator": {
+        "id": "ou_358d547a8defe93637e1aa4046adde44",
+        "type": "user"
+      },
+      "dependencies": [],
+      "description": "编号：100-20 / IAR-05；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：同一文档两次reingest并发，或删除与已运行ingest交错。\n\n影响：旧作业仍可覆盖新作业文档状态/清单，已删除文档仍可能新增向量；查询有已删标题过滤，不据此声称删除后必定可读。\n\n证据与边界：reingest每次创建新作业并改latest指向；运行/成功/失败UPDATE仅WHERE document.id，不约束latest_ingest_job_id或is_deleted；replaceChunks按document整删；PG replaceDocumentVectors亦按document先停旧向量。\n\n修复方向：按文档租约串行，或在发布结果时比较latest_ingest_job_id与未删除状态；先写作业独立代次，成功后原子切换有效代次，失效作业仅清理自己的结果。\n\n验收条件：控制旧作业晚于新作业完成，最终清单/向量/状态均来自新作业；删除后旧作业完成不得重新激活；重复回调幂等。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java:263\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:308\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:318\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:334\nserver/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java:352\nserver/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java:79",
+      "extra": "",
+      "guid": "5cad070d-1de9-444a-b3f0-a7c42f1bf61e",
+      "is_milestone": false,
+      "mode": 2,
+      "origin": {
+        "href": {
+          "title": "sailtrack 飞书 CLI",
+          "url": ""
+        },
+        "platform_i18n_name": {
+          "de_de": "sailtrack 飞书 CLI",
+          "en_us": "sailtrack 飞书 CLI",
+          "es_es": "sailtrack 飞书 CLI",
+          "fr_fr": "sailtrack 飞书 CLI",
+          "it_it": "sailtrack 飞书 CLI",
+          "ja_jp": "sailtrack 飞书 CLI",
+          "ko_kr": "sailtrack 飞书 CLI",
+          "ru_ru": "sailtrack 飞书 CLI",
+          "th_th": "sailtrack 飞书 CLI",
+          "zh_cn": "sailtrack 飞书 CLI",
+          "zh_hk": "sailtrack 飞书 CLI",
+          "zh_tw": "sailtrack 飞书 CLI"
+        }
+      },
+      "parent_task_guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+      "repeat_rule": "",
+      "source": 7,
+      "status": "todo",
+      "subtask_count": 0,
+      "summary": "[P2][100-20][新问题] 文档入库并发缺少作业代次隔离",
+      "task_id": "t100060",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ],
+      "updated_at": "1794139493493",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=5cad070d-1de9-444a-b3f0-a7c42f1bf61e\u0026suite_entity_num=t100060"
+    }
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

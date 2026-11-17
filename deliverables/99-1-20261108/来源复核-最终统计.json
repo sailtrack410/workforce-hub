@@ -1,0 +1,20 @@
+{
+  "totals": {
+    "tests": 1229,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2
+  },
+  "skipped": [
+    {
+      "class": "com.workforcehub.auth.ModuleAuthMailSmtpSmokeTest",
+      "test": "realSmtpShouldSendBindEmailCode"
+    },
+    {
+      "class": "com.workforcehub.agent.AgentModelClientRealLlmSmokeTest",
+      "test": "realOpenAiCompatibleModelShouldReplyThroughSpringAi"
+    }
+  ],
+  "current_source_differences": [],
+  "snapshot": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-final-hx_f659t/source"
+}

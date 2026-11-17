@@ -1,0 +1,207 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "审批模板版本创建与发布",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "ops",
+      "label": "管理端配置"
+    },
+    {
+      "id": "state",
+      "label": "发布与消费"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "entry",
+      "lane": "ops",
+      "col": 0,
+      "type": "frontend",
+      "label": "治理页面",
+      "sublabel": "类型、模板、版本",
+      "sources": [
+        {
+          "path": "admin-web/src/views/WorkflowGovernanceView.vue",
+          "line": 195,
+          "end_line": 239
+        }
+      ]
+    },
+    {
+      "id": "template",
+      "lane": "ops",
+      "col": 1,
+      "type": "backend",
+      "label": "创建类型与模板",
+      "sublabel": "校验启用与唯一编码",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 66,
+          "end_line": 107
+        }
+      ]
+    },
+    {
+      "id": "draft",
+      "lane": "ops",
+      "col": 2,
+      "type": "backend",
+      "label": "保存草稿",
+      "sublabel": "规范化表单和规则JSON",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 109,
+          "end_line": 132
+        }
+      ]
+    },
+    {
+      "id": "gate",
+      "lane": "ops",
+      "col": 3,
+      "type": "security",
+      "label": "校验发布条件",
+      "sublabel": "草稿＋启用模板＋定义",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 134,
+          "end_line": 156
+        }
+      ]
+    },
+    {
+      "id": "archive",
+      "lane": "ops",
+      "col": 4,
+      "type": "backend",
+      "label": "归档旧发布版",
+      "sublabel": "关闭旧生效区间",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 158,
+          "end_line": 164
+        }
+      ]
+    },
+    {
+      "id": "published",
+      "lane": "ops",
+      "col": 5,
+      "type": "backend",
+      "label": "发布新版本",
+      "sublabel": "保存精确definitionId",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 158,
+          "end_line": 165
+        }
+      ]
+    },
+    {
+      "id": "blocked",
+      "lane": "state",
+      "col": 3,
+      "type": "security",
+      "label": "拒绝发布",
+      "sublabel": "409状态或404定义",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 138,
+          "end_line": 155
+        }
+      ]
+    },
+    {
+      "id": "select",
+      "lane": "state",
+      "col": 5,
+      "type": "backend",
+      "label": "新申请选择发布版",
+      "sublabel": "有效区间内最高版本",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/repository/WorkflowRepository.java",
+          "line": 37,
+          "end_line": 64
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "entry",
+      "to": "template"
+    },
+    {
+      "from": "template",
+      "to": "draft"
+    },
+    {
+      "from": "draft",
+      "to": "gate"
+    },
+    {
+      "from": "gate",
+      "to": "archive",
+      "label": "通过"
+    },
+    {
+      "from": "archive",
+      "to": "published"
+    },
+    {
+      "from": "gate",
+      "to": "blocked",
+      "label": "不满足",
+      "role": "error"
+    },
+    {
+      "from": "published",
+      "to": "select"
+    }
+  ],
+  "mainPath": [
+    "entry",
+    "template",
+    "draft",
+    "gate",
+    "archive",
+    "published",
+    "select"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "正常与回退",
+      "items": [
+        "发布事务内归档旧版并启用新版；未找到定义则抛错。",
+        "已有申请保留 template_version_id，AI回调按申请取原版本。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "优化与边界",
+      "items": [
+        "当前内置BPMN为直属上级单步审批；任意定义发布前应核验可兼容的任务结构。",
+        "仅静态代码追踪；未验证并发发布、真实Flowable部署与数据库事务。"
+      ]
+    }
+  ]
+}

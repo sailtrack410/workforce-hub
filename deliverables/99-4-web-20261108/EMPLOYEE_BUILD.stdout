@@ -1,0 +1,66 @@
+
+> workforce-hub-employee-web@0.1.0 build
+> vue-tsc --noEmit && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1715 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                    0.55 kB │ gzip:  0.36 kB
+dist/assets/app-icon-today-CuHVxMC-.jpg           18.30 kB
+dist/assets/app-icon-oa-DHmloktH.jpg              21.76 kB
+dist/assets/app-icon-attendance-BEFXwT8X.jpg      22.65 kB
+dist/assets/empty-generic-BfKtthUn.jpg            23.08 kB
+dist/assets/app-icon-leave-DmLIfv2T.jpg           25.96 kB
+dist/assets/empty-contacts-BTIXbuE5.jpg           27.83 kB
+dist/assets/empty-messages-BqHiQMbA.jpg           28.49 kB
+dist/assets/empty-files-C-B4IagS.jpg              31.01 kB
+dist/assets/empty-todos-BJyGuw8W.jpg              34.19 kB
+dist/assets/cloud-folder-D1mKNfXA.png             36.20 kB
+dist/assets/empty-workbench-BFsge_qt.jpg          41.53 kB
+dist/assets/avatar-qa-ByU5xggD.jpg                45.82 kB
+dist/assets/avatar-echo-B2QDtkoS.jpg              48.50 kB
+dist/assets/AppDialog-D3JrJAGD.css                 0.62 kB │ gzip:  0.33 kB
+dist/assets/AppTag-PTiXKehG.css                    0.88 kB │ gzip:  0.37 kB
+dist/assets/AppEmptyState-BKvyHWIS.css             1.17 kB │ gzip:  0.50 kB
+dist/assets/AppInput-Q-CTOt4X.css                  1.54 kB │ gzip:  0.58 kB
+dist/assets/HubEmpty-DvwiQw5M.css                  2.57 kB │ gzip:  0.89 kB
+dist/assets/AppAvatar-c71X7-jX.css                 4.10 kB │ gzip:  0.76 kB
+dist/assets/employee-shell-context-CUAnPmV5.css    4.56 kB │ gzip:  1.19 kB
+dist/assets/HubShell-DxCRepaw.css                  5.41 kB │ gzip:  1.51 kB
+dist/assets/MessagesView-DcTfR8U7.css              7.65 kB │ gzip:  1.72 kB
+dist/assets/ApprovalsView-CxivkU4W.css             8.68 kB │ gzip:  1.82 kB
+dist/assets/AuthView-BBOSJ2_S.css                 12.56 kB │ gzip:  3.03 kB
+dist/assets/WorkbenchView-CHVXhivV.css            13.08 kB │ gzip:  2.52 kB
+dist/assets/MessagesView-VWSSX9eB.css             18.39 kB │ gzip:  3.35 kB
+dist/assets/index-CTPR52ZQ.css                   141.30 kB │ gzip: 21.94 kB
+dist/assets/AppDialog-BK3Yindz.js                  0.46 kB │ gzip:  0.33 kB
+dist/assets/file-format-CmJBW1em.js                0.46 kB │ gzip:  0.33 kB
+dist/assets/AppTag-C5CROKnV.js                     0.67 kB │ gzip:  0.44 kB
+dist/assets/employee-format-BzCaL0yN.js            1.24 kB │ gzip:  0.74 kB
+dist/assets/AppEmptyState-N32qzVr7.js              1.26 kB │ gzip:  0.67 kB
+dist/assets/AppAvatar-By3FFuK9.js                  1.53 kB │ gzip:  0.83 kB
+dist/assets/HubEmpty-CXVtC7G0.js                   1.72 kB │ gzip:  0.87 kB
+dist/assets/AppInput-BymaDR-t.js                   1.81 kB │ gzip:  0.98 kB
+dist/assets/file-record-jhUIYEN5.js                1.81 kB │ gzip:  0.85 kB
+dist/assets/session-cQlr_EBJ.js                    2.49 kB │ gzip:  0.95 kB
+dist/assets/employee-shell-context-BEzJXKVU.js     2.88 kB │ gzip:  1.18 kB
+dist/assets/notifications-fdJkfu4o.js              3.43 kB │ gzip:  1.46 kB
+dist/assets/useImSocket-CHeCd4yI.js                3.54 kB │ gzip:  1.47 kB
+dist/assets/HubShell-DLlvg5Kg.js                   3.96 kB │ gzip:  1.75 kB
+dist/assets/AgentsSection-Bqlbxf63.js              7.00 kB │ gzip:  2.86 kB
+dist/assets/index-uZf7M2UJ.js                      7.29 kB │ gzip:  3.07 kB
+dist/assets/employee-B-1QRT1j.js                  11.04 kB │ gzip:  3.22 kB
+dist/assets/WorkbenchView-Cd-Ypzc8.js             11.20 kB │ gzip:  4.63 kB
+dist/assets/ApprovalsView-BZos1hKs.js             14.78 kB │ gzip:  5.30 kB
+dist/assets/ContactsSection-Sw25HCzb.js           17.64 kB │ gzip:  6.42 kB
+dist/assets/AuthView-BLwIM022.js                  17.93 kB │ gzip:  5.87 kB
+dist/assets/MessagesView-CXmyVKUx.js              28.23 kB │ gzip:  9.49 kB
+dist/assets/SettingsSection-CTbzbREd.js           29.53 kB │ gzip:  8.55 kB
+dist/assets/FilesSection-14CGfE2v.js              30.54 kB │ gzip: 13.43 kB
+dist/assets/vendor-icons-Bvh1NiiE.js              39.20 kB │ gzip:  7.31 kB
+dist/assets/shell-C0CEADQx.js                     45.01 kB │ gzip: 14.30 kB
+dist/assets/MessagesView-C-ZAmkVt.js              55.57 kB │ gzip: 18.32 kB
+dist/assets/vendor-vue-CrmAYWuW.js               141.83 kB │ gzip: 54.82 kB
+✓ built in 2.90s

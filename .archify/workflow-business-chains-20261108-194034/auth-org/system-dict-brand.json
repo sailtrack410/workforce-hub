@@ -1,0 +1,196 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "数据字典维护与品牌配置发布",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "管理端配置"
+    },
+    {
+      "id": "service",
+      "label": "字典与品牌服务"
+    },
+    {
+      "id": "read",
+      "label": "消费与审计"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "edit",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "维护字典与品牌",
+      "sublabel": "品牌使用固定字典类型",
+      "sources": [
+        {
+          "path": "admin-web/src/views/EnterpriseView.vue",
+          "line": 15,
+          "end_line": 17
+        }
+      ]
+    },
+    {
+      "id": "save",
+      "lane": "ui",
+      "col": 1,
+      "type": "frontend",
+      "label": "提交条目保存",
+      "sublabel": "新增／编辑排序启用状态",
+      "sources": [
+        {
+          "path": "admin-web/src/views/EnterpriseView.vue",
+          "line": 82,
+          "end_line": 98
+        }
+      ]
+    },
+    {
+      "id": "write",
+      "lane": "service",
+      "col": 2,
+      "type": "database",
+      "label": "字典写入事务",
+      "sublabel": "创建更新删除",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 51,
+          "end_line": 75
+        }
+      ]
+    },
+    {
+      "id": "cache",
+      "lane": "service",
+      "col": 3,
+      "type": "backend",
+      "label": "失效本机标签缓存",
+      "sublabel": "按字典类型移除",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 106,
+          "end_line": 139
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "lane": "read",
+      "col": 3,
+      "type": "database",
+      "label": "追加审计记录",
+      "sublabel": "DICT_CREATE／UPDATE／DELETE",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 93,
+          "end_line": 107
+        }
+      ]
+    },
+    {
+      "id": "brand",
+      "lane": "read",
+      "col": 4,
+      "type": "backend",
+      "label": "公开读取启用标语",
+      "sublabel": "从sys_dict按序取标签",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/BrandingService.java",
+          "line": 24,
+          "end_line": 33
+        }
+      ]
+    },
+    {
+      "id": "fixed",
+      "lane": "read",
+      "col": 5,
+      "type": "frontend",
+      "label": "当前登录固定内容",
+      "sublabel": "新员工页未读取品牌接口",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 11,
+          "end_line": 28
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "edit",
+      "to": "save",
+      "role": "main"
+    },
+    {
+      "from": "save",
+      "to": "write",
+      "role": "main"
+    },
+    {
+      "from": "write",
+      "to": "cache",
+      "role": "main"
+    },
+    {
+      "from": "write",
+      "to": "audit",
+      "label": "记录",
+      "role": "branch"
+    },
+    {
+      "from": "cache",
+      "to": "brand",
+      "label": "后续读取",
+      "role": "main"
+    },
+    {
+      "from": "brand",
+      "to": "fixed",
+      "label": "当前页未接入",
+      "role": "branch"
+    }
+  ],
+  "mainPath": [
+    "edit",
+    "save",
+    "write",
+    "cache",
+    "brand"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "实际消费边界",
+      "items": [
+        "品牌配置已落sys_dict并有公开读取服务；当前新员工登录页与独立hub页展示固定品牌内容。",
+        "旧MessagesView使用品牌接口的能力不能证明当前/login页面已消费。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "多实例优化",
+      "items": [
+        "labelCache是进程内ConcurrentMap，写后只失效当前实例；多JVM标签一致性需要验收。",
+        "99-3可变假期类型问题沿用；不把字典维护本身重复列为新问题。"
+      ]
+    }
+  ]
+}

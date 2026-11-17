@@ -1,0 +1,259 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ workforce-hub ---
+[INFO] Deleting /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 92 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 530 source files with javac [debug release 17] to target/classes
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 115 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/src/test/java/com/workforcehub/plugin/repository/PluginOperationIdempotencyRepositoryTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.leave.LeaveSettlementTransactionTest
+SETTLEMENT change=MODE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=MODE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=MODE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=INACTIVE outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=INACTIVE outcome=WITHDRAWN available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=APPROVED available=960 frozen=0
+SETTLEMENT change=DELETED outcome=REJECTED available=1440 frozen=0
+SETTLEMENT change=DELETED outcome=WITHDRAWN available=1440 frozen=0
+[INFO] Tests run: 32, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.288 s -- in com.workforcehub.leave.LeaveSettlementTransactionTest
+[INFO] Running com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+20:51:17.120 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest]: ModuleLeaveWorkflowIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+20:51:17.306 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+2026-11-08T20:51:17.894+08:00  INFO [] 46824 --- [background-preinit] o.h.validator.internal.util.Version      : HV000001: Hibernate Validator 8.0.1.Final
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:51:17.972+08:00  INFO [] 46824 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Starting ModuleLeaveWorkflowIntegrationTest using Java 17.0.18 with PID 46824 (started by sailtrack in /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server)
+2026-11-08T20:51:17.972+08:00 DEBUG [] 46824 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:51:17.973+08:00  INFO [] 46824 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : The following 1 profile is active: "api"
+2026-11-08T20:51:20.068+08:00  INFO [] 46824 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:51:20.070+08:00  INFO [] 46824 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:51:20.113+08:00  INFO [] 46824 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 34 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:51:20.527+08:00  INFO [] 46824 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-11-08T20:51:20.663+08:00  INFO [] 46824 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-11-08T20:51:20.765+08:00  INFO [] 46824 --- [main] o.f.c.internal.license.VersionPrinter    : Flyway Community Edition 9.22.3 by Redgate
+2026-11-08T20:51:20.765+08:00  INFO [] 46824 --- [main] o.f.c.internal.license.VersionPrinter    : See release notes here: https://rd.gt/416ObMi
+2026-11-08T20:51:20.765+08:00  INFO [] 46824 --- [main] o.f.c.internal.license.VersionPrinter    : 
+2026-11-08T20:51:20.797+08:00  INFO [] 46824 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:62826/workforce_993_test (MySQL 8.4)
+2026-11-08T20:51:20.839+08:00  WARN [] 46824 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:51:20.903+08:00  INFO [] 46824 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 67 migrations (execution time 00:00.055s)
+2026-11-08T20:51:20.911+08:00  INFO [] 46824 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_993_test`: 69
+2026-11-08T20:51:20.912+08:00  INFO [] 46824 --- [main] o.f.core.internal.command.DbMigrate      : Schema `workforce_993_test` is up to date. No migration necessary.
+2026-11-08T20:51:22.197+08:00  INFO [] 46824 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:51:22.197+08:00  INFO [] 46824 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:51:22.198+08:00  INFO [] 46824 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:51:23.254+08:00  INFO [] 46824 --- [main] o.f.engine.impl.ProcessEngineImpl        : ProcessEngine default created
+2026-11-08T20:51:23.281+08:00  INFO [] 46824 --- [main] o.f.e.impl.cmd.ValidateV5EntitiesCmd     : Total of v5 deployments found: 0
+2026-11-08T20:51:23.999+08:00  INFO [] 46824 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:51:24.124+08:00  INFO [] 46824 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@6767f1c4, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@199f2854, org.springframework.security.web.context.SecurityContextHolderFilter@5dae85f7, org.springframework.security.web.header.HeaderWriterFilter@a983f06, org.springframework.web.filter.CorsFilter@5c9cbc69, org.springframework.security.web.csrf.CsrfFilter@7c09fdb8, com.workforcehub.auth.security.SessionValidityFilter@1b12c870, com.workforcehub.auth.security.UserTypePathFilter@7a7f5c44, com.workforcehub.auth.security.AdminPermissionFilter@25df95b, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@47651c28, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@5a67843b, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@60a4e124, org.springframework.security.web.session.SessionManagementFilter@7c4d74da, org.springframework.security.web.access.ExceptionTranslationFilter@3bb6bcf8, org.springframework.security.web.access.intercept.AuthorizationFilter@235babaf]
+2026-11-08T20:51:24.741+08:00 DEBUG [] 46824 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:51:24.741+08:00 DEBUG [] 46824 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:51:24.741+08:00 DEBUG [] 46824 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:51:24.741+08:00 DEBUG [] 46824 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:51:24.741+08:00 DEBUG [] 46824 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:51:24.742+08:00  INFO [] 46824 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:51:24.743+08:00  INFO [] 46824 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:51:24.745+08:00  INFO [] 46824 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-11-08T20:51:24.903+08:00  INFO [] 46824 --- [main] o.f.s.c.DefaultAutoDeploymentStrategy    : Deploying resources [file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/borrow-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/business-trip-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/certificate-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/clock-correction-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/expense-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/leave-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/overtime-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/project-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/purchase-manager-approval.bpmn20.xml], file [/private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server/target/classes/processes/seal-manager-approval.bpmn20.xml]] for engine org.flowable.engine.impl.ProcessEngineImpl@2d29b8d3 deployment name hint SpringBootAutoDeployment
+2026-11-08T20:51:24.953+08:00  INFO [] 46824 --- [main] c.w.l.ModuleLeaveWorkflowIntegrationTest : Started ModuleLeaveWorkflowIntegrationTest in 7.443 seconds (process running for 12.048)
+2026-11-08T20:51:24.984+08:00  INFO [] 46824 --- [main] c.w.plugin.runtime.PluginManagerService  : 恢复 0 个可用插件
+2026-11-08T20:51:26.910+08:00 DEBUG [fa6a964723bd4ebf8cec1c784585361d] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:26.928+08:00  INFO [fa6a964723bd4ebf8cec1c784585361d] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=4f6397fa-f48e-4e4d-bf8e-8d8ce83f196e
+2026-11-08T20:51:27.391+08:00  WARN [c601aa9f0246491fa408c0973f2ffa6a] 46824 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=400, code=100400, message=假期余额不足
+2026-11-08T20:51:27.597+08:00 DEBUG [3f9a0a5c55544888bd6259b800af4bd9] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:27.600+08:00  INFO [3f9a0a5c55544888bd6259b800af4bd9] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=8dadb1c4-c794-4f94-a711-d341635a20d9
+2026-11-08T20:51:27.679+08:00 DEBUG [cc6e16ae10864cd5bcc881e26b5e6c23] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:27.682+08:00  INFO [cc6e16ae10864cd5bcc881e26b5e6c23] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=f687a34b-ad9b-4bcb-95dd-f2b6fa0f0c4e
+2026-11-08T20:51:28.228+08:00 DEBUG [f22d3235d9fe47988dd7019095f5d543] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:28.232+08:00  INFO [f22d3235d9fe47988dd7019095f5d543] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=5756a83d-ed78-48fd-a309-df6cfd82e1b3
+2026-11-08T20:51:28.315+08:00 DEBUG [54e54a8a1a11476b984129cea1dfe63a] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:28.317+08:00  INFO [54e54a8a1a11476b984129cea1dfe63a] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=1ec14de7-caeb-4df9-92e0-e76739b0b9fc
+2026-11-08T20:51:28.586+08:00 DEBUG [2982fe675bcb4470878a8e200ea90b26] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:28.588+08:00  INFO [2982fe675bcb4470878a8e200ea90b26] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=9a3412f1-23bb-4e9b-aabd-ef11a4f02101
+2026-11-08T20:51:28.667+08:00 DEBUG [b35ab9a8a4f646c7b97dfaea93fee003] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:28.671+08:00  INFO [b35ab9a8a4f646c7b97dfaea93fee003] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=bd159d6e-bdd3-4038-b489-c48f8da2f6c6
+2026-11-08T20:51:28.732+08:00  WARN [1de2d75260074b8798e6e98ab87eb651] 46824 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同假期扣减操作使用
+MYSQL_FINGERPRINT_CONFLICT http=409 available=900 frozen=480 status=IN_APPROVAL
+2026-11-08T20:51:28.881+08:00 DEBUG [ae8e8c652c9d4f06b2614a42809db015] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:28.884+08:00  INFO [ae8e8c652c9d4f06b2614a42809db015] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=61ef551f-cdc5-43d9-99a0-bc025a589f81
+2026-11-08T20:51:29.255+08:00 DEBUG [aa2dbcbcc57044fbbfc62eb8ce47763d] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:29.269+08:00  INFO [aa2dbcbcc57044fbbfc62eb8ce47763d] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=9aedd5c7-9491-4c5a-9898-f51fbf9f0201
+2026-11-08T20:51:29.389+08:00 DEBUG [98bf75a540d14863a56927e2b6db00b1] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:29.395+08:00  INFO [98bf75a540d14863a56927e2b6db00b1] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=3f416823-f71e-470b-ad72-e0b23ba2e182
+2026-11-08T20:51:29.906+08:00 DEBUG [c493eabaf09e4755b9bc241febe2c8e4] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:29.908+08:00  INFO [c493eabaf09e4755b9bc241febe2c8e4] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=eec7b3e3-17ee-427d-8972-21625f6e4c49
+2026-11-08T20:51:29.989+08:00 DEBUG [a487a63de1834734b44422e6312835a6] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:29.991+08:00  INFO [a487a63de1834734b44422e6312835a6] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=4cca753e-18d1-4c83-95d3-cfd845b32459
+2026-11-08T20:51:30.264+08:00 DEBUG [2e429003a24945648f9ed4f7cc57a2ce] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:30.268+08:00  INFO [2e429003a24945648f9ed4f7cc57a2ce] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=3ee01003-5bbc-4767-96cb-665ddfdee899
+2026-11-08T20:51:30.354+08:00 DEBUG [969608c6abf44a2bb37ea16afa3a75b8] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:30.358+08:00  INFO [969608c6abf44a2bb37ea16afa3a75b8] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=6f8684b4-bd15-4956-83ff-7ec4b55fc5f6
+2026-11-08T20:51:30.548+08:00 DEBUG [0b9510d8fefe4e4b87fb2ec848a5ee3d] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:30.550+08:00  INFO [0b9510d8fefe4e4b87fb2ec848a5ee3d] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=af6fd106-a182-461b-8647-b7c47fb83d21
+2026-11-08T20:51:30.619+08:00 DEBUG [87a7358fb4a2487aab2423910dd06b5e] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:30.621+08:00  INFO [87a7358fb4a2487aab2423910dd06b5e] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=86654f56-eb94-4f55-817d-8e710dc105d5
+MYSQL_ORIGINAL_NO_DEDUCT current=DEDUCT outcome=APPROVED available=960 frozen=0 deduct_txns=0
+2026-11-08T20:51:30.781+08:00 DEBUG [7e9083a65ec44413bae4c890f8c371f2] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:30.786+08:00  INFO [7e9083a65ec44413bae4c890f8c371f2] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=3ec9b7fc-2592-4ff6-a72f-b8e1f7bf1c49
+2026-11-08T20:51:30.802+08:00  WARN [c007c68f302b4290b7e80fac18a4257d] 46824 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=400, code=100400, message=假期余额不足
+2026-11-08T20:51:30.924+08:00 DEBUG [9042352a3f714c3cbef56735dfc01150] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:30.926+08:00  INFO [9042352a3f714c3cbef56735dfc01150] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=c129edfa-334e-49e2-a700-1771851cb3de
+2026-11-08T20:51:31.007+08:00 DEBUG [f9e5f3986908472bb03426bc2ce800d2] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.010+08:00  INFO [f9e5f3986908472bb03426bc2ce800d2] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=3162593f-81d3-404c-afbb-46e9d5c5faf6
+2026-11-08T20:51:31.197+08:00 DEBUG [c46959e38c804d02a371a380caaccd53] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.198+08:00  INFO [c46959e38c804d02a371a380caaccd53] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=e88b61b7-223c-414f-8c67-342a502074ed
+2026-11-08T20:51:31.332+08:00 DEBUG [ac1ddcb3250147d19bdcfec2c51f2fbc] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.336+08:00  INFO [ac1ddcb3250147d19bdcfec2c51f2fbc] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=5f8fbd94-68cf-4cd2-9014-911f1b7ad592
+2026-11-08T20:51:31.404+08:00 DEBUG [35da949ba1c7466d83027a3da5408020] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.406+08:00  INFO [35da949ba1c7466d83027a3da5408020] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=6b3261fd-63b8-4f03-b9b4-c5b4e9773395
+MYSQL_CONFIGURATION change=MODE outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:51:31.589+08:00 DEBUG [8e412248bd234aa4897c666c563929d3] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.591+08:00  INFO [8e412248bd234aa4897c666c563929d3] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=6cdc7254-a928-4001-961e-4606a6824aaf
+2026-11-08T20:51:31.663+08:00 DEBUG [1b2d19fd43ab4b30a4cbc9ffa8ddf359] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.673+08:00  INFO [1b2d19fd43ab4b30a4cbc9ffa8ddf359] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=d025348d-4048-4bcc-a3fa-e6d84b9b0949
+MYSQL_CONFIGURATION change=MODE outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:51:31.903+08:00 DEBUG [d6be5389a65044cbbd119a86608a96cd] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.907+08:00  INFO [d6be5389a65044cbbd119a86608a96cd] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=799f3750-e0f2-4506-9910-50c0e1726898
+2026-11-08T20:51:31.982+08:00 DEBUG [1612d80bd2ef4567960baba211157725] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:31.984+08:00  INFO [1612d80bd2ef4567960baba211157725] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=380d6838-ef69-46fd-94cd-1d5b9808cde9
+MYSQL_CONFIGURATION change=MODE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+2026-11-08T20:51:32.154+08:00 DEBUG [7083a233c65341bca99aad0c1a3ca0f5] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:32.157+08:00  INFO [7083a233c65341bca99aad0c1a3ca0f5] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=e519e338-179e-4607-93db-a00ae24bb3b9
+2026-11-08T20:51:32.238+08:00 DEBUG [12945ac9d28546fdabb167451dc2d598] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:32.241+08:00  INFO [12945ac9d28546fdabb167451dc2d598] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=963bf084-52a9-458e-8b26-06caf6ea1f76
+MYSQL_CONFIGURATION change=INACTIVE outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:51:32.446+08:00 DEBUG [2f3875d3337b4a01a787aef10f16a31b] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:32.448+08:00  INFO [2f3875d3337b4a01a787aef10f16a31b] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=6db2b145-33bc-44a3-ad51-c83c1db979fa
+2026-11-08T20:51:32.517+08:00 DEBUG [a9bb1113dbda482c8f8af84c4d952fb1] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:32.518+08:00  INFO [a9bb1113dbda482c8f8af84c4d952fb1] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=69145077-1c25-4f0b-b0e3-6bde06045684
+MYSQL_CONFIGURATION change=INACTIVE outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:51:32.674+08:00 DEBUG [deef0144a5a2494ea3131f458c557c9b] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:32.676+08:00  INFO [deef0144a5a2494ea3131f458c557c9b] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=d63d68de-698e-4422-a5c6-bbb5d9d1a4bb
+2026-11-08T20:51:32.742+08:00 DEBUG [579c3401fbe84944977368a3357367d1] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:32.744+08:00  INFO [579c3401fbe84944977368a3357367d1] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=947fe4b1-d6d0-46aa-89a4-fcf38954cc74
+MYSQL_CONFIGURATION change=INACTIVE outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+2026-11-08T20:51:32.926+08:00 DEBUG [e55b0f15381b4cbbb8e16b4015ea3aed] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:32.929+08:00  INFO [e55b0f15381b4cbbb8e16b4015ea3aed] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=fd5727d9-f61f-4db1-a4f1-2ab2c7fa650d
+2026-11-08T20:51:33.005+08:00 DEBUG [b38f843d171c40268161a841e83c577a] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:33.007+08:00  INFO [b38f843d171c40268161a841e83c577a] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=e6dac667-bbb4-4abe-a305-e89e75a1b7cb
+MYSQL_CONFIGURATION change=DELETED outcome=APPROVED available=480 frozen=0 terminal_txns=1
+2026-11-08T20:51:33.272+08:00 DEBUG [20c70409f1fe42c0b62b26ea28b6120e] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:33.294+08:00  INFO [20c70409f1fe42c0b62b26ea28b6120e] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=3fbe9486-dfb3-4a10-b6bc-e42269e81277
+2026-11-08T20:51:33.399+08:00 DEBUG [5dad253c9080432cbb69138c98d84ccf] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:33.407+08:00  INFO [5dad253c9080432cbb69138c98d84ccf] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=3956dd50-a009-4acd-9b24-2c8e9fc39ec6
+MYSQL_CONFIGURATION change=DELETED outcome=REJECTED available=960 frozen=0 terminal_txns=1
+2026-11-08T20:51:33.662+08:00 DEBUG [f65a3fa598804462a030f5ec25cc0867] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:33.665+08:00  INFO [f65a3fa598804462a030f5ec25cc0867] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=fcf9a132-b9ab-43bb-ba1e-2707a8a43f68
+2026-11-08T20:51:33.743+08:00 DEBUG [e956d62c66e94e8c96c292c19ca29971] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:33.747+08:00  INFO [e956d62c66e94e8c96c292c19ca29971] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2002 loginName=lisi.manager sessionId=e5f738c1-a937-4893-ba42-4f56f02d7a6e
+MYSQL_CONFIGURATION change=DELETED outcome=WITHDRAWN available=960 frozen=0 terminal_txns=1
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 16.75 s -- in com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest
+[INFO] Running com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+2026-11-08T20:51:33.804+08:00  INFO [] 46824 --- [main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.workforcehub.leave.ModuleLeaveApiIntegrationTest]: ModuleLeaveApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-11-08T20:51:33.809+08:00  INFO [] 46824 --- [main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+2026-11-08T20:51:33.830+08:00  WARN [] 46824 --- [main] lowableLiquibaseEnvironmentPostProcessor : Liquibase has not been explicitly enabled or disabled. Overriding default from Spring Boot from `true` to `false`. Flowable pulls in Liquibase, but does not use the Spring Boot configuration for it. If you are using it you would need to set `spring.liquibase.enabled` to `true` by yourself
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:51:33.838+08:00  INFO [] 46824 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Starting ModuleLeaveApiIntegrationTest using Java 17.0.18 with PID 46824 (started by sailtrack in /private/tmp/workforce-993-mysql-vrpbk4lz/snapshot/server)
+2026-11-08T20:51:33.838+08:00 DEBUG [] 46824 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:51:33.838+08:00  INFO [] 46824 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : The following 1 profile is active: "api"
+2026-11-08T20:51:34.425+08:00  INFO [] 46824 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:51:34.425+08:00  INFO [] 46824 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:51:34.481+08:00  INFO [] 46824 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 55 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:51:34.588+08:00  INFO [] 46824 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-11-08T20:51:34.598+08:00  INFO [] 46824 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-11-08T20:51:34.621+08:00  INFO [] 46824 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:62826/workforce_993_test (MySQL 8.4)
+2026-11-08T20:51:34.624+08:00  WARN [] 46824 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:51:34.659+08:00  INFO [] 46824 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 67 migrations (execution time 00:00.032s)
+2026-11-08T20:51:34.667+08:00  INFO [] 46824 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_993_test`: 69
+2026-11-08T20:51:34.668+08:00  INFO [] 46824 --- [main] o.f.core.internal.command.DbMigrate      : Schema `workforce_993_test` is up to date. No migration necessary.
+2026-11-08T20:51:34.859+08:00  INFO [] 46824 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:51:34.859+08:00  INFO [] 46824 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:51:34.859+08:00  INFO [] 46824 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:51:34.969+08:00  INFO [] 46824 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:51:34.976+08:00  INFO [] 46824 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@6c027ab7, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@65399087, org.springframework.security.web.context.SecurityContextHolderFilter@a3d02fe, org.springframework.security.web.header.HeaderWriterFilter@7c516b63, org.springframework.web.filter.CorsFilter@32122ad3, org.springframework.security.web.csrf.CsrfFilter@75293ab6, com.workforcehub.auth.security.SessionValidityFilter@1937bcc6, com.workforcehub.auth.security.UserTypePathFilter@40487b38, com.workforcehub.auth.security.AdminPermissionFilter@55cc19ee, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@31248251, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@46d9fd65, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@410e5a50, org.springframework.security.web.session.SessionManagementFilter@367d620d, org.springframework.security.web.access.ExceptionTranslationFilter@7cf8fb4b, org.springframework.security.web.access.intercept.AuthorizationFilter@792149c8]
+2026-11-08T20:51:35.037+08:00 DEBUG [] 46824 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:51:35.037+08:00 DEBUG [] 46824 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:51:35.037+08:00 DEBUG [] 46824 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:51:35.037+08:00 DEBUG [] 46824 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:51:35.037+08:00 DEBUG [] 46824 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:51:35.037+08:00  INFO [] 46824 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:51:35.037+08:00  INFO [] 46824 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:51:35.038+08:00  INFO [] 46824 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:51:35.054+08:00  INFO [] 46824 --- [main] c.w.leave.ModuleLeaveApiIntegrationTest  : Started ModuleLeaveApiIntegrationTest in 1.242 seconds (process running for 22.149)
+2026-11-08T20:51:35.056+08:00  INFO [] 46824 --- [main] c.w.plugin.runtime.PluginManagerService  : 恢复 0 个可用插件
+2026-11-08T20:51:35.266+08:00 DEBUG [d096237ec4e142d2b48d94e52f5796aa] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:35.269+08:00  INFO [d096237ec4e142d2b48d94e52f5796aa] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=ea9f9a25-02bf-4a83-b302-b6e586f874ae
+2026-11-08T20:51:35.454+08:00 DEBUG [ede1990dc8ce431cb52fbce092cb6ef5] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:35.457+08:00  INFO [ede1990dc8ce431cb52fbce092cb6ef5] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=9fd1e14d-048a-42b5-865e-3f27a03a8225
+2026-11-08T20:51:35.618+08:00 DEBUG [54815ea0790c4f95a5ee62827fda9c0c] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:35.621+08:00  INFO [54815ea0790c4f95a5ee62827fda9c0c] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=317c35a5-fa8e-4e9c-bf79-e4a0985dfbf4
+2026-11-08T20:51:35.809+08:00 DEBUG [5c10aaa39def46e38f2e45f14f2d993c] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:35.810+08:00  INFO [5c10aaa39def46e38f2e45f14f2d993c] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=6b2c783b-670c-4fe3-ae65-06a1db028eb8
+2026-11-08T20:51:35.950+08:00 DEBUG [f2c7e14473364de3abba9a95dbe8fd52] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:35.952+08:00  INFO [f2c7e14473364de3abba9a95dbe8fd52] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=0debab52-e3cf-458a-81f8-86e6b73c6e93
+2026-11-08T20:51:35.976+08:00  WARN [40bdfce182184dfeb02f0b9fa3708c20] 46824 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:51:35.983+08:00  WARN [e2f870b35395432d9775ae09820e9125] 46824 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:51:35.990+08:00  WARN [654f5e5849b5425487dc16dad73dc211] 46824 --- [main] c.w.c.exception.GlobalExceptionHandler   : 业务异常: httpStatus=409, code=100409, message=幂等键已被不同余额调整操作使用
+2026-11-08T20:51:36.089+08:00 DEBUG [a7cad209d5e648aa82b172ed396bfca6] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:36.091+08:00  INFO [a7cad209d5e648aa82b172ed396bfca6] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=ADMIN userId=8001 loginName=admin.demo sessionId=6966b8fc-571e-4817-8a1d-f7e9cb7a935a
+2026-11-08T20:51:36.167+08:00 DEBUG [995ec7739d6e45a7a583a78e5a02f87a] 46824 --- [main] c.w.a.s.WfhAuthenticationProvider        : Authenticated user
+2026-11-08T20:51:36.168+08:00  INFO [995ec7739d6e45a7a583a78e5a02f87a] 46824 --- [main] c.w.auth.service.LoginService            : 登录成功 userType=USER userId=2003 loginName=zhangsan.employee sessionId=583b897a-c771-4725-bb5b-a2f2d0a70a50
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.374 s -- in com.workforcehub.leave.ModuleLeaveApiIntegrationTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 58, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  40.929 s
+[INFO] Finished at: 2026-11-08T20:51:36+08:00
+[INFO] ------------------------------------------------------------------------

@@ -1,0 +1,26 @@
+[
+  {
+    "label": "BASELINE",
+    "command": [
+      "mvn",
+      "-B",
+      "-Dstyle.color=never",
+      "-Dtest=SessionValidityRequestChainTest",
+      "test"
+    ],
+    "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-baseline-final-yq3gc84g/server",
+    "exit": 1
+  },
+  {
+    "label": "ROLLBACK",
+    "command": [
+      "mvn",
+      "-B",
+      "-Dstyle.color=never",
+      "-Dtest=SessionValidityRequestChainTest",
+      "test"
+    ],
+    "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/wfh-99-2-packaged-rollback-p7a46hq_/server",
+    "exit": 1
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "id": "hello-plugin",
+  "version": "0.1.0",
+  "sdkVersion": "0.1.0",
+  "minHostVersion": "0.1.0",
+  "maxHostVersion": "0.2.0",
+  "javaVersion": "17",
+  "type": "UI",
+  "provider": "Workforce Hub",
+  "frontendSha384": "sha384-c527zMMh7jwa0gTNl9fI1Mg5xEqGXyEFnTFCcjr7fokaoyPHzkIY7kC9f13c4zUQ"
+}

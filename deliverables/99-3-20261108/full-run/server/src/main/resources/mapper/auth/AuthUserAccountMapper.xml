@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.auth.mapper.AuthUserAccountMapper">
+
+    <resultMap id="BaseResultMap" type="com.workforcehub.auth.domain.AuthUserAccount">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="login_name" property="loginName"/>
+        <result column="password_hash" property="passwordHash"/>
+        <result column="password_salt" property="passwordSalt"/>
+        <result column="email" property="email"/>
+        <result column="email_verified_at" property="emailVerifiedAt"/>
+        <result column="account_status" property="accountStatus"/>
+        <result column="last_login_at" property="lastLoginAt"/>
+        <result column="password_updated_at" property="passwordUpdatedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="is_deleted" property="isDeleted"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO auth_user_account
+            (id, user_id, login_name, password_hash, password_salt, email, email_verified_at,
+             account_status, last_login_at, password_updated_at, created_by, updated_by)
+        VALUES
+            (#{id}, #{userId}, #{loginName}, #{passwordHash}, #{passwordSalt}, #{email}, #{emailVerifiedAt},
+             #{accountStatus}, #{lastLoginAt}, #{passwordUpdatedAt}, #{createdBy}, #{updatedBy})
+    </insert>
+
+    <update id="updateById">
+        UPDATE auth_user_account
+        SET user_id = #{userId},
+            login_name = #{loginName},
+            password_hash = #{passwordHash},
+            password_salt = #{passwordSalt},
+            email = #{email},
+            email_verified_at = #{emailVerifiedAt},
+            account_status = #{accountStatus},
+            last_login_at = #{lastLoginAt},
+            password_updated_at = #{passwordUpdatedAt},
+            updated_by = #{updatedBy},
+            updated_at = NOW(),
+            is_deleted = #{isDeleted}
+        WHERE id = #{id}
+          AND is_deleted = 0
+    </update>
+
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT * FROM auth_user_account
+        WHERE user_id = #{userId}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="countByLoginName" resultType="long">
+        SELECT COUNT(*) FROM auth_user_account
+        WHERE login_name = #{loginName}
+          AND (#{exceptId} IS NULL OR id &lt;&gt; #{exceptId})
+          AND is_deleted = 0
+    </select>
+
+    <select id="countByEmail" resultType="long">
+        SELECT COUNT(*) FROM auth_user_account
+        WHERE email = #{email}
+          AND (#{exceptId} IS NULL OR id &lt;&gt; #{exceptId})
+          AND is_deleted = 0
+    </select>
+
+    <select id="selectByLoginName" resultMap="BaseResultMap">
+        SELECT * FROM auth_user_account
+        WHERE login_name = #{loginName}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectByEmail" resultMap="BaseResultMap">
+        SELECT * FROM auth_user_account
+        WHERE email = #{email}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+</mapper>

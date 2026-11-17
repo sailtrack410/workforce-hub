@@ -1,0 +1,522 @@
+/* 审批中心样式：对齐画布「员工端-审批中心」8:34（1440×900 版） */
+.ap-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* ---------- 页头 ---------- */
+.ap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex: none;
+}
+.ap-head-copy h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+}
+.ap-head-copy p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--hub-tertiary);
+}
+.ap-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--hub-primary);
+  color: #fff;
+  font: 500 14px/20px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.2s var(--hub-ease);
+}
+.ap-create-btn:hover { background: var(--hub-primary-deep); }
+
+/* ---------- 指标卡 ---------- */
+.ap-metrics {
+  display: flex;
+  gap: 14px;
+  flex: none;
+}
+.ap-metric {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  height: 92px;
+  padding: 20px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: var(--hub-card);
+}
+.ap-metric-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--hub-sky);
+  color: var(--hub-primary);
+}
+.ap-metric-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.ap-metric-copy small {
+  font-size: 12px;
+  color: var(--hub-tertiary);
+}
+.ap-metric-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.ap-metric-value strong {
+  font: 700 24px/28px Inter, "Noto Sans SC", sans-serif;
+  color: var(--hub-ink);
+}
+.ap-metric-value em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--hub-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 主体区 ---------- */
+.ap-main {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+.ap-list-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  background: var(--hub-card);
+}
+.ap-list-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex: none;
+  flex-wrap: wrap;
+}
+.ap-tabs {
+  display: flex;
+  gap: 8px;
+}
+.ap-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hub-chip);
+  color: var(--hub-secondary);
+  font: 400 14px/20px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease), color 0.2s var(--hub-ease);
+}
+.ap-tab.active {
+  background: var(--hub-pill-dark);
+  color: #fff;
+  font-weight: 500;
+}
+.ap-tab em {
+  font-style: normal;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font: 500 12px/16px Inter, sans-serif;
+}
+.ap-tab:not(.active) em {
+  background: var(--hub-track);
+  color: var(--hub-secondary);
+}
+.ap-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.ap-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px 0 14px;
+  border-radius: 999px;
+  background: var(--hub-chip);
+  color: var(--hub-secondary);
+}
+.ap-select select {
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: 400 13px/18px "Noto Sans SC", sans-serif;
+  color: var(--hub-secondary);
+  appearance: none;
+  cursor: pointer;
+}
+.ap-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 200px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--hub-chip);
+  color: var(--hub-muted);
+  box-sizing: border-box;
+}
+.ap-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: 400 13px/18px "Noto Sans SC", sans-serif;
+  color: var(--hub-ink);
+}
+.ap-search input::placeholder { color: var(--hub-muted); }
+
+/* ---------- 列表 ---------- */
+.ap-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ap-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--hub-inner);
+  flex: none;
+}
+.ap-item-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--hub-sky);
+  color: var(--hub-primary);
+}
+.ap-item-icon.warm {
+  background: #fbf5e8;
+  color: #d98a1f;
+}
+.ap-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.ap-item-info strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--hub-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ap-item-info small {
+  font-size: 12px;
+  color: var(--hub-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ap-urgent {
+  align-self: flex-start;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--hub-red);
+}
+.ap-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.ap-btn-approve {
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--hub-primary);
+  color: #fff;
+  font: 500 13px/18px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease);
+}
+.ap-btn-approve:hover { background: var(--hub-primary-deep); }
+.ap-btn-reject {
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--hub-red);
+  border-radius: 12px;
+  background: var(--hub-card);
+  color: var(--hub-red);
+  font: 500 13px/18px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease);
+}
+.ap-btn-reject:hover { background: var(--hub-chip); }
+.ap-btn-approve:disabled, .ap-btn-reject:disabled { opacity: 0.5; cursor: default; }
+.ap-btn-withdraw {
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--hub-chip);
+  color: var(--hub-secondary);
+  font: 500 13px/18px "Noto Sans SC", sans-serif;
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease);
+}
+.ap-btn-withdraw:hover { background: var(--hub-track); }
+.ap-status-pill {
+  font-style: normal;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font: 500 12px/16px "Noto Sans SC", sans-serif;
+}
+.ap-status-pill.ok { background: #edf7f1; color: var(--hub-green); }
+.ap-status-pill.danger { background: #fdeceb; color: var(--hub-red); }
+.ap-status-pill.pending { background: var(--hub-sky); color: var(--hub-primary); }
+
+/* ---------- 分页器 ---------- */
+.ap-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+.ap-pager small {
+  font-size: 12px;
+  color: var(--hub-tertiary);
+}
+.ap-pager-btns {
+  display: flex;
+  gap: 6px;
+}
+.ap-page-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hub-chip);
+  color: var(--hub-secondary);
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease);
+}
+.ap-page-btn:hover { background: var(--hub-track); }
+
+/* ---------- 右栏 336 ---------- */
+.ap-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 336px;
+  flex: none;
+  min-height: 0;
+}
+.ap-side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  background: var(--hub-card);
+}
+.ap-side-grow { flex: 1; min-height: 0; }
+.ap-side-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--hub-primary);
+}
+.ap-side-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--hub-ink);
+}
+.ap-side-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.ap-data-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.ap-data-row small { font-size: 13px; color: var(--hub-tertiary); }
+.ap-data-row strong { font: 700 14px/20px Inter, "Noto Sans SC", sans-serif; color: var(--hub-ink); }
+.ap-data-row strong.ok { color: var(--hub-green); }
+.ap-data-row strong.warn { color: #ff9f18; }
+.ap-side-sep {
+  height: 1px;
+  background: var(--hub-track);
+}
+.ap-side-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--hub-muted);
+}
+.ap-eff-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--hub-inner);
+}
+.ap-eff-item small { font-size: 12px; color: var(--hub-tertiary); }
+.ap-eff-value strong {
+  font: 700 20px/24px Inter, "Noto Sans SC", sans-serif;
+  color: var(--hub-ink);
+}
+.ap-eff-value strong.warn { color: #ff9f18; }
+
+/* ---------- 弹窗 ---------- */
+.ap-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 440px;
+  max-width: calc(100vw - 64px);
+}
+.ap-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ap-dialog-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.ap-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hub-chip);
+  color: var(--hub-secondary);
+  cursor: pointer;
+}
+.ap-icon-btn:hover { background: var(--hub-track); }
+.ap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--hub-tertiary);
+}
+.ap-field textarea {
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 12px;
+  outline: none;
+  background: var(--hub-chip);
+  font: 400 13px/20px "Noto Sans SC", sans-serif;
+  color: var(--hub-ink);
+  resize: vertical;
+  box-sizing: border-box;
+  width: 100%;
+}
+.ap-dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.ap-create-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ap-create-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--hub-inner);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease);
+}
+.ap-create-item:hover { background: var(--hub-sky); }
+
+/* toast */
+.ap-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  z-index: 70;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--hub-pill-dark);
+  color: #fff;
+  font: 400 13px/18px "Noto Sans SC", sans-serif;
+  box-shadow: 0 12px 32px rgba(15, 30, 55, 0.2);
+}
+.ap-toast-enter-active, .ap-toast-leave-active { transition: opacity 0.25s var(--hub-ease), transform 0.25s var(--hub-ease); }
+.ap-toast-enter-from, .ap-toast-leave-to { opacity: 0; transform: translate(-50%, 8px); }
+
+/* 响应式 */
+@media (max-width: 1180px) {
+  .ap-side { display: none; }
+  .ap-search { width: 160px; }
+}
+@media (max-width: 960px) {
+  .ap-metrics { flex-wrap: wrap; }
+  .ap-metric { flex: 1 1 40%; }
+}

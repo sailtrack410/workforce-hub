@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/opt/homebrew/bin/redis-cli",
+    "-h",
+    "127.0.0.1",
+    "-p",
+    "62827",
+    "shutdown",
+    "nosave"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/redis-stop.stdout",
+  "stderr": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/redis-stop.stderr"
+}

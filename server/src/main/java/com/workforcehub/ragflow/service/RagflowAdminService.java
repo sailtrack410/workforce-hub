@@ -51,7 +51,7 @@ public class RagflowAdminService {
     // 知识库可见范围枚举：PRIVATE 仅自己、ROLE/DEPARTMENT/POSITION 按组织维度、PUBLIC 全员可见
     private static final Set<String> VISIBILITIES = Set.of("PRIVATE", "ROLE", "DEPARTMENT", "POSITION", "PUBLIC");
     private static final Set<String> STATUSES = Set.of("ACTIVE", "INACTIVE");
-    private static final Set<String> SUBJECT_TYPES = Set.of("ROLE", "DEPARTMENT", "POSITION");
+    private static final Set<String> SUBJECT_TYPES = Set.of("ROLE", "DEPARTMENT", "POSITION", "USER");
     private static final Set<String> PERMISSIONS = Set.of("read", "manage");
 
     private final RagflowRepository ragflowRepository;
@@ -340,11 +340,8 @@ public class RagflowAdminService {
     }
 
     public RagflowSearchTestResponse searchTest(Long spaceId, RagflowSearchTestRequest request) {
-        RagflowSpaceRow space = ragflowRepository.getSpaceOrThrow(spaceId);
         String query = trimRequired(request.getQuery(), "搜索内容不能为空");
-        RagflowEffectiveConfig config = configResolver.resolve(space, ragflowRepository.getGlobalSetting());
-        int topK = defaultInt(config.retrievalTopK(), 5);
-        List<RagflowSearchHitRow> rows = knowledgeSearchService.searchRows(spaceId, query, topK);
+        List<RagflowSearchHitRow> rows = knowledgeSearchService.searchRowsForAdmin(spaceId, query, null);
         RagflowSearchTestResponse response = new RagflowSearchTestResponse();
         response.setQuery(query);
         response.setHits(rows.stream().map(this::toSearchHit).toList());

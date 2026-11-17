@@ -1,0 +1,26 @@
+{
+  "server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java": {
+    "modified": "223e36cd956b02933c9d825cadd385c49d7c407f491ac4e78ede18ccf1eee847",
+    "baseline": "f0d6336c2c3d8345a7fefd4c66a52de46fa58a0efeadda212c109d087d5d9d40"
+  },
+  "server/src/main/resources/db/migration/V67__add_admin_operations_permissions.sql": {
+    "modified": "a8d035f77d0965f4a3971a1839cb17cd6e3ccf1cb05c23e2ab8cc24b8d0668b7",
+    "baseline": null
+  },
+  "server/src/test/java/com/workforcehub/auth/AdminPermissionFilterTest.java": {
+    "modified": "8cceee3d3611715ef07d768583195a2ac57c92f1bfede43558276b2a8ddb5424",
+    "baseline": "579cd7287f2b74f11de0e07b76054de89e00683c82f8d5dfe5954c220cebc0b6"
+  },
+  "server/src/test/java/com/workforcehub/auth/AdminPermissionRouteMatrixTest.java": {
+    "modified": "a822d244eb13d4ba3360e6eb5c7758a93ce60790c58f37a5cdb775c899b38d46",
+    "baseline": null
+  },
+  "server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java": {
+    "modified": "2c63399f3aadb76781e65ee84c38fdf3278da5a7c64a975c34165001e39b0ae9",
+    "baseline": null
+  },
+  "server/src/test/resources/security/admin-permission-matrix.tsv": {
+    "modified": "92adfb83a4eae6a512dd12fc59cf8d99e592e733d8f097864b5a62914684a96c",
+    "baseline": null
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "server/src/main/java/com/workforcehub/common/config/SecurityConfig.java": "5b9987f9ec2e4a9c6524eb8e49bb21011200db9a1293f81cdff6b5899f5b8287",
+  "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketHandshakeInterceptor.java": "c6a537236500fe61d67edb706418b68dc35549219a24305b0a712b5bf0dad05c",
+  "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketHandler.java": "ae0959e6323a2e63b7c2e8be03b19f08e2a0bb59394d768fb050ec435099aa8d",
+  "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketSessionRegistry.java": "f70d264c62a9728ac0efac68afaf71914034aac0c433fffeb0598963fa8ef6d1",
+  "server/src/main/java/com/workforcehub/auth/security/EmployeeUserDetailsService.java": "0ad85c4ecf8d13075032e87d115b1de9c8e4d96b9d6a90e44c12015de366e385",
+  "server/src/test/java/com/workforcehub/im/ModuleImApiIntegrationTest.java": "b1ef4705b10433500a6c2cb858a5c0edf2b3e8c3be9480142b7e0f2ad9ce982a",
+  "server/src/test/java/com/workforcehub/im/ModuleImOutboxIntegrationTest.java": "5e3efed591f813983a311febff32c8c34a4c1701a76291fa49d8dedad0030079",
+  "server/src/test/java/com/workforcehub/auth/AdminPermissionWebTest.java": "2c63399f3aadb76781e65ee84c38fdf3278da5a7c64a975c34165001e39b0ae9",
+  "server/src/test/java/com/workforcehub/plugin/AdminPluginManagementWebTest.java": "3201e7f9dba6ff052bc6a4050f1ff57ebccb9e163d13210c0ed65cbe04602fa6",
+  "server/src/test/java/com/workforcehub/plugin/PluginGatewaySecurityTest.java": "7e7ec4923d8a564f44968175efd70730744ece107a5b957b41108dd0f6880243",
+  "server/src/test/java/com/workforcehub/attendance/ModuleAttendanceApiIntegrationTest.java": "cffb516cacee79933adcc3ae9fb134e38623a3576957277015d29c786136344b",
+  "server/src/test/java/com/workforcehub/plugin/PluginGatewayPermissionMatrixIntegrationTest.java": "8d0c7fa0dcadba40f50b3d8a0f706d7195d3f27bb02210399570fb483c3b8e9c",
+  "server/src/test/java/com/workforcehub/plugin/EmployeePluginListIntegrationTest.java": "7a35f6a83242d329608ffb51140fefacbe3e7e66d4837c16661229c2ae13dece",
+  "server/src/test/java/com/workforcehub/plugin/PluginManagerServiceIntegrationTest.java": "9edd4c3a99f06a84ec663b8e8ec4bd1fae5ef573f9413d3407988a55ba695503"
+}

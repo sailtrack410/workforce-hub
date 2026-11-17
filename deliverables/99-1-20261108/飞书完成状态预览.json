@@ -1,0 +1,198 @@
+[
+  {
+    "review_id": "20/3-3",
+    "guid": "d218effd-c29c-441e-9fc7-134f36be97b6",
+    "preview": {
+      "ok": true,
+      "identity": "user",
+      "dry_run": true,
+      "data": {
+        "api": [
+          {
+            "desc": "get current task status",
+            "method": "GET",
+            "url": "/open-apis/task/v2/tasks/d218effd-c29c-441e-9fc7-134f36be97b6",
+            "params": {
+              "user_id_type": "open_id"
+            }
+          },
+          {
+            "desc": "complete task if not completed",
+            "method": "PATCH",
+            "url": "/open-apis/task/v2/tasks/d218effd-c29c-441e-9fc7-134f36be97b6",
+            "params": {
+              "user_id_type": "open_id"
+            },
+            "body": {
+              "task": {
+                "completed_at": "1794142689000"
+              },
+              "update_fields": [
+                "completed_at"
+              ]
+            }
+          }
+        ],
+        "context": {
+          "app_id": "cli_aa63ec950278dcf3",
+          "user_open_id": "ou_358d547a8defe93637e1aa4046adde44"
+        }
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  },
+  {
+    "review_id": "99-1",
+    "guid": "44e97d39-f938-449b-95f3-87b075ca9649",
+    "preview": {
+      "ok": true,
+      "identity": "user",
+      "dry_run": true,
+      "data": {
+        "api": [
+          {
+            "desc": "get current task status",
+            "method": "GET",
+            "url": "/open-apis/task/v2/tasks/44e97d39-f938-449b-95f3-87b075ca9649",
+            "params": {
+              "user_id_type": "open_id"
+            }
+          },
+          {
+            "desc": "complete task if not completed",
+            "method": "PATCH",
+            "url": "/open-apis/task/v2/tasks/44e97d39-f938-449b-95f3-87b075ca9649",
+            "params": {
+              "user_id_type": "open_id"
+            },
+            "body": {
+              "task": {
+                "completed_at": "1794142689000"
+              },
+              "update_fields": [
+                "completed_at"
+              ]
+            }
+          }
+        ],
+        "context": {
+          "app_id": "cli_aa63ec950278dcf3",
+          "user_open_id": "ou_358d547a8defe93637e1aa4046adde44"
+        }
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  },
+  {
+    "review_id": "99-2",
+    "guid": "81e62079-5016-4737-8ed9-329168e7d942",
+    "preview": {
+      "ok": true,
+      "identity": "user",
+      "dry_run": true,
+      "data": {
+        "api": [
+          {
+            "desc": "get current task status",
+            "method": "GET",
+            "url": "/open-apis/task/v2/tasks/81e62079-5016-4737-8ed9-329168e7d942",
+            "params": {
+              "user_id_type": "open_id"
+            }
+          },
+          {
+            "desc": "complete task if not completed",
+            "method": "PATCH",
+            "url": "/open-apis/task/v2/tasks/81e62079-5016-4737-8ed9-329168e7d942",
+            "params": {
+              "user_id_type": "open_id"
+            },
+            "body": {
+              "task": {
+                "completed_at": "1794142689000"
+              },
+              "update_fields": [
+                "completed_at"
+              ]
+            }
+          }
+        ],
+        "context": {
+          "app_id": "cli_aa63ec950278dcf3",
+          "user_open_id": "ou_358d547a8defe93637e1aa4046adde44"
+        }
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  },
+  {
+    "review_id": "99-3",
+    "guid": "67d36331-97d7-427d-a310-f87556f3c107",
+    "preview": {
+      "ok": true,
+      "identity": "user",
+      "dry_run": true,
+      "data": {
+        "api": [
+          {
+            "desc": "get current task status",
+            "method": "GET",
+            "url": "/open-apis/task/v2/tasks/67d36331-97d7-427d-a310-f87556f3c107",
+            "params": {
+              "user_id_type": "open_id"
+            }
+          },
+          {
+            "desc": "complete task if not completed",
+            "method": "PATCH",
+            "url": "/open-apis/task/v2/tasks/67d36331-97d7-427d-a310-f87556f3c107",
+            "params": {
+              "user_id_type": "open_id"
+            },
+            "body": {
+              "task": {
+                "completed_at": "1794142689000"
+              },
+              "update_fields": [
+                "completed_at"
+              ]
+            }
+          }
+        ],
+        "context": {
+          "app_id": "cli_aa63ec950278dcf3",
+          "user_open_id": "ou_358d547a8defe93637e1aa4046adde44"
+        }
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  }
+]

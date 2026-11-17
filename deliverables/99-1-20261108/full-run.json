@@ -1,0 +1,8 @@
+{
+  "command": [
+    "mvn",
+    "test"
+  ],
+  "cwd": "/var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-99-1-full-1g9j1owh/server",
+  "config_boundary": "disposable source copy, no real .env or inherited service credentials; no user app process changes"
+}

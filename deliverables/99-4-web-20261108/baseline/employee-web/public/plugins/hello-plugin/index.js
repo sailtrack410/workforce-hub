@@ -1,0 +1,1 @@
+(function(){"use strict";const n=window.__WORKFORCE_HOST__;if(!n)throw new Error("宿主 SDK 未初始化：window.__WORKFORCE_HOST__ 不存在");const{Vue:e}=n,{defineComponent:o,h:l}=e,i=o({name:"HelloPluginView",setup(){return()=>l("div",{class:"hello-plugin"},"Hello Plugin")}});n.register("hello-plugin",{id:"hello-plugin",name:"Hello Plugin",component:()=>Promise.resolve(i)})})();

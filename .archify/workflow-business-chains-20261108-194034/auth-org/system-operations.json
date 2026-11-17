@@ -1,0 +1,292 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "站内通知、邮件测试、告警处理与审计",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/system-operations.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "notice",
+      "label": "站内通知（独立能力）"
+    },
+    {
+      "id": "mail",
+      "label": "邮件配置测试（独立能力）"
+    },
+    {
+      "id": "alert",
+      "label": "运维告警与审计（独立能力）"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "push",
+      "lane": "notice",
+      "col": 0,
+      "type": "backend",
+      "label": "通知写入能力",
+      "sublabel": "push入口尚无业务调用",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/SysNotificationService.java",
+          "line": 58,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "read",
+      "lane": "notice",
+      "col": 1,
+      "type": "database",
+      "label": "按本人读取通知",
+      "sublabel": "列表／未读数",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/SysNotificationService.java",
+          "line": 29,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "mark",
+      "lane": "notice",
+      "col": 2,
+      "type": "database",
+      "label": "单条或全部已读",
+      "sublabel": "条件更新read_flag",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/repository/SysNotificationRepository.java",
+          "line": 42,
+          "end_line": 57
+        }
+      ]
+    },
+    {
+      "id": "config",
+      "lane": "mail",
+      "col": 0,
+      "type": "database",
+      "label": "保存邮件渠道",
+      "sublabel": "EMAIL_DEFAULT配置",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 62,
+          "end_line": 98
+        }
+      ]
+    },
+    {
+      "id": "gate",
+      "lane": "mail",
+      "col": 1,
+      "type": "security",
+      "label": "测试收件人门禁",
+      "sublabel": "当前管理员邮箱＋三十秒",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 101,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "send",
+      "lane": "mail",
+      "col": 2,
+      "type": "external",
+      "label": "使用提交参数发信",
+      "sublabel": "独立JavaMailSenderImpl",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 172,
+          "end_line": 193
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "lane": "mail",
+      "col": 3,
+      "type": "database",
+      "label": "记录测试结果",
+      "sublabel": "成功／失败及脱敏消息",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 115,
+          "end_line": 140
+        }
+      ]
+    },
+    {
+      "id": "aggregate",
+      "lane": "alert",
+      "col": 0,
+      "type": "backend",
+      "label": "聚合五类失败状态",
+      "sublabel": "按SQL计数＋规则查询",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminAlertService.java",
+          "line": 30,
+          "end_line": 73
+        }
+      ]
+    },
+    {
+      "id": "rule",
+      "lane": "alert",
+      "col": 1,
+      "type": "database",
+      "label": "维护规则和渠道",
+      "sublabel": "保存通知开关和冷却配置",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminAlertService.java",
+          "line": 76,
+          "end_line": 128
+        }
+      ]
+    },
+    {
+      "id": "resolve",
+      "lane": "alert",
+      "col": 2,
+      "type": "database",
+      "label": "登记处置记录",
+      "sublabel": "不修改原始失败任务",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminAlertService.java",
+          "line": 132,
+          "end_line": 157
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "lane": "alert",
+      "col": 4,
+      "type": "database",
+      "label": "写sys_audit_log",
+      "sublabel": "渠道测试／告警处置",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/common/audit/AuditLogWriter.java",
+          "line": 16,
+          "end_line": 32
+        }
+      ]
+    },
+    {
+      "id": "query",
+      "lane": "alert",
+      "col": 5,
+      "type": "frontend",
+      "label": "管理端审计查询",
+      "sublabel": "按过滤条件分页",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/repository/AdminSystemRepository.java",
+          "line": 76,
+          "end_line": 144
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "push",
+      "to": "read",
+      "label": "存在通知",
+      "role": "main"
+    },
+    {
+      "from": "read",
+      "to": "mark",
+      "role": "main"
+    },
+    {
+      "from": "config",
+      "to": "gate",
+      "role": "main"
+    },
+    {
+      "from": "gate",
+      "to": "send",
+      "role": "main"
+    },
+    {
+      "from": "send",
+      "to": "result",
+      "role": "main"
+    },
+    {
+      "from": "result",
+      "to": "audit",
+      "label": "写测试审计",
+      "role": "branch"
+    },
+    {
+      "from": "aggregate",
+      "to": "rule",
+      "label": "查询／维护",
+      "role": "main"
+    },
+    {
+      "from": "rule",
+      "to": "resolve",
+      "label": "操作员处置",
+      "role": "main"
+    },
+    {
+      "from": "resolve",
+      "to": "audit",
+      "role": "main"
+    },
+    {
+      "from": "audit",
+      "to": "query",
+      "role": "main"
+    }
+  ],
+  "mainPath": [
+    "aggregate",
+    "rule",
+    "resolve",
+    "audit",
+    "query"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "独立能力与边界",
+      "items": [
+        "站内通知、邮件测试、告警聚合为独立流程，图中未连接为自动投递链。",
+        "站内通知push未发现业务调用；独立hub工作台及顶栏已消费通知读取与全部已读接口。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "配置与处置缺口",
+      "items": [
+        "AUTH-06：管理端邮件渠道测试使用数据库／请求参数，认证码使用注入的JavaMailSender，两者未连通。",
+        "处置登记只追加ops_alert_resolution，不会恢复原任务；邮件与告警真实外部投递未验证。"
+      ]
+    }
+  ]
+}

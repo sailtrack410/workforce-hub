@@ -1,0 +1,258 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "插件事件与前端运行时：分发、加载及隔离边界",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/P04.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "event",
+      "lane": "main",
+      "col": 0,
+      "type": "messagebus",
+      "label": "事务提交后发布",
+      "sublabel": "业务事件不是耐久队列",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/common/event/DomainEventPublisher.java",
+          "line": 21,
+          "end_line": 32
+        }
+      ]
+    },
+    {
+      "id": "adapt",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": "转换SDK事件",
+      "sublabel": "事件标识与幂等编号",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginFileUploadedEventListener.java",
+          "line": 29,
+          "end_line": 51
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "lane": "main",
+      "col": 2,
+      "type": "messagebus",
+      "label": "查订阅并异步入队",
+      "sublabel": "宿主有界线程池",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 93,
+          "end_line": 109
+        }
+      ]
+    },
+    {
+      "id": "guard",
+      "lane": "main",
+      "col": 3,
+      "type": "security",
+      "label": "插件状态与能力检查",
+      "sublabel": "守卫与幂等声明",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 130,
+          "end_line": 165
+        }
+      ]
+    },
+    {
+      "id": "callback",
+      "lane": "main",
+      "col": 4,
+      "type": "backend",
+      "label": "执行并计时中断",
+      "sublabel": "超时不保证强制终止",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 168,
+          "end_line": 195
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 249,
+          "end_line": 281
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "lane": "main",
+      "col": 5,
+      "type": "database",
+      "label": "尽力记录回调审计",
+      "sublabel": "失败写日志",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 292,
+          "end_line": 329
+        }
+      ]
+    },
+    {
+      "id": "manifest",
+      "lane": "branch",
+      "col": 0,
+      "type": "frontend",
+      "label": "另支：可见插件清单",
+      "sublabel": "仅活动且可见的UI插件",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/controller/employee/EmployeePluginService.java",
+          "line": 53,
+          "end_line": 71
+        }
+      ]
+    },
+    {
+      "id": "sri",
+      "lane": "branch",
+      "col": 2,
+      "type": "security",
+      "label": "同源脚本与SRI校验",
+      "sublabel": "加载注册来源与十秒超时",
+      "sources": [
+        {
+          "path": "employee-web/src/core/plugin-loader.ts",
+          "line": 33,
+          "end_line": 67
+        },
+        {
+          "path": "employee-web/src/core/plugin-loader.ts",
+          "line": 91,
+          "end_line": 133
+        }
+      ]
+    },
+    {
+      "id": "host",
+      "lane": "branch",
+      "col": 4,
+      "type": "frontend",
+      "label": "注册与宿主渲染",
+      "sublabel": "旧工作台组件入口",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/WorkbenchSection.vue",
+          "line": 943,
+          "end_line": 944
+        }
+      ]
+    },
+    {
+      "id": "lost",
+      "lane": "failure",
+      "col": 2,
+      "type": "security",
+      "label": "队满丢弃并记录日志",
+      "sublabel": "未进入耐久重试账本",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 102,
+          "end_line": 119
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "event",
+      "to": "adapt"
+    },
+    {
+      "id": "e1",
+      "from": "adapt",
+      "to": "queue"
+    },
+    {
+      "id": "e2",
+      "from": "queue",
+      "to": "guard",
+      "label": "入队成功"
+    },
+    {
+      "id": "e3",
+      "from": "guard",
+      "to": "callback",
+      "label": "允许执行"
+    },
+    {
+      "id": "e4",
+      "from": "callback",
+      "to": "audit"
+    },
+    {
+      "id": "e5",
+      "from": "queue",
+      "to": "lost",
+      "label": "队列拒绝"
+    },
+    {
+      "id": "e6",
+      "from": "manifest",
+      "to": "sri",
+      "label": "可见清单"
+    },
+    {
+      "id": "e7",
+      "from": "sri",
+      "to": "host",
+      "label": "加载并完成注册"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "employee-web 旧壳加载插件清单，当前新工作台未挂载旧 PluginWorkbenchHost；独立 hub-web 无插件入口。",
+        "提交后领域事件→订阅→有界线程池→回调；前端另支加载清单与SRI脚本。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "PLUGIN-E：回调队满直接丢弃，失败只日志；重要业务事件需要持久投递账本与可审计补偿。",
+        "PLUGIN-F：新工作台与旧插件宿主入口断层，组件代码存在不能代表用户可进入。",
+        "前端插件与宿主共享页面，SRI校验来源和完整性，不是浏览器安全沙箱。"
+      ]
+    }
+  ]
+}

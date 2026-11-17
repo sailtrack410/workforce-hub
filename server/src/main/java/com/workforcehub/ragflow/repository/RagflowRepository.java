@@ -74,6 +74,48 @@ public class RagflowRepository {
         return rows.get(0);
     }
 
+    public boolean canReadSpace(Long spaceId, Long userId) {
+        if (userId == null) return false;
+        Long count = jdbcTemplate.queryForObject("""
+            SELECT COUNT(*)
+            FROM kb_space s
+            JOIN org_user u ON u.id = ? AND u.status = 'ACTIVE' AND u.is_deleted = 0
+                AND u.employment_status IN ('ACTIVE', 'PROBATION', 'PENDING_OFFBOARD')
+            JOIN auth_user_account account ON account.user_id = u.id
+                AND account.account_status = 'ACTIVE' AND account.is_deleted = 0
+            WHERE s.id = ? AND s.status = 'ACTIVE' AND s.is_deleted = 0
+              AND s.visibility IN ('PRIVATE', 'PUBLIC', 'ROLE', 'DEPARTMENT', 'POSITION')
+              AND (
+                  s.visibility = 'PUBLIC'
+                  OR (s.owner_type = 'USER' AND s.owner_id = u.id)
+                  OR (s.owner_type = 'DEPARTMENT'
+                      AND s.owner_id = u.primary_dept_id AND EXISTS (
+                          SELECT 1 FROM org_department d
+                          WHERE d.id = u.primary_dept_id AND d.status = 'ACTIVE' AND d.is_deleted = 0))
+                  OR (s.owner_type = 'POSITION'
+                      AND s.owner_id = u.position_id AND EXISTS (
+                          SELECT 1 FROM org_position p
+                          WHERE p.id = u.position_id AND p.status = 'ACTIVE' AND p.is_deleted = 0))
+                  OR EXISTS (
+                      SELECT 1 FROM kb_space_acl acl
+                      WHERE acl.space_id = s.id AND acl.status = 'ACTIVE'
+                        AND LOWER(acl.perm_code) IN ('read', 'manage')
+                        AND (
+                            (acl.subject_type = 'USER' AND acl.subject_id = u.id)
+                            OR (acl.subject_type = 'DEPARTMENT' AND acl.subject_id = u.primary_dept_id
+                                AND EXISTS (SELECT 1 FROM org_department d
+                                    WHERE d.id = acl.subject_id AND d.status = 'ACTIVE' AND d.is_deleted = 0))
+                            OR (acl.subject_type = 'POSITION' AND acl.subject_id = u.position_id
+                                AND EXISTS (SELECT 1 FROM org_position p
+                                    WHERE p.id = acl.subject_id AND p.status = 'ACTIVE' AND p.is_deleted = 0))
+                        )
+                  )
+              )
+            """, Long.class, userId, spaceId);
+        // ROLE 对应后台角色，员工没有该角色关系，不能按相同数字 ID 推断授权。
+        return count != null && count > 0;
+    }
+
     public RagflowGlobalSettingRow getGlobalSetting() {
         List<RagflowGlobalSettingRow> rows = jdbcTemplate.query("""
             SELECT id, ocr_base_url, ocr_api_key, ocr_model, ocr_model_id,
@@ -175,14 +217,14 @@ public class RagflowRepository {
                             Long operatorId) {
         jdbcTemplate.update("""
             INSERT INTO kb_space
-                (id, space_name, space_code, description, visibility, status,
+                (id, space_name, space_code, description, visibility, status, owner_type, owner_id,
                  embedding_provider, embedding_model, embedding_model_id, embedding_dimension, rerank_enabled,
                  rerank_provider, rerank_model, rerank_model_id, chunk_size, chunk_overlap, retrieval_top_k,
                  score_threshold, created_by, updated_by)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, 'ADMIN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, spaceId, spaceName, spaceCode, description, visibility, status,
-            embeddingProvider, embeddingModel, embeddingModelId, embeddingDimension, boolFlag(rerankEnabled),
+            operatorId, embeddingProvider, embeddingModel, embeddingModelId, embeddingDimension, boolFlag(rerankEnabled),
             rerankProvider, rerankModel, rerankModelId, chunkSize, chunkOverlap, retrievalTopK, scoreThreshold,
             operatorId, operatorId);
     }
@@ -502,8 +544,8 @@ public class RagflowRepository {
                    acl.space_id,
                    acl.subject_type,
                    acl.subject_id,
-                   COALESCE(role.role_name, dept.dept_name, pos.position_name) AS subject_name,
-                   COALESCE(role.role_code, dept.dept_code, pos.position_code) AS subject_code,
+                   COALESCE(role.role_name, dept.dept_name, pos.position_name, u.real_name) AS subject_name,
+                   COALESCE(role.role_code, dept.dept_code, pos.position_code, u.employee_no) AS subject_code,
                    acl.perm_code,
                    acl.status,
                    acl.created_at
@@ -511,6 +553,7 @@ public class RagflowRepository {
             LEFT JOIN admin_role role ON acl.subject_type = 'ROLE' AND role.id = acl.subject_id
             LEFT JOIN org_department dept ON acl.subject_type = 'DEPARTMENT' AND dept.id = acl.subject_id
             LEFT JOIN org_position pos ON acl.subject_type = 'POSITION' AND pos.id = acl.subject_id
+            LEFT JOIN org_user u ON acl.subject_type = 'USER' AND u.id = acl.subject_id
             WHERE acl.space_id = ?
               AND acl.status = 'ACTIVE'
             ORDER BY acl.created_at DESC, acl.id DESC

@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "subtask": {
+      "agent_task_status": 1,
+      "completed_at": "0",
+      "created_at": "1794139497706",
+      "creator": {
+        "id": "ou_358d547a8defe93637e1aa4046adde44",
+        "type": "user"
+      },
+      "dependencies": [],
+      "description": "编号：100-23 / IAR-08；优先级：P2；类型：新问题\n\n验证状态：静态代码确认；未运行应用复现。尚未修复，待复现/整改/验收。\n\n触发条件：用户在employee-web新入口点击知识卡/流程卡动作，或期待旧MessagesSection已有操作出现在新页。\n\n影响：卡片只显示toast而未执行动作；新旧页面和独立hub-web能力不一致，后台能力存在不能作为新入口交付证明。\n\n证据与边界：新路由/hub/messages指向src/hub/views/MessagesView，旧/messages重定向。新页handleKnowledgeAction/handleProcessAction仅“即将上线”；新页群编辑只改名+加人+退群，独立hub-web已有移除成员API。\n\n修复方向：以新入口逐项登记能力，接通卡片动作的真实业务API/路由；未实现动作隐藏或禁用，避免只toast假闭环；群治理按当前产品要求补齐。\n\n验收条件：从默认入口操作卡片，观察对应业务请求/落库或正确路由；失败可恢复且有错误。新页公告/移除成员等是否交付单独列证，不以旧页测试替代。\n\n代码/文档位置：\nemployee-web/src/router/index.ts:35\nemployee-web/src/router/index.ts:60\nemployee-web/src/hub/views/MessagesView.vue:339\nemployee-web/src/hub/views/MessagesView.vue:446\nhub-web/src/views/MessagesView.vue:553",
+      "extra": "",
+      "guid": "0f3b7684-67d4-41e8-8674-808f33d84cf3",
+      "is_milestone": false,
+      "mode": 2,
+      "origin": {
+        "href": {
+          "title": "sailtrack 飞书 CLI",
+          "url": ""
+        },
+        "platform_i18n_name": {
+          "de_de": "sailtrack 飞书 CLI",
+          "en_us": "sailtrack 飞书 CLI",
+          "es_es": "sailtrack 飞书 CLI",
+          "fr_fr": "sailtrack 飞书 CLI",
+          "it_it": "sailtrack 飞书 CLI",
+          "ja_jp": "sailtrack 飞书 CLI",
+          "ko_kr": "sailtrack 飞书 CLI",
+          "ru_ru": "sailtrack 飞书 CLI",
+          "th_th": "sailtrack 飞书 CLI",
+          "zh_cn": "sailtrack 飞书 CLI",
+          "zh_hk": "sailtrack 飞书 CLI",
+          "zh_tw": "sailtrack 飞书 CLI"
+        }
+      },
+      "parent_task_guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+      "repeat_rule": "",
+      "source": 7,
+      "status": "todo",
+      "subtask_count": 0,
+      "summary": "[P2][100-23][新问题] 新消息卡片动作仍为占位",
+      "task_id": "t100063",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ],
+      "updated_at": "1794139497741",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=0f3b7684-67d4-41e8-8674-808f33d84cf3\u0026suite_entity_num=t100063"
+    }
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

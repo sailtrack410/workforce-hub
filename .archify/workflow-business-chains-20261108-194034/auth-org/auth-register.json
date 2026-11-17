@@ -1,0 +1,237 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "邀请注册与短信演示边界",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-register.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "页面与公开入口"
+    },
+    {
+      "id": "service",
+      "label": "注册服务"
+    },
+    {
+      "id": "store",
+      "label": "注册事务与终态"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "page",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "注册页占位",
+      "sublabel": "当前页面不调用注册API",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 410,
+          "end_line": 443
+        }
+      ]
+    },
+    {
+      "id": "public",
+      "lane": "ui",
+      "col": 1,
+      "type": "external",
+      "label": "公开注册API",
+      "sublabel": "发短信码与提交注册",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/controller/PublicRegistrationController.java",
+          "line": 35,
+          "end_line": 50
+        }
+      ]
+    },
+    {
+      "id": "sms",
+      "lane": "service",
+      "col": 1,
+      "type": "backend",
+      "label": "生成短信码",
+      "sublabel": "六位码哈希入库十分钟",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 39,
+          "end_line": 48
+        }
+      ]
+    },
+    {
+      "id": "demo",
+      "lane": "store",
+      "col": 2,
+      "type": "external",
+      "label": "短信仅写日志",
+      "sublabel": "未调用真实短信网关",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 89,
+          "end_line": 92
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "service",
+      "col": 2,
+      "type": "security",
+      "label": "校验注册输入",
+      "sublabel": "手机号／密码／短信码",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 53,
+          "end_line": 69
+        }
+      ]
+    },
+    {
+      "id": "invite",
+      "lane": "service",
+      "col": 3,
+      "type": "security",
+      "label": "查询有效邀请码",
+      "sublabel": "部门来自未核销邀请码",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java",
+          "line": 66,
+          "end_line": 77
+        }
+      ]
+    },
+    {
+      "id": "create",
+      "lane": "store",
+      "col": 3,
+      "type": "database",
+      "label": "事务创建员工账号",
+      "sublabel": "PROBATION＋ACTIVE账号",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java",
+          "line": 88,
+          "end_line": 101
+        }
+      ]
+    },
+    {
+      "id": "consume",
+      "lane": "store",
+      "col": 4,
+      "type": "database",
+      "label": "核销短信与邀请码",
+      "sublabel": "邀请码更新未检查行数",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java",
+          "line": 42,
+          "end_line": 85
+        }
+      ]
+    },
+    {
+      "id": "return",
+      "lane": "store",
+      "col": 5,
+      "type": "backend",
+      "label": "返回账号标识",
+      "sublabel": "无Session，需另行登录",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 73,
+          "end_line": 80
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "page",
+      "to": "public",
+      "label": "页面尚未接入",
+      "role": "branch"
+    },
+    {
+      "from": "public",
+      "to": "sms",
+      "label": "发码",
+      "role": "main"
+    },
+    {
+      "from": "sms",
+      "to": "demo",
+      "role": "main"
+    },
+    {
+      "from": "public",
+      "to": "validate",
+      "label": "提交",
+      "role": "main"
+    },
+    {
+      "from": "validate",
+      "to": "invite",
+      "role": "main"
+    },
+    {
+      "from": "invite",
+      "to": "create",
+      "role": "main"
+    },
+    {
+      "from": "create",
+      "to": "consume",
+      "role": "main"
+    },
+    {
+      "from": "consume",
+      "to": "return",
+      "role": "main"
+    }
+  ],
+  "mainPath": [
+    "public",
+    "validate",
+    "invite",
+    "create",
+    "consume",
+    "return"
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "实现边界",
+      "items": [
+        "短信为SMS-DEMO，前端注册没有真正提交；注册成功返回userId和loginName，不自动登录。",
+        "邀请码只有消费侧，生成管理接口缺失；不把文档期望当实际能力。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "并发与发送问题",
+      "items": [
+        "AUTH-04：并发使用同一邀请码时核销影响行数未检查，可能两份账号均提交。",
+        "AUTH-05：公开短信发码未见频控，且演示日志包含明文验证码；均为代码事实／风险推导。"
+      ]
+    }
+  ]
+}

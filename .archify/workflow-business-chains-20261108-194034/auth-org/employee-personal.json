@@ -1,0 +1,336 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "个人档案、头像、偏好、密码与退出",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "profile",
+      "label": "档案与个人资料"
+    },
+    {
+      "id": "avatar",
+      "label": "头像与附件门禁"
+    },
+    {
+      "id": "prefs",
+      "label": "偏好与密码（独立操作）"
+    },
+    {
+      "id": "exit",
+      "label": "退出与会话清理"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "entry",
+      "lane": "profile",
+      "col": 0,
+      "label": "进入个人设置",
+      "sublabel": "姓名岗位组织只读",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 104,
+          "end_line": 108
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "lane": "profile",
+      "col": 1,
+      "label": "提交手机号修改",
+      "sublabel": "保留当前头像引用",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 289,
+          "end_line": 306
+        }
+      ]
+    },
+    {
+      "id": "write",
+      "lane": "profile",
+      "col": 2,
+      "label": "更新本人档案",
+      "sublabel": "手机号非null才写入",
+      "type": "database",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgDirectoryService.java",
+          "line": 195,
+          "end_line": 213
+        }
+      ]
+    },
+    {
+      "id": "refresh",
+      "lane": "profile",
+      "col": 3,
+      "label": "重载账号与档案",
+      "sublabel": "同步shell状态",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 300,
+          "end_line": 305
+        }
+      ]
+    },
+    {
+      "id": "pick",
+      "lane": "avatar",
+      "col": 1,
+      "label": "选择图片头像",
+      "sublabel": "图片类型前置检查",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 427,
+          "end_line": 440
+        }
+      ]
+    },
+    {
+      "id": "upload",
+      "lane": "avatar",
+      "col": 2,
+      "label": "上传头像附件",
+      "sublabel": "USER_AVATAR所有者",
+      "type": "backend",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/usePersonalFileTransfer.ts",
+          "line": 101,
+          "end_line": 108
+        }
+      ]
+    },
+    {
+      "id": "owner",
+      "lane": "avatar",
+      "col": 3,
+      "label": "核验附件所有权",
+      "sublabel": "本人上传且附件未删除",
+      "type": "security",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgDirectoryService.java",
+          "line": 216,
+          "end_line": 234
+        }
+      ]
+    },
+    {
+      "id": "avatarwrite",
+      "lane": "avatar",
+      "col": 4,
+      "label": "保存头像并刷新",
+      "sublabel": "updateProfile后重取URL",
+      "type": "database",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 440,
+          "end_line": 448
+        }
+      ]
+    },
+    {
+      "id": "pref",
+      "lane": "prefs",
+      "col": 0,
+      "label": "读取与更改偏好",
+      "sublabel": "主题通知签名等",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 213,
+          "end_line": 245
+        }
+      ]
+    },
+    {
+      "id": "prefsave",
+      "lane": "prefs",
+      "col": 1,
+      "label": "按本人插入或更新",
+      "sublabel": "缺省值与字段裁剪",
+      "type": "database",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/EmployeePreferenceService.java",
+          "line": 50,
+          "end_line": 115
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "lane": "prefs",
+      "col": 3,
+      "label": "发送改密邮件码",
+      "sublabel": "RESET_PASSWORD用途",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 380,
+          "end_line": 408
+        }
+      ]
+    },
+    {
+      "id": "pwd",
+      "lane": "prefs",
+      "col": 4,
+      "label": "核验并写密码",
+      "sublabel": "不退出已有Session",
+      "type": "security",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 121,
+          "end_line": 135
+        }
+      ]
+    },
+    {
+      "id": "confirm",
+      "lane": "exit",
+      "col": 0,
+      "label": "确认退出登录",
+      "sublabel": "明确对话框确认",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 458,
+          "end_line": 471
+        }
+      ]
+    },
+    {
+      "id": "invalidate",
+      "lane": "exit",
+      "col": 1,
+      "label": "销毁会话上下文",
+      "sublabel": "后端Session.invalidate",
+      "type": "security",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 254,
+          "end_line": 260
+        }
+      ]
+    },
+    {
+      "id": "clear",
+      "lane": "exit",
+      "col": 2,
+      "label": "清前端状态并重载",
+      "sublabel": "账号档案关系清空",
+      "type": "frontend",
+      "sources": [
+        {
+          "path": "employee-web/src/stores/session.ts",
+          "line": 132,
+          "end_line": 145
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "entry",
+      "to": "mobile"
+    },
+    {
+      "from": "mobile",
+      "to": "write"
+    },
+    {
+      "from": "write",
+      "to": "refresh"
+    },
+    {
+      "from": "entry",
+      "to": "pick",
+      "label": "更换头像"
+    },
+    {
+      "from": "pick",
+      "to": "upload"
+    },
+    {
+      "from": "upload",
+      "to": "owner"
+    },
+    {
+      "from": "owner",
+      "to": "avatarwrite"
+    },
+    {
+      "from": "avatarwrite",
+      "to": "refresh"
+    },
+    {
+      "from": "pref",
+      "to": "prefsave"
+    },
+    {
+      "from": "code",
+      "to": "pwd"
+    },
+    {
+      "from": "confirm",
+      "to": "invalidate"
+    },
+    {
+      "from": "invalidate",
+      "to": "clear"
+    }
+  ],
+  "mainPath": [
+    "entry",
+    "mobile",
+    "write",
+    "refresh"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "可自管字段与独立操作",
+      "items": [
+        "个人资料仅自助修改手机号与头像；姓名岗位部门由管理端维护。",
+        "偏好、邮件验证码改密和退出是独立操作，不是自动串行执行。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "边界与优化",
+      "items": [
+        "AUTH-09：UI把空手机号发成null，后端null表示保持，清空动作未生效。",
+        "偏好读取失败仍允许写本地快照；后端失败被静默吞掉，应增加保存状态与重试。",
+        "密码重置后旧Session失效沿用99-2；本图没有实测应用或外部邮件。"
+      ]
+    }
+  ]
+}

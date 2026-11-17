@@ -1,0 +1,14 @@
+{
+  "command": [
+    "mvn",
+    "-B",
+    "-Dstyle.color=never",
+    "-Dquota.mysql.url=jdbc:mysql://127.0.0.1:62970/quota_2033_test?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true",
+    "clean",
+    "test"
+  ],
+  "cwd": "/tmp/wfh-99-2-integration-bbls4p52/snapshot/server",
+  "exit": 1,
+  "stdout": "integration-full.stdout",
+  "stderr": "integration-full.stderr"
+}

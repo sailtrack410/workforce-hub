@@ -1,0 +1,483 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.workforcehub:workforce-hub >-------------------
+[INFO] Building workforce-hub 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.4.1:enforce (enforce-java-version) @ workforce-hub ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 92 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 530 source files with javac [debug release 17] to target/classes
+[INFO] /private/tmp/workforce-991-audit-jia90rso/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: /private/tmp/workforce-991-audit-jia90rso/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-991-audit-jia90rso/snapshot/server/src/main/java/com/workforcehub/agent/model/OpenAiCompatibleAgentModelClient.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ workforce-hub ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ workforce-hub ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 115 source files with javac [debug release 17] to target/test-classes
+[INFO] /private/tmp/workforce-991-audit-jia90rso/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 某些输入文件使用或覆盖了已过时的 API。
+[INFO] /private/tmp/workforce-991-audit-jia90rso/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/WorkforcePluginManagerTest.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[INFO] /private/tmp/workforce-991-audit-jia90rso/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/PluginPermissionServiceTest.java: 某些输入文件使用了未经检查或不安全的操作。
+[INFO] /private/tmp/workforce-991-audit-jia90rso/snapshot/server/src/test/java/com/workforcehub/plugin/runtime/PluginPermissionServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ workforce-hub ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest
+20:38:40.245 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest]: AdminPluginLifecycleAuditIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+20:38:40.305 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.workforcehub.WorkforceHubApplication for test class com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-11-08T20:38:40.485+08:00  INFO [] 42754 --- [background-preinit] o.h.validator.internal.util.Version      : HV000001: Hibernate Validator 8.0.1.Final
+2026-11-08T20:38:40.499+08:00  INFO [] 42754 --- [main] AdminPluginLifecycleAuditIntegrationTest : Starting AdminPluginLifecycleAuditIntegrationTest using Java 17.0.18 with PID 42754 (started by sailtrack in /private/tmp/workforce-991-audit-jia90rso/snapshot/server)
+2026-11-08T20:38:40.499+08:00 DEBUG [] 42754 --- [main] AdminPluginLifecycleAuditIntegrationTest : Running with Spring Boot v3.2.5, Spring v6.1.6
+2026-11-08T20:38:40.500+08:00  INFO [] 42754 --- [main] AdminPluginLifecycleAuditIntegrationTest : The following 1 profile is active: "api"
+2026-11-08T20:38:41.086+08:00  INFO [] 42754 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-08T20:38:41.087+08:00  INFO [] 42754 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-08T20:38:41.112+08:00  INFO [] 42754 --- [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 17 ms. Found 0 Redis repository interfaces.
+2026-11-08T20:38:41.789+08:00  INFO [] 42754 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-11-08T20:38:41.900+08:00  INFO [] 42754 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-11-08T20:38:41.951+08:00  INFO [] 42754 --- [main] o.f.c.internal.license.VersionPrinter    : Flyway Community Edition 9.22.3 by Redgate
+2026-11-08T20:38:41.951+08:00  INFO [] 42754 --- [main] o.f.c.internal.license.VersionPrinter    : See release notes here: https://rd.gt/416ObMi
+2026-11-08T20:38:41.951+08:00  INFO [] 42754 --- [main] o.f.c.internal.license.VersionPrinter    : 
+2026-11-08T20:38:41.962+08:00  INFO [] 42754 --- [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:57961/workforce_991_test (MySQL 8.4)
+2026-11-08T20:38:41.967+08:00  WARN [] 42754 --- [main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.0.
+2026-11-08T20:38:42.004+08:00  INFO [] 42754 --- [main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `workforce_991_test`.`flyway_schema_history` does not exist yet
+2026-11-08T20:38:42.006+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbValidate     : Successfully validated 67 migrations (execution time 00:00.033s)
+2026-11-08T20:38:42.013+08:00  INFO [] 42754 --- [main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `workforce_991_test`.`flyway_schema_history` ...
+2026-11-08T20:38:42.031+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Current version of schema `workforce_991_test`: << Empty Schema >>
+2026-11-08T20:38:42.062+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "1 - init schema"
+2026-11-08T20:38:42.212+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "2 - enhance file center schema"
+2026-11-08T20:38:42.248+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "3 - link attachment to upload ticket"
+2026-11-08T20:38:42.260+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "4 - harden file center idempotency"
+2026-11-08T20:38:42.286+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "5 - add file upload policy"
+2026-11-08T20:38:42.297+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "6 - align file upload policy owner type comment"
+2026-11-08T20:38:42.304+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "7 - add admin file upload policy"
+2026-11-08T20:38:42.311+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "8 - add file cleanup job records"
+2026-11-08T20:38:42.322+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "9 - add workflow request attachment"
+2026-11-08T20:38:42.330+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "10 - add workflow agent pre review task id"
+2026-11-08T20:38:42.353+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "11 - init flowable process schema"
+2026-11-08T20:38:42.354+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: PROCEDURE workforce_991_test.wfh_init_flowable_process_schema_if_needed does not exist (SQL State: 42000 - Error Code: 1305)
+2026-11-08T20:38:42.728+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "12 - add agent timeout job records"
+2026-11-08T20:38:42.738+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "13 - add im message client idempotency"
+2026-11-08T20:38:42.749+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "14 - add im event outbox"
+2026-11-08T20:38:42.757+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "15 - add employee profile avatar and preferences"
+2026-11-08T20:38:42.768+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "16 - extend employee preferences"
+2026-11-08T20:38:42.772+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:38:42.772+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:38:42.772+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:38:42.772+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Integer display width is deprecated and will be removed in a future release. (SQL State: HY000 - Error Code: 1681)
+2026-11-08T20:38:42.776+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "17 - add employee upload owner type policies"
+2026-11-08T20:38:42.781+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "18 - add im group file upload policy"
+2026-11-08T20:38:42.784+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "19 - add agent workflow trace"
+2026-11-08T20:38:42.793+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "20 - add llm model table"
+2026-11-08T20:38:42.799+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "21 - add agent version test gate"
+2026-11-08T20:38:42.807+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "22 - add agent version label"
+2026-11-08T20:38:42.815+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "23 - ragflow admin foundation"
+2026-11-08T20:38:42.837+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "24 - ragflow documents and model config"
+2026-11-08T20:38:42.845+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "25 - ragflow global model setting"
+2026-11-08T20:38:42.852+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "26 - ragflow model endpoint and key"
+2026-11-08T20:38:42.857+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "27 - ragflow separate model endpoints"
+2026-11-08T20:38:42.863+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "28 - ragflow ingest status and chunk unique"
+2026-11-08T20:38:42.874+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "29 - employee file folders"
+2026-11-08T20:38:42.886+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "30 - agent avatar attachment"
+2026-11-08T20:38:42.894+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "31 - add im message user action"
+2026-11-08T20:38:42.901+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "32 - seed admin rbac permissions"
+2026-11-08T20:38:42.902+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.902+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.902+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.902+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.902+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.902+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.902+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.903+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.903+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.903+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.903+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.904+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.904+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.907+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "33 - add attendance punch daily unique"
+2026-11-08T20:38:42.918+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "34 - add workflow step config"
+2026-11-08T20:38:42.920+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.924+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "35 - add ops alert closure"
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.931+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.932+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.932+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.935+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "36 - agent failure code and ops indexes"
+2026-11-08T20:38:42.950+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "37 - seed builtin workflow definitions"
+2026-11-08T20:38:42.951+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.951+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.951+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.951+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.952+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.952+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.952+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.952+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.953+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.956+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "38 - add ct friend"
+2026-11-08T20:38:42.962+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "39 - seed standard leave types"
+2026-11-08T20:38:42.967+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "40 - add ops alert tables"
+2026-11-08T20:38:42.967+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Table 'ops_alert_channel' already exists (SQL State: 42S01 - Error Code: 1050)
+2026-11-08T20:38:42.968+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Table 'ops_alert_rule' already exists (SQL State: 42S01 - Error Code: 1050)
+2026-11-08T20:38:42.968+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Table 'ops_alert_resolution' already exists (SQL State: 42S01 - Error Code: 1050)
+2026-11-08T20:38:42.971+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "41 - add notify channel config"
+2026-11-08T20:38:42.975+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.975+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.976+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.976+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.979+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "42 - seed notification channel permission"
+2026-11-08T20:38:42.980+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.980+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.980+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.980+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.980+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.980+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.980+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:42.984+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "43 - extend ai model base"
+2026-11-08T20:38:42.998+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "44 - add ai provider and model features"
+2026-11-08T20:38:43.007+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "45 - ensure demo admin super admin role"
+2026-11-08T20:38:43.011+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "46 - restore super admin role and permissions"
+2026-11-08T20:38:43.016+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "47 - allow kb space inherit global ragflow settings"
+2026-11-08T20:38:43.024+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "48 - freeze kb space vector settings"
+2026-11-08T20:38:43.029+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "49 - seed oa workflow templates"
+2026-11-08T20:38:43.030+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_991_test.seed_company_policy_kb' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:38:43.030+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_991_test.seed_oa_workflow_templates' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:38:43.031+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.032+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.036+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "50 - add generic oa request detail"
+2026-11-08T20:38:43.044+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "51 - seed more oa workflow templates"
+2026-11-08T20:38:43.044+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_991_test.seed_company_policy_kb' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:38:43.045+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: Unknown table 'workforce_991_test.seed_more_oa_workflow_templates' (SQL State: 42S02 - Error Code: 1051)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.046+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.051+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "52 - add plugin tables"
+2026-11-08T20:38:43.066+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "53 - add plugin call permission"
+2026-11-08T20:38:43.066+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.066+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.066+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.066+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.066+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.066+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.066+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.070+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "54 - add plugin event subscription"
+2026-11-08T20:38:43.077+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "55 - add plugin operation idempotency"
+2026-11-08T20:38:43.083+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "56 - repair plugin call permission id"
+2026-11-08T20:38:43.087+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "57 - align ops alert schema"
+2026-11-08T20:38:43.095+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "58 - add sys dict"
+2026-11-08T20:38:43.098+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.098+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.098+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.098+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.102+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "59 - add plugin config version"
+2026-11-08T20:38:43.110+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "60 - add plugin manage permission"
+2026-11-08T20:38:43.114+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "61 - add plugin action idempotency"
+2026-11-08T20:38:43.120+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "62 - index plugin dependency reverse lookup"
+2026-11-08T20:38:43.126+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "63 - seed brand login taglines"
+2026-11-08T20:38:43.127+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.127+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.127+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.127+08:00  WARN [] 42754 --- [main] o.f.c.i.s.DefaultSqlScriptExecutor       : DB: 'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead (SQL State: HY000 - Error Code: 1287)
+2026-11-08T20:38:43.131+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "64 - seed demo leave accounts"
+2026-11-08T20:38:43.138+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "66 - hub web api requirements"
+2026-11-08T20:38:43.155+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "67 - add admin operations permissions"
+2026-11-08T20:38:43.160+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Migrating schema `workforce_991_test` to version "69 - snapshot leave balance mode"
+2026-11-08T20:38:43.168+08:00  INFO [] 42754 --- [main] o.f.core.internal.command.DbMigrate      : Successfully applied 67 migrations to schema `workforce_991_test`, now at version v69 (execution time 00:00.795s)
+2026-11-08T20:38:43.812+08:00  INFO [] 42754 --- [main] org.pf4j.DefaultPluginStatusProvider     : Enabled plugins: []
+2026-11-08T20:38:43.812+08:00  INFO [] 42754 --- [main] org.pf4j.DefaultPluginStatusProvider     : Disabled plugins: []
+2026-11-08T20:38:43.813+08:00  INFO [] 42754 --- [main] org.pf4j.DefaultPluginManager            : PF4J version 3.15.0 in 'deployment' mode
+2026-11-08T20:38:44.049+08:00  INFO [] 42754 --- [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoint(s) beneath base path '/actuator'
+2026-11-08T20:38:44.074+08:00  INFO [] 42754 --- [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@3d1b97e4, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@53b3cd9b, org.springframework.security.web.context.SecurityContextHolderFilter@27b8daa1, org.springframework.security.web.header.HeaderWriterFilter@5249b9c5, org.springframework.web.filter.CorsFilter@4a218cc6, org.springframework.security.web.csrf.CsrfFilter@be73bbd, com.workforcehub.auth.security.SessionValidityFilter@102bce96, com.workforcehub.auth.security.UserTypePathFilter@1e5f3c4a, com.workforcehub.auth.security.AdminPermissionFilter@13553828, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@4f1a6259, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@548051d7, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@417a5aab, org.springframework.security.web.session.SessionManagementFilter@25712d03, org.springframework.security.web.access.ExceptionTranslationFilter@3e0bbd36, org.springframework.security.web.access.intercept.AuthorizationFilter@79cc08fb]
+2026-11-08T20:38:44.282+08:00 DEBUG [] 42754 --- [main] c.w.common.config.RequestIdFilter        : Filter 'requestIdFilter' configured for use
+2026-11-08T20:38:44.282+08:00 DEBUG [] 42754 --- [main] c.w.p.c.PluginGatewayRequestSizeFilter   : Filter 'pluginGatewayRequestSizeFilter' configured for use
+2026-11-08T20:38:44.282+08:00 DEBUG [] 42754 --- [main] c.w.p.c.a.PluginConfigRequestSizeFilter  : Filter 'pluginConfigRequestSizeFilter' configured for use
+2026-11-08T20:38:44.282+08:00 DEBUG [] 42754 --- [main] c.w.auth.security.AdminPermissionFilter  : Filter 'adminPermissionFilter' configured for use
+2026-11-08T20:38:44.282+08:00 DEBUG [] 42754 --- [main] c.w.auth.security.UserTypePathFilter     : Filter 'userTypePathFilter' configured for use
+2026-11-08T20:38:44.282+08:00  INFO [] 42754 --- [main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-11-08T20:38:44.282+08:00  INFO [] 42754 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-11-08T20:38:44.283+08:00  INFO [] 42754 --- [main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-11-08T20:38:44.355+08:00  INFO [] 42754 --- [main] AdminPluginLifecycleAuditIntegrationTest : Started AdminPluginLifecycleAuditIntegrationTest in 4.011 seconds (process running for 4.351)
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/admin/system/audit-logs
+       Parameters = {actionType=[PLUGIN_DISABLED], targetType=[PLUGIN]}
+          Headers = [X-CSRF-TOKEN:"def6492a-8b71-453f-a0a7-131fd57b643f"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@4f598dfb, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 401
+    Error message = null
+          Headers = [X-Request-Id:"2a4c75bb9cfe4337bf5b635bc14fe449", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100401,"message":"登录状态已变更，请重新登录","data":null,"requestId":"2a4c75bb9cfe4337bf5b635bc14fe449"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin/disable
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"27514885-5752-4ef3-8078-85c1d83c79d6", "27514885-5752-4ef3-8078-85c1d83c79d6"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@3b886b0f, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 401
+    Error message = null
+          Headers = [X-Request-Id:"5395c578dfe14cc289d9d886c6b38f71", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100401,"message":"登录状态已变更，请重新登录","data":null,"requestId":"5395c578dfe14cc289d9d886c6b38f71"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin/enable
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"8a877b11-6da4-4e86-979f-cafd95bc699b", "8a877b11-6da4-4e86-979f-cafd95bc699b"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@42404d83, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 401
+    Error message = null
+          Headers = [X-Request-Id:"e176cb0d18dc4b0a96f941d7ae42e5ce", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100401,"message":"登录状态已变更，请重新登录","data":null,"requestId":"e176cb0d18dc4b0a96f941d7ae42e5ce"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/plugins/lifecycle-audit-plugin/enable
+       Parameters = {}
+          Headers = [X-CSRF-TOKEN:"a02c82d8-8d91-423b-99bd-b3180b8ad57a", "a02c82d8-8d91-423b-99bd-b3180b8ad57a"]
+             Body = null
+    Session Attrs = {SPRING_SECURITY_CONTEXT=SecurityContextImpl [Authentication=UsernamePasswordAuthenticationToken [Principal=com.workforcehub.auth.security.AdminUserDetails@629059a9, Credentials=[PROTECTED], Authenticated=true, Details=null, Granted Authorities=[ADMIN_PLUGIN_MANAGE]]]}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 401
+    Error message = null
+          Headers = [X-Request-Id:"923b73d8e0604546874bf925f3ac7339", Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json;charset=UTF-8", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = application/json;charset=UTF-8
+             Body = {"code":100401,"message":"登录状态已变更，请重新登录","data":null,"requestId":"923b73d8e0604546874bf925f3ac7339"}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+[ERROR] Tests run: 4, Failures: 4, Errors: 0, Skipped: 0, Time elapsed: 4.495 s <<< FAILURE! -- in com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.legacyFailedResultShouldRemainDisplayedAsFailure -- Time elapsed: 0.224 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<401>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.assertAuditDisplay(AdminPluginLifecycleAuditIntegrationTest.java:194)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.legacyFailedResultShouldRemainDisplayedAsFailure(AdminPluginLifecycleAuditIntegrationTest.java:159)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText -- Time elapsed: 0.025 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<500> but was:<401>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText(AdminPluginLifecycleAuditIntegrationTest.java:139)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields -- Time elapsed: 0.023 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<409> but was:<401>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields(AdminPluginLifecycleAuditIntegrationTest.java:121)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[ERROR] com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames -- Time elapsed: 0.021 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<401>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames(AdminPluginLifecycleAuditIntegrationTest.java:90)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields:121 Status expected:<409> but was:<401>
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.legacyFailedResultShouldRemainDisplayedAsFailure:159->assertAuditDisplay:194 Status expected:<200> but was:<401>
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames:90 Status expected:<200> but was:<401>
+[ERROR]   AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText:139 Status expected:<500> but was:<401>
+[INFO] 
+[ERROR] Tests run: 4, Failures: 4, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  11.276 s
+[INFO] Finished at: 2026-11-08T20:38:44+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.1.2:test (default-test) on project workforce-hub: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /private/tmp/workforce-991-audit-jia90rso/snapshot/server/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

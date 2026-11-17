@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld",
+    "--no-defaults",
+    "--basedir=/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64",
+    "--datadir=/tmp/workforce-993-mysql-vrpbk4lz/data",
+    "--bind-address=127.0.0.1",
+    "--port=62826",
+    "--socket=/tmp/workforce-993-mysql-vrpbk4lz/mysql.sock",
+    "--pid-file=/tmp/workforce-993-mysql-vrpbk4lz/mysql.pid",
+    "--log-error=/tmp/workforce-993-mysql-vrpbk4lz/mysql.log",
+    "--mysqlx=OFF",
+    "--daemonize"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/mysql-start.stdout",
+  "stderr": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/mysql-start.stderr"
+}

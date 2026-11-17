@@ -1,0 +1,392 @@
+{
+  "chains": [
+    {
+      "id": "im-delivery",
+      "title": "消息发送、实时送达与附件访问",
+      "scope": "私聊/群聊消息：幂等发送、会话序号、事务Outbox、已读、撤回与下载票据。",
+      "frontend_status": "新入口/hub/messages已接文本/附件发送/引用/撤回；附件打开误用通用文件票据，将被IM_MESSAGE归属校验403；图中IM专用票据是可修复使用的后端能力。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-delivery/im-delivery.finalize-summary.json",
+      "summary": "发送成功同时保存消息、附件引用、会话摘要与Outbox；在线推送后前端合并消息，读后更新位点。"
+    },
+    {
+      "id": "im-groups",
+      "title": "群聊创建、成员治理与退出解散",
+      "scope": "自定义群创建、群主治理、成员退出、解散与变更通知。",
+      "frontend_status": "employee-web新页支持改名/加成员/退群；独立hub-web另接公告、移除成员；旧MessagesSection治理入口不作为新页实现证据。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-groups/im-groups.finalize-summary.json",
+      "summary": "创建群及成员；群主校验后治理；Outbox通知并刷新成员与会话列表。"
+    },
+    {
+      "id": "im-outbox",
+      "title": "Outbox认领、失败重试与人工审计",
+      "scope": "待发事件轮询、过期SENDING回收、FAILED/DEAD重试、后台审计与指标。",
+      "frontend_status": "后台提供事件列表、失败摘要、单条/批量重试和手动派发API；前端是否可见不替代后台权限结论。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.finalize-summary.json",
+      "summary": "定时或手工认领到期事件，发送后标SENT；后台可查看状态、失败分类与治理审计。"
+    },
+    {
+      "id": "agent-release",
+      "title": "Agent草稿、DAG测试与ACL发布",
+      "scope": "Agent版本配置、工具绑定、DAG校验、测试签名、使用范围与发布启停。",
+      "frontend_status": "admin-web管理Agent/版本/工作流；员工目录仅返回可用Agent；不能以管理端可配置推断员工已接所有能力。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.finalize-summary.json",
+      "summary": "草稿配置工具和可用范围，DAG验证与试运行后签名匹配才正常发布；员工使用再查ACTIVE/use ACL。"
+    },
+    {
+      "id": "agent-tools",
+      "title": "工具任务、人审确认与超时取消",
+      "scope": "显式工具调用的人审、恢复执行、拒绝取消、超时扫描及DAG分支差异。",
+      "frontend_status": "员工任务确认/取消API已实现；DAG APPROVAL是提示节点，不代表持久人审暂停。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.finalize-summary.json",
+      "summary": "显式工具需确认时先落等待任务，所属员工确认后执行并记审计；AUTO直接执行。"
+    },
+    {
+      "id": "agent-conversation",
+      "title": "会话触发Agent、异步执行与结果回写",
+      "scope": "提交后的Agent任务创建、进程内调度、DAG/模型执行、结果写回IM与失败卡片。",
+      "frontend_status": "employee-web新/hub/messages与独立hub-web均展示Agent消息；employee-web新页知识卡/流程卡动作仅toast，后端回复成功不表示卡片动作可执行。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-conversation.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-conversation.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-agent-conversation/agent-conversation.finalize-summary.json",
+      "summary": "用户文本提交后创建任务，异步置RUNNING并执行；成功事务内更新任务、插入Agent回复及消息事件。"
+    },
+    {
+      "id": "knowledge-documents",
+      "title": "知识空间ACL与文档入库生命周期",
+      "scope": "空间创建/模型维度、ACL保存、附件校验、异步入库、重入库与软删除。",
+      "frontend_status": "admin-web知识库具备空间、文档、ACL与检索测试入口；ACL保存不代表所有读取链已执行ACL。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.finalize-summary.json",
+      "summary": "创建空间并保存ACL，上传附件登记文档和作业；解析分块、嵌入、写PG向量和MySQL清单，更新成功。"
+    },
+    {
+      "id": "rag-qa",
+      "title": "知识检索、提示编排与问答返回",
+      "scope": "Agent已授权工具检索知识空间，查询嵌入、向量阈值过滤、补标题并进入模型提示。",
+      "frontend_status": "员工问答通过Agent及IM显示；employee-web新页知识卡动作仅“即将上线”；管理端searchTest返回命中，不等同问答端到端实测。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/rag-qa.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/rag-qa.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-rag-qa/rag-qa.finalize-summary.json",
+      "summary": "可用Agent调用已绑定知识工具，解析配置、嵌入query、TopK向量检索，补标题后进入模型上下文并回写消息。"
+    },
+    {
+      "id": "ai-provider-health",
+      "title": "AI供应商模型配置、探活与自检",
+      "scope": "供应商与多类模型配置、列表发现、类型化探针、结果持久化及定时自检。",
+      "frontend_status": "admin-web配置供应商和模型；配置响应使用Key是否已配置的标记，图中不包含真实凭证。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.finalize-summary.json",
+      "summary": "配置模型，发现供应商模型列表，按能力执行真实协议探针，记录结果和耗时；周期自检复用此链。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "IAR-01",
+      "severity": "P1",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "有Agent使用权限的员工通过已绑定KNOWLEDGE_SEARCH_CHUNKS查询其无read权限的知识空间。",
+      "impact": "Agent use授权不能替代知识空间ACL，PRIVATE/部门范围配置可能不约束该工具读链；实际返回取决于配置与文档内容。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/EmployeeAgentController.java",
+          "line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 518
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java",
+          "line": 86
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+          "line": 44
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 60
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 361
+        }
+      ],
+      "evidence": "Controller直接进入AgentService；上层只检查Agent use。工具对payload.userId作组织授权，但知识工具只传spaceId/query/topK；searchRows无操作者参数，向量SQL仅space_id、is_active和score。kb_space_acl仅在管理端保存/读取，不参与该读链。",
+      "fix": "在知识检索服务统一传入真实操作者，强制空间ACTIVE、visibility及read/manage ACL；管理员测试明确单独受控；文档检索与问答共用同一授权决策。",
+      "acceptance": "同一私有空间：空间所有者/已授权员工能命中，无read权限但有Agent use权限者收到403；跨部门、ACL撤销及停用空间同测；不得仅在UI隐藏。"
+    },
+    {
+      "id": "IAR-02",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "DAG TOOL或节点toolCalls绑定REQUIRE_CONFIRM，员工创建任务时request.toolCalls为空，或由会话触发DAG。",
+      "impact": "配置要求的人审被跳过，工具日志直接标APPROVED；当前实现的SPI为查询且CONNECTOR返回501，因此不声称已有写业务被执行。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 531
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 537
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java",
+          "line": 161
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java",
+          "line": 313
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java",
+          "line": 50
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowValidator.java",
+          "line": 49
+        }
+      ],
+      "evidence": "人审计算仅遍历外部preparedToolCalls。DAG执行器检查绑定存在后直接调用execute，并记录APPROVED；执行器与validator未检查approvalMode。APPROVAL节点也被分派到executePromptNode，不是持久化人工等待。",
+      "fix": "将审批判断收口到工具执行边界；DAG遇需确认工具持久化节点/参数/版本快照，WAITING_HUMAN_CONFIRM后暂停，确认时从该节点恢复，未批准不得落APPROVED。",
+      "acceptance": "相同REQUIRE_CONFIRM绑定分别经显式工具、DAG TOOL、内嵌toolCalls、会话触发时均先等待；拒绝/超时不执行；重复确认只执行一次；AUTO保持直通。"
+    },
+    {
+      "id": "IAR-03",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "创建含内嵌工具调用的DAG草稿，或将非DAG草稿更新为DAG，随后直接发布。",
+      "impact": "部分路径未实际试运行即获得workflow_test_signature/workflow_tested_at，弱化“当前版本完成一次流程测试”的发布门禁。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 319
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 350
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 444
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/repository/AgentRepository.java",
+          "line": 105
+        },
+        {
+          "path": "server/src/test/java/com/workforcehub/agent/ModuleAgentApiIntegrationTest.java",
+          "line": 240
+        }
+      ],
+      "evidence": "createVersion与旧配置转DAG直接调用updateAgentVersionWorkflowTest；该方法写签名和NOW()。publish只比较签名。仓库测试契约明确“后台发布DAG Agent前必须完成一次当前版本流程测试”，但该测试覆盖simpleWorkflow，非自动签名例外。",
+      "fix": "只有成功试运行入口写测试签名/时间；创建、更新、工具绑定/关键引用变更均清空测试证明；兼容迁移标记与真实测试结果分字段。",
+      "acceptance": "两类自动签名分支在未试运行时发布400；失败试运行仍不能发布；成功且配置相同可发布；改配置或工具绑定后必须重测。"
+    },
+    {
+      "id": "IAR-04",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "Agent或知识入库事务已提交，但进程在Executor投递前/执行中退出，或线程池拒绝任务。",
+      "impact": "任务/作业记录仍在表中，可停留PENDING/RUNNING；当前范围未发现自动重新认领/恢复入口，现有人工确认超时扫描不覆盖它们。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 111
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 164
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/repository/AgentTaskTimeoutRepository.java",
+          "line": 28
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 287
+        }
+      ],
+      "evidence": "两类任务提交后仅调用进程内Executor。超时SQL限定WAITING_HUMAN_CONFIRM；ragflow目录中ingest调用仅scheduleIngest。记录持久化已存在，问题是执行投递/恢复，不是数据库任务丢失。",
+      "fix": "使用现有任务表实现带租约的待执行认领，保存可恢复输入及重试次数；入库作业亦以表状态调度，定义运行中超时和人工重试边界。",
+      "acceptance": "在提交后投递前及执行中分别终止可控测试worker；重启后同作业被恢复且消息/切片无重复；拒绝执行可查询、可重试且不永久显示处理中。"
+    },
+    {
+      "id": "IAR-05",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "同一文档两次reingest并发，或删除与已运行ingest交错。",
+      "impact": "旧作业仍可覆盖新作业文档状态/清单，已删除文档仍可能新增向量；查询有已删标题过滤，不据此声称删除后必定可读。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 263
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 308
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 318
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 334
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 352
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java",
+          "line": 79
+        }
+      ],
+      "evidence": "reingest每次创建新作业并改latest指向；运行/成功/失败UPDATE仅WHERE document.id，不约束latest_ingest_job_id或is_deleted；replaceChunks按document整删；PG replaceDocumentVectors亦按document先停旧向量。",
+      "fix": "按文档租约串行，或在发布结果时比较latest_ingest_job_id与未删除状态；先写作业独立代次，成功后原子切换有效代次，失效作业仅清理自己的结果。",
+      "acceptance": "控制旧作业晚于新作业完成，最终清单/向量/状态均来自新作业；删除后旧作业完成不得重新激活；重复回调幂等。"
+    },
+    {
+      "id": "IAR-06",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "重入库写PG向量后MySQL清单失败，或向量插入中途失败。",
+      "impact": "向量与清单跨库非原子，旧向量先停用且部分新向量可能可见；MySQL作业FAILED不能保证检索仍使用完整旧版本。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 35
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java",
+          "line": 79
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 334
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 60
+        }
+      ],
+      "evidence": "replaceDocumentVectors先UPDATE旧向量is_active=false，再逐条insert active新向量；完成后才调用MySQL replaceChunks/markIngestSuccess。search不连接MySQL作业成功状态，只按space与active。",
+      "fix": "按jobId写不可见新代次，完整写入后切换已发布代次；失败删除该job向量并保留旧代次，增加跨库对账修复。",
+      "acceptance": "在第N条向量插入与MySQL清单阶段分别注入失败，查询保持上一完整版本且不出现半批内容；重试成功后再切换，清理只影响失败job。"
+    },
+    {
+      "id": "IAR-07",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "知识空间启用rerank并配置重排模型后进行搜索测试或Agent检索。",
+      "impact": "配置面存在重排选项，但当前有效配置及检索链未调用重排，排序仍为向量距离；属于功能闭环缺口。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 193
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowConfigResolver.java",
+          "line": 10
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+          "line": 44
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 75
+        }
+      ],
+      "evidence": "空间更新保存rerankEnabled/provider/model/modelId；RagflowEffectiveConfig解析仅Embedding、chunk、topK与threshold，searchRows直接返回向量排序且未调用rerank客户端。",
+      "fix": "在TopN向量候选后接受控重排并返回实际生效标记，或在接通前禁止可保存的启用选项，避免配置与执行不一致。",
+      "acceptance": "启用后测试替身断言真实调用重排且返回重排顺序；停用无重排调用；重排超时有明确降级状态与结果，不静默假装生效。"
+    },
+    {
+      "id": "IAR-08",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "用户在employee-web新入口点击知识卡/流程卡动作，或期待旧MessagesSection已有操作出现在新页。",
+      "impact": "卡片只显示toast而未执行动作；新旧页面和独立hub-web能力不一致，后台能力存在不能作为新入口交付证明。",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 35
+        },
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 60
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 339
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 446
+        },
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 553
+        }
+      ],
+      "evidence": "新路由/hub/messages指向src/hub/views/MessagesView，旧/messages重定向。新页handleKnowledgeAction/handleProcessAction仅“即将上线”；新页群编辑只改名+加人+退群，独立hub-web已有移除成员API。",
+      "fix": "以新入口逐项登记能力，接通卡片动作的真实业务API/路由；未实现动作隐藏或禁用，避免只toast假闭环；群治理按当前产品要求补齐。",
+      "acceptance": "从默认入口操作卡片，观察对应业务请求/落库或正确路由；失败可恢复且有错误。新页公告/移除成员等是否交付单独列证，不以旧页测试替代。"
+    },
+    {
+      "id": "IAR-09",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "在employee-web新/hub/messages上传并发送附件，再点击附件打开；从个人文件转发到消息也一样。",
+      "impact": "消息发送成功且展示附件，但打开走个人文件票据，被IM_MESSAGE归属限制拒绝403；属于下载契约错配，不是越权。",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/usePersonalFileTransfer.ts",
+          "line": 109
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 317
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/im/repository/ImRepository.java",
+          "line": 357
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 824
+        },
+        {
+          "path": "employee-web/src/stores/im.ts",
+          "line": 697
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 329
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 219
+        }
+      ],
+      "evidence": "上传ownerType=IM_MESSAGE_PENDING；发送时不论源ownerType均复制为IM_MESSAGE引用，消息响应从IM_MESSAGE列表返回新refId；前端保留此refId后交给employeeApi.files.createDownloadTicket。FileDownloadService仅允许PERSONAL_FILE/USER_AVATAR，因此该请求确定不匹配契约。",
+      "fix": "新页openAttachment使用会话ID、消息ID、附件refId调用IM专用下载票据API，并使用其downloadUrl；消息/群文件/个人文件分别使用对应入口。",
+      "acceptance": "上传发送后发送方和正常成员可打开；退出群/被移除、撤回、过期和已用票据均按IM规则拒绝。网络失败保留附件可重试。"
+    }
+  ]
+}

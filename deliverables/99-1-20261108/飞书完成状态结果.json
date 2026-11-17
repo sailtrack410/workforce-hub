@@ -1,0 +1,134 @@
+[
+  {
+    "review_id": "20/3-3",
+    "command": [
+      "lark-cli",
+      "task",
+      "+complete",
+      "--as",
+      "user",
+      "--task-id",
+      "d218effd-c29c-441e-9fc7-134f36be97b6"
+    ],
+    "exit": 0,
+    "response": {
+      "ok": true,
+      "identity": "user",
+      "data": {
+        "already_completed": false,
+        "completed_at": "1794142731000",
+        "guid": "d218effd-c29c-441e-9fc7-134f36be97b6",
+        "status": "done",
+        "summary": "[P1][20/3-3][既有风险] 并发配额检查与实际占额分离",
+        "url": "https://applink.feishu.cn/client/todo/detail?guid=d218effd-c29c-441e-9fc7-134f36be97b6"
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  },
+  {
+    "review_id": "99-1",
+    "command": [
+      "lark-cli",
+      "task",
+      "+complete",
+      "--as",
+      "user",
+      "--task-id",
+      "44e97d39-f938-449b-95f3-87b075ca9649"
+    ],
+    "exit": 0,
+    "response": {
+      "ok": true,
+      "identity": "user",
+      "data": {
+        "already_completed": false,
+        "completed_at": "1794142732000",
+        "guid": "44e97d39-f938-449b-95f3-87b075ca9649",
+        "status": "done",
+        "summary": "[P1][99-1][既有风险] 未知管理路由默认放行",
+        "url": "https://applink.feishu.cn/client/todo/detail?guid=44e97d39-f938-449b-95f3-87b075ca9649"
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  },
+  {
+    "review_id": "99-2",
+    "command": [
+      "lark-cli",
+      "task",
+      "+complete",
+      "--as",
+      "user",
+      "--task-id",
+      "81e62079-5016-4737-8ed9-329168e7d942"
+    ],
+    "exit": 0,
+    "response": {
+      "ok": true,
+      "identity": "user",
+      "data": {
+        "already_completed": false,
+        "completed_at": "1794142734000",
+        "guid": "81e62079-5016-4737-8ed9-329168e7d942",
+        "status": "done",
+        "summary": "[P1][99-2][既有风险] 停用撤权未统一失效旧会话",
+        "url": "https://applink.feishu.cn/client/todo/detail?guid=81e62079-5016-4737-8ed9-329168e7d942"
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  },
+  {
+    "review_id": "99-3",
+    "command": [
+      "lark-cli",
+      "task",
+      "+complete",
+      "--as",
+      "user",
+      "--task-id",
+      "67d36331-97d7-427d-a310-f87556f3c107"
+    ],
+    "exit": 0,
+    "response": {
+      "ok": true,
+      "identity": "user",
+      "data": {
+        "already_completed": false,
+        "completed_at": "1794142735000",
+        "guid": "67d36331-97d7-427d-a310-f87556f3c107",
+        "status": "done",
+        "summary": "[P1][99-3][既有风险] 可变假种破坏在途余额结算",
+        "url": "https://applink.feishu.cn/client/todo/detail?guid=67d36331-97d7-427d-a310-f87556f3c107"
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    }
+  }
+]

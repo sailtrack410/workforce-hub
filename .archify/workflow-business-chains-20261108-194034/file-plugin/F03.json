@@ -1,0 +1,249 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "个人云盘：目录、移动与复制",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/F03.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "entry",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "云盘操作",
+      "sublabel": "创建、移动或复制",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/FilesSection.vue",
+          "line": 1,
+          "end_line": 35
+        }
+      ]
+    },
+    {
+      "id": "folder",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "目录归属校验",
+      "sublabel": "仅当前用户有效目录",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 540,
+          "end_line": 555
+        }
+      ]
+    },
+    {
+      "id": "source",
+      "lane": "main",
+      "col": 2,
+      "type": "security",
+      "label": "源文件可操作",
+      "sublabel": "个人、本人、未删除",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 191,
+          "end_line": 205
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 503,
+          "end_line": 537
+        }
+      ]
+    },
+    {
+      "id": "quota",
+      "lane": "main",
+      "col": 3,
+      "type": "security",
+      "label": "复制前复核配额",
+      "sublabel": "个人池与企业池",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 220,
+          "end_line": 226
+        }
+      ]
+    },
+    {
+      "id": "copy",
+      "lane": "main",
+      "col": 4,
+      "type": "database",
+      "label": "复制为新引用",
+      "sublabel": "共享原物理对象",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 228,
+          "end_line": 246
+        }
+      ]
+    },
+    {
+      "id": "ledger",
+      "lane": "main",
+      "col": 5,
+      "type": "database",
+      "label": "累计逻辑用量",
+      "sublabel": "引用、用量、审计同事务",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 247,
+          "end_line": 254
+        }
+      ]
+    },
+    {
+      "id": "create",
+      "lane": "branch",
+      "col": 1,
+      "type": "database",
+      "label": "创建同级目录",
+      "sublabel": "重名返回409",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 162,
+          "end_line": 187
+        }
+      ]
+    },
+    {
+      "id": "move",
+      "lane": "branch",
+      "col": 4,
+      "type": "database",
+      "label": "移动仅改目录",
+      "sublabel": "不新增物理对象",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 196,
+          "end_line": 216
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "failure",
+      "col": 3,
+      "type": "security",
+      "label": "操作拒绝",
+      "sublabel": "目录无权、文件删除或超额",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 211,
+          "end_line": 226
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 533,
+          "end_line": 555
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "entry",
+      "to": "folder"
+    },
+    {
+      "id": "e1",
+      "from": "folder",
+      "to": "source",
+      "label": "移动或复制"
+    },
+    {
+      "id": "e2",
+      "from": "source",
+      "to": "quota",
+      "label": "复制"
+    },
+    {
+      "id": "e3",
+      "from": "quota",
+      "to": "copy",
+      "label": "足够"
+    },
+    {
+      "id": "e4",
+      "from": "copy",
+      "to": "ledger"
+    },
+    {
+      "id": "e5",
+      "from": "folder",
+      "to": "create",
+      "label": "新建目录"
+    },
+    {
+      "id": "e6",
+      "from": "source",
+      "to": "move",
+      "label": "移动"
+    },
+    {
+      "id": "e7",
+      "from": "quota",
+      "to": "reject",
+      "label": "不足"
+    },
+    {
+      "id": "e8",
+      "from": "source",
+      "to": "reject",
+      "label": "不可操作"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "employee-web /files 接入；收藏和最近使用在客户端保存。独立 hub-web 无云盘页面路由。",
+        "目录浏览、分类查询、创建文件夹、文件移动、逻辑复制及配额。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "FILE-Q：并发复制共用非原子配额检查，需与上传确认统一占额，不能只保护累加 SQL。",
+        "优化：标明逻辑占用与物理占用口径，跨设备收藏/最近记录若成为需求再做服务端同步。"
+      ]
+    }
+  ]
+}

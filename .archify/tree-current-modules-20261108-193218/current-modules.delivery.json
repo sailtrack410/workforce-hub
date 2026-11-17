@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "4220a9c5-ddaf-4f0b-bee9-a5f991fb4233",
+  "status": "current",
+  "command": "deliver",
+  "type": "tree",
+  "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/tree-current-modules-20261108-193218/candidate.json",
+  "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/tree-current-modules-20261108-193218/current-modules.html",
+  "specification": {
+    "sha256": "b950ec4ce15728a81bb712f5a2c302ba7ae916b3e3b1bc7222a4196cc7d0bfff",
+    "bytes": 77545
+  },
+  "artifact": {
+    "sha256": "f2f798eaba1631649dd639d778cf88a533fdec3c1e18eb5d3a6581fa3e654e68",
+    "bytes": 1230727
+  }
+}

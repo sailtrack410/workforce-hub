@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "identity": "user",
+  "dry_run": true,
+  "data": {
+    "api": [
+      {
+        "method": "POST",
+        "url": "/open-apis/task/v2/tasks",
+        "params": {
+          "user_id_type": "open_id"
+        },
+        "body": {
+          "client_token": "b218311d-7ffa-55bf-90af-f27600436eb8",
+          "description": "范围：36条业务链路的架构与流程审查。\n待办：26项本轮新问题（6项P1、20项P2）＋6项既有风险跟进＋2项优化建议，共34项。\n执行顺序：权限/会话/邀请码 → 默认入口与下载契约 → 余额/容量/考勤一致性 → Agent及RAG可靠性 → 展示、配置与插件。\n每项先确认复现条件，再修复并按验收条件留证。问题尚未修复；第100审以静态源码追踪为主，未执行真实业务HTTP/数据库复现，历史验证仅在对应条目说明。\n优化建议须先确认产品交付承诺。\n依据：docs/审查/第100审_全业务链路流程图与优化记录.md；历史项沿用第99审及20/3-3编号。",
+          "summary": "Workforce｜第100审业务链路问题整改与验收",
+          "tasklists": [
+            {
+              "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+            }
+          ]
+        }
+      }
+    ],
+    "context": {
+      "app_id": "cli_aa63ec950278dcf3",
+      "user_open_id": "ou_358d547a8defe93637e1aa4046adde44"
+    }
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

@@ -1,0 +1,244 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "通讯录好友申请、接受、备注与移除",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "员工通讯录"
+    },
+    {
+      "id": "friend",
+      "label": "关系服务"
+    },
+    {
+      "id": "store",
+      "label": "状态与展示"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "list",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "展示好友与申请",
+      "sublabel": "当前员工ID隔离",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/service/ContactFriendService.java",
+          "line": 35,
+          "end_line": 42
+        }
+      ]
+    },
+    {
+      "id": "send",
+      "lane": "ui",
+      "col": 1,
+      "type": "frontend",
+      "label": "发送好友申请",
+      "sublabel": "联系人详情加好友",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/ContactsSection.vue",
+          "line": 340,
+          "end_line": 362
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "friend",
+      "col": 1,
+      "type": "security",
+      "label": "校验目标与重复",
+      "sublabel": "拒绝自身／不存在／已申请",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/service/ContactFriendService.java",
+          "line": 46,
+          "end_line": 61
+        }
+      ]
+    },
+    {
+      "id": "incoming",
+      "lane": "friend",
+      "col": 2,
+      "type": "backend",
+      "label": "检查反向待接受",
+      "sublabel": "反向PENDING则直接接受",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/service/ContactFriendService.java",
+          "line": 62,
+          "end_line": 79
+        }
+      ]
+    },
+    {
+      "id": "pending",
+      "lane": "store",
+      "col": 2,
+      "type": "database",
+      "label": "创建单向PENDING",
+      "sublabel": "重复键转409",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/service/ContactFriendService.java",
+          "line": 66,
+          "end_line": 79
+        }
+      ]
+    },
+    {
+      "id": "acceptui",
+      "lane": "ui",
+      "col": 3,
+      "type": "frontend",
+      "label": "接受收到的申请",
+      "sublabel": "刷新申请与好友列表",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/ContactsSection.vue",
+          "line": 366,
+          "end_line": 377
+        }
+      ]
+    },
+    {
+      "id": "active",
+      "lane": "store",
+      "col": 3,
+      "type": "database",
+      "label": "双向置ACTIVE",
+      "sublabel": "事务写两条方向关系",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/service/ContactFriendService.java",
+          "line": 83,
+          "end_line": 103
+        }
+      ]
+    },
+    {
+      "id": "remark",
+      "lane": "friend",
+      "col": 4,
+      "type": "backend",
+      "label": "修改个人备注",
+      "sublabel": "仅允许ACTIVE关系",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/service/ContactFriendService.java",
+          "line": 114,
+          "end_line": 121
+        }
+      ]
+    },
+    {
+      "id": "remove",
+      "lane": "store",
+      "col": 5,
+      "type": "database",
+      "label": "删除双向关系",
+      "sublabel": "也可移除待处理关系",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/contact/service/ContactFriendService.java",
+          "line": 107,
+          "end_line": 110
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "list",
+      "to": "send",
+      "role": "main"
+    },
+    {
+      "from": "send",
+      "to": "validate",
+      "role": "main"
+    },
+    {
+      "from": "validate",
+      "to": "incoming",
+      "role": "main"
+    },
+    {
+      "from": "incoming",
+      "to": "pending",
+      "label": "无反向申请",
+      "role": "branch"
+    },
+    {
+      "from": "pending",
+      "to": "acceptui",
+      "role": "main"
+    },
+    {
+      "from": "acceptui",
+      "to": "active",
+      "role": "main"
+    },
+    {
+      "from": "incoming",
+      "to": "active",
+      "label": "有反向申请",
+      "role": "branch"
+    },
+    {
+      "from": "active",
+      "to": "remark",
+      "role": "main"
+    },
+    {
+      "from": "remark",
+      "to": "remove",
+      "role": "main"
+    }
+  ],
+  "mainPath": [
+    "list",
+    "send",
+    "validate",
+    "incoming",
+    "pending",
+    "acceptui",
+    "active",
+    "remark",
+    "remove"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "关系语义",
+      "items": [
+        "接受好友申请后形成双向ACTIVE；备注只更新本人方向；移除同时删除两个方向。",
+        "没有独立拒绝接口；DELETE可删除待接受关系，但当前页面未提供明确拒绝操作。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "优化建议",
+      "items": [
+        "补发出申请状态与拒绝操作，避免用户只看到“已发送好友申请”冲突提示。",
+        "同时互加／接受的真实并发结果尚未验证，应以唯一键与事务竞争专项测试验收。"
+      ]
+    }
+  ]
+}

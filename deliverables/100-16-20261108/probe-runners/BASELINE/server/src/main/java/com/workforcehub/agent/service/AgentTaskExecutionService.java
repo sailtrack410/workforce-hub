@@ -1,0 +1,416 @@
+package com.workforcehub.agent.service;
+
+import com.workforcehub.common.util.IdGenerator;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforcehub.agent.dto.AgentTaskResponse;
+import com.workforcehub.agent.model.OpenAiCompatibleAgentModelClient;
+import com.workforcehub.agent.model.AgentModelException;
+import com.workforcehub.agent.model.AgentModelRequest;
+import com.workforcehub.agent.model.AgentModelResponse;
+import com.workforcehub.agent.repository.AgentRepository;
+import com.workforcehub.agent.repository.AgentRow;
+import com.workforcehub.agent.repository.AgentTaskRow;
+import com.workforcehub.agent.repository.AgentVersionRow;
+import com.workforcehub.agent.workflow.WorkflowExecutionResult;
+import com.workforcehub.agent.workflow.WorkflowExecutor;
+import com.workforcehub.agent.workflow.WorkflowParser;
+import com.workforcehub.common.exception.BizException;
+import com.workforcehub.im.service.ImAgentConversationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
+
+import java.util.Map;
+import java.util.concurrent.Executor;
+
+import static com.workforcehub.common.util.JsonValues.normalize;
+import static com.workforcehub.common.util.JsonValues.write;
+import static com.workforcehub.common.util.TextValues.safeSummary;
+
+/**
+ * Agent 任务执行服务。
+ */
+@Service
+public class AgentTaskExecutionService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentTaskExecutionService.class);
+
+    private final AgentRepository agentRepository;
+    private final ObjectMapper objectMapper;
+    private final OpenAiCompatibleAgentModelClient agentModelClient;
+    private final ObjectProvider<ImAgentConversationService> imAgentConversationServiceProvider;
+    private final Executor agentExecutor;
+    private final TransactionTemplate transactionTemplate;
+    private final WorkflowParser workflowParser;
+    private final WorkflowExecutor workflowExecutor;
+
+    public AgentTaskExecutionService(AgentRepository agentRepository,
+                                     ObjectMapper objectMapper,
+                                     OpenAiCompatibleAgentModelClient agentModelClient,
+                                     ObjectProvider<ImAgentConversationService> imAgentConversationServiceProvider,
+                                     @Qualifier("agentExecutor") Executor agentExecutor,
+                                     PlatformTransactionManager transactionManager,
+                                     WorkflowParser workflowParser,
+                                     WorkflowExecutor workflowExecutor) {
+        this.agentRepository = agentRepository;
+        this.objectMapper = objectMapper;
+        this.agentModelClient = agentModelClient;
+        this.imAgentConversationServiceProvider = imAgentConversationServiceProvider;
+        this.agentExecutor = agentExecutor;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.workflowParser = workflowParser;
+        this.workflowExecutor = workflowExecutor;
+    }
+
+    // IM 会话触发 AI 任务：先入库任务记录，事务提交后再异步执行
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public AgentTaskResponse createConversationReplyTask(ImAgentTriggerCommand command) {
+        Long conversationId = command.conversationId();
+        Long agentId = command.agentId();
+        Long senderId = command.triggerUserId();
+        AgentRow agent = agentRepository.getAgentOrThrow(agentId);
+        if ("DEPRECATED".equals(agent.status())) {
+            throw new BizException(409, AgentService.DEPRECATED_AGENT_MESSAGE);
+        }
+        if (agent.publishedVersionId() == null || !"ACTIVE".equals(agent.status())) {
+            throw new BizException(409, "AI助手未发布或未启用");
+        }
+        if (!agentRepository.canUseAgent(agentId, senderId)) {
+            throw new BizException(403, "无权使用该AI助手");
+        }
+        String normalizedMessageContent = normalize(objectMapper, command.messageContentJson(), "AI会话输入内容不是合法JSON");
+        Long taskId = IdGenerator.nextId();
+        agentRepository.insertTask(
+            taskId,
+            agent.id(),
+            agent.publishedVersionId(),
+            "CONVERSATION",
+            "IM_CONVERSATION",
+            conversationId,
+            "USER",
+            senderId,
+            "PENDING",
+            null,
+            senderId
+        );
+        audit(taskId, "TASK_CREATED", "AGENT", agent.id(), "消息会话触发AI任务", false);
+        scheduleConversationExecution(taskId, command);
+        return toTaskResponse(agentRepository.getTaskOrThrow(taskId));
+    }
+
+    // 事务提交后再异步执行，避免任务执行期间持有数据库连接
+    private void scheduleConversationExecution(Long taskId, ImAgentTriggerCommand command) {
+        Runnable execution = () -> agentExecutor.execute(() -> executeConversationReplyTask(taskId, command));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    execution.run();
+                }
+            });
+            return;
+        }
+        execution.run();
+    }
+
+    // AI 任务执行：先尝试工作流模式，降级到单轮对话模式
+    private void executeConversationReplyTask(Long taskId, ImAgentTriggerCommand command) {
+        ConversationExecutionContext context = startConversationExecution(taskId, command);
+        if (context == null) {
+            return;
+        }
+        try {
+            if (workflowParser.isWorkflowConfig(context.version().workflowConfigJson())) {
+                WorkflowExecutionResult result = workflowExecutor.execute(
+                    taskId,
+                    context.agent().id(),
+                    context.agent().agentName(),
+                    context.version(),
+                    context.messageContent(),
+                    command.triggerUserId()
+                );
+                finishConversationSucceeded(command, context, result.replyText(), result.traceJson());
+                return;
+            }
+            AgentModelResponse modelResponse = agentModelClient.generateReply(new AgentModelRequest(
+                context.agent().id(),
+                taskId,
+                context.agent().agentName(),
+                context.version().systemPrompt(),
+                extractTextFromMessageContent(context.messageContent()),
+                context.version().modelConfigJson()
+            ));
+            finishConversationSucceeded(command, context, modelResponse.text(), null);
+        } catch (AgentModelException e) {
+            log.warn("AI会话模型调用失败 taskId={} failureType={}", context.taskId(), e.failureType(), e);
+            finishConversationFailed(command, context, e.failureType(), e.getMessage());
+        } catch (Exception e) {
+            log.warn("AI会话执行异常 taskId={}", context.taskId(), e);
+            finishConversationFailed(command, context, "UNKNOWN", e.getMessage());
+        }
+    }
+
+    // 开启新事务标记任务为运行中，只有 PENDING 状态的任务才能被拾取
+    private ConversationExecutionContext startConversationExecution(Long taskId, ImAgentTriggerCommand command) {
+        return transactionTemplate.execute(status -> {
+            AgentTaskRow task = agentRepository.getTaskOrThrow(taskId);
+            if (!"PENDING".equals(task.status())) {
+                return null;
+            }
+            AgentRow agent = agentRepository.getAgentOrThrow(task.agentId());
+            AgentVersionRow version = agentRepository.getVersionOrThrow(task.agentVersionId());
+            agentRepository.markTaskRunning(taskId, command.triggerUserId());
+            // 工作流模式需要把配置快照写入任务，防止执行期间版本被修改
+            if (workflowParser.isWorkflowConfig(version.workflowConfigJson())) {
+                agentRepository.updateTaskWorkflowSnapshot(taskId, version.workflowConfigJson(), command.triggerUserId());
+            }
+            audit(taskId, "TASK_RUNNING", "AGENT_TASK", taskId, "AI会话任务开始执行", false);
+            return new ConversationExecutionContext(
+                taskId,
+                agent,
+                version,
+                normalize(objectMapper, command.messageContentJson(), "AI会话输入内容不是合法JSON")
+            );
+        });
+    }
+
+    private void finishConversationSucceeded(ImAgentTriggerCommand command,
+                                             ConversationExecutionContext context,
+                                             String replyText,
+                                             String traceJson) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                if (StringUtils.hasText(traceJson)) {
+                    agentRepository.updateTaskExecutionTrace(context.taskId(), traceJson, command.triggerUserId());
+                }
+                agentRepository.finishTask(context.taskId(), "SUCCEEDED", null, command.triggerUserId());
+                audit(context.taskId(), "TASK_SUCCEEDED", "AGENT_TASK",
+                    context.taskId(), "AI会话任务执行成功", false);
+                notifyImAgentSucceeded(command, context.agent(), context.taskId(), replyText);
+            });
+        } catch (Exception e) {
+            log.warn("AI会话执行异常 taskId={}", context.taskId(), e);
+            finishConversationFailed(command, context, "UNKNOWN", e.getMessage());
+        }
+    }
+
+    private void finishConversationFailed(ImAgentTriggerCommand command,
+                                          ConversationExecutionContext context,
+                                          String failureType,
+                                          String failureMessage) {
+        Long taskId = context.taskId();
+        String safeFailureType = StringUtils.hasText(failureType) ? failureType : "UNKNOWN";
+        String errorMessage = safeSummary(failureMessage);
+        transactionTemplate.executeWithoutResult(status -> {
+            agentRepository.finishTask(taskId, "FAILED", errorMessage, command.triggerUserId());
+            audit(taskId, "TASK_FAILED", "AGENT_TASK", taskId, errorMessage, true);
+        });
+        try {
+            notifyImAgentFailed(command, context.agent(), taskId, safeFailureType, errorMessage);
+        } catch (Exception e) {
+            log.warn("AI会话失败结果回写IM失败 taskId={} conversationId={}",
+                taskId,
+                command.conversationId(),
+                e
+            );
+        }
+    }
+
+    private void notifyImAgentSucceeded(ImAgentTriggerCommand command,
+                                        AgentRow agent,
+                                        Long taskId,
+                                        String replyText) {
+        ImAgentConversationService callback = imAgentConversationServiceProvider.getIfAvailable();
+        if (callback == null) {
+            throw new BizException(501, "消息会话AI结果回写服务未接入");
+        }
+        AgentConversationReplyContent replyContent = buildConversationReplyContent(replyText, taskId, agent.agentCode());
+        callback.onAgentReply(new ImAgentReplyResult(
+            command.conversationId(),
+            command.sourceMessageId(),
+            agent.id(),
+            taskId,
+            replyContent.messageType(),
+            replyContent.contentJson(),
+            "SUCCEEDED",
+            null,
+            null,
+            agentMessageIdempotencyKey(taskId)
+        ));
+    }
+
+    private AgentConversationReplyContent buildConversationReplyContent(String replyText, Long taskId, String agentCode) {
+        String safeText = safeReplyText(replyText);
+        JsonNode cardNode = parseAgentCardNode(safeText);
+        if (cardNode instanceof com.fasterxml.jackson.databind.node.ObjectNode objectNode) {
+            objectNode.put("agentTaskId", taskId);
+            objectNode.put("agentCode", agentCode);
+            return new AgentConversationReplyContent("CARD", write(objectMapper, objectNode));
+        }
+        return new AgentConversationReplyContent("TEXT", write(objectMapper, Map.of(
+            "text", safeText,
+            "agentTaskId", taskId,
+            "agentCode", agentCode
+        )));
+    }
+
+    private JsonNode parseAgentCardNode(String replyText) {
+        try {
+            JsonNode node = objectMapper.readTree(replyText);
+            JsonNode cardType = node.get("cardType");
+            if (cardType == null) {
+                return null;
+            }
+            String value = cardType.asText();
+            return "knowledge_answer".equals(value) || "agent_result".equals(value) ? node : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void notifyImAgentFailed(ImAgentTriggerCommand command,
+                                     AgentRow agent,
+                                     Long taskId,
+                                     String failureType,
+                                     String failureMessage) {
+        ImAgentConversationService callback = imAgentConversationServiceProvider.getIfAvailable();
+        if (callback == null) {
+            throw new BizException(501, "消息会话AI结果回写服务未接入");
+        }
+        callback.onAgentReply(new ImAgentReplyResult(
+            command.conversationId(),
+            command.sourceMessageId(),
+            agent.id(),
+            taskId,
+            null,
+            null,
+            "FAILED",
+            failureType,
+            failureMessage,
+            agentMessageIdempotencyKey(taskId)
+        ));
+    }
+
+    private String agentMessageIdempotencyKey(Long taskId) {
+        return taskId == null ? null : "agent-task-" + taskId;
+    }
+
+    private String safeReplyText(String replyText) {
+        if (!StringUtils.hasText(replyText)) {
+            throw new AgentModelException("INVALID_RESPONSE", "模型服务返回内容为空");
+        }
+        return replyText.trim();
+    }
+
+    private String extractTextFromMessageContent(String messageContent) {
+        try {
+            JsonNode node = objectMapper.readTree(messageContent);
+            JsonNode textNode = node.get("text");
+            return textNode == null || textNode.isNull() ? "" : safeSummary(textNode.asText(""));
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private void audit(Long taskId,
+                       String actionType,
+                       String targetType,
+                       Long targetId,
+                       String decisionSummary,
+                       boolean riskFlag) {
+        agentRepository.insertAuditLog(
+            IdGenerator.nextId(),
+            taskId,
+            actionType,
+            targetType,
+            targetId,
+            safeSummary(decisionSummary),
+            riskFlag
+        );
+    }
+
+    private AgentTaskResponse toTaskResponse(AgentTaskRow row) {
+        AgentTaskResponse response = new AgentTaskResponse();
+        response.setTaskId(row.id());
+        response.setAgentId(row.agentId());
+        response.setAgentName(agentRepository.getAgentOrThrow(row.agentId()).agentName());
+        response.setAgentVersionId(row.agentVersionId());
+        response.setTriggerType(row.triggerType());
+        response.setTriggerTypeName(triggerTypeName(row.triggerType()));
+        response.setContextType(row.contextType());
+        response.setContextTypeName(contextTypeName(row.contextType()));
+        response.setContextId(row.contextId());
+        response.setContextDisplayName(contextDisplayName(row.contextType(), row.contextId()));
+        response.setStatus(row.status());
+        response.setStatusName(statusName(row.status()));
+        response.setToolCallCount(agentRepository.countToolCalls(row.id()));
+        response.setWaitingDeadlineAt(row.waitingDeadlineAt());
+        response.setStartedAt(row.startedAt());
+        response.setFinishedAt(row.finishedAt());
+        response.setErrorMessage(row.errorMessage());
+        response.setCreatedAt(row.createdAt());
+        response.setUpdatedAt(row.updatedAt());
+        return response;
+    }
+
+    private String statusName(String value) {
+        if ("PENDING".equals(value)) return "待处理";
+        if ("RUNNING".equals(value)) return "运行中";
+        if ("SUCCEEDED".equals(value) || "SUCCESS".equals(value)) return "成功";
+        if ("FAILED".equals(value)) return "失败";
+        if ("WAITING_HUMAN_CONFIRM".equals(value)) return "待确认";
+        if ("REJECTED".equals(value)) return "已拒绝";
+        if ("CANCELLED".equals(value)) return "已取消";
+        return value == null ? null : "未知状态";
+    }
+
+    private String triggerTypeName(String value) {
+        if ("MANUAL".equals(value)) return "手动";
+        if ("CONVERSATION".equals(value)) return "会话";
+        if ("WORKFLOW".equals(value)) return "审批";
+        if ("TIMER".equals(value) || "SCHEDULED".equals(value)) return "定时任务";
+        if ("EVENT".equals(value)) return "事件";
+        if ("SERVICE".equals(value)) return "服务";
+        return value == null ? null : "其他触发";
+    }
+
+    private String contextTypeName(String value) {
+        if ("USER_QUERY".equals(value)) return "员工咨询";
+        if ("WF_REQUEST".equals(value)) return "审批申请";
+        if ("IM_GROUP".equals(value)) return "群聊消息";
+        if ("IM_CONVERSATION".equals(value) || "CONVERSATION".equals(value)) return "消息会话";
+        return value == null ? null : "业务场景";
+    }
+
+    private String contextDisplayName(String contextType, Long contextId) {
+        if (contextId == null) return null;
+        if ("WF_REQUEST".equals(contextType)) return "审批申请";
+        if ("IM_CONVERSATION".equals(contextType) || "CONVERSATION".equals(contextType)) return "消息会话";
+        if ("USER_QUERY".equals(contextType)) return "员工咨询";
+        return "业务记录";
+    }
+
+    private record ConversationExecutionContext(
+        Long taskId,
+        AgentRow agent,
+        AgentVersionRow version,
+        String messageContent
+    ) {
+    }
+
+    private record AgentConversationReplyContent(
+        String messageType,
+        String contentJson
+    ) {
+    }
+}

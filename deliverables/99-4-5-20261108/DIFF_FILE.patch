@@ -1,0 +1,1691 @@
+diff --git a/admin-web/src/utils/format.ts b/admin-web/src/utils/format.ts
+index 2828e87..fb22656 100644
+--- a/admin-web/src/utils/format.ts
++++ b/admin-web/src/utils/format.ts
+@@ -422,6 +422,7 @@ export function attendanceSourceLabel(value?: string | null) {
+ export function attendanceResultLabel(value?: string | null) {
+   const labels: Record<string, string> = {
+     NORMAL: '正常',
++    REST: '休息',
+     ABNORMAL: '异常',
+     NO_RULE: '未排班',
+     LEAVE: '请假',
+diff --git a/employee-web/src/api/employee.test.ts b/employee-web/src/api/employee.test.ts
+index 617fe68..9b2932c 100644
+--- a/employee-web/src/api/employee.test.ts
++++ b/employee-web/src/api/employee.test.ts
+@@ -26,6 +26,16 @@ function createSpyClient() {
+ }
+ 
+ describe('createEmployeeApi', () => {
++  it('previews leave duration using the authenticated workflow calendar endpoint', async () => {
++    const { client, calls } = createSpyClient();
++    const api = createEmployeeApi(client);
++    const query = { startAt: '2026-05-07T09:00:00', endAt: '2026-05-07T12:00:00' };
++
++    await api.workflow.leaveDuration(query);
++
++    expect(calls).toEqual([['get', '/api/employee/workflow/leave-duration', { query }]]);
++  });
++
+   it('maps auth endpoints to backend employee auth controller', async () => {
+     const { client, calls } = createSpyClient();
+     const api = createEmployeeApi(client);
+diff --git a/employee-web/src/api/employee.ts b/employee-web/src/api/employee.ts
+index 6fb36c5..278cdf1 100644
+--- a/employee-web/src/api/employee.ts
++++ b/employee-web/src/api/employee.ts
+@@ -42,6 +42,8 @@ import type {
+   ImMessageActionResponse,
+   ImMessageResponse,
+   LeaveRequestCreateRequest,
++  LeaveDurationQuery,
++  LeaveDurationResponse,
+   LeaveAccountResponse,
+   LeaveTypeResponse,
+   LoginSendCodeRequest,
+@@ -115,6 +117,7 @@ export function createEmployeeApi(client: ApiClient = defaultApiClient) {
+       deptTree: () => client.get<OrgDepartmentTreeNodeResponse[]>('/api/employee/contacts/dept-tree'),
+     },
+     workflow: {
++      leaveDuration: (query: LeaveDurationQuery) => client.get<LeaveDurationResponse>('/api/employee/workflow/leave-duration', { query: { ...query } }),
+       submitLeaveRequest: (request: LeaveRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/leave-requests', request),
+       submitClockCorrectionRequest: (request: ClockCorrectionRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/clock-correction-requests', request),
+       submitGenericRequest: (request: GenericWorkflowRequestCreateRequest) => client.post<WorkflowRequestCreateResponse>('/api/employee/workflow/generic-requests', request),
+diff --git a/employee-web/src/api/types.ts b/employee-web/src/api/types.ts
+index a890a8d..75bcaf8 100644
+--- a/employee-web/src/api/types.ts
++++ b/employee-web/src/api/types.ts
+@@ -470,6 +470,15 @@ export interface EditImMessageRequest {
+   text: string;
+ }
+ 
++export interface LeaveDurationQuery {
++  startAt: string;
++  endAt: string;
++}
++
++export interface LeaveDurationResponse {
++  durationMinutes: number;
++}
++
+ export interface LeaveRequestCreateRequest {
+   leaveTypeId: EntityId;
+   startAt: string;
+diff --git a/employee-web/src/composables/useWorkbenchState.test.ts b/employee-web/src/composables/useWorkbenchState.test.ts
+index b5ee875..2ec0fb5 100644
+--- a/employee-web/src/composables/useWorkbenchState.test.ts
++++ b/employee-web/src/composables/useWorkbenchState.test.ts
+@@ -169,7 +169,8 @@ describe('useWorkbenchState', () => {
+     expect(state.workflowRequests.value[0]?.requestId).toBe('REQ-1');
+   });
+ 
+-  it('computes leave minutes from datetime range and rounds up to half day', async () => {
++  it('uses calendar minutes from the server without rounding up to half day', async () => {
++    const preview = vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes: 120 });
+     vi.spyOn(employeeApi.leave, 'types').mockResolvedValue([
+       { leaveTypeId: 'L-1', leaveCode: 'ANNUAL', leaveName: '年假', balanceMode: 'DEDUCT', status: 'ACTIVE' },
+       { leaveTypeId: 'L-2', leaveCode: 'SICK', leaveName: '病假', balanceMode: 'NO_DEDUCT', status: 'ACTIVE' },
+@@ -188,7 +189,108 @@ describe('useWorkbenchState', () => {
+     state.leaveForm.value.endAt = '2026-05-08T10:00';
+     await nextTick();
+ 
+-    expect(state.leaveForm.value.durationMinutes).toBe('240');
++    expect(state.leaveForm.value.durationMinutes).toBe('120');
++    expect(preview).toHaveBeenCalledWith({ startAt: '2026-05-07T17:00:00', endAt: '2026-05-08T10:00:00' });
++  });
++
++  it.each([180, 300, 60, 0])('displays authoritative duration %i for the selected calendar range', async (durationMinutes) => {
++    vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes });
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value.startAt = '2026-05-07T09:00';
++    state.leaveForm.value.endAt = '2026-05-07T12:00';
++    await nextTick();
++
++    expect(state.leaveForm.value.durationMinutes).toBe(String(durationMinutes));
++  });
++
++  it('discards stale previews and clears duration immediately when dates change or are removed', async () => {
++    const older = createDeferred<{ durationMinutes: number }>();
++    const newer = createDeferred<{ durationMinutes: number }>();
++    vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockImplementationOnce(() => older.promise)
++      .mockImplementationOnce(() => newer.promise);
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value.startAt = '2026-05-07T09:00';
++    state.leaveForm.value.endAt = '2026-05-07T12:00';
++    state.leaveForm.value.endAt = '2026-05-07T18:00';
++    expect(state.leaveForm.value.durationMinutes).toBe('');
++    newer.resolve({ durationMinutes: 480 });
++    await nextTick();
++    older.resolve({ durationMinutes: 180 });
++    await nextTick();
++    expect(state.leaveForm.value.durationMinutes).toBe('480');
++
++    const pending = createDeferred<{ durationMinutes: number }>();
++    vi.mocked(employeeApi.workflow.leaveDuration).mockImplementationOnce(() => pending.promise);
++    state.leaveForm.value.endAt = '2026-05-07T17:00';
++    state.leaveForm.value.startAt = '';
++    pending.resolve({ durationMinutes: 420 });
++    await nextTick();
++    expect(state.leaveForm.value.durationMinutes).toBe('');
++  });
++
++  it('clears old duration and blocks submission when the calendar preview fails', async () => {
++    vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockResolvedValueOnce({ durationMinutes: 180 })
++      .mockRejectedValue(new Error('未配置员工排班'));
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await nextTick();
++    expect(state.leaveForm.value.durationMinutes).toBe('180');
++    await state.submitLeaveRequest();
++
++    expect(state.leaveForm.value.durationMinutes).toBe('');
++    expect(state.leaveError.value).toBe('未配置员工排班');
++    expect(state.leaveSubmitting.value).toBe(false);
++    expect(submit).not.toHaveBeenCalled();
++  });
++
++  it('revalidates the duration before submission instead of trusting an old displayed value', async () => {
++    const preview = vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockResolvedValueOnce({ durationMinutes: 180 })
++      .mockResolvedValueOnce({ durationMinutes: 150 });
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest').mockRejectedValue(new Error('测试提交结束'));
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await nextTick();
++    state.leaveForm.value.durationMinutes = '999';
++    await state.submitLeaveRequest();
++
++    expect(preview).toHaveBeenCalledTimes(2);
++    expect(submit).toHaveBeenCalledExactlyOnceWith({ leaveTypeId: 'L-1', startAt: '2026-05-07 09:00:00', endAt: '2026-05-07 12:00:00', durationMinutes: 150, reason: '休假', attachmentRefIds: [] });
++  });
++
++  it('does not submit a stale range when dates change during submission preview', async () => {
++    const pending = createDeferred<{ durationMinutes: number }>();
++    vi.spyOn(employeeApi.workflow, 'leaveDuration')
++      .mockResolvedValueOnce({ durationMinutes: 180 })
++      .mockImplementationOnce(() => pending.promise)
++      .mockResolvedValueOnce({ durationMinutes: 480 });
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await nextTick();
++    const submitting = state.submitLeaveRequest();
++    await state.submitLeaveRequest();
++    state.leaveForm.value.endAt = '2026-05-07T18:00';
++    pending.resolve({ durationMinutes: 180 });
++    await submitting;
++
++    expect(state.leaveForm.value.durationMinutes).toBe('480');
++    expect(state.leaveSubmitting.value).toBe(false);
++    expect(submit).not.toHaveBeenCalled();
++  });
++
++  it.each([0, -1, 1.5, Number.NaN])('rejects nonpositive or invalid authoritative duration %s', async (durationMinutes) => {
++    vi.spyOn(employeeApi.workflow, 'leaveDuration').mockResolvedValue({ durationMinutes });
++    const submit = vi.spyOn(employeeApi.workflow, 'submitLeaveRequest');
++    const state = useWorkbenchState({ shell: createShell(), session: createSession(), showToast: vi.fn() });
++    state.leaveForm.value = { leaveTypeId: 'L-1', startAt: '2026-05-07T09:00', endAt: '2026-05-07T12:00', durationMinutes: '', reason: '休假' };
++    await state.submitLeaveRequest();
++
++    expect(state.leaveError.value).not.toBe('');
++    expect(submit).not.toHaveBeenCalled();
+   });
+ 
+   it('keeps no-deduct leave types selectable without annual leave default bias', async () => {
+diff --git a/employee-web/src/composables/useWorkbenchState.ts b/employee-web/src/composables/useWorkbenchState.ts
+index 4932b86..7c5857b 100644
+--- a/employee-web/src/composables/useWorkbenchState.ts
++++ b/employee-web/src/composables/useWorkbenchState.ts
+@@ -42,44 +42,6 @@ interface UseWorkbenchStateOptions {
+   showToast: (message: string) => void;
+ }
+ 
+-const HALF_DAY_MINUTES = 240;
+-
+-function overlapMinutes(rangeStart: Date, rangeEnd: Date, segmentStart: Date, segmentEnd: Date) {
+-  const start = Math.max(rangeStart.getTime(), segmentStart.getTime());
+-  const end = Math.min(rangeEnd.getTime(), segmentEnd.getTime());
+-  if (end <= start) return 0;
+-  return Math.round((end - start) / 60000);
+-}
+-
+-// 按半天（4h）为最小单位计算请假时长，只计算工作时间段（9-12, 13-18）
+-function calculateLeaveDurationMinutes(startAt: string, endAt: string) {
+-  if (!startAt || !endAt) return 0;
+-  const start = new Date(startAt);
+-  const end = new Date(endAt);
+-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return 0;
+-  let minutes = 0;
+-  const cursor = new Date(start);
+-  while (cursor <= end) {
+-    const day = new Date(cursor);
+-    day.setHours(0, 0, 0, 0);
+-    const morningStart = new Date(day);
+-    morningStart.setHours(9, 0, 0, 0);
+-    const morningEnd = new Date(day);
+-    morningEnd.setHours(12, 0, 0, 0);
+-    const afternoonStart = new Date(day);
+-    afternoonStart.setHours(13, 0, 0, 0);
+-    const afternoonEnd = new Date(day);
+-    afternoonEnd.setHours(18, 0, 0, 0);
+-    minutes += overlapMinutes(start, end, morningStart, morningEnd);
+-    minutes += overlapMinutes(start, end, afternoonStart, afternoonEnd);
+-    cursor.setDate(cursor.getDate() + 1);
+-    cursor.setHours(0, 0, 0, 0);
+-  }
+-  if (minutes <= 0) return 0;
+-  // 向上取整到半天
+-  return Math.ceil(minutes / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
+-}
+-
+ function accountAsLeaveType(account: LeaveAccountResponse): LeaveTypeResponse {
+   return {
+     leaveTypeId: account.leaveTypeId,
+@@ -120,13 +82,14 @@ export function useWorkbenchState({
+     leaveTypeId: '',
+     startAt: '',
+     endAt: '',
+-    durationMinutes: '480',
++    durationMinutes: '',
+     reason: '',
+   });
+   const leaveAttachmentIds = ref<Array<number | string>>([]);
+   const leaveSubmitting = ref(false);
+   const leaveResult = ref<WorkflowRequestCreateResponse | null>(null);
+   const leaveError = ref('');
++  let leaveDurationRequestSeq = 0;
+   const workflowRequests = ref<WorkflowRequestSummaryResponse[]>([]);
+   const workflowRequestsTotal = ref(0);
+   const workflowRequestsLoading = ref(false);
+@@ -188,9 +151,6 @@ export function useWorkbenchState({
+       note: annualLeaveAccount.value?.leaveName ?? '假期',
+     },
+   ]);
+-  const computedLeaveDurationMinutes = computed(() => (
+-    calculateLeaveDurationMinutes(leaveForm.value.startAt, leaveForm.value.endAt)
+-  ));
+   const workflowDetailRows = computed<FieldRows>(() => {
+     const detail = workflowDetail.value;
+     if (!detail) return [];
+@@ -297,21 +257,33 @@ export function useWorkbenchState({
+   }
+ 
+   async function submitLeaveRequest() {
++    if (leaveSubmitting.value) return;
+     leaveError.value = '';
+     leaveResult.value = null;
+     const leaveTypeId = leaveForm.value.leaveTypeId.trim();
+-    const durationMinutes = computedLeaveDurationMinutes.value;
++    const { startAt, endAt } = leaveForm.value;
+     const reason = leaveForm.value.reason.trim();
+-    if (!leaveTypeId || !leaveForm.value.startAt || !leaveForm.value.endAt || !durationMinutes || !reason) {
++    if (!leaveTypeId || !startAt || !endAt || !reason) {
+       leaveError.value = '请完整填写请假申请';
+       return;
+     }
+     leaveSubmitting.value = true;
+     try {
++      const durationMinutes = await refreshLeaveDuration(startAt, endAt);
++      if (startAt !== leaveForm.value.startAt || endAt !== leaveForm.value.endAt
++        || leaveTypeId !== leaveForm.value.leaveTypeId.trim() || reason !== leaveForm.value.reason.trim()) {
++        leaveError.value = '申请内容已变更，请重新提交';
++        return;
++      }
++      if (durationMinutes === null) return;
++      if (durationMinutes <= 0) {
++        leaveError.value = '所选时段无可请假工作时间';
++        return;
++      }
+       leaveResult.value = await employeeApi.workflow.submitLeaveRequest({
+         leaveTypeId,
+-        startAt: toApiDateTime(leaveForm.value.startAt),
+-        endAt: toApiDateTime(leaveForm.value.endAt),
++        startAt: toApiDateTime(startAt),
++        endAt: toApiDateTime(endAt),
+         durationMinutes,
+         reason,
+         attachmentRefIds: leaveAttachmentIds.value,
+@@ -329,12 +301,41 @@ export function useWorkbenchState({
+     }
+   }
+ 
++  async function refreshLeaveDuration(startAt: string, endAt: string): Promise<number | null> {
++    const requestSeq = ++leaveDurationRequestSeq;
++    leaveForm.value.durationMinutes = '';
++    leaveError.value = '';
++    if (!startAt || !endAt) return null;
++    if (!Number.isFinite(Date.parse(startAt)) || !Number.isFinite(Date.parse(endAt)) || endAt <= startAt) {
++      leaveError.value = '结束时间必须晚于开始时间';
++      return null;
++    }
++    try {
++      const result = await employeeApi.workflow.leaveDuration({
++        startAt: toApiDateTime(startAt).replace(' ', 'T'),
++        endAt: toApiDateTime(endAt).replace(' ', 'T'),
++      });
++      if (requestSeq !== leaveDurationRequestSeq) return null;
++      if (!Number.isSafeInteger(result.durationMinutes) || result.durationMinutes < 0) {
++        throw new Error('请假时长计算失败');
++      }
++      leaveForm.value.durationMinutes = String(result.durationMinutes);
++      return result.durationMinutes;
++    } catch (error) {
++      if (requestSeq === leaveDurationRequestSeq) {
++        leaveError.value = error instanceof Error ? error.message : '请假时长计算失败';
++      }
++      return null;
++    }
++  }
++
++  // 以下两条注释描述旧算法，现已由服务端排班计时替代。
++  // 按半天（4h）为最小单位计算请假时长，只计算工作时间段（9-12, 13-18）
++  // 向上取整到半天
+   watch(
+-    computedLeaveDurationMinutes,
+-    (minutes) => {
+-      leaveForm.value.durationMinutes = minutes > 0 ? String(minutes) : '';
+-    },
+-    { immediate: true },
++    () => [leaveForm.value.startAt, leaveForm.value.endAt],
++    ([startAt, endAt]) => { void refreshLeaveDuration(startAt, endAt); },
++    { immediate: true, flush: 'sync' },
+   );
+ 
+   async function loadWorkflowRequests() {
+@@ -473,6 +474,7 @@ export function useWorkbenchState({
+ 
+   if (getCurrentInstance()) {
+     onBeforeUnmount(() => {
++      leaveDurationRequestSeq += 1;
+       closeWorkflowFilePreview();
+     });
+   }
+diff --git a/employee-web/src/utils/employee-format.test.ts b/employee-web/src/utils/employee-format.test.ts
+index f9887c4..46af8c0 100644
+--- a/employee-web/src/utils/employee-format.test.ts
++++ b/employee-web/src/utils/employee-format.test.ts
+@@ -19,6 +19,7 @@ describe('employee format helpers', () => {
+     expect(displayField('  ')).toBe('-');
+     expect(displayField(0)).toBe('0');
+     expect(statusText('IN_APPROVAL')).toBe('审批中');
++    expect(statusText('REST')).toBe('休息');
+     expect(statusText('UNKNOWN')).toBe('其他状态');
+     expect(bizTypeLabel('LEAVE')).toBe('请假');
+     expect(punchTypeLabel('OFF_DUTY')).toBe('下班');
+diff --git a/employee-web/src/utils/employee-format.ts b/employee-web/src/utils/employee-format.ts
+index db792ec..b994f0e 100644
+--- a/employee-web/src/utils/employee-format.ts
++++ b/employee-web/src/utils/employee-format.ts
+@@ -56,6 +56,7 @@ export function statusText(status: string) {
+   if (status === 'IN_APPROVAL') return '审批中';
+   if (status === 'ABNORMAL') return '异常';
+   if (status === 'NORMAL') return '正常';
++  if (status === 'REST') return '休息';
+   if (status === 'ACTIVE') return '正常';
+   if (status === 'READY') return '就绪';
+   if (status === 'PASSED') return '已通过';
+diff --git a/server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java b/server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java
+index 347c147..35c487a 100644
+--- a/server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java
++++ b/server/src/main/java/com/workforcehub/attendance/repository/AttendanceRepository.java
+@@ -96,6 +96,50 @@ public class AttendanceRepository {
+         );
+     }
+ 
++    public Boolean findCalendarWorkday(Long calendarId, LocalDate workDate) {
++        List<Boolean> days = jdbcTemplate.query("""
++            SELECT is_workday FROM att_work_calendar_day
++            WHERE calendar_id = ? AND work_date = ?
++            """, (rs, rowNum) -> rs.getBoolean("is_workday"), calendarId, workDate);
++        return days.isEmpty() ? null : days.get(0);
++    }
++
++    public List<AttendanceWorkPeriod> listShiftWorkPeriods(Long shiftId, LocalDate workDate) {
++        List<LocalTime[]> segments = jdbcTemplate.query("""
++            SELECT start_time, end_time FROM att_shift_segment
++            WHERE shift_id = ? ORDER BY segment_no, id
++            """, (rs, rowNum) -> new LocalTime[]{rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime()}, shiftId);
++        List<AttendanceWorkPeriod> periods = new ArrayList<>();
++        LocalDate segmentDate = workDate;
++        LocalDateTime previousStart = null;
++        for (LocalTime[] segment : segments) {
++            LocalDateTime start = segmentDate.atTime(segment[0]);
++            if (previousStart != null && start.isBefore(previousStart)) {
++                segmentDate = segmentDate.plusDays(1);
++                start = segmentDate.atTime(segment[0]);
++            }
++            LocalDateTime end = segmentDate.atTime(segment[1]);
++            if (!end.isAfter(start)) end = end.plusDays(1);
++            if (!periods.isEmpty() && start.isBefore(periods.get(periods.size() - 1).endAt())) {
++                throw new BizException(400, "班次工作时段重叠，请调整班次");
++            }
++            periods.add(new AttendanceWorkPeriod(start, end));
++            previousStart = start;
++        }
++        return periods;
++    }
++
++    public LocalDateTime getPunchAtInPeriod(Long userId, LocalDateTime startAt, LocalDateTime endAt, String punchType) {
++        List<LocalDateTime> punches = jdbcTemplate.query("""
++            SELECT punch_at FROM att_punch_record
++            WHERE user_id = ? AND punch_at >= ? AND punch_at <= ?
++              AND punch_type = ? AND status = 'NORMAL'
++            ORDER BY punch_at
++            """, (rs, rowNum) -> rs.getTimestamp("punch_at").toLocalDateTime(), userId, startAt, endAt, punchType);
++        if (punches.isEmpty()) return null;
++        return "ON_DUTY".equals(punchType) ? punches.get(0) : punches.get(punches.size() - 1);
++    }
++
+     public boolean existsShiftCode(String shiftCode) {
+         Long count = jdbcTemplate.queryForObject("""
+             SELECT COUNT(*)
+diff --git a/server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java b/server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java
+index f1feaa0..68469fc 100644
+--- a/server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java
++++ b/server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java
+@@ -24,6 +24,7 @@ import com.workforcehub.attendance.repository.AttendanceGroupRow;
+ import com.workforcehub.attendance.repository.AttendanceRepository;
+ import com.workforcehub.attendance.repository.AttendanceScheduleRow;
+ import com.workforcehub.attendance.repository.AttendanceShiftRow;
++import com.workforcehub.attendance.repository.AttendanceWorkPeriod;
+ import com.workforcehub.attendance.repository.PunchRecordRow;
+ import com.workforcehub.common.event.DomainEventPublisher;
+ import com.workforcehub.common.event.attendance.AttendanceExceptionCreatedEvent;
+@@ -98,6 +99,60 @@ public class AttendanceService {
+         this.domainEventPublisher = domainEventPublisher;
+     }
+ 
++    @Transactional
++    public int calculateLeaveDurationMinutes(Long userId, LocalDateTime startAt, LocalDateTime endAt) {
++        if (startAt == null || endAt == null || !endAt.isAfter(startAt)) {
++            throw new BizException(400, "结束时间必须晚于开始时间");
++        }
++        if (startAt.getSecond() != 0 || startAt.getNano() != 0 || endAt.getSecond() != 0 || endAt.getNano() != 0) {
++            throw new BizException(400, "请假时间必须精确到整分钟");
++        }
++        if (startAt.plusDays(366).isBefore(endAt)) {
++            throw new BizException(400, "请假跨度不能超过366天");
++        }
++        int minutes = 0;
++        LocalDateTime previousEnd = null;
++        // 前一天的跨日班次可能覆盖申请开始时间。
++        for (LocalDate date = startAt.toLocalDate().minusDays(1); date.atStartOfDay().isBefore(endAt); date = date.plusDays(1)) {
++            AttendanceGroupRow group = attendanceRepository.getEffectiveGroupForUpdate(userId, date);
++            if (group == null) {
++                if (!date.isBefore(startAt.toLocalDate()) && date.atStartOfDay().isBefore(endAt)) {
++                    throw new BizException(400, "请假期间未配置有效考勤组");
++                }
++                continue;
++            }
++            AttendanceScheduleRow schedule = attendanceRepository.getActiveSchedule(userId, date);
++            for (AttendanceWorkPeriod period : resolveWorkPeriods(date, group, schedule)) {
++                int overlap = period.overlapMinutes(startAt, endAt);
++                if (overlap == 0) continue;
++                LocalDateTime from = period.startAt().isAfter(startAt) ? period.startAt() : startAt;
++                if (previousEnd != null && from.isBefore(previousEnd)) {
++                    throw new BizException(400, "员工相邻排班工作时段重叠，请调整排班");
++                }
++                previousEnd = period.endAt().isBefore(endAt) ? period.endAt() : endAt;
++                minutes = Math.addExact(minutes, overlap);
++            }
++        }
++        return minutes;
++    }
++
++    private List<AttendanceWorkPeriod> resolveWorkPeriods(LocalDate date, AttendanceGroupRow group, AttendanceScheduleRow schedule) {
++        Long calendarId = schedule != null && schedule.calendarId() != null ? schedule.calendarId() : group.calendarId();
++        AttendanceCalendarRow calendar = attendanceRepository.getCalendarOrThrow(calendarId);
++        if (!STATUS_ACTIVE.equals(calendar.status())) throw new BizException(400, "工作日历已停用");
++        Boolean workday = attendanceRepository.findCalendarWorkday(calendarId, date);
++        if (Boolean.FALSE.equals(workday) || (workday == null && schedule == null && date.getDayOfWeek().getValue() > 5)) {
++            return List.of();
++        }
++        Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
++        if (shiftId == null) throw new BizException(400, "未配置有效班次");
++        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
++        if (!STATUS_ACTIVE.equals(shift.status())) throw new BizException(400, "班次已停用");
++        List<AttendanceWorkPeriod> periods = attendanceRepository.listShiftWorkPeriods(shiftId, date);
++        if (periods.isEmpty()) throw new BizException(400, "班次未配置工作时段");
++        return periods;
++    }
++
+     @Transactional(rollbackFor = Exception.class)
+     public AttendanceCalendarResponse createCalendar(CreateAttendanceCalendarRequest request) {
+         Long operatorId = CurrentUserHolder.requireUserId();
+@@ -439,6 +494,21 @@ public class AttendanceService {
+         recalculateDailyResult(userId, workDate);
+     }
+ 
++    @Transactional(rollbackFor = Exception.class)
++    public void recalculateDailyResultsForApprovedLeave(Long userId, LocalDateTime startAt, LocalDateTime endAt) {
++        LocalDate firstDate = startAt.toLocalDate();
++        LocalDate previousDate = firstDate.minusDays(1);
++        AttendanceGroupRow previousGroup = attendanceRepository.getEffectiveGroupForUpdate(userId, previousDate);
++        if (previousGroup != null && resolveWorkPeriods(previousDate, previousGroup,
++                attendanceRepository.getActiveSchedule(userId, previousDate)).stream()
++                .anyMatch(period -> period.overlapMinutes(startAt, endAt) > 0)) {
++            firstDate = previousDate;
++        }
++        for (LocalDate date = firstDate; date.atStartOfDay().isBefore(endAt); date = date.plusDays(1)) {
++            recalculateDailyResult(userId, date);
++        }
++    }
++
+     // 补卡审批通过后，插入虚拟打卡记录并重算当天考勤
+     @Transactional(rollbackFor = Exception.class)
+     public void applyApprovedClockCorrection(Long userId,
+@@ -482,19 +552,30 @@ public class AttendanceService {
+         Long scheduleId = schedule == null ? null : schedule.scheduleId();
+         // 没有特殊排班就用考勤组的默认班次
+         Long shiftId = schedule == null ? group.defaultShiftId() : schedule.shiftId();
+-        AttendanceShiftRow shift = attendanceRepository.getShiftOrThrow(shiftId);
+-        LocalDateTime firstPunchAt = attendanceRepository.getFirstPunchAt(userId, workDate);
+-        LocalDateTime lastPunchAt = attendanceRepository.getLastPunchAt(userId, workDate);
++        List<AttendanceWorkPeriod> periods = resolveWorkPeriods(workDate, group, schedule);
++        if (periods.isEmpty()) {
++            AttendanceDailyResultRow row = upsertDailyResult(userId, workDate, scheduleId, group.groupId(), shiftId,
++                "REST", 0, 0, 0, 0, false);
++            rebuildExceptions(row, 0, 0, 0);
++            return attendanceRepository.getDailyResult(userId, workDate);
++        }
++        LocalDateTime expectedStart = periods.get(0).startAt();
++        LocalDateTime expectedEnd = periods.get(periods.size() - 1).endAt();
++        boolean crossDay = expectedEnd.toLocalDate().isAfter(workDate);
++        LocalDateTime firstPunchAt = crossDay
++            ? attendanceRepository.getPunchAtInPeriod(userId, workDate.atStartOfDay(), expectedEnd, PUNCH_TYPE_ON_DUTY)
++            : attendanceRepository.getFirstPunchAt(userId, workDate);
++        LocalDateTime lastPunchAt = crossDay
++            ? attendanceRepository.getPunchAtInPeriod(userId, expectedStart, expectedEnd.toLocalDate().plusDays(1).atStartOfDay(), PUNCH_TYPE_OFF_DUTY)
++            : attendanceRepository.getLastPunchAt(userId, workDate);
+         // 获取当天已审批通过的请假时段，用于抵扣迟到/早退/缺勤
+-        List<ApprovedLeavePeriod> approvedLeavePeriods =
+-            leaveService.listApprovedLeavePeriodsOnDate(userId, workDate);
+-        int requiredWorkMinutes = minutesBetween(shift.startTime(), shift.endTime());
+-        int approvedLeaveCoveredMinutes = calculateApprovedLeaveCoveredMinutes(
+-            approvedLeavePeriods,
+-            workDate,
+-            shift.startTime(),
+-            shift.endTime()
+-        );
++        List<ApprovedLeavePeriod> approvedLeavePeriods = new ArrayList<>(leaveService.listApprovedLeavePeriodsOnDate(userId, workDate));
++        if (expectedEnd.toLocalDate().isAfter(workDate)) {
++            approvedLeavePeriods.addAll(leaveService.listApprovedLeavePeriodsOnDate(userId, expectedEnd.toLocalDate()));
++        }
++        int requiredWorkMinutes = periods.stream().mapToInt(AttendanceWorkPeriod::minutes).sum();
++        int approvedLeaveCoveredMinutes = periods.stream().mapToInt(period ->
++            calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, period.startAt(), period.endAt())).sum();
+         // 请假覆盖了全部应出勤时间，直接标记为请假状态
+         if (approvedLeaveCoveredMinutes >= requiredWorkMinutes) {
+             AttendanceDailyResultRow row = upsertDailyResult(
+@@ -514,29 +595,31 @@ public class AttendanceService {
+             return attendanceRepository.getDailyResult(userId, workDate);
+         }
+ 
+-        int lateMinutes = calculateLateMinutes(
+-            firstPunchAt,
+-            workDate,
+-            shift.startTime(),
+-            group.lateGraceMinutes(),
+-            approvedLeavePeriods
+-        );
+-        int earlyLeaveMinutes = calculateEarlyLeaveMinutes(
+-            lastPunchAt,
+-            workDate,
+-            shift.endTime(),
+-            group.earlyLeaveGraceMinutes(),
+-            approvedLeavePeriods
+-        );
+-        int absenceMinutes = calculateAbsenceMinutes(
+-            firstPunchAt,
+-            lastPunchAt,
+-            workDate,
+-            shift.startTime(),
+-            shift.endTime(),
+-            approvedLeavePeriods
+-        );
+-        int workMinutes = calculateWorkMinutes(firstPunchAt, lastPunchAt);
++        int lateMinutes = 0;
++        int earlyLeaveMinutes = 0;
++        int absenceMinutes = 0;
++        int workMinutes = 0;
++        int missingHalfMinutes = requiredWorkMinutes / 2;
++        int precedingMinutes = 0;
++        for (AttendanceWorkPeriod period : periods) {
++            LocalDateTime lateStart = expectedStart.plusMinutes(group.lateGraceMinutes());
++            LocalDateTime earlyEnd = expectedEnd.minusMinutes(group.earlyLeaveGraceMinutes());
++            if (firstPunchAt != null) {
++                lateMinutes += uncoveredWorkMinutes(period, lateStart, firstPunchAt, approvedLeavePeriods);
++            }
++            if (lastPunchAt != null) {
++                earlyLeaveMinutes += uncoveredWorkMinutes(period, lastPunchAt, earlyEnd, approvedLeavePeriods);
++            }
++            if (firstPunchAt == null && lastPunchAt == null) {
++                absenceMinutes += period.minutes() - calculateApprovedLeaveCoveredMinutes(approvedLeavePeriods, period.startAt(), period.endAt());
++            } else if (firstPunchAt == null || lastPunchAt == null) {
++                int from = firstPunchAt == null ? 0 : Math.max(0, missingHalfMinutes - precedingMinutes);
++                int to = firstPunchAt == null ? Math.min(period.minutes(), missingHalfMinutes - precedingMinutes) : period.minutes();
++                if (to > from) absenceMinutes += uncoveredWorkMinutes(period, period.startAt().plusMinutes(from), period.startAt().plusMinutes(to), approvedLeavePeriods);
++            }
++            if (firstPunchAt != null && lastPunchAt != null) workMinutes += period.overlapMinutes(firstPunchAt, lastPunchAt);
++            precedingMinutes += period.minutes();
++        }
+         boolean exceptionFlag = lateMinutes > 0 || earlyLeaveMinutes > 0 || absenceMinutes > 0;
+         String resultStatus = exceptionFlag ? RESULT_ABNORMAL : RESULT_NORMAL;
+ 
+@@ -635,6 +718,14 @@ public class AttendanceService {
+         }
+     }
+ 
++    private int uncoveredWorkMinutes(AttendanceWorkPeriod period, LocalDateTime start, LocalDateTime end,
++                                     List<ApprovedLeavePeriod> leaves) {
++        LocalDateTime from = start.isAfter(period.startAt()) ? start : period.startAt();
++        LocalDateTime to = end.isBefore(period.endAt()) ? end : period.endAt();
++        if (!to.isAfter(from)) return 0;
++        return period.overlapMinutes(from, to) - calculateApprovedLeaveCoveredMinutes(leaves, from, to);
++    }
++
+     private int calculateLateMinutes(LocalDateTime firstPunchAt,
+                                      LocalDate workDate,
+                                      LocalTime startTime,
+@@ -978,6 +1069,7 @@ public class AttendanceService {
+         if (RESULT_ABNORMAL.equals(value)) return "异常";
+         if (RESULT_NO_RULE.equals(value)) return "未设置规则";
+         if (RESULT_LEAVE.equals(value)) return "请假";
++        if ("REST".equals(value)) return "休息";
+         return "未知结果";
+     }
+ 
+diff --git a/server/src/main/java/com/workforcehub/common/util/IdGenerator.java b/server/src/main/java/com/workforcehub/common/util/IdGenerator.java
+index 8e2f4b3..a09cf87 100644
+--- a/server/src/main/java/com/workforcehub/common/util/IdGenerator.java
++++ b/server/src/main/java/com/workforcehub/common/util/IdGenerator.java
+@@ -1,24 +1,31 @@
+ package com.workforcehub.common.util;
+ 
+-import java.util.concurrent.atomic.AtomicLong;
++import java.util.LinkedHashMap;
++import java.util.function.LongSupplier;
+ 
+ // 简化版雪花 ID：时间戳左移 20 位 + 自增序列，单机每毫秒可生成约 100 万个 ID
++// 上行为历史实现说明；现使用共享数据库持久号段，不再依赖时间戳或单机序列。
+ public final class IdGenerator {
+ 
+-    private static final AtomicLong LAST_ID = new AtomicLong(System.currentTimeMillis() << 20);
++    // 生产号段由共享数据库持久分配，禁止在初始化失败时退回单机算法。
++    private static final LinkedHashMap<Object, LongSupplier> GENERATORS = new LinkedHashMap<>();
+ 
+     private IdGenerator() {
+     }
+ 
+-    public static long nextId() {
+-        long now = System.currentTimeMillis() << 20;
+-        while (true) {
+-            long current = LAST_ID.get();
+-            long next = Math.max(now, current + 1);
+-            if (LAST_ID.compareAndSet(current, next)) {
+-                return next;
+-            }
+-        }
++    static synchronized void register(Object owner, LongSupplier generator) {
++        GENERATORS.put(owner, generator);
++    }
++
++    static synchronized void unregister(Object owner) {
++        GENERATORS.remove(owner);
++    }
++
++    public static synchronized long nextId() {
++        LongSupplier generator = null;
++        for (LongSupplier active : GENERATORS.values()) generator = active;
++        if (generator == null) throw new IllegalStateException("ID generator database is not initialized");
++        return generator.getAsLong();
+     }
+ 
+     public static String nextIdString() {
+diff --git a/server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java b/server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java
+index aa66cb0..00bb15f 100644
+--- a/server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java
++++ b/server/src/main/java/com/workforcehub/workflow/controller/EmployeeWorkflowController.java
+@@ -9,6 +9,7 @@ import com.workforcehub.file.dto.DownloadFileResult;
+ import com.workforcehub.file.dto.DownloadTicketResponse;
+ import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
+ import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
++import com.workforcehub.workflow.dto.LeaveDurationResponse;
+ import com.workforcehub.workflow.dto.WorkflowRequestCreateResponse;
+ import com.workforcehub.workflow.dto.WorkflowRequestDetailResponse;
+ import com.workforcehub.workflow.dto.WorkflowRequestListQuery;
+@@ -37,6 +38,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.List;
++import java.time.LocalDateTime;
++import org.springframework.format.annotation.DateTimeFormat;
+ 
+ /**
+  * 员工端审批流程接口。
+@@ -56,6 +59,14 @@ public class EmployeeWorkflowController {
+         this.downloadResponseFactory = downloadResponseFactory;
+     }
+ 
++    @Operation(summary = "计算请假工作时长", operationId = "previewLeaveDuration")
++    @GetMapping("/leave-duration")
++    public R<LeaveDurationResponse> leaveDuration(
++            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startAt,
++            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endAt) {
++        return R.ok(workflowService.previewLeaveDuration(startAt, endAt));
++    }
++
+     @Operation(summary = "提交请假申请", operationId = "submitLeaveRequest")
+     @PostMapping("/leave-requests")
+     public R<WorkflowRequestCreateResponse> submitLeaveRequest(
+diff --git a/server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java b/server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java
+index fac28ee..306d750 100644
+--- a/server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java
++++ b/server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java
+@@ -24,6 +24,7 @@ import com.workforcehub.org.service.OrgDirectoryService;
+ import com.workforcehub.workflow.dto.ClockCorrectionRequestCreateRequest;
+ import com.workforcehub.workflow.dto.GenericWorkflowRequestCreateRequest;
+ import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
++import com.workforcehub.workflow.dto.LeaveDurationResponse;
+ import com.workforcehub.workflow.dto.WorkflowClockCorrectionDetailResponse;
+ import com.workforcehub.workflow.dto.WorkflowGenericDetailResponse;
+ import com.workforcehub.workflow.dto.WorkflowLeaveDetailResponse;
+@@ -62,10 +63,8 @@ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ import org.springframework.util.StringUtils;
+ 
+-import java.time.Duration;
+ import java.time.LocalDate;
+ import java.time.LocalDateTime;
+-import java.time.LocalTime;
+ import java.time.format.DateTimeFormatter;
+ import java.util.HashMap;
+ import java.util.LinkedHashSet;
+@@ -101,11 +100,6 @@ public class WorkflowService implements WorkflowAgentResultCallback {
+         "BORROW",
+         "PROJECT"
+     );
+-    private static final long HALF_DAY_MINUTES = 240L;
+-    private static final LocalTime WORK_START = LocalTime.of(9, 0);
+-    private static final LocalTime LUNCH_BREAK_START = LocalTime.of(12, 0);
+-    private static final LocalTime LUNCH_BREAK_END = LocalTime.of(13, 0);
+-    private static final LocalTime WORK_END = LocalTime.of(18, 0);
+     private static final DateTimeFormatter REQUEST_NO_TIME_FORMATTER =
+         DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+ 
+@@ -827,12 +821,7 @@ public class WorkflowService implements WorkflowAgentResultCallback {
+ 
+     // 请假审批通过后，重新计算请假期间每天的考勤结果
+     private void recalculateAttendanceForApprovedLeave(Long userId, WorkflowLeaveDetailRow leaveDetail) {
+-        LocalDate workDate = leaveDetail.startAt().toLocalDate();
+-        LocalDate endDate = leaveDetail.endAt().toLocalDate();
+-        while (!workDate.isAfter(endDate)) {
+-            attendanceService.recalculateDailyResultForExternalEvent(userId, workDate);
+-            workDate = workDate.plusDays(1);
+-        }
++        attendanceService.recalculateDailyResultsForApprovedLeave(userId, leaveDetail.startAt(), leaveDetail.endAt());
+     }
+ 
+     private void ensureRequestParticipant(Long requestId, Long userId) {
+@@ -901,7 +890,10 @@ public class WorkflowService implements WorkflowAgentResultCallback {
+         if (!request.getEndAt().isAfter(request.getStartAt())) {
+             throw new BizException(400, "结束时间必须晚于开始时间");
+         }
+-        long actualDurationMinutes = roundLeaveDurationMinutes(calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt()));
++        long actualDurationMinutes = calculateLeaveDurationMinutes(request.getStartAt(), request.getEndAt());
++        if (actualDurationMinutes <= 0) {
++            throw new BizException(400, "请假期间没有应出勤工作时间");
++        }
+         if (actualDurationMinutes != request.getDurationMinutes()) {
+             throw new BizException(400, "请假时长与开始结束时间不一致");
+         }
+@@ -927,35 +919,13 @@ public class WorkflowService implements WorkflowAgentResultCallback {
+         }
+     }
+ 
+-    private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
+-        long durationMinutes = 0;
+-        LocalDate currentDate = startAt.toLocalDate();
+-        LocalDate endDate = endAt.toLocalDate();
+-        while (!currentDate.isAfter(endDate)) {
+-            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(WORK_START), currentDate.atTime(LUNCH_BREAK_START));
+-            durationMinutes += overlapMinutes(startAt, endAt, currentDate.atTime(LUNCH_BREAK_END), currentDate.atTime(WORK_END));
+-            currentDate = currentDate.plusDays(1);
+-        }
+-        return durationMinutes;
++    @Transactional
++    public LeaveDurationResponse previewLeaveDuration(LocalDateTime startAt, LocalDateTime endAt) {
++        return new LeaveDurationResponse(Math.toIntExact(calculateLeaveDurationMinutes(startAt, endAt)));
+     }
+ 
+-    private long roundLeaveDurationMinutes(long durationMinutes) {
+-        if (durationMinutes <= 0) {
+-            return 0;
+-        }
+-        return ((durationMinutes + HALF_DAY_MINUTES - 1) / HALF_DAY_MINUTES) * HALF_DAY_MINUTES;
+-    }
+-
+-    private long overlapMinutes(LocalDateTime rangeStart,
+-                                LocalDateTime rangeEnd,
+-                                LocalDateTime segmentStart,
+-                                LocalDateTime segmentEnd) {
+-        LocalDateTime overlapStart = rangeStart.isAfter(segmentStart) ? rangeStart : segmentStart;
+-        LocalDateTime overlapEnd = rangeEnd.isBefore(segmentEnd) ? rangeEnd : segmentEnd;
+-        if (!overlapEnd.isAfter(overlapStart)) {
+-            return 0;
+-        }
+-        return Duration.between(overlapStart, overlapEnd).toMinutes();
++    private long calculateLeaveDurationMinutes(LocalDateTime startAt, LocalDateTime endAt) {
++        return attendanceService.calculateLeaveDurationMinutes(CurrentUserHolder.requireUserId(), startAt, endAt);
+     }
+ 
+     private WorkflowTodoResponse toTodoResponse(WorkflowTodoRow row) {
+diff --git a/server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java b/server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java
+index 5a786d6..88b0ee8 100644
+--- a/server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java
++++ b/server/src/test/java/com/workforcehub/leave/ModuleLeaveWorkflowIntegrationTest.java
+@@ -269,7 +269,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+             leaveTypeId,
+             "2026-05-07 09:00:00",
+             "2026-05-07 10:00:00",
+-            240,
++            60,
+             "上午临时请假一小时"
+         );
+         approveManagerTask(managerSession, scenario.managerTask().getId());
+@@ -282,7 +282,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+             .andExpect(jsonPath("$.code").value(0))
+             .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+             .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
+-            .andExpect(jsonPath("$.data[0].absenceMinutes").value(480));
++            .andExpect(jsonPath("$.data[0].absenceMinutes").value(420));
+ 
+         assertEquals(1L, attendanceExceptionCount());
+     }
+@@ -301,15 +301,15 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+                     leaveTypeId,
+                     "2026-05-07 17:00:00",
+                     "2026-05-08 10:00:00",
+-                    240,
++                    120,
+                     "跨天请假"
+                 )))
+             .andExpect(status().isOk())
+             .andExpect(jsonPath("$.code").value(0))
+             .andExpect(jsonPath("$.data.status").value("IN_APPROVAL"));
+ 
+-        assertEquals(720, availableMinutes(leaveTypeId));
+-        assertEquals(240, frozenMinutes(leaveTypeId));
++        assertEquals(840, availableMinutes(leaveTypeId));
++        assertEquals(120, frozenMinutes(leaveTypeId));
+     }
+ 
+     @Test
+@@ -326,7 +326,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+             leaveTypeId,
+             "2026-05-07 09:00:00",
+             "2026-05-07 10:00:00",
+-            240,
++            60,
+             "上午临时请假一小时"
+         );
+         approveManagerTask(managerSession, firstScenario.managerTask().getId());
+@@ -335,7 +335,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+             leaveTypeId,
+             "2026-05-07 09:30:00",
+             "2026-05-07 10:30:00",
+-            240,
++            60,
+             "继续请假一小时"
+         );
+         approveManagerTask(managerSession, secondScenario.managerTask().getId());
+@@ -348,7 +348,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+             .andExpect(jsonPath("$.code").value(0))
+             .andExpect(jsonPath("$.data[0].resultStatus").value("ABNORMAL"))
+             .andExpect(jsonPath("$.data[0].exceptionFlag").value(true))
+-            .andExpect(jsonPath("$.data[0].absenceMinutes").value(450));
++            .andExpect(jsonPath("$.data[0].absenceMinutes").value(390));
+ 
+         assertEquals(1L, attendanceExceptionCount());
+     }
+@@ -367,7 +367,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+             leaveTypeId,
+             "2026-05-07 09:00:00",
+             "2026-05-07 10:00:00",
+-            240,
++            60,
+             "上午请假一小时"
+         );
+         approveManagerTask(managerSession, morningScenario.managerTask().getId());
+@@ -376,7 +376,7 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+             leaveTypeId,
+             "2026-05-07 17:00:00",
+             "2026-05-07 18:00:00",
+-            240,
++            60,
+             "下午请假一小时"
+         );
+         approveManagerTask(managerSession, eveningScenario.managerTask().getId());
+@@ -609,9 +609,11 @@ class ModuleLeaveWorkflowIntegrationTest extends WorkflowFlowableIntegrationTest
+                  on_duty_punch_start, on_duty_punch_end,
+                  off_duty_punch_start, off_duty_punch_end)
+             VALUES
+-                (9603, 9602, 1, '09:00:00', '18:00:00',
++                (9603, 9602, 1, '09:00:00', '12:00:00',
+                  '08:00:00', '10:00:00',
+-                 '17:00:00', '19:00:00')
++                 '17:00:00', '19:00:00'),
++                (9606, 9602, 2, '13:00:00', '18:00:00',
++                 '12:00:00', '14:00:00', '17:00:00', '19:00:00')
+             """);
+         jdbcTemplate.update("""
+             INSERT INTO att_group
+diff --git a/server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java b/server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java
+index 4aeee89..75df96c 100644
+--- a/server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java
++++ b/server/src/test/java/com/workforcehub/support/WorkflowFlowableIntegrationTestSupport.java
+@@ -104,6 +104,12 @@ public abstract class WorkflowFlowableIntegrationTestSupport {
+         populator.setSqlScriptEncoding("UTF-8");
+         populator.addScript(resolveSeedScript());
+         DatabasePopulatorUtils.execute(populator, dataSource);
++        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
++        jdbc.update("INSERT INTO att_work_calendar(id,calendar_code,calendar_name,calendar_type,status) VALUES(9801,'CAL_WORKFLOW_BASE','审批计时日历','STANDARD','ACTIVE')");
++        jdbc.update("INSERT INTO att_shift(id,shift_code,shift_name,status) VALUES(9802,'SHIFT_WORKFLOW_BASE','审批计时班次','ACTIVE')");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(9803,9802,1,'09:00:00','12:00:00'),(9806,9802,2,'13:00:00','18:00:00')");
++        jdbc.update("INSERT INTO att_group(id,group_code,group_name,calendar_id,default_shift_id,status) VALUES(9804,'GROUP_WORKFLOW_BASE','审批计时考勤组',9801,9802,'ACTIVE')");
++        jdbc.update("INSERT INTO att_group_member(id,group_id,user_id,effective_from,source_type,status) VALUES(9805,9804,2003,'2000-01-01','MANUAL','ACTIVE')");
+     }
+ 
+     protected ResultMatcher jsonLong(String expression, long expected) {
+diff --git a/server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java b/server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java
+index 4b1cdce..afe1b71 100644
+--- a/server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java
++++ b/server/src/test/java/com/workforcehub/workflow/ModuleWorkflowFlowableIntegrationTest.java
+@@ -248,7 +248,7 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
+             .andExpect(jsonPath("$.data", hasSize(1)))
+             .andExpect(jsonPath("$.data[0].resultStatus").value("NORMAL"))
+             .andExpect(jsonPath("$.data[0].exceptionFlag").value(false))
+-            .andExpect(jsonPath("$.data[0].workMinutes").value(540));
++            .andExpect(jsonPath("$.data[0].workMinutes").value(480));
+     }
+ 
+     @Test
+@@ -553,8 +553,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
+     }
+ 
+     @Test
+-    @DisplayName("请假时长按半天向上取整")
+-    void leaveRequestShouldRoundUpToHalfDay() throws Exception {
++    @DisplayName("跨日请假按实际工作分钟累计")
++    void leaveRequestShouldUseActualWorkingMinutes() throws Exception {
+         Cookie employeeSession = loginEmployee();
+         Long annualLeaveTypeId = seedWorkflowAndLeaveType();
+ 
+@@ -566,8 +566,8 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
+                       "leaveTypeId": %d,
+                       "startAt": "2026-05-07 17:00:00",
+                       "endAt": "2026-05-08 10:00:00",
+-                      "durationMinutes": 240,
+-                      "reason": "半天起算"
++                      "durationMinutes": 120,
++                      "reason": "跨日两小时"
+                     }
+                     """.formatted(annualLeaveTypeId)))
+             .andExpect(status().isOk())
+@@ -1268,10 +1268,13 @@ class ModuleWorkflowFlowableIntegrationTest extends WorkflowFlowableIntegrationT
+                  on_duty_punch_start, on_duty_punch_end,
+                  off_duty_punch_start, off_duty_punch_end)
+             VALUES
+-                (9703, 9702, 1, '09:00:00', '18:00:00',
++                (9703, 9702, 1, '09:00:00', '12:00:00',
+                  '08:00:00', '10:00:00',
+-                 '17:00:00', '19:00:00')
++                 '17:00:00', '19:00:00'),
++                (9706, 9702, 2, '13:00:00', '18:00:00',
++                 '12:00:00', '14:00:00', '17:00:00', '19:00:00')
+             """);
++        jdbcTemplate.update("INSERT INTO att_work_calendar_day(id,calendar_id,work_date,day_type,is_workday) VALUES(9707,9701,'2026-05-16','WORKDAY',1)");
+         jdbcTemplate.update("""
+             INSERT INTO att_group
+                 (id, group_code, group_name, calendar_id, default_shift_id,
+diff --git a/admin-web/src/utils/format.test.ts b/admin-web/src/utils/format.test.ts
+new file mode 100644
+index 0000000..5b93e25
+--- /dev/null
++++ b/admin-web/src/utils/format.test.ts
+@@ -0,0 +1,11 @@
++import { describe, expect, it } from 'vitest';
++import { attendanceResultLabel } from './format';
++
++describe('attendanceResultLabel', () => {
++  it('renders scheduled rest days as rest instead of an unknown attendance result', () => {
++    expect(attendanceResultLabel('REST')).toBe('休息');
++    expect(attendanceResultLabel('NORMAL')).toBe('正常');
++    expect(attendanceResultLabel('ABNORMAL')).toBe('异常');
++    expect(attendanceResultLabel('NO_RULE')).toBe('未排班');
++  });
++});
+diff --git a/server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java b/server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java
+new file mode 100644
+index 0000000..95c9364
+--- /dev/null
++++ b/server/src/main/java/com/workforcehub/attendance/repository/AttendanceWorkPeriod.java
+@@ -0,0 +1,16 @@
++package com.workforcehub.attendance.repository;
++
++import java.time.Duration;
++import java.time.LocalDateTime;
++
++public record AttendanceWorkPeriod(LocalDateTime startAt, LocalDateTime endAt) {
++    public int overlapMinutes(LocalDateTime start, LocalDateTime end) {
++        LocalDateTime from = startAt.isAfter(start) ? startAt : start;
++        LocalDateTime to = endAt.isBefore(end) ? endAt : end;
++        return to.isAfter(from) ? Math.toIntExact(Duration.between(from, to).toMinutes()) : 0;
++    }
++
++    public int minutes() {
++        return Math.toIntExact(Duration.between(startAt, endAt).toMinutes());
++    }
++}
+diff --git a/server/src/main/java/com/workforcehub/common/util/DatabaseIdGenerator.java b/server/src/main/java/com/workforcehub/common/util/DatabaseIdGenerator.java
+new file mode 100644
+index 0000000..18f30a5
+--- /dev/null
++++ b/server/src/main/java/com/workforcehub/common/util/DatabaseIdGenerator.java
+@@ -0,0 +1,92 @@
++package com.workforcehub.common.util;
++
++import com.zaxxer.hikari.HikariConfig;
++import com.zaxxer.hikari.HikariDataSource;
++import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
++import org.springframework.jdbc.datasource.AbstractDriverBasedDataSource;
++import org.springframework.stereotype.Component;
++
++import javax.sql.DataSource;
++import java.sql.SQLException;
++
++@Component
++@DependsOnDatabaseInitialization
++public final class DatabaseIdGenerator implements AutoCloseable {
++    private static final long BLOCK_SIZE = 1000;
++    private final DataSource dataSource;
++    private final HikariDataSource dedicatedPool;
++    private long next;
++    private long end;
++    private boolean closed;
++
++    public DatabaseIdGenerator(DataSource dataSource) {
++        if (dataSource instanceof HikariDataSource pooled) {
++            // 业务事务可能耗尽业务池；发号必须使用独立小池，不能等待业务连接释放。
++            var config = new HikariConfig();
++            pooled.copyStateTo(config);
++            config.setPoolName(pooled.getPoolName() + "-ids");
++            config.setMaximumPoolSize(1);
++            config.setMinimumIdle(0);
++            config.setRegisterMbeans(false);
++            config.setReadOnly(false);
++            dedicatedPool = new HikariDataSource(config);
++            this.dataSource = dedicatedPool;
++        } else if (dataSource instanceof AbstractDriverBasedDataSource) {
++            dedicatedPool = null;
++            this.dataSource = dataSource;
++        } else {
++            throw new IllegalArgumentException("ID generator requires Hikari or an unpooled driver data source");
++        }
++        IdGenerator.register(this, this::nextId);
++    }
++
++    public synchronized long nextId() {
++        if (closed) throw new IllegalStateException("ID generator is closed");
++        if (next == end) reserve();
++        return ++next;
++    }
++
++    private void reserve() {
++        // 不使用线程绑定的业务连接，号段必须先独立提交才能交付，业务回滚不能回收已发 ID。
++        try (var connection = dataSource.getConnection()) {
++            connection.setAutoCommit(false);
++            try {
++                long start;
++                try (var statement = connection.prepareStatement(
++                    "SELECT high_watermark FROM sys_id_sequence WHERE sequence_name = 'global' FOR UPDATE");
++                     var rows = statement.executeQuery()) {
++                    if (!rows.next()) throw new SQLException("Global ID sequence is missing");
++                    start = rows.getLong(1);
++                }
++                if (start < 0 || start > Long.MAX_VALUE - BLOCK_SIZE) {
++                    throw new SQLException("Global ID sequence is exhausted or invalid");
++                }
++                try (var statement = connection.prepareStatement(
++                    "UPDATE sys_id_sequence SET high_watermark = ? WHERE sequence_name = 'global'")) {
++                    statement.setLong(1, start + BLOCK_SIZE);
++                    if (statement.executeUpdate() != 1) throw new SQLException("Global ID sequence is missing");
++                }
++                connection.commit();
++                next = start;
++                end = start + BLOCK_SIZE;
++            } catch (SQLException failure) {
++                try { connection.rollback(); } catch (SQLException rollback) { failure.addSuppressed(rollback); }
++                throw failure;
++            }
++        } catch (SQLException failure) {
++            throw new IllegalStateException("Cannot reserve durable IDs", failure);
++        }
++    }
++
++    @Override
++    public void close() {
++        // 与静态入口采用相同锁顺序，防止关闭上下文和发号发生死锁。
++        synchronized (IdGenerator.class) {
++            synchronized (this) {
++                closed = true;
++                IdGenerator.unregister(this);
++                if (dedicatedPool != null) dedicatedPool.close();
++            }
++        }
++    }
++}
+diff --git a/server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java b/server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java
+new file mode 100644
+index 0000000..9551b51
+--- /dev/null
++++ b/server/src/main/java/com/workforcehub/workflow/dto/LeaveDurationResponse.java
+@@ -0,0 +1,4 @@
++package com.workforcehub.workflow.dto;
++
++public record LeaveDurationResponse(int durationMinutes) {
++}
+diff --git a/server/src/main/java/db/migration/V70__create_durable_id_sequence.java b/server/src/main/java/db/migration/V70__create_durable_id_sequence.java
+new file mode 100644
+index 0000000..b5331aa
+--- /dev/null
++++ b/server/src/main/java/db/migration/V70__create_durable_id_sequence.java
+@@ -0,0 +1,38 @@
++package db.migration;
++
++import org.flywaydb.core.api.migration.BaseJavaMigration;
++import org.flywaydb.core.api.migration.Context;
++
++import java.util.ArrayList;
++
++public class V70__create_durable_id_sequence extends BaseJavaMigration {
++    @Override
++    public void migrate(Context context) throws Exception {
++        var connection = context.getConnection();
++        long watermark = 1L << 62;
++        var columns = new ArrayList<String[]>();
++        try (var statement = connection.prepareStatement(
++            "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS "
++                + "WHERE TABLE_SCHEMA = DATABASE() AND DATA_TYPE = 'bigint' AND COLUMN_KEY = 'PRI'");
++             var rows = statement.executeQuery()) {
++            while (rows.next()) columns.add(new String[]{rows.getString(1), rows.getString(2)});
++        }
++        // 升级时停用旧发号实例；扫描历史主键，避免时钟异常产生过的旧 ID 与新序列重叠。
++        for (var column : columns) {
++            String table = column[0].replace("`", "``");
++            String name = column[1].replace("`", "``");
++            try (var statement = connection.createStatement();
++                 var rows = statement.executeQuery("SELECT MAX(`" + name + "`) FROM `" + table + "`")) {
++                if (rows.next()) watermark = Math.max(watermark, rows.getLong(1));
++            }
++        }
++        try (var statement = connection.createStatement()) {
++            statement.execute("CREATE TABLE sys_id_sequence (sequence_name VARCHAR(32) NOT NULL PRIMARY KEY, "
++                + "high_watermark BIGINT NOT NULL) ENGINE=InnoDB");
++        }
++        try (var statement = connection.prepareStatement("INSERT INTO sys_id_sequence VALUES ('global', ?)")) {
++            statement.setLong(1, watermark);
++            statement.executeUpdate();
++        }
++    }
++}
+diff --git a/server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java b/server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java
+new file mode 100644
+index 0000000..b286c2c
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/attendance/LeaveWorkingTimeTest.java
+@@ -0,0 +1,200 @@
++package com.workforcehub.attendance;
++
++import com.workforcehub.attendance.repository.*;
++import com.workforcehub.attendance.service.AttendanceService;
++import com.workforcehub.auth.security.WfhUserDetails;
++import com.workforcehub.common.exception.BizException;
++import com.workforcehub.leave.repository.ApprovedLeavePeriod;
++import com.workforcehub.leave.service.LeaveService;
++import com.workforcehub.workflow.controller.EmployeeWorkflowController;
++import com.workforcehub.workflow.dto.LeaveRequestCreateRequest;
++import com.workforcehub.workflow.repository.WorkflowRepository;
++import com.workforcehub.workflow.service.WorkflowService;
++import org.junit.jupiter.api.*;
++import org.springframework.beans.factory.ObjectProvider;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.security.core.context.SecurityContextHolder;
++import org.springframework.test.web.servlet.setup.MockMvcBuilders;
++
++import java.lang.reflect.InvocationTargetException;
++import java.time.*;
++import java.util.*;
++
++import static org.junit.jupiter.api.Assertions.*;
++import static org.mockito.ArgumentMatchers.*;
++import static org.mockito.Mockito.*;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++class LeaveWorkingTimeTest {
++    JdbcTemplate jdbc;
++    AttendanceRepository repository;
++    AttendanceService attendance;
++    LeaveService leave;
++    WorkflowService workflow;
++
++    @BeforeEach
++    void setup() {
++        jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:working_" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""));
++        jdbc.execute("CREATE TABLE org_user(id BIGINT, employee_no VARCHAR, real_name VARCHAR)");
++        jdbc.execute("CREATE TABLE att_work_calendar(id BIGINT, calendar_code VARCHAR, calendar_name VARCHAR, calendar_type VARCHAR, status VARCHAR, is_deleted INT DEFAULT 0)");
++        jdbc.execute("CREATE TABLE att_work_calendar_day(id BIGINT, calendar_id BIGINT, work_date DATE, is_workday INT)");
++        jdbc.execute("CREATE TABLE att_shift(id BIGINT, shift_code VARCHAR, shift_name VARCHAR, status VARCHAR, is_deleted INT DEFAULT 0)");
++        jdbc.execute("CREATE TABLE att_shift_segment(id BIGINT, shift_id BIGINT, segment_no INT, start_time TIME, end_time TIME, on_duty_punch_start TIME, on_duty_punch_end TIME, off_duty_punch_start TIME, off_duty_punch_end TIME)");
++        jdbc.execute("CREATE TABLE att_group(id BIGINT, group_code VARCHAR, group_name VARCHAR, calendar_id BIGINT, default_shift_id BIGINT, late_grace_minutes INT DEFAULT 0, early_leave_grace_minutes INT DEFAULT 0, status VARCHAR, is_deleted INT DEFAULT 0)");
++        jdbc.execute("CREATE TABLE att_group_member(id BIGINT, group_id BIGINT, user_id BIGINT, effective_from DATE, effective_to DATE, status VARCHAR)");
++        jdbc.execute("CREATE TABLE att_schedule(id BIGINT, user_id BIGINT, work_date DATE, shift_id BIGINT, calendar_id BIGINT, schedule_source VARCHAR, status VARCHAR)");
++        jdbc.execute("CREATE TABLE att_punch_record(user_id BIGINT, punch_at TIMESTAMP, punch_type VARCHAR, status VARCHAR)");
++        jdbc.update("INSERT INTO att_work_calendar VALUES(2,'C','C','STANDARD','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift VALUES(3,'S','S','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'09:00:00','12:00:00'),(2,3,2,'13:00:00','18:00:00')");
++        jdbc.update("INSERT INTO att_group(id,group_code,group_name,calendar_id,default_shift_id,status) VALUES(4,'G','G',2,3,'ACTIVE')");
++        jdbc.update("INSERT INTO att_group_member VALUES(5,4,1,'2026-01-01',NULL,'ACTIVE')");
++        repository = spy(new AttendanceRepository(jdbc));
++        leave = mock(LeaveService.class);
++        ObjectProvider<Clock> clocks = mock(ObjectProvider.class);
++        when(clocks.getIfAvailable(any())).thenReturn(Clock.systemUTC());
++        attendance = new AttendanceService(repository, leave, clocks, null, null);
++        WorkflowRepository workflows = mock(WorkflowRepository.class);
++        when(workflows.existsActiveLeaveType(2L)).thenReturn(true);
++        workflow = new WorkflowService(workflows,null,null,null,null,null,leave,attendance,null,null,null);
++        WfhUserDetails principal = mock(WfhUserDetails.class);
++        when(principal.getUserId()).thenReturn(1L);
++        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,List.of()));
++    }
++
++    @AfterEach
++    void close() { SecurityContextHolder.clearContext(); jdbc.execute("SHUTDOWN"); }
++
++    int minutes(String start, String end) { return attendance.calculateLeaveDurationMinutes(1L, LocalDateTime.parse(start), LocalDateTime.parse(end)); }
++
++    @Test
++    void actualMinutesExcludeLunchAndMeasureUnequalHalfDays() {
++        assertEquals(480,minutes("2026-05-07T09:00", "2026-05-07T18:00"));
++        assertEquals(180,minutes("2026-05-07T09:00", "2026-05-07T12:00"));
++        assertEquals(300,minutes("2026-05-07T13:00", "2026-05-07T18:00"));
++        assertEquals(0,minutes("2026-05-07T12:00", "2026-05-07T13:00"));
++        assertEquals(120,minutes("2026-05-07T17:00", "2026-05-08T10:00"));
++    }
++
++    @Test
++    void calendarHolidaysAndMakeupDaysOverrideStandardWeek() {
++        assertEquals(0,minutes("2026-05-10T09:00", "2026-05-10T18:00"));
++        jdbc.update("INSERT INTO att_work_calendar_day VALUES(1,2,'2026-05-07',0),(2,2,'2026-05-10',1)");
++        assertEquals(0,minutes("2026-05-07T09:00", "2026-05-07T18:00"));
++        assertEquals(480,minutes("2026-05-10T09:00", "2026-05-10T18:00"));
++    }
++
++    @Test
++    void explicitScheduleUsesItsOwnShiftAndCalendar() {
++        jdbc.update("INSERT INTO att_shift VALUES(6,'ALT','ALT','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(3,6,1,'10:00','14:00'),(4,6,2,'15:00','19:00')");
++        jdbc.update("INSERT INTO att_work_calendar VALUES(7,'ALT','ALT','STANDARD','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_schedule VALUES(8,1,'2026-05-10',6,7,'MANUAL','ACTIVE')");
++        assertEquals(420,minutes("2026-05-10T10:00", "2026-05-10T18:00"));
++        jdbc.update("INSERT INTO att_work_calendar_day VALUES(9,7,'2026-05-10',0)");
++        assertEquals(0,minutes("2026-05-10T10:00", "2026-05-10T19:00"));
++    }
++
++    @Test
++    void overnightShiftIncludesPreviousWorkDateAndMidnightBreak() {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','02:00'),(2,3,2,'03:00','06:00')");
++        assertEquals(420,minutes("2026-05-08T22:00", "2026-05-09T06:00"));
++        assertEquals(240,minutes("2026-05-09T01:00", "2026-05-09T06:00"));
++        assertEquals(0,minutes("2026-05-09T02:00", "2026-05-09T03:00"));
++    }
++
++    @Test
++    void midnightEndDoesNotRequireNextDaysConfiguration() {
++        jdbc.update("INSERT INTO att_schedule VALUES(8,1,'2026-05-08',999,2,'MANUAL','ACTIVE')");
++        assertEquals(60,minutes("2026-05-07T17:00", "2026-05-08T00:00"));
++    }
++
++    @Test
++    void overlappingAdjacentWorkDatesAreRejectedBeforeChargingLeave() {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','06:00')");
++        jdbc.update("INSERT INTO att_shift VALUES(6,'ALT','ALT','ACTIVE',0)");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(2,6,1,'05:00','13:00')");
++        jdbc.update("INSERT INTO att_schedule VALUES(8,1,'2026-05-09',6,2,'MANUAL','ACTIVE')");
++        BizException error = assertThrows(BizException.class,()->minutes("2026-05-08T22:00", "2026-05-09T07:00"));
++        assertEquals("员工相邻排班工作时段重叠，请调整排班",error.getMessage());
++    }
++
++    @Test
++    void invalidOrUnconfiguredPeriodsFailExplicitly() {
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00", "2026-05-07T09:00"));
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00:01", "2026-05-07T11:00"));
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00", "2027-05-09T10:00"));
++        jdbc.update("DELETE FROM att_group_member");
++        assertThrows(BizException.class,()->minutes("2026-05-07T10:00", "2026-05-07T11:00"));
++    }
++
++    @Test
++    void previewIsAuthenticatedAndSubmissionRecalculatesRatherThanTrustingClient() throws Exception {
++        MockMvcBuilders.standaloneSetup(new EmployeeWorkflowController(workflow,null)).build()
++            .perform(get("/api/employee/workflow/leave-duration").param("startAt","2026-05-07T13:00:00").param("endAt","2026-05-07T18:00:00"))
++            .andExpect(status().isOk()).andExpect(jsonPath("$.data.durationMinutes").value(300));
++        var validate = WorkflowService.class.getDeclaredMethod("validateLeaveRequest", LeaveRequestCreateRequest.class);
++        validate.setAccessible(true);
++        LeaveRequestCreateRequest request = new LeaveRequestCreateRequest();
++        request.setStartAt(LocalDateTime.parse("2026-05-07T13:00")); request.setEndAt(LocalDateTime.parse("2026-05-07T18:00"));
++        request.setLeaveTypeId(2L); request.setDurationMinutes(300);
++        validate.invoke(workflow,request);
++        verify(leave).ensureLeaveRequestBalance(1L,2L,300);
++        request.setDurationMinutes(480);
++        assertInstanceOf(BizException.class, assertThrows(InvocationTargetException.class,()->validate.invoke(workflow,request)).getCause());
++        request.setStartAt(LocalDateTime.parse("2026-05-10T09:00")); request.setEndAt(LocalDateTime.parse("2026-05-10T18:00")); request.setDurationMinutes(0);
++        assertInstanceOf(BizException.class, assertThrows(InvocationTargetException.class,()->validate.invoke(workflow,request)).getCause());
++        SecurityContextHolder.clearContext();
++        assertThrows(BizException.class,()->workflow.previewLeaveDuration(request.getStartAt(),request.getEndAt()));
++    }
++
++    @Test
++    void dailyAttendanceUsesSamePeriodsForWorkAbsenceAndApprovedLeave() throws Exception {
++        doReturn(null).when(repository).getDailyResult(anyLong(),any());
++        doReturn(null).when(repository).getDailyResultForUpdate(anyLong(),any());
++        doReturn(List.of()).when(repository).listExceptionsByDailyResultId(any());
++        doNothing().when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        var row = mock(AttendanceDailyResultRow.class);
++        when(row.dailyResultId()).thenReturn(100L);
++        doReturn(row).when(repository).getDailyResultForUpdate(anyLong(),any());
++        when(leave.listApprovedLeavePeriodsOnDate(eq(1L),any())).thenReturn(List.of(new ApprovedLeavePeriod(LocalDateTime.parse("2026-05-07T09:00"),LocalDateTime.parse("2026-05-07T10:00"))));
++        var recalc = AttendanceService.class.getDeclaredMethod("recalculateDailyResult",Long.class,LocalDate.class); recalc.setAccessible(true);
++        // Avoid publishing exceptions; verify the real computed upsert before rebuilding exceptions.
++        doThrow(new IllegalStateException("observed")).when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-07")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),any(),isNull(),eq(4L),eq(3L),eq("ABNORMAL"),eq(0),eq(0),eq(420),eq(0),eq(true),any());
++        jdbc.update("INSERT INTO att_punch_record VALUES(1,'2026-05-07 06:00:00','ON_DUTY','NORMAL'),(1,'2026-05-07 21:00:00','OFF_DUTY','NORMAL')");
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-07")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),any(),isNull(),eq(4L),eq(3L),eq("NORMAL"),eq(0),eq(0),eq(0),eq(480),eq(false),any());
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-10")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),any(),isNull(),eq(4L),eq(3L),eq("REST"),eq(0),eq(0),eq(0),eq(0),eq(false),any());
++    }
++
++    @Test
++    void overnightDailyAttendanceFindsNextDayPunchAndExcludesBreak() throws Exception {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','02:00'),(2,3,2,'03:00','06:00')");
++        jdbc.update("INSERT INTO att_punch_record VALUES(1,'2026-05-08 21:30:00','ON_DUTY','NORMAL'),(1,'2026-05-09 06:30:00','OFF_DUTY','NORMAL')");
++        doThrow(new IllegalStateException("observed")).when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        var recalc = AttendanceService.class.getDeclaredMethod("recalculateDailyResult",Long.class,LocalDate.class); recalc.setAccessible(true);
++        assertThrows(InvocationTargetException.class,()->recalc.invoke(attendance,1L,LocalDate.parse("2026-05-08")));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),eq(LocalDate.parse("2026-05-08")),isNull(),eq(4L),eq(3L),eq("NORMAL"),eq(0),eq(0),eq(0),eq(420),eq(false),any());
++    }
++
++    @Test
++    void afterMidnightApprovalRecalculatesPreviousWorkDate() {
++        jdbc.update("DELETE FROM att_shift_segment");
++        jdbc.update("INSERT INTO att_shift_segment(id,shift_id,segment_no,start_time,end_time) VALUES(1,3,1,'22:00','02:00'),(2,3,2,'03:00','06:00')");
++        var start = LocalDateTime.parse("2026-05-09T01:00");
++        var end = LocalDateTime.parse("2026-05-09T06:00");
++        when(leave.listApprovedLeavePeriodsOnDate(eq(1L),any())).thenReturn(List.of(new ApprovedLeavePeriod(start,end)));
++        doThrow(new IllegalStateException("observed")).when(repository).upsertDailyResult(anyLong(),anyLong(),any(),any(),any(),any(),anyString(),anyInt(),anyInt(),anyInt(),anyInt(),anyBoolean(),any());
++        assertThrows(IllegalStateException.class,()->attendance.recalculateDailyResultsForApprovedLeave(1L,start,end));
++        verify(repository).upsertDailyResult(anyLong(),eq(1L),eq(LocalDate.parse("2026-05-08")),isNull(),eq(4L),eq(3L),eq("ABNORMAL"),eq(0),eq(0),eq(180),eq(0),eq(true),any());
++    }
++}
+diff --git a/server/src/test/java/com/workforcehub/common/util/IdGeneratorMysqlTest.java b/server/src/test/java/com/workforcehub/common/util/IdGeneratorMysqlTest.java
+new file mode 100644
+index 0000000..eb10ae6
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/IdGeneratorMysqlTest.java
+@@ -0,0 +1,68 @@
++package com.workforcehub.common.util;
++
++import com.zaxxer.hikari.HikariConfig;
++import com.zaxxer.hikari.HikariDataSource;
++import db.migration.V70__create_durable_id_sequence;
++import org.flywaydb.core.Flyway;
++import org.junit.jupiter.api.*;
++import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
++import org.springframework.context.annotation.AnnotationConfigApplicationContext;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DataSourceTransactionManager;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.transaction.support.TransactionTemplate;
++
++import javax.sql.DataSource;
++import java.util.concurrent.Executors;
++import static org.junit.jupiter.api.Assertions.*;
++
++@Tag("durable-id")
++@EnabledIfSystemProperty(named = "id.mysql.url", matches = "jdbc:mysql://127\\.0\\.0\\.1:[0-9]+/id_995_test\\?.*")
++class IdGeneratorMysqlTest {
++    @Test void migrationSpringLifecycleConcurrencyAndBusinessRollback() throws Exception {
++        var source = new DriverManagerDataSource(System.getProperty("id.mysql.url"), "root", "");
++        var jdbc = new JdbcTemplate(source);
++        jdbc.execute("DROP TABLE IF EXISTS flyway_schema_history, sys_id_sequence, legacy_ids");
++        jdbc.execute("CREATE TABLE legacy_ids(id BIGINT PRIMARY KEY) ENGINE=InnoDB");
++        jdbc.update("INSERT INTO legacy_ids VALUES (?)", 6_000_000_000_000_000_000L);
++        Flyway.configure().dataSource(source).locations(new String[0]).baselineOnMigrate(true)
++            .javaMigrations(new V70__create_durable_id_sequence()).load().migrate();
++        assertEquals(6_000_000_000_000_000_000L,
++            jdbc.queryForObject("SELECT high_watermark FROM sys_id_sequence", Long.class));
++        var config = new HikariConfig();
++        config.setDataSource(source);
++        config.setMaximumPoolSize(1);
++        config.setMinimumIdle(0);
++        config.setConnectionTimeout(500);
++        DatabaseIdGenerator springGenerator;
++        try (var business = new HikariDataSource(config); var context = new AnnotationConfigApplicationContext()) {
++            context.registerBean(DataSource.class, () -> business);
++            context.scan("com.workforcehub.common.util");
++            context.refresh();
++            springGenerator = context.getBean(DatabaseIdGenerator.class);
++            assertNotNull(springGenerator);
++            var ids = java.util.concurrent.ConcurrentHashMap.<Long>newKeySet();
++            var executor = Executors.newFixedThreadPool(8);
++            try {
++                var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
++                for (int thread = 0; thread < 8; thread++) futures.add(executor.submit(() -> {
++                    for (int i = 0; i < 2500; i++) assertTrue(ids.add(IdGenerator.nextId()));
++                }));
++                for (var future : futures) future.get(30, java.util.concurrent.TimeUnit.SECONDS);
++            } finally { executor.shutdownNow(); }
++            assertEquals(20000, ids.size());
++            long[] rolledBack = new long[1];
++            new TransactionTemplate(new DataSourceTransactionManager(business)).executeWithoutResult(status -> {
++                rolledBack[0] = assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), IdGenerator::nextId);
++                assertEquals(1, business.getHikariPoolMXBean().getActiveConnections());
++                status.setRollbackOnly();
++            });
++            try (var restarted = new DatabaseIdGenerator(source)) {
++                assertTrue(restarted.nextId() > rolledBack[0]);
++            }
++            assertTrue(IdGenerator.nextId() > 6_000_000_000_000_000_000L);
++        }
++        assertThrows(IllegalStateException.class, springGenerator::nextId);
++        System.out.println("MYSQL_MIGRATION_LEGACY_MAX=6000000000000000000; SPRING_THREADS=8; UNIQUE_IDS=20000; BUSINESS_POOL_CAPACITY=1; BUSINESS_POOL_OCCUPIED=1; ID_RESERVATION=success; BUSINESS_ROLLBACK=durable; CONTEXT_CLOSE=fail-closed");
++    }
++}
+diff --git a/server/src/test/java/com/workforcehub/common/util/IdGeneratorProcessProbe.java b/server/src/test/java/com/workforcehub/common/util/IdGeneratorProcessProbe.java
+new file mode 100644
+index 0000000..75a02f4
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/IdGeneratorProcessProbe.java
+@@ -0,0 +1,18 @@
++package com.workforcehub.common.util;
++
++import org.springframework.context.annotation.AnnotationConfigApplicationContext;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import javax.sql.DataSource;
++
++public final class IdGeneratorProcessProbe {
++    public static void main(String[] args) {
++        // This intentionally uses production component discovery rather than the standalone JUnit fixture.
++        try (var context = new AnnotationConfigApplicationContext()) {
++            context.registerBean(DataSource.class, () -> new DriverManagerDataSource(args[0], "root", ""));
++            context.scan("com.workforcehub.common.util");
++            context.refresh();
++            int count = Integer.parseInt(args[1]);
++            for (int index = 0; index < count; index++) System.out.println("ID=" + IdGenerator.nextId());
++        }
++    }
++}
+diff --git a/server/src/test/java/com/workforcehub/common/util/IdGeneratorTest.java b/server/src/test/java/com/workforcehub/common/util/IdGeneratorTest.java
+new file mode 100644
+index 0000000..9c25a9e
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/IdGeneratorTest.java
+@@ -0,0 +1,117 @@
++package com.workforcehub.common.util;
++
++import com.zaxxer.hikari.HikariConfig;
++import com.zaxxer.hikari.HikariDataSource;
++import org.junit.jupiter.api.*;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DataSourceTransactionManager;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.transaction.support.TransactionTemplate;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++@Tag("durable-id")
++class IdGeneratorTest {
++    private DriverManagerDataSource source;
++    private JdbcTemplate jdbc;
++
++    @BeforeEach
++    void setup() {
++        source = new DriverManagerDataSource("jdbc:h2:mem:sequence_" + java.util.UUID.randomUUID()
++            + ";DB_CLOSE_DELAY=-1", "sa", "");
++        jdbc = new JdbcTemplate(source);
++        jdbc.execute("CREATE TABLE sys_id_sequence(sequence_name VARCHAR(32) PRIMARY KEY, high_watermark BIGINT)");
++        jdbc.update("INSERT INTO sys_id_sequence VALUES('global', ?)", 1L << 62);
++    }
++
++    @AfterEach void cleanup() { jdbc.execute("SHUTDOWN"); }
++
++    @Test void uninitializedAndClosedGeneratorsFailWithoutFallback() throws Exception {
++        try (var isolated = new java.net.URLClassLoader(new java.net.URL[]{
++            IdGenerator.class.getProtectionDomain().getCodeSource().getLocation()}, null)) {
++            var isolatedType = Class.forName(IdGenerator.class.getName(), true, isolated);
++            var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
++                () -> isolatedType.getMethod("nextId").invoke(null));
++            assertInstanceOf(IllegalStateException.class, failure.getCause());
++        }
++        var generator = new DatabaseIdGenerator(source);
++        generator.close();
++        assertThrows(IllegalStateException.class, generator::nextId);
++    }
++
++    @Test void independentInstancesAndRestartNeverRecycleCommittedRanges() {
++        long first;
++        try (var one = new DatabaseIdGenerator(source); var two = new DatabaseIdGenerator(source)) {
++            first = one.nextId();
++            assertEquals(first + 1000, two.nextId());
++            assertEquals(first + 1, one.nextId());
++        }
++        try (var restarted = new DatabaseIdGenerator(source)) {
++            assertEquals(first + 2000, restarted.nextId());
++        }
++    }
++
++    @Test void businessRollbackCannotRecycleAllocatedIds() {
++        long[] allocated = new long[1];
++        try (var generator = new DatabaseIdGenerator(source)) {
++            new TransactionTemplate(new DataSourceTransactionManager(source)).executeWithoutResult(status -> {
++                allocated[0] = IdGenerator.nextId();
++                status.setRollbackOnly();
++            });
++        }
++        try (var restarted = new DatabaseIdGenerator(source)) {
++            assertTrue(restarted.nextId() > allocated[0]);
++        }
++    }
++
++    @Test void closingNewestContextRestoresPreviousAndPreservesStringContract() {
++        try (var one = new DatabaseIdGenerator(source)) {
++            long first = IdGenerator.nextId();
++            try (var two = new DatabaseIdGenerator(source)) {
++                assertTrue(IdGenerator.nextId() >= first + 1000);
++            }
++            assertEquals(Long.toString(first + 1), IdGenerator.nextIdString());
++        }
++    }
++
++    @Test void missingSequenceAndDatabaseErrorsFailWithoutFallback() {
++        jdbc.update("DELETE FROM sys_id_sequence");
++        try (var generator = new DatabaseIdGenerator(source)) {
++            assertThrows(IllegalStateException.class, IdGenerator::nextId);
++            jdbc.execute("DROP TABLE sys_id_sequence");
++            assertThrows(IllegalStateException.class, IdGenerator::nextId);
++        }
++    }
++
++    @Test void exhaustionNeverWrapsToNegativeIds() {
++        jdbc.update("UPDATE sys_id_sequence SET high_watermark=?", Long.MAX_VALUE - 999);
++        try (var generator = new DatabaseIdGenerator(source)) {
++            assertThrows(IllegalStateException.class, IdGenerator::nextId);
++            assertEquals(Long.MAX_VALUE - 999,
++                jdbc.queryForObject("SELECT high_watermark FROM sys_id_sequence", Long.class));
++        }
++    }
++
++    @Test void exhaustedSingleConnectionBusinessPoolCannotBlockIdReservation() {
++        var config = new HikariConfig();
++        config.setJdbcUrl(source.getUrl());
++        config.setUsername("sa");
++        config.setPassword("");
++        config.setMaximumPoolSize(1);
++        config.setMinimumIdle(0);
++        config.setConnectionTimeout(500);
++        try (var business = new HikariDataSource(config)) {
++            long[] allocated = new long[1];
++            try (var generator = new DatabaseIdGenerator(business)) {
++                new TransactionTemplate(new DataSourceTransactionManager(business)).executeWithoutResult(status -> {
++                    allocated[0] = assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), IdGenerator::nextId);
++                    assertEquals(1, business.getHikariPoolMXBean().getActiveConnections());
++                    status.setRollbackOnly();
++                });
++            }
++            try (var restarted = new DatabaseIdGenerator(business)) {
++                assertTrue(restarted.nextId() > allocated[0]);
++            }
++        }
++    }
++}
+diff --git a/server/src/test/java/com/workforcehub/common/util/StandaloneIdGeneratorExtension.java b/server/src/test/java/com/workforcehub/common/util/StandaloneIdGeneratorExtension.java
+new file mode 100644
+index 0000000..a960b99
+--- /dev/null
++++ b/server/src/test/java/com/workforcehub/common/util/StandaloneIdGeneratorExtension.java
+@@ -0,0 +1,39 @@
++package com.workforcehub.common.util;
++
++import org.junit.jupiter.api.extension.AfterAllCallback;
++import org.junit.jupiter.api.extension.BeforeAllCallback;
++import org.junit.jupiter.api.extension.ExtensionContext;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.junit.platform.commons.support.AnnotationSupport;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.springframework.test.context.junit.jupiter.SpringExtension;
++
++/** Only standalone unit tests receive a private fixture; Spring tests must wire the production bean. */
++public class StandaloneIdGeneratorExtension implements BeforeAllCallback, AfterAllCallback {
++    @Override
++    public void beforeAll(ExtensionContext context) {
++        boolean spring = AnnotationSupport.findRepeatableAnnotations(context.getRequiredTestClass(), ExtendWith.class)
++            .stream().flatMap(annotation -> java.util.Arrays.stream(annotation.value()))
++            .anyMatch(SpringExtension.class::equals);
++        if (spring || context.getTags().contains("durable-id")) return;
++        var source = new DriverManagerDataSource("jdbc:h2:mem:ids_" + java.util.UUID.randomUUID()
++            + ";DB_CLOSE_DELAY=-1", "sa", "");
++        var jdbc = new JdbcTemplate(source);
++        jdbc.execute("CREATE TABLE sys_id_sequence(sequence_name VARCHAR(32) PRIMARY KEY, high_watermark BIGINT)");
++        jdbc.update("INSERT INTO sys_id_sequence VALUES('global', ?)", 1L << 62);
++        var store = context.getStore(ExtensionContext.Namespace.create(getClass(), context.getUniqueId()));
++        store.put("jdbc", jdbc);
++        store.put("generator", new DatabaseIdGenerator(source));
++    }
++
++    @Override
++    public void afterAll(ExtensionContext context) {
++        var store = context.getStore(ExtensionContext.Namespace.create(getClass(), context.getUniqueId()));
++        var generator = store.remove("generator", DatabaseIdGenerator.class);
++        if (generator != null) {
++            generator.close();
++            store.remove("jdbc", JdbcTemplate.class).execute("SHUTDOWN");
++        }
++    }
++}
+diff --git a/server/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension b/server/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension
+new file mode 100644
+index 0000000..c400955
+--- /dev/null
++++ b/server/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension
+@@ -0,0 +1 @@
++com.workforcehub.common.util.StandaloneIdGeneratorExtension
+diff --git a/server/src/test/resources/junit-platform.properties b/server/src/test/resources/junit-platform.properties
+new file mode 100644
+index 0000000..6efc0d5
+--- /dev/null
++++ b/server/src/test/resources/junit-platform.properties
+@@ -0,0 +1 @@
++junit.jupiter.extensions.autodetection.enabled=true

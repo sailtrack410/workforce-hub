@@ -1,0 +1,227 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "插件配置：版本校验、敏感值与软删除",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/file-plugin/P03.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "正常业务链路"
+    },
+    {
+      "id": "branch",
+      "label": "分支与恢复"
+    },
+    {
+      "id": "failure",
+      "label": "拒绝或处理边界",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "entry",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "提交配置变更",
+      "sublabel": "带 expectedVersion",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 61,
+          "end_line": 78
+        }
+      ]
+    },
+    {
+      "id": "lock",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "锁插件与校验状态",
+      "sublabel": "停用中或卸载禁止保存",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 70,
+          "end_line": 74
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "lane": "main",
+      "col": 2,
+      "type": "security",
+      "label": "校验配置类型",
+      "sublabel": "普通值或敏感值",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 180,
+          "end_line": 217
+        }
+      ]
+    },
+    {
+      "id": "version",
+      "lane": "main",
+      "col": 3,
+      "type": "database",
+      "label": "核对版本并写入",
+      "sublabel": "创建、更新或恢复",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 81,
+          "end_line": 142
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "lane": "main",
+      "col": 4,
+      "type": "database",
+      "label": "递增版本与审计",
+      "sublabel": "同事务记录变更",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 138,
+          "end_line": 146
+        }
+      ]
+    },
+    {
+      "id": "response",
+      "lane": "main",
+      "col": 5,
+      "type": "frontend",
+      "label": "返回脱敏结果",
+      "sublabel": "不返回敏感原值",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 278,
+          "end_line": 300
+        }
+      ]
+    },
+    {
+      "id": "delete",
+      "lane": "branch",
+      "col": 3,
+      "type": "database",
+      "label": "按版本软删除",
+      "sublabel": "同次重复删除幂等",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 149,
+          "end_line": 177
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "failure",
+      "col": 2,
+      "type": "security",
+      "label": "拒绝非法变更",
+      "sublabel": "状态、版本或类型冲突",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 117,
+          "end_line": 123
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginConfigService.java",
+          "line": 157,
+          "end_line": 173
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "entry",
+      "to": "lock"
+    },
+    {
+      "id": "e1",
+      "from": "lock",
+      "to": "input",
+      "label": "可写"
+    },
+    {
+      "id": "e2",
+      "from": "input",
+      "to": "version",
+      "label": "保存"
+    },
+    {
+      "id": "e3",
+      "from": "version",
+      "to": "audit"
+    },
+    {
+      "id": "e4",
+      "from": "audit",
+      "to": "response"
+    },
+    {
+      "id": "e5",
+      "from": "lock",
+      "to": "delete",
+      "label": "删除"
+    },
+    {
+      "id": "e6",
+      "from": "delete",
+      "to": "response"
+    },
+    {
+      "id": "e7",
+      "from": "input",
+      "to": "reject",
+      "label": "非法类型或值"
+    },
+    {
+      "id": "e8",
+      "from": "version",
+      "to": "reject",
+      "label": "版本过期"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与覆盖",
+      "items": [
+        "admin-web 插件配置弹窗调用治理API；敏感值只展示设置状态，不读取实际配置数据。",
+        "插件状态锁、expectedVersion、类型校验、敏感值保护、恢复及删除幂等。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "问题与优化记录",
+      "items": [
+        "优化：requiresRestart 的界面提示与操作回执应明确配置何时生效；本图不把标记等同自动重启。",
+        "敏感配置只追踪代码处理方式，本轮没有读取任何配置真实值。"
+      ]
+    }
+  ]
+}

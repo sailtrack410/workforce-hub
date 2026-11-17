@@ -1,0 +1,8 @@
+2026-11-08T13:51:27.525298Z 0 [System] [MY-015017] [Server] MySQL Server Initialization - start.
+2026-11-08T13:51:27.536851Z 0 [System] [MY-013169] [Server] /tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqld (mysqld 8.4.7) initializing of server in progress as process 66173
+2026-11-08T13:51:27.543273Z 0 [Warning] [MY-010159] [Server] Setting lower_case_table_names=2 because file system for /var/folders/vm/js1lw2zd3m30kkk70l6d6y040000gn/T/workforce-review-10016-qlj_fwm5/data/ is case insensitive
+2026-11-08T13:51:27.551974Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-11-08T13:51:27.596038Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-11-08T13:51:28.073711Z 5 [Warning] [MY-010453] [Server] root@localhost is created with an empty password ! Please consider switching off the --initialize-insecure option.
+2026-11-08T13:51:28.282333Z 0 [System] [MY-013172] [Server] Received SHUTDOWN from user <via user signal>. Shutting down mysqld (Version: 8.4.7).
+2026-11-08T13:51:28.766337Z 0 [System] [MY-015018] [Server] MySQL Server Initialization - end.

@@ -1,0 +1,747 @@
+<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { Crosshair, Plus, RefreshCcw } from 'lucide-vue-next';
+import { adminApi } from '@/api/admin';
+import type { EntityId, OrgUserSummaryResponse, OrgUserDetailResponse, OrgDepartmentTreeNodeResponse, OrgPositionResponse, OrgUserListQuery } from '@/api/types';
+import { errorMessage, formatDateTime, genderLabel, statusLabel } from '@/utils/format';
+import { useUserViewStore } from '@/stores/userView';
+import { useToast } from '@/composables/useToast';
+import AdminPanel from '@/components/AdminPanel.vue';
+import AdminFilterBar from '@/components/AdminFilterBar.vue';
+import AdminTable, { type TableColumn } from '@/components/AdminTable.vue';
+import AdminDetailList, { type DetailRow } from '@/components/AdminDetailList.vue';
+import AdminSkeleton from '@/components/AdminSkeleton.vue';
+import AdminPagination from '@/components/AdminPagination.vue';
+import OrgMindTree from '@/components/OrgMindTree.vue';
+import AdminConfirmDialog from '@/components/AdminConfirmDialog.vue';
+import AdminDialog from '@/components/AdminDialog.vue';
+import AdminMetricStrip from '@/components/AdminMetricStrip.vue';
+import { maxLength, mobileFormat, requiredText } from '@/utils/validation';
+
+const store = useUserViewStore();
+const toast = useToast();
+
+const loading = ref(false);
+const orgLoading = ref(false);
+const detailLoading = ref(false);
+const items = ref<OrgUserSummaryResponse[]>([]);
+const orgUsers = ref<OrgUserSummaryResponse[]>([]);
+const selectedDetail = ref<OrgUserDetailResponse | null>(null);
+const depts = ref<OrgDepartmentTreeNodeResponse[]>([]);
+const positions = ref<OrgPositionResponse[]>([]);
+const creating = ref(false);
+const createForm = reactive({ employeeNo: '', realName: '', gender: 'MALE', mobile: '', primaryDeptId: undefined as EntityId | undefined, positionId: undefined as EntityId | undefined, employmentStatus: 'ACTIVE', status: 'ACTIVE' });
+const departmentCreating = ref(false);
+const departmentFormOpen = ref(false);
+const departmentForm = reactive({ parentId: undefined as EntityId | undefined, deptCode: '', deptName: '' });
+const userCreateTouched = reactive({ employeeNo: false, realName: false, mobile: false, primaryDeptId: false, positionId: false });
+const ORG_ROOT_ID = '__org_root__';
+const orgViewportRef = ref<HTMLElement | null>(null);
+const orgCanvasRef = ref<HTMLElement | null>(null);
+const detailDialogOpen = ref(false);
+const departmentDeleteVisible = ref(false);
+const departmentDeleteTarget = ref<OrgDepartmentTreeNodeResponse | null>(null);
+const orgLinks = ref<OrgLink[]>([]);
+const orgCanvasSize = reactive({ width: 0, height: 0 });
+const orgPanState = { active: false, moved: false, pointerId: 0, x: 0, y: 0, left: 0, top: 0 };
+let orgLinkFrame = 0;
+let orgPanClearTimer = 0;
+let orgResizeObserver: ResizeObserver | null = null;
+
+const userCreateErrors = computed(() => ({
+  employeeNo: maxLength(createForm.employeeNo, 64, '员工编号'),
+  realName: requiredText(createForm.realName, '姓名') || maxLength(createForm.realName, 64, '姓名'),
+  mobile: maxLength(createForm.mobile, 32, '手机号') || mobileFormat(createForm.mobile),
+  primaryDeptId: createForm.primaryDeptId == null ? '请选择部门' : '',
+  positionId: createForm.positionId == null ? '请选择岗位' : '',
+}));
+const userCreateInvalid = computed(() => Object.values(userCreateErrors.value).some(Boolean));
+const departmentNameError = computed(() => requiredText(departmentForm.deptName, '部门名称') || maxLength(departmentForm.deptName, 128, '部门名称'));
+
+interface OrgLink {
+  key: string;
+  path: string;
+}
+
+const columns: TableColumn[] = [
+  { key: 'realName', label: '姓名' },
+  { key: 'employeeNo', label: '员工编号' },
+  { key: 'primaryDeptName', label: '部门' },
+  { key: 'positionName', label: '岗位' },
+  { key: 'employmentStatus', label: '状态' },
+];
+
+const detailRows = computed<DetailRow[]>(() => {
+  const r = selectedDetail.value;
+  if (!r) return [];
+  return [
+    { label: '姓名', value: r.realName },
+    { label: '性别', value: genderLabel(r.gender) },
+    { label: '手机', value: r.mobile ?? '-' },
+    { label: '邮箱', value: r.email ?? '-' },
+    { label: '部门', value: r.primaryDeptName ?? '-' },
+    { label: '岗位', value: r.positionName ?? '-' },
+    { label: '上级', value: r.managerName ?? '-' },
+    { label: '入职日期', value: r.hireDate ?? '-' },
+    { label: '在职状态', value: statusLabel(r.employmentStatus ?? '') },
+    { label: '状态', value: statusLabel(r.status ?? '') },
+  ];
+});
+
+// 递归展平部门树，保留层级深度用于下拉框缩进显示
+function flattenDepts(nodes: OrgDepartmentTreeNodeResponse[], depth = 0): { node: OrgDepartmentTreeNodeResponse; depth: number }[] {
+  return nodes.flatMap(n => [{ node: n, depth }, ...flattenDepts(n.children ?? [], depth + 1)]);
+}
+
+const flatDepts = computed(() => flattenDepts(depts.value));
+
+const orgRootNodes = computed<OrgDepartmentTreeNodeResponse[]>(() => {
+  if (!depts.value.length) return [];
+  return [{
+    id: ORG_ROOT_ID,
+    parentId: null,
+    treePath: null,
+    deptCode: '全部部门',
+    deptName: '组织架构',
+    deptType: 'ROOT',
+    deptLevel: -1,
+    status: 'ACTIVE',
+    children: depts.value,
+  }];
+});
+
+const usersByDept = computed(() => {
+  const map = new Map<string, OrgUserSummaryResponse[]>();
+  for (const user of orgUsers.value) {
+    const key = user.primaryDeptId == null ? '' : String(user.primaryDeptId);
+    const group = map.get(key) ?? [];
+    group.push(user);
+    map.set(key, group);
+  }
+  return map;
+});
+
+const unassignedUsers = computed(() => usersByDept.value.get('') ?? []);
+const peopleMetrics = computed(() => [
+  { label: '组织人数', value: orgUsers.value.length },
+  { label: '在职员工', value: orgUsers.value.filter((item) => item.employmentStatus === 'ACTIVE').length },
+  { label: '试用员工', value: orgUsers.value.filter((item) => item.employmentStatus === 'PROBATION').length },
+  { label: '未分配部门', value: unassignedUsers.value.length },
+]);
+const expandedDeptIds = ref<string[]>([]);
+
+const orgVisibleEdges = computed(() => {
+  const edges: { sourceId: string; targetId: string }[] = [];
+  function walk(nodes: OrgDepartmentTreeNodeResponse[]) {
+    for (const node of nodes) {
+      if (!isDeptExpanded(node.id)) continue;
+      if (String(node.id) !== ORG_ROOT_ID) {
+        for (const user of usersByDept.value.get(String(node.id)) ?? []) {
+          edges.push({ sourceId: String(node.id), targetId: `user:${String(node.id)}:${String(user.userId)}` });
+        }
+      }
+      if (node.children?.length) {
+        for (const child of node.children) {
+          edges.push({ sourceId: String(node.id), targetId: String(child.id) });
+        }
+        walk(node.children);
+      }
+    }
+  }
+  walk(orgRootNodes.value);
+  return edges;
+});
+
+async function loadList() {
+  loading.value = true;
+  try {
+    const query: OrgUserListQuery = { pageNo: store.pagination.pageNo, pageSize: store.pagination.pageSize };
+    if (store.filters.keyword) query.keyword = store.filters.keyword;
+    if (store.filters.deptId) query.deptId = store.filters.deptId;
+    if (store.filters.employmentStatus) query.employmentStatus = store.filters.employmentStatus;
+    const res = await adminApi.org.users(query);
+    items.value = res.list;
+    store.pagination.total = res.total;
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadDetail(row: OrgUserSummaryResponse) {
+  store.selectedUserId = row.userId;
+  selectedDetail.value = null;
+  detailLoading.value = true;
+  try {
+    selectedDetail.value = await adminApi.org.userDetail(row.userId);
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+async function loadMeta() {
+  orgLoading.value = true;
+  try {
+    const [d, p, u] = await Promise.all([adminApi.org.departmentTree(), adminApi.org.positions(), adminApi.org.orgChartUsers()]);
+    depts.value = d;
+    positions.value = p;
+    orgUsers.value = u;
+    expandedDeptIds.value = [...new Set([ORG_ROOT_ID, ...expandedDeptIds.value])];
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    orgLoading.value = false;
+  }
+}
+
+async function handleCreate() {
+  if (userCreateInvalid.value) return;
+  creating.value = true;
+  try {
+    await adminApi.org.createUser(createForm);
+    createForm.employeeNo = '';
+    createForm.realName = '';
+    createForm.mobile = '';
+    Object.keys(userCreateTouched).forEach((key) => { userCreateTouched[key as keyof typeof userCreateTouched] = false; });
+    await Promise.all([loadList(), loadMeta()]);
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    creating.value = false;
+  }
+}
+
+function startCreateDepartment(parent?: OrgDepartmentTreeNodeResponse | null) {
+  departmentForm.parentId = parent && String(parent.id) !== ORG_ROOT_ID ? parent.id : undefined;
+  departmentForm.deptCode = '';
+  departmentForm.deptName = '';
+  departmentFormOpen.value = true;
+}
+
+async function handleCreateDepartment() {
+  if (departmentNameError.value) return;
+  departmentCreating.value = true;
+  try {
+    const parentId = departmentForm.parentId;
+    const deptId = await adminApi.org.createDepartment({
+      parentId: parentId ?? null,
+      deptCode: '',
+      deptName: departmentForm.deptName.trim(),
+      deptType: 'TEAM',
+      status: 'ACTIVE',
+    });
+    departmentForm.parentId = undefined;
+    departmentForm.deptCode = '';
+    departmentForm.deptName = '';
+    departmentFormOpen.value = false;
+    expandedDeptIds.value = [...new Set([
+      ORG_ROOT_ID,
+      ...expandedDeptIds.value,
+      ...(parentId == null ? [] : [String(parentId)]),
+      String(deptId),
+    ])];
+    await loadMeta();
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    departmentCreating.value = false;
+  }
+}
+
+function handleDeleteDepartment(dept: OrgDepartmentTreeNodeResponse) {
+  if (String(dept.id) === ORG_ROOT_ID) return;
+  departmentDeleteTarget.value = dept;
+  departmentDeleteVisible.value = true;
+}
+
+async function confirmDeleteDepartment() {
+  const dept = departmentDeleteTarget.value;
+  if (!dept || String(dept.id) === ORG_ROOT_ID) return;
+  try {
+    await adminApi.org.deleteDepartment(dept.id);
+    expandedDeptIds.value = expandedDeptIds.value.filter((item) => item !== String(dept.id));
+    if (store.filters.deptId != null && String(store.filters.deptId) === String(dept.id)) {
+      store.filters.deptId = undefined;
+    }
+    await Promise.all([loadList(), loadMeta()]);
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    departmentDeleteTarget.value = null;
+  }
+}
+
+function onRowClick(row: OrgUserSummaryResponse) {
+  openUserDetail(row);
+}
+
+async function openUserDetail(row: OrgUserSummaryResponse) {
+  detailDialogOpen.value = true;
+  await loadDetail(row);
+}
+
+function closeUserDetail() {
+  detailDialogOpen.value = false;
+}
+
+function isDeptExpanded(id: unknown) {
+  return expandedDeptIds.value.includes(String(id));
+}
+
+function toggleDept(id: unknown) {
+  const key = String(id);
+  expandedDeptIds.value = isDeptExpanded(id)
+    ? expandedDeptIds.value.filter((item) => item !== key)
+    : [...expandedDeptIds.value, key];
+}
+
+function scheduleOrgLinks() {
+  if (orgLinkFrame) window.cancelAnimationFrame(orgLinkFrame);
+  orgLinkFrame = window.requestAnimationFrame(() => {
+    orgLinkFrame = 0;
+    redrawOrgLinks();
+  });
+}
+
+function redrawOrgLinks() {
+  const canvas = orgCanvasRef.value;
+  if (!canvas) return;
+  const canvasRect = canvas.getBoundingClientRect();
+  orgCanvasSize.width = Math.max(canvas.scrollWidth, canvas.offsetWidth);
+  orgCanvasSize.height = Math.max(canvas.scrollHeight, canvas.offsetHeight);
+  const nodeMap = new Map<string, HTMLElement>();
+  canvas.querySelectorAll<HTMLElement>('[data-org-node-id]').forEach((el) => {
+    if (el.dataset.orgNodeId) nodeMap.set(el.dataset.orgNodeId, el);
+  });
+  orgLinks.value = orgVisibleEdges.value.flatMap((edge) => {
+    const parent = nodeMap.get(edge.sourceId);
+    const child = nodeMap.get(edge.targetId);
+    if (!parent || !child) return [];
+    const p = parent.getBoundingClientRect();
+    const c = child.getBoundingClientRect();
+    const x1 = p.right - canvasRect.left;
+    const y1 = p.top - canvasRect.top + 33;
+    const x2 = c.left - canvasRect.left;
+    const y2 = c.top - canvasRect.top + 33;
+    const midX = x1 + Math.max(24, (x2 - x1) / 2);
+    return [{
+      key: `${edge.sourceId}-${edge.targetId}`,
+      path: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`,
+    }];
+  });
+}
+
+function resetOrgPan() {
+  const viewport = orgViewportRef.value;
+  if (!viewport) return;
+  viewport.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+  scheduleOrgLinks();
+}
+
+function startOrgPan(event: PointerEvent) {
+  const viewport = orgViewportRef.value;
+  if (!viewport) return;
+  if ((event.target as Element | null)?.closest('button,input,select,textarea,a,summary')) return;
+  orgPanState.active = true;
+  orgPanState.moved = false;
+  orgPanState.pointerId = event.pointerId;
+  orgPanState.x = event.clientX;
+  orgPanState.y = event.clientY;
+  orgPanState.left = viewport.scrollLeft;
+  orgPanState.top = viewport.scrollTop;
+  viewport.setPointerCapture(event.pointerId);
+}
+
+function moveOrgPan(event: PointerEvent) {
+  const viewport = orgViewportRef.value;
+  if (!viewport || !orgPanState.active || orgPanState.pointerId !== event.pointerId) return;
+  const dx = event.clientX - orgPanState.x;
+  const dy = event.clientY - orgPanState.y;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) orgPanState.moved = true;
+  viewport.scrollLeft = orgPanState.left - dx;
+  viewport.scrollTop = orgPanState.top - dy;
+}
+
+function endOrgPan(event: PointerEvent) {
+  const viewport = orgViewportRef.value;
+  if (!viewport || orgPanState.pointerId !== event.pointerId) return;
+  orgPanState.active = false;
+  viewport.releasePointerCapture(event.pointerId);
+  if (orgPanClearTimer) window.clearTimeout(orgPanClearTimer);
+  orgPanClearTimer = window.setTimeout(() => {
+    orgPanState.moved = false;
+    orgPanClearTimer = 0;
+  }, 0);
+}
+
+function preventOrgClickAfterPan(event: MouseEvent) {
+  if (!orgPanState.moved) return;
+  event.preventDefault();
+  event.stopPropagation();
+  orgPanState.moved = false;
+}
+
+watch([orgRootNodes, expandedDeptIds], () => nextTick(scheduleOrgLinks), { deep: true });
+
+onMounted(() => {
+  loadList();
+  loadMeta();
+  nextTick(() => {
+    if (orgCanvasRef.value) {
+      orgResizeObserver = new ResizeObserver(scheduleOrgLinks);
+      orgResizeObserver.observe(orgCanvasRef.value);
+    }
+    scheduleOrgLinks();
+  });
+});
+
+onBeforeUnmount(() => {
+  if (orgLinkFrame) window.cancelAnimationFrame(orgLinkFrame);
+  if (orgPanClearTimer) window.clearTimeout(orgPanClearTimer);
+  orgResizeObserver?.disconnect();
+});
+</script>
+
+<template>
+  <div class="page-grid user-page">
+    <AdminPanel :span="12" title="人员主数据态势" subtitle="组织归属、在职状态与岗位信息共同构成人事协同基线">
+      <AdminMetricStrip :cards="peopleMetrics" />
+    </AdminPanel>
+
+    <AdminPanel :span="12" title="组织拓扑" subtitle="拖动画布查看完整组织，点击员工进入详情；未分配人员单独列示">
+      <template #actions>
+        <button class="icon-button" title="新建部门" @click="startCreateDepartment(null)"><Plus :size="16" /></button>
+        <button class="icon-button" title="重置视图" @click="resetOrgPan"><Crosshair :size="16" /></button>
+        <button class="secondary-button" title="刷新" @click="loadMeta"><RefreshCcw :size="16" />刷新</button>
+      </template>
+
+      <div v-if="departmentFormOpen" class="department-form stack-form">
+        <label>上级部门
+          <select v-model="departmentForm.parentId">
+            <option :value="undefined">顶级部门</option>
+            <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ f.node.deptName }}</option>
+          </select>
+        </label>
+        <label>部门名称 <input v-model="departmentForm.deptName" :aria-invalid="Boolean(departmentNameError)" maxlength="128" /><small v-if="departmentNameError" class="field-error">{{ departmentNameError }}</small></label>
+        <div class="department-actions">
+          <button class="secondary-button" @click="departmentFormOpen = false">取消</button>
+          <button class="primary-button" :disabled="departmentCreating || Boolean(departmentNameError)" @click="handleCreateDepartment">
+            <Plus :size="16" /> 创建
+          </button>
+        </div>
+      </div>
+
+      <AdminSkeleton v-if="orgLoading" :lines="5" />
+      <template v-else>
+        <div class="org-health" aria-label="组织拓扑摘要">
+          <span><strong>{{ flatDepts.length }}</strong> 个部门</span>
+          <span><strong>{{ orgUsers.length }}</strong> 名员工</span>
+          <span :class="{ risk: unassignedUsers.length }"><strong>{{ unassignedUsers.length }}</strong> 人未归属</span>
+        </div>
+        <div
+          ref="orgViewportRef"
+          class="org-chart"
+          @pointerdown="startOrgPan"
+          @pointermove="moveOrgPan"
+          @pointerup="endOrgPan"
+          @pointercancel="endOrgPan"
+          @click.capture="preventOrgClickAfterPan"
+          @scroll="scheduleOrgLinks"
+        >
+        <div ref="orgCanvasRef" class="org-canvas">
+          <svg
+            class="org-link-layer"
+            :width="orgCanvasSize.width"
+            :height="orgCanvasSize.height"
+            :viewBox="`0 0 ${orgCanvasSize.width} ${orgCanvasSize.height}`"
+            aria-hidden="true"
+          >
+            <path
+              v-for="link in orgLinks"
+              :key="link.key"
+              class="org-link-path"
+              :d="link.path"
+            />
+          </svg>
+          <OrgMindTree
+            v-if="orgRootNodes.length"
+            :nodes="orgRootNodes"
+            :users-by-dept="usersByDept"
+            :expanded-dept-ids="expandedDeptIds"
+            :selected-user-id="store.selectedUserId"
+            :selected-dept-id="store.filters.deptId"
+            :virtual-root-id="ORG_ROOT_ID"
+            root
+            @toggle="toggleDept"
+            @select-user="openUserDetail"
+            @add-department="startCreateDepartment"
+            @delete-department="handleDeleteDepartment"
+          />
+          <div v-else class="empty-state">无部门</div>
+        </div>
+
+        <div v-if="unassignedUsers.length" class="org-users unassigned">
+          <span class="org-empty">未分配部门</span>
+          <button
+            v-for="user in unassignedUsers"
+            :key="user.userId"
+            type="button"
+            class="org-user"
+            :class="{ selected: store.selectedUserId === user.userId }"
+            @click="openUserDetail(user)"
+          >
+            <strong>{{ user.realName }}</strong>
+            <span>{{ user.positionName ?? '-' }}</span>
+            <span>{{ statusLabel(user.employmentStatus ?? '') }}</span>
+          </button>
+        </div>
+        </div>
+      </template>
+    </AdminPanel>
+
+    <AdminPanel :span="7" :title="`人员目录 (${store.pagination.total})`" subtitle="按姓名、部门与在职状态定位员工，选择记录查看完整资料">
+      <template #actions>
+        <button class="secondary-button" title="刷新" @click="loadList"><RefreshCcw :size="16" />刷新</button>
+      </template>
+      <AdminFilterBar @search="loadList">
+        <input v-model="store.filters.keyword" placeholder="搜索姓名" @keyup.enter="loadList" />
+        <select v-model="store.filters.deptId" @change="loadList">
+          <option :value="undefined">全部部门</option>
+          <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ '&nbsp;'.repeat(f.depth * 4) }}{{ f.node.deptName }}</option>
+        </select>
+        <select v-model="store.filters.employmentStatus" @change="loadList">
+          <option value="">全部状态</option>
+          <option value="ACTIVE">在职</option>
+          <option value="PROBATION">试用</option>
+          <option value="RESIGNED">离职</option>
+        </select>
+      </AdminFilterBar>
+
+      <AdminTable
+        interactive
+        :columns="columns"
+        :rows="items"
+        :loading="loading"
+        :selected-id="store.selectedUserId"
+        row-key="userId"
+        @row-click="onRowClick"
+      >
+        <template #cell-realName="{ row }"><strong>{{ row.realName }}</strong><span>{{ row.positionName || '未分配岗位' }}</span></template>
+        <template #cell-employeeNo="{ row }">{{ row.employeeNo || '-' }}</template>
+        <template #cell-primaryDeptName="{ row }"><span :class="{ 'risk-text': !row.primaryDeptName }">{{ row.primaryDeptName || '未分配部门' }}</span></template>
+        <template #cell-employmentStatus="{ row }"><span class="status-pill" :class="{ 'risk-status': row.employmentStatus !== 'ACTIVE' }">{{ statusLabel(row.employmentStatus ?? '') }}</span></template>
+      </AdminTable>
+      <AdminPagination
+        :page-no="store.pagination.pageNo"
+        :page-size="store.pagination.pageSize"
+        :total="store.pagination.total"
+        @update:page-no="(v) => { store.pagination.pageNo = v; loadList(); }"
+        @update:page-size="(v) => { store.pagination.pageSize = v; store.pagination.pageNo = 1; loadList(); }"
+      />
+    </AdminPanel>
+
+    <AdminPanel :span="5" title="新增员工" subtitle="先完成组织和岗位归属，再创建人员主数据">
+      <div class="stack-form create-form">
+        <label>员工编号 <input v-model="createForm.employeeNo" :aria-invalid="userCreateTouched.employeeNo && Boolean(userCreateErrors.employeeNo)" maxlength="64" placeholder="可选" @blur="userCreateTouched.employeeNo = true" /><small v-if="userCreateTouched.employeeNo && userCreateErrors.employeeNo" class="field-error">{{ userCreateErrors.employeeNo }}</small></label>
+        <label>姓名 <input v-model="createForm.realName" :aria-invalid="userCreateTouched.realName && Boolean(userCreateErrors.realName)" maxlength="64" @blur="userCreateTouched.realName = true" /><small v-if="userCreateTouched.realName && userCreateErrors.realName" class="field-error">{{ userCreateErrors.realName }}</small></label>
+        <label>手机 <input v-model="createForm.mobile" :aria-invalid="userCreateTouched.mobile && Boolean(userCreateErrors.mobile)" maxlength="32" inputmode="tel" placeholder="可选" @blur="userCreateTouched.mobile = true" /><small v-if="userCreateTouched.mobile && userCreateErrors.mobile" class="field-error">{{ userCreateErrors.mobile }}</small></label>
+        <label>部门
+          <select v-model="createForm.primaryDeptId" :aria-invalid="userCreateTouched.primaryDeptId && Boolean(userCreateErrors.primaryDeptId)" @blur="userCreateTouched.primaryDeptId = true">
+            <option :value="undefined">请选择</option>
+            <option v-for="f in flatDepts" :key="f.node.id" :value="f.node.id">{{ f.node.deptName }}</option>
+          </select>
+          <small v-if="userCreateTouched.primaryDeptId && userCreateErrors.primaryDeptId" class="field-error">{{ userCreateErrors.primaryDeptId }}</small>
+        </label>
+        <label>岗位
+          <select v-model="createForm.positionId" :aria-invalid="userCreateTouched.positionId && Boolean(userCreateErrors.positionId)" @blur="userCreateTouched.positionId = true">
+            <option :value="undefined">请选择</option>
+            <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.positionName }}</option>
+          </select>
+          <small v-if="userCreateTouched.positionId && userCreateErrors.positionId" class="field-error">{{ userCreateErrors.positionId }}</small>
+        </label>
+        <div class="create-impact">
+          <span>创建后状态</span>
+          <strong>在职 · 账号启用</strong>
+        </div>
+        <button class="primary-button" :disabled="creating || userCreateInvalid" @click="handleCreate">
+          <Plus :size="16" /> 创建员工
+        </button>
+      </div>
+    </AdminPanel>
+
+    <AdminDialog v-model:visible="detailDialogOpen" title="员工详情" labelled-by="user-detail-title" width="min(560px, 92vw)" @close="closeUserDetail">
+      <AdminSkeleton v-if="detailLoading" :lines="5" />
+      <AdminDetailList v-else-if="selectedDetail" :rows="detailRows" />
+      <div v-else class="empty-state">无数据</div>
+    </AdminDialog>
+
+    <AdminConfirmDialog
+      v-model:visible="departmentDeleteVisible"
+      title="删除部门"
+      message="删除部门"
+      confirm-label="删除"
+      :danger="true"
+      @confirm="confirmDeleteDepartment"
+      @cancel="departmentDeleteTarget = null"
+    />
+  </div>
+</template>
+
+<style scoped>
+.user-page { letter-spacing: 0; }
+
+.create-impact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-left: 3px solid var(--green);
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.create-impact strong { color: var(--ink); }
+
+.department-form {
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--line);
+}
+
+.department-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.org-health {
+  display: flex;
+  gap: var(--space-base);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.org-health span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  padding-right: var(--space-base);
+  border-right: 1px solid var(--line);
+}
+
+.org-health strong { color: var(--ink); font-size: var(--text-base); }
+.org-health .risk,
+.org-health .risk strong,
+.risk-status,
+.risk-text { color: var(--red-dark) !important; }
+
+.org-chart {
+  height: min(68vh, 720px);
+  overflow: auto;
+  position: relative;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: grab;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  user-select: none;
+}
+
+.org-chart::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.org-chart:active {
+  cursor: grabbing;
+}
+
+.org-canvas {
+  position: relative;
+  min-width: 1900px;
+  min-height: 860px;
+  width: max-content;
+  padding: 12px 120px 80px 12px;
+}
+
+.org-canvas :deep(.org-tree) {
+  position: relative;
+  z-index: 2;
+}
+
+.org-link-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.org-link-path {
+  fill: none;
+  stroke: var(--org-link-stroke);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.org-users {
+  min-width: 420px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-base);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--line);
+}
+
+.org-users.unassigned {
+  align-items: center;
+}
+
+.org-user {
+  min-width: 156px;
+  max-width: 220px;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink);
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.org-user:hover,
+.org-user.selected {
+  border-color: var(--green);
+  background: var(--pill-bg);
+}
+
+.org-empty {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .org-health { display: grid; gap: var(--space-sm); }
+  .org-health span { border-right: 0; }
+  .create-impact { align-items: flex-start; flex-direction: column; }
+}
+
+</style>

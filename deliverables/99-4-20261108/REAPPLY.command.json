@@ -1,0 +1,9 @@
+{
+  "command": [
+    "patch",
+    "-p1",
+    "-i",
+    "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/DIFF_FILE.patch"
+  ],
+  "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-4-20261108/rollback-copy"
+}

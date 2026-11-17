@@ -1,0 +1,22 @@
+[
+  {
+    "label": "BASELINE",
+    "command": [
+      "mvn",
+      "-Dtest=LeaveSettlementTransactionTest",
+      "test"
+    ],
+    "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/baseline-run/server",
+    "exit": 1
+  },
+  {
+    "label": "ROLLBACK",
+    "command": [
+      "mvn",
+      "-Dtest=LeaveSettlementTransactionTest",
+      "test"
+    ],
+    "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/99-3-20261108/rollback-run/server",
+    "exit": 1
+  }
+]

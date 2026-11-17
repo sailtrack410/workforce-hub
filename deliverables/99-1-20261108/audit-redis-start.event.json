@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/opt/homebrew/bin/redis-server",
+    "--bind",
+    "127.0.0.1",
+    "--port",
+    "62839",
+    "--save",
+    "",
+    "--appendonly",
+    "no",
+    "--dir",
+    "/tmp/workforce-991-audit-2vmxwuvk",
+    "--daemonize",
+    "yes",
+    "--pidfile",
+    "/tmp/workforce-991-audit-2vmxwuvk/redis.pid",
+    "--logfile",
+    "/tmp/workforce-991-audit-2vmxwuvk/redis.log"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "audit-redis-start.stdout",
+  "stderr": "audit-redis-start.stderr"
+}

@@ -1,0 +1,65 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/composables/useWorkbenchState.test.ts > useWorkbenchState > uses calendar minutes from the server without rounding up to half day
+AssertionError: expected "leaveDuration" to be called with arguments: [ { …(2) } ]
+
+Received:
+
+  1st leaveDuration call:
+
+  [
+    {
+-     "endAt": "2026-05-08T10:00:00",
+-     "startAt": "2026-05-07T17:00:00",
++     "endAt": "2026-05-08 10:00:00",
++     "startAt": "2026-05-07 17:00:00",
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/composables/useWorkbenchState.test.ts:193:21
+    191|
+    192|     expect(state.leaveForm.value.durationMinutes).toBe('120');
+    193|     expect(preview).toHaveBeenCalledWith({ startAt: '2026-05-07T17:00:…
+       |                     ^
+    194|   });
+    195|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/composables/useWorkbenchState.test.ts > useWorkbenchState > revalidates the duration before submission instead of trusting an old displayed value
+AssertionError: expected "submitLeaveRequest" to be called once with arguments: [ { leaveTypeId: 'L-1', …(5) } ]
+
+Received:
+
+  1st submitLeaveRequest call:
+
+  [
+    {
+      "attachmentRefIds": [],
+      "durationMinutes": 150,
+-     "endAt": "2026-05-07T12:00:00",
++     "endAt": "2026-05-07 12:00:00",
+      "leaveTypeId": "L-1",
+      "reason": "休假",
+-     "startAt": "2026-05-07T09:00:00",
++     "startAt": "2026-05-07 09:00:00",
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/composables/useWorkbenchState.test.ts:261:20
+    259|
+    260|     expect(preview).toHaveBeenCalledTimes(2);
+    261|     expect(submit).toHaveBeenCalledExactlyOnceWith({ leaveTypeId: 'L-1…
+       |                    ^
+    262|   });
+    263|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

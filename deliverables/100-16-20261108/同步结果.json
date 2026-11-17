@@ -1,0 +1,22 @@
+{
+  "target": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "operation": "sync_verified_candidate",
+  "files": [
+    "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowContext.java",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java",
+    "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+    "server/src/test/java/com/workforcehub/agent/AgentToolKnowledgeAuthorizationTest.java",
+    "server/src/test/java/com/workforcehub/agent/workflow/WorkflowContextOperatorTest.java",
+    "server/src/test/java/com/workforcehub/ragflow/RagflowKnowledgeAccessIntegrationTest.java",
+    "server/src/test/java/com/workforcehub/ragflow/service/KnowledgeAccessTestFixture.java",
+    "server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeAccessRepositoryTest.java",
+    "server/src/test/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchAuthorizationTest.java"
+  ],
+  "full_run": "复核-final2-执行.json",
+  "hashes_match": true,
+  "git_head": "77d4fe743bf4ffe199b07e90ac2953609d9fbde0",
+  "committed": false
+}

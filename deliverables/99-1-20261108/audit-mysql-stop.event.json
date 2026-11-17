@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/tmp/workforce-quota-2033-runtime/mysql-8.4.7-macos15-arm64/bin/mysqladmin",
+    "--no-defaults",
+    "--socket=/tmp/workforce-991-audit-2vmxwuvk/mysql.sock",
+    "-uroot",
+    "shutdown"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "audit-mysql-stop.stdout",
+  "stderr": "audit-mysql-stop.stderr"
+}

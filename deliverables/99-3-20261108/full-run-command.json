@@ -1,0 +1,20 @@
+{
+  "command": [
+    "mvn",
+    "test"
+  ],
+  "cwd": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/full-run/server",
+  "environment": {
+    "PATH": "/opt/homebrew/bin:/usr/bin:/bin",
+    "JAVA_HOME": "/Users/sailtrack/Library/Java/JavaVirtualMachines/ms-17.0.18/Contents/Home",
+    "TEST_DB_HOST": "127.0.0.1",
+    "TEST_DB_PORT": "1",
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "1",
+    "TEST_REDIS_HOST": "127.0.0.1",
+    "TEST_REDIS_PORT": "1",
+    "REDIS_HOST": "127.0.0.1",
+    "REDIS_PORT": "1"
+  },
+  "note": "No real credentials or .env copied or supplied. Infrastructure tests may fail due to absent credentials."
+}

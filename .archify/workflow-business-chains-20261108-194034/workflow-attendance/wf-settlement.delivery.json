@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "7f86b01c-6d0c-457e-8a06-9d9bf3264893",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.candidate.json",
+  "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.html",
+  "specification": {
+    "sha256": "cd0e668fe0ea77c22946b150d2c19fe54820d03e5da41c244318f1bbc15f2ecd",
+    "bytes": 6752
+  },
+  "artifact": {
+    "sha256": "35bd53df84a2737daba7c08d62f1833b1df2b810eb9a5c708268dab62e0176ee",
+    "bytes": 825636
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/Users/sailtrack/.codex/skills/playwright/scripts/playwright_cli.sh",
+    "-s=99-4-web-proof",
+    "open",
+    "file:///Users/sailtrack/%E5%B7%A5%E7%A8%8B%E6%96%87%E4%BB%B6/java_web/workforce-hub/deliverables/99-4-web-20261108/browser-harness/index.html",
+    "--browser",
+    "msedge"
+  ],
+  "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "exit_status": 1,
+  "stdout": "### Browser `99-4-web-proof` opened with pid 59847.\n### Error\nError: Access to \"file:\" protocol is blocked. Attempted URL: \"file:///Users/sailtrack/%E5%B7%A5%E7%A8%8B%E6%96%87%E4%BB%B6/java_web/workforce-hub/deliverables/99-4-web-20261108/browser-harness/index.html\"\n",
+  "stderr": ""
+}

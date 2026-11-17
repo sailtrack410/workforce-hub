@@ -1,0 +1,72 @@
+[
+  {
+    "review_id": "99-4",
+    "commit": "700737f",
+    "command": [
+      "lark-cli",
+      "task",
+      "+complete",
+      "--as",
+      "user",
+      "--task-id",
+      "22f180a6-89ff-4a16-94a5-61bd16ecf88a"
+    ],
+    "exit": 0,
+    "response": {
+      "ok": true,
+      "identity": "user",
+      "data": {
+        "already_completed": false,
+        "completed_at": "1794144823000",
+        "guid": "22f180a6-89ff-4a16-94a5-61bd16ecf88a",
+        "status": "done",
+        "summary": "[P2][99-4][既有风险] 请假计算固定时段与取整口径",
+        "url": "https://applink.feishu.cn/client/todo/detail?guid=22f180a6-89ff-4a16-94a5-61bd16ecf88a"
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    },
+    "stderr": ""
+  },
+  {
+    "review_id": "99-5",
+    "commit": "77d4fe7",
+    "command": [
+      "lark-cli",
+      "task",
+      "+complete",
+      "--as",
+      "user",
+      "--task-id",
+      "bd955dc8-7c59-4ce7-8d04-39ec09ae777e"
+    ],
+    "exit": 0,
+    "response": {
+      "ok": true,
+      "identity": "user",
+      "data": {
+        "already_completed": false,
+        "completed_at": "1794144825000",
+        "guid": "bd955dc8-7c59-4ce7-8d04-39ec09ae777e",
+        "status": "done",
+        "summary": "[P2][99-5][既有风险] ID生成器跨实例唯一性未保证",
+        "url": "https://applink.feishu.cn/client/todo/detail?guid=bd955dc8-7c59-4ce7-8d04-39ec09ae777e"
+      },
+      "_notice": {
+        "update": {
+          "command": "lark-cli update",
+          "current": "1.0.97",
+          "latest": "1.0.99",
+          "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+        }
+      }
+    },
+    "stderr": ""
+  }
+]

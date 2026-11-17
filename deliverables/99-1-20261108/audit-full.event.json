@@ -1,0 +1,13 @@
+{
+  "command": [
+    "mvn",
+    "-B",
+    "clean",
+    "-Dquota.mysql.url=jdbc:mysql://127.0.0.1:62838/quota_2033_test?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true",
+    "test"
+  ],
+  "cwd": "/tmp/workforce-991-audit-2vmxwuvk/snapshot/server",
+  "exit": 1,
+  "stdout": "audit-full.stdout",
+  "stderr": "audit-full.stderr"
+}

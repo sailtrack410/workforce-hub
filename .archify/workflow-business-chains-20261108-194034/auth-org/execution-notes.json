@@ -1,0 +1,23 @@
+{
+  "tool_errors": [
+    {
+      "source": "auth-email首次finalize",
+      "exit_status": 1,
+      "diagnostic": "workflow/node-overlap: resetui and bind share lane ui col0",
+      "correction": "只移动bind到ui空闲col1，完整finalize通过，未到浏览器前修复。"
+    },
+    {
+      "source": "org-lifecycle首次finalize",
+      "exit_status": 1,
+      "diagnostic": "delivery/provenance-locked: Delivery ownership is unresolved while the output lock remains",
+      "correction": "候选不变，后续全部串行finalize，通过。"
+    },
+    {
+      "source": "python3 finish.py首次直接执行",
+      "exit_status": 1,
+      "stderr": "SyntaxError: Non-UTF-8 code starting with \\xe6 in file finish.py on line 27, but no encoding declared",
+      "correction": "验证文件UTF8可解码后添加coding:utf-8声明；相同命令已退出0。"
+    }
+  ],
+  "final_status": "9 workflow artifacts passed all four gates; static contracts 6 passed 0 failed"
+}

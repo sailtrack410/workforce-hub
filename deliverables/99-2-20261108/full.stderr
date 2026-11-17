@@ -1,0 +1,949 @@
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: org.pf4j.processor.ExtensionAnnotationProcessor init
+注: Options {}
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+注: Processing @org.pf4j.Extension
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+
+
+
+============================
+CONDITIONS EVALUATION REPORT
+============================
+
+
+Positive matches:
+-----------------
+
+    None
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+

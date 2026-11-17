@@ -1,0 +1,264 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "组织维护、员工入转离与账号停用",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.html",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "admin",
+      "label": "管理入口"
+    },
+    {
+      "id": "org",
+      "label": "组织与员工事务"
+    },
+    {
+      "id": "out",
+      "label": "记录、事件与登录"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "manage",
+      "lane": "admin",
+      "col": 0,
+      "type": "frontend",
+      "label": "部门岗位员工入口",
+      "sublabel": "管理端权限路由",
+      "sources": [
+        {
+          "path": "admin-web/src/router/index.ts",
+          "line": 54,
+          "end_line": 56
+        }
+      ]
+    },
+    {
+      "id": "dept",
+      "lane": "org",
+      "col": 0,
+      "type": "backend",
+      "label": "维护部门树",
+      "sublabel": "树路径级联与负责人同步",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 140,
+          "end_line": 184
+        }
+      ]
+    },
+    {
+      "id": "delete",
+      "lane": "out",
+      "col": 1,
+      "type": "security",
+      "label": "删除部门门禁",
+      "sublabel": "有子部门／员工则拒绝",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 188,
+          "end_line": 209
+        }
+      ]
+    },
+    {
+      "id": "create",
+      "lane": "org",
+      "col": 1,
+      "type": "database",
+      "label": "创建员工档案",
+      "sublabel": "关联部门岗位上级校验",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 260,
+          "end_line": 296
+        }
+      ]
+    },
+    {
+      "id": "edit",
+      "lane": "org",
+      "col": 2,
+      "type": "backend",
+      "label": "调部门岗位上级",
+      "sublabel": "记录变更前后快照",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 300,
+          "end_line": 357
+        }
+      ]
+    },
+    {
+      "id": "transition",
+      "lane": "org",
+      "col": 3,
+      "type": "security",
+      "label": "入转离状态迁移",
+      "sublabel": "按允许状态表＋行锁",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 362,
+          "end_line": 379
+        }
+      ]
+    },
+    {
+      "id": "disable",
+      "lane": "out",
+      "col": 3,
+      "type": "database",
+      "label": "不准入则禁用账号",
+      "sublabel": "账号改为DISABLED",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 767,
+          "end_line": 783
+        }
+      ]
+    },
+    {
+      "id": "event",
+      "lane": "out",
+      "col": 4,
+      "type": "messagebus",
+      "label": "人事记录与领域事件",
+      "sublabel": "入职／离职／状态变更",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 386,
+          "end_line": 396
+        }
+      ]
+    },
+    {
+      "id": "login",
+      "lane": "out",
+      "col": 5,
+      "type": "security",
+      "label": "下次登录准入检查",
+      "sublabel": "生命周期＋账号状态",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/security/EmployeeUserDetailsService.java",
+          "line": 57,
+          "end_line": 80
+        }
+      ]
+    },
+    {
+      "id": "account",
+      "lane": "admin",
+      "col": 4,
+      "type": "security",
+      "label": "独立维护登录账号",
+      "sublabel": "启用须满足员工准入",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgManagementService.java",
+          "line": 401,
+          "end_line": 439
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "manage",
+      "to": "dept",
+      "label": "部门",
+      "role": "main"
+    },
+    {
+      "from": "dept",
+      "to": "delete",
+      "label": "删除",
+      "role": "branch"
+    },
+    {
+      "from": "manage",
+      "to": "create",
+      "label": "员工",
+      "role": "main"
+    },
+    {
+      "from": "create",
+      "to": "edit",
+      "role": "main"
+    },
+    {
+      "from": "edit",
+      "to": "transition",
+      "role": "main"
+    },
+    {
+      "from": "transition",
+      "to": "disable",
+      "label": "不准入",
+      "role": "branch"
+    },
+    {
+      "from": "transition",
+      "to": "event",
+      "label": "迁移成功",
+      "role": "main"
+    },
+    {
+      "from": "disable",
+      "to": "event",
+      "role": "main"
+    },
+    {
+      "from": "event",
+      "to": "login",
+      "role": "main"
+    },
+    {
+      "from": "account",
+      "to": "login",
+      "role": "main"
+    }
+  ],
+  "mainPath": [
+    "manage",
+    "create",
+    "edit",
+    "transition",
+    "event",
+    "login"
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "状态事实",
+      "items": [
+        "待入职→试用/在职→待离职→离职；待离职可回试用/在职，离职不可迁出。",
+        "员工档案停用或不再满足准入时自动禁用账号；账号恢复须管理端显式启用。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "会话边界",
+      "items": [
+        "新登录会执行状态准入，已发Session是否即时失效沿用99-2。",
+        "注册服务直接插入员工，未走OrgManagementService创建领域事件；下游影响需专项验证。"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,283 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "消息发送、实时送达与附件访问",
+    "locale": "zh-CN",
+    "output": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "业务入口与结果"
+    },
+    {
+      "id": "core",
+      "label": "服务执行与落库"
+    },
+    {
+      "id": "recover",
+      "label": "分支、异常与恢复",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "compose",
+    "access",
+    "persist",
+    "enqueue",
+    "deliver",
+    "sync"
+  ],
+  "nodes": [
+    {
+      "id": "compose",
+      "lane": "entry",
+      "col": 0,
+      "type": "frontend",
+      "label": "员工发送",
+      "sublabel": "文本、附件、引用、提及",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 188,
+          "end_line": 210
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 304,
+          "end_line": 335
+        }
+      ]
+    },
+    {
+      "id": "access",
+      "lane": "core",
+      "col": 1,
+      "type": "security",
+      "label": "校验会话成员",
+      "sublabel": "内容与附件归属",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 197,
+          "end_line": 232
+        }
+      ]
+    },
+    {
+      "id": "persist",
+      "lane": "core",
+      "col": 2,
+      "type": "database",
+      "label": "幂等写入消息",
+      "sublabel": "会话行锁；seq递增",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 206,
+          "end_line": 267
+        }
+      ]
+    },
+    {
+      "id": "enqueue",
+      "lane": "core",
+      "col": 3,
+      "type": "messagebus",
+      "label": "同事务写Outbox",
+      "sublabel": "提交后触发派发",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketPushService.java",
+          "line": 37,
+          "end_line": 53
+        }
+      ]
+    },
+    {
+      "id": "deliver",
+      "lane": "core",
+      "col": 4,
+      "type": "messagebus",
+      "label": "派发在线连接",
+      "sublabel": "SENT不等于员工已读",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/websocket/ImWebSocketOutboxDispatcher.java",
+          "line": 97,
+          "end_line": 119
+        }
+      ]
+    },
+    {
+      "id": "sync",
+      "lane": "entry",
+      "col": 5,
+      "type": "frontend",
+      "label": "同步会话消息",
+      "sublabel": "重连补拉列表与历史",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/useImSocket.ts",
+          "line": 102,
+          "end_line": 169
+        }
+      ]
+    },
+    {
+      "id": "read",
+      "lane": "recover",
+      "col": 5,
+      "type": "database",
+      "label": "更新已读位点",
+      "sublabel": "不超过会话最大seq",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 582,
+          "end_line": 603
+        }
+      ]
+    },
+    {
+      "id": "recall",
+      "lane": "recover",
+      "col": 2,
+      "type": "backend",
+      "label": "撤回本人消息",
+      "sublabel": "状态与会话归属校验",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 319,
+          "end_line": 337
+        }
+      ]
+    },
+    {
+      "id": "ticket",
+      "lane": "recover",
+      "col": 3,
+      "type": "security",
+      "label": "附件下载票据",
+      "sublabel": "10分钟；执行时复查",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 464,
+          "end_line": 523
+        }
+      ]
+    },
+    {
+      "id": "download",
+      "lane": "recover",
+      "col": 4,
+      "type": "backend",
+      "label": "领取票据读对象",
+      "sublabel": "撤回或移出后拒绝",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 526,
+          "end_line": 573
+        }
+      ]
+    },
+    {
+      "id": "duplicate",
+      "lane": "recover",
+      "col": 1,
+      "type": "backend",
+      "label": "返回已有消息",
+      "sublabel": "同clientMessageId不重写",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 215,
+          "end_line": 226
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "compose",
+      "to": "access"
+    },
+    {
+      "from": "access",
+      "to": "persist",
+      "label": "通过"
+    },
+    {
+      "from": "persist",
+      "to": "enqueue"
+    },
+    {
+      "from": "enqueue",
+      "to": "deliver",
+      "label": "提交后",
+      "role": "async",
+      "variant": "dashed"
+    },
+    {
+      "from": "deliver",
+      "to": "sync"
+    },
+    {
+      "from": "sync",
+      "to": "read",
+      "label": "阅读"
+    },
+    {
+      "from": "persist",
+      "to": "duplicate",
+      "label": "已存在",
+      "role": "branch"
+    },
+    {
+      "from": "persist",
+      "to": "recall",
+      "label": "本人操作",
+      "role": "branch"
+    },
+    {
+      "from": "ticket",
+      "to": "download",
+      "label": "状态正常"
+    },
+    {
+      "from": "persist",
+      "to": "ticket",
+      "label": "专用API能力",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "范围与实现",
+      "items": [
+        "私聊/群聊消息：幂等发送、会话序号、事务Outbox、已读、撤回与下载票据。",
+        "新入口/hub/messages已接文本/附件发送/引用/撤回；附件打开误用通用文件票据，将被IM_MESSAGE归属校验403；图中IM专用票据是可修复使用的后端能力。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常与恢复",
+      "items": [
+        "在线连接不存在也可标SENT；重连通过HTTP补拉，Outbox不是离线收件箱。",
+        "重复clientMessageId返回已有消息；撤回后下载受消息状态限制。",
+        "新员工页误用通用文件票据，IM_MESSAGE引用被403；附件打开闭环尚未接通。"
+      ]
+    }
+  ]
+}

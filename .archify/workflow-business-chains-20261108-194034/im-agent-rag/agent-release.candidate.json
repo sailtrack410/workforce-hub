@@ -1,0 +1,247 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Agent草稿、DAG测试与ACL发布",
+    "locale": "zh-CN",
+    "output": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/sailtrack410/workforce-hub.git",
+      "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "业务入口与结果"
+    },
+    {
+      "id": "core",
+      "label": "服务执行与落库"
+    },
+    {
+      "id": "recover",
+      "label": "分支、异常与恢复",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "draft",
+    "bind",
+    "validate",
+    "test",
+    "gate",
+    "available"
+  ],
+  "nodes": [
+    {
+      "id": "draft",
+      "lane": "entry",
+      "col": 0,
+      "type": "backend",
+      "label": "创建草稿版本",
+      "sublabel": "配置、提示词、DAG",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 293,
+          "end_line": 329
+        }
+      ]
+    },
+    {
+      "id": "bind",
+      "lane": "core",
+      "col": 1,
+      "type": "security",
+      "label": "绑定工具与ACL",
+      "sublabel": "草稿绑定；可用范围",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 386,
+          "end_line": 426
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "core",
+      "col": 2,
+      "type": "backend",
+      "label": "校验DAG与知识库",
+      "sublabel": "起止、可达性、环路",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowValidator.java",
+          "line": 31,
+          "end_line": 90
+        }
+      ]
+    },
+    {
+      "id": "test",
+      "lane": "core",
+      "col": 3,
+      "type": "backend",
+      "label": "试运行记录签名",
+      "sublabel": "到达END后保存签名",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 1757,
+          "end_line": 1773
+        }
+      ]
+    },
+    {
+      "id": "gate",
+      "lane": "core",
+      "col": 4,
+      "type": "security",
+      "label": "发布门禁",
+      "sublabel": "DRAFT、ACL、测试签名",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 429,
+          "end_line": 455
+        }
+      ]
+    },
+    {
+      "id": "available",
+      "lane": "entry",
+      "col": 5,
+      "type": "backend",
+      "label": "员工可见可用",
+      "sublabel": "ACTIVE且use ACL通过",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 487,
+          "end_line": 503
+        }
+      ]
+    },
+    {
+      "id": "invalid",
+      "lane": "recover",
+      "col": 2,
+      "type": "security",
+      "label": "校验失败",
+      "sublabel": "修改配置再验证",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 211,
+          "end_line": 218
+        }
+      ]
+    },
+    {
+      "id": "autostamp",
+      "lane": "recover",
+      "col": 1,
+      "type": "backend",
+      "label": "自动写入测试签名",
+      "sublabel": "内嵌工具或旧配置转DAG",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 319,
+          "end_line": 357
+        }
+      ]
+    },
+    {
+      "id": "disabled",
+      "lane": "recover",
+      "col": 5,
+      "type": "backend",
+      "label": "停用或弃用",
+      "sublabel": "弃用不可重新启用",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 458,
+          "end_line": 484
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "draft",
+      "to": "bind"
+    },
+    {
+      "from": "bind",
+      "to": "validate"
+    },
+    {
+      "from": "validate",
+      "to": "test",
+      "label": "合法"
+    },
+    {
+      "from": "test",
+      "to": "gate",
+      "label": "成功"
+    },
+    {
+      "from": "gate",
+      "to": "available"
+    },
+    {
+      "from": "validate",
+      "to": "invalid",
+      "label": "不合法",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "invalid",
+      "to": "draft",
+      "label": "修改",
+      "role": "return"
+    },
+    {
+      "from": "draft",
+      "to": "autostamp",
+      "label": "特定配置",
+      "role": "branch"
+    },
+    {
+      "from": "autostamp",
+      "to": "gate",
+      "label": "已有签名"
+    },
+    {
+      "from": "available",
+      "to": "disabled",
+      "label": "管理操作",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "范围与实现",
+      "items": [
+        "Agent版本配置、工具绑定、DAG校验、测试签名、使用范围与发布启停。",
+        "admin-web管理Agent/版本/工作流；员工目录仅返回可用Agent；不能以管理端可配置推断员工已接所有能力。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "异常与恢复",
+      "items": [
+        "实际存在自动写测试签名路径；签名存在不一定证明模型/工具试运行成功。",
+        "发布会再次验证DAG和知识引用；权限use与visible不是同一概念。"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2074 @@
+{
+  "causes": {
+    "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context": 384,
+    "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801": 26,
+    "Caused by: java.io.FileNotFoundException: class path resource [application.yml] cannot be opened because it does not exist": 3
+  },
+  "tests": [
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveApiIntegrationTest.repeatedAdjustmentSourceTxnKeyShouldBeIdempotent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveApiIntegrationTest.adminShouldCreateLeaveTypeAdjustBalanceAndEmployeeShouldQueryOwnAccount",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveApiIntegrationTest.accountBalanceUpdateShouldRejectStaleVersion",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveApiIntegrationTest.adjustmentSourceTxnKeyShouldRejectDifferentOperationFingerprint",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveApiIntegrationTest.employeeLeaveTypesShouldHideDemoLeaveType",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAdminApiIntegrationTest.publishingUnknownFlowableDefinitionShouldFail",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAdminApiIntegrationTest.adminShouldCreateAndPublishWorkflowTemplateVersion",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAdminApiIntegrationTest.publishingNewVersionShouldRetirePreviousPublishedVersion",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAdminApiIntegrationTest.adminShouldQueryWorkflowRequestsDetailAndActions",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileStorageProviderIntegrationTest.employeeUploadTicketShouldUseConfiguredStorageProvider",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImOutboxIntegrationTest.websocketOutboxShouldRetryFailedDelivery",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImOutboxIntegrationTest.adminBatchRetryOutboxEventsShouldValidateEventIds",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImOutboxIntegrationTest.adminShouldGetImOutboxFailureSummary",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImOutboxIntegrationTest.adminShouldManageImOutboxEvents",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImOutboxIntegrationTest.adminShouldSummarizeImOutboxEvents",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.reverseDependencyLookupIndexShouldExist",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.insertShouldPersistAndReadDependenciesSortedByTarget",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.replaceShouldRollbackRecordDependenciesAndLedgersWhenDependencyInsertFails",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.insertShouldRollbackPluginWhenDependencyBatchFails",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.findDependentPluginIdsShouldSortAndIgnoreUninstalledOwners",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.findAllAndFindByStatusShouldHydrateEveryPluginDependencyList",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.replaceShouldSwapOutgoingDependenciesPreserveIncomingAndClearOldLedgers",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.repository.PluginRepositoryDependencyIntegrationTest.pluginRowShouldDefensivelyCopyDependenciesAndRejectNull",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeePurgeShouldReleaseUsageOnlyWhenStateChangedUnderConcurrency",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.adminQuotaPolicyShouldRejectDuplicatePolicyCode",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.avatarAttachmentShouldStayOutOfPersonalFileCenterAndAllowInlineDownload",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeUploadTicketShouldRejectUnsupportedBusinessOwnerType",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeLifecycleShouldRejectWorkflowAttachmentRef",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.restoreShouldRejectWhenGlobalQuotaIsInsufficient",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.uploadTicketShouldRejectWhenPersonalQuotaIsInsufficient",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeShouldUploadConfirmDeduplicateAndCreateDownloadTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.confirmUploadShouldRejectWhenOwnerDoesNotMatchTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.expiredDownloadTicketShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.purgeShouldNotReleaseUsageTwice",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.databaseShouldRejectDuplicateNullScopeQuotaPolicy",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.confirmUploadShouldBeIdempotentWhenTicketStatusIsStale",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.adminQuotaPolicyShouldRejectDuplicateScope",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeShouldListOwnPersonalFilesAndRecycleBin",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.adminQuotaPolicyShouldValidateThresholdAndUsedBytes",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.missingFileObjectShouldNotConsumeDownloadTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.concurrentDeduplicatedUploadShouldCreateOneAttachmentAndDispatchOnce",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.adminShouldCreateListAndUpdateQuotaPolicy",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.uploadTicketShouldBeIdempotentByClientRequestId",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.databaseShouldRejectDuplicateNullScopeUsage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeDownloadTicketShouldBeClaimedOnceUnderConcurrency",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.avatarAttachmentShouldAllowOtherEmployeeInlineDownloadTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.uploadTicketShouldRejectUnsupportedFileType",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.concurrentConfirmShouldCreateOneAttachmentAndDispatchOnce",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.uploadTicketShouldRejectWhenFileExceedsSceneLimit",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.confirmUploadRollbackShouldNotDispatchFileUploadedEvent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.uploadTicketShouldReturnExistingTicketWhenPolicyChangesAfterFirstRequest",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.integrationTestResetShouldClearAuditLog",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeShouldDownloadFileByActiveTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.userAndAdminShouldQueryQuotaAndStorageSummary",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeFileBrowserShouldPersistFoldersMoveCopyAndFilter",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileApiIntegrationTest.employeeShouldTrashRestoreAndPurgeAttachmentReference",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutRepositoryBoundaryTest.timeoutScanShouldHaveDedicatedRepositoryBoundary",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.employeeShouldNotCreateGroupWithoutOtherMembers",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.employeeShouldNotCreateGroupWithInvalidMember",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.ownerShouldAddMembersToCustomGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.groupMemberShouldReadGroupProfile",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.groupMemberShouldListMembersOfJoinedGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.employeeGroupCreationShouldDeduplicateMembersAndSelf",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.groupMemberShouldReadGroupConversationDetail",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.normalMemberShouldNotManageGroupMembers",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.nonMemberShouldNotListMembersOfGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.normalMemberShouldLeaveGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.employeeShouldCreateCustomGroupConversationAsOwner",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.groupMemberShouldListAndDownloadOnlyJoinedGroupFiles",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.normalMemberShouldNotUpdateGroupProfile",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.ownerShouldDismissCustomGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.ownerShouldUpdateGroupProfile",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.groupMemberShouldUploadGroupFileOutsidePersonalFileCenter",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.ownerShouldRemoveMemberFromCustomGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.ownerShouldNotRemoveSelfFromGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.groupMembersShouldStartPrivateConversationWithEachOther",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.normalMemberShouldNotDismissGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.ownerShouldNotLeaveGroupConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImGroupIntegrationTest.onlyGroupOwnerOrAdminShouldDeleteGroupFile",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.ragflow.RagflowVectorDisabledIntegrationTest.searchShouldFailWhenVectorDbDisabled",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.removingCapabilityAfterSuccessfulRequestShouldDenyNextRequest",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.visibleEmployeeWithSpoofedIdentityHeadersShouldStillBeDenied",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.disabledAdminUserShouldDenyExistingSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.removingActionMappingShouldDenyBeforeHandlerExecution",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.deletedAdminPluginCallPermissionShouldDenyExistingSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.removedSuperAdminPluginPermissionRelationShouldDenyExistingSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.sameKeyWithDifferentParamsShouldConflict",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.duplicateSameRequestShouldReplayWithoutExecutingAgain",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.idempotencyKeyShouldBeCaseSensitive",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.hostAuthoritativeDbMappingShouldAllowDescriptorCapabilityMismatch",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.adminDemoWithMappedCapabilityShouldExecuteAction",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayPermissionMatrixIntegrationTest.inactiveAdminPluginCallPermissionShouldDenyExistingSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginCallPermissionMigrationIntegrationTest.shouldPreserveOccupiedPermissionAndItsRelationWhenAllocatingPluginPermissionId",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginCallPermissionMigrationIntegrationTest.seedShouldAllocatePluginPermissionAndRelationWhenLegacyIdsAreOccupied",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginCallPermissionMigrationIntegrationTest.shouldPreserveOccupiedRelationIdAndAllocateNewPluginPermissionRelationId",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.promptWorkflowNodeShouldExecuteEmbeddedToolCalls",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.nullToolCallsShouldBeTreatedAsEmptyList",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldListGetDisableAndEnablePublishedAgent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.toolExecutionFailureShouldKeepFailedTaskAndLog",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.dataSourceWorkflowNodeShouldReturnDepartmentHeadcountFields",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.highRiskToolShouldWaitForHumanConfirmation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.dataSourceWorkflowNodeShouldKeepOnlyConfiguredArrayItemFields",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.knowledgeNodeShouldRequireActiveKnowledgeSpace",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminDeleteShouldDeprecateAgentAndHideFromEmployee",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldPublishAgentAndAuthorizedEmployeeShouldCreateSucceededTask",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.waitingTaskShouldNotSucceedWhenPendingToolBindingIsInactive",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldRejectDagPublishWithoutWorkflowTest",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.employeeShouldSearchUsableAgentsForImAdd",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.waitingTaskShouldOnlyBeCancelledByTriggerUser",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldRejectDagPublishAfterWorkflowChangedSinceTest",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.employeeDagDataSourceShouldRejectUnauthorizedTargetUser",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldGetAgentTaskToolCallsAndAudits",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.employeeShouldNotUseAgentWithoutAcl",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldGetAgentTaskMetricsAndFailureSummary",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.waitingTaskShouldContinueAfterHumanConfirmation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminTaskListShouldRejectUnsupportedStatus",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.workflowRunShouldKeepOnlyConfiguredArrayItemFields",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.unboundToolShouldBeRejectedWithoutCreatingTask",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldListAndGetAgentTasks",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldRejectPublishWithoutAcl",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.roleAclShouldAuthorizeEmployeeAndLeader",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.waitingTaskShouldRejectWithoutExecutingTool",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.employeeDagTaskShouldExecuteBoundToolAndExposeTrace",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.workflowRunShouldReturnConfiguredReplyJson",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldValidateWorkflowAndRejectInvalidWorkflowPublish",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.employeeToolCallShouldRejectUnauthorizedTargetUser",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.adminShouldUpdateDraftVersionWorkflowAndRejectPublishedVersionUpdate",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentApiIntegrationTest.groupAclShouldAuthorizeOnlyActiveGroupMembers",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.genericRequestShouldWaitForAgentPreReviewBeforeHumanApproval",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.agentApprovedCallbackShouldStartHumanApproval",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.leaveRequestShouldWaitForAgentPreReviewBeforeHumanApproval",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.concurrentAgentApprovedCallbacksShouldNotStartDuplicateFlowableInstances",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.leaveRequestShouldKeepHumanApprovalWhenAgentTriggerReturnsNull",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.agentTimeoutCallbackShouldRejectRequestWithoutHumanTask",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.agentCallbackShouldMatchPendingAgentTaskId",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.agentCallbackShouldRejectNullAgentTaskId",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowAgentPreReviewIntegrationTest.agentRejectedCallbackShouldRejectRequestWithoutHumanTask",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgApiIntegrationTest.pathIsolationAndValidationShouldWork",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgApiIntegrationTest.managerAndAdminShouldObserveNullAndNonEmptySemantics",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgApiIntegrationTest.healthEndpointsShouldBeUp",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgApiIntegrationTest.unauthenticatedAdminRequestShouldReturn401",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgApiIntegrationTest.adminShouldCreateAndDeleteEmptyDepartment",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgApiIntegrationTest.adminShouldLoginAndQueryDirectory",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgApiIntegrationTest.employeeShouldQueryProfileManagerAndEmptySubordinates",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.conversationListShouldHideInvalidPrivateAvatarAttachment",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotReadUnjoinedConversationDetail",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.imAttachmentShouldNotUseEmployeePersonalFileDownloadEndpoint",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeReadPositionShouldBeCappedByLastMessageSeq",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.conversationMemberShouldDownloadImAttachmentWithTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldSendTextMessageToJoinedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeMessagePageSizeShouldBeCappedByServerLimit",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldReadJoinedConversationDetail",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotEditAttachmentMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.recalledMessageShouldNotBeEditedOrRecalledAgain",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldEditOwnTextMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeePinnedConversationShouldSortBeforeRecentUnpinnedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.managerShouldStartPrivateConversationWithDirectSubordinate",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.startingExistingPrivateConversationShouldReuseConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.sendingMessageShouldPushWebSocketEventToConversationMembers",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.unavailableEmployeeShouldNotReceiveWebSocketPush",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotSendMessageToUnjoinedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.deprecatedAgentConversationShouldWriteDeprecatedSystemMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotUpdateReadPositionOfUnjoinedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldReuseExistingMessageWhenClientMessageIdRepeated",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.repeatedAgentResultCallbackShouldReuseExistingMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.offboardedEmployeeShouldNotSendMessageWithOldSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.updatingReadPositionShouldPushWebSocketEvent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldPageConversationsByLastMessageCursor",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeConversationPreferenceShouldRejectEmptyRequest",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldRecallOwnMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotReadMessagesOfUnjoinedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.conversationDetailShouldFallbackDisplayNameWhenMemberProfileDeleted",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeConversationPageParamsShouldBeValidated",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.recalledAttachmentMessageShouldNotCreateDownloadTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.agentTriggerFailureShouldWriteSystemMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotStartPrivateConversationWithoutDirectRelation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.imDagAgentShouldRouteByIntentPort",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.agentModelMissingConfigShouldFailTaskAndWriteSystemMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.imDagAgentShouldReadCurrentEmployeeInfo",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldTranslateConversationMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldStartPrivateConversationWithDirectManager",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldListMessagesByBeforeSeqAndSize",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeReadPositionShouldNotMoveBackward",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldSendOwnedPersonalFileAsMessageAttachment",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotSendOtherUserPersonalFileAsMessageAttachment",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldListOnlyJoinedActiveConversations",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.nonMemberShouldNotCreateImAttachmentDownloadTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldRunMessageActions",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldSendPendingImAttachmentAsMessageAttachment",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotEditOtherUserMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldUpdateConversationPreference",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.repeatedAgentFailureCallbackShouldReuseExistingSystemMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldNotUpdatePreferenceOfUnjoinedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.imDagAgentShouldWriteReplyJson",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.authorizedEmployeeShouldStartAgentConversationAndReceiveAgentReply",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.unauthorizedEmployeeShouldNotStartAgentConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldListMessagesOfJoinedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.im.ModuleImApiIntegrationTest.employeeShouldUpdateReadPositionOfJoinedConversation",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.EmployeePluginListIntegrationTest.zhangsanSeesMatchingPlugins",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.EmployeePluginListIntegrationTest.lisiSeesManagerScope",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.EmployeePluginListIntegrationTest.invalidOrgUserReturnsEmpty",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.EmployeePluginListIntegrationTest.adminOnEmployeePath403",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.EmployeePluginListIntegrationTest.anonymous401",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.EmployeePluginListIntegrationTest.managerScopeRequiresValidSubordinatesWhenNoDeptLeader",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldUnloadPluginWhenRestoreDependencyResolutionFailsBeforeLoadReturns",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldInstallMigrateAndPersistLifecycle",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldNotUnloadExistingUnresolvedDependentWhenFailedPluginCleanupRuns",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldRestoreActivePluginAcrossTwoIndependentJvmProcesses",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldRestoreActivePluginWithFreshManagerInSameJvm",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldSurviveOneHundredSerialEnableDisableCycles",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldUnloadPluginWhenMigrationFails",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldUnloadPluginWhenDependencyResolutionFailsBeforeLoadReturns",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldRejectPf4jDependencyMissingFromSignedManifestBeforeMigration",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.realPf4jPluginShouldReadBoundConfigAndUninstallShouldPreserveIt",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldPersistExposeAndRestoreTrustedDependencyGraph",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldFailClosedBeforePf4jLoadWhenRealUiManifestPersistenceDrifts(ManifestDrift)[1]",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldFailClosedBeforePf4jLoadWhenRealUiManifestPersistenceDrifts(ManifestDrift)[2]",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldFailClosedBeforePf4jLoadWhenRealUiManifestPersistenceDrifts(ManifestDrift)[3]",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldFailClosedBeforePf4jLoadWhenRealUiManifestPersistenceDrifts(ManifestDrift)[4]",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpLifecycleShouldDrainAndUnloadRealPlugin",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldReplaceUninstalledSameIdAndPreserveDurableState",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpShouldKeepPluginRecoverableWhenClassLoaderCloseFails",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpShouldUninstallInstalledPluginWithoutStartingIt",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.replaceUninstalledShouldRollbackRecordAndCleanupWhenRuntimeResetFails",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldRejectExistingPluginBeforeMigration",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldRejectPersistedDependencyDriftBeforeRestoreLoad",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpUploadShouldRejectInvalidSignatureWithoutResidue",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldRejectTamperedJarBeforePf4jLoad",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.shouldUnloadAndDeleteSnapshotWhenPersistenceFailsAfterMigration",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagerServiceIntegrationTest.adminHttpUploadShouldInstallSignedJarAndRejectSameIdReplacement",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.GlobalCsrfIntegrationTest.adminAndEmployeeLoginShouldRequireMatchingCookieAndHeader",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.GlobalCsrfIntegrationTest.anonymousUnsafeRequestWithValidCsrfShouldReachAuthenticationBoundary",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.GlobalCsrfIntegrationTest.authenticatedGetShouldNotRequireCsrfHeader",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.GlobalCsrfIntegrationTest.csrfBootstrapShouldReturnRealCookieAndHeaderContract",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.GlobalCsrfIntegrationTest.logoutShouldRejectMissingAndWrongTokenWithoutInvalidatingSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.GlobalCsrfIntegrationTest.publicVerificationAndPasswordResetPostsShouldRequireCsrf",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayCsrfIntegrationTest.anonymousRequestShouldRemainUnauthorized",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayCsrfIntegrationTest.maliciousAndMissingSourcesShouldBeRejectedWithSameSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginGatewayCsrfIntegrationTest.trustedOriginShouldReachPermissionCheckWithRealSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.directBeanUnsubscribeWithoutTotalCapabilityShouldBeDenied",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.concurrentSameKeyAndActionShouldBothSucceed",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.unsubscribeShouldPersistOneAuditWithoutReplayingSubscribeAudit",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.unsubscribeAuditFailureShouldRollBackDeleteAndIdempotencyClaim",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.auditFailureShouldRollBackSubscriptionAndIdempotencyClaim",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.subscribeShouldPersistSubscriptionAndIdempotencyInOneTransaction",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.subscriptionFailureShouldRollBackIdempotencyClaim",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.duplicateKeyWithDifferentActionShouldNotOverwriteOriginalSubscription",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.directBeanCallWithoutTotalCapabilityShouldBeDenied",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.DefaultEventServiceIntegrationTest.concurrentSameKeyAndDifferentActionShouldReturnOneConflict",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginEventEndToEndIntegrationTest.employeeHireShouldReachRealPf4jSubscriber",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginConfigIntegrationTest.superAdminShouldCrudWithoutCrossingPluginNamespaces",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginConfigIntegrationTest.concurrentUpdatesWithSameVersionShouldHaveSingleWinner",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginConfigIntegrationTest.authenticationPermissionAndCsrfBoundariesShouldBeEnforced",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginConfigIntegrationTest.validationAndStateFailuresShouldNotPartiallyModifyConfiguration",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginConfigIntegrationTest.secretShouldBeEncryptedMaskedPreservedAndSafelyRecreated",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginConfigIntegrationTest.staleVersionShouldNotMatchRecreatedConfiguration",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginConfigIntegrationTest.sizeKeyAndQuotaLimitsShouldFailBeforeWriting",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminAuditLogApiIntegrationTest.adminShouldListAuditLogs",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminAuditLogApiIntegrationTest.adminShouldSeePluginActionAuditNames",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.invalidThemeShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.employeeAvatarShouldRequireOwnAvatarAttachment",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.preferencesShouldHydrateAndPersist",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.preferencesInvalidEnumsShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.colleaguesShouldExcludeSelf",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.preferencesListWidthShouldBeClamped",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.colleaguesShouldExposePersonalizationFields",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.colleaguesShouldHideInvalidAvatarAttachment",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleEmployeeProfilePreferenceIntegrationTest.employeeShouldUpdateMobileAndAvatar",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminNotificationChannelIntegrationTest.adminWithoutPermissionShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminNotificationChannelIntegrationTest.adminShouldTestEmailChannelWithCurrentFormConfig",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminNotificationChannelIntegrationTest.testRecipientShouldBeCurrentAdminEmail",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminNotificationChannelIntegrationTest.adminShouldManageEmailChannelWithoutLeakingSecret",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.submittedLeaveRequestShouldFreezeBalanceBeforeApproval",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.approvedHourlyLeaveShouldOffsetLateAndEarlyWindows",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.approvedLeaveRequestShouldDeductBalance",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.workflowDeductSourceTxnKeyShouldRejectDifferentFingerprint",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.crossDayLeaveShouldOnlyCountWorkingMinutes",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.overlappingApprovedHourlyLeavesShouldNotDoubleOffsetAbsenceMinutes",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.rejectedLeaveRequestShouldNotDeductBalance",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.approvedHourlyLeaveShouldOnlyOffsetCoveredAbsenceMinutes",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.leaveRequestShouldRejectWhenBalanceInsufficient",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.approvedLeaveRequestShouldRecalculateAttendanceAsLeaveResult",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.leave.ModuleLeaveWorkflowIntegrationTest.withdrawnLeaveRequestShouldReleaseFrozenBalance",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.activeCreateShouldPublishCompleteHiredSnapshotAfterCommit",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.rolledBackActiveCreateMustNotPublishHiredEvent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.lifecycleShouldPublishHiredAndLeftOnceAtExactTransitions",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.probationCreateShouldPublishHiredAfterCommit",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.concurrentConflictingTargetsShouldAllowOnlyOneMigration",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.concurrentSameTargetShouldProduceOneMigrationAndOneHiredEvent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.rolledBackOffboardingMustNotPublishLeftEvent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.PluginEmployeeLifecycleIntegrationTest.pendingOnboardToActiveShouldPublishHiredOnce",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminAlertIntegrationTest.adminShouldManageAlertClosure",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminAlertIntegrationTest.adminShouldListActiveAlerts",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginManagePermissionMigrationIntegrationTest.shouldAllocatePermissionAndRelationWithoutOverwritingExistingRows",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.leaveRequestShouldRejectMismatchedDurationMinutes",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.leaveRequestShouldStartPublishedFlowableDefinitionId",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.leaveRequestShouldRejectInvalidAttachmentRefs",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.workflowAttachmentDownloadShouldRecheckLatestScanStatus",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.requestDetailAndActionsShouldBeQueryableByParticipant",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.nonParticipantOrForeignAttachmentShouldNotDownloadWorkflowAttachment",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.approvedClockCorrectionRequestShouldCreateManualPunchAndRecalculateDailyResult",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.nonAssigneeShouldNotApproveWorkflowTask",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.concurrentApproveAndRejectShouldCompleteOnceAndDispatchOnce",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.employeeShouldListOwnWorkflowRequestsOnly",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.leaveRequestShouldBindOwnedAttachmentRefs",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.employeeLeaveRequestShouldBeApprovedByManagerWithFlowable",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.workflowCurrentStepNameShouldComeFromDatabaseConfig",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.workflowAttachmentShouldNotUseEmployeePersonalFileDownloadEndpoint",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.managerShouldRejectWorkflowTask",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.participantShouldDownloadWorkflowAttachmentWithTicket",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.leaveRequestShouldRoundUpToHalfDay",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.workflow.ModuleWorkflowFlowableIntegrationTest.applicantShouldWithdrawWorkflowRequest",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.PluginMultipartLimitServletIntegrationTest.productionConfigurationShouldKeepPluginUploadLimits",
+      "kind": "error",
+      "cause": "Caused by: java.io.FileNotFoundException: class path resource [application.yml] cannot be opened because it does not exist"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.simultaneousDifferentRequestShouldExecuteOnlyWinner",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.corruptedCompletedResponseShouldFailClosed",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.cleanupShouldDrainMoreThanOneBatch",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.oversizedResponseShouldLeaveFailClosedClaim",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.auditFailureShouldRollBackCompletionAndPreventDuplicateExecution",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.nonRetryableFailureShouldBeReplayed",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.handlerExceptionShouldKeepClaimAndPreventDuplicateExecution",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.simultaneousSameRequestShouldExecuteOnlyOnce",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.claimShouldRetryWhenConflictingRowDisappearsBeforeRead",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.nullHandlerResultShouldAuditFailClosedAndRestoreThreadState",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.retryableResultShouldReleaseClaimForRetry",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.handlerFailureAuditFailureShouldKeepClaimAndPreventDuplicateExecution",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.cleanupShouldDeleteOnlyExpiredCompleted",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.concurrentReplayOfCompletedRequestShouldNotDeadlock",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.completionWriteFailureShouldLeaveFailClosedClaim",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.callerActionAndKeyCaseShouldHaveIndependentScopes",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.sameRequestShouldReplayAndIgnoreObjectKeyOrder",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.serializationFailureShouldLeaveFailClosedClaim",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.expiredCompletedResponseShouldAllowKeyReuse",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.retryableAuditFailureShouldKeepClaimAndPreventDuplicateExecution",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.nonFatalHandlerErrorShouldAuditFailClosedAndRestoreThreadState",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.activeClaimShouldReturnRetryableConflictWithoutSecondExecution",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.runtime.PluginActionIdempotencyServiceIntegrationTest.sameScopeAndKeyWithDifferentParamsShouldConflict",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileCleanupIntegrationTest.cleanupDryRunShouldOnlyReportCandidates",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileCleanupIntegrationTest.cleanupPendingPhysicalDeleteShouldBeRecoveredByRetryJob",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileCleanupIntegrationTest.cleanupPhysicalDeleteFailureShouldBeRecordedWithoutRollingBackRun",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileCleanupIntegrationTest.cleanupDatabaseStageFailureShouldRecordFailedRun",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileCleanupIntegrationTest.cleanupFailedPhysicalDeleteShouldBeRetried",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileCleanupIntegrationTest.cleanupExecuteShouldExpireTicketsPurgeRefsDeleteObjectsAndAudit",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.legacyFailedResultShouldRemainDisplayedAsFailure",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.unexpectedLifecycleFailureShouldReturn500AndPersistFailAuditWithoutExceptionText",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.blockedLifecycleOperationShouldPersistBlockedAuditWithoutInternalFields",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.plugin.AdminPluginLifecycleAuditIntegrationTest.successfulLifecycleOperationsShouldPersistSanitizedAuditsAndDisplayNames",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminDictIntegrationTest.adminShouldManageDictItems",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.AdminDictIntegrationTest.adminShouldListSeedDictData",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgWriteApiIntegrationTest.successfulUpdatesShouldPublishDomainEvents",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgWriteApiIntegrationTest.employmentLifecycleShouldDriveAccountStatus",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgWriteApiIntegrationTest.hierarchyCyclesShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.org.ModuleOrgWriteApiIntegrationTest.adminShouldCreateDepartmentPositionAndEmployee",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.common.ApplicationConfigContractTest.applicationConfigShouldImportRepoRootDotEnv",
+      "kind": "error",
+      "cause": "Caused by: java.io.FileNotFoundException: class path resource [application.yml] cannot be opened because it does not exist"
+    },
+    {
+      "test": "com.workforcehub.common.ApplicationConfigContractTest.flowableShouldDisableUnusedEngines",
+      "kind": "error",
+      "cause": "Caused by: java.io.FileNotFoundException: class path resource [application.yml] cannot be opened because it does not exist"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginRequiresEmailCodeWhenAccountHasEmail",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginWithoutBoundEmailShouldRequireEmailBinding",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginWithInvalidEmailCodeShouldFail",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.loginWithEmailCodeShouldIssueSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthEmailVerifyIntegrationTest.sendLoginCodeShouldAcceptLoginNameAndEmail",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.failedLoginShouldBeLockedAfterTooManyAttempts",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.unauthenticatedRequestsShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.employeeShouldLoginQueryMeAndLogout",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.employmentStatusShouldBlockLoginWithExplicitMessage",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.employeeShouldBindEmailSuccessfully",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.resetPasswordShouldTakeEffectImmediately",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.sendCodeShouldWorkAndBeThrottled",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.adminShouldLoginAndQueryCurrentUser",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleAuthApiIntegrationTest.superAdminMeShouldExposeAllActivePermissionsWithoutRolePermissionBinding",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminShouldUploadConfirmAndDeduplicateFile",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminFileListShouldHideStorageInternals",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminDownloadTicketShouldBeClaimedOnceUnderConcurrency",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminExpiredDownloadTicketShouldBeMarkedExpired",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminConfirmUploadShouldScheduleTemporaryObjectCleanupWhenGlobalDeduplicated",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminShouldBrowseEnterpriseFileCatalog",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminDownloadShouldFallbackWhenMimeTypeInvalid",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminDeduplicatedUploadShouldBeIdempotentByClientRequestId",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminPurgeShouldReleaseUsageOnlyWhenStateChanged",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminUploadTicketShouldNotDeduplicateEmployeeFileByHashOnly",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.file.ModuleFileAdminApiIntegrationTest.adminShouldManageAdminFileLifecycle",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleRbacApiIntegrationTest.adminWithoutPermissionShouldBeRejected",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleRbacApiIntegrationTest.adminShouldManageRolesAndPermissions",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleRbacApiIntegrationTest.shouldKeepAtLeastOneActiveSuperAdminUser",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.auth.ModuleRbacApiIntegrationTest.builtInSuperAdminRoleShouldBeProtected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.scheduledTimeoutScanShouldSkipWhenDisabledInTestProfile",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.adminShouldTriggerTimeoutScanManually",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.timeoutScanServiceShouldExposeScheduledEntry",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.adminTimeoutScanRunListShouldRejectUnsupportedStatus",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.adminTimeoutScanShouldUseDefaultBatchSizeWhenBatchSizeIsNull",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.adminShouldListTimeoutScanRuns",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.workflowPreReviewWaitingTaskShouldNotifyWorkflowWhenTimeoutCancelled",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.waitingHumanConfirmTaskShouldRemainWhenDeadlineNotExpired",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.timeoutScanShouldSkipWhenAnotherInstanceHoldsLock",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.waitingHumanConfirmTaskShouldBeCancelledWhenDeadlineExpired",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.agent.ModuleAgentTaskTimeoutIntegrationTest.timeoutScanShouldCreateJobRunRecordAndReturnSummary",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.employeePunchShouldCreateNormalDailyResultAndManagerShouldQueryTeamResult",
+      "kind": "error",
+      "cause": "Caused by: java.lang.IllegalStateException: \u7f3a\u5c11\u6570\u636e\u5e93\u53e3\u4ee4\uff1a\u8bf7\u5728\u4ed3\u5e93\u6839\u76ee\u5f55 .env \u914d\u7f6e DB_PASSWORD\uff08\u6216 TEST_DB_PASSWORD\uff09\uff0c\u4e0d\u8981\u628a\u771f\u5b9e\u51ed\u8bc1\u5199\u5165\u4ee3\u7801"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.concurrentOverlappingGroupMembershipShouldAllowOnlyOneActiveRecord",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.scheduleShouldOverrideDefaultGroupShiftWhenCalculatingDailyResult",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.employeePunchShouldAllowMissingClientPunchAt",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.lateAndEarlyPunchShouldCreateAbnormalDailyResultAndExceptions",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.offboardedEmployeeShouldNotPunchWithExistingSession",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.reappearingExceptionShouldCreateNewIdentityAndEvent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.adminShouldListAttendanceGovernanceData",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.employeePunchShouldRejectControlledManualSourceType",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.concurrentRecalculationShouldCreateAndPublishOneExceptionPerType",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.duplicateSameDayPunchTypeShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.updatingScheduleShouldRecalculateExistingDailyResult",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.overlappingGroupMembershipShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.employeePunchShouldUseServerReceivedTimeInsteadOfClientPunchAt",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.inactiveScheduleShouldStillRejectCreateForSameUserDate",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.concurrentNoRuleDailyResultRecalculationShouldCreateOnlyOneRow",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.duplicateActiveScheduleShouldBeRejected",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.missingOffDutyPunchShouldCreateMissPunchException",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    },
+    {
+      "test": "com.workforcehub.attendance.ModuleAttendanceApiIntegrationTest.recalculationShouldPreserveExceptionIdentityAndPublishNoDuplicateEvent",
+      "kind": "error",
+      "cause": "ApplicationContext failure threshold (1) exceeded: skipping repeated attempt to load context"
+    }
+  ]
+}

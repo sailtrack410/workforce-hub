@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.workforcehub.org.mapper.OrgPositionMapper">
+
+    <resultMap id="BaseResultMap" type="com.workforcehub.org.domain.OrgPosition">
+        <id column="id" property="id"/>
+        <result column="position_code" property="positionCode"/>
+        <result column="position_name" property="positionName"/>
+        <result column="position_category" property="positionCategory"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="is_deleted" property="isDeleted"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM org_position
+        WHERE id = #{id}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO org_position
+            (id, position_code, position_name, position_category, status, created_by, updated_by)
+        VALUES
+            (#{id}, #{positionCode}, #{positionName}, #{positionCategory}, #{status}, #{createdBy}, #{updatedBy})
+    </insert>
+
+    <update id="updateById">
+        UPDATE org_position
+        SET position_code = #{positionCode},
+            position_name = #{positionName},
+            position_category = #{positionCategory},
+            status = #{status},
+            updated_by = #{updatedBy},
+            updated_at = NOW(),
+            is_deleted = #{isDeleted}
+        WHERE id = #{id}
+          AND is_deleted = 0
+    </update>
+
+    <select id="countByPositionCode" resultType="long">
+        SELECT COUNT(*) FROM org_position
+        WHERE position_code = #{positionCode}
+          AND (#{exceptId} IS NULL OR id &lt;&gt; #{exceptId})
+          AND is_deleted = 0
+    </select>
+
+    <select id="listActiveOrderByName" resultMap="BaseResultMap">
+        SELECT * FROM org_position
+        WHERE is_deleted = 0
+        ORDER BY position_name ASC
+    </select>
+
+</mapper>

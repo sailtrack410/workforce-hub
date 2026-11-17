@@ -24,6 +24,7 @@ import ImKnowledgeCard from '@/components/im/ImKnowledgeCard.vue';
 import ImProcessCard from '@/components/im/ImProcessCard.vue';
 import { useSessionStore } from '@/stores/session';
 import { useImStore, kindOf, lastMessageText } from '@/stores/im';
+import { getMessageScroll, saveMessageScroll } from '@/stores/messageScroll';
 import { useImSocket } from '@/composables/useImSocket';
 import { uploadImAttachment } from '@/composables/useUpload';
 import { agentApi, contactsApi, fileApi, imApi } from '@/api';
@@ -226,22 +227,19 @@ function saveScrollPosition() {
   const streamTop = el.getBoundingClientRect().top;
   const anchor = [...el.querySelectorAll<HTMLElement>('[data-message-id]')]
     .find((item) => item.getBoundingClientRect().bottom > streamTop);
-  im.scrollPositions[activeId.value] = {
+  saveMessageScroll(activeId.value, {
     top: el.scrollTop,
     messageId: anchor?.dataset.messageId ?? '',
     offset: anchor ? anchor.getBoundingClientRect().top - streamTop : 0,
-  };
+    atBottom: el.scrollHeight - el.scrollTop - el.clientHeight <= 2,
+  });
 }
-function restoreScrollPosition(id: string, el: HTMLElement | null) {
-  if (!el || el.dataset.scrollRestored === 'true') return;
-  el.dataset.scrollRestored = 'true';
-  void nextTick(() => requestAnimationFrame(() => {
-    const saved = im.scrollPositions[id];
-    if (!saved) {
-      el.scrollTop = el.scrollHeight;
-      updateLatestVisibility();
-      return;
-    }
+function applyScrollPosition(el: HTMLElement, id: string) {
+  const saved = getMessageScroll(id);
+  if (!saved || saved.atBottom) {
+    // 明确离开前位于底部时始终跟随最新内容，不用旧像素位置恢复。
+    el.scrollTop = el.scrollHeight;
+  } else {
     el.scrollTop = saved.top;
     // 图片等异步内容改变高度后，用原消息锚点修正，保持视口内容不变。
     const anchor = [...el.querySelectorAll<HTMLElement>('[data-message-id]')]
@@ -250,8 +248,14 @@ function restoreScrollPosition(id: string, el: HTMLElement | null) {
       const offset = anchor.getBoundingClientRect().top - el.getBoundingClientRect().top;
       el.scrollTop += offset - saved.offset;
     }
-    updateLatestVisibility();
-  }));
+  }
+  updateLatestVisibility();
+}
+function restoreScrollPosition(id: string, el: HTMLElement | null) {
+  // 不使用 requestAnimationFrame：窗口被遮挡时帧回调可能暂停，恢复会静默丢失。
+  if (!el || el.dataset.scrollRestored === 'true') return;
+  el.dataset.scrollRestored = 'true';
+  void nextTick(() => applyScrollPosition(el, id));
 }
 
 /* ---------- 头像 ---------- */
@@ -978,6 +982,7 @@ onMounted(async () => {
       await router.replace({ name: 'messages-detail', params: { conversationId: restoredId } });
     } else {
       await syncConversation(restoredId);
+      restoreScrollPosition(restoredId, messageStream.value);
     }
   }
 });
@@ -993,7 +998,10 @@ watch(activeId, async (id) => {
   recordKeyword.value = '';
   recordSearchOpen.value = false;
   detailOpen.value = false;
-  if (id) await syncConversation(id);
+  if (id) {
+    await syncConversation(id);
+    restoreScrollPosition(id, messageStream.value);
+  }
 });
 
 onBeforeUnmount(() => {
@@ -1080,7 +1088,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="im-stream-wrap">
-      <div :key="activeId" :ref="(el) => { messageStream = el as HTMLElement | null; restoreScrollPosition(activeId, el as HTMLElement | null); }" class="im-stream" @scroll.passive="updateLatestVisibility">
+      <div :key="activeId" ref="messageStream" class="im-stream" @scroll.passive="updateLatestVisibility">
         <TransitionGroup name="im-message">
         <template v-if="streamItems.length">
           <template v-for="item in streamItems" :key="item.key">

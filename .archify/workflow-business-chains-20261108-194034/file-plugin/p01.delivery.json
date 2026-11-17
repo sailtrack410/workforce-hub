@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "91088f41-dc3e-4cfa-9339-ecf951b646fd",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P01.json",
+  "output": "/Users/sailtrack/工程文件/java_web/workforce-hub/.archify/workflow-business-chains-20261108-194034/file-plugin/P01.html",
+  "specification": {
+    "sha256": "8732b5380e583d7e8014d9c95d042587b6e13748eab126b543e50f42283af2c0",
+    "bytes": 6346
+  },
+  "artifact": {
+    "sha256": "45c8008b475dd4a53f494642ba4e9a2f22699a6e50141495c416bfd538025112",
+    "bytes": 824263
+  }
+}

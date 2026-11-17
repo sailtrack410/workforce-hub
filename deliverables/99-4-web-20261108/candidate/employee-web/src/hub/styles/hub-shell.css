@@ -1,0 +1,309 @@
+/* Hub 新壳样式：对齐画布「员工端-新工作台」3:1285（1440×900 版） */
+.hub-shell {
+  --hub-canvas: #edf1f7;
+  --hub-card: #ffffff;
+  --hub-inner: #f6f8fb;
+  --hub-chip: #f2f5f9;
+  --hub-track: #eaeff5;
+  --hub-pill-dark: #181d23;
+  --hub-ink: #181d23;
+  --hub-secondary: #424b56;
+  --hub-tertiary: #717d8c;
+  --hub-muted: #9ba6b4;
+  --hub-faint: #b8c5d3;
+  --hub-primary: #1677ff;
+  --hub-primary-deep: #124da3;
+  --hub-sky: #d9ebff;
+  --hub-green: #1fad66;
+  --hub-red: #ff5a4e;
+  --hub-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --hub-morph: cubic-bezier(0.65, 0, 0.35, 1);
+  --hub-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100vh;
+  padding: 16px 20px 20px;
+  box-sizing: border-box;
+  background: var(--hub-canvas);
+  color: var(--hub-ink);
+  font-family: "Noto Sans SC", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+[data-theme="dark"] .hub-shell {
+  --hub-canvas: #0e1319;
+  --hub-card: #1a222c;
+  --hub-inner: #232c39;
+  --hub-chip: #26303d;
+  --hub-track: #2a3542;
+  --hub-pill-dark: #38455a;
+  --hub-ink: #e9edf2;
+  --hub-secondary: #aeb8c4;
+  --hub-tertiary: #8b96a3;
+  --hub-muted: #6e7a87;
+  --hub-faint: #59636f;
+}
+
+/* ---------- 顶部导航：高64 圆角20,品牌左/导航中/操作右 ---------- */
+.hub-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 64px;
+  flex: none;
+  border-radius: 20px;
+  background: var(--hub-card);
+  padding: 0 16px 0 24px;
+  box-sizing: border-box;
+  animation: hub-rise 0.5s var(--hub-ease) both;
+}
+
+.hub-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  justify-self: start;
+}
+
+.hub-brand-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--hub-primary) 0%, var(--hub-primary-deep) 100%);
+  color: #fff;
+  font: 700 14px/1 Inter, sans-serif;
+}
+
+.hub-brand-name {
+  font: 700 17px/1 Inter, sans-serif;
+  color: var(--hub-ink);
+}
+
+.hub-nav {
+  display: flex;
+  gap: 6px;
+  justify-self: center;
+}
+
+.hub-nav-item {
+  height: 40px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: 500 14px/40px "Noto Sans SC", sans-serif;
+  color: var(--hub-secondary);
+  cursor: pointer;
+  transition: background 0.25s var(--hub-ease), color 0.25s var(--hub-ease);
+}
+.hub-nav-item:hover:not(.active) {
+  background: var(--hub-chip);
+}
+.hub-nav-item.active {
+  background: var(--hub-pill-dark);
+  color: #fff;
+}
+
+.hub-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: end;
+}
+
+.hub-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 224px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--hub-chip);
+  box-sizing: border-box;
+}
+.hub-search-icon {
+  color: var(--hub-muted);
+  flex: none;
+}
+.hub-search input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: 400 13px/18px "Noto Sans SC", sans-serif;
+  color: var(--hub-ink);
+}
+.hub-search input::placeholder {
+  color: var(--hub-muted);
+}
+.hub-search input:disabled {
+  cursor: default;
+}
+
+.hub-icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hub-chip);
+  color: var(--hub-secondary);
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease);
+}
+.hub-icon-btn:hover {
+  background: var(--hub-track);
+}
+.hub-badge-dot {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hub-red);
+  border: 1.5px solid var(--hub-card);
+}
+
+.hub-avatar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 4px 0 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.hub-avatar > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--hub-primary) 0%, var(--hub-primary-deep) 100%);
+  color: #fff;
+  font: 600 14px/1 "Noto Sans SC", sans-serif;
+}
+.hub-avatar-caret {
+  color: var(--hub-muted);
+}
+
+/* ---------- 主体：图标栏 64 + 内容 ---------- */
+.hub-body {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.hub-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 64px;
+  flex: none;
+  padding: 16px 10px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--hub-primary) 0%, var(--hub-primary-deep) 100%);
+  animation: hub-rise 0.5s var(--hub-ease) 0.05s both;
+}
+
+.hub-rail-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: background 0.2s var(--hub-ease), color 0.2s var(--hub-ease), transform 0.15s var(--hub-ease);
+}
+.hub-rail-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.hub-rail-btn:active {
+  transform: scale(0.94);
+}
+.hub-rail-btn.active {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.hub-rail-btn.dim {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.hub-rail-sep {
+  width: 32px;
+  height: 1px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hub-rail-spacer {
+  flex: 1;
+}
+
+/* ---------- 页面内容：随图标栏填充 ---------- */
+.hub-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+@keyframes hub-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .hub-shell {
+    padding: 12px;
+    gap: 12px;
+  }
+  .hub-search {
+    display: none;
+  }
+  .hub-nav-item {
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 960px) {
+  .hub-body {
+    flex-direction: column-reverse;
+  }
+  .hub-rail {
+    flex-direction: row;
+    width: 100%;
+    height: 56px;
+    padding: 6px 10px;
+  }
+  .hub-rail-sep {
+    width: 1px;
+    height: 32px;
+    margin: 0 4px;
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "source": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/probe-runners/MODIFIED",
+  "events": [
+    {
+      "label": "probe",
+      "command": [
+        "mvn",
+        "-B",
+        "-Dstyle.color=never",
+        "-Dtest=KnowledgeAclEvidenceProbe",
+        "clean",
+        "test"
+      ],
+      "cwd": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/probe-runners/MODIFIED/server",
+      "exit": 0,
+      "stdout": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/MODIFIED-probe.stdout",
+      "stderr": "/Users/sailtrack/工程文件/java_web/workforce-hub/deliverables/100-16-20261108/MODIFIED-probe.stderr"
+    }
+  ],
+  "production_hashes": {
+    "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java": "2801128b191e730fdad7369870a31475f8b39275ddbab12092d01cf6bb7850ab",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java": "a739ac1713c5de136ba7a45d809235b6b9f86760cf578e6e10d69df40504e024",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java": "6766cebd46d32ae8df90aa7743c15c00068abab1250f3874ca314f93d8fd757b",
+    "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java": "26778adfaa77caffc36d66b4789e72569ceeb788c4e692f32dfa86e6a653546f",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowContext.java": "644e7e4527450c3a3553da19b1a7fb40a6741590dc47d61b3275e1b8327527a3",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java": "d1ffde1babf34a9144eeffa096e28b057fe887932ae978bad1dc1792ac533c28"
+  }
+}

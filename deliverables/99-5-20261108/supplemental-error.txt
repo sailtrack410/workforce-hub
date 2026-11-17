@@ -1,0 +1,1 @@
+Previous sync preparation: exit 1; FileNotFoundError from accidentally duplicated deliverables directory in cwd-relative path. Corrected with explicit workspace absolute path; corrected command exit 0. Evaluator command itself launched independently.

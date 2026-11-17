@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/ROLLBACK.sh",
+    "--followup",
+    "/tmp/workforce-993-mysql-vrpbk4lz/snapshot"
+  ],
+  "cwd": "None",
+  "exit": 0,
+  "stdout": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/rollback-script.stdout",
+  "stderr": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/rollback-script.stderr"
+}

@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "subtask": {
+      "agent_task_status": 1,
+      "completed_at": "0",
+      "created_at": "1794139477111",
+      "creator": {
+        "id": "ou_358d547a8defe93637e1aa4046adde44",
+        "type": "user"
+      },
+      "dependencies": [],
+      "description": "编号：100-05 / AUTH-05；优先级：P2；类型：新问题\n\n验证状态：静态确认，未执行真实业务调用。尚未修复，待复现/整改/验收。\n\n触发条件：调用公开短信注册发码接口，或用户在当前注册页点击发送短信\n\n影响：后端只演示日志发送且明文记录手机号与验证码；当前employee页面仅本地“已发送”，未调用后端。真实注册交付缺口明确。\n\n证据与边界：公开服务生成/持久化码后sendSms仅log.info；当前employee sendSmsCode仅设置sent与倒计时，独立hub仅toast。服务内未见频控。\n\n修复方向：前端接实际发码/注册接口；生产接短信网关并移除验证码日志，添加现有Redis能力实现的发送频控。\n\n验收条件：供应商接收成功才显示已发送；失败可重试；日志不含验证码；单位时间重复请求被限制；注册成功后明确转登录。\n\n代码/文档位置：\nserver/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java:39\nserver/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java:89\nemployee-web/src/hub/views/AuthView.vue:410\nhub-web/src/views/AuthView.vue:111",
+      "extra": "",
+      "guid": "866b278a-a08f-4de1-8f2d-3fce030f69cf",
+      "is_milestone": false,
+      "mode": 2,
+      "origin": {
+        "href": {
+          "title": "sailtrack 飞书 CLI",
+          "url": ""
+        },
+        "platform_i18n_name": {
+          "de_de": "sailtrack 飞书 CLI",
+          "en_us": "sailtrack 飞书 CLI",
+          "es_es": "sailtrack 飞书 CLI",
+          "fr_fr": "sailtrack 飞书 CLI",
+          "it_it": "sailtrack 飞书 CLI",
+          "ja_jp": "sailtrack 飞书 CLI",
+          "ko_kr": "sailtrack 飞书 CLI",
+          "ru_ru": "sailtrack 飞书 CLI",
+          "th_th": "sailtrack 飞书 CLI",
+          "zh_cn": "sailtrack 飞书 CLI",
+          "zh_hk": "sailtrack 飞书 CLI",
+          "zh_tw": "sailtrack 飞书 CLI"
+        }
+      },
+      "parent_task_guid": "927c6dcf-d86e-4b6f-a215-ba6ebda14b16",
+      "repeat_rule": "",
+      "source": 7,
+      "status": "todo",
+      "subtask_count": 0,
+      "summary": "[P2][100-05][新问题] 注册短信及前端提交仍为演示或占位",
+      "task_id": "t100048",
+      "tasklists": [
+        {
+          "section_guid": "241ab2bf-bb7e-cfae-fce4-2a3308706ca3",
+          "tasklist_guid": "42105db4-d930-4d71-8dab-c86576536eb0"
+        }
+      ],
+      "updated_at": "1794139477137",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=866b278a-a08f-4de1-8f2d-3fce030f69cf\u0026suite_entity_num=t100048"
+    }
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.99",
+      "message": "lark-cli 1.0.99 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

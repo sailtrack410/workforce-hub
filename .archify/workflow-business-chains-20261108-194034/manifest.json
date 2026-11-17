@@ -1,0 +1,1890 @@
+{
+  "revision": "38d829167042dc26efd7af502ce623c976d6e224",
+  "chains": [
+    {
+      "id": "auth-login",
+      "title": "登录、失败锁定与会话退出",
+      "scope": "管理员/员工密码认证、邮箱门禁、Redis锁定、Session轮换、退出",
+      "frontend_status": "admin-web 实接；employee-web 当前新登录页缺绑定分支；独立hub-web未处理二验",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-login.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-login.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-login.finalize-summary.json",
+      "summary": "管理员不走员工邮箱二验；员工已绑邮箱用LOGIN码，未绑邮箱用BIND码。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "AUTH-01",
+        "AUTH-07",
+        "99-2"
+      ],
+      "url": "auth-org/auth-login.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "auth-email",
+      "title": "邮箱绑定与找回密码",
+      "scope": "验证码发信、用途隔离、绑定唯一性、密码重置与当前入口错误",
+      "frontend_status": "后端能力齐；employee-web当前找回页错误发送LOGIN码；旧composable发送RESET_PASSWORD码",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-email.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-email.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-email.finalize-summary.json",
+      "summary": "AUTH-02：当前employee找回页发LOGIN码，重置接口验证RESET_PASSWORD，正常操作无法闭环。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "AUTH-02",
+        "AUTH-03",
+        "AUTH-06"
+      ],
+      "url": "auth-org/auth-email.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "auth-register",
+      "title": "邀请注册与短信演示边界",
+      "scope": "公开发码、邀请码部门、注册事务、核销、回到登录",
+      "frontend_status": "employee-web和独立hub-web注册均为占位；公开后端可直接调用；无管理端邀请码生成入口",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-register.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-register.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-register.finalize-summary.json",
+      "summary": "短信为SMS-DEMO，前端注册没有真正提交；注册成功返回userId和loginName，不自动登录。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "AUTH-04",
+        "AUTH-05"
+      ],
+      "url": "auth-org/auth-register.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "org-lifecycle",
+      "title": "组织维护、员工入转离与账号停用",
+      "scope": "部门树路径、岗位、员工档案、状态机、账号禁用及领域事件",
+      "frontend_status": "admin-web 部门/岗位/员工实接；employee-web查询组织；独立hub-web查询组织档案",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/org-lifecycle.finalize-summary.json",
+      "summary": "待入职→试用/在职→待离职→离职；待离职可回试用/在职，离职不可迁出。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "99-2"
+      ],
+      "url": "auth-org/org-lifecycle.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "auth-rbac",
+      "title": "管理员角色配置与接口鉴权",
+      "scope": "角色CRUD、权限分配、管理员角色、超级管理员保留、Session权限",
+      "frontend_status": "admin-web角色与权限页实接；员工端不具备后台RBAC管理入口",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/auth-rbac.finalize-summary.json",
+      "summary": "权限和角色通过替换关联表更新；禁止修改内置超级角色，禁止移除最后活跃超级管理员。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "99-1",
+        "99-2"
+      ],
+      "url": "auth-org/auth-rbac.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "contacts-friends",
+      "title": "通讯录好友申请、接受、备注与移除",
+      "scope": "员工好友列表、双向申请自动接受、双向ACTIVE、单方备注、双向删除",
+      "frontend_status": "employee-web通讯录实接；独立hub-web API仅见备注更新，联系人主要源于组织",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/contacts-friends.finalize-summary.json",
+      "summary": "接受好友申请后形成双向ACTIVE；备注只更新本人方向；移除同时删除两个方向。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [],
+      "url": "auth-org/contacts-friends.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "system-dict-brand",
+      "title": "数据字典维护与品牌配置发布",
+      "scope": "字典CRUD、标签缓存、审计、公开品牌读取、当前登录页接线",
+      "frontend_status": "admin-web字典和企业品牌维护实接；当前employee与独立hub登录页使用固定内容",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/system-dict-brand.finalize-summary.json",
+      "summary": "品牌配置已落sys_dict并有公开读取服务；当前新员工登录页与独立hub页展示固定品牌内容。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "AUTH-08"
+      ],
+      "url": "auth-org/system-dict-brand.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "system-operations",
+      "title": "站内通知、邮件测试、告警处理与审计",
+      "scope": "三条独立运维能力：通知读取、SMTP测试、告警聚合处置；共享审计查询",
+      "frontend_status": "admin-web设置/审计实接；告警仅后端入口；独立hub工作台与顶栏已消费通知API",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/system-operations.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/system-operations.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/system-operations.finalize-summary.json",
+      "summary": "站内通知、邮件测试、告警聚合为独立流程，图中未连接为自动投递链。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "AUTH-06",
+        "99-1"
+      ],
+      "url": "auth-org/system-operations.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "employee-personal",
+      "title": "个人档案、头像、偏好、密码与退出",
+      "scope": "姓名组织只读、手机修改、头像上传、偏好同步、验证码改密、确认退出",
+      "frontend_status": "employee-web /settings实接；独立hub未发现同等个人设置页面，不混同旧壳与独立工程",
+      "html": ".archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/auth-org/employee-personal.finalize-summary.json",
+      "summary": "个人自管字段仅手机号与头像；设置、偏好、密码、退出分别执行业务操作。",
+      "verification": {
+        "status": "pass",
+        "gates": {
+          "validate": "pass",
+          "deliver": "pass",
+          "check": "pass",
+          "browser-check": "pass"
+        },
+        "visual_review": "未做人工视觉审阅"
+      },
+      "group": "auth-org",
+      "groupLabel": "认证、组织与系统",
+      "findingIds": [
+        "AUTH-09"
+      ],
+      "url": "auth-org/employee-personal.html",
+      "reportUrl": "auth-org/report.md"
+    },
+    {
+      "id": "wf-template",
+      "title": "审批模板版本创建与发布",
+      "scope": "流程类型→模板→草稿JSON→绑定Flowable精确版本→旧版归档→新申请选版",
+      "frontend_status": "admin-web /workflow 路由可达；版本发布调用真实接口",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-template.finalize-summary.json",
+      "summary": "发布绑定精确Flowable定义；业务申请固定所选模板版本。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [],
+      "url": "workflow-attendance/wf-template.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "wf-leave-ai",
+      "title": "请假提交、冻结与AI预审回调",
+      "scope": "请假API→校验时长与余额→事务冻结→可选AI→人工或驳回释放",
+      "frontend_status": "employee-web 新申请仅toast，旧WorkbenchSection未被当前工作台路由挂载；图中API入口为后端能力",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-leave-ai.finalize-summary.json",
+      "summary": "AI回调进入人工或拒绝补偿；发起表单在当前员工路由尚未接通。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [
+        "WF-01",
+        "WF-02",
+        "99-3",
+        "99-4"
+      ],
+      "url": "workflow-attendance/wf-leave-ai.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "wf-settlement",
+      "title": "人工审批、驳回与撤回结算",
+      "scope": "任务处理人授权→请假扣减或释放→Flowable结束→考勤重算；申请人撤回",
+      "frontend_status": "employee-web /hub/approvals 同意、驳回、撤回接真实API；hub-web独立审批页为Placeholder",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-settlement.review-2/wf-settlement.finalize-summary.json",
+      "summary": "同意扣冻结、驳回与撤回释放；人工同意和驳回均发布WorkflowCompletedEvent。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [
+        "WF-02",
+        "99-3"
+      ],
+      "url": "workflow-attendance/wf-settlement.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "wf-correction",
+      "title": "缺卡补卡审批与考勤恢复",
+      "scope": "补卡API→同日时点校验→直属上级审批→虚拟MANUAL打卡→重算",
+      "frontend_status": "当前employee-web新工作台未提供可提交补卡表单；后端API和审批处理可用",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-correction.finalize-summary.json",
+      "summary": "补卡为缺失记录补入，未实现已有打卡的时间更正。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [
+        "WF-01"
+      ],
+      "url": "workflow-attendance/wf-correction.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "wf-generic-attachments",
+      "title": "通用OA提交与审批附件下载",
+      "scope": "通用表单保存→个人附件转审批引用→可选预审→人工审批；参与人票据下载",
+      "frontend_status": "employee-web当前新建费用等类型仅toast；后端通用OA及附件API存在",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/wf-generic-attachments.review-2/wf-generic-attachments.finalize-summary.json",
+      "summary": "附件从本人个人文件复制为审批引用；下载执行会重新授权并消费票据。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [
+        "WF-01",
+        "WF-03"
+      ],
+      "url": "workflow-attendance/wf-generic-attachments.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "att-governance",
+      "title": "考勤日历、班次、成员与排班变更",
+      "scope": "管理配置→有效考勤组→成员区间锁→排班创建/修改→已有日结果重算",
+      "frontend_status": "admin-web /attendance 路由真实配置接口；employee-web读取排班",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-governance.finalize-summary.json",
+      "summary": "成员加入有数据库用户行锁；排班修改可同步刷新既有日结果。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [
+        "AT-02"
+      ],
+      "url": "workflow-attendance/att-governance.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "att-punch",
+      "title": "员工打卡、日结果与异常协调",
+      "scope": "hub真实OUT→服务端当前时钟→同日类型去重→规则/请假计算→异常增删与提交后事件",
+      "frontend_status": "hub-web工作台OUT真实提交；其attendance独立页为Placeholder；employee-web时间展示有硬编码",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/att-punch.review-2/att-punch.finalize-summary.json",
+      "summary": "打卡后同步计算日结果；异常只在新增时发布事件。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [
+        "AT-01",
+        "99-4"
+      ],
+      "url": "workflow-attendance/att-punch.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "leave-governance",
+      "title": "假种治理与管理员余额调整",
+      "scope": "假种CRUD→员工/假种有效性→外部key指纹幂等→账户行锁→非负余额→ADJUST流水",
+      "frontend_status": "admin-web /leave 与 /leave-types 路由可达，余额调整真实调用",
+      "html": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/workflow-attendance/leave-governance.finalize-summary.json",
+      "summary": "后端有幂等指纹与行锁，但管理页面重试不会保留同一业务key。",
+      "group": "workflow-attendance",
+      "groupLabel": "审批、假期与考勤",
+      "findingIds": [
+        "LV-01",
+        "99-3"
+      ],
+      "url": "workflow-attendance/leave-governance.html",
+      "reportUrl": "workflow-attendance/report.md"
+    },
+    {
+      "id": "im-delivery",
+      "title": "消息发送、实时送达与附件访问",
+      "scope": "私聊/群聊消息：幂等发送、会话序号、事务Outbox、已读、撤回与下载票据。",
+      "frontend_status": "新入口/hub/messages已接文本/附件发送/引用/撤回；附件打开误用通用文件票据，将被IM_MESSAGE归属校验403；图中IM专用票据是可修复使用的后端能力。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-delivery.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-delivery/im-delivery.finalize-summary.json",
+      "summary": "发送成功同时保存消息、附件引用、会话摘要与Outbox；在线推送后前端合并消息，读后更新位点。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "IAR-09"
+      ],
+      "url": "im-agent-rag/im-delivery.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "im-groups",
+      "title": "群聊创建、成员治理与退出解散",
+      "scope": "自定义群创建、群主治理、成员退出、解散与变更通知。",
+      "frontend_status": "employee-web新页支持改名/加成员/退群；独立hub-web另接公告、移除成员；旧MessagesSection治理入口不作为新页实现证据。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-groups.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-im-groups/im-groups.finalize-summary.json",
+      "summary": "创建群及成员；群主校验后治理；Outbox通知并刷新成员与会话列表。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "IAR-08"
+      ],
+      "url": "im-agent-rag/im-groups.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "im-outbox",
+      "title": "Outbox认领、失败重试与人工审计",
+      "scope": "待发事件轮询、过期SENDING回收、FAILED/DEAD重试、后台审计与指标。",
+      "frontend_status": "后台提供事件列表、失败摘要、单条/批量重试和手动派发API；前端是否可见不替代后台权限结论。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/im-outbox.finalize-summary.json",
+      "summary": "定时或手工认领到期事件，发送后标SENT；后台可查看状态、失败分类与治理审计。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "99-1"
+      ],
+      "url": "im-agent-rag/im-outbox.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "agent-release",
+      "title": "Agent草稿、DAG测试与ACL发布",
+      "scope": "Agent版本配置、工具绑定、DAG校验、测试签名、使用范围与发布启停。",
+      "frontend_status": "admin-web管理Agent/版本/工作流；员工目录仅返回可用Agent；不能以管理端可配置推断员工已接所有能力。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-release.finalize-summary.json",
+      "summary": "草稿配置工具和可用范围，DAG验证与试运行后签名匹配才正常发布；员工使用再查ACTIVE/use ACL。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "IAR-03"
+      ],
+      "url": "im-agent-rag/agent-release.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "agent-tools",
+      "title": "工具任务、人审确认与超时取消",
+      "scope": "显式工具调用的人审、恢复执行、拒绝取消、超时扫描及DAG分支差异。",
+      "frontend_status": "员工任务确认/取消API已实现；DAG APPROVAL是提示节点，不代表持久人审暂停。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-tools.finalize-summary.json",
+      "summary": "显式工具需确认时先落等待任务，所属员工确认后执行并记审计；AUTO直接执行。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "IAR-02",
+        "IAR-04"
+      ],
+      "url": "im-agent-rag/agent-tools.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "agent-conversation",
+      "title": "会话触发Agent、异步执行与结果回写",
+      "scope": "提交后的Agent任务创建、进程内调度、DAG/模型执行、结果写回IM与失败卡片。",
+      "frontend_status": "employee-web新/hub/messages与独立hub-web均展示Agent消息；employee-web新页知识卡/流程卡动作仅toast，后端回复成功不表示卡片动作可执行。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-conversation.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/agent-conversation.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-agent-conversation/agent-conversation.finalize-summary.json",
+      "summary": "用户文本提交后创建任务，异步置RUNNING并执行；成功事务内更新任务、插入Agent回复及消息事件。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "IAR-02",
+        "IAR-04"
+      ],
+      "url": "im-agent-rag/agent-conversation.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "knowledge-documents",
+      "title": "知识空间ACL与文档入库生命周期",
+      "scope": "空间创建/模型维度、ACL保存、附件校验、异步入库、重入库与软删除。",
+      "frontend_status": "admin-web知识库具备空间、文档、ACL与检索测试入口；ACL保存不代表所有读取链已执行ACL。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/knowledge-documents.finalize-summary.json",
+      "summary": "创建空间并保存ACL，上传附件登记文档和作业；解析分块、嵌入、写PG向量和MySQL清单，更新成功。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "IAR-04",
+        "IAR-05",
+        "IAR-06"
+      ],
+      "url": "im-agent-rag/knowledge-documents.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "rag-qa",
+      "title": "知识检索、提示编排与问答返回",
+      "scope": "Agent已授权工具检索知识空间，查询嵌入、向量阈值过滤、补标题并进入模型提示。",
+      "frontend_status": "员工问答通过Agent及IM显示；employee-web新页知识卡动作仅“即将上线”；管理端searchTest返回命中，不等同问答端到端实测。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/rag-qa.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/rag-qa.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/review-3-rag-qa/rag-qa.finalize-summary.json",
+      "summary": "可用Agent调用已绑定知识工具，解析配置、嵌入query、TopK向量检索，补标题后进入模型上下文并回写消息。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [
+        "IAR-01",
+        "IAR-07"
+      ],
+      "url": "im-agent-rag/rag-qa.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "ai-provider-health",
+      "title": "AI供应商模型配置、探活与自检",
+      "scope": "供应商与多类模型配置、列表发现、类型化探针、结果持久化及定时自检。",
+      "frontend_status": "admin-web配置供应商和模型；配置响应使用Key是否已配置的标记，图中不包含真实凭证。",
+      "html": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.candidate.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/im-agent-rag/ai-provider-health.finalize-summary.json",
+      "summary": "配置模型，发现供应商模型列表，按能力执行真实协议探针，记录结果和耗时；周期自检复用此链。",
+      "group": "im-agent-rag",
+      "groupLabel": "消息、Agent与知识库",
+      "findingIds": [],
+      "url": "im-agent-rag/ai-provider-health.html",
+      "reportUrl": "im-agent-rag/report.md"
+    },
+    {
+      "id": "F01",
+      "title": "文件上传：票据、秒传与确认",
+      "scope": "个人文件、头像、审批及群附件、后台与知识文档共用上传基础；业务归属分别校验。",
+      "frontend_status": "employee-web 文件页可用；管理端知识文档可上传；LOCAL 返回本地路径而非浏览器 PUT 地址，使用前须确认部署存储。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/F01.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/F01.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/f01.finalize-summary.json",
+      "summary": "FILE-Q：配额读取与用量累加分离；并发确认/复制可同时通过余量检查，属于历史并发治理项的具体复核。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [
+        "20/3-3"
+      ],
+      "url": "file-plugin/F01.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "F02",
+      "title": "文件下载：鉴权、单次票据与二进制返回",
+      "scope": "个人文件/头像走通用票据；审批、会话附件必须走各自业务授权。",
+      "frontend_status": "employee-web 文件页支持预览和下载；管理端通用下载仅支持限定归属。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/F02.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/F02.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/f02.finalize-summary.json",
+      "summary": "下载票据在返回资源时已消费，不能承诺客户端下载完成；网络中断需重新申请票据。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [
+        "IAR-09"
+      ],
+      "url": "file-plugin/F02.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "F03",
+      "title": "个人云盘：目录、移动与复制",
+      "scope": "目录浏览、分类查询、创建文件夹、文件移动、逻辑复制及配额。",
+      "frontend_status": "employee-web /files 接入；收藏和最近使用在客户端保存。独立 hub-web 无云盘页面路由。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/F03.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/F03.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/f03.finalize-summary.json",
+      "summary": "FILE-Q：并发复制共用非原子配额检查，需与上传确认统一占额，不能只保护累加 SQL。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [
+        "20/3-3"
+      ],
+      "url": "file-plugin/F03.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "F04",
+      "title": "文件回收站：删除、恢复与彻底清除",
+      "scope": "个人文件和后台文件分别限定归属；删除只隐藏，彻底清除才释放逻辑用量。",
+      "frontend_status": "employee-web 文件页接入删除恢复清除；管理端当前页面主要为目录和清理任务，后端治理能力更多。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/F04.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/F04.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/f04.finalize-summary.json",
+      "summary": "删除、彻底清除、物理删除是三种状态；流程和容量展示应保持一致。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [],
+      "url": "file-plugin/F04.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "F05",
+      "title": "文件治理：预演、数据库清理与失败重试",
+      "scope": "过期上传/下载票据、到期回收引用、无引用对象、失败或超时物理删除。",
+      "frontend_status": "admin-web 文件清理页可预演、确认正式执行和失败物理对象重试。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/F05.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/F05.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/f05.finalize-summary.json",
+      "summary": "优化：预演与正式执行之间会变化，预演数量应作为估算；现状正式执行会重新扫描。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [],
+      "url": "file-plugin/F05.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "P01",
+      "title": "插件安装与生命周期：校验、启停、卸载",
+      "scope": "签名快照、版本兼容、Flyway迁移、PF4J、依赖、排空与错误恢复。",
+      "frontend_status": "admin-web 插件管理页可上传签名包、启用停用卸载；不支持上传覆盖既有ID。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/P01.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/P01.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/p01.finalize-summary.json",
+      "summary": "优化：安装迁移与安装记录不是一个可回滚外部事务；失败时应说明已执行迁移与人工恢复步骤。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [],
+      "url": "file-plugin/P01.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "P02",
+      "title": "插件动作网关：权限、幂等与结果重放",
+      "scope": "来源检查、上下文、三重授权、生命周期守卫、参数校验、请求占用及审计。",
+      "frontend_status": "Host SDK 调用后端插件网关；HTTP仅开放声明幂等的动作，必须携带Idempotency-Key。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/P02.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/P02.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/p02.finalize-summary.json",
+      "summary": "PLUGIN-U：异常保留IN_PROGRESS避免重复副作用，但缺少显式人工核对/恢复入口，长期同键请求只能409。此项属于恢复能力建议，不能用自动过期后重跑代替。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [
+        "PLUGIN-U"
+      ],
+      "url": "file-plugin/P02.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "P03",
+      "title": "插件配置：版本校验、敏感值与软删除",
+      "scope": "插件状态锁、expectedVersion、类型校验、敏感值保护、恢复及删除幂等。",
+      "frontend_status": "admin-web 插件配置弹窗调用治理API；敏感值只展示设置状态，不读取实际配置数据。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/P03.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/P03.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/p03.finalize-summary.json",
+      "summary": "优化：requiresRestart 的界面提示与操作回执应明确配置何时生效；本图不把标记等同自动重启。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [],
+      "url": "file-plugin/P03.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "P04",
+      "title": "插件事件与前端运行时：分发、加载及隔离边界",
+      "scope": "提交后领域事件→订阅→有界线程池→回调；前端另支加载清单与SRI脚本。",
+      "frontend_status": "employee-web 旧壳加载插件清单，当前新工作台未挂载旧 PluginWorkbenchHost；独立 hub-web 无插件入口。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/P04.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/P04.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/p04.finalize-summary.json",
+      "summary": "PLUGIN-E：回调队满直接丢弃，失败只日志；重要业务事件需要持久投递账本与可审计补偿。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [
+        "PLUGIN-E",
+        "PLUGIN-F"
+      ],
+      "url": "file-plugin/P04.html",
+      "reportUrl": "file-plugin/report.md"
+    },
+    {
+      "id": "W01",
+      "title": "工作台聚合：各端数据读取与业务跳转",
+      "scope": "三个前端分别聚合已有业务API，不是一个共用工作台；失败与空数据的表现需要区分。",
+      "frontend_status": "employee-web /hub/workbench；独立hub-web /workbench；admin-web /dashboard。",
+      "html": ".archify/workflow-business-chains-20261108-194034/file-plugin/W01.html",
+      "candidate": ".archify/workflow-business-chains-20261108-194034/file-plugin/W01.json",
+      "receipt": ".archify/workflow-business-chains-20261108-194034/file-plugin/w01.finalize-summary.json",
+      "summary": "WORKBENCH-D：employee“我的申请”用workflow.todos映射，混淆本人发起和待本人处理；应改用本人requests。打卡硬编码时间沿用AT-01。",
+      "group": "file-plugin",
+      "groupLabel": "文件、插件与工作台",
+      "findingIds": [
+        "WORKBENCH-D",
+        "AT-01"
+      ],
+      "url": "file-plugin/W01.html",
+      "reportUrl": "file-plugin/report.md"
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUTH-01",
+      "severity": "P1",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "默认开启邮箱二验，首次使用未绑定邮箱的员工账号；或独立hub-web用户需要二验",
+      "impact": "employee当前页未处理requiresEmailBinding，显示成功后跳转但无Session；独立hub把待二验响应保存为user，前后端认证状态不一致。",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 10
+        },
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 370
+        },
+        {
+          "path": "employee-web/src/stores/session.ts",
+          "line": 81
+        },
+        {
+          "path": "hub-web/src/stores/session.ts",
+          "line": 65
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 187
+        }
+      ],
+      "evidence": "当前路由指向HubAuthView；新页只检查requiresEmailCode。employee store同时识别两种待验证响应并不设置user；独立hub store直接赋值。后端两种pending返回发生于写Session之前。",
+      "fix": "当前登录页消费两种pending状态并接通绑定流程；独立hub共用相同认证状态判定。",
+      "acceptance": "分别用已绑定、未绑定账号验证：pending时无已登录状态；完成BIND/LOGIN后me成功。",
+      "title": "当前登录页面未完整处理邮箱认证待续状态",
+      "reviewId": "100-01"
+    },
+    {
+      "id": "AUTH-02",
+      "severity": "P1",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "从当前employee /login页面进入忘记密码，发送验证码后提交重置",
+      "impact": "发出LOGIN码，重置要求RESET_PASSWORD；未另发正确用途码时始终失败。",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 467
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 105
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/AccountService.java",
+          "line": 122
+        },
+        {
+          "path": "employee-web/src/stores/session.ts",
+          "line": 147
+        }
+      ],
+      "evidence": "sendResetCode直接调用employeeApi.auth.sendLoginCode；LoginService按LOGIN发码；AccountService.resetPassword按RESET_PASSWORD核验。正确的sendPasswordResetCode存在但当前页未调用。",
+      "fix": "当前找回页调用session.sendPasswordResetCode(email)。",
+      "acceptance": "从实际/login路由发RESET_PASSWORD码；使用该码重置成功，LOGIN码不可重置。",
+      "title": "找回密码错误发送LOGIN用途验证码",
+      "reviewId": "100-02"
+    },
+    {
+      "id": "AUTH-03",
+      "severity": "P2",
+      "status": "静态并发推导，未运行Redis竞争验证",
+      "trigger": "两个并发请求以同一邮箱、用途和正确验证码进入verifyCode",
+      "impact": "GET/DELETE分离允许两请求先读到相同码并均返回true；不保证一次性核销。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java",
+          "line": 91
+        }
+      ],
+      "evidence": "代码顺序为GET→比较→DELETE→true；错误码仅返回false，无尝试次数限制。此项为静态并发推导，未对真实Redis压测。",
+      "fix": "用Redis Lua执行比较与删除，并为邮箱/用途设置有限校验尝试次数。",
+      "acceptance": "真实Redis并发核验同一码仅一次成功；错误尝试达到阈值后失效，重发/用途隔离仍正确。",
+      "title": "邮箱验证码比较与核销非原子",
+      "reviewId": "100-03"
+    },
+    {
+      "id": "AUTH-04",
+      "severity": "P1",
+      "status": "静态并发推导，未运行数据库竞争验证",
+      "trigger": "两个不同手机号同时提交同一个有效邀请码，各持各自有效短信码",
+      "impact": "两个事务可能先读到同一邀请码并各建账号；后者核销UPDATE影响0行也返回成功，单次邀请码可被复用。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 70
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java",
+          "line": 67
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/repository/AuthRegistrationRepository.java",
+          "line": 81
+        }
+      ],
+      "evidence": "邀请码SELECT无行锁；markInviteUsed返回void且忽略条件UPDATE影响行数；service无核销成功判断。此项为静态事务交错推导，未运行MySQL并发复现。",
+      "fix": "锁定邀请码行或原子领取并校验更新恰为1行，失败回滚员工和账号创建。",
+      "acceptance": "两个手机号并发消费同一邀请码恰一成功，另一返回业务冲突且无孤立员工/账号。",
+      "title": "并发注册可重复消费单次邀请码",
+      "reviewId": "100-04"
+    },
+    {
+      "id": "AUTH-05",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "调用公开短信注册发码接口，或用户在当前注册页点击发送短信",
+      "impact": "后端只演示日志发送且明文记录手机号与验证码；当前employee页面仅本地“已发送”，未调用后端。真实注册交付缺口明确。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 39
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmployeeRegistrationService.java",
+          "line": 89
+        },
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 410
+        },
+        {
+          "path": "hub-web/src/views/AuthView.vue",
+          "line": 111
+        }
+      ],
+      "evidence": "公开服务生成/持久化码后sendSms仅log.info；当前employee sendSmsCode仅设置sent与倒计时，独立hub仅toast。服务内未见频控。",
+      "fix": "前端接实际发码/注册接口；生产接短信网关并移除验证码日志，添加现有Redis能力实现的发送频控。",
+      "acceptance": "供应商接收成功才显示已发送；失败可重试；日志不含验证码；单位时间重复请求被限制；注册成功后明确转登录。",
+      "title": "注册短信及前端提交仍为演示或占位",
+      "reviewId": "100-05"
+    },
+    {
+      "id": "AUTH-06",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "管理员保存并测试EMAIL_DEFAULT，期望认证邮件使用该配置",
+      "impact": "测试可成功但登录/绑定/找回邮件仍走注入JavaMailSender配置，数据库渠道保存不影响认证码发送。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 63
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/NotificationChannelService.java",
+          "line": 172
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/EmailCodeService.java",
+          "line": 36
+        }
+      ],
+      "evidence": "渠道测试新建JavaMailSenderImpl使用请求/数据库参数；EmailCodeService注入JavaMailSender且未查询NotificationChannelRepository。未发送真实SMTP邮件。",
+      "fix": "将认证邮件明确接到已保存邮件渠道，或把配置页面标明只管理测试渠道并提供实际认证渠道状态。",
+      "acceptance": "更改保存的渠道后，通过实际/login触发认证邮件使用相同配置；断开渠道时两条链均给一致错误。",
+      "title": "后台邮件渠道与认证发信配置分离",
+      "reviewId": "100-06"
+    },
+    {
+      "id": "AUTH-07",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "直接切换当前employee登录页到验证码登录，不先输入密码",
+      "impact": "提交伪密码email-code:<code>，后端先执行密码认证；合法验证码不能构成独立登录。重复失败还可能消耗登录尝试。",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 356
+        },
+        {
+          "path": "employee-web/src/hub/views/AuthView.vue",
+          "line": 365
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 120
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/auth/service/LoginService.java",
+          "line": 160
+        }
+      ],
+      "evidence": "密码为空时前端合成字符串；后端先provider.authenticate，再进入邮箱二验；这是二因素登录而非验证码独立登录。",
+      "fix": "将验证码入口限定为密码认证后的二验步骤；保留密码后再提交验证码。",
+      "acceptance": "新会话无法只凭验证码登录；密码通过后进入二验并成功，不产生伪密码认证失败。switchLoginMode只改视图与状态、不清密码，因此保留原密码的密码后二验路径不在此缺陷范围。",
+      "title": "独立验证码登录入口不符合后端密码二验契约",
+      "reviewId": "100-07"
+    },
+    {
+      "id": "AUTH-08",
+      "severity": "P2",
+      "status": "静态多实例推导，待验证",
+      "trigger": "在实例A修改字典，实例B已缓存该类型标签",
+      "impact": "仅本机缓存失效，其他实例继续展示旧标签，直到缓存重建/进程重启。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 35
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 107
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/system/service/AdminDictService.java",
+          "line": 137
+        }
+      ],
+      "evidence": "ConcurrentHashMap按类型缓存，无TTL；写操作labelCache.remove仅当前JVM。未运行双JVM验证。",
+      "fix": "当前规模优先去除该轻量标签缓存或加短TTL；按实际部署验收跨实例一致性。",
+      "acceptance": "A修改后B在约定窗口读取新标签；禁用/删除同样刷新。",
+      "title": "字典标签缓存只在当前JVM失效",
+      "reviewId": "100-08"
+    },
+    {
+      "id": "AUTH-09",
+      "severity": "P2",
+      "status": "静态确认，未执行真实业务调用",
+      "trigger": "个人设置将已有手机号清空后保存",
+      "impact": "页面显示手机号已更新，但请求传null，后端跳过写入，实际手机号保持原值。",
+      "sources": [
+        {
+          "path": "employee-web/src/views/sections/SettingsSection.vue",
+          "line": 296
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/org/service/OrgDirectoryService.java",
+          "line": 205
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/org/dto/UpdateEmployeeProfileRequest.java",
+          "line": 14
+        }
+      ],
+      "evidence": "前端mobile || null；后端仅request.getMobile()!=null时trim并更新。后端空串可清空，前端恰将其转换成null。仅静态追踪，未真实保存。",
+      "fix": "将清空语义统一：前端发送空字符串，或后端明确区分字段缺失与null清空。",
+      "acceptance": "已有手机号清空保存后重新加载为null，非空手机号仍可正常更新。",
+      "title": "手机号输入清空未转化为实际清除",
+      "reviewId": "100-09"
+    },
+    {
+      "id": "WF-01",
+      "severity": "P1",
+      "status": "静态确认，入口未接通",
+      "trigger": "员工在当前审批中心选择请假、费用、加班或用印新申请",
+      "impact": "仅提示表单即将上线，不调用提交接口；旧WorkbenchSection不能视作当前入口能力",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 46
+        },
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 78
+        },
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 232
+        }
+      ],
+      "evidence": "当前路由使用hub/ApprovalsView；pickCreateType只有showToast，无表单提交。未点真实页面。",
+      "fix": "在当前工作台和审批路由接入请假、补卡与通用OA表单、附件和提交后状态跳转。",
+      "acceptance": "通过当前入口提交各类申请，每次只新增一条；余额不足、无上级、附件越权均显示真实错误。",
+      "title": "当前员工申请入口未接通提交链",
+      "reviewId": "100-10"
+    },
+    {
+      "id": "LV-01",
+      "severity": "P1",
+      "status": "静态确认，未动态复现",
+      "trigger": "余额调整已提交，但响应丢失或请求报错后管理员重试同一次调整",
+      "impact": "每次提交生成新的Date.now幂等key，服务端把重试当作新业务，可能重复调整",
+      "sources": [
+        {
+          "path": "admin-web/src/views/LeaveGovernanceView.vue",
+          "line": 87
+        },
+        {
+          "path": "admin-web/src/views/LeaveGovernanceView.vue",
+          "line": 99
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 104
+        }
+      ],
+      "evidence": "后端按sourceTxnKey查询流水并核对指纹；前端每次submitAdjustment均生成新key。未模拟响应丢失。",
+      "fix": "同一编辑意图保留稳定key，重试复用；成功确认或明确新建调整时再换key。",
+      "acceptance": "服务端提交成功后丢弃首次响应，再重试，同一ADJUST流水只有一条且余额只变一次；同key不同参数拒绝。",
+      "title": "余额调整重试不复用幂等键",
+      "reviewId": "100-11"
+    },
+    {
+      "id": "AT-01",
+      "severity": "P2",
+      "status": "静态确认，展示可信性缺口",
+      "trigger": "employee-web工作台当天workMinutes大于0或达到480分钟",
+      "impact": "页面显示固定08:57或18:00，可能与真实首末打卡时间不一致",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 85
+        },
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 86
+        },
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 88
+        }
+      ],
+      "evidence": "punchIn按workMinutes真假选择08:57；punchOut按480阈值选择18:00。hub-web独立工作台则读取实际firstPunchAt/lastPunchAt。",
+      "fix": "格式化日结果firstPunchAt/lastPunchAt；空值显示未打卡。",
+      "acceptance": "输入实际09:12和18:37，分别显示09:12和18:37；只有时长不能凭空产生打卡时间。",
+      "title": "工作台显示固定打卡时间",
+      "reviewId": "100-12"
+    },
+    {
+      "id": "WF-02",
+      "severity": "P2",
+      "status": "静态确认，操作资格不一致",
+      "trigger": "未结束的PENDING_REVIEW申请在页面点击撤回",
+      "impact": "前端按!finishedAt显示撤回，后端只接受IN_APPROVAL，操作会被拒绝，冻结仍等待预审终态",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/ApprovalsView.vue",
+          "line": 367
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 599
+        }
+      ],
+      "evidence": "预审请求未finishedAt；withdrawRequest非IN_APPROVAL抛400。未动态提交撤销。",
+      "fix": "按后端允许状态显示撤回；若产品要求预审可取消，补任务取消、状态锁和冻结释放。",
+      "acceptance": "预审中不显示不可用操作；本人IN_APPROVAL可撤回一次并释放冻结；终态和非本人拒绝。",
+      "title": "AI预审中撤回按钮与后端资格不一致",
+      "reviewId": "100-13"
+    },
+    {
+      "id": "WF-03",
+      "severity": "P2",
+      "status": "静态确认，模板约束未执行",
+      "trigger": "generic-requests提交JSON对象，但漏模板必填字段或类型错误",
+      "impact": "仅验证对象结构，未按模板formSchema做字段校验，错误业务数据可进入审批",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 266
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 292
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 924
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowAdminService.java",
+          "line": 120
+        }
+      ],
+      "evidence": "版本保存formSchemaJson；通用提交只检查isObject，然后直接压缩保存。未动态提交非法请求。",
+      "fix": "按选定已发布版本校验必填、类型、长度和枚举，并返回字段错误。",
+      "acceptance": "缺字段、错误类型、越界枚举返回400且无新增申请；正确请求可提交，版本更新不改变在途基准。",
+      "title": "通用OA未执行所选模板表单约束",
+      "reviewId": "100-14"
+    },
+    {
+      "id": "AT-02",
+      "severity": "P2",
+      "status": "静态确认，既有结果可能陈旧",
+      "trigger": "当天已按默认班次生成日结果后，再首次创建当天个人排班",
+      "impact": "createSchedule只存排班，日结果维持旧班次，直到另一打卡、审批或重算触发",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 238
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 252
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 262
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/attendance/service/AttendanceService.java",
+          "line": 285
+        }
+      ],
+      "evidence": "创建直接返回；修改则显式检查日结果存在并重算。未动态创建排班。",
+      "fix": "创建排班成功后，与修改路径一致地对已有日结果重算。",
+      "acceptance": "默认班次已有结果，创建不同班次后，同一请求结束时shiftId、时长与异常立即更新。",
+      "title": "首次创建排班不刷新既有考勤结果",
+      "reviewId": "100-15"
+    },
+    {
+      "id": "99-3",
+      "severity": "P1",
+      "status": "既有问题，沿用第99审编号",
+      "trigger": "冻结后停用、删除假种或更改balanceMode",
+      "impact": "终态重新读取当前有效假种/模式，可能阻断结算或跳过冻结处理",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 68
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 85
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 212
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 262
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/leave/service/LeaveService.java",
+          "line": 326
+        }
+      ],
+      "evidence": "冻结、扣减、释放均重新getActiveLeaveTypeOrThrow且按当前NO_DEDUCT跳过；仅引用既有问题，非新发现。",
+      "fix": "提交时固定结算策略，或依据原冻结流水驱动终态结算；停用不影响在途请求。",
+      "acceptance": "冻结后改模式/状态，再批准、驳回或撤回，按原规则归零冻结且重复请求不二次结算。",
+      "title": "可变假种破坏在途余额结算",
+      "reviewId": "99-3"
+    },
+    {
+      "id": "99-4",
+      "severity": "P2",
+      "status": "既有问题，沿用第99审编号",
+      "trigger": "非固定9-12/13-18班次、休息日或小于半天请假",
+      "impact": "固定工作区间和240分钟取整可能与真实排班不一致",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 904
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 930
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/workflow/service/WorkflowService.java",
+          "line": 942
+        }
+      ],
+      "evidence": "逐日套固定工作时段，按HALF_DAY_MINUTES向上取整；仅引用第99审，不算新发现。",
+      "fix": "请假计算统一消费有效日历、排班与假种计量规则。",
+      "acceptance": "非标准班次、节假日、跨日和半天边界都与实际规则一致，冻结和扣减同基准。",
+      "title": "请假计算固定时段与取整口径",
+      "reviewId": "99-4"
+    },
+    {
+      "id": "IAR-01",
+      "severity": "P1",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "有Agent使用权限的员工通过已绑定KNOWLEDGE_SEARCH_CHUNKS查询其无read权限的知识空间。",
+      "impact": "Agent use授权不能替代知识空间ACL，PRIVATE/部门范围配置可能不约束该工具读链；实际返回取决于配置与文档内容。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/controller/EmployeeAgentController.java",
+          "line": 40
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 518
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java",
+          "line": 86
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+          "line": 44
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 60
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 361
+        }
+      ],
+      "evidence": "Controller直接进入AgentService；上层只检查Agent use。工具对payload.userId作组织授权，但知识工具只传spaceId/query/topK；searchRows无操作者参数，向量SQL仅space_id、is_active和score。kb_space_acl仅在管理端保存/读取，不参与该读链。",
+      "fix": "在知识检索服务统一传入真实操作者，强制空间ACTIVE、visibility及read/manage ACL；管理员测试明确单独受控；文档检索与问答共用同一授权决策。",
+      "acceptance": "同一私有空间：空间所有者/已授权员工能命中，无read权限但有Agent use权限者收到403；跨部门、ACL撤销及停用空间同测；不得仅在UI隐藏。",
+      "title": "知识工具检索未执行空间ACL",
+      "reviewId": "100-16"
+    },
+    {
+      "id": "IAR-02",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "DAG TOOL或节点toolCalls绑定REQUIRE_CONFIRM，员工创建任务时request.toolCalls为空，或由会话触发DAG。",
+      "impact": "配置要求的人审被跳过，工具日志直接标APPROVED；当前实现的SPI为查询且CONNECTOR返回501，因此不声称已有写业务被执行。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 531
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 537
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java",
+          "line": 161
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java",
+          "line": 313
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java",
+          "line": 50
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/workflow/WorkflowValidator.java",
+          "line": 49
+        }
+      ],
+      "evidence": "人审计算仅遍历外部preparedToolCalls。DAG执行器检查绑定存在后直接调用execute，并记录APPROVED；执行器与validator未检查approvalMode。APPROVAL节点也被分派到executePromptNode，不是持久化人工等待。",
+      "fix": "将审批判断收口到工具执行边界；DAG遇需确认工具持久化节点/参数/版本快照，WAITING_HUMAN_CONFIRM后暂停，确认时从该节点恢复，未批准不得落APPROVED。",
+      "acceptance": "相同REQUIRE_CONFIRM绑定分别经显式工具、DAG TOOL、内嵌toolCalls、会话触发时均先等待；拒绝/超时不执行；重复确认只执行一次；AUTO保持直通。",
+      "title": "DAG工具执行跳过配置的人审门禁",
+      "reviewId": "100-17"
+    },
+    {
+      "id": "IAR-03",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "创建含内嵌工具调用的DAG草稿，或将非DAG草稿更新为DAG，随后直接发布。",
+      "impact": "部分路径未实际试运行即获得workflow_test_signature/workflow_tested_at，弱化“当前版本完成一次流程测试”的发布门禁。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 319
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 350
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentService.java",
+          "line": 444
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/repository/AgentRepository.java",
+          "line": 105
+        },
+        {
+          "path": "server/src/test/java/com/workforcehub/agent/ModuleAgentApiIntegrationTest.java",
+          "line": 240
+        }
+      ],
+      "evidence": "createVersion与旧配置转DAG直接调用updateAgentVersionWorkflowTest；该方法写签名和NOW()。publish只比较签名。仓库测试契约明确“后台发布DAG Agent前必须完成一次当前版本流程测试”，但该测试覆盖simpleWorkflow，非自动签名例外。",
+      "fix": "只有成功试运行入口写测试签名/时间；创建、更新、工具绑定/关键引用变更均清空测试证明；兼容迁移标记与真实测试结果分字段。",
+      "acceptance": "两类自动签名分支在未试运行时发布400；失败试运行仍不能发布；成功且配置相同可发布；改配置或工具绑定后必须重测。",
+      "title": "草稿部分路径自动获得流程测试证明",
+      "reviewId": "100-18"
+    },
+    {
+      "id": "IAR-04",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "Agent或知识入库事务已提交，但进程在Executor投递前/执行中退出，或线程池拒绝任务。",
+      "impact": "任务/作业记录仍在表中，可停留PENDING/RUNNING；当前范围未发现自动重新认领/恢复入口，现有人工确认超时扫描不覆盖它们。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 111
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/service/AgentTaskExecutionService.java",
+          "line": 164
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/agent/repository/AgentTaskTimeoutRepository.java",
+          "line": 28
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 287
+        }
+      ],
+      "evidence": "两类任务提交后仅调用进程内Executor。超时SQL限定WAITING_HUMAN_CONFIRM；ragflow目录中ingest调用仅scheduleIngest。记录持久化已存在，问题是执行投递/恢复，不是数据库任务丢失。",
+      "fix": "使用现有任务表实现带租约的待执行认领，保存可恢复输入及重试次数；入库作业亦以表状态调度，定义运行中超时和人工重试边界。",
+      "acceptance": "在提交后投递前及执行中分别终止可控测试worker；重启后同作业被恢复且消息/切片无重复；拒绝执行可查询、可重试且不永久显示处理中。",
+      "title": "异步任务提交后缺少持久认领恢复",
+      "reviewId": "100-19"
+    },
+    {
+      "id": "IAR-05",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "同一文档两次reingest并发，或删除与已运行ingest交错。",
+      "impact": "旧作业仍可覆盖新作业文档状态/清单，已删除文档仍可能新增向量；查询有已删标题过滤，不据此声称删除后必定可读。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 263
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 308
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 318
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 334
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 352
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java",
+          "line": 79
+        }
+      ],
+      "evidence": "reingest每次创建新作业并改latest指向；运行/成功/失败UPDATE仅WHERE document.id，不约束latest_ingest_job_id或is_deleted；replaceChunks按document整删；PG replaceDocumentVectors亦按document先停旧向量。",
+      "fix": "按文档租约串行，或在发布结果时比较latest_ingest_job_id与未删除状态；先写作业独立代次，成功后原子切换有效代次，失效作业仅清理自己的结果。",
+      "acceptance": "控制旧作业晚于新作业完成，最终清单/向量/状态均来自新作业；删除后旧作业完成不得重新激活；重复回调幂等。",
+      "title": "文档入库并发缺少作业代次隔离",
+      "reviewId": "100-20"
+    },
+    {
+      "id": "IAR-06",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "重入库写PG向量后MySQL清单失败，或向量插入中途失败。",
+      "impact": "向量与清单跨库非原子，旧向量先停用且部分新向量可能可见；MySQL作业FAILED不能保证检索仍使用完整旧版本。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 35
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowIngestService.java",
+          "line": 79
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+          "line": 334
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 60
+        }
+      ],
+      "evidence": "replaceDocumentVectors先UPDATE旧向量is_active=false，再逐条insert active新向量；完成后才调用MySQL replaceChunks/markIngestSuccess。search不连接MySQL作业成功状态，只按space与active。",
+      "fix": "按jobId写不可见新代次，完整写入后切换已发布代次；失败删除该job向量并保留旧代次，增加跨库对账修复。",
+      "acceptance": "在第N条向量插入与MySQL清单阶段分别注入失败，查询保持上一完整版本且不出现半批内容；重试成功后再切换，清理只影响失败job。",
+      "title": "跨库入库发布缺少完整版本切换",
+      "reviewId": "100-21"
+    },
+    {
+      "id": "IAR-07",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "知识空间启用rerank并配置重排模型后进行搜索测试或Agent检索。",
+      "impact": "配置面存在重排选项，但当前有效配置及检索链未调用重排，排序仍为向量距离；属于功能闭环缺口。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+          "line": 193
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowConfigResolver.java",
+          "line": 10
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+          "line": 44
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/ragflow/repository/RagflowVectorRepository.java",
+          "line": 75
+        }
+      ],
+      "evidence": "空间更新保存rerankEnabled/provider/model/modelId；RagflowEffectiveConfig解析仅Embedding、chunk、topK与threshold，searchRows直接返回向量排序且未调用rerank客户端。",
+      "fix": "在TopN向量候选后接受控重排并返回实际生效标记，或在接通前禁止可保存的启用选项，避免配置与执行不一致。",
+      "acceptance": "启用后测试替身断言真实调用重排且返回重排顺序；停用无重排调用；重排超时有明确降级状态与结果，不静默假装生效。",
+      "title": "知识重排配置未进入执行链",
+      "reviewId": "100-22"
+    },
+    {
+      "id": "IAR-08",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "用户在employee-web新入口点击知识卡/流程卡动作，或期待旧MessagesSection已有操作出现在新页。",
+      "impact": "卡片只显示toast而未执行动作；新旧页面和独立hub-web能力不一致，后台能力存在不能作为新入口交付证明。",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 35
+        },
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 60
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 339
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 446
+        },
+        {
+          "path": "hub-web/src/views/MessagesView.vue",
+          "line": 553
+        }
+      ],
+      "evidence": "新路由/hub/messages指向src/hub/views/MessagesView，旧/messages重定向。新页handleKnowledgeAction/handleProcessAction仅“即将上线”；新页群编辑只改名+加人+退群，独立hub-web已有移除成员API。",
+      "fix": "以新入口逐项登记能力，接通卡片动作的真实业务API/路由；未实现动作隐藏或禁用，避免只toast假闭环；群治理按当前产品要求补齐。",
+      "acceptance": "从默认入口操作卡片，观察对应业务请求/落库或正确路由；失败可恢复且有错误。新页公告/移除成员等是否交付单独列证，不以旧页测试替代。",
+      "title": "新消息卡片动作仍为占位",
+      "reviewId": "100-23"
+    },
+    {
+      "id": "IAR-09",
+      "severity": "P2",
+      "status": "静态代码确认；未运行应用复现",
+      "trigger": "在employee-web新/hub/messages上传并发送附件，再点击附件打开；从个人文件转发到消息也一样。",
+      "impact": "消息发送成功且展示附件，但打开走个人文件票据，被IM_MESSAGE归属限制拒绝403；属于下载契约错配，不是越权。",
+      "sources": [
+        {
+          "path": "employee-web/src/composables/usePersonalFileTransfer.ts",
+          "line": 109
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 317
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/im/repository/ImRepository.java",
+          "line": 357
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/im/service/ImService.java",
+          "line": 824
+        },
+        {
+          "path": "employee-web/src/stores/im.ts",
+          "line": 697
+        },
+        {
+          "path": "employee-web/src/hub/views/MessagesView.vue",
+          "line": 329
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileDownloadService.java",
+          "line": 219
+        }
+      ],
+      "evidence": "上传ownerType=IM_MESSAGE_PENDING；发送时不论源ownerType均复制为IM_MESSAGE引用，消息响应从IM_MESSAGE列表返回新refId；前端保留此refId后交给employeeApi.files.createDownloadTicket。FileDownloadService仅允许PERSONAL_FILE/USER_AVATAR，因此该请求确定不匹配契约。",
+      "fix": "新页openAttachment使用会话ID、消息ID、附件refId调用IM专用下载票据API，并使用其downloadUrl；消息/群文件/个人文件分别使用对应入口。",
+      "acceptance": "上传发送后发送方和正常成员可打开；退出群/被移除、撤回、过期和已用票据均按IM规则拒绝。网络失败保留附件可重试。",
+      "title": "新消息页附件下载使用错误业务票据入口",
+      "reviewId": "100-24"
+    },
+    {
+      "id": "WORKBENCH-D",
+      "title": "“我的申请”混用待办审批数据",
+      "severity": "P2",
+      "status": "静态源码确认；未动态业务复现",
+      "trigger": "员工进入当前employee-web工作台查看“我的申请”。",
+      "impact": "workflow.todos返回待本人处理项，页面将其当成本人申请展示，归属和进度语义错误。",
+      "sources": [
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 142
+        },
+        {
+          "path": "employee-web/src/hub/views/WorkbenchView.vue",
+          "line": 181
+        }
+      ],
+      "evidence": "myRequests直接从todos.value映射；没有查询本人requests。独立hub-web有单独requests查询，不能证明employee新页正确。",
+      "fix": "查询本人requests，待办继续单独展示；两类卡片使用各自状态与时间。",
+      "acceptance": "A发起给B审批：A的我的申请可见该单，B的待办可见该单，B的我的申请不得把该单当作本人发起。",
+      "reviewId": "100-25"
+    },
+    {
+      "id": "PLUGIN-F",
+      "title": "新工作台缺少插件宿主入口",
+      "severity": "P2",
+      "status": "静态源码确认；未动态业务复现",
+      "trigger": "员工使用当前/hub/workbench，希望进入已授权的UI插件。",
+      "impact": "后端可见清单、loader和旧PluginWorkbenchHost均存在，但当前工作台路由未挂载旧WorkbenchSection，无法据这些代码认定用户已可打开插件。",
+      "sources": [
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 27
+        },
+        {
+          "path": "employee-web/src/router/index.ts",
+          "line": 78
+        },
+        {
+          "path": "employee-web/src/views/sections/WorkbenchSection.vue",
+          "line": 943
+        },
+        {
+          "path": "employee-web/src/stores/plugins.ts",
+          "line": 17
+        }
+      ],
+      "evidence": "当前路由指向hub/WorkbenchView；旧workbench路由重定向。旧壳某些路由仍会加载插件清单，问题限定为当前新工作台的渲染入口，不宣称插件后端不可用。",
+      "fix": "在当前新工作台提供授权插件入口并挂载已有宿主组件；以当前入口重新验收SRI、卸载和失败重试。",
+      "acceptance": "从默认登录路径进入工作台，能打开授权UI插件；不可见插件无入口且网关仍拒绝，加载失败可恢复。",
+      "reviewId": "100-26"
+    },
+    {
+      "id": "20/3-3",
+      "title": "并发配额检查与实际占额分离",
+      "severity": "P1",
+      "status": "历史问题具体复核；静态事务交错推导",
+      "trigger": "两个不同上传确认或复制事务在同一用户/全局池余量仅容一份时并发执行。",
+      "impact": "两次可先读到相同已用量并通过校验，之后分别累加，最终超出容量限制。此项延续第20审3-3并发配额治理项，不新增重复编号。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQuotaPolicyService.java",
+          "line": 197
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java",
+          "line": 19
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/StorageUsageLedgerService.java",
+          "line": 45
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileQueryService.java",
+          "line": 225
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/file/service/FileUploadConfirmService.java",
+          "line": 99
+        }
+      ],
+      "evidence": "usedBytes是普通SELECT；ensurePersonalQuota/GlobalQuota先比较；increaseUsage后续单独累加且SQL没有quota条件。V4规范化scope_key已解决NULL唯一性，不能重报那个已修模型问题。未跑真实数据库并发。",
+      "fix": "在同事务内按固定顺序锁定作用域用量并校验占额，或条件更新原子占额；覆盖首次创建账本行及多作用域冲突。",
+      "acceptance": "余量只容一份时并发两次确认/复制仅一成功，另一返回容量错误，拒绝事务无多余引用；重试与回滚不重复占额。",
+      "reviewId": "20/3-3"
+    },
+    {
+      "id": "99-1",
+      "title": "未知管理路由默认放行",
+      "severity": "P1",
+      "status": "既有风险引用；本轮未重新动态复现",
+      "trigger": "详见第99审原触发条件。",
+      "impact": "原风险尚未修复，本轮未修改业务代码。",
+      "sources": [
+        {
+          "path": "docs/审查/第99审_项目结构与核心逻辑风险记录.md",
+          "line": 1
+        }
+      ],
+      "evidence": "引用第99审已归档证据；本轮不重放旧探针，不将旧结果冒充新执行。",
+      "fix": "沿用第99审修复方向。",
+      "acceptance": "沿用第99审对应修复验收。",
+      "reviewId": "99-1"
+    },
+    {
+      "id": "99-2",
+      "title": "停用撤权未统一失效旧会话",
+      "severity": "P1",
+      "status": "既有风险引用；本轮未重新动态复现",
+      "trigger": "详见第99审原触发条件。",
+      "impact": "原风险尚未修复，本轮未修改业务代码。",
+      "sources": [
+        {
+          "path": "docs/审查/第99审_项目结构与核心逻辑风险记录.md",
+          "line": 1
+        }
+      ],
+      "evidence": "引用第99审已归档证据；本轮不重放旧探针，不将旧结果冒充新执行。",
+      "fix": "沿用第99审修复方向。",
+      "acceptance": "沿用第99审对应修复验收。",
+      "reviewId": "99-2"
+    },
+    {
+      "id": "99-5",
+      "title": "ID生成器跨实例唯一性未保证",
+      "severity": "P2",
+      "status": "既有风险引用；本轮未重新动态复现",
+      "trigger": "详见第99审原触发条件。",
+      "impact": "原风险尚未修复，本轮未修改业务代码。",
+      "sources": [
+        {
+          "path": "docs/审查/第99审_项目结构与核心逻辑风险记录.md",
+          "line": 1
+        }
+      ],
+      "evidence": "引用第99审已归档证据；本轮不重放旧探针，不将旧结果冒充新执行。",
+      "fix": "沿用第99审修复方向。",
+      "acceptance": "沿用第99审对应修复验收。",
+      "reviewId": "99-5"
+    }
+  ],
+  "suggestions": [
+    {
+      "id": "PLUGIN-E",
+      "title": "重要插件事件增加可恢复投递账本",
+      "severity": "P2",
+      "status": "优化建议；未动态注入队列故障",
+      "trigger": "业务事务已提交后进程退出、回调队列满或处理器返回失败。",
+      "impact": "当前事件提交后进程内发布，有界队列拒绝明确丢弃；回调失败/可重试只日志和尽力审计，没有持久投递重试。当前实现是尽力交付，是否升级取决于插件业务承诺。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/common/event/DomainEventPublisher.java",
+          "line": 27
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 93
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginEventDispatcher.java",
+          "line": 185
+        }
+      ],
+      "evidence": "代码明确日志“队列已满，已丢弃”，不把它伪装为现有可靠消息能力；本项作为能力优化，不等同已发生丢单事故。",
+      "fix": "对影响业务结果的事件用持久投递记录与消费幂等；查询型/提示型事件可继续尽力交付但明确契约。",
+      "acceptance": "队列拒绝与重启后待投递记录仍可查询并重试；消费重复不产生重复业务结果。",
+      "reviewId": "PLUGIN-E"
+    },
+    {
+      "id": "PLUGIN-U",
+      "title": "插件动作未知结果增加人工核对恢复",
+      "severity": "P2",
+      "status": "优化建议；保留现有防重安全语义",
+      "trigger": "处理器已经占用幂等键后异常、返回空值或响应无法序列化。",
+      "impact": "保留IN_PROGRESS防止重复副作用是合理保护；但同键后续持续409，当前清理只删过期COMPLETED，缺少显式人工核对与完成/释放入口。",
+      "sources": [
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 117
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyService.java",
+          "line": 211
+        },
+        {
+          "path": "server/src/main/java/com/workforcehub/plugin/runtime/PluginActionIdempotencyCleanupJob.java",
+          "line": 29
+        }
+      ],
+      "evidence": "已有测试覆盖异常保持占用，故不建议简单自动超时删除；需让真实未知结果可见、可审计恢复。",
+      "fix": "增加占用状态查询和经授权的结果核对、完成/释放流程；沿用原幂等范围与审计，不盲目重跑。",
+      "acceptance": "处理器完成外部副作用后模拟响应失败，经人工核对记录结果，再次同键可重放且不再执行业务。",
+      "reviewId": "PLUGIN-U"
+    }
+  ],
+  "coverage": [
+    {
+      "side": "管理端",
+      "module": "首页与指标",
+      "chains": [
+        "W01"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "组织/部门/岗位/人员",
+      "chains": [
+        "org-lifecycle"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "角色权限",
+      "chains": [
+        "auth-rbac"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "审批治理",
+      "chains": [
+        "wf-template",
+        "wf-settlement",
+        "wf-generic-attachments"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "考勤与假期",
+      "chains": [
+        "att-governance",
+        "att-punch",
+        "leave-governance"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "Agent/DAG/任务治理",
+      "chains": [
+        "agent-release",
+        "agent-tools",
+        "agent-conversation"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "知识库/空间ACL/模型",
+      "chains": [
+        "knowledge-documents",
+        "rag-qa",
+        "ai-provider-health"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "文件目录/配额/清理",
+      "chains": [
+        "F01",
+        "F02",
+        "F04",
+        "F05"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "插件/配置",
+      "chains": [
+        "P01",
+        "P02",
+        "P03",
+        "P04"
+      ]
+    },
+    {
+      "side": "管理端",
+      "module": "Outbox/审计/字典/邮件/告警",
+      "chains": [
+        "im-outbox",
+        "system-dict-brand",
+        "system-operations"
+      ]
+    },
+    {
+      "side": "员工端",
+      "module": "登录/邮箱/注册",
+      "chains": [
+        "auth-login",
+        "auth-email",
+        "auth-register"
+      ]
+    },
+    {
+      "side": "员工端",
+      "module": "工作台/审批申请与处理",
+      "chains": [
+        "W01",
+        "wf-leave-ai",
+        "wf-correction",
+        "wf-generic-attachments",
+        "wf-settlement"
+      ]
+    },
+    {
+      "side": "员工端",
+      "module": "消息/群聊/附件",
+      "chains": [
+        "im-delivery",
+        "im-groups",
+        "F02"
+      ]
+    },
+    {
+      "side": "员工端",
+      "module": "文件/通讯录",
+      "chains": [
+        "F01",
+        "F02",
+        "F03",
+        "F04",
+        "contacts-friends"
+      ]
+    },
+    {
+      "side": "员工端",
+      "module": "Agent与知识问答",
+      "chains": [
+        "agent-conversation",
+        "agent-tools",
+        "rag-qa"
+      ]
+    },
+    {
+      "side": "员工端",
+      "module": "设置与插件",
+      "chains": [
+        "employee-personal",
+        "P04"
+      ]
+    },
+    {
+      "side": "独立画布端",
+      "module": "认证/工作台/真实下班打卡",
+      "chains": [
+        "auth-login",
+        "W01",
+        "att-punch"
+      ]
+    },
+    {
+      "side": "独立画布端",
+      "module": "消息/群治理/通知",
+      "chains": [
+        "im-delivery",
+        "im-groups",
+        "system-operations"
+      ]
+    },
+    {
+      "side": "独立画布端",
+      "module": "审批/考勤/Agent独立页占位",
+      "chains": [
+        "wf-settlement",
+        "att-punch",
+        "agent-conversation"
+      ]
+    },
+    {
+      "side": "共享与后端",
+      "module": "HTTP与认证边界",
+      "chains": [
+        "auth-login",
+        "auth-rbac"
+      ]
+    },
+    {
+      "side": "共享与后端",
+      "module": "存储/事务/异步恢复",
+      "chains": [
+        "F01",
+        "F05",
+        "im-outbox",
+        "agent-conversation",
+        "knowledge-documents",
+        "P04"
+      ]
+    }
+  ],
+  "counts": {
+    "chains": 36,
+    "new": 26,
+    "old": 6,
+    "suggestions": 2,
+    "p1": 6,
+    "p2": 20
+  }
+}

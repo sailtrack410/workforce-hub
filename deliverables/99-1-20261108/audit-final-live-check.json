@@ -1,0 +1,8 @@
+{
+  "changed_since_full_snapshot": [
+    "server/src/main/java/com/workforcehub/leave/repository/LeaveRepository.java",
+    "server/src/main/java/com/workforcehub/leave/service/LeaveService.java"
+  ],
+  "target_matches": true,
+  "head": "38d829167042dc26efd7af502ce623c976d6e224"
+}

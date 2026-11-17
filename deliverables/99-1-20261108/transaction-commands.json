@@ -1,0 +1,38 @@
+[
+  {
+    "label": "BASELINE",
+    "command": [
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/RUN_PROBE.sh",
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/baseline/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java"
+    ],
+    "cwd": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub",
+    "exit": 0
+  },
+  {
+    "label": "MODIFIED",
+    "command": [
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/RUN_PROBE.sh",
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/modified/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java"
+    ],
+    "cwd": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub",
+    "exit": 0
+  },
+  {
+    "label": "ROLLBACK-script",
+    "command": [
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/ROLLBACK.sh",
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/rollback-copy/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java"
+    ],
+    "cwd": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub",
+    "exit": 0
+  },
+  {
+    "label": "ROLLBACK",
+    "command": [
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/RUN_PROBE.sh",
+      "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-1-20261108/rollback-copy/server/src/main/java/com/workforcehub/auth/security/AdminPermissionFilter.java"
+    ],
+    "cwd": "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub",
+    "exit": 0
+  }
+]

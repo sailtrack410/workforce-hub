@@ -1,0 +1,20 @@
+{
+  "target": "/Users/sailtrack/工程文件/java_web/workforce-hub",
+  "head": "77d4fe743bf4ffe199b07e90ac2953609d9fbde0",
+  "production_paths": [
+    "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java",
+    "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowContext.java",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java"
+  ],
+  "baseline_hashes": {
+    "server/src/main/java/com/workforcehub/ragflow/repository/RagflowRepository.java": "7f63dcd62be348fd7013de930a2677a4cf4a6119b742b8956f69897e351de981",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowKnowledgeSearchService.java": "cf69e1fd4c204b2d50a30ab22878f7d9ad0429b5c8fa9ccb2e464e5664120163",
+    "server/src/main/java/com/workforcehub/ragflow/service/RagflowAdminService.java": "13b8be315e37aab8ea0175f139cd330bb2917e3a20d656896207efaf4f530f49",
+    "server/src/main/java/com/workforcehub/agent/service/AgentToolExecutionService.java": "e618f4e953e4b8fce50d1b1e889e379c055deef97c0295141e53ea38005fdce9",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowContext.java": "a921c3bb026b08046e10d6b68ad22dc3417684d97560b4a04cdd616e13e333c4",
+    "server/src/main/java/com/workforcehub/agent/workflow/WorkflowExecutor.java": "6863fa4f15fd95624c4d25b0716c0fc9ca97b3b162d8dfe87fb4b51178503671"
+  }
+}

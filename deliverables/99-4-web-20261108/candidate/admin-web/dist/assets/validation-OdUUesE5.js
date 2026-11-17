@@ -1,0 +1,1 @@
+function n(r,t){return r.trim()?"":`请输入${t}`}function i(r,t,e){return r.trim().length<=t?"":`${e}不能超过 ${t} 个字符`}function o(r,t){return/^[A-Z][A-Z0-9_]*$/.test(r.trim())?"":`${t}仅支持大写字母、数字和下划线，且需以字母开头`}function u(r){const t=r.trim();return t?/^\+?[0-9][0-9 -]{5,30}[0-9]$/.test(t)?"":"请输入有效手机号，仅支持数字、空格、短横线和国际区号":""}export{u as a,o as c,i as m,n as r};

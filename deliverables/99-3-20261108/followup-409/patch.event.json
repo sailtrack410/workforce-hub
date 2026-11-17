@@ -1,0 +1,10 @@
+{
+  "command": [
+    "patch",
+    "-p1",
+    "-d",
+    "/Users/sailtrack/\u5de5\u7a0b\u6587\u4ef6/java_web/workforce-hub/deliverables/99-3-20261108/followup-409/patch-reconstruction"
+  ],
+  "exit": 0,
+  "matches": "6/6"
+}

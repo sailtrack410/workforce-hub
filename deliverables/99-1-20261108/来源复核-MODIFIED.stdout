@@ -1,0 +1,4 @@
+input=POST /api/admin/im/outbox-events/dispatch; permissions=[]
+filterChainInvoked=false; mockResponseStatus=403
+body={"code":100403,"message":"无权限访问","data":null,"requestId":null}
+boundary=filter probe only; no HTTP business success claimed
