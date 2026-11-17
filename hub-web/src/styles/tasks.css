@@ -1,0 +1,201 @@
+/* 团队任务页样式（画布 30:4645） */
+.tk-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  background: var(--hw-canvas);
+  overflow-y: auto;
+}
+
+.tk-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.tk-head h1 { font-size: 20px; font-weight: 600; }
+.tk-head p { margin-top: 4px; font-size: 13px; color: var(--hw-tertiary); }
+.tk-head-spacer { flex: 1; }
+.tk-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--hw-primary);
+  color: var(--hw-on-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tk-btn-primary:hover { background: var(--hw-primary-deep); }
+
+.tk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tk-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--hw-chip);
+}
+.tk-tabs button {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--hw-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.tk-tabs button.active { background: var(--hw-card); color: var(--hw-ink); font-weight: 500; box-shadow: var(--hw-shadow-switch); }
+.tk-view-switch { margin-left: auto; display: flex; gap: 4px; }
+.tk-view-switch button {
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--hw-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.tk-view-switch button.active { background: var(--hw-chip); color: var(--hw-ink); font-weight: 500; }
+
+.tk-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--hw-card);
+  box-shadow: var(--hw-shadow-card);
+}
+
+/* 泳道：左列固定 120px + 7 天等宽区域，任务色条绝对定位 */
+.tk-lane { min-width: 0; }
+.tk-lane-header { display: grid; grid-template-columns: 120px repeat(7, 1fr); border-bottom: 1px solid var(--hw-border); }
+.tk-lane-head-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px;
+  font-size: 12px;
+  color: var(--hw-tertiary);
+}
+.tk-lane-head-cell.today { color: var(--hw-primary); font-weight: 600; }
+.tk-lane-row { display: flex; align-items: stretch; }
+.tk-lane-row:not(:last-child) { border-bottom: 1px solid var(--hw-border); }
+.tk-lane-name-cell {
+  flex: none;
+  width: 120px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--hw-ink);
+  font-weight: 500;
+}
+.tk-lane-area { position: relative; flex: 1; display: flex; min-width: 0; }
+.tk-lane-day {
+  flex: 1;
+  border-left: 1px solid var(--hw-border);
+}
+.tk-lane-day.today { background: var(--hw-chip); }
+.tk-lane-day.today::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--hw-primary);
+  opacity: 0.5;
+}
+.tk-task-bar {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--hw-ink);
+  cursor: pointer;
+  overflow: hidden;
+}
+.tk-task-bar strong { display: block; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.tk-task-bar small { display: block; color: var(--hw-tertiary); font-size: 11px; white-space: nowrap; }
+.tk-task-bar.todo { background: var(--hw-sky); }
+.tk-task-bar.progress { background: var(--hw-sky-strong); color: #fff; }
+.tk-task-bar.progress small { color: var(--hw-nav-text); }
+.tk-task-bar.review { background: var(--hw-amber-bg); }
+.tk-task-bar.done { background: var(--hw-green-bg); }
+.tk-task-bar.done strong { text-decoration: line-through; color: var(--hw-tertiary); }
+
+/* 列表视图 */
+.tk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tk-table th, .tk-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--hw-border); }
+.tk-table th { font-size: 12px; font-weight: 500; color: var(--hw-muted); }
+.tk-table tbody tr { cursor: pointer; }
+.tk-table tbody tr:hover { background: var(--hw-chip); }
+.tk-status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.tk-status.todo { background: var(--hw-sky); color: var(--hw-secondary); }
+.tk-status.progress { background: var(--hw-primary); color: #fff; }
+.tk-status.review { background: var(--hw-amber-bg); color: var(--hw-amber-strong); }
+.tk-status.done { background: var(--hw-green-bg); color: var(--hw-green); }
+
+/* 弹层表单 */
+.tk-form { display: flex; flex-direction: column; gap: 14px; width: 360px; }
+.tk-form h2 { font-size: 16px; font-weight: 600; }
+.tk-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--hw-secondary); }
+.tk-form input, .tk-form textarea, .tk-form select {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--hw-border);
+  border-radius: 8px;
+  background: var(--hw-inner);
+  color: var(--hw-ink);
+  font-size: 13px;
+}
+.tk-form textarea { height: auto; min-height: 72px; padding: 8px 12px; resize: vertical; }
+.tk-form-row { display: flex; gap: 10px; }
+.tk-form-row label { flex: 1; }
+.tk-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+/* 详情弹层 */
+.tk-detail { display: flex; flex-direction: column; gap: 14px; width: 360px; }
+.tk-detail h2 { font-size: 16px; font-weight: 600; }
+.tk-detail dl { display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.tk-detail dt { font-size: 12px; color: var(--hw-muted); }
+.tk-detail dd { margin-top: 2px; color: var(--hw-ink); }
+.tk-detail-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.tk-confirm {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--hw-red-bg);
+  color: var(--hw-red);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tk-confirm button {
+  border: 0;
+  background: var(--hw-red);
+  color: #fff;
+  border-radius: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  cursor: pointer;
+}

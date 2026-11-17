@@ -254,3 +254,30 @@ export interface SysNotificationResponse {
   read: boolean;
   createdAt: string;
 }
+
+/* ---------- 团队任务 ---------- */
+export interface TeamTaskResponse {
+  taskId: EntityId;
+  title: string;
+  description?: string | null;
+  assigneeId: EntityId;
+  assigneeName?: string | null;
+  creatorId?: EntityId | null;
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+  startDate: string;
+  endDate: string;
+  groupId?: EntityId | null;
+}
+
+/* ---------- 个人待办 ---------- */
+export interface PersonalTodoResponse {
+  todoId: EntityId;
+  ownerId: EntityId;
+  title: string;
+  category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER';
+  status: 'PENDING' | 'DONE';
+  dueAt?: string | null;
+  note?: string | null;
+  createdAt?: string | null;
+  completedAt?: string | null;
+}

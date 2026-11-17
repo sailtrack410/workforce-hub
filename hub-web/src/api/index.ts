@@ -20,7 +20,9 @@ import type {
   OrgUserDetailResponse,
   OrgUserSummaryResponse,
   PageResult,
+  PersonalTodoResponse,
   SysNotificationResponse,
+  TeamTaskResponse,
   UploadTicketResponse,
   WorkflowRequestSummaryResponse,
   WorkflowTodoResponse,
@@ -167,4 +169,29 @@ export const fileApi = {
   createDownloadTicket: (attachmentRefId: EntityId, downloadType: 'INLINE' | 'ATTACHMENT' = 'INLINE') =>
     http.post<DownloadTicketResponse>(`/api/employee/files/${id(attachmentRefId)}/download-tickets`, { downloadType }),
   downloadUrl: (ticketNo: string) => `/api/employee/files/download/${encodeURIComponent(ticketNo)}`,
+};
+
+export const teamTaskApi = {
+  list: (query: { assigneeId?: string; status?: string; start?: string; end?: string } = {}) =>
+    http.get<TeamTaskResponse[]>('/api/employee/team-tasks', query),
+  create: (request: { title: string; description?: string; assigneeId: string; startDate: string; endDate: string; groupId?: string }) =>
+    http.post<TeamTaskResponse>('/api/employee/team-tasks', request),
+  detail: (taskId: EntityId) => http.get<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}`),
+  update: (taskId: EntityId, request: { title: string; description?: string; assigneeId: string; startDate: string; endDate: string; groupId?: string }) =>
+    http.put<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}`, request),
+  updateStatus: (taskId: EntityId, status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE') =>
+    http.put<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}/status`, { status }),
+  remove: (taskId: EntityId) => http.delete<void>(`/api/employee/team-tasks/${id(taskId)}`),
+};
+
+export const personalTodoApi = {
+  list: (query: { category?: string; status?: string; start?: string; end?: string } = {}) =>
+    http.get<PersonalTodoResponse[]>('/api/employee/personal-todos', query),
+  create: (request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; dueAt?: string; note?: string }) =>
+    http.post<PersonalTodoResponse>('/api/employee/personal-todos', request),
+  update: (todoId: EntityId, request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; dueAt?: string; note?: string }) =>
+    http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}`, request),
+  complete: (todoId: EntityId) => http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}/complete`),
+  reopen: (todoId: EntityId) => http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}/reopen`),
+  remove: (todoId: EntityId) => http.delete<void>(`/api/employee/personal-todos/${id(todoId)}`),
 };

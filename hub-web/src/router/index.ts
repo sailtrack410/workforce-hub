@@ -8,6 +8,8 @@ const MessagesView = () => import('@/views/MessagesView.vue');
 const AttendanceView = () => import('@/views/AttendanceView.vue');
 const ProfileView = () => import('@/views/ProfileView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
+const TasksView = () => import('@/views/TasksView.vue');
+const TodosView = () => import('@/views/TodosView.vue');
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -20,7 +22,9 @@ export const router = createRouter({
     { path: '/attendance', name: 'attendance', component: AttendanceView },
     { path: '/profile', name: 'profile', component: ProfileView },
     { path: '/settings', name: 'settings', component: SettingsView },
-    ...['tasks', 'todos', 'approvals', 'knowledge', 'drive', 'contacts'].map((name) => ({
+    { path: '/tasks', name: 'tasks', component: TasksView },
+    { path: '/todos', name: 'todos', component: TodosView },
+    ...['approvals', 'knowledge', 'drive', 'contacts'].map((name) => ({
       path: `/${name}`, name, component: PlaceholderView,
     })),
     { path: '/agent', redirect: '/messages' },
