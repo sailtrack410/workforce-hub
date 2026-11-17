@@ -1,0 +1,172 @@
+/* 审批中心页样式（对齐 todos.css 页面级布局） */
+.ap-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  background: var(--hw-canvas);
+  overflow-y: auto;
+}
+
+.ap-head { display: flex; align-items: center; gap: 16px; }
+.ap-head h1 { font-size: 20px; font-weight: 600; }
+.ap-head p { margin-top: 4px; font-size: 13px; color: var(--hw-tertiary); }
+.ap-head-spacer { flex: 1; }
+.ap-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--hw-primary);
+  color: var(--hw-on-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ap-btn-primary:hover { background: var(--hw-primary-deep); }
+
+.ap-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--hw-card);
+  box-shadow: var(--hw-shadow-card);
+}
+.ap-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ap-card-head h2 { font-size: 15px; font-weight: 600; }
+
+.ap-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--hw-chip); }
+.ap-tabs button {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--hw-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ap-tabs button.active { background: var(--hw-card); color: var(--hw-ink); font-weight: 500; box-shadow: 0 1px 4px rgba(15, 30, 55, 0.08); }
+
+.ap-list { display: flex; flex-direction: column; }
+.ap-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--hw-border);
+  cursor: pointer;
+}
+.ap-row:last-child { border-bottom: 0; }
+.ap-row:hover { background: var(--hw-inner); }
+.ap-row-main { flex: 1; min-width: 0; }
+.ap-row-main strong { display: block; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-row-main small { display: block; margin-top: 2px; font-size: 12px; color: var(--hw-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-row-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.ap-row-actions button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ap-btn-approve { background: var(--hw-green-bg); color: var(--hw-green); }
+.ap-btn-approve:hover { background: var(--hw-green); color: var(--hw-on-primary); }
+.ap-btn-reject { background: var(--hw-chip); color: var(--hw-red); }
+.ap-btn-reject:hover { background: var(--hw-red-bg); }
+
+.ap-status {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--hw-chip);
+  color: var(--hw-secondary);
+}
+.ap-status.success { background: var(--hw-green-bg); color: var(--hw-green); }
+.ap-status.info { background: var(--hw-sky); color: var(--hw-primary); }
+.ap-status.warn { background: var(--hw-amber-bg); color: var(--hw-amber-strong); }
+.ap-status.danger { background: var(--hw-red-bg); color: var(--hw-red); }
+
+.ap-pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 12px; color: var(--hw-tertiary); }
+.ap-pager button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--hw-border);
+  border-radius: 6px;
+  background: var(--hw-card);
+  color: var(--hw-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ap-pager button:disabled { opacity: 0.4; cursor: default; }
+
+/* 弹层表单 */
+.ap-form { display: flex; flex-direction: column; gap: 12px; min-width: 420px; }
+.ap-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--hw-secondary); }
+.ap-form input,
+.ap-form select,
+.ap-form textarea {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--hw-border);
+  border-radius: 8px;
+  background: var(--hw-inner);
+  color: var(--hw-ink);
+  font-size: 13px;
+  outline: none;
+}
+.ap-form textarea { height: auto; min-height: 72px; padding: 8px 10px; resize: vertical; font-family: inherit; }
+.ap-form input:focus,
+.ap-form select:focus,
+.ap-form textarea:focus { border-color: var(--hw-focus); }
+.ap-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ap-type-grid button {
+  height: 60px;
+  border: 1px solid var(--hw-border);
+  border-radius: 10px;
+  background: var(--hw-inner);
+  color: var(--hw-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ap-type-grid button.active { border-color: var(--hw-primary); background: var(--hw-sky); color: var(--hw-primary); font-weight: 500; }
+.ap-duration { font-size: 13px; color: var(--hw-primary); }
+.ap-form-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+/* 详情弹层 */
+.ap-detail { display: flex; flex-direction: column; gap: 14px; min-width: 480px; }
+.ap-detail-title h3 { font-size: 16px; font-weight: 600; }
+.ap-detail-title p { margin-top: 4px; font-size: 12px; color: var(--hw-tertiary); }
+.ap-meta { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px; }
+.ap-meta dt { color: var(--hw-tertiary); }
+.ap-meta dd { margin: 0; color: var(--hw-ink); overflow-wrap: anywhere; }
+.ap-section h4 { margin: 8px 0 6px; font-size: 13px; font-weight: 600; color: var(--hw-secondary); }
+.ap-timeline { display: flex; flex-direction: column; gap: 8px; }
+.ap-timeline-item { display: flex; gap: 8px; font-size: 12px; }
+.ap-timeline-item small { color: var(--hw-tertiary); flex-shrink: 0; }
+.ap-attachments { display: flex; flex-direction: column; gap: 6px; }
+.ap-attachments button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--hw-border);
+  border-radius: 6px;
+  background: var(--hw-card);
+  color: var(--hw-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ap-attachments button:hover { background: var(--hw-inner); }

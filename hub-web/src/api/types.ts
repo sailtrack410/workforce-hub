@@ -129,6 +129,8 @@ export interface WorkflowTodoResponse {
   statusName?: string | null;
   priority?: string | null;
   priorityName?: string | null;
+  aiVerdict?: string | null;
+  aiVerdictName?: string | null;
   createdAt?: string | null;
 }
 export interface WorkflowRequestSummaryResponse {
@@ -142,6 +144,74 @@ export interface WorkflowRequestSummaryResponse {
   currentStepName?: string | null;
   submittedAt?: string | null;
   finishedAt?: string | null;
+}
+export interface WorkflowRequestCreateResponse {
+  requestId: EntityId;
+  requestNo: string;
+  status: string;
+  statusName?: string | null;
+}
+export interface WorkflowRequestStatusResponse {
+  requestId: EntityId;
+  status: string;
+  statusName?: string | null;
+}
+export interface WorkflowLeaveDetailResponse {
+  leaveTypeId?: EntityId | null;
+  leaveName?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  durationMinutes?: number | null;
+  reason?: string | null;
+}
+export interface WorkflowClockCorrectionDetailResponse {
+  targetDate?: string | null;
+  missingPunchType?: string | null;
+  missingPunchTypeName?: string | null;
+  expectedPunchAt?: string | null;
+  reason?: string | null;
+}
+export interface WorkflowRequestAttachmentResponse {
+  attachmentRefId: EntityId;
+  displayName?: string | null;
+  mimeType?: string | null;
+  fileSize?: number | null;
+}
+export interface WorkflowRequestDetailResponse {
+  requestId: EntityId;
+  requestNo: string;
+  bizType: string;
+  bizTypeName?: string | null;
+  title: string;
+  status: string;
+  statusName?: string | null;
+  currentStepName?: string | null;
+  submittedAt?: string | null;
+  finishedAt?: string | null;
+  leave?: WorkflowLeaveDetailResponse | null;
+  clockCorrection?: WorkflowClockCorrectionDetailResponse | null;
+  generic?: { processCode?: string | null; summary?: string | null; formPayload?: unknown } | null;
+  attachments: WorkflowRequestAttachmentResponse[];
+}
+export interface WorkflowTaskActionResponse {
+  actionId: EntityId;
+  stepName?: string | null;
+  actorName?: string | null;
+  actionType: string;
+  actionTypeName?: string | null;
+  comment?: string | null;
+  actedAt?: string | null;
+}
+export interface WorkflowCcResponse {
+  requestId: string;
+  requestNo: string;
+  bizTypeName?: string | null;
+  title: string;
+  applicantName?: string | null;
+  ccAt?: string | null;
+  status: string;
+  statusName?: string | null;
+  read: boolean;
 }
 export interface PageResult<T> {
   pageNo: number;
@@ -223,6 +293,24 @@ export interface EmployeeFileResponse {
   folderId?: EntityId | null;
   uploaderName?: string | null;
   createdAt?: string | null;
+}
+export interface EmployeeFileFolderResponse {
+  folderId: EntityId;
+  parentFolderId?: EntityId | null;
+  folderName: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+export interface EmployeeFileBrowserResponse {
+  currentFolderId?: EntityId | null;
+  breadcrumbs: EmployeeFileFolderResponse[];
+  folders: EmployeeFileFolderResponse[];
+  files: EmployeeFileResponse[];
+}
+export interface FileTrashResponse {
+  attachmentRefId: EntityId;
+  deletedAt?: string | null;
+  purgeAfter?: string | null;
 }
 
 /* ---------- 批次⑫ 联调新增（2026-10-15 后端已实现） ---------- */

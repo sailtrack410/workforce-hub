@@ -1,0 +1,114 @@
+/* 知识库页样式 */
+.kb-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  background: var(--hw-canvas);
+  overflow-y: auto;
+}
+
+.kb-head { display: flex; align-items: center; gap: 16px; }
+.kb-head h1 { font-size: 20px; font-weight: 600; }
+.kb-head p { margin-top: 4px; font-size: 13px; color: var(--hw-tertiary); }
+.kb-head-spacer { flex: 1; }
+.kb-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--hw-primary);
+  color: var(--hw-on-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.kb-btn-primary:hover { background: var(--hw-primary-deep); }
+
+.kb-toolbar { display: flex; align-items: center; gap: 12px; }
+.kb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 280px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--hw-card);
+  border: 1px solid var(--hw-border);
+  color: var(--hw-muted);
+}
+.kb-search input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--hw-ink);
+  font-size: 13px;
+}
+
+.kb-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
+.kb-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 180px;
+  flex: none;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--hw-card);
+  box-shadow: var(--hw-shadow-card);
+  height: fit-content;
+}
+.kb-side button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hw-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.kb-side button.active { background: var(--hw-chip); color: var(--hw-ink); font-weight: 500; }
+
+.kb-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--hw-card);
+  box-shadow: var(--hw-shadow-card);
+}
+
+.kb-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--hw-inner);
+  margin-bottom: 8px;
+  cursor: pointer;
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+  color: var(--hw-ink);
+}
+.kb-doc:hover { background: var(--hw-chip); }
+.kb-doc strong { font-size: 13px; font-weight: 500; }
+.kb-doc small { font-size: 12px; color: var(--hw-tertiary); }
+.kb-doc span { font-size: 11px; color: var(--hw-muted); }

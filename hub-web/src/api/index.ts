@@ -7,6 +7,8 @@ import type {
   AttendanceScheduleResponse,
   CurrentUserResponse,
   DownloadTicketResponse,
+  EmployeeFileBrowserResponse,
+  EmployeeFileFolderResponse,
   EmployeeFileResponse,
   EntityId,
   ImConversationDetailResponse,
@@ -23,8 +25,14 @@ import type {
   PersonalTodoResponse,
   SysNotificationResponse,
   TeamTaskResponse,
+  FileTrashResponse,
   UploadTicketResponse,
+  WorkflowCcResponse,
+  WorkflowRequestCreateResponse,
+  WorkflowRequestDetailResponse,
+  WorkflowRequestStatusResponse,
   WorkflowRequestSummaryResponse,
+  WorkflowTaskActionResponse,
   WorkflowTodoResponse,
 } from './types';
 
@@ -100,6 +108,7 @@ export const imApi = {
 };
 
 export const contactsApi = {
+  listFriends: () => http.get<OrgUserSummaryResponse[]>('/api/employee/contacts/friends'),
   updateFriendRemark: (userId: EntityId, remarkName: string) =>
     http.put<OrgUserSummaryResponse>(`/api/employee/contacts/friends/${id(userId)}`, { remarkName }),
 };
@@ -118,6 +127,25 @@ export const workflowApi = {
     http.post<void>(`/api/employee/workflow/tasks/${encodeURIComponent(taskId)}/reject`, { comment }),
   withdrawRequest: (requestId: EntityId, comment: string) =>
     http.post<void>(`/api/employee/workflow/requests/${id(requestId)}/withdraw`, { comment }),
+  requestDetail: (requestId: EntityId) =>
+    http.get<WorkflowRequestDetailResponse>(`/api/employee/workflow/requests/${id(requestId)}`),
+  requestActions: (requestId: EntityId) =>
+    http.get<WorkflowTaskActionResponse[]>(`/api/employee/workflow/requests/${id(requestId)}/actions`),
+  submitGenericRequest: (request: { processCode: string; title?: string; summary?: string; formPayload?: Record<string, unknown> }) =>
+    http.post<WorkflowRequestCreateResponse>('/api/employee/workflow/generic-requests', request),
+  submitLeaveRequest: (request: { leaveTypeId: EntityId; startAt: string; endAt: string; durationMinutes: number; reason: string }) =>
+    http.post<WorkflowRequestCreateResponse>('/api/employee/workflow/leave-requests', request),
+  submitClockCorrectionRequest: (request: { targetDate: string; missingPunchType: 'ON_DUTY' | 'OFF_DUTY'; expectedPunchAt: string; reason: string }) =>
+    http.post<WorkflowRequestCreateResponse>('/api/employee/workflow/clock-correction-requests', request),
+  previewLeaveDuration: (startAt: string, endAt: string) =>
+    http.get<{ durationMinutes: number }>('/api/employee/workflow/leave-duration', { startAt, endAt }),
+  ccList: (query: { pageNo?: number; pageSize?: number } = {}) =>
+    http.get<PageResult<WorkflowCcResponse>>('/api/employee/workflow/cc-list', query),
+  markCcRead: (requestId: string) =>
+    http.post<void>(`/api/employee/workflow/cc-list/${encodeURIComponent(requestId)}/read`),
+  attachmentDownloadTicket: (requestId: EntityId, attachmentRefId: EntityId, downloadType: 'INLINE' | 'ATTACHMENT' = 'ATTACHMENT') =>
+    http.post<DownloadTicketResponse>(`/api/employee/workflow/requests/${id(requestId)}/attachments/${id(attachmentRefId)}/download-tickets`, { downloadType }),
+  attachmentDownloadUrl: (ticketNo: string) => `/api/employee/workflow/attachments/download/${encodeURIComponent(ticketNo)}`,
 };
 
 export const attendanceApi = {
@@ -169,6 +197,13 @@ export const fileApi = {
   createDownloadTicket: (attachmentRefId: EntityId, downloadType: 'INLINE' | 'ATTACHMENT' = 'INLINE') =>
     http.post<DownloadTicketResponse>(`/api/employee/files/${id(attachmentRefId)}/download-tickets`, { downloadType }),
   downloadUrl: (ticketNo: string) => `/api/employee/files/download/${encodeURIComponent(ticketNo)}`,
+  browser: (query: { folderId?: EntityId; keyword?: string; fileType?: string } = {}) =>
+    http.get<EmployeeFileBrowserResponse>('/api/employee/files/browser', query),
+  folders: () => http.get<EmployeeFileFolderResponse[]>('/api/employee/files/folders'),
+  createFolder: (request: { parentFolderId?: EntityId | null; folderName: string }) =>
+    http.post<EmployeeFileFolderResponse>('/api/employee/files/folders', request),
+  trash: (attachmentRefId: EntityId, reason?: string) =>
+    http.post<FileTrashResponse>(`/api/employee/files/${id(attachmentRefId)}/trash`, { reason }),
 };
 
 export const teamTaskApi = {

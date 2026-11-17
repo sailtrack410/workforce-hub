@@ -10,6 +10,11 @@ const ProfileView = () => import('@/views/ProfileView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
 const TasksView = () => import('@/views/TasksView.vue');
 const TodosView = () => import('@/views/TodosView.vue');
+const ContactsView = () => import('@/views/ContactsView.vue');
+const NotificationsView = () => import('@/views/NotificationsView.vue');
+const ApprovalsView = () => import('@/views/ApprovalsView.vue');
+const KnowledgeView = () => import('@/views/KnowledgeView.vue');
+const DriveView = () => import('@/views/DriveView.vue');
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -24,9 +29,11 @@ export const router = createRouter({
     { path: '/settings', name: 'settings', component: SettingsView },
     { path: '/tasks', name: 'tasks', component: TasksView },
     { path: '/todos', name: 'todos', component: TodosView },
-    ...['approvals', 'knowledge', 'drive', 'contacts'].map((name) => ({
-      path: `/${name}`, name, component: PlaceholderView,
-    })),
+    { path: '/knowledge', name: 'knowledge', component: KnowledgeView },
+    { path: '/drive', name: 'drive', component: DriveView },
+    { path: '/contacts', name: 'contacts', component: ContactsView },
+    { path: '/notifications', name: 'notifications', component: NotificationsView },
+    { path: '/approvals', name: 'approvals', component: ApprovalsView },
     { path: '/agent', redirect: '/messages' },
     { path: '/', redirect: '/messages' },
     { path: '/:pathMatch(.*)*', redirect: '/messages' },

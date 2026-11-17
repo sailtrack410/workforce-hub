@@ -12,6 +12,7 @@ import HubToast from '@/components/base/HubToast.vue';
 import { useSessionStore } from '@/stores/session';
 import { useImStore } from '@/stores/im';
 import { useToast } from '@/composables/useToast';
+import { notificationApi } from '@/api';
 import { NAV_MAX_WIDTH, NAV_MIN_WIDTH, navigationWidth } from '@/utils/imLayout';
 
 const session = useSessionStore();
@@ -25,12 +26,14 @@ const navResizing = ref(false);
 const theme = ref<'light' | 'dark'>('light');
 const searchKeyword = ref('');
 let resizeCleanup: (() => void) | null = null;
+let notificationTimer: number | null = null;
 
 const primaryNav = [
   { id: 'messages', label: '消息', path: '/messages', icon: MessageSquare },
   { id: 'workbench', label: '工作台', path: '/workbench', icon: LayoutDashboard },
   { id: 'tasks', label: '任务', path: '/tasks', icon: CheckSquare },
   { id: 'todos', label: '待办', path: '/todos', icon: Bell },
+  { id: 'notifications', label: '通知', path: '/notifications', icon: Bell },
   { id: 'approvals', label: '审批', path: '/approvals', icon: Stamp },
   { id: 'attendance', label: '考勤', path: '/attendance', icon: CalendarDays },
   { id: 'knowledge', label: '知识库', path: '/knowledge', icon: BookOpen },
@@ -39,6 +42,7 @@ const primaryNav = [
 ];
 const activeId = computed(() => primaryNav.find((item) => route.path.startsWith(item.path))?.id ?? '');
 const unreadTotal = computed(() => im.conversations.reduce((sum, item) => sum + (item.mute ? 0 : item.unreadCount), 0));
+const notificationUnread = ref(0);
 const displayName = computed(() => session.displayName || '同事');
 
 function readPreference(key: string) {
@@ -131,9 +135,15 @@ onMounted(async () => {
   }
   void session.loadOrgProfile();
   void im.loadConversations().catch(() => undefined);
+  notificationApi.unreadCount().then((count) => { notificationUnread.value = count; }).catch(() => undefined);
+  // 通知未读数轮询（30s），进入通知页后由页面自行刷新
+  notificationTimer = window.setInterval(() => {
+    notificationApi.unreadCount().then((count) => { notificationUnread.value = count; }).catch(() => undefined);
+  }, 30000);
 });
 onBeforeUnmount(() => {
   resizeCleanup?.();
+  if (notificationTimer !== null) window.clearInterval(notificationTimer);
   document.removeEventListener('click', onDocumentClick);
   document.removeEventListener('keydown', onKeydown);
 });
@@ -166,6 +176,7 @@ onBeforeUnmount(() => {
             <component :is="item.icon" :size="20" :stroke-width="2" />
             <span class="hw-nav-label">{{ item.label }}</span>
             <em v-if="item.id === 'messages' && unreadTotal" class="hw-nav-badge">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</em>
+            <em v-else-if="item.id === 'notifications' && notificationUnread" class="hw-nav-badge">{{ notificationUnread > 99 ? '99+' : notificationUnread }}</em>
           </button>
         </nav>
 
