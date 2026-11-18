@@ -210,7 +210,10 @@ onBeforeUnmount(() => {
         :tabindex="accountOpen ? -1 : 0" :style="{ pointerEvents: accountOpen ? 'none' : undefined }" @pointerdown="startNavResize"
         @keydown.left.prevent="resizeNavByKeyboard(-4)" @keydown.right.prevent="resizeNavByKeyboard(4)"
       />
-      <main class="hw-content"><slot /></main>
+      <main class="hw-content">
+        <!-- RouterView 内置于壳内而非 slot：App 层 slot 缓存导致路由切换后视图冻结（复现：首次导航后 DOM 停在首屏） -->
+        <router-view />
+      </main>
     </div>
     <HubToast :message="toastMessage" />
   </div>

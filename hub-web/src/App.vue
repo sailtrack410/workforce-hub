@@ -15,7 +15,5 @@ const bare = computed(() => route.name === 'login' || route.name === 'register')
 
 <template>
   <router-view v-if="bare" />
-  <HubShell v-else>
-    <router-view />
-  </HubShell>
+  <HubShell v-else />
 </template>
