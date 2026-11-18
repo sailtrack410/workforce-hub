@@ -12,10 +12,10 @@
     "desktop:pack": "npm run build && electron-packager . 'Workforce Hub' --out=desktop-dist --overwrite --prune=true --ignore='^/(desktop-dist|src|node_modules/.cache)'"
   },
   "dependencies": {
-    "lucide-vue-next": "^0.469.0",
+    "lucide-vue-next": "0.499.0",
     "pinia": "^2.2.6",
-    "vue": "^3.5.13",
-    "vue-router": "^4.4.5"
+    "vue": "3.5.45",
+    "vue-router": "4.6.5"
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",

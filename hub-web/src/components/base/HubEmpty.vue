@@ -8,17 +8,19 @@ import { Inbox } from 'lucide-vue-next';
 withDefaults(defineProps<{
   title?: string;
   note?: string;
-  icon?: Component;
+  // 不能给 lucide 图标作 default：Vue 会把函数型默认值当 props 工厂调用，
+  // 触发 Inbox.call(null, props) → 解构 { slots } 抛错并冻结渲染调度。默认值改为 null，模板兜底。
+  icon?: Component | null;
 }>(), {
   title: '暂无数据',
   note: '',
-  icon: Inbox,
+  icon: null,
 });
 </script>
 
 <template>
   <div class="hw-empty">
-    <span class="hw-empty-icon"><component :is="icon" :size="20" :stroke-width="2" /></span>
+    <span class="hw-empty-icon"><component :is="icon ?? Inbox" :size="20" :stroke-width="2" /></span>
     <strong>{{ title }}</strong>
     <small v-if="note">{{ note }}</small>
     <div v-if="$slots.default" class="hw-empty-actions"><slot /></div>

@@ -128,7 +128,8 @@ async function submitCreate() {
     await personalTodoApi.create({
       title: form.value.title.trim(),
       category: form.value.category,
-      dueAt: form.value.dueAt || undefined,
+      // datetime-local 值为分钟精度（yyyy-MM-ddTHH:mm），后端 LocalDateTime 反序列化要求带秒，补 ":00"。
+      dueAt: form.value.dueAt ? form.value.dueAt.replace("T", " ") + ":00" : undefined,
       note: form.value.note.trim() || undefined,
     });
     showToast('待办已创建');
