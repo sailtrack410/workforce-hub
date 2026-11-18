@@ -46,7 +46,7 @@ const hasMore = computed(() => items.value.length < total.value);
 
 const unreadTotal = ref(0);
 async function refreshUnread() {
-  try { unreadTotal.value = await notificationApi.unreadCount(); } catch { /* 徽标失败不阻断 */ }
+  try { unreadTotal.value = (await notificationApi.unreadCount())?.unreadCount ?? 0; } catch { /* 徽标失败不阻断 */ }
 }
 
 async function markAllRead() {

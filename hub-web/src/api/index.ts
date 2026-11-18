@@ -162,7 +162,7 @@ export const attendanceApi = {
 export const notificationApi = {
   list: (query: { pageNo?: number; pageSize?: number } = {}) =>
     http.get<PageResult<SysNotificationResponse> | SysNotificationResponse[]>('/api/employee/notifications', query),
-  unreadCount: () => http.get<number>('/api/employee/notifications/unread-count'),
+  unreadCount: () => http.get<{ unreadCount: number }>('/api/employee/notifications/unread-count'),
   markRead: (notificationId: EntityId) =>
     http.post<void>(`/api/employee/notifications/${id(notificationId)}/read`),
   markAllRead: () => http.post<void>('/api/employee/notifications/read-all'),

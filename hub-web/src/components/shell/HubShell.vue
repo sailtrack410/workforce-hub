@@ -135,10 +135,10 @@ onMounted(async () => {
   }
   void session.loadOrgProfile();
   void im.loadConversations().catch(() => undefined);
-  notificationApi.unreadCount().then((count) => { notificationUnread.value = count; }).catch(() => undefined);
+  notificationApi.unreadCount().then((payload) => { notificationUnread.value = payload?.unreadCount ?? 0; }).catch(() => undefined);
   // 通知未读数轮询（30s），进入通知页后由页面自行刷新
   notificationTimer = window.setInterval(() => {
-    notificationApi.unreadCount().then((count) => { notificationUnread.value = count; }).catch(() => undefined);
+    notificationApi.unreadCount().then((payload) => { notificationUnread.value = payload?.unreadCount ?? 0; }).catch(() => undefined);
   }, 30000);
 });
 onBeforeUnmount(() => {
@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
         @keydown.left.prevent="resizeNavByKeyboard(-4)" @keydown.right.prevent="resizeNavByKeyboard(4)"
       />
       <main class="hw-content">
-        <!-- RouterView 内置于壳内而非 slot：App 层 slot 缓存导致路由切换后视图冻结（复现：首次导航后 DOM 停在首屏） -->
+        <!-- RouterView 内置于壳内而非 slot：App 层 slot 缓存导致路由切换后视图冻结（首次导航后 DOM 停在首屏，点击导航只改 URL 不换页） -->
         <router-view />
       </main>
     </div>
