@@ -31,23 +31,27 @@ public class TeamTaskRepository {
             Date.valueOf(task.getStartDate()), Date.valueOf(task.getEndDate()), task.getGroupId());
     }
 
-    public void update(TeamTaskResponse task) {
-        jdbcTemplate.update("""
+    public int update(TeamTaskResponse task) {
+        return jdbcTemplate.update("""
             UPDATE team_task
             SET title = ?, description = ?, assignee_id = ?, status = ?, start_date = ?, end_date = ?, group_id = ?
-            WHERE task_id = ?
+            WHERE task_id = ? AND creator_id = ?
             """,
             task.getTitle(), task.getDescription(), task.getAssigneeId(), task.getStatus(),
             Date.valueOf(task.getStartDate()), Date.valueOf(task.getEndDate()), task.getGroupId(),
-            task.getTaskId());
+            task.getTaskId(), task.getCreatorId());
     }
 
-    public void updateStatus(Long taskId, String status) {
-        jdbcTemplate.update("UPDATE team_task SET status = ? WHERE task_id = ?", status, taskId);
+    public int updateStatus(Long taskId, Long userId, String status) {
+        // 负责人可能在读取后被重新分配，写入时必须再次校验当前关系。
+        return jdbcTemplate.update("""
+            UPDATE team_task SET status = ?
+            WHERE task_id = ? AND (creator_id = ? OR assignee_id = ?)
+            """, status, taskId, userId, userId);
     }
 
-    public void deleteById(Long taskId) {
-        jdbcTemplate.update("DELETE FROM team_task WHERE task_id = ?", taskId);
+    public int deleteById(Long taskId, Long creatorId) {
+        return jdbcTemplate.update("DELETE FROM team_task WHERE task_id = ? AND creator_id = ?", taskId, creatorId);
     }
 
     public Optional<TeamTaskResponse> findById(Long taskId) {
@@ -63,12 +67,14 @@ public class TeamTaskRepository {
         return rows.stream().findFirst();
     }
 
-    public List<TeamTaskResponse> find(Long assigneeId, String status, java.time.LocalDate start, java.time.LocalDate end) {
+    public List<TeamTaskResponse> find(Long userId, Long assigneeId, String status, java.time.LocalDate start, java.time.LocalDate end) {
         StringBuilder sql = new StringBuilder("""
             SELECT task_id, title, description, assignee_id, creator_id, status, start_date, end_date, group_id, created_at, updated_at
-            FROM team_task WHERE 1=1
+            FROM team_task WHERE (creator_id = ? OR assignee_id = ?)
             """);
         List<Object> params = new ArrayList<>();
+        params.add(userId);
+        params.add(userId);
         if (assigneeId != null) {
             sql.append(" AND assignee_id = ?");
             params.add(assigneeId);

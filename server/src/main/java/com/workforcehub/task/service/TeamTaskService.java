@@ -29,12 +29,13 @@ public class TeamTaskService {
 
     @Transactional(rollbackFor = Exception.class)
     public TeamTaskResponse create(TeamTaskSaveRequest request) {
+        Long creatorId = requireEmployeeId();
         TeamTaskResponse task = new TeamTaskResponse();
         task.setTaskId(IdGenerator.nextId());
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());
         task.setAssigneeId(request.getAssigneeId());
-        task.setCreatorId(CurrentUserHolder.requireUserId());
+        task.setCreatorId(creatorId);
         task.setStatus("TODO");
         task.setStartDate(request.getStartDate());
         task.setEndDate(request.getEndDate());
@@ -47,7 +48,7 @@ public class TeamTaskService {
         if (StringUtils.hasText(status) && !ALLOWED_STATUSES.contains(status)) {
             throw new BizException(400, "无效的任务状态");
         }
-        return teamTaskRepository.find(assigneeId, status, start, end);
+        return teamTaskRepository.find(requireEmployeeId(), assigneeId, status, start, end);
     }
 
     public TeamTaskResponse detail(Long taskId) {
@@ -57,13 +58,18 @@ public class TeamTaskService {
     @Transactional(rollbackFor = Exception.class)
     public TeamTaskResponse update(Long taskId, TeamTaskSaveRequest request) {
         TeamTaskResponse existing = requireTask(taskId);
+        if (!existing.getCreatorId().equals(CurrentUserHolder.requireUserId())) {
+            throw new BizException(403, "仅创建人可编辑团队任务");
+        }
         existing.setTitle(request.getTitle());
         existing.setDescription(request.getDescription());
         existing.setAssigneeId(request.getAssigneeId());
         existing.setStartDate(request.getStartDate());
         existing.setEndDate(request.getEndDate());
         existing.setGroupId(request.getGroupId());
-        teamTaskRepository.update(existing);
+        if (teamTaskRepository.update(existing) == 0) {
+            throw new BizException(404, "团队任务不存在");
+        }
         return requireTask(taskId);
     }
 
@@ -73,18 +79,36 @@ public class TeamTaskService {
             throw new BizException(400, "无效的任务状态");
         }
         requireTask(taskId);
-        teamTaskRepository.updateStatus(taskId, status);
+        if (teamTaskRepository.updateStatus(taskId, CurrentUserHolder.requireUserId(), status) == 0) {
+            throw new BizException(404, "团队任务不存在");
+        }
         return requireTask(taskId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long taskId) {
-        requireTask(taskId);
-        teamTaskRepository.deleteById(taskId);
+        TeamTaskResponse existing = requireTask(taskId);
+        Long userId = CurrentUserHolder.requireUserId();
+        if (!existing.getCreatorId().equals(userId)) {
+            throw new BizException(403, "仅创建人可删除团队任务");
+        }
+        if (teamTaskRepository.deleteById(taskId, userId) == 0) {
+            throw new BizException(404, "团队任务不存在");
+        }
     }
 
     private TeamTaskResponse requireTask(Long taskId) {
+        Long userId = requireEmployeeId();
         return teamTaskRepository.findById(taskId)
+            .filter(task -> userId.equals(task.getCreatorId()) || userId.equals(task.getAssigneeId()))
             .orElseThrow(() -> new BizException(404, "团队任务不存在"));
+    }
+
+    private Long requireEmployeeId() {
+        Long userId = CurrentUserHolder.requireUserId();
+        if (!CurrentUserHolder.isEmployee()) {
+            throw new BizException(403, "仅员工端支持团队任务");
+        }
+        return userId;
     }
 }
