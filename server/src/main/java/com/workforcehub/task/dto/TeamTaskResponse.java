@@ -21,6 +21,20 @@ public class TeamTaskResponse {
 
     private Long creatorId;
 
+    private String creatorName;
+
+    private String assigneeName;
+
+    private boolean canEdit;
+
+    private boolean canDelete;
+
+    private boolean canStart;
+
+    private boolean canComplete;
+
+    private boolean canReopen;
+
     private String status;
 
     private LocalDate startDate;

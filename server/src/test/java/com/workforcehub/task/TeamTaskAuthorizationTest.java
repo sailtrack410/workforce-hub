@@ -52,6 +52,12 @@ class TeamTaskAuthorizationTest {
         jdbc = new JdbcTemplate(source);
         new ResourceDatabasePopulator(new ClassPathResource(
             "db/migration/V71__add_team_task_and_personal_todo.sql")).execute(source);
+        jdbc.execute("""
+            CREATE TABLE org_user (id BIGINT PRIMARY KEY, real_name VARCHAR(128), primary_dept_id BIGINT,
+                manager_user_id BIGINT, status VARCHAR(32) DEFAULT 'ACTIVE',
+                employment_status VARCHAR(32) DEFAULT 'ACTIVE', is_deleted INT DEFAULT 0)
+            """);
+        jdbc.update("INSERT INTO org_user (id,primary_dept_id) VALUES (2002,10),(2003,10),(2004,10),(2005,10),(9999,20)");
         jdbc.execute("CREATE TABLE sys_id_sequence (sequence_name VARCHAR(64) PRIMARY KEY, high_watermark BIGINT)");
         jdbc.update("INSERT INTO sys_id_sequence VALUES ('global', 10000)");
         ids = new DatabaseIdGenerator(source);
@@ -74,7 +80,7 @@ class TeamTaskAuthorizationTest {
 
     @ParameterizedTest
     @CsvSource({
-        "creator,detail,200", "creator,update,200", "creator,status,200", "creator,delete,200",
+        "creator,detail,200", "creator,update,200", "creator,status,403", "creator,delete,200",
         "assignee,detail,200", "assignee,update,403", "assignee,status,200", "assignee,delete,403",
         "other,detail,404", "other,update,404", "other,status,404", "other,delete,404",
         "admin,detail,403", "admin,update,403", "admin,status,403", "admin,delete,403",
@@ -129,7 +135,9 @@ class TeamTaskAuthorizationTest {
         assertEquals(2002L, task.get("creatorId").asLong());
         long id = task.get("taskId").asLong();
         mvc.perform(operation("update", id)).andExpect(status().isOk());
+        employee(2003L);
         mvc.perform(operation("status", id)).andExpect(status().isOk());
+        employee(2002L);
         assertEquals("DONE", service.detail(id).getStatus());
         mvc.perform(operation("delete", id)).andExpect(status().isOk());
         mvc.perform(operation("detail", id)).andExpect(status().isNotFound());

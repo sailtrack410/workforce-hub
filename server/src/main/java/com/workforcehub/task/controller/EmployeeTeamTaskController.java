@@ -5,6 +5,7 @@ import com.workforcehub.task.dto.TeamTaskResponse;
 import com.workforcehub.task.dto.TeamTaskSaveRequest;
 import com.workforcehub.task.dto.TeamTaskStatusRequest;
 import com.workforcehub.task.service.TeamTaskService;
+import com.workforcehub.org.dto.OrgUserSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -43,8 +44,15 @@ public class EmployeeTeamTaskController {
             @RequestParam(required = false) Long assigneeId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
-        return R.ok(teamTaskService.list(assigneeId, status, start, end));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
+            @RequestParam(defaultValue = "ALL") String scope) {
+        return R.ok(teamTaskService.list(assigneeId, status, start, end, scope));
+    }
+
+    @Operation(summary = "查询可派发任务的员工", operationId = "listTeamTaskAssignees")
+    @GetMapping("/assignees")
+    public R<List<OrgUserSummaryResponse>> assignees() {
+        return R.ok(teamTaskService.assignees());
     }
 
     @Operation(summary = "创建团队任务", operationId = "createTeamTask")

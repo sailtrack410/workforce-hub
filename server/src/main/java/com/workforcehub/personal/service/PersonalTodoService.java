@@ -31,13 +31,14 @@ public class PersonalTodoService {
 
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse create(PersonalTodoSaveRequest request) {
+        Long ownerId = requireEmployeeId();
         String category = StringUtils.hasText(request.getCategory()) ? request.getCategory() : "TASK";
         if (!ALLOWED_CATEGORIES.contains(category)) {
             throw new BizException(400, "无效的待办分类");
         }
         PersonalTodoResponse todo = new PersonalTodoResponse();
         todo.setTodoId(IdGenerator.nextId());
-        todo.setOwnerId(CurrentUserHolder.requireUserId());
+        todo.setOwnerId(ownerId);
         todo.setTitle(request.getTitle());
         todo.setCategory(category);
         todo.setStatus("PENDING");
@@ -55,7 +56,10 @@ public class PersonalTodoService {
         if (StringUtils.hasText(status) && !ALLOWED_STATUSES.contains(status)) {
             throw new BizException(400, "无效的待办状态");
         }
-        Long ownerId = CurrentUserHolder.requireUserId();
+        if (start != null && end != null && start.isAfter(end)) {
+            throw new BizException(400, "开始时间不能晚于结束时间");
+        }
+        Long ownerId = requireEmployeeId();
         return personalTodoRepository.find(ownerId, category, status, start, end);
     }
 
@@ -78,6 +82,9 @@ public class PersonalTodoService {
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse complete(Long todoId) {
         PersonalTodoResponse existing = requireTodo(todoId);
+        if ("DONE".equals(existing.getStatus())) {
+            return existing;
+        }
         personalTodoRepository.updateStatus(todoId, existing.getOwnerId(), "DONE", LocalDateTime.now());
         return requireTodo(todoId);
     }
@@ -85,6 +92,9 @@ public class PersonalTodoService {
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse reopen(Long todoId) {
         PersonalTodoResponse existing = requireTodo(todoId);
+        if ("PENDING".equals(existing.getStatus())) {
+            return existing;
+        }
         personalTodoRepository.updateStatus(todoId, existing.getOwnerId(), "PENDING", null);
         return requireTodo(todoId);
     }
@@ -96,8 +106,16 @@ public class PersonalTodoService {
     }
 
     private PersonalTodoResponse requireTodo(Long todoId) {
-        Long ownerId = CurrentUserHolder.requireUserId();
+        Long ownerId = requireEmployeeId();
         return personalTodoRepository.findByIdAndOwner(todoId, ownerId)
             .orElseThrow(() -> new BizException(404, "个人待办不存在"));
+    }
+
+    private Long requireEmployeeId() {
+        Long userId = CurrentUserHolder.requireUserId();
+        if (!CurrentUserHolder.isEmployee()) {
+            throw new BizException(403, "仅员工端支持个人待办");
+        }
+        return userId;
     }
 }

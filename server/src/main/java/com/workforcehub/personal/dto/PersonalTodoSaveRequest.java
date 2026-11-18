@@ -2,6 +2,7 @@ package com.workforcehub.personal.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 public class PersonalTodoSaveRequest {
 
     @NotBlank(message = "标题不能为空")
+    @Size(max = 128, message = "标题不能超过128个字符")
     private String title;
 
     private String category;
@@ -20,5 +22,6 @@ public class PersonalTodoSaveRequest {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime dueAt;
 
+    @Size(max = 1024, message = "备注不能超过1024个字符")
     private String note;
 }

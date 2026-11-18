@@ -26,7 +26,7 @@ public class PersonalTodoRepository {
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             todo.getTodoId(), todo.getOwnerId(), todo.getTitle(), todo.getCategory(),
-            todo.getStatus(), java.sql.Timestamp.valueOf(todo.getDueAt()), todo.getNote());
+            todo.getStatus(), todo.getDueAt() == null ? null : java.sql.Timestamp.valueOf(todo.getDueAt()), todo.getNote());
     }
 
     public void update(PersonalTodoResponse todo) {
