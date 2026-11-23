@@ -4,7 +4,7 @@
  */
 import { onBeforeUnmount, onMounted } from 'vue';
 
-const props = withDefaults(defineProps<{ lock?: boolean }>(), { lock: false });
+const props = withDefaults(defineProps<{ lock?: boolean; titleId?: string }>(), { lock: false });
 const emit = defineEmits<{ (e: 'close'): void }>();
 
 function onKeydown(event: KeyboardEvent) {
@@ -19,7 +19,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 
 <template>
   <div class="hw-dialog-overlay" role="presentation" @click="onOverlayClick">
-    <div class="hw-dialog" role="dialog" aria-modal="true">
+    <div class="hw-dialog" role="dialog" aria-modal="true" :aria-labelledby="titleId">
       <slot />
     </div>
   </div>
@@ -32,21 +32,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   z-index: 50;
   display: grid;
   place-items: center;
-  padding: 32px;
-  background: rgba(15, 30, 55, 0.42);
+  padding: var(--hw-space-4);
+  background: var(--hw-overlay);
   animation: hw-dialog-fade 0.18s ease-out;
 }
 .hw-dialog {
   display: flex;
   flex-direction: column;
-  max-width: calc(100vw - 64px);
-  max-height: calc(100vh - 96px);
-  padding: 24px;
-  border-radius: 20px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: var(--hw-space-6);
+  border: 1px solid var(--hw-border);
+  border-radius: var(--hw-radius-panel);
   background: var(--hw-card);
-  box-shadow: 0 24px 64px rgba(15, 30, 55, 0.22);
+  box-shadow: var(--hw-shadow-dialog);
   overflow-y: auto;
-  animation: hw-dialog-rise 0.22s var(--hw-spring);
+  animation: hw-dialog-rise var(--hw-duration-panel) var(--hw-motion-enter);
 }
 @keyframes hw-dialog-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hw-dialog-rise {

@@ -207,14 +207,15 @@ export const fileApi = {
 };
 
 export const teamTaskApi = {
-  list: (query: { assigneeId?: string; status?: string; start?: string; end?: string } = {}) =>
+  list: (query: { scope?: 'ALL' | 'ASSIGNED' | 'CREATED'; assigneeId?: string; status?: string; start?: string; end?: string } = {}) =>
     http.get<TeamTaskResponse[]>('/api/employee/team-tasks', query),
+  assignees: () => http.get<Pick<OrgUserSummaryResponse, 'userId' | 'realName' | 'primaryDeptId'>[]>('/api/employee/team-tasks/assignees'),
   create: (request: { title: string; description?: string; assigneeId: string; startDate: string; endDate: string; groupId?: string }) =>
     http.post<TeamTaskResponse>('/api/employee/team-tasks', request),
   detail: (taskId: EntityId) => http.get<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}`),
   update: (taskId: EntityId, request: { title: string; description?: string; assigneeId: string; startDate: string; endDate: string; groupId?: string }) =>
     http.put<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}`, request),
-  updateStatus: (taskId: EntityId, status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE') =>
+  updateStatus: (taskId: EntityId, status: 'TODO' | 'IN_PROGRESS' | 'DONE') =>
     http.put<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}/status`, { status }),
   remove: (taskId: EntityId) => http.delete<void>(`/api/employee/team-tasks/${id(taskId)}`),
 };

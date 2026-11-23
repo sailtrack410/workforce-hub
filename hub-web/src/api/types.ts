@@ -351,9 +351,15 @@ export interface TeamTaskResponse {
   assigneeId: EntityId;
   assigneeName?: string | null;
   creatorId?: EntityId | null;
+  creatorName?: string | null;
+  canEdit: boolean;
+  canDelete: boolean;
+  canStart: boolean;
+  canComplete: boolean;
+  canReopen: boolean;
   status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
-  startDate: string;
-  endDate: string;
+  startDate: string | null;
+  endDate: string | null;
   groupId?: EntityId | null;
 }
 

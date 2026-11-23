@@ -7,6 +7,7 @@
   --hw-chip: #f2f5f9;
   --hw-track: #eaeff5;
   --hw-border: #e8edf3;
+  --hw-control-border: #9ba6b4;
   --hw-sky: #d9ebff;
   --hw-sky-strong: #87c2ff;
 
@@ -15,10 +16,15 @@
   --hw-secondary: #424b56;
   --hw-tertiary: #717d8c;
   --hw-muted: #9ba6b4;
+  --hw-disabled-text: #9ba6b4;
 
   /* 品牌与语义 */
   --hw-primary: #1677ff;
   --hw-primary-deep: #124da3;
+  --hw-primary-active: #124da3;
+  --hw-primary-fill: var(--hw-primary);
+  --hw-primary-fill-hover: var(--hw-primary-deep);
+  --hw-primary-fill-active: var(--hw-primary-active);
   --hw-pill-dark: #181d23;
   --hw-green: #1fad66;
   --hw-green-bg: #edf7f1;
@@ -33,9 +39,24 @@
   --hw-nav-text: #e7f0ff;
   --hw-nav-hover: #ffffff14;
   --hw-nav-active: #ffffff29;
-  --hw-shadow-card: 0 24px 64px #0f1e371f;
-  --hw-shadow-menu: 0 12px 32px #0f1e3724;
-  --hw-shadow-switch: 0 1px 3px #00000033;
+  --hw-overlay: #0f1e376b;
+  --hw-shadow-card: none;
+  --hw-shadow-menu: 0 4px 16px #0f1e371a;
+  --hw-shadow-dialog: 0 8px 32px #0f1e3738;
+  --hw-shadow-switch: 0 1px 2px #0000001a;
+  --hw-radius-sm: 4px;
+  --hw-radius-control: 6px;
+  --hw-radius-panel: 8px;
+  --hw-control-sm: 28px;
+  --hw-control-md: 32px;
+  --hw-font-body: 14px;
+  --hw-line-body: 22px;
+  --hw-space-1: 4px;
+  --hw-space-2: 8px;
+  --hw-space-3: 12px;
+  --hw-space-4: 16px;
+  --hw-space-5: 20px;
+  --hw-space-6: 24px;
 
   /* 动效：进入减速、退出加速 */
   --hw-ease: cubic-bezier(0.33, 1, 0.68, 1);
@@ -46,22 +67,42 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --hw-canvas: #0e1319;
   --hw-card: #1a222c;
   --hw-inner: #232c39;
   --hw-chip: #26303d;
   --hw-track: #2a3542;
   --hw-border: #2a3542;
+  --hw-control-border: #6e7a87;
   --hw-sky: #1d3350;
   --hw-sky-strong: #2c4a73;
   --hw-ink: #e9edf2;
   --hw-secondary: #aeb8c4;
   --hw-tertiary: #8b96a3;
   --hw-muted: #6e7a87;
+  --hw-disabled-text: #6e7a87;
+  --hw-primary: #1677ff;
+  --hw-primary-deep: #124da3;
+  --hw-primary-active: #124da3;
+  --hw-primary-fill: #1677ff;
+  --hw-primary-fill-hover: #124da3;
+  --hw-primary-fill-active: #124da3;
   --hw-pill-dark: #38455a;
+  --hw-green: #1fad66;
   --hw-green-bg: #14301f;
+  --hw-amber: #ff9f18;
+  --hw-amber-strong: #d98a1f;
   --hw-amber-bg: #33270f;
+  --hw-red: #ff5a4e;
   --hw-red-bg: #3a1a17;
+  --hw-nav-bg: linear-gradient(180deg, #1677ff 0%, #124da3 100%);
+  --hw-nav-active: #ffffff29;
+  --hw-focus: var(--hw-primary);
+  --hw-nav-hover: #ffffff14;
+  --hw-overlay: #00000099;
+  --hw-shadow-menu: 0 4px 16px #0000004d;
+  --hw-shadow-dialog: 0 8px 32px #00000066;
 }
 
 * {
@@ -79,6 +120,8 @@ body {
   font-family: "Noto Sans SC", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: var(--hw-ink);
   background: var(--hw-canvas);
+  font-size: var(--hw-font-body);
+  line-height: var(--hw-line-body);
   -webkit-font-smoothing: antialiased;
 }
 
