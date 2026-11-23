@@ -51,7 +51,8 @@ class TeamTaskAuthorizationTest {
             + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         jdbc = new JdbcTemplate(source);
         new ResourceDatabasePopulator(new ClassPathResource(
-            "db/migration/V71__add_team_task_and_personal_todo.sql")).execute(source);
+            "db/migration/V71__add_team_task_and_personal_todo.sql"), new ClassPathResource(
+            "db/migration/V73__add_team_task_collaboration.sql")).execute(source);
         jdbc.execute("""
             CREATE TABLE org_user (id BIGINT PRIMARY KEY, real_name VARCHAR(128), primary_dept_id BIGINT,
                 manager_user_id BIGINT, status VARCHAR(32) DEFAULT 'ACTIVE',

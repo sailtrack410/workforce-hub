@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 团队任务响应。
@@ -42,6 +43,16 @@ public class TeamTaskResponse {
     private LocalDate endDate;
 
     private String groupId;
+
+    private String groupName;
+
+    private boolean watching;
+
+    private List<String> watcherNames = List.of();
+
+    private List<TeamTaskSubtaskResponse> subtasks = List.of();
+
+    private List<TeamTaskActivityResponse> activities = List.of();
 
     private LocalDateTime createdAt;
 

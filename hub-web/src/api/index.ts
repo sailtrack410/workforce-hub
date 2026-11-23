@@ -207,6 +207,19 @@ export const fileApi = {
 };
 
 export const teamTaskApi = {
+  attachments: (taskId: EntityId) => http.get<import('./types').TeamTaskAttachmentResponse[]>(`/api/employee/team-tasks/${id(taskId)}/attachments`),
+  attach: (taskId: EntityId, attachmentRefId: EntityId) => http.put<import('./types').TeamTaskAttachmentResponse[]>(`/api/employee/team-tasks/${id(taskId)}/attachments/${id(attachmentRefId)}`),
+  removeAttachment: (taskId: EntityId, attachmentRefId: EntityId) => http.delete<void>(`/api/employee/team-tasks/${id(taskId)}/attachments/${id(attachmentRefId)}`),
+  attachmentTicket: (taskId: EntityId, attachmentRefId: EntityId) => http.post<DownloadTicketResponse>(`/api/employee/team-tasks/${id(taskId)}/attachments/${id(attachmentRefId)}/download-tickets`),
+  lists: () => http.get<import('./types').TeamTaskListResponse[]>('/api/employee/team-tasks/lists'),
+  createList: (name: string) => http.post<import('./types').TeamTaskListResponse>('/api/employee/team-tasks/lists', { content: name }),
+  renameList: (listId: EntityId, name: string) => http.put<import('./types').TeamTaskListResponse>(`/api/employee/team-tasks/lists/${id(listId)}`, { content: name }),
+  removeList: (listId: EntityId) => http.delete<void>(`/api/employee/team-tasks/lists/${id(listId)}`),
+  watch: (taskId: EntityId, watching: boolean) => http.put<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}/watch?watching=${watching}`),
+  comment: (taskId: EntityId, content: string) => http.post<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}/comments`, { content }),
+  addSubtask: (taskId: EntityId, title: string) => http.post<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}/subtasks`, { title, completed: false }),
+  updateSubtask: (taskId: EntityId, subtaskId: EntityId, title: string, completed: boolean) => http.put<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}/subtasks/${id(subtaskId)}`, { title, completed }),
+  removeSubtask: (taskId: EntityId, subtaskId: EntityId) => http.delete<TeamTaskResponse>(`/api/employee/team-tasks/${id(taskId)}/subtasks/${id(subtaskId)}`),
   list: (query: { scope?: 'ALL' | 'ASSIGNED' | 'CREATED'; assigneeId?: string; status?: string; start?: string; end?: string } = {}) =>
     http.get<TeamTaskResponse[]>('/api/employee/team-tasks', query),
   assignees: () => http.get<Pick<OrgUserSummaryResponse, 'userId' | 'realName' | 'primaryDeptId'>[]>('/api/employee/team-tasks/assignees'),

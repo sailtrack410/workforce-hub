@@ -4,6 +4,9 @@ import com.workforcehub.common.response.R;
 import com.workforcehub.task.dto.TeamTaskResponse;
 import com.workforcehub.task.dto.TeamTaskSaveRequest;
 import com.workforcehub.task.dto.TeamTaskStatusRequest;
+import com.workforcehub.task.dto.TeamTaskListResponse;
+import com.workforcehub.task.dto.TeamTaskTextRequest;
+import com.workforcehub.task.dto.TeamTaskSubtaskRequest;
 import com.workforcehub.task.service.TeamTaskService;
 import com.workforcehub.org.dto.OrgUserSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -84,5 +87,47 @@ public class EmployeeTeamTaskController {
     public R<Void> delete(@PathVariable Long taskId) {
         teamTaskService.delete(taskId);
         return R.ok(null);
+    }
+
+    @GetMapping("/lists")
+    public R<List<TeamTaskListResponse>> lists() { return R.ok(teamTaskService.lists()); }
+
+    @PostMapping("/lists")
+    public R<TeamTaskListResponse> createList(@Valid @RequestBody TeamTaskTextRequest request) {
+        return R.ok(teamTaskService.saveList(null, request.content()));
+    }
+
+    @PutMapping("/lists/{listId}")
+    public R<TeamTaskListResponse> updateList(@PathVariable Long listId, @Valid @RequestBody TeamTaskTextRequest request) {
+        return R.ok(teamTaskService.saveList(listId, request.content()));
+    }
+
+    @DeleteMapping("/lists/{listId}")
+    public R<Void> deleteList(@PathVariable Long listId) { teamTaskService.deleteList(listId); return R.ok(null); }
+
+    @PutMapping("/{taskId}/watch")
+    public R<TeamTaskResponse> watch(@PathVariable Long taskId, @RequestParam boolean watching) {
+        return R.ok(teamTaskService.watch(taskId, watching));
+    }
+
+    @PostMapping("/{taskId}/comments")
+    public R<TeamTaskResponse> comment(@PathVariable Long taskId, @Valid @RequestBody TeamTaskTextRequest request) {
+        return R.ok(teamTaskService.comment(taskId, request.content()));
+    }
+
+    @PostMapping("/{taskId}/subtasks")
+    public R<TeamTaskResponse> addSubtask(@PathVariable Long taskId, @Valid @RequestBody TeamTaskSubtaskRequest request) {
+        return R.ok(teamTaskService.addSubtask(taskId, request));
+    }
+
+    @PutMapping("/{taskId}/subtasks/{subtaskId}")
+    public R<TeamTaskResponse> updateSubtask(@PathVariable Long taskId, @PathVariable Long subtaskId,
+                                            @Valid @RequestBody TeamTaskSubtaskRequest request) {
+        return R.ok(teamTaskService.updateSubtask(taskId, subtaskId, request));
+    }
+
+    @DeleteMapping("/{taskId}/subtasks/{subtaskId}")
+    public R<TeamTaskResponse> deleteSubtask(@PathVariable Long taskId, @PathVariable Long subtaskId) {
+        return R.ok(teamTaskService.deleteSubtask(taskId, subtaskId));
     }
 }

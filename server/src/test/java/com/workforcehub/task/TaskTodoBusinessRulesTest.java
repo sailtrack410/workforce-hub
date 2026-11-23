@@ -43,7 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** 独立 H2、真实 V71 迁移、实际控制器/服务/SQL，验证任务派发与私人待办边界。 */
 class TaskTodoBusinessRulesTest {
-    private final ObjectMapper json = Jackson2ObjectMapperBuilder.json().modules(new JavaTimeModule()).build();
+    private final ObjectMapper json = Jackson2ObjectMapperBuilder.json().modules(new JavaTimeModule())
+        .featuresToDisable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).build();
     private JdbcTemplate jdbc;
     private DatabaseIdGenerator ids;
     private MockMvc mvc;
@@ -55,7 +56,8 @@ class TaskTodoBusinessRulesTest {
         var source = new DriverManagerDataSource("jdbc:h2:mem:task_todo_" + UUID.randomUUID()
             + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         jdbc = new JdbcTemplate(source);
-        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V71__add_team_task_and_personal_todo.sql"))
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V71__add_team_task_and_personal_todo.sql"),
+            new ClassPathResource("db/migration/V73__add_team_task_collaboration.sql"))
             .execute(source);
         jdbc.execute("""
             CREATE TABLE org_user (id BIGINT PRIMARY KEY, real_name VARCHAR(128), primary_dept_id BIGINT,

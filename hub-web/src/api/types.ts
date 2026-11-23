@@ -361,6 +361,32 @@ export interface TeamTaskResponse {
   startDate: string | null;
   endDate: string | null;
   groupId?: EntityId | null;
+  groupName?: string | null;
+  watching?: boolean;
+  watcherNames?: string[];
+  subtasks?: TeamTaskSubtaskResponse[];
+  activities?: TeamTaskActivityResponse[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface TeamTaskListResponse {
+  listId: EntityId;
+  name: string;
+  ownerId: EntityId;
+  taskCount: number;
+  canEdit: boolean;
+}
+
+export interface TeamTaskSubtaskResponse { subtaskId: EntityId; title: string; completed: boolean }
+export interface TeamTaskAttachmentResponse { attachmentRefId: EntityId; fileName: string; fileSize: number; mimeType: string; scanStatus: string; canRemove: boolean }
+export interface TeamTaskActivityResponse {
+  activityId: EntityId;
+  actorId: EntityId;
+  actorName?: string | null;
+  kind: string;
+  content: string;
+  createdAt: string;
 }
 
 /* ---------- 个人待办 ---------- */

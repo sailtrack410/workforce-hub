@@ -5,6 +5,9 @@ import com.workforcehub.common.util.CurrentUserHolder;
 import com.workforcehub.common.util.IdGenerator;
 import com.workforcehub.task.dto.TeamTaskResponse;
 import com.workforcehub.task.dto.TeamTaskSaveRequest;
+import com.workforcehub.task.dto.TeamTaskListResponse;
+import com.workforcehub.task.dto.TeamTaskSubtaskRequest;
+import com.workforcehub.task.dto.TeamTaskSubtaskResponse;
 import com.workforcehub.task.repository.TeamTaskRepository;
 import com.workforcehub.org.dto.OrgUserSummaryResponse;
 import org.springframework.stereotype.Service;
@@ -13,6 +16,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Set;
+import java.util.Objects;
 
 /**
  * 团队任务服务。
@@ -32,6 +36,7 @@ public class TeamTaskService {
     public TeamTaskResponse create(TeamTaskSaveRequest request) {
         Long creatorId = requireEmployeeId();
         validateAssignment(request, creatorId);
+        validateList(request.getGroupId(), null, creatorId);
         TeamTaskResponse task = new TeamTaskResponse();
         task.setTaskId(IdGenerator.nextId());
         task.setTitle(request.getTitle());
@@ -43,7 +48,8 @@ public class TeamTaskService {
         task.setEndDate(request.getEndDate());
         task.setGroupId(request.getGroupId());
         teamTaskRepository.insert(task);
-        return requireTask(task.getTaskId());
+        teamTaskRepository.activity(task.getTaskId(), creatorId, "CREATED", "创建了任务");
+        return detail(task.getTaskId());
     }
 
     public List<TeamTaskResponse> list(Long assigneeId, String status, java.time.LocalDate start, java.time.LocalDate end, String scope) {
@@ -59,6 +65,7 @@ public class TeamTaskService {
         }
         List<TeamTaskResponse> tasks = teamTaskRepository.find(userId, assigneeId, status, start, end, scope);
         tasks.forEach(task -> fillCapabilities(task, userId));
+        teamTaskRepository.fillSummaries(tasks, userId);
         return tasks;
     }
 
@@ -67,7 +74,13 @@ public class TeamTaskService {
     }
 
     public TeamTaskResponse detail(Long taskId) {
-        return requireTask(taskId);
+        TeamTaskResponse task = requireTask(taskId);
+        task.setGroupName(teamTaskRepository.listName(task.getGroupId()));
+        task.setWatching(teamTaskRepository.watching(taskId, CurrentUserHolder.requireUserId()));
+        task.setWatcherNames(teamTaskRepository.watcherNames(taskId));
+        task.setSubtasks(teamTaskRepository.subtasks(taskId));
+        task.setActivities(teamTaskRepository.activities(taskId));
+        return task;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -77,6 +90,7 @@ public class TeamTaskService {
             throw new BizException(403, "仅创建人可编辑团队任务");
         }
         validateAssignment(request, existing.getCreatorId());
+        validateList(request.getGroupId(), existing.getGroupId(), existing.getCreatorId());
         Long expectedAssigneeId = existing.getAssigneeId();
         String expectedStatus = existing.getStatus();
         existing.setTitle(request.getTitle());
@@ -91,7 +105,8 @@ public class TeamTaskService {
         if (teamTaskRepository.update(existing, expectedAssigneeId, expectedStatus) == 0) {
             throw new BizException(409, "任务已变更，请刷新后重试");
         }
-        return requireTask(taskId);
+        teamTaskRepository.activity(taskId, CurrentUserHolder.requireUserId(), "UPDATED", "更新了任务信息");
+        return detail(taskId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -105,7 +120,7 @@ public class TeamTaskService {
             throw new BizException(403, "仅负责人可更新任务执行状态");
         }
         if (status.equals(existing.getStatus())) {
-            return existing;
+            return detail(taskId);
         }
         boolean allowed = switch (existing.getStatus()) {
             case "TODO" -> Set.of("IN_PROGRESS", "DONE").contains(status);
@@ -122,7 +137,12 @@ public class TeamTaskService {
             requireTask(taskId);
             throw new BizException(409, "任务已变更，请刷新后重试");
         }
-        return requireTask(taskId);
+        teamTaskRepository.activity(taskId, userId, "STATUS", switch (status) {
+            case "DONE" -> "完成了任务";
+            case "IN_PROGRESS" -> "开始了任务";
+            default -> "将任务设为待开始";
+        });
+        return detail(taskId);
     }
 
     private void validateAssignment(TeamTaskSaveRequest request, Long creatorId) {
@@ -162,6 +182,102 @@ public class TeamTaskService {
         }
         if (teamTaskRepository.deleteById(taskId, userId) == 0) {
             throw new BizException(404, "团队任务不存在");
+        }
+        teamTaskRepository.deleteCollaboration(taskId);
+    }
+
+    public List<TeamTaskListResponse> lists() {
+        return teamTaskRepository.lists(requireEmployeeId());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public TeamTaskListResponse saveList(Long listId, String name) {
+        Long userId = requireEmployeeId();
+        String normalized = name == null ? "" : name.strip();
+        if (normalized.isEmpty() || normalized.length() > 64) throw new BizException(400, "清单名称须为1至64个字符");
+        boolean create = listId == null;
+        if (create) listId = IdGenerator.nextId();
+        else if (!teamTaskRepository.listById(listId, userId).orElseThrow(() -> new BizException(404, "清单不存在")).canEdit()) {
+            throw new BizException(403, "仅创建人可修改清单");
+        }
+        teamTaskRepository.saveList(listId, normalized, userId, create);
+        return teamTaskRepository.listById(listId, userId).orElseThrow(() -> new BizException(404, "清单不存在"));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteList(Long listId) {
+        Long userId = requireEmployeeId();
+        if (!teamTaskRepository.listById(listId, userId).orElseThrow(() -> new BizException(404, "清单不存在")).canEdit()) {
+            throw new BizException(403, "仅创建人可删除清单");
+        }
+        if (!teamTaskRepository.deleteEmptyList(listId, userId)) throw new BizException(409, "请先移出清单中的任务");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public TeamTaskResponse watch(Long taskId, boolean watching) {
+        teamTaskRepository.lockTask(taskId);
+        requireTask(taskId);
+        teamTaskRepository.watch(taskId, CurrentUserHolder.requireUserId(), watching);
+        return detail(taskId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public TeamTaskResponse comment(Long taskId, String content) {
+        teamTaskRepository.lockTask(taskId);
+        requireTask(taskId);
+        String text = content == null ? "" : content.strip();
+        if (text.isEmpty() || text.length() > 2000) throw new BizException(400, "评论须为1至2000个字符");
+        teamTaskRepository.activity(taskId, CurrentUserHolder.requireUserId(), "COMMENT", text);
+        return detail(taskId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public TeamTaskResponse addSubtask(Long taskId, TeamTaskSubtaskRequest request) {
+        teamTaskRepository.lockTask(taskId);
+        TeamTaskResponse task = requireTask(taskId);
+        if (!task.isCanEdit()) throw new BizException(403, "仅创建人可添加子任务");
+        String title = subtaskTitle(request.title());
+        teamTaskRepository.addSubtask(IdGenerator.nextId(), taskId, title);
+        teamTaskRepository.activity(taskId, CurrentUserHolder.requireUserId(), "SUBTASK", "添加子任务：" + title);
+        return detail(taskId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public TeamTaskResponse updateSubtask(Long taskId, Long subtaskId, TeamTaskSubtaskRequest request) {
+        teamTaskRepository.lockTask(taskId);
+        TeamTaskResponse task = requireTask(taskId);
+        TeamTaskSubtaskResponse existing = teamTaskRepository.subtasks(taskId).stream()
+            .filter(item -> item.subtaskId().equals(subtaskId)).findFirst().orElseThrow(() -> new BizException(404, "子任务不存在"));
+        String title = subtaskTitle(request.title());
+        boolean titleChanged = !existing.title().equals(title);
+        boolean statusChanged = existing.completed() != request.completed();
+        if (titleChanged && !task.isCanEdit()) throw new BizException(403, "仅创建人可编辑子任务标题");
+        if (statusChanged && !CurrentUserHolder.requireUserId().equals(task.getAssigneeId())) throw new BizException(403, "仅负责人可完成或重开子任务");
+        if (teamTaskRepository.updateSubtask(taskId, subtaskId, title, request.completed()) == 0) throw new BizException(409, "子任务已变更");
+        if (titleChanged || statusChanged) teamTaskRepository.activity(taskId, CurrentUserHolder.requireUserId(), "SUBTASK",
+            (statusChanged ? request.completed() ? "完成子任务：" : "重开子任务：" : "更新子任务：") + title);
+        return detail(taskId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public TeamTaskResponse deleteSubtask(Long taskId, Long subtaskId) {
+        teamTaskRepository.lockTask(taskId);
+        if (!requireTask(taskId).isCanEdit()) throw new BizException(403, "仅创建人可删除子任务");
+        if (teamTaskRepository.deleteSubtask(taskId, subtaskId) == 0) throw new BizException(404, "子任务不存在");
+        teamTaskRepository.activity(taskId, CurrentUserHolder.requireUserId(), "SUBTASK", "删除了子任务");
+        return detail(taskId);
+    }
+
+    private String subtaskTitle(String title) {
+        String normalized = title == null ? "" : title.strip();
+        if (normalized.isEmpty() || normalized.length() > 128) throw new BizException(400, "子任务标题须为1至128个字符");
+        return normalized;
+    }
+
+    private void validateList(String groupId, String previousGroupId, Long creatorId) {
+        if (groupId == null || Objects.equals(groupId, previousGroupId)) return;
+        if (teamTaskRepository.listOwner(groupId).filter(owner -> !owner.equals(creatorId)).isPresent()) {
+            throw new BizException(403, "只能将任务添加到自己创建的清单");
         }
     }
 
