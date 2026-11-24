@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('workforceDesktop', {
   openDownloads: () => ipcRenderer.invoke('storage:open-downloads'),
   exportDiagnostics: () => ipcRenderer.invoke('diagnostics:export'),
   reportError: (kind) => ipcRenderer.invoke('diagnostics:error', kind),
+  checkReminders: (context, offline) => ipcRenderer.invoke('reminders:check', context, offline),
   media: (context, key, url) => ipcRenderer.invoke('media:get', context, key, url),
   stageUpload: (context, id, bytes, metadata) => ipcRenderer.invoke('transfers:stage', context, id, bytes, metadata),
   uploads: (context) => ipcRenderer.invoke('transfers:list', context),

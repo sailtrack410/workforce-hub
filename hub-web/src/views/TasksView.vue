@@ -4,6 +4,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useLocalDraft } from '@/services/localData';
+import { useViewState } from '@/services/viewState';
 import { Plus, LayoutList, ChartNoAxesCombined, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, UsersRound, Send, CircleCheck, Folder, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, Search, X, UserRound, Bookmark, Pencil, Trash2, Link, Check, ListTree, MessageSquare, Clock3, Maximize2, Paperclip, Download, FileText } from 'lucide-vue-next';
 import { teamTaskApi } from '@/api';
 import { ApiError } from '@/api/http';
@@ -67,6 +68,7 @@ const removingAttachment = ref<TeamTaskAttachmentResponse | null>(null);
 /* 当前周（周一到周日） */
 const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
 const weekOffset = ref(0);
+useViewState('task-view', { filter, statusFilter, keyword, assigneeFilter, groupFilter, sidebarCollapsed, weekOffset });
 const todayIso = toIso(new Date());
 function toIso(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

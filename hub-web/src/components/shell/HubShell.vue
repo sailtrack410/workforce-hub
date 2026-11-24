@@ -18,7 +18,7 @@ import { NAV_MAX_WIDTH, NAV_MIN_WIDTH, navigationWidth } from '@/utils/imLayout'
 import { resolvedTheme as theme, savePreferences } from '@/services/preferences';
 import { useImSocket } from '@/composables/useImSocket';
 import { useDesktopNotifications } from '@/composables/useDesktopNotifications';
-import { localStatus } from '@/services/localData';
+import { localStatus, currentContext } from '@/services/localData';
 import { syncPending } from '@/services/sync';
 
 const session = useSessionStore();
@@ -136,7 +136,10 @@ function onKeydown(event: KeyboardEvent) {
     document.querySelector<HTMLInputElement>('.hw-global-search input')?.focus();
   }
 }
-function onOnline() { void syncPending().catch(() => undefined); }
+function onOnline() {
+  void syncPending().catch(() => undefined);
+  void currentContext().then(context => context ? window.workforceDesktop?.checkReminders(context, localStatus.offline) : undefined).catch(() => undefined);
+}
 function onSyncResult(event: Event) {
   const { operation, value } = (event as CustomEvent).detail;
   if (!value || !operation.path.includes('/im/conversations/') || !operation.path.endsWith('/messages')) return;

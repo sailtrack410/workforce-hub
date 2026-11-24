@@ -59,10 +59,11 @@ export async function syncPending() {
       try {
         const value = await execute<Record<string, unknown>>(op);
         if (value && op.entityKey && value.todoId != null) {
-          for (const later of queue.filter((next) => next.id !== op.id && next.entityKey === op.entityKey)) {
+          for (const later of queue.slice(queue.indexOf(op) + 1).filter((next) => next.entityKey === op.entityKey)) {
             const old = later.entityKey!;
             later.path = later.path.replace('/' + old, '/' + String(value.todoId));
             later.entityKey = String(value.todoId); later.version = value.version as number;
+            if (later.snapshot) later.snapshot = { ...later.snapshot as Record<string, unknown>, todoId: value.todoId, version: value.version };
             if (later.body) later.body.expectedVersion = value.version;
             await desktop.enqueue(context, later);
           }

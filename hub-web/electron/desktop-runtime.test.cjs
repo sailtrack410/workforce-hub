@@ -41,7 +41,7 @@ async function runtime() {
     dialog: { showOpenDialog: async () => ({ canceled: false, filePaths: [dir] }), showErrorBox: () => assert.fail('Unexpected dialog') }, shell: {},
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'main.cjs'), 'utf8'), {
-    __dirname, process: { platform: 'darwin', env: {} }, console, setTimeout, clearTimeout, URL,
+    __dirname, process: { platform: 'darwin', env: {} }, console, setTimeout, clearTimeout, setInterval, clearInterval, URL,
     require: (name) => name === 'electron' ? electron : name === './message-store.cjs' ? { MessageStore: class { close() {} } } : require(name),
   });
   await app.ready;

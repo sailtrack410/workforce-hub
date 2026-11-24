@@ -38,4 +38,11 @@ describe('待同步队列', () => {
     expect(http.put).toHaveBeenCalledTimes(2); expect(queue[0].state).toBe('conflict'); expect(queue).toHaveLength(2);
     expect(await pendingOperations()).toHaveLength(2);
   });
+  it('同一待办连续修改不重新入队已完成操作', async () => {
+    queue = [{ id: 'a', method: 'PUT', path: '/api/employee/personal-todos/1', entityKey: '1', body: { title: 'first' } }, { id: 'b', method: 'PUT', path: '/api/employee/personal-todos/1', entityKey: '1', body: { title: 'second' } }];
+    vi.mocked(http.put).mockResolvedValueOnce({ todoId: '1', version: 1 }).mockResolvedValueOnce({ todoId: '1', version: 2 });
+    await syncPending(); await syncPending();
+    expect(queue).toHaveLength(0); expect(http.put).toHaveBeenCalledTimes(2);
+    expect(http.put).toHaveBeenLastCalledWith('/api/employee/personal-todos/1', { title: 'second', expectedVersion: 1 });
+  });
 });

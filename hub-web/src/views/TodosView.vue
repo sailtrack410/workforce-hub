@@ -13,6 +13,7 @@ import HubDialog from '@/components/base/HubDialog.vue';
 import HubEmpty from '@/components/base/HubEmpty.vue';
 import TodoEditor, { type TodoDraft } from './TodoEditor.vue';
 import { useLocalDraft } from '@/services/localData';
+import { useViewState } from '@/services/viewState';
 
 const { show: showToast } = useToast();
 const todos = ref<PersonalTodoResponse[]>([]);
@@ -145,6 +146,7 @@ async function submitQuick() {
 
 /* 月历：当月网格 */
 const weekOffset = ref(0);
+useViewState('todo-view', { filter, viewMode, categoryFilter, search, sidebarCollapsed, showCompleted, sort, weekOffset });
 const weekDays = computed(() => {
   const monday = new Date(now.value); monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7 + weekOffset.value * 7); monday.setHours(0, 0, 0, 0);
   return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(d.getDate() + i); return { iso: toIso(d), num: d.getDate(), label: '周' + WEEK_LABELS[i] }; });

@@ -6,6 +6,7 @@ import { computed, onMounted, ref } from 'vue';
 import { notificationApi } from '@/api';
 import type { PageResult, SysNotificationResponse } from '@/api/types';
 import { useToast } from '@/composables/useToast';
+import { pendingOperations } from '@/services/sync';
 import HubButton from '@/components/base/HubButton.vue';
 import HubDialog from '@/components/base/HubDialog.vue';
 import HubEmpty from '@/components/base/HubEmpty.vue';
@@ -29,6 +30,9 @@ async function load(reset: boolean) {
     const res = await notificationApi.list({ pageNo: reset ? 1 : pageNo.value, pageSize: PAGE_SIZE });
     const page = Array.isArray(res) ? { list: res, total: res.length } : (res as PageResult<SysNotificationResponse>);
     items.value = reset ? page.list : [...items.value, ...page.list];
+    const queue = await pendingOperations();
+    const allRead = queue.some(op => op.path === '/api/employee/notifications/read-all');
+    for (const n of items.value) if (allRead || queue.some(op => op.path === `/api/employee/notifications/${n.notificationId}/read`)) n.read = true;
     total.value = page.total;
     pageNo.value = reset ? 1 : pageNo.value + 1;
     loadFailed.value = false;

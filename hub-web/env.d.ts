@@ -16,6 +16,7 @@ interface WorkforceDesktopBridge {
   openDownloads(): Promise<string>;
   exportDiagnostics(): Promise<boolean>;
   reportError(kind: string): Promise<void>;
+  checkReminders(context: string, offline: boolean): Promise<void>;
   media(context: string, key: string, url?: string): Promise<string | null>;
   stageUpload(context: string, id: string, bytes: number[], metadata: import('./src/services/transfers').UploadRecord): Promise<void>;
   uploads(context: string): Promise<import('./src/services/transfers').UploadRecord[]>;

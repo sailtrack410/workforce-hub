@@ -9,6 +9,7 @@ const { LocalStore } = require('./local-store.cjs');
 const { Diagnostics } = require('./diagnostics.cjs');
 const { AssetCache } = require('./asset-cache.cjs');
 const { Transfers } = require('./transfers.cjs');
+const { dueReminders } = require('./reminders.cjs');
 const { createHash, randomUUID } = require('node:crypto');
 
 // 更名后复用已有数据目录，保留消息缓存和登录会话。
@@ -34,6 +35,8 @@ let accountGeneration = 0;
 let diagnostics;
 let assets;
 let transfers;
+let reminderTimer;
+let remindersOffline = false;
 const notifications = new Map();
 const notified = new Set();
 const downloadPaths = new Set();
@@ -44,7 +47,8 @@ async function bindCacheAccount() {
   binding = (async () => {
     const generation = accountGeneration;
     try {
-      const response = await require('electron').session.defaultSession.fetch(backendOrigin + '/api/employee/auth/me', { credentials: 'include', headers: { 'X-Workforce-Client': 'desktop' } });
+      const authOrigin = appServer?.origin || (mainWindow ? new URL(mainWindow.webContents.getURL()).origin : backendOrigin);
+      const response = await require('electron').session.defaultSession.fetch(authOrigin + '/api/employee/auth/me', { credentials: 'include', headers: { 'X-Workforce-Client': 'desktop' } });
       if (response.status === 401 || response.status === 403) {
         activeAccount = undefined; cacheContext = undefined; localStore.meta('account:' + backendOrigin, null); return null;
       }
@@ -73,6 +77,13 @@ async function bindCacheAccount() {
 function requireCache(context) {
   if (!context || cacheContext !== context || !activeAccount) throw new Error('本地账号已切换，请重新加载');
   return activeAccount.scope;
+}
+
+function handle(channel, callback) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame && event.senderFrame !== event.sender.mainFrame) throw new Error('调用来源无效');
+    return callback(event, ...args);
+  });
 }
 
 function showWindow() {
@@ -182,23 +193,23 @@ app.whenReady().then(async () => {
   diagnostics.write('info', 'app-start', app.getVersion?.() || 'development');
   assets = new AssetCache(path.join(app.getPath('userData'), 'asset-cache'));
   transfers = new Transfers(path.join(app.getPath('userData'), 'transfers'));
-  ipcMain.handle('transfers:stage', (_event, context, id, bytes, metadata) => transfers.stage(requireCache(context), id, bytes, metadata));
-  ipcMain.handle('transfers:list', (_event, context) => transfers.list(requireCache(context)));
-  ipcMain.handle('transfers:read', (_event, context, id) => transfers.read(requireCache(context), id));
-  ipcMain.handle('transfers:status', (_event, context, id, status) => transfers.status(requireCache(context), id, status));
-  ipcMain.handle('transfers:discard', (_event, context, id) => transfers.discard(requireCache(context), id));
+  handle('transfers:stage', (_event, context, id, bytes, metadata) => transfers.stage(requireCache(context), id, bytes, metadata));
+  handle('transfers:list', (_event, context) => transfers.list(requireCache(context)));
+  handle('transfers:read', (_event, context, id) => transfers.read(requireCache(context), id));
+  handle('transfers:status', (_event, context, id, status) => transfers.status(requireCache(context), id, status));
+  handle('transfers:discard', (_event, context, id) => transfers.discard(requireCache(context), id));
   localStore = new LocalStore(path.join(app.getPath('userData'), 'local.sqlite'));
   if (localStore.recovered) diagnostics.write('warn', 'local-database-recovered', '原文件已隔离保留');
   process.on?.('uncaughtExceptionMonitor', (error) => diagnostics.write('error', 'uncaught-exception', error.name));
   app.on('render-process-gone', (_event, _contents, details) => diagnostics.write('error', 'renderer-gone', details.reason));
   app.on('child-process-gone', (_event, details) => diagnostics.write('error', 'child-gone', details.reason));
-  ipcMain.handle('diagnostics:error', (_event, kind) => diagnostics.write('error', 'renderer-error', ['error', 'unhandledrejection'].includes(kind) ? kind : 'unknown'));
-  ipcMain.handle('diagnostics:export', async () => {
+  handle('diagnostics:error', (_event, kind) => diagnostics.write('error', 'renderer-error', ['error', 'unhandledrejection'].includes(kind) ? kind : 'unknown'));
+  handle('diagnostics:export', async () => {
     const result = await dialog.showSaveDialog(mainWindow, { title: '导出诊断日志', defaultPath: path.join(app.getPath('downloads'), 'workforce-diagnostics.log') });
     if (!result.canceled && result.filePath) { diagnostics.export(result.filePath); return true; }
     return false;
   });
-  ipcMain.handle('storage:stats', (_event, context) => {
+  handle('storage:stats', (_event, context) => {
     const business = context ? localStore.stats(requireCache(context)) : { entries: 0, bytes: 0, drafts: 0, pending: 0 };
     let databaseBytes = 0;
     for (const file of ['local.sqlite', 'local.sqlite-wal', 'messages.sqlite', 'messages.sqlite-wal']) {
@@ -206,13 +217,13 @@ app.whenReady().then(async () => {
     }
     return { ...business, databaseBytes, mediaBytes: assets.bytes(), logBytes: diagnostics.bytes(), transferBytes: context ? transfers.bytes(requireCache(context)) : 0, recovered: Boolean(localStore.recovered) };
   });
-  ipcMain.handle('storage:clear', async (_event, context) => {
+  handle('storage:clear', async (_event, context) => {
     localStore.clearCache(requireCache(context)); assets.clear();
     await require('electron').session.defaultSession.clearCache();
     diagnostics.write('info', 'cache-cleared');
   });
-  ipcMain.handle('storage:open-downloads', async () => { fs.mkdirSync(preferences.get().downloadDirectory, { recursive: true }); return shell.openPath(preferences.get().downloadDirectory); });
-  ipcMain.handle('media:get', async (_event, context, key, rawUrl) => {
+  handle('storage:open-downloads', async () => { fs.mkdirSync(preferences.get().downloadDirectory, { recursive: true }); return shell.openPath(preferences.get().downloadDirectory); });
+  handle('media:get', async (_event, context, key, rawUrl) => {
     const scope = requireCache(context);
     if (typeof key !== 'string' || key.length > 512) throw new Error('媒体标识无效');
     const cached = assets.get(scope, key);
@@ -231,9 +242,9 @@ app.whenReady().then(async () => {
       return `data:${entry.mime};base64,${entry.base64}`;
     } catch { return cached ? `data:${cached.mime};base64,${cached.base64}` : null; }
   });
-  ipcMain.handle('cache:bind-account', () => bindCacheAccount());
-  ipcMain.handle('cache:context', async () => { if (!activeAccount) await bindCacheAccount(); return cacheContext ?? null; });
-  ipcMain.handle('cache:logout', async () => {
+  handle('cache:bind-account', () => bindCacheAccount());
+  handle('cache:context', async () => { if (!activeAccount) await bindCacheAccount(); return cacheContext ?? null; });
+  handle('cache:logout', async () => {
     accountGeneration++;
     activeAccount = undefined; cacheContext = undefined; localStore.meta('account:' + backendOrigin, null);
     for (const n of notifications.values()) n.close(); notifications.clear(); notified.clear();
@@ -242,21 +253,21 @@ app.whenReady().then(async () => {
       await cookies.remove(`${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`, 'SESSION');
     }
   });
-  ipcMain.handle('cache:get', (_event, context, key) => localStore.get(requireCache(context), String(key)));
-  ipcMain.handle('cache:put', (_event, context, key, value) => {
+  handle('cache:get', (_event, context, key) => localStore.get(requireCache(context), String(key)));
+  handle('cache:put', (_event, context, key, value) => {
     if (typeof key !== 'string' || !key.startsWith('/api/employee/') || /auth|token|ticket|download/i.test(key)) throw new Error('不允许缓存此接口');
     localStore.put(requireCache(context), key, value);
   });
-  ipcMain.handle('cache:invalidate', (_event, context, prefix) => localStore.invalidate(requireCache(context), String(prefix)));
-  ipcMain.handle('cache:draft', (_event, context, key, value) => localStore.draft(requireCache(context), String(key), value));
-  ipcMain.handle('cache:read-draft', (_event, context, key) => localStore.readDraft(requireCache(context), String(key)));
-  ipcMain.handle('cache:stats', (_event, context) => localStore.stats(requireCache(context)));
-  ipcMain.handle('cache:queue', (_event, context) => localStore.queue(requireCache(context)));
-  ipcMain.handle('cache:enqueue', (_event, context, operation) => {
+  handle('cache:invalidate', (_event, context, prefix) => localStore.invalidate(requireCache(context), String(prefix)));
+  handle('cache:draft', (_event, context, key, value) => localStore.draft(requireCache(context), String(key), value));
+  handle('cache:read-draft', (_event, context, key) => localStore.readDraft(requireCache(context), String(key)));
+  handle('cache:stats', (_event, context) => localStore.stats(requireCache(context)));
+  handle('cache:queue', (_event, context) => localStore.queue(requireCache(context)));
+  handle('cache:enqueue', (_event, context, operation) => {
     if (!operation || typeof operation.id !== 'string' || !['POST', 'PUT', 'DELETE'].includes(operation.method) || !/^\/api\/employee\/(personal-todos(?:\/[^/?]+(?:\/(?:complete|reopen))?)?|im\/conversations\/\d+\/(?:messages|read-position)|notifications(?:\/\d+\/read|\/read-all))$/.test(operation.path)) throw new Error('此操作不支持离线同步');
     localStore.enqueue(requireCache(context), operation);
   });
-  ipcMain.handle('cache:queue-state', (_event, context, id, state, error) => {
+  handle('cache:queue-state', (_event, context, id, state, error) => {
     if (!['pending', 'conflict', 'error', 'done'].includes(state)) throw new Error('同步状态无效');
     localStore.queueState(requireCache(context), id, state, typeof error === 'string' ? error.slice(0, 300) : null);
   });
@@ -272,8 +283,8 @@ app.whenReady().then(async () => {
     }
     catch { item.cancel(); dialog.showErrorBox('下载失败', '下载目录不可写，请在设置中更改目录'); }
   });
-  ipcMain.handle('settings:get', () => settingsResponse());
-  ipcMain.handle('settings:update', (_event, patch) => {
+  handle('settings:get', () => settingsResponse());
+  handle('settings:update', (_event, patch) => {
     if (!patch || Object.keys(patch).some((key) => ['windowState', 'downloadDirectory', 'canLaunchAtLogin', 'notificationsSupported', 'themeConfigured'].includes(key))) throw new Error('配置字段不可修改');
     if ('launchAtLogin' in patch && !settingsResponse().canLaunchAtLogin) throw new Error('开机启动仅支持安装版');
     const previous = preferences.get();
@@ -285,7 +296,7 @@ app.whenReady().then(async () => {
     if (!preferences.get().desktopNotifications || isQuietTime(preferences.get()) || !preferences.get().messagePreview) for (const n of notifications.values()) n.close();
     return settingsResponse();
   });
-  ipcMain.handle('settings:choose-download-directory', async () => {
+  handle('settings:choose-download-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, { title: '下载文件保存到', defaultPath: preferences.get().downloadDirectory, properties: ['openDirectory', 'createDirectory'] });
     if (!result.canceled && result.filePaths[0]) {
       fs.accessSync(result.filePaths[0], fs.constants.W_OK);
@@ -293,11 +304,11 @@ app.whenReady().then(async () => {
     }
     return settingsResponse();
   });
-  ipcMain.handle('desktop:dismiss-notifications', () => {
+  handle('desktop:dismiss-notifications', () => {
     for (const n of notifications.values()) n.close();
     notifications.clear(); notified.clear();
   });
-  ipcMain.handle('desktop:notify', (_event, payload) => {
+  const notifyDesktop = (payload) => {
     const settings = preferences.get();
     if (!settings.desktopNotifications || isQuietTime(settings) || !Notification.isSupported() || mainWindow.isFocused()) return false;
     if (!payload || typeof payload.id !== 'string' || typeof payload.title !== 'string' || typeof payload.body !== 'string' || typeof payload.route !== 'string') throw new Error('通知格式无效');
@@ -312,22 +323,36 @@ app.whenReady().then(async () => {
     notifications.set(payload.id, notification);
     notification.show();
     return true;
-  });
-  ipcMain.handle('desktop:download', (event, rawUrl) => {
+  };
+  handle('desktop:notify', (_event, payload) => notifyDesktop(payload));
+  function checkReminders() {
+    if (!remindersOffline || !activeAccount) return;
+    const key = 'reminders-delivered';
+    const delivered = new Set(localStore.readDraft(activeAccount.scope, key) || []);
+    const todos = localStore.get(activeAccount.scope, '/api/employee/personal-todos')?.value || [];
+    for (const todo of dueReminders(todos, delivered)) {
+      const id = `${todo.todoId}:${todo.reminderAt}`;
+      if (notifyDesktop({ id: `reminder:${id}`, title: '待办提醒', body: todo.title, route: `/todos?todoId=${todo.todoId}` })) delivered.add(id);
+    }
+    localStore.draft(activeAccount.scope, key, [...delivered].slice(-500));
+  }
+  handle('reminders:check', (_event, context, offline) => { requireCache(context); remindersOffline = offline === true; checkReminders(); });
+  reminderTimer = setInterval(checkReminders, 30000); reminderTimer.unref();
+  handle('desktop:download', (event, rawUrl) => {
     const url = new URL(rawUrl, mainWindow.webContents.getURL());
     const origin = new URL(mainWindow.webContents.getURL()).origin;
     if (!['http:', 'https:'].includes(url.protocol) || url.origin !== origin) throw new Error('下载地址无效');
     event.sender.downloadURL(url.href, { headers: { 'X-Workforce-Client': 'desktop' } });
   });
   store = new MessageStore(path.join(app.getPath('userData'), 'messages.sqlite'));
-  ipcMain.handle('messages:list', (_event, userId, conversationId) =>
+  handle('messages:list', (_event, userId, conversationId) =>
     String(userId) === String(activeAccount?.user.userId) ? store.list(activeAccount.scope, String(conversationId)) : []);
-  ipcMain.handle('messages:save', (_event, userId, messages) =>
+  handle('messages:save', (_event, userId, messages) =>
     String(userId) === String(activeAccount?.user.userId) ? store.save(activeAccount.scope, messages) : undefined);
-  ipcMain.handle('messages:replace', (_event, context, conversationId, messages) => store.replace(requireCache(context), String(conversationId), messages));
-  ipcMain.handle('messages:remove', (_event, context, messageId) => store.remove(requireCache(context), String(messageId)));
-  ipcMain.handle('messages:clear', (_event, context, conversationId) => store.clear(requireCache(context), String(conversationId)));
-  ipcMain.handle('files:write-local-upload', (_event, uploadPath, content) =>
+  handle('messages:replace', (_event, context, conversationId, messages) => store.replace(requireCache(context), String(conversationId), messages));
+  handle('messages:remove', (_event, context, messageId) => store.remove(requireCache(context), String(messageId)));
+  handle('messages:clear', (_event, context, conversationId) => store.clear(requireCache(context), String(conversationId)));
+  handle('files:write-local-upload', (_event, uploadPath, content) =>
     writeLocalUpload(uploadPath, content));
   // 仅本机显式指定输出路径时生成验收截图，不对渲染进程暴露此能力。
   if (process.env.HUB_DESKTOP_CAPTURE) {
@@ -354,4 +379,4 @@ app.on('before-quit', () => {
   saveWindowState();
   for (const n of notifications.values()) n.close();
 });
-app.on('will-quit', () => { appServer?.close(); localStore?.close(); store?.close(); });
+app.on('will-quit', () => { clearInterval(reminderTimer); appServer?.close(); localStore?.close(); store?.close(); });
