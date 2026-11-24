@@ -11,7 +11,7 @@
 .st-head p { margin-top: 4px; font-size: 12px; color: var(--hw-tertiary); }
 .st-card { display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid var(--hw-border); border-radius: 8px; background: var(--hw-card); }
 .st-card h3 { font-size: 16px; font-weight: 700; line-height: 24px; }
-.st-row { display: flex; align-items: center; gap: 16px; min-height: 52px; }
+.st-row { display: flex; align-items: center; gap: 16px; min-height: 52px; flex-wrap: wrap; }
 .st-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 .st-copy strong { font-size: 14px; font-weight: 500; }
 .st-copy small { font-size: 12px; color: var(--hw-muted); }
@@ -25,7 +25,11 @@
 .st-toggle.on i { left: 20px; }
 .st-select, .st-btn { height: 36px; padding: 0 14px; border: 1px solid var(--hw-border); border-radius: 6px; background: var(--hw-card); color: var(--hw-secondary); font-size: 13px; cursor: pointer; }
 .st-select:hover, .st-btn:hover { background: var(--hw-inner); }
-.st-path { min-width: 0; padding: 8px 12px; border-radius: 6px; background: var(--hw-inner); color: var(--hw-secondary); font-size: 13px; }
+.st-path { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 8px 12px; border-radius: 6px; background: var(--hw-inner); color: var(--hw-secondary); font-size: 13px; }
+.st-status { font-size: 12px; color: var(--hw-muted); }
+.st-time-range label { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--hw-secondary); }
+.st-time-range input { height: 36px; padding: 0 10px; border: 1px solid var(--hw-border); border-radius: 6px; background: var(--hw-card); color: var(--hw-ink); }
+.st-page button:disabled, .st-page select:disabled, .st-page input:disabled { opacity: .5; cursor: default; }
 .st-about { align-items: center; text-align: center; }
 .st-logo { display: block; width: 48px; height: 48px; object-fit: contain; }
 .st-about h3 { font-size: 20px; font-weight: 500; }

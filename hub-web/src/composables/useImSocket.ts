@@ -1,5 +1,5 @@
 // hub-web IM WebSocket：原生实现，心跳 + 指数退避重连
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { useImStore } from '@/stores/im';
 import { useSessionStore } from '@/stores/session';
 import type { ImMessageResponse } from '@/api/types';
@@ -16,10 +16,11 @@ function isMessagePayload(value: unknown): value is ImMessageResponse {
 
 export function useImSocket(options: {
   onMessage: (conversationId: string) => void;
+  onCreated?: (message: ImMessageResponse) => void;
 }) {
   const im = useImStore();
   const session = useSessionStore();
-  const connected = ref(false);
+  const connected = computed(() => im.socketConnected);
   let socket: WebSocket | null = null;
   let reconnectTimer: number | undefined;
   let heartbeatTimer: number | undefined;
@@ -53,6 +54,8 @@ export function useImSocket(options: {
     }
     if (isMessagePayload(event.payload)) {
       im.upsertMessage(event.payload);
+      im.receivedMessage = event.payload;
+      if (event.eventType === 'IM_MESSAGE_CREATED' || event.eventType === 'IM_AGENT_MESSAGE_CREATED') options.onCreated?.(event.payload);
       if (event.conversationId !== undefined && event.conversationId !== null) {
         options.onMessage(String(event.conversationId));
       }
@@ -69,7 +72,7 @@ export function useImSocket(options: {
     const next = new WebSocket(url());
     socket = next;
     next.onopen = () => {
-      connected.value = true;
+      im.socketConnected = true;
       attempts = 0;
       if (heartbeatTimer) window.clearInterval(heartbeatTimer);
       heartbeatTimer = window.setInterval(() => {
@@ -79,7 +82,7 @@ export function useImSocket(options: {
     next.onmessage = (event) => handleEvent(String(event.data));
     next.onclose = () => {
       if (socket === next) socket = null;
-      connected.value = false;
+      im.socketConnected = false;
       if (heartbeatTimer) {
         window.clearInterval(heartbeatTimer);
         heartbeatTimer = undefined;
@@ -106,7 +109,7 @@ export function useImSocket(options: {
       socket.close();
       socket = null;
     }
-    connected.value = false;
+    im.socketConnected = false;
   }
 
   return { connected, connect, close };

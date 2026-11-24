@@ -4,17 +4,17 @@
  * 左侧二级导航（通用/消息通知/存储/关于）+ 右侧分组表单。
  */
 import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
 import HubToast from '@/components/base/HubToast.vue';
 import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
+import { preferences, savePreferences, chooseDownloadDirectory, type LocalPreferences } from '@/services/preferences';
 
 const session = useSessionStore();
-const router = useRouter();
 const { message: toastMessage, show: showToast } = useToast();
 const section = ref<'general' | 'notifications' | 'storage' | 'about'>('general');
-const theme = ref<'light' | 'dark' | 'system'>('light');
+const saving = ref(false);
+const desktop = Boolean(window.workforceDesktop);
 
 const SECTIONS = [
   { id: 'general', label: '通用' },
@@ -24,12 +24,7 @@ const SECTIONS = [
 ] as const;
 
 onMounted(() => {
-  try {
-    const saved = localStorage.getItem('hw-theme');
-    if (saved === 'dark') theme.value = 'dark';
-    else if (saved === 'light') theme.value = 'light';
-    else theme.value = 'system';
-  } catch { /* 隐私模式不阻断 */ }
+  /* 隐私模式不阻断 */
   if (!session.profile) void session.loadOrgProfile();
 });
 
@@ -41,13 +36,18 @@ const subtitle = computed(() => ({
   about: '应用版本、服务支持与许可信息',
 }[section.value] ?? ''));
 
-function setTheme(value: 'light' | 'dark' | 'system') {
-  theme.value = value;
-  const resolved = value === 'system'
-    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    : value;
-  document.body.dataset.theme = resolved;
-  try { localStorage.setItem('hw-theme', value); } catch { /* 隐私模式不阻断 */ }
+async function save(patch: Partial<LocalPreferences>) {
+  if (saving.value) return;
+  saving.value = true;
+  try { await savePreferences(patch); }
+  catch (error) { /* 隐私模式不阻断 */ showToast(error instanceof Error ? error.message : '设置保存失败'); }
+  finally { saving.value = false; }
+}
+async function selectDirectory() {
+  saving.value = true;
+  try { await chooseDownloadDirectory(); }
+  catch { showToast('下载目录设置失败'); }
+  finally { saving.value = false; }
 }
 </script>
 
@@ -71,7 +71,7 @@ function setTheme(value: 'light' | 'dark' | 'system') {
           <div class="st-row">
             <div class="st-copy"><strong>外观主题</strong><small>选择浅色、深色或跟随系统</small></div>
             <div class="st-seg">
-              <button v-for="t in ['system', 'light', 'dark'] as const" :key="t" type="button" :class="{ active: theme === t }" @click="setTheme(t)">
+              <button v-for="t in ['system', 'light', 'dark'] as const" :key="t" type="button" :class="{ active: preferences.theme === t }" :disabled="saving" @click="save({ theme: t })">
                 {{ t === 'system' ? '跟随系统' : t === 'light' ? '浅色' : '深色' }}
               </button>
             </div>
@@ -81,11 +81,15 @@ function setTheme(value: 'light' | 'dark' | 'system') {
           <h3>桌面端</h3>
           <div class="st-row">
             <div class="st-copy"><strong>开机时启动</strong><small>登录系统后自动打开 workforce</small></div>
-            <button type="button" class="st-toggle" aria-label="开机时启动" @click="showToast('开机启动即将上线')"><i /></button>
+            <span v-if="!preferences.canLaunchAtLogin" class="st-status">仅安装版可设置</span>
+            <button type="button" class="st-toggle" :class="{ on: preferences.launchAtLogin }" role="switch" :aria-checked="preferences.launchAtLogin" aria-label="开机时启动" :disabled="saving || !preferences.canLaunchAtLogin" @click="save({ launchAtLogin: !preferences.launchAtLogin })"><i /></button>
           </div>
           <div class="st-row">
             <div class="st-copy"><strong>关闭窗口时</strong><small>选择关闭窗口后的应用行为</small></div>
-            <button type="button" class="st-select" @click="showToast('窗口行为设置即将上线')">退出应用</button>
+            <select class="st-select" aria-label="关闭窗口时" :value="preferences.closeBehavior" :disabled="saving || !desktop" @change="save({ closeBehavior: ($event.target as HTMLSelectElement).value as LocalPreferences['closeBehavior'] })"><option value="quit">退出应用</option><option value="background">后台运行</option></select>
+          </div>
+          <div class="st-row">
+            <div class="st-copy"><strong>窗口状态</strong></div><span class="st-status">{{ desktop ? '自动保存位置、大小与最大化状态' : '由浏览器管理' }}</span>
           </div>
         </section>
       </template>
@@ -95,22 +99,27 @@ function setTheme(value: 'light' | 'dark' | 'system') {
           <h3>消息通知</h3>
           <div class="st-row">
             <div class="st-copy"><strong>桌面通知</strong><small>收到新消息时在桌面显示提醒</small></div>
-            <button type="button" class="st-toggle on" aria-label="桌面通知" @click="showToast('桌面通知即将上线')"><i /></button>
+            <span v-if="!desktop || !preferences.notificationsSupported" class="st-status">当前环境不支持</span>
+            <button type="button" class="st-toggle" :class="{ on: preferences.desktopNotifications }" role="switch" :aria-checked="preferences.desktopNotifications" aria-label="桌面通知" :disabled="saving || !desktop || !preferences.notificationsSupported" @click="save({ desktopNotifications: !preferences.desktopNotifications })"><i /></button>
           </div>
           <div class="st-row">
             <div class="st-copy"><strong>通知声音</strong><small>新消息提醒时播放提示音</small></div>
-            <button type="button" class="st-toggle" aria-label="通知声音" @click="showToast('通知声音即将上线')"><i /></button>
+            <button type="button" class="st-toggle" :class="{ on: preferences.notificationSound }" role="switch" :aria-checked="preferences.notificationSound" aria-label="通知声音" :disabled="saving || !desktop || !preferences.desktopNotifications" @click="save({ notificationSound: !preferences.notificationSound })"><i /></button>
           </div>
           <div class="st-row">
             <div class="st-copy"><strong>显示消息预览</strong><small>关闭后仅提示收到新消息，不展示正文</small></div>
-            <button type="button" class="st-toggle on" aria-label="显示消息预览" @click="showToast('消息预览设置即将上线')"><i /></button>
+            <button type="button" class="st-toggle" :class="{ on: preferences.messagePreview }" role="switch" :aria-checked="preferences.messagePreview" aria-label="显示消息预览" :disabled="saving || !desktop || !preferences.desktopNotifications" @click="save({ messagePreview: !preferences.messagePreview })"><i /></button>
           </div>
         </section>
         <section class="st-card">
           <h3>免打扰</h3>
           <div class="st-row">
             <div class="st-copy"><strong>免打扰时段</strong><small>仅暂停本机提醒，不影响消息接收</small></div>
-            <button type="button" class="st-toggle" aria-label="免打扰时段" @click="showToast('免打扰即将上线')"><i /></button>
+            <button type="button" class="st-toggle" :class="{ on: preferences.dndEnabled }" role="switch" :aria-checked="preferences.dndEnabled" aria-label="免打扰时段" :disabled="saving || !desktop" @click="save({ dndEnabled: !preferences.dndEnabled })"><i /></button>
+          </div>
+          <div v-if="preferences.dndEnabled" class="st-row st-time-range">
+            <label>开始时间<input type="time" aria-label="免打扰开始时间" :value="preferences.dndStart" :disabled="saving" @change="save({ dndStart: ($event.target as HTMLInputElement).value })" /></label>
+            <label>结束时间<input type="time" aria-label="免打扰结束时间" :value="preferences.dndEnd" :disabled="saving" @change="save({ dndEnd: ($event.target as HTMLInputElement).value })" /></label>
           </div>
         </section>
       </template>
@@ -120,8 +129,8 @@ function setTheme(value: 'light' | 'dark' | 'system') {
           <h3>默认存储位置</h3>
           <div class="st-row">
             <div class="st-copy"><strong>下载文件保存到</strong><small>仅影响本机下载目录，不改变云端文件位置</small></div>
-            <span class="st-path">~/Downloads/workforce</span>
-            <button type="button" class="st-btn" @click="showToast('更改存储位置即将上线')">更改位置</button>
+            <span class="st-path" :title="preferences.downloadDirectory">{{ desktop ? preferences.downloadDirectory : '由浏览器管理' }}</span>
+            <button type="button" class="st-btn" :disabled="saving || !desktop" @click="selectDirectory">更改位置</button>
           </div>
         </section>
         <section class="st-card">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { downloadFile } from '@/services/download';
 /**
  * 我的云空间：文件/文件夹浏览、搜索、类型筛选、上传、新建文件夹、下载、删除。
  * 分享暂无后端接口，按钮 toast 占位。
@@ -123,7 +124,7 @@ async function submitFolder() {
 async function download(file: EmployeeFileResponse) {
   try {
     const ticket = await fileApi.createDownloadTicket(file.attachmentRefId, 'ATTACHMENT');
-    window.open(fileApi.downloadUrl(ticket.ticketNo), '_blank');
+    await downloadFile(fileApi.downloadUrl(ticket.ticketNo));
   } catch (error) {
     showToast(error instanceof Error ? error.message : '下载失败');
   }

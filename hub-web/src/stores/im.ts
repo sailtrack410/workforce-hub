@@ -57,6 +57,8 @@ function readActiveConversationId() {
 
 export const useImStore = defineStore('hw-im', {
   state: () => ({
+    socketConnected: false,
+    receivedMessage: null as ImMessageResponse | null,
     conversations: [] as ImConversationSummaryResponse[],
     messagesByConversation: {} as Record<string, ImMessageResponse[]>,
     detailsByConversation: {} as Record<string, ImConversationDetailResponse>,

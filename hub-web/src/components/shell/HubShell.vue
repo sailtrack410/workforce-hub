@@ -15,6 +15,9 @@ import { useImStore } from '@/stores/im';
 import { useToast } from '@/composables/useToast';
 import { notificationApi } from '@/api';
 import { NAV_MAX_WIDTH, NAV_MIN_WIDTH, navigationWidth } from '@/utils/imLayout';
+import { resolvedTheme as theme, savePreferences } from '@/services/preferences';
+import { useImSocket } from '@/composables/useImSocket';
+import { useDesktopNotifications } from '@/composables/useDesktopNotifications';
 
 const session = useSessionStore();
 const im = useImStore();
@@ -24,10 +27,21 @@ const { message: toastMessage, show: showToast } = useToast();
 const accountOpen = ref(false);
 const navWidth = ref(180);
 const navResizing = ref(false);
-const theme = ref<'light' | 'dark'>('light');
 const searchKeyword = ref('');
 let resizeCleanup: (() => void) | null = null;
 let notificationTimer: number | null = null;
+let removeDesktopNavigation: (() => void) | undefined;
+const desktopNotifications = useDesktopNotifications();
+const socket = useImSocket({
+  onMessage: () => { void im.loadConversations().catch(() => undefined); },
+  onCreated: (message) => {
+    if (loggingOut.value || (message.senderType === 'USER' && String(message.senderId) === String(session.user?.userId))) return;
+    const conversation = im.conversations.find((c) => String(c.conversationId) === String(message.conversationId));
+    if (conversation?.mute) return;
+    void window.workforceDesktop?.notify({ id: `message:${message.messageId}`, title: conversation?.title || message.senderName || '新消息',
+      body: message.contentText || (message.messageType === 'FILE' ? '[文件]' : '[新消息]'), route: `/messages/${message.conversationId}` }).catch(() => undefined);
+  },
+});
 
 const primaryNav = [
   { id: 'messages', label: '消息', path: '/messages', icon: MessageSquare },
@@ -80,9 +94,7 @@ function resizeNavByKeyboard(delta: number) {
   saveNavWidth();
 }
 function toggleTheme() {
-  theme.value = theme.value === 'light' ? 'dark' : 'light';
-  document.body.dataset.theme = theme.value;
-  try { localStorage.setItem('hw-theme', theme.value); } catch { /* 隐私模式不阻断 */ }
+  void savePreferences({ theme: theme.value === 'light' ? 'dark' : 'light' }).catch(() => { /* 隐私模式不阻断 */ showToast('外观设置保存失败'); });
 }
 function goto(path: string) {
   accountOpen.value = false;
@@ -107,6 +119,8 @@ async function logout() {
   if (loggingOut.value) return;
   loggingOut.value = true;
   accountOpen.value = false;
+  socket.close(); desktopNotifications.stop();
+  await window.workforceDesktop?.dismissNotifications().catch(() => undefined);
   await session.logout();
   await router.replace({ name: 'login' });
 }
@@ -125,8 +139,6 @@ onMounted(async () => {
   if (loggingOut.value) return;
   const savedWidth = Number(readPreference('hw-nav-width'));
   if (savedWidth >= NAV_MIN_WIDTH && savedWidth <= NAV_MAX_WIDTH) navWidth.value = savedWidth;
-  theme.value = readPreference('hw-theme') === 'dark' ? 'dark' : 'light';
-  document.body.dataset.theme = theme.value;
   document.addEventListener('click', onDocumentClick);
   document.addEventListener('keydown', onKeydown);
   if (!session.initialized) await session.loadCurrentUser();
@@ -134,15 +146,21 @@ onMounted(async () => {
     void router.replace({ name: 'login' });
     return;
   }
+  socket.connect();
+  removeDesktopNavigation = window.workforceDesktop?.onNavigate((path) => { if (session.isAuthenticated) void router.push(path); });
+  void desktopNotifications.poll();
   void session.loadOrgProfile();
   void im.loadConversations().catch(() => undefined);
   notificationApi.unreadCount().then((payload) => { notificationUnread.value = payload?.unreadCount ?? 0; }).catch(() => undefined);
   // 通知未读数轮询（30s），进入通知页后由页面自行刷新
   notificationTimer = window.setInterval(() => {
+    if (loggingOut.value) return;
+    void desktopNotifications.poll();
     notificationApi.unreadCount().then((payload) => { notificationUnread.value = payload?.unreadCount ?? 0; }).catch(() => undefined);
   }, 30000);
 });
 onBeforeUnmount(() => {
+  socket.close(); desktopNotifications.stop(); removeDesktopNavigation?.();
   resizeCleanup?.();
   if (notificationTimer !== null) window.clearInterval(notificationTimer);
   document.removeEventListener('click', onDocumentClick);

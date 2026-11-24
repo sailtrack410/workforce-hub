@@ -25,8 +25,8 @@ import ImProcessCard from '@/components/im/ImProcessCard.vue';
 import { useSessionStore } from '@/stores/session';
 import { useImStore, kindOf, lastMessageText } from '@/stores/im';
 import { getMessageScroll, saveMessageScroll } from '@/stores/messageScroll';
-import { useImSocket } from '@/composables/useImSocket';
 import { uploadImAttachment } from '@/composables/useUpload';
+import { downloadFile } from '@/services/download';
 import { agentApi, contactsApi, fileApi, imApi } from '@/api';
 import type { AgentResponse, EmployeeFileResponse, EntityId, ImConversationSummaryResponse, ImGroupFileResponse, ImGroupNoticeResponse, ImMessageAttachment, ImMessageResponse } from '@/api/types';
 import { toMessageView, friendlyTime, TIME_DIVIDER_GAP, type MessageView } from '@/utils/message';
@@ -84,17 +84,18 @@ function selectConversation(id: string) {
 }
 
 /* ---------- 实时 ---------- */
-const { connected: wsConnected, connect: connectSocket, close: closeSocket } = useImSocket({
-  onMessage: (conversationId) => {
-    if (conversationId === activeId.value) {
-      // 浏览历史时不强制跳转；只有本来就在底部才跟随新消息。
-      const el = messageStream.value;
-      if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 48) scrollToBottom();
-      void im.markRead(conversationId);
-    } else {
-      void im.loadConversations().catch(() => undefined);
-    }
-  },
+const wsConnected = computed(() => im.socketConnected);
+watch(() => im.receivedMessage, (message) => {
+  if (!message) return;
+  const conversationId = String(message.conversationId);
+  if (conversationId === activeId.value) {
+    // 浏览历史时不强制跳转；只有本来就在底部才跟随新消息。
+    const el = messageStream.value;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 48) scrollToBottom();
+    void im.markRead(conversationId);
+  } else {
+    void im.loadConversations().catch(() => undefined);
+  }
 });
 
 /* ---------- 聊天头：记录搜索 + 面板切换（画布 3:2303） ---------- */
@@ -732,7 +733,7 @@ async function downloadGroupFile(file: ImGroupFileResponse) {
   try {
     const ticket = await imApi.createGroupFileDownloadTicket(file.conversationId, file.attachmentRefId);
     const url = ticket.downloadUrl || ticket.url || imApi.attachmentDownloadUrl(ticket.ticketNo);
-    window.open(url, '_blank');
+    await downloadFile(url);
   } catch (error) {
     showToast(error instanceof Error ? error.message : '下载失败');
   }
@@ -968,7 +969,6 @@ onMounted(async () => {
     return;
   }
   await Promise.allSettled([im.loadConversations(), session.loadOrgProfile()]);
-  connectSocket();
   if (activeId.value) im.selectConversation(activeId.value);
   const restoredId = resolveConversationId(
     activeId.value,
@@ -1007,7 +1007,6 @@ watch(activeId, async (id) => {
 onBeforeUnmount(() => {
   saveScrollPosition();
   resizeCleanup?.();
-  closeSocket();
 });
 </script>
 
