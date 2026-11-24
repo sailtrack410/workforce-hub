@@ -6,6 +6,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useSessionStore } from '@/stores/session';
 import HubToast from '@/components/base/HubToast.vue';
+import HubDialog from '@/components/base/HubDialog.vue';
 import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
 import { preferences, savePreferences, chooseDownloadDirectory, type LocalPreferences } from '@/services/preferences';
@@ -22,6 +23,18 @@ const desktop = Boolean(window.workforceDesktop);
 const serverAddress = ref(preferences.serverUrl);
 const operations = ref<SyncOperation[]>([]);
 const uploadRecords = ref<UploadRecord[]>([]);
+const discardingOperation = ref<SyncOperation | null>(null);
+const discardingUpload = ref<UploadRecord | null>(null);
+async function confirmDiscard() {
+  saving.value = true;
+  try {
+    if (discardingOperation.value) await discardOperation(discardingOperation.value.id);
+    if (discardingUpload.value) await discardUpload(discardingUpload.value.id);
+    discardingOperation.value = null; discardingUpload.value = null;
+    await refreshOperations(); await refreshUploads(); await refreshStorage();
+  } catch { showToast('操作失败'); }
+  finally { saving.value = false; }
+}
 async function refreshUploads() { uploadRecords.value = await uploads(); }
 async function resumeUpload(id: string) {
   saving.value = true;
@@ -110,7 +123,7 @@ async function selectDirectory() {
       <template v-if="section === 'general'">
         <section v-if="operations.length" class="st-card">
           <h3>待同步 {{ operations.length }}</h3>
-          <div v-for="operation in operations" :key="operation.id" class="st-row"><div class="st-copy"><strong>{{ operationLabel(operation) }}</strong><small>{{ operation.error || '等待同步' }}</small></div><button class="st-btn" @click="discardOperation(operation.id).then(refreshOperations)">放弃本次修改</button></div>
+          <div v-for="operation in operations" :key="operation.id" class="st-row"><div class="st-copy"><strong>{{ operationLabel(operation) }}</strong><small>{{ operation.error || '等待同步' }}</small></div><button class="st-btn" @click="discardingOperation = operation">放弃本次修改</button></div>
           <button class="st-btn" @click="syncNow">立即同步</button>
         </section>
         <section class="st-card">
@@ -180,7 +193,7 @@ async function selectDirectory() {
       </template>
 
       <template v-else-if="section === 'storage'">
-        <section v-if="uploadRecords.length" class="st-card"><h3>文件传输</h3><div v-for="upload in uploadRecords" :key="upload.id" class="st-row"><div class="st-copy"><strong>{{ upload.fileName }}</strong><small>{{ upload.status === 'done' ? '已上传' : upload.status === 'failed' ? '上传失败' : '待上传' }} · {{ formatBytes(upload.fileSize) }}</small></div><button v-if="upload.status !== 'done'" class="st-btn" :disabled="saving" @click="resumeUpload(upload.id)">重试</button><button class="st-btn" :disabled="saving" @click="discardUpload(upload.id).then(refreshUploads)">{{ upload.status === 'done' ? '移除记录' : '取消上传' }}</button></div></section>
+        <section v-if="uploadRecords.length" class="st-card"><h3>文件传输</h3><div v-for="upload in uploadRecords" :key="upload.id" class="st-row"><div class="st-copy"><strong>{{ upload.fileName }}</strong><small>{{ upload.status === 'done' ? '已上传' : upload.status === 'failed' ? '上传失败' : '待上传' }} · {{ formatBytes(upload.fileSize) }}</small></div><button v-if="upload.status !== 'done'" class="st-btn" :disabled="saving" @click="resumeUpload(upload.id)">重试</button><button class="st-btn" :disabled="saving" @click="discardingUpload = upload">{{ upload.status === 'done' ? '移除记录' : '取消上传' }}</button></div></section>
         <section class="st-card">
           <h3>默认存储位置</h3>
           <div class="st-row">
@@ -228,6 +241,7 @@ async function selectDirectory() {
         </section>
       </template>
     </main>
+    <HubDialog v-if="discardingOperation || discardingUpload" :lock="saving" title-id="st-discard-title" @close="discardingOperation = null; discardingUpload = null"><section class="st-card"><h3 id="st-discard-title">{{ discardingOperation ? '放弃未同步修改？' : discardingUpload?.status === 'done' ? '移除上传记录？' : '取消上传并删除本机暂存？' }}</h3><div class="st-row"><button class="st-btn" :disabled="saving" @click="discardingOperation = null; discardingUpload = null">取消</button><button class="st-btn" :disabled="saving" @click="confirmDiscard">确认</button></div></section></HubDialog>
     <HubToast :message="toastMessage" />
   </div>
 </template>
