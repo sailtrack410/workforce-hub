@@ -1,12 +1,28 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { File } from 'node:buffer';
-import { fileApi } from '@/api';
+import { fileApi, orgApi } from '@/api';
 import { durableRequest } from '@/services/sync';
 import { uploadEmployeeFile } from './useUpload';
-vi.mock('@/api', () => ({ fileApi: { createUploadTicket: vi.fn(), confirmUpload: vi.fn() }, teamTaskApi: { attach: vi.fn() } }));
+const { session } = vi.hoisted(() => ({ session: { user: { userId: '123' } } }));
+vi.mock('@/api', () => ({ fileApi: { createUploadTicket: vi.fn(), confirmUpload: vi.fn() }, teamTaskApi: { attach: vi.fn() }, orgApi: { updateProfile: vi.fn() } }));
 vi.mock('@/services/sync', () => ({ durableRequest: vi.fn() }));
-vi.mock('@/stores/session', () => ({ useSessionStore: () => ({ user: { userId: '123' } }) }));
+vi.mock('@/stores/session', () => ({ useSessionStore: () => session }));
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+it('头像附件确认后绑定个人资料，绑定失败保留暂存，重试复用上传标识', async () => {
+  const stageUpload = vi.fn().mockResolvedValue(undefined), uploadStatus = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('window', { workforceDesktop: { cacheContext: async () => 'account', stageUpload, uploadStatus } });
+  vi.mocked(fileApi.createUploadTicket).mockResolvedValue({ deduplicated: true, attachmentRefId: '9007199254740993' } as never);
+  vi.mocked(orgApi.updateProfile).mockRejectedValueOnce(new TypeError('offline')).mockResolvedValueOnce({ avatarAttachmentRefId: '9007199254740993' });
+  const file = new File(['avatar-fixture'], 'avatar.png', { type: 'image/png' }) as unknown as globalThis.File;
+  await expect(uploadEmployeeFile({ file, ownerType: 'USER_AVATAR' })).rejects.toThrow('offline');
+  const id = stageUpload.mock.calls[0][1];
+  expect(uploadStatus).toHaveBeenLastCalledWith('account', id, 'failed');
+  const result = await uploadEmployeeFile({ file, ownerType: 'USER_AVATAR', transferId: id });
+  expect(result.profile?.avatarAttachmentRefId).toBe('9007199254740993');
+  expect(orgApi.updateProfile).toHaveBeenCalledWith({ avatarAttachmentRefId: '9007199254740993' });
+  expect(vi.mocked(fileApi.createUploadTicket).mock.calls.map(call => call[0].clientRequestId)).toEqual([id, id]);
+  expect(uploadStatus).toHaveBeenLastCalledWith('account', id, 'done');
+});
 it('断网上传先暂存，重试复用同一标识，确认成功后释放暂存', async () => {
   const stageUpload = vi.fn().mockResolvedValue(undefined), uploadStatus = vi.fn().mockResolvedValue(undefined);
   vi.stubGlobal('window', { workforceDesktop: { cacheContext: async () => 'account', stageUpload, uploadStatus } });

@@ -9,6 +9,9 @@ import HubToast from '@/components/base/HubToast.vue';
 import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
 import { useSessionStore } from '@/stores/session';
+import { authApi } from '@/api';
+import { useEmailCode } from '@/composables/useEmailCode';
+import HubDialog from '@/components/base/HubDialog.vue';
 
 const session = useSessionStore();
 const route = useRoute();
@@ -29,6 +32,37 @@ const loginError = ref('');
 const loginState = ref<'idle' | 'loading' | 'success' | 'error'>('idle');
 const restoring = ref(true);
 let loginTimer = 0;
+const forgotOpen = ref(false), resetSaving = ref(false);
+const resetForm = ref({ email: '', code: '', password: '', confirm: '' });
+const resetCode = useEmailCode(() => resetForm.value.email, 'RESET_PASSWORD');
+const loginChallenge = ref<'' | 'verify' | 'bind'>(''), verificationCode = ref(''), bindingEmail = ref(''), maskedEmail = ref('');
+const loginCodeSending = ref(false), loginCodeWait = ref(0);
+let loginCodeTimer: ReturnType<typeof setInterval> | undefined;
+async function sendLoginCode() {
+  if (loginCodeSending.value || loginCodeWait.value) return;
+  loginCodeSending.value = true;
+  try {
+    if (loginChallenge.value === 'bind') await authApi.sendEmailCode(bindingEmail.value.trim(), 'BIND');
+    else maskedEmail.value = (await authApi.sendLoginCode(loginName.value.trim())).maskedEmail;
+    loginCodeWait.value = 60;
+    loginCodeTimer = setInterval(() => { loginCodeWait.value--; if (!loginCodeWait.value) clearInterval(loginCodeTimer); }, 1000);
+  } catch (error) { showToast(error instanceof Error ? error.message : '验证码发送失败'); }
+  finally { loginCodeSending.value = false; }
+}
+async function sendResetCode() {
+  try { await resetCode.send(); } catch (error) { showToast(error instanceof Error ? error.message : '验证码发送失败'); }
+}
+async function resetPassword() {
+  if (resetSaving.value) return;
+  if (resetForm.value.password !== resetForm.value.confirm) { showToast('两次输入的密码不一致'); return; }
+  resetSaving.value = true;
+  try {
+    await authApi.resetPassword(resetForm.value.email.trim(), resetForm.value.code.trim(), resetForm.value.password);
+    loginName.value = resetForm.value.email.trim(); password.value = ''; forgotOpen.value = false;
+    resetForm.value = { email: '', code: '', password: '', confirm: '' }; showToast('密码已重置');
+  } catch (error) { showToast(error instanceof Error ? error.message : '密码重置失败'); }
+  finally { resetSaving.value = false; }
+}
 
 async function submitLogin() {
   if (loginState.value !== 'idle') return;
@@ -39,7 +73,13 @@ async function submitLogin() {
   loginError.value = '';
   loginState.value = 'loading';
   try {
-    await session.login(loginName.value.trim(), password.value);
+    const result = await session.login(loginName.value.trim(), password.value, loginChallenge.value ? {
+      emailCode: verificationCode.value.trim() || undefined,
+      bindEmail: loginChallenge.value === 'bind' ? bindingEmail.value.trim() || undefined : undefined,
+    } : {});
+    if (result.requiresEmailCode || result.requiresEmailBinding) {
+      loginChallenge.value = result.requiresEmailBinding ? 'bind' : 'verify'; maskedEmail.value = result.maskedEmail || ''; loginState.value = 'idle'; return;
+    }
     void session.loadOrgProfile().catch(() => undefined);
     loginState.value = 'success';
     loginTimer = window.setTimeout(() => void router.replace('/messages'), 280);
@@ -85,6 +125,7 @@ onMounted(async () => {
   restoring.value = false;
 });
 onBeforeUnmount(() => window.clearTimeout(loginTimer));
+onBeforeUnmount(() => clearInterval(loginCodeTimer));
 </script>
 
 <template>
@@ -118,7 +159,9 @@ onBeforeUnmount(() => window.clearTimeout(loginTimer));
               <label class="auth-field">密码
                 <span class="auth-password"><input v-model="password" :type="showPassword ? 'text' : 'password'" placeholder="请输入密码" autocomplete="current-password" /><button type="button" :aria-label="showPassword ? '隐藏密码' : '显示密码'" @click="showPassword = !showPassword"><EyeOff v-if="showPassword" :size="17" /><Eye v-else :size="17" /></button></span>
               </label>
-              <div class="auth-forgot-row"><button type="button" class="auth-link" @click="showToast('找回密码即将上线')">忘记密码？</button></div>
+              <label v-if="loginChallenge === 'bind'" class="auth-field">绑定邮箱<input v-model="bindingEmail" type="email" required autocomplete="email" :disabled="loginCodeSending || loginCodeWait > 0" /></label>
+              <label v-if="loginChallenge" class="auth-field">{{ loginChallenge === 'bind' ? '邮箱验证码' : `邮箱验证码 ${maskedEmail}` }}<span class="auth-password"><input v-model="verificationCode" required autocomplete="one-time-code" /><button type="button" class="auth-link" :disabled="loginCodeSending || loginCodeWait > 0" @click="sendLoginCode">{{ loginCodeWait ? `${loginCodeWait} 秒` : '获取验证码' }}</button></span></label>
+              <div class="auth-forgot-row"><button type="button" class="auth-link" @click="forgotOpen = true">忘记密码？</button></div>
               <p v-if="loginError" class="auth-error" role="alert">{{ loginError }}</p>
               <button type="submit" class="auth-submit" :class="`is-${loginState}`" :disabled="loginState !== 'idle'">
                 <LoaderCircle v-if="loginState === 'loading'" class="auth-spin" :size="19" />
@@ -154,11 +197,22 @@ onBeforeUnmount(() => window.clearTimeout(loginTimer));
         </Transition>
       </section>
     </div>
+    <HubDialog v-if="forgotOpen" :lock="resetSaving" @close="forgotOpen = false">
+      <form class="auth-reset" @submit.prevent="resetPassword">
+        <h2>找回密码</h2>
+        <label class="auth-field">绑定邮箱<input v-model="resetForm.email" type="email" required autocomplete="email" :disabled="resetSaving || resetCode.sending.value" /></label>
+        <label class="auth-field">邮箱验证码<span class="auth-password"><input v-model="resetForm.code" required autocomplete="one-time-code" :disabled="resetSaving" /><button type="button" class="auth-link" :disabled="resetSaving || resetCode.sending.value || resetCode.remaining.value > 0" @click="sendResetCode">{{ resetCode.remaining.value ? `${resetCode.remaining.value} 秒` : '获取验证码' }}</button></span></label>
+        <label class="auth-field">新密码<input v-model="resetForm.password" type="password" required minlength="8" maxlength="64" autocomplete="new-password" :disabled="resetSaving" /></label>
+        <label class="auth-field">确认密码<input v-model="resetForm.confirm" type="password" required minlength="8" maxlength="64" autocomplete="new-password" :disabled="resetSaving" /></label>
+        <button class="auth-submit" :disabled="resetSaving">{{ resetSaving ? '保存中…' : '重置密码' }}</button>
+      </form>
+    </HubDialog>
     <HubToast :message="toastMessage" />
   </div>
 </template>
 
 <style scoped>
+.auth-reset { display: flex; flex-direction: column; gap: var(--hw-space-4); width: min(360px, calc(100vw - 96px)); }
 .auth-page { display: grid; place-items: center; min-height: 100dvh; padding: 32px; background: var(--hw-canvas); }
 .auth-card { display: flex; width: min(1100px, 100%); height: min(720px, calc(100dvh - 64px)); min-height: 600px; border-radius: 24px; background: var(--hw-card); box-shadow: var(--hw-shadow-card); overflow: hidden; }
 .auth-brand { display: flex; flex-direction: column; width: 440px; padding: 48px; background: linear-gradient(135deg, var(--hw-primary), var(--hw-primary-deep)); color: var(--hw-on-primary); flex: none; }

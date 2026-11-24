@@ -7,6 +7,7 @@ import lombok.Data;
  */
 @Data
 public class EmployeePreferenceResponse {
+    private String displayName;
 
     /**
      * 主题：light / dark

@@ -1,7 +1,7 @@
 // hub-web 上传工具：申请票据 → PUT 对象存储 → 确认上传
-import { fileApi, teamTaskApi } from '@/api';
+import { fileApi, teamTaskApi, orgApi } from '@/api';
 import { currentContext } from '@/services/localData';
-import type { EntityId, ImMessageResponse } from '@/api/types';
+import type { EntityId, ImMessageResponse, OrgUserDetailResponse } from '@/api/types';
 import { durableRequest } from '@/services/sync';
 import { useSessionStore } from '@/stores/session';
 
@@ -47,8 +47,9 @@ export async function uploadEmployeeFile(request: {
   transferId?: string;
   taskId?: string;
   conversationId?: string;
-}): Promise<{ attachmentRefId: EntityId; message?: ImMessageResponse }> {
+}): Promise<{ attachmentRefId: EntityId; message?: ImMessageResponse; profile?: OrgUserDetailResponse }> {
   const context = await currentContext();
+  const user = useSessionStore().user;
   const transferId = request.transferId || crypto.randomUUID();
   if (context && !request.transferId) {
     await window.workforceDesktop!.stageUpload(context, transferId, [...new Uint8Array(await request.file.arrayBuffer())], {
@@ -58,6 +59,8 @@ export async function uploadEmployeeFile(request: {
   }
   try {
     const result = await performUpload(request, transferId);
+    if (useSessionStore().user !== user || await currentContext() !== context) throw new Error('登录状态已变化');
+    const profile = request.ownerType === 'USER_AVATAR' ? await orgApi.updateProfile({ avatarAttachmentRefId: result.attachmentRefId }) : undefined;
     if (request.taskId) await teamTaskApi.attach(request.taskId, result.attachmentRefId);
     let message: ImMessageResponse | undefined;
     if (request.conversationId) {
@@ -66,7 +69,7 @@ export async function uploadEmployeeFile(request: {
       message = sent.queued ? snapshot : sent.value;
     }
     if (context) await window.workforceDesktop!.uploadStatus(context, transferId, 'done');
-    return { ...result, message };
+    return { ...result, message, profile };
   } catch (error) {
     if (context) await window.workforceDesktop!.uploadStatus(context, transferId, 'failed').catch(() => undefined);
     throw error;

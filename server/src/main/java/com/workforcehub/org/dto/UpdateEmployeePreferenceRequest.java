@@ -10,6 +10,8 @@ import lombok.Data;
  */
 @Data
 public class UpdateEmployeePreferenceRequest {
+    @Size(max = 64, message = "显示名称不能超过 64 个字符")
+    private String displayName;
 
     @Pattern(regexp = "light|dark", message = "theme 必须是 light 或 dark")
     private String theme;

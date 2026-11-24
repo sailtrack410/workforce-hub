@@ -8,7 +8,13 @@ export interface CurrentUserResponse {
   displayName: string;
   email?: string | null;
 }
+export interface LoginResponse extends CurrentUserResponse {
+  requiresEmailCode?: boolean;
+  requiresEmailBinding?: boolean;
+  maskedEmail?: string;
+}
 export interface OrgUserDetailResponse {
+  mobile?: string | null;
   realName?: string | null;
   primaryDeptName?: string | null;
   positionName?: string | null;

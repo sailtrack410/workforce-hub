@@ -73,7 +73,7 @@ async function confirmDiscard() {
 async function refreshUploads() { uploadRecords.value = await uploads(); }
 async function resumeUpload(id: string) {
   saving.value = true;
-  try { const result = await retryUpload(id); if (result?.message) useImStore().upsertMessage(result.message); showToast('上传已完成'); }
+  try { const result = await retryUpload(id); if (result?.message) useImStore().upsertMessage(result.message); if (result?.profile) session.profile = result.profile; showToast('上传已完成'); }
   catch (error) { showToast(error instanceof Error ? error.message : '上传失败'); }
   finally { saving.value = false; await refreshUploads(); await refreshStorage(); }
 }

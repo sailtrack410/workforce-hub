@@ -1,6 +1,7 @@
 package com.workforcehub.auth.controller;
 
 import com.workforcehub.auth.dto.BindEmailRequest;
+import com.workforcehub.auth.dto.ChangePasswordRequest;
 import com.workforcehub.auth.dto.CurrentUserResponse;
 import com.workforcehub.auth.dto.LoginRequest;
 import com.workforcehub.auth.dto.LoginResponse;
@@ -74,6 +75,13 @@ public class EmployeeAuthController {
     @PostMapping("/email/bind")
     public R<Void> bindEmail(@Valid @RequestBody BindEmailRequest request) {
         accountService.bindEmail(request);
+        return R.ok();
+    }
+
+    @Operation(summary = "修改登录密码", operationId = "changeEmployeePassword")
+    @PostMapping("/password/change")
+    public R<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        accountService.changePassword(request);
         return R.ok();
     }
 

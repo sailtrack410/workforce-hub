@@ -70,6 +70,7 @@ public class EmployeePreferenceService {
             entity.setBubbleStyle(DEFAULT_BUBBLE);
         }
         if (request != null) {
+            if (request.getDisplayName() != null) entity.setDisplayName(request.getDisplayName().trim());
             if (request.getTheme() != null) {
                 entity.setTheme(request.getTheme());
             }
@@ -120,6 +121,7 @@ public class EmployeePreferenceService {
             row = new EmpUserPreference();
         }
         EmployeePreferenceResponse response = new EmployeePreferenceResponse();
+        response.setDisplayName(strOrDefault(row.getDisplayName(), ""));
         response.setTheme(strOrDefault(row.getTheme(), DEFAULT_THEME));
         response.setMessageDensity(strOrDefault(row.getMessageDensity(), DEFAULT_DENSITY));
         response.setListWidth(row.getListWidth() != null ? clampListWidth(row.getListWidth()) : DEFAULT_LIST_WIDTH);

@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class EmpUserPreference {
 
     private Long userId;
+    private String displayName;
 
     private String theme;
     private String messageDensity;

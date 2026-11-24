@@ -56,3 +56,8 @@
 .pc-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .pc-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--hw-primary); border-radius: 6px; background: var(--hw-primary); color: var(--hw-on-primary); font-size: 13px; cursor: pointer; white-space: nowrap; }
 .pc-btn-primary:hover { background: var(--hw-primary-deep); }
+.pc-contact-form { display: flex; flex-direction: column; gap: var(--hw-space-3); }
+.pc-code-row { display: flex; align-items: end; gap: var(--hw-space-3); }
+.pc-code-row label { min-width: 0; flex: 1; }
+.pc-code-row input { width: 100%; }
+.pc-page button:disabled { opacity: .5; cursor: default; }

@@ -71,6 +71,21 @@ class ModuleEmployeeProfilePreferenceIntegrationTest extends LocalIntegrationTes
     }
 
     @Test
+    @DisplayName("显示名称跨请求保存且不覆盖组织姓名及其他偏好")
+    void employeeDisplayNameShouldPersistWithoutChangingLegalName() throws Exception {
+        Cookie session = loginEmployee("zhangsan.employee", "Employee@123456", "test-display-name");
+        mockMvc.perform(put("/api/employee/me/preferences").cookie(session).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"displayName\":\"  项目昵称  \",\"theme\":\"dark\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.displayName").value("项目昵称"));
+        mockMvc.perform(put("/api/employee/me/preferences").cookie(session).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"signature\":\"签名\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.displayName").value("项目昵称"));
+        mockMvc.perform(get("/api/employee/me/preferences").cookie(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.displayName").value("项目昵称"))
+            .andExpect(jsonPath("$.data.theme").value("dark"));
+    }
+
+    @Test
     @DisplayName("同部门同事列表应排除本人并保持非空")
     void colleaguesShouldExcludeSelf() throws Exception {
         Cookie session = loginEmployee("zhangsan.employee", "Employee@123456", "test-colleagues-001");

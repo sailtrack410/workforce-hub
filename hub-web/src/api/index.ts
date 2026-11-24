@@ -8,6 +8,7 @@ import type {
   AttendanceDailyResultResponse,
   AttendanceScheduleResponse,
   CurrentUserResponse,
+  LoginResponse,
   DownloadTicketResponse,
   EmployeeFileBrowserResponse,
   EmployeeFileFolderResponse,
@@ -41,14 +42,22 @@ import type {
 const id = (value: EntityId) => encodeURIComponent(String(value));
 
 export const authApi = {
-  login: (loginName: string, password: string) =>
-    http.post<CurrentUserResponse>('/api/employee/auth/login', { loginName, password }),
+  login: (loginName: string, password: string, verification: { emailCode?: string; bindEmail?: string } = {}) =>
+    http.post<LoginResponse>('/api/employee/auth/login', { loginName, password, ...verification }),
+  sendLoginCode: (identifier: string) => http.post<{ maskedEmail: string }>('/api/employee/auth/login/send-code', { identifier }),
   me: () => http.get<CurrentUserResponse>('/api/employee/auth/me'),
   logout: () => http.post<void>('/api/employee/auth/logout'),
+  changePassword: (currentPassword: string, newPassword: string) => http.post<void>('/api/employee/auth/password/change', { currentPassword, newPassword }),
+  sendEmailCode: (email: string, purpose: 'BIND' | 'RESET_PASSWORD') => http.post<void>('/api/employee/auth/email/send-code', { email, purpose }),
+  bindEmail: (email: string, code: string) => http.post<void>('/api/employee/auth/email/bind', { email, code }),
+  resetPassword: (email: string, code: string, newPassword: string) => http.post<void>('/api/employee/auth/password/reset', { email, code, newPassword }),
 };
 
 export const orgApi = {
   profile: () => http.get<OrgUserDetailResponse>('/api/employee/me/profile'),
+  updateProfile: (request: { mobile?: string; avatarAttachmentRefId?: EntityId | null }) => http.put<OrgUserDetailResponse>('/api/employee/me/profile', request),
+  preferences: () => http.get<{ displayName?: string }>('/api/employee/me/preferences'),
+  updatePreferences: (request: { displayName: string }) => http.put<{ displayName?: string }>('/api/employee/me/preferences', request),
   manager: () => http.get<OrgUserSummaryResponse | null>('/api/employee/me/manager'),
   subordinates: () => http.get<OrgUserSummaryResponse[]>('/api/employee/me/subordinates'),
   colleagues: () => http.get<OrgUserSummaryResponse[]>('/api/employee/me/colleagues'),

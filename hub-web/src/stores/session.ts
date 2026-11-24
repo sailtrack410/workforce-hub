@@ -28,10 +28,11 @@ export const useSessionStore = defineStore('hw-session', {
     subordinates: [] as OrgUserSummaryResponse[],
     colleagues: [] as OrgUserSummaryResponse[],
     initialized: false,
+    personalization: null as { displayName?: string } | null,
   }),
   getters: {
     isAuthenticated: (state) => state.user !== null,
-    displayName: (state) => state.profile?.realName ?? state.user?.displayName ?? '',
+    displayName: (state) => state.personalization?.displayName?.trim() || state.profile?.realName || state.user?.displayName || '',
     contacts(state): ContactView[] {
       const map = new Map<string, ContactView>();
       const push = (u: OrgUserSummaryResponse, relation: string) => {
@@ -74,14 +75,17 @@ export const useSessionStore = defineStore('hw-session', {
         this.initialized = true;
       }
     },
-    async login(loginName: string, password: string) {
+    async login(loginName: string, password: string, verification: { emailCode?: string; bindEmail?: string } = {}) {
       localStatus.suspended = true;
       try {
-      this.user = await authApi.login(loginName, password);
+      const result = await authApi.login(loginName, password, verification);
+      if (result.requiresEmailCode || result.requiresEmailBinding) return result;
+      this.user = await authApi.me().catch(() => result);
       const account = await window.workforceDesktop?.bindCacheAccount?.();
       if (account && !account.offline && String(account.user.userId) === String(this.user.userId)) this.user = account.user;
       else if (account) await window.workforceDesktop?.logoutCache?.();
       this.initialized = true;
+      return result;
       } finally { localStatus.suspended = false; }
     },
     async logout() {
@@ -91,21 +95,26 @@ export const useSessionStore = defineStore('hw-session', {
       useImStore().$reset();
       this.user = null;
       this.profile = null;
+      this.personalization = null;
       this.manager = null; this.subordinates = []; this.colleagues = [];
       Object.assign(localStatus, { offline: false, cachedAt: 0, pending: 0, conflicts: 0, error: '' });
     },
     async loadOrgProfile() {
       if (!this.user) return;
-      const [profile, manager, subordinates, colleagues] = await Promise.all([
+      const user = this.user;
+      const [profile, manager, subordinates, colleagues, personalization] = await Promise.all([
         orgApi.profile().catch(() => null),
         orgApi.manager().catch(() => null),
         orgApi.subordinates().catch(() => []),
         orgApi.colleagues().catch(() => []),
+        orgApi.preferences().catch(() => null),
       ]);
+      if (this.user !== user) return;
       this.profile = profile;
       this.manager = manager;
       this.subordinates = subordinates;
       this.colleagues = colleagues;
+      this.personalization = personalization;
     },
   },
 });

@@ -2,6 +2,7 @@ package com.workforcehub.auth.service;
 
 import com.workforcehub.auth.domain.AuthUserAccount;
 import com.workforcehub.auth.dto.BindEmailRequest;
+import com.workforcehub.auth.dto.ChangePasswordRequest;
 import com.workforcehub.auth.dto.CurrentUserResponse;
 import com.workforcehub.auth.dto.ResetPasswordRequest;
 import com.workforcehub.auth.domain.OrgUser;
@@ -113,6 +114,18 @@ public class AccountService {
         accountMapper.updateById(account);
 
         log.info("邮箱绑定成功 userId={} email={}", currentUserId, LoginService.maskEmail(request.getEmail()));
+    }
+
+    public void changePassword(ChangePasswordRequest request) {
+        if (!CurrentUserHolder.isEmployee()) throw new BizException(403, "仅员工端支持修改密码");
+        Long userId = CurrentUserHolder.requireUserId();
+        AuthUserAccount account = accountMapper.selectByUserId(userId);
+        if (account == null) throw new BizException(404, "账号不存在");
+        if (!passwordEncoder.matches(request.getCurrentPassword(), account.getPasswordHash())) throw new BizException(400, "当前密码不正确");
+        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) throw new BizException(400, "新密码不能与当前密码相同");
+        account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        account.setPasswordUpdatedAt(LocalDateTime.now());
+        accountMapper.updateById(account);
     }
 
     /**
