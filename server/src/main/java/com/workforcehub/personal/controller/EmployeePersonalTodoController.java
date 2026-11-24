@@ -46,6 +46,12 @@ public class EmployeePersonalTodoController {
         return R.ok(personalTodoService.list(category, status, start, end));
     }
 
+    @Operation(summary = "查询个人待办详情", operationId = "getPersonalTodo")
+    @GetMapping("/{todoId}")
+    public R<PersonalTodoResponse> detail(@PathVariable Long todoId) {
+        return R.ok(personalTodoService.detail(todoId));
+    }
+
     @Operation(summary = "创建个人待办", operationId = "createPersonalTodo")
     @PostMapping
     public R<PersonalTodoResponse> create(@Valid @RequestBody PersonalTodoSaveRequest request) {

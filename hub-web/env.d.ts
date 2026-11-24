@@ -26,6 +26,7 @@ interface WorkforceDesktopBridge {
   pendingOperations(context: string): Promise<import('./src/services/sync').SyncOperation[]>;
   enqueue(context: string, operation: import('./src/services/sync').SyncOperation): Promise<void>;
   setOperationState(context: string, id: string, state: string, error?: string): Promise<void>;
+  discardOperations(context: string, ids: string[]): Promise<void>;
   getSettings(): Promise<import('./src/services/preferences').DesktopSettings>;
   updateSettings(patch: Partial<import('./src/services/preferences').LocalPreferences>): Promise<import('./src/services/preferences').DesktopSettings>;
   chooseDownloadDirectory(): Promise<import('./src/services/preferences').DesktopSettings>;

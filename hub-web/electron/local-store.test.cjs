@@ -4,6 +4,14 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { LocalStore } = require('./local-store.cjs');
+test('冲突解决原子清理指定操作，保留其他待办与账号的队列', () => {
+  const store = new LocalStore(':memory:');
+  store.enqueue('a', { id: 'first' }); store.enqueue('a', { id: 'later' }); store.enqueue('a', { id: 'other' }); store.enqueue('b', { id: 'first' });
+  store.discardOperations('a', ['first', 'later']);
+  assert.deepEqual(store.queue('a').map(op => op.id), ['other']); assert.equal(store.queue('b').length, 1);
+  assert.throws(() => store.discardOperations('a', ['other', null]), /无效/); assert.equal(store.queue('a').length, 1);
+  store.close();
+});
 test('损坏数据库隔离原件并恢复空缓存，不直接删除原有文件', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'workforce-corrupt-'));
   try {

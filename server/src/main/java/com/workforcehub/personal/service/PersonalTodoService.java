@@ -73,6 +73,10 @@ public class PersonalTodoService {
         return personalTodoRepository.find(ownerId, category, status, start, end);
     }
 
+    public PersonalTodoResponse detail(Long todoId) {
+        return requireTodo(todoId);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse update(Long todoId, PersonalTodoSaveRequest request) {
         PersonalTodoResponse existing = requireTodo(todoId);

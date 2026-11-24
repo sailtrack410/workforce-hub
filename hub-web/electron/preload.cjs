@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('workforceDesktop', {
   pendingOperations: (context) => ipcRenderer.invoke('cache:queue', context),
   enqueue: (context, operation) => ipcRenderer.invoke('cache:enqueue', context, operation),
   setOperationState: (context, id, state, error) => ipcRenderer.invoke('cache:queue-state', context, id, state, error),
+  discardOperations: (context, ids) => ipcRenderer.invoke('cache:discard-operations', context, ids),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
   chooseDownloadDirectory: () => ipcRenderer.invoke('settings:choose-download-directory'),

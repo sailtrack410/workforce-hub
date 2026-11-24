@@ -465,6 +465,15 @@ class TaskTodoBusinessRulesTest {
         assertNull(jdbc.queryForObject("SELECT reminded_at FROM personal_todo WHERE todo_id = ?", java.sql.Timestamp.class, id));
     }
 
+    @Test
+    void personalTodoDetailReadsCurrentVersionAndEnforcesOwnership() throws Exception {
+        var created = data(post(TODOS), "{\"title\":\"版本对比\"}", 200);
+        long id = created.path("todoId").asLong();
+        assertEquals(created.path("version").asInt(), data(get(TODOS + "/" + id), null, 200).path("version").asInt());
+        employee(2003);
+        data(get(TODOS + "/" + id), null, 404);
+    }
+
     private JsonNode data(MockHttpServletRequestBuilder request, String payload, int expected) throws Exception {
         if (payload != null) request.contentType("application/json").content(payload);
         var response = mvc.perform(request).andExpect(status().is(expected)).andReturn().getResponse();

@@ -62,6 +62,15 @@ class LocalStore {
     if (state === 'done') this.db.prepare('DELETE FROM outbox WHERE scope=? AND id=?').run(scope, id);
     else this.db.prepare('UPDATE outbox SET state=?,error=? WHERE scope=? AND id=?').run(state, error, scope, id);
   }
+  discardOperations(scope, ids) {
+    if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string')) throw new TypeError('待同步操作无效');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const remove = this.db.prepare('DELETE FROM outbox WHERE scope=? AND id=?');
+      for (const id of ids) remove.run(scope, id);
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
   meta(key, value) {
     if (arguments.length === 2) {
       if (value == null) this.db.prepare('DELETE FROM local_meta WHERE key=?').run(key);

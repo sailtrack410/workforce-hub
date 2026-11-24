@@ -271,6 +271,7 @@ app.whenReady().then(async () => {
     if (!['pending', 'conflict', 'error', 'done'].includes(state)) throw new Error('同步状态无效');
     localStore.queueState(requireCache(context), id, state, typeof error === 'string' ? error.slice(0, 300) : null);
   });
+  handle('cache:discard-operations', (_event, context, ids) => localStore.discardOperations(requireCache(context), ids));
   if (app.isPackaged) appServer = await startAppServer({ root: path.join(__dirname, '..', 'dist'), backend: preferences.get().serverUrl });
   syncTray();
   const session = require('electron').session.defaultSession;

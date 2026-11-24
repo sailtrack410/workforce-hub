@@ -10,7 +10,8 @@ import HubDialog from '@/components/base/HubDialog.vue';
 import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
 import { preferences, savePreferences, chooseDownloadDirectory, type LocalPreferences } from '@/services/preferences';
-import { pendingOperations, syncPending, discardOperation, type SyncOperation } from '@/services/sync';
+import { pendingOperations, syncPending, discardOperation, readTodoConflict, resolveTodoConflict, type TodoConflict, type SyncOperation } from '@/services/sync';
+import type { PersonalTodoResponse } from '@/api/types';
 import { currentContext } from '@/services/localData';
 import { uploads, retryUpload, discardUpload, type UploadRecord } from '@/services/transfers';
 import { useImStore } from '@/stores/im';
@@ -25,6 +26,40 @@ const operations = ref<SyncOperation[]>([]);
 const uploadRecords = ref<UploadRecord[]>([]);
 const discardingOperation = ref<SyncOperation | null>(null);
 const discardingUpload = ref<UploadRecord | null>(null);
+const conflict = ref<TodoConflict | null>(null);
+const mergeDraft = ref<PersonalTodoResponse | null>(null);
+const conflictFields = [
+  { key: 'title', label: '名称' }, { key: 'category', label: '分类' }, { key: 'status', label: '状态' },
+  { key: 'startAt', label: '开始时间' }, { key: 'dueAt', label: '截止时间' }, { key: 'allDay', label: '全天' },
+  { key: 'reminderMinutes', label: '提前提醒（分钟）' }, { key: 'note', label: '备注' },
+] as const;
+const localDelete = computed(() => conflict.value?.operations.at(-1)?.method === 'DELETE');
+function conflictValue(value: unknown) {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  return ({ PENDING: '未完成', DONE: '已完成', TASK: '任务', MEETING: '会议', REMINDER: '提醒', APPROVAL: '审批' } as Record<string, string>)[String(value)] ?? String(value).replace('T', ' ');
+}
+async function compareOperation(operation: SyncOperation) {
+  saving.value = true;
+  try {
+    conflict.value = await readTodoConflict(operation.id);
+    mergeDraft.value = { ...conflict.value.local };
+  } catch (error) { showToast(error instanceof Error ? error.message : '版本加载失败'); }
+  finally { saving.value = false; }
+}
+function copyRemoteField(key: typeof conflictFields[number]['key']) {
+  if (mergeDraft.value && conflict.value?.remote) Object.assign(mergeDraft.value, { [key]: conflict.value.remote[key] });
+}
+async function resolveConflict(choice: 'local' | 'remote' | 'merge') {
+  if (!conflict.value || saving.value) return;
+  saving.value = true;
+  try {
+    await resolveTodoConflict(conflict.value, choice, mergeDraft.value ?? undefined);
+    conflict.value = null; mergeDraft.value = null;
+    await refreshOperations(); await refreshStorage(); showToast('冲突已处理');
+  } catch (error) { showToast(error instanceof Error ? error.message : '冲突处理失败'); }
+  finally { saving.value = false; }
+}
 async function confirmDiscard() {
   saving.value = true;
   try {
@@ -123,7 +158,7 @@ async function selectDirectory() {
       <template v-if="section === 'general'">
         <section v-if="operations.length" class="st-card">
           <h3>待同步 {{ operations.length }}</h3>
-          <div v-for="operation in operations" :key="operation.id" class="st-row"><div class="st-copy"><strong>{{ operationLabel(operation) }}</strong><small>{{ operation.error || '等待同步' }}</small></div><button class="st-btn" @click="discardingOperation = operation">放弃本次修改</button></div>
+          <div v-for="operation in operations" :key="operation.id" class="st-row"><div class="st-copy"><strong>{{ operationLabel(operation) }}</strong><small>{{ operation.error || '等待同步' }}</small></div><button v-if="['conflict', 'error'].includes(operation.state || '') && /^\/api\/employee\/personal-todos\/\d+/.test(operation.path)" class="st-btn" :disabled="saving" @click="compareOperation(operation)">处理冲突</button><button class="st-btn" :disabled="saving" @click="discardingOperation = operation">放弃本次修改</button></div>
           <button class="st-btn" @click="syncNow">立即同步</button>
         </section>
         <section class="st-card">
@@ -242,6 +277,26 @@ async function selectDirectory() {
       </template>
     </main>
     <HubDialog v-if="discardingOperation || discardingUpload" :lock="saving" title-id="st-discard-title" @close="discardingOperation = null; discardingUpload = null"><section class="st-card"><h3 id="st-discard-title">{{ discardingOperation ? '放弃未同步修改？' : discardingUpload?.status === 'done' ? '移除上传记录？' : '取消上传并删除本机暂存？' }}</h3><div class="st-row"><button class="st-btn" :disabled="saving" @click="discardingOperation = null; discardingUpload = null">取消</button><button class="st-btn" :disabled="saving" @click="confirmDiscard">确认</button></div></section></HubDialog>
+    <HubDialog v-if="conflict && mergeDraft" :lock="saving" @close="conflict = null; mergeDraft = null">
+      <div class="st-conflict">
+        <h2>处理待办冲突</h2>
+        <p>待处理修改 {{ conflict.operations.length }}<span v-if="!conflict.remote"> · 服务端已删除</span><span v-if="localDelete"> · 本地待删除</span></p>
+        <table><thead><tr><th>字段</th><th>本地版本</th><th>服务端版本</th><th v-if="conflict.remote && !localDelete">合并</th></tr></thead><tbody><tr v-for="field in conflictFields" :key="field.key"><th>{{ field.label }}</th><td>{{ conflictValue(conflict.local[field.key]) }}</td><td>{{ conflictValue(conflict.remote?.[field.key]) }}</td><td v-if="conflict.remote && !localDelete"><button class="st-btn" :disabled="saving" :aria-label="`采用服务端${field.label}`" @click="copyRemoteField(field.key)">采用服务端</button></td></tr></tbody></table>
+        <form v-if="!localDelete" class="st-merge-form" @submit.prevent="resolveConflict('merge')">
+          <h3>合并结果</h3>
+          <label>名称<input v-model="mergeDraft.title" required maxlength="200" :disabled="saving" /></label>
+          <label>分类<select v-model="mergeDraft.category" :disabled="saving"><option value="TASK">任务</option><option value="MEETING">会议</option><option value="REMINDER">提醒</option><option value="APPROVAL">审批</option></select></label>
+          <label>状态<select v-model="mergeDraft.status" :disabled="saving"><option value="PENDING">未完成</option><option value="DONE">已完成</option></select></label>
+          <label>开始时间<input v-model="mergeDraft.startAt" type="datetime-local" :disabled="saving" /></label>
+          <label>截止时间<input v-model="mergeDraft.dueAt" type="datetime-local" :disabled="saving" /></label>
+          <label>提前提醒（分钟）<input v-model.number="mergeDraft.reminderMinutes" type="number" min="0" :disabled="saving" /></label>
+          <label class="st-merge-check"><input v-model="mergeDraft.allDay" type="checkbox" :disabled="saving" />全天</label>
+          <label class="st-merge-note">备注<textarea v-model="mergeDraft.note" :disabled="saving" /></label>
+          <button class="st-btn" :disabled="saving">保存合并并同步</button>
+        </form>
+        <div class="st-conflict-actions"><button class="st-btn" :disabled="saving" @click="compareOperation(conflict.operation)">重新加载版本</button><button class="st-btn" :disabled="saving" @click="resolveConflict('remote')">采用服务端</button><button class="st-btn" :disabled="saving" @click="resolveConflict('local')">{{ localDelete ? '确认本地删除' : conflict.remote ? '保留本地' : '保留本地并新建' }}</button></div>
+      </div>
+    </HubDialog>
     <HubToast :message="toastMessage" />
   </div>
 </template>
