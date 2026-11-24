@@ -3,7 +3,8 @@
  * 审批中心：待我审批 / 我发起的 / 抄送我的 三个 tab；
  * 支持发起审批（请假、补卡走专用契约，其余走通用表单）、审批、撤回、详情查看。
  */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { useLocalDraft } from '@/services/localData';
 import { Download, Plus } from 'lucide-vue-next';
 import { fileApi, leaveApi, workflowApi } from '@/api';
 import type {
@@ -79,6 +80,13 @@ const ccTargetDate = ref('');
 const ccPunchType = ref<'ON_DUTY' | 'OFF_DUTY'>('ON_DUTY');
 const ccExpectedAt = ref('');
 const ccReason = ref('');
+const approvalFields = { selectedProcess, genericTitle, genericSummary, genericAmount, genericDate, leaveTypeId, leaveStart, leaveEnd, leaveReason, leaveDuration, ccTargetDate, ccPunchType, ccExpectedAt, ccReason };
+const approvalDraft = useLocalDraft('approval-form', computed({
+  get: () => Object.fromEntries(Object.entries(approvalFields).map(([key, value]) => [key, value.value])),
+  set: (value) => { for (const [key, field] of Object.entries(approvalFields)) if (key in value) (field as { value: unknown }).value = value[key]; },
+}));
+onMounted(() => { void approvalDraft.restore(); });
+onBeforeUnmount(approvalDraft.stop);
 
 const isLeave = computed(() => selectedProcess.value === 'LEAVE');
 const isClock = computed(() => selectedProcess.value === 'CLOCK_CORRECTION');
@@ -285,6 +293,7 @@ async function submitCreate() {
     showToast('提交成功，已进入审批流程');
     createOpen.value = false;
     resetForm();
+    await approvalDraft.clear();
     tab.value = 'mine';
     requestPage.value = 1;
     await loadRequests();

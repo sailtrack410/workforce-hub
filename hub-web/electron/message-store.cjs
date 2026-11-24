@@ -22,13 +22,28 @@ class MessageStore {
 
   list(userId, conversationId) {
     const rows = this.db.prepare(`
-      SELECT payload FROM im_messages
-      WHERE user_id = ? AND conversation_id = ? ORDER BY seq_no
+      SELECT payload FROM (SELECT payload,seq_no FROM im_messages
+      WHERE user_id = ? AND conversation_id = ? ORDER BY seq_no DESC LIMIT 200) ORDER BY seq_no
     `).all(userId, conversationId);
     return rows.flatMap((row) => {
       try { return [JSON.parse(row.payload)]; } catch { return []; }
     });
   }
+
+  replace(userId, conversationId, messages) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare('DELETE FROM im_messages WHERE user_id=? AND conversation_id=?').run(userId, conversationId);
+      const statement = this.db.prepare('INSERT INTO im_messages(user_id,conversation_id,message_id,seq_no,sent_at,payload) VALUES(?,?,?,?,?,?)');
+      for (const message of messages) {
+        if (String(message.conversationId) !== String(conversationId) || message.messageId == null || !Number.isFinite(message.seqNo)) throw new Error('消息格式无效');
+        statement.run(userId, conversationId, String(message.messageId), message.seqNo, message.sentAt ?? null, JSON.stringify(message));
+      }
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  remove(userId, messageId) { this.db.prepare('DELETE FROM im_messages WHERE user_id=? AND message_id=?').run(userId, messageId); }
+  clear(userId, conversationId) { this.db.prepare('DELETE FROM im_messages WHERE user_id=? AND conversation_id=?').run(userId, conversationId); }
 
   save(userId, messages) {
     if (!Array.isArray(messages)) throw new TypeError('消息格式无效');

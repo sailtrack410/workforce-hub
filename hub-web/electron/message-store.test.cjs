@@ -1,6 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { MessageStore } = require('./message-store.cjs');
+test('服务端快照替换同步删除与撤回，单条删除后不会离线复现，分页有上限', () => {
+  const store = new MessageStore(':memory:');
+  const message = (id) => ({ messageId: String(id), conversationId: '9', seqNo: id, contentText: 'message' });
+  store.save('scope-a', Array.from({ length: 250 }, (_, i) => message(i + 1)));
+  assert.equal(store.list('scope-a', '9').length, 200);
+  store.replace('scope-a', '9', [{ ...message(250), status: 'RECALLED' }]);
+  assert.equal(store.list('scope-a', '9').length, 1);
+  assert.equal(store.list('scope-a', '9')[0].status, 'RECALLED');
+  store.remove('scope-a', '250'); assert.equal(store.list('scope-a', '9').length, 0);
+  store.save('scope-a', [message(251)]); store.clear('scope-a', '9');
+  assert.equal(store.list('scope-a', '9').length, 0); store.close();
+});
 
 test('消息按用户和会话隔离，并按 ID 幂等更新', () => {
   const store = new MessageStore(':memory:');

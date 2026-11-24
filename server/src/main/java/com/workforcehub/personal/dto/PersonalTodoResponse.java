@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
  */
 @Data
 public class PersonalTodoResponse {
+    private Integer version;
 
     private Long todoId;
 

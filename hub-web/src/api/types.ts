@@ -391,6 +391,8 @@ export interface TeamTaskActivityResponse {
 
 /* ---------- 个人待办 ---------- */
 export interface PersonalTodoResponse {
+  version?: number;
+  syncState?: 'pending' | 'conflict';
   todoId: EntityId;
   ownerId: EntityId;
   title: string;

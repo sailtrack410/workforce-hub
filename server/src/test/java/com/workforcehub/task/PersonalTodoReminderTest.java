@@ -29,7 +29,8 @@ class PersonalTodoReminderTest {
         jdbc = new JdbcTemplate(ds); tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V71__add_team_task_and_personal_todo.sql"),
             new ClassPathResource("db/migration/V72__add_personal_todo_start_at.sql"),
-            new ClassPathResource("db/migration/V74__add_personal_todo_schedule_and_reminder.sql")).execute(ds);
+            new ClassPathResource("db/migration/V74__add_personal_todo_schedule_and_reminder.sql"),
+            new ClassPathResource("db/migration/V75__add_personal_todo_sync_version.sql")).execute(ds);
         jdbc.execute("CREATE TABLE sys_id_sequence (sequence_name VARCHAR(64) PRIMARY KEY, high_watermark BIGINT)");
         jdbc.update("INSERT INTO sys_id_sequence VALUES ('global', 10000)"); ids = new DatabaseIdGenerator(ds);
         jdbc.execute("CREATE TABLE sys_notification (id BIGINT PRIMARY KEY,user_id BIGINT,type VARCHAR(32),title VARCHAR(256),content VARCHAR(1024),link_type VARCHAR(32),link_id VARCHAR(64))");

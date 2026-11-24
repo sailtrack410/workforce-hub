@@ -140,6 +140,7 @@ function fileSize(bytes?: number | null) {
       :agent="message.senderType === 'AGENT'"
     />
     <div class="im-bubble-stack" :class="{ right: isRight }">
+      <small v-if="message.status === 'PENDING'" class="im-bubble-author">待发送</small>
       <small v-if="showAuthor && !isRight" class="im-bubble-author">{{ message.author }}</small>
       <div class="im-bubble-wrap" :class="{ right: isRight }">
         <!-- 引用卡独立于气泡上方：纵向堆叠，不与气泡同行 -->

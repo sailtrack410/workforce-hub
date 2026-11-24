@@ -3,6 +3,7 @@
  * 团队任务：按负责人 × 当前周的时间泳道，任务为横向色条；支持列表视图、新建与详情弹层。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useLocalDraft } from '@/services/localData';
 import { Plus, LayoutList, ChartNoAxesCombined, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, UsersRound, Send, CircleCheck, Folder, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, Search, X, UserRound, Bookmark, Pencil, Trash2, Link, Check, ListTree, MessageSquare, Clock3, Maximize2, Paperclip, Download, FileText } from 'lucide-vue-next';
 import { teamTaskApi } from '@/api';
 import { ApiError } from '@/api/http';
@@ -229,6 +230,8 @@ const candidatesLoading = ref(false);
 const candidatesFailed = ref(false);
 const editing = ref<TeamTaskResponse | null>(null);
 const form = ref({ title: '', description: '', assigneeId: '', startDate: todayIso, endDate: todayIso, groupId: '' });
+const taskDraft = useLocalDraft('task-create', form);
+onBeforeUnmount(taskDraft.stop);
 const formErrors = ref<Record<string, string>>({});
 const formPanel = ref<HTMLFormElement | null>(null);
 const detailPanel = ref<HTMLElement | null>(null);
@@ -283,6 +286,7 @@ function openCreate(task: TeamTaskResponse | null = null) {
   initialForm = JSON.stringify(form.value);
   formErrors.value = {};
   showCreate.value = true; void loadCandidates();
+  if (!task) void taskDraft.restore();
 }
 async function submitCreate() {
   if (creating.value || candidatesLoading.value || candidatesFailed.value) return;
@@ -298,6 +302,7 @@ async function submitCreate() {
     const payload = { ...form.value, title: form.value.title.trim(), description: form.value.description.trim(), groupId: form.value.groupId === undefined ? (editing.value?.groupId == null ? undefined : String(editing.value.groupId)) : form.value.groupId || undefined };
     const saved = editing.value ? await teamTaskApi.update(editing.value.taskId, payload) : await teamTaskApi.create(payload);
     if (editing.value && saved) detail.value = saved;
+    await taskDraft.clear();
     showToast(editing.value ? '任务已保存' : '任务已派发'); showCreate.value = false; await Promise.all([load(), loadLists()]);
   } catch (error) { await handleError(error); }
   finally { creating.value = false; }

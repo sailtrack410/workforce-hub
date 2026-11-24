@@ -9,6 +9,7 @@ import HubToast from '@/components/base/HubToast.vue';
 import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
 import { preferences, savePreferences, chooseDownloadDirectory, type LocalPreferences } from '@/services/preferences';
+import { pendingOperations, syncPending, discardOperation, type SyncOperation } from '@/services/sync';
 
 const session = useSessionStore();
 const { message: toastMessage, show: showToast } = useToast();
@@ -16,6 +17,13 @@ const section = ref<'general' | 'notifications' | 'storage' | 'about'>('general'
 const saving = ref(false);
 const desktop = Boolean(window.workforceDesktop);
 const serverAddress = ref(preferences.serverUrl);
+const operations = ref<SyncOperation[]>([]);
+async function refreshOperations() { operations.value = await pendingOperations(); }
+async function syncNow() { await syncPending(); await refreshOperations(); }
+function operationLabel(operation: SyncOperation) {
+  const value = operation.snapshot as { title?: string; contentText?: string } | undefined;
+  return value?.title || value?.contentText || '待同步操作';
+}
 
 const SECTIONS = [
   { id: 'general', label: '通用' },
@@ -27,6 +35,7 @@ const SECTIONS = [
 onMounted(() => {
   /* 隐私模式不阻断 */
   if (!session.profile) void session.loadOrgProfile();
+  void refreshOperations();
 });
 
 const title = computed(() => SECTIONS.find((s) => s.id === section.value)?.label ?? '通用');
@@ -67,6 +76,11 @@ async function selectDirectory() {
       <header class="st-head"><h2>{{ title }}</h2><p>{{ subtitle }}</p></header>
 
       <template v-if="section === 'general'">
+        <section v-if="operations.length" class="st-card">
+          <h3>待同步 {{ operations.length }}</h3>
+          <div v-for="operation in operations" :key="operation.id" class="st-row"><div class="st-copy"><strong>{{ operationLabel(operation) }}</strong><small>{{ operation.error || '等待同步' }}</small></div><button class="st-btn" @click="discardOperation(operation.id).then(refreshOperations)">放弃本次修改</button></div>
+          <button class="st-btn" @click="syncNow">立即同步</button>
+        </section>
         <section class="st-card">
           <h3>服务连接</h3>
           <form class="st-row" @submit.prevent="save({ serverUrl: serverAddress }).then(saved => { if (saved) showToast('重启应用后生效'); })">

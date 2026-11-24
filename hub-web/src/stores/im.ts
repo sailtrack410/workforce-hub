@@ -9,6 +9,8 @@ import type {
 } from '@/api/types';
 import { cacheMessages, listCachedMessages } from '@/services/desktopMessages';
 import { useSessionStore } from '@/stores/session';
+import { currentContext } from '@/services/localData';
+import { durableRequest, pendingOperations } from '@/services/sync';
 
 export interface ConversationView extends ImConversationSummaryResponse {
   kind: 'team' | 'agent' | 'private' | 'system';
@@ -62,7 +64,7 @@ export const useImStore = defineStore('hw-im', {
     conversations: [] as ImConversationSummaryResponse[],
     messagesByConversation: {} as Record<string, ImMessageResponse[]>,
     detailsByConversation: {} as Record<string, ImConversationDetailResponse>,
-    activeConversationId: readActiveConversationId(),
+    activeConversationId: '',
     loadingConversations: {} as Record<string, boolean>,
     sending: false,
   }),
@@ -70,9 +72,12 @@ export const useImStore = defineStore('hw-im', {
     selectConversation(conversationId: EntityId) {
       this.activeConversationId = String(conversationId);
       try { localStorage.setItem('hw-active-conversation', this.activeConversationId); } catch { /* 隐私模式不阻断 */ }
+      void currentContext().then(context => { if (context) return window.workforceDesktop?.saveDraft(context, 'active-conversation', this.activeConversationId); });
     },
     async loadConversations() {
       this.conversations = await imApi.conversations();
+      const context = await currentContext();
+      if (context && !this.activeConversationId) this.activeConversationId = await window.workforceDesktop?.readDraft(context, 'active-conversation') as string || '';
     },
     async loadMessages(conversationId: EntityId) {
       const key = String(conversationId);
@@ -87,7 +92,11 @@ export const useImStore = defineStore('hw-im', {
       try {
         const messages = await imApi.messages(conversationId, { limit: 100 });
         this.messagesByConversation[key] = messages;
-        if (userId) void cacheMessages(userId, messages).catch(() => undefined);
+        const context = await currentContext();
+        if (context) await window.workforceDesktop?.replaceMessages(context, key, messages).catch(() => undefined);
+        for (const op of await pendingOperations()) {
+          if (op.path === `/api/employee/im/conversations/${key}/messages` && op.snapshot) this.upsertMessage(op.snapshot as ImMessageResponse);
+        }
       } catch (error) {
         if (!this.messagesByConversation[key]?.length) throw error;
       } finally {
@@ -113,13 +122,17 @@ export const useImStore = defineStore('hw-im', {
     async sendText(conversationId: EntityId, text: string, options: { quotedMessageId?: EntityId; mentionUserIds?: EntityId[] } = {}) {
       this.sending = true;
       try {
-        const message = await imApi.sendMessage(conversationId, {
+        const id = clientId(`hw-${conversationId}`);
+        const body = {
           messageType: 'TEXT',
           text,
-          clientMessageId: clientId(`hw-${conversationId}`),
+          clientMessageId: id,
           quotedMessageId: options.quotedMessageId,
           mentionUserIds: options.mentionUserIds?.length ? options.mentionUserIds : undefined,
-        });
+        };
+        const snapshot: ImMessageResponse = { messageId: `local-${id}`, conversationId, seqNo: Date.now(), senderId: useSessionStore().user?.userId, senderType: 'USER', messageType: 'TEXT', contentText: text, status: 'PENDING', sentAt: new Date().toISOString() };
+        const result = await durableRequest<ImMessageResponse>({ id, method: 'POST', path: `/api/employee/im/conversations/${conversationId}/messages`, body, snapshot });
+        const message = result.queued ? snapshot : result.value!;
         this.upsertMessage(message);
         return message;
       } finally {
@@ -146,18 +159,21 @@ export const useImStore = defineStore('hw-im', {
     },
     async remove(conversationId: EntityId, messageId: EntityId) {
       await imApi.deleteMessage(conversationId, messageId);
+      const context = await currentContext();
+      if (context) await window.workforceDesktop?.removeMessage(context, String(messageId));
       const key = String(conversationId);
       this.messagesByConversation[key] = (this.messagesByConversation[key] ?? [])
         .filter((item) => String(item.messageId) !== String(messageId));
     },
     async markRead(conversationId: EntityId) {
-      const messages = this.messagesByConversation[String(conversationId)] ?? [];
+      const messages = (this.messagesByConversation[String(conversationId)] ?? []).filter(m => m.status !== 'PENDING');
       const lastSeq = messages.length ? messages[messages.length - 1].seqNo : 0;
       if (!lastSeq) return;
       try {
-        const updated = await imApi.updateReadPosition(conversationId, lastSeq);
+        const result = await durableRequest<ImConversationSummaryResponse>({ id: `read-${conversationId}-${lastSeq}`, method: 'POST', path: `/api/employee/im/conversations/${conversationId}/read-position`, body: { lastReadSeq: lastSeq } });
+        const updated = result.value;
         const index = this.conversations.findIndex((c) => String(c.conversationId) === String(conversationId));
-        if (index >= 0) this.conversations[index] = updated;
+        if (index >= 0 && updated) this.conversations[index] = updated;
       } catch { /* 已读回写失败不阻断 */ }
     },
     upsertConversation(conversation: ImConversationSummaryResponse) {

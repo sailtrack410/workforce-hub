@@ -6,6 +6,7 @@ export function cacheable(path: string) {
   return path.startsWith('/api/employee/') && !/auth|token|ticket|download/i.test(path);
 }
 export async function currentContext() {
+  if (typeof window === 'undefined') return null;
   return await window.workforceDesktop?.cacheContext?.().catch(() => null) ?? null;
 }
 export async function cachedResponse<T>(context: string | null, path: string): Promise<T | undefined> {

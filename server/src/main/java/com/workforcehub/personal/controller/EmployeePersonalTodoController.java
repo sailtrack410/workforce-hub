@@ -60,20 +60,20 @@ public class EmployeePersonalTodoController {
 
     @Operation(summary = "完成个人待办", operationId = "completePersonalTodo")
     @PutMapping("/{todoId}/complete")
-    public R<PersonalTodoResponse> complete(@PathVariable Long todoId) {
-        return R.ok(personalTodoService.complete(todoId));
+    public R<PersonalTodoResponse> complete(@PathVariable Long todoId, @RequestParam(required = false) Integer expectedVersion) {
+        return R.ok(personalTodoService.complete(todoId, expectedVersion));
     }
 
     @Operation(summary = "重开个人待办", operationId = "reopenPersonalTodo")
     @PutMapping("/{todoId}/reopen")
-    public R<PersonalTodoResponse> reopen(@PathVariable Long todoId) {
-        return R.ok(personalTodoService.reopen(todoId));
+    public R<PersonalTodoResponse> reopen(@PathVariable Long todoId, @RequestParam(required = false) Integer expectedVersion) {
+        return R.ok(personalTodoService.reopen(todoId, expectedVersion));
     }
 
     @Operation(summary = "删除个人待办", operationId = "deletePersonalTodo")
     @DeleteMapping("/{todoId}")
-    public R<Void> delete(@PathVariable Long todoId) {
-        personalTodoService.delete(todoId);
+    public R<Void> delete(@PathVariable Long todoId, @RequestParam(required = false) Integer expectedVersion) {
+        personalTodoService.delete(todoId, expectedVersion);
         return R.ok(null);
     }
 }

@@ -1,3 +1,5 @@
+import { listPersonalTodos, savePersonalTodo } from '@/services/personalTodos';
+import { durableRequest } from '@/services/sync';
 // hub-web API 端点：直连后端契约（端口 8080，经 vite 代理）
 import { http } from './http';
 import type {
@@ -164,8 +166,8 @@ export const notificationApi = {
     http.get<PageResult<SysNotificationResponse> | SysNotificationResponse[]>('/api/employee/notifications', query),
   unreadCount: () => http.get<{ unreadCount: number }>('/api/employee/notifications/unread-count'),
   markRead: (notificationId: EntityId) =>
-    http.post<void>(`/api/employee/notifications/${id(notificationId)}/read`),
-  markAllRead: () => http.post<void>('/api/employee/notifications/read-all'),
+    durableRequest({ id: `notification-read-${notificationId}`, method: 'POST', path: `/api/employee/notifications/${id(notificationId)}/read` }),
+  markAllRead: () => durableRequest({ id: `notification-all-${Date.now()}`, method: 'POST', path: '/api/employee/notifications/read-all' }),
 };
 
 export const leaveApi = {
@@ -235,12 +237,12 @@ export const teamTaskApi = {
 
 export const personalTodoApi = {
   list: (query: { category?: string; status?: string; start?: string; end?: string } = {}) =>
-    http.get<PersonalTodoResponse[]>('/api/employee/personal-todos', query),
+    listPersonalTodos(query),
   create: (request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; startAt?: string; dueAt?: string; note?: string; allDay?: boolean; reminderMinutes?: number | null }) =>
-    http.post<PersonalTodoResponse>('/api/employee/personal-todos', request),
+    savePersonalTodo('create', undefined, request) as Promise<PersonalTodoResponse>,
   update: (todoId: EntityId, request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; startAt?: string; dueAt?: string; note?: string; allDay?: boolean; reminderMinutes?: number | null }) =>
-    http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}`, request),
-  complete: (todoId: EntityId) => http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}/complete`),
-  reopen: (todoId: EntityId) => http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}/reopen`),
-  remove: (todoId: EntityId) => http.delete<void>(`/api/employee/personal-todos/${id(todoId)}`),
+    savePersonalTodo('update', todoId, request) as Promise<PersonalTodoResponse>,
+  complete: (todoId: EntityId) => savePersonalTodo('complete', todoId) as Promise<PersonalTodoResponse>,
+  reopen: (todoId: EntityId) => savePersonalTodo('reopen', todoId) as Promise<PersonalTodoResponse>,
+  remove: (todoId: EntityId) => savePersonalTodo('delete', todoId),
 };

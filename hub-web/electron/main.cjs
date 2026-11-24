@@ -193,6 +193,15 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:draft', (_event, context, key, value) => localStore.draft(requireCache(context), String(key), value));
   ipcMain.handle('cache:read-draft', (_event, context, key) => localStore.readDraft(requireCache(context), String(key)));
   ipcMain.handle('cache:stats', (_event, context) => localStore.stats(requireCache(context)));
+  ipcMain.handle('cache:queue', (_event, context) => localStore.queue(requireCache(context)));
+  ipcMain.handle('cache:enqueue', (_event, context, operation) => {
+    if (!operation || typeof operation.id !== 'string' || !['POST', 'PUT', 'DELETE'].includes(operation.method) || !/^\/api\/employee\/(personal-todos(?:\/[^/?]+(?:\/(?:complete|reopen))?)?|im\/conversations\/\d+\/(?:messages|read-position)|notifications(?:\/\d+\/read|\/read-all))$/.test(operation.path)) throw new Error('此操作不支持离线同步');
+    localStore.enqueue(requireCache(context), operation);
+  });
+  ipcMain.handle('cache:queue-state', (_event, context, id, state, error) => {
+    if (!['pending', 'conflict', 'error', 'done'].includes(state)) throw new Error('同步状态无效');
+    localStore.queueState(requireCache(context), id, state, typeof error === 'string' ? error.slice(0, 300) : null);
+  });
   if (app.isPackaged) appServer = await startAppServer({ root: path.join(__dirname, '..', 'dist'), backend: preferences.get().serverUrl });
   syncTray();
   const session = require('electron').session.defaultSession;
@@ -257,6 +266,9 @@ app.whenReady().then(async () => {
     String(userId) === String(activeAccount?.user.userId) ? store.list(activeAccount.scope, String(conversationId)) : []);
   ipcMain.handle('messages:save', (_event, userId, messages) =>
     String(userId) === String(activeAccount?.user.userId) ? store.save(activeAccount.scope, messages) : undefined);
+  ipcMain.handle('messages:replace', (_event, context, conversationId, messages) => store.replace(requireCache(context), String(conversationId), messages));
+  ipcMain.handle('messages:remove', (_event, context, messageId) => store.remove(requireCache(context), String(messageId)));
+  ipcMain.handle('messages:clear', (_event, context, conversationId) => store.clear(requireCache(context), String(conversationId)));
   ipcMain.handle('files:write-local-upload', (_event, uploadPath, content) =>
     writeLocalUpload(uploadPath, content));
   // 仅本机显式指定输出路径时生成验收截图，不对渲染进程暴露此能力。

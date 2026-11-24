@@ -32,6 +32,8 @@ public class PersonalTodoService {
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse create(PersonalTodoSaveRequest request) {
         Long ownerId = requireEmployeeId();
+        var previous = personalTodoRepository.findByClientRequest(ownerId, request.getClientRequestId());
+        if (previous.isPresent()) return previous.get();
         String category = StringUtils.hasText(request.getCategory()) ? request.getCategory() : "TASK";
         if (!ALLOWED_CATEGORIES.contains(category)) {
             throw new BizException(400, "无效的待办分类");
@@ -49,7 +51,10 @@ public class PersonalTodoService {
         todo.setReminderMinutes(request.getReminderMinutes());
         todo.setReminderAt(reminderAt(request));
         todo.setNote(request.getNote());
-        personalTodoRepository.insert(todo);
+        try { personalTodoRepository.insert(todo, request.getClientRequestId()); }
+        catch (org.springframework.dao.DuplicateKeyException error) {
+            return personalTodoRepository.findByClientRequest(ownerId, request.getClientRequestId()).orElseThrow(() -> error);
+        }
         return requireTodo(todo.getTodoId());
     }
 
@@ -71,6 +76,7 @@ public class PersonalTodoService {
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse update(Long todoId, PersonalTodoSaveRequest request) {
         PersonalTodoResponse existing = requireTodo(todoId);
+        checkVersion(existing, request.getExpectedVersion());
         validateTimeRange(request);
         existing.setTitle(request.getTitle());
         if (StringUtils.hasText(request.getCategory())) {
@@ -85,34 +91,53 @@ public class PersonalTodoService {
         existing.setReminderMinutes(request.getReminderMinutes());
         existing.setReminderAt(reminderAt(request));
         existing.setNote(request.getNote());
-        personalTodoRepository.update(existing);
+        if (personalTodoRepository.update(existing) != 1) throw new BizException(409, "待办已在其他设备修改，请刷新后重试");
         return requireTodo(todoId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse complete(Long todoId) {
+        return complete(todoId, null);
+    }
+
+    public PersonalTodoResponse complete(Long todoId, Integer expectedVersion) {
         PersonalTodoResponse existing = requireTodo(todoId);
         if ("DONE".equals(existing.getStatus())) {
             return existing;
         }
-        personalTodoRepository.updateStatus(todoId, existing.getOwnerId(), "DONE", LocalDateTime.now());
+        checkVersion(existing, expectedVersion);
+        if (personalTodoRepository.updateStatus(todoId, existing.getOwnerId(), "DONE", LocalDateTime.now(), existing.getVersion()) != 1) throw new BizException(409, "待办已在其他设备修改");
         return requireTodo(todoId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse reopen(Long todoId) {
+        return reopen(todoId, null);
+    }
+
+    public PersonalTodoResponse reopen(Long todoId, Integer expectedVersion) {
         PersonalTodoResponse existing = requireTodo(todoId);
         if ("PENDING".equals(existing.getStatus())) {
             return existing;
         }
-        personalTodoRepository.updateStatus(todoId, existing.getOwnerId(), "PENDING", null);
+        checkVersion(existing, expectedVersion);
+        if (personalTodoRepository.updateStatus(todoId, existing.getOwnerId(), "PENDING", null, existing.getVersion()) != 1) throw new BizException(409, "待办已在其他设备修改");
         return requireTodo(todoId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long todoId) {
-        requireTodo(todoId);
-        personalTodoRepository.deleteById(todoId, CurrentUserHolder.requireUserId());
+        delete(todoId, null);
+    }
+
+    public void delete(Long todoId, Integer expectedVersion) {
+        var existing = requireTodo(todoId);
+        checkVersion(existing, expectedVersion);
+        if (personalTodoRepository.deleteById(todoId, existing.getOwnerId(), existing.getVersion()) != 1) throw new BizException(409, "待办已在其他设备修改");
+    }
+
+    private void checkVersion(PersonalTodoResponse existing, Integer expectedVersion) {
+        if (expectedVersion != null && !expectedVersion.equals(existing.getVersion())) throw new BizException(409, "待办已在其他设备修改，请刷新后重试");
     }
 
     private void validateTimeRange(PersonalTodoSaveRequest request) {

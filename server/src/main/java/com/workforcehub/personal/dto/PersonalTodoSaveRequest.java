@@ -12,6 +12,10 @@ import java.time.LocalDateTime;
  */
 @Data
 public class PersonalTodoSaveRequest {
+    @Size(max = 64)
+    private String clientRequestId;
+
+    private Integer expectedVersion;
 
     @NotBlank(message = "标题不能为空")
     @Size(max = 128, message = "标题不能超过128个字符")

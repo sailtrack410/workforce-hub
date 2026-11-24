@@ -24,9 +24,10 @@ import ImKnowledgeCard from '@/components/im/ImKnowledgeCard.vue';
 import ImProcessCard from '@/components/im/ImProcessCard.vue';
 import { useSessionStore } from '@/stores/session';
 import { useImStore, kindOf, lastMessageText } from '@/stores/im';
-import { getMessageScroll, saveMessageScroll } from '@/stores/messageScroll';
+import { getMessageScroll, saveMessageScroll, loadMessageScroll } from '@/stores/messageScroll';
 import { uploadImAttachment } from '@/composables/useUpload';
 import { downloadFile } from '@/services/download';
+import { currentContext } from '@/services/localData';
 import { agentApi, contactsApi, fileApi, imApi } from '@/api';
 import type { AgentResponse, EmployeeFileResponse, EntityId, ImConversationSummaryResponse, ImGroupFileResponse, ImGroupNoticeResponse, ImMessageAttachment, ImMessageResponse } from '@/api/types';
 import { toMessageView, friendlyTime, TIME_DIVIDER_GAP, type MessageView } from '@/utils/message';
@@ -252,7 +253,8 @@ function applyScrollPosition(el: HTMLElement, id: string) {
   }
   updateLatestVisibility();
 }
-function restoreScrollPosition(id: string, el: HTMLElement | null) {
+async function restoreScrollPosition(id: string, el: HTMLElement | null) {
+  await loadMessageScroll(id).catch(() => undefined);
   // 不使用 requestAnimationFrame：窗口被遮挡时帧回调可能暂停，恢复会静默丢失。
   if (!el || el.dataset.scrollRestored === 'true') return;
   el.dataset.scrollRestored = 'true';
@@ -282,6 +284,20 @@ function jumpToQuoted(id: string) {
 
 /* ---------- 发送 ---------- */
 const draft = ref('');
+let draftConversation = '';
+let restoringDraft = false;
+watch(draft, (value) => {
+  if (!draftConversation || restoringDraft) return;
+  const key = `message:${draftConversation}`;
+  void currentContext().then(context => context ? window.workforceDesktop?.saveDraft(context, key, value || null) : undefined);
+}, { flush: 'sync' });
+async function restoreDraft(id: string) {
+  draftConversation = id;
+  const context = await currentContext();
+  const value = context ? await window.workforceDesktop?.readDraft(context, `message:${id}`) : null;
+  if (draftConversation !== id) return;
+  restoringDraft = true; draft.value = typeof value === 'string' ? value : ''; restoringDraft = false;
+}
 const sending = computed(() => im.sending);
 
 async function sendMessage() {
@@ -895,6 +911,8 @@ async function confirmClearMessages() {
   clearing.value = true;
   try {
     await imApi.clearMessages(activeId.value);
+    const context = await currentContext();
+    if (context) await window.workforceDesktop?.clearMessages(context, activeId.value);
     im.messagesByConversation[activeId.value] = [];
     clearConfirmOpen.value = false;
     showToast('聊天记录已清空');
@@ -970,6 +988,7 @@ onMounted(async () => {
   }
   await Promise.allSettled([im.loadConversations(), session.loadOrgProfile()]);
   if (activeId.value) im.selectConversation(activeId.value);
+  if (activeId.value) await restoreDraft(activeId.value);
   const restoredId = resolveConversationId(
     activeId.value,
     im.activeConversationId,
@@ -990,7 +1009,7 @@ onMounted(async () => {
 watch(activeId, async (id) => {
   saveScrollPosition();
   if (id) im.selectConversation(id);
-  draft.value = '';
+  await restoreDraft(id);
   quotedMessage.value = null;
   mentionPanelUserIds.value = new Set();
   mentionPanelOpen.value = false;

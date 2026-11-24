@@ -19,6 +19,7 @@ import { resolvedTheme as theme, savePreferences } from '@/services/preferences'
 import { useImSocket } from '@/composables/useImSocket';
 import { useDesktopNotifications } from '@/composables/useDesktopNotifications';
 import { localStatus } from '@/services/localData';
+import { syncPending } from '@/services/sync';
 
 const session = useSessionStore();
 const im = useImStore();
@@ -135,6 +136,15 @@ function onKeydown(event: KeyboardEvent) {
     document.querySelector<HTMLInputElement>('.hw-global-search input')?.focus();
   }
 }
+function onOnline() { void syncPending().catch(() => undefined); }
+function onSyncResult(event: Event) {
+  const { operation, value } = (event as CustomEvent).detail;
+  if (!value || !operation.path.includes('/im/conversations/') || !operation.path.endsWith('/messages')) return;
+  const key = String(value.conversationId);
+  const temporaryId = operation.snapshot?.messageId;
+  im.messagesByConversation[key] = (im.messagesByConversation[key] ?? []).filter(m => String(m.messageId) !== String(temporaryId));
+  im.upsertMessage(value);
+}
 
 onMounted(async () => {
   if (loggingOut.value) return;
@@ -148,6 +158,8 @@ onMounted(async () => {
     return;
   }
   socket.connect();
+  window.addEventListener('online', onOnline); onOnline();
+  window.addEventListener('workforce:sync-result', onSyncResult);
   removeDesktopNavigation = window.workforceDesktop?.onNavigate((path) => { if (session.isAuthenticated) void router.push(path); });
   void desktopNotifications.poll();
   void session.loadOrgProfile();
@@ -156,11 +168,14 @@ onMounted(async () => {
   // 通知未读数轮询（30s），进入通知页后由页面自行刷新
   notificationTimer = window.setInterval(() => {
     if (loggingOut.value) return;
+    onOnline();
     void desktopNotifications.poll();
     notificationApi.unreadCount().then((payload) => { notificationUnread.value = payload?.unreadCount ?? 0; }).catch(() => undefined);
   }, 30000);
 });
 onBeforeUnmount(() => {
+  window.removeEventListener('online', onOnline);
+  window.removeEventListener('workforce:sync-result', onSyncResult);
   socket.close(); desktopNotifications.stop(); removeDesktopNavigation?.();
   resizeCleanup?.();
   if (notificationTimer !== null) window.clearInterval(notificationTimer);
@@ -182,7 +197,7 @@ onBeforeUnmount(() => {
         <kbd>⌘ K</kbd>
       </form>
     </header>
-    <div v-if="localStatus.offline || localStatus.error" class="hw-local-status" role="status">{{ localStatus.error || '离线缓存' }}<time v-if="localStatus.offline && localStatus.cachedAt">{{ new Date(localStatus.cachedAt).toLocaleString('zh-CN', { hour12: false }) }}</time></div>
+    <div v-if="localStatus.offline || localStatus.error || localStatus.pending" class="hw-local-status" role="status">{{ localStatus.error || (localStatus.offline ? '离线缓存' : '同步中') }}<time v-if="localStatus.offline && localStatus.cachedAt">{{ new Date(localStatus.cachedAt).toLocaleString('zh-CN', { hour12: false }) }}</time><button v-if="localStatus.pending" type="button" @click="goto('/settings')">待同步 {{ localStatus.pending }}<span v-if="localStatus.conflicts"> · 需处理 {{ localStatus.conflicts }}</span></button></div>
 
     <div class="hw-body" :class="{ 'nav-resizing': navResizing }" :style="{ '--hw-nav-width': `${navWidth}px` }">
       <aside class="hw-primary-nav" :class="{ compact: navWidth === NAV_MIN_WIDTH }" aria-label="一级导航">
@@ -243,6 +258,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .hw-shell { display: flex; flex-direction: column; height: 100dvh; min-width: 960px; background: var(--hw-canvas); overflow: hidden; }
 .hw-local-status { display: flex; align-items: center; gap: 16px; padding: 6px 20px; background: var(--hw-sky); color: var(--hw-secondary); font-size: 12px; flex: none; }
+.hw-local-status button { border: 0; background: transparent; color: var(--hw-primary); cursor: pointer; }
 .hw-topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 20px 0 calc(20px + var(--hw-desktop-inset)); border-bottom: 1px solid var(--hw-border); background: var(--hw-card); flex: none; app-region: drag; -webkit-app-region: drag; }
 .hw-topbar button, .hw-topbar input, .hw-topbar form { app-region: no-drag; -webkit-app-region: no-drag; }
 .hw-brand { display: flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--hw-ink); cursor: pointer; }

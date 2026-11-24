@@ -12,6 +12,7 @@ import HubButton from '@/components/base/HubButton.vue';
 import HubDialog from '@/components/base/HubDialog.vue';
 import HubEmpty from '@/components/base/HubEmpty.vue';
 import TodoEditor, { type TodoDraft } from './TodoEditor.vue';
+import { useLocalDraft } from '@/services/localData';
 
 const { show: showToast } = useToast();
 const todos = ref<PersonalTodoResponse[]>([]);
@@ -55,11 +56,14 @@ function openLinkedTodo() {
   else showToast('待办不存在或已删除');
 }
 onMounted(async () => {
+  await quickDraft.restore();
+  if (quickForm.value.title || quickForm.value.note) { quickOpen.value = true; quickInitial = JSON.stringify(emptyDraft()); }
   await load(); openLinkedTodo();
   clock = setInterval(() => { now.value = new Date(); }, 60000);
   window.addEventListener('hashchange', openLinkedTodo);
+  window.addEventListener('workforce:sync-result', load);
 });
-onBeforeUnmount(() => { if (clock) clearInterval(clock); window.removeEventListener('hashchange', openLinkedTodo); });
+onBeforeUnmount(() => { quickDraft.stop(); if (clock) clearInterval(clock); window.removeEventListener('hashchange', openLinkedTodo); window.removeEventListener('workforce:sync-result', load); });
 function groupOf(t: PersonalTodoResponse) {
   if (t.status === 'DONE') return 'done';
   const day = dayOf(t);
@@ -92,6 +96,7 @@ const emptyDraft = (): TodoDraft => ({ title: '', category: (categoryFilter.valu
 const quickOpen = ref(false);
 const quickGroup = ref('unscheduled');
 const quickForm = ref<TodoDraft>(emptyDraft());
+const quickDraft = useLocalDraft('todo-quick', quickForm);
 const quickTitle = computed({ get: () => quickForm.value.title, set: (value: string) => { quickForm.value.title = value; } });
 const quickCreating = ref(false);
 const quickError = ref('');
@@ -131,9 +136,9 @@ async function submitQuick() {
   quickCreating.value = true; quickError.value = '';
   try {
     const created = await personalTodoApi.create(payload(quickForm.value));
-    todos.value.push(created); quickForm.value = emptyDraft(); quickOpen.value = false; quickDiscarding.value = false;
+    todos.value.push(created); quickForm.value = emptyDraft(); await quickDraft.clear(); quickOpen.value = false; quickDiscarding.value = false;
     if (filter.value !== 'all' && !['today', 'unscheduled', 'overdue'].includes(groupOf(created))) filter.value = 'all';
-    showToast('待办已添加');
+    showToast(created.syncState ? '待办已保存，等待同步' : '待办已添加');
   } catch (error) { quickError.value = error instanceof Error ? error.message : '添加失败'; }
   finally { quickCreating.value = false; }
 }
@@ -282,7 +287,7 @@ async function toggleDone(t: PersonalTodoResponse, done: boolean) {
   try {
     const updated = done ? await personalTodoApi.complete(t.todoId) : await personalTodoApi.reopen(t.todoId);
     todos.value = todos.value.map(item => String(item.todoId) === id ? updated : item);
-    showToast(done ? '已完成' : '已重开');
+    showToast(updated.syncState ? '已保存，等待同步' : done ? '已完成' : '已重开');
     if (detail.value && String(detail.value.todoId) === id) detail.value = null;
   } catch (error) { await handleError(error); }
   finally { pendingIds.value.delete(id); }
@@ -325,7 +330,7 @@ async function removeTodo() {
             <div v-for="t in group.items" :key="String(t.todoId)" class="td-check-row" :class="[categoryClass(t.category), { done: t.status === 'DONE' }]">
               <button class="td-check" type="button" role="checkbox" :aria-checked="t.status === 'DONE'" :aria-label="`${t.status === 'DONE' ? '重开' : '完成'}：${t.title}`" :disabled="pendingIds.has(String(t.todoId))" @click="toggleDone(t, t.status !== 'DONE')"><LoaderCircle v-if="pendingIds.has(String(t.todoId))" :size="13" class="td-spinner" /><Check v-else :size="13" class="td-check-mark" /></button>
               <div class="td-item-info"><button class="td-item-body" type="button" @click="openDetail(t)">{{ t.title }}</button><span v-if="t.note" class="td-note-preview">{{ t.note }}</span><button v-if="t.startAt || t.dueAt" class="td-date" :class="{ overdue: group.key === 'overdue' }" type="button" :aria-label="`修改时间：${t.title}`" :disabled="pendingIds.has(String(t.todoId))" @click="openCreate(t)"><Clock3 :size="12" />{{ timeText(t) }}<Bell v-if="t.reminderMinutes != null" :size="12" /></button></div>
-              <span class="td-item-category">{{ categoryName(t.category) }}</span><button class="td-icon td-row-edit" type="button" :aria-label="`编辑：${t.title}`" :disabled="pendingIds.has(String(t.todoId))" @click="openCreate(t)"><Pencil :size="14" /></button>
+              <span class="td-item-category">{{ t.syncState === 'conflict' ? '同步冲突' : t.syncState ? '待同步' : categoryName(t.category) }}</span><button class="td-icon td-row-edit" type="button" :aria-label="`编辑：${t.title}`" :disabled="pendingIds.has(String(t.todoId))" @click="openCreate(t)"><Pencil :size="14" /></button>
             </div>
             <TodoEditor v-if="quickOpen && quickGroup === group.key" v-model="quickForm" class="td-quick-form" :saving="quickCreating" :error="quickError" @save="submitQuick" @cancel="closeQuick" />
             <button v-else-if="group.key !== 'done'" class="td-quick-trigger" type="button" :aria-label="`添加${group.label}待办`" @click="openQuick(group.key)"><Plus :size="17" />添加待办</button>

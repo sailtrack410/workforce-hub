@@ -59,7 +59,8 @@ class TaskTodoBusinessRulesTest {
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V71__add_team_task_and_personal_todo.sql"),
             new ClassPathResource("db/migration/V72__add_personal_todo_start_at.sql"),
             new ClassPathResource("db/migration/V73__add_team_task_collaboration.sql"),
-            new ClassPathResource("db/migration/V74__add_personal_todo_schedule_and_reminder.sql"))
+            new ClassPathResource("db/migration/V74__add_personal_todo_schedule_and_reminder.sql"),
+            new ClassPathResource("db/migration/V75__add_personal_todo_sync_version.sql"))
             .execute(source);
         jdbc.execute("""
             CREATE TABLE org_user (id BIGINT PRIMARY KEY, real_name VARCHAR(128), primary_dept_id BIGINT,
@@ -104,6 +105,21 @@ class TaskTodoBusinessRulesTest {
         employee(2003);
         data(put(TASKS + "/" + created.get("taskId").asLong() + "/status"), "{\"status\":\"DONE\"}", 200);
         assertEquals(0, count("personal_todo"));
+    }
+
+    @Test
+    void offlineTodoReplayIsIdempotentAndConflictingVersionDoesNotOverwrite() throws Exception {
+        String request = "{\"title\":\"离线待办\",\"category\":\"TASK\",\"clientRequestId\":\"fixture-sync-1\"}";
+        var created = data(post(TODOS), request, 200);
+        var replayed = data(post(TODOS), request, 200);
+        assertEquals(created.get("todoId"), replayed.get("todoId"));
+        assertEquals(1, count("personal_todo"));
+        String path = TODOS + "/" + created.get("todoId").asText();
+        data(put(path), "{\"title\":\"新版本\",\"category\":\"TASK\",\"expectedVersion\":0}", 200);
+        data(put(path), "{\"title\":\"过期修改\",\"category\":\"TASK\",\"expectedVersion\":0}", 409);
+        assertEquals("新版本", data(get(TODOS), null, 200).get(0).get("title").asText());
+        data(put(path + "/complete?expectedVersion=0"), null, 409);
+        data(put(path + "/complete?expectedVersion=1"), null, 200);
     }
 
     @ParameterizedTest

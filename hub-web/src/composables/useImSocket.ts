@@ -74,6 +74,7 @@ export function useImSocket(options: {
     next.onopen = () => {
       im.socketConnected = true;
       attempts = 0;
+      void im.loadConversations().then(() => im.activeConversationId ? im.loadMessages(im.activeConversationId) : undefined).catch(() => undefined);
       if (heartbeatTimer) window.clearInterval(heartbeatTimer);
       heartbeatTimer = window.setInterval(() => {
         if (next.readyState === WebSocket.OPEN) next.send('PING');
