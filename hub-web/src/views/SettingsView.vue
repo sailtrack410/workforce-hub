@@ -15,6 +15,7 @@ const { message: toastMessage, show: showToast } = useToast();
 const section = ref<'general' | 'notifications' | 'storage' | 'about'>('general');
 const saving = ref(false);
 const desktop = Boolean(window.workforceDesktop);
+const serverAddress = ref(preferences.serverUrl);
 
 const SECTIONS = [
   { id: 'general', label: '通用' },
@@ -39,8 +40,8 @@ const subtitle = computed(() => ({
 async function save(patch: Partial<LocalPreferences>) {
   if (saving.value) return;
   saving.value = true;
-  try { await savePreferences(patch); }
-  catch (error) { /* 隐私模式不阻断 */ showToast(error instanceof Error ? error.message : '设置保存失败'); }
+  try { await savePreferences(patch); return true; }
+  catch (error) { /* 隐私模式不阻断 */ showToast(error instanceof Error ? error.message : '设置保存失败'); return false; }
   finally { saving.value = false; }
 }
 async function selectDirectory() {
@@ -66,6 +67,14 @@ async function selectDirectory() {
       <header class="st-head"><h2>{{ title }}</h2><p>{{ subtitle }}</p></header>
 
       <template v-if="section === 'general'">
+        <section class="st-card">
+          <h3>服务连接</h3>
+          <form class="st-row" @submit.prevent="save({ serverUrl: serverAddress }).then(saved => { if (saved) showToast('重启应用后生效'); })">
+            <label class="st-copy" for="server-address"><strong>服务器地址</strong></label>
+            <input id="server-address" v-model="serverAddress" class="st-select" type="url" required :disabled="saving || !desktop" />
+            <button class="st-btn" :disabled="saving || !desktop">保存</button>
+          </form>
+        </section>
         <section class="st-card">
           <h3>外观</h3>
           <div class="st-row">

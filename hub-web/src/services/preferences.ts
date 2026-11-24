@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue';
 
 export interface LocalPreferences {
+  serverUrl: string;
   theme: 'light' | 'dark' | 'system';
   desktopNotifications: boolean;
   notificationSound: boolean;
@@ -19,6 +20,7 @@ export interface DesktopSettings extends LocalPreferences {
 }
 
 export const preferences = reactive<DesktopSettings>({
+  serverUrl: 'http://127.0.0.1:8080',
   theme: 'system', desktopNotifications: true, notificationSound: false, messagePreview: true,
   dndEnabled: false, dndStart: '22:00', dndEnd: '08:00', downloadDirectory: '',
   closeBehavior: 'quit', launchAtLogin: false, canLaunchAtLogin: false, notificationsSupported: false,

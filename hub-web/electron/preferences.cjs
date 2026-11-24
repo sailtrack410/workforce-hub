@@ -4,6 +4,7 @@ const path = require('node:path');
 const defaults = {
   theme: 'system', desktopNotifications: true, notificationSound: false, messagePreview: true,
   dndEnabled: false, dndStart: '22:00', dndEnd: '08:00', closeBehavior: 'quit', launchAtLogin: false,
+  serverUrl: 'http://127.0.0.1:8080',
 };
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -12,6 +13,9 @@ function validate(patch) {
   for (const [key, value] of Object.entries(patch)) {
     if (typeof defaults[key] === 'boolean' && typeof value === 'boolean') continue;
     if (key === 'theme' && ['light', 'dark', 'system'].includes(value)) continue;
+    if (key === 'serverUrl' && typeof value === 'string') {
+      try { const url = new URL(value); if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) continue; } catch { /* 无效地址统一报错 */ }
+    }
     if (key === 'closeBehavior' && ['quit', 'background'].includes(value)) continue;
     if (['dndStart', 'dndEnd'].includes(key) && typeof value === 'string' && timePattern.test(value)) continue;
     if (key === 'downloadDirectory' && typeof value === 'string' && path.isAbsolute(value) && !value.includes('\0')) continue;

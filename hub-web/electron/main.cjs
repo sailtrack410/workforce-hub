@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const { MessageStore } = require('./message-store.cjs');
 const { writeLocalUpload } = require('./local-upload.cjs');
 const { Preferences, isQuietTime, windowBounds, downloadPath } = require('./preferences.cjs');
+const { startAppServer } = require('./app-server.cjs');
 
 // 更名后复用已有数据目录，保留消息缓存和登录会话。
 const legacyUserData = path.join(app.getPath('appData'), 'hub-web');
@@ -18,6 +19,7 @@ let preferences;
 let tray;
 let quitting = false;
 let saveWindowTimer;
+let appServer;
 const notifications = new Map();
 const notified = new Set();
 const downloadPaths = new Set();
@@ -118,12 +120,13 @@ async function createWindow() {
     return { action: 'deny' };
   });
   // 默认通过同一 HTTP 源加载，沿用服务端 Cookie、CSRF 与 WebSocket 鉴权。
-  await mainWindow.loadURL(process.env.HUB_WEB_URL || 'http://127.0.0.1:5174');
+  await mainWindow.loadURL(appServer?.origin || process.env.HUB_WEB_URL || 'http://127.0.0.1:5174');
 }
 
 app.whenReady().then(async () => {
   if (process.platform === 'darwin') app.dock.setIcon(iconPath);
   preferences = new Preferences(path.join(app.getPath('userData'), 'preferences.json'), app.getPath('downloads'));
+  if (app.isPackaged) appServer = await startAppServer({ root: path.join(__dirname, '..', 'dist'), backend: preferences.get().serverUrl });
   syncTray();
   const session = require('electron').session.defaultSession;
   session.on('will-download', (_event, item) => {
@@ -214,4 +217,4 @@ app.on('before-quit', () => {
   saveWindowState();
   for (const n of notifications.values()) n.close();
 });
-app.on('will-quit', () => store?.close());
+app.on('will-quit', () => { appServer?.close(); store?.close(); });
