@@ -20,7 +20,14 @@ public class PersonalTodoSaveRequest {
     private String category;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime startAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime dueAt;
+
+    private boolean allDay;
+
+    private Integer reminderMinutes;
 
     @Size(max = 1024, message = "备注不能超过1024个字符")
     private String note;

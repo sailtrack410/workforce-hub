@@ -396,7 +396,11 @@ export interface PersonalTodoResponse {
   title: string;
   category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER';
   status: 'PENDING' | 'DONE';
+  startAt?: string | null;
   dueAt?: string | null;
+  allDay?: boolean;
+  reminderMinutes?: number | null;
+  reminderAt?: string | null;
   note?: string | null;
   createdAt?: string | null;
   completedAt?: string | null;

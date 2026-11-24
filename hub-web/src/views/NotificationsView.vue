@@ -122,7 +122,7 @@ async function openDetail(n: SysNotificationResponse) {
           <span>{{ (detail.createdAt || '').slice(0, 16).replace('T', ' ') }}</span>
         </p>
         <p class="nt-detail-body">{{ contentText(detail) || '（无正文）' }}</p>
-        <div class="nt-detail-actions"><HubButton @click="detail = null">关闭</HubButton></div>
+        <div class="nt-detail-actions"><HubButton v-if="detail.linkType === 'PERSONAL_TODO' && detail.linkId" variant="primary" @click="$router.push({ path: '/todos', query: { todoId: String(detail.linkId) } })">查看待办</HubButton><HubButton @click="detail = null">关闭</HubButton></div>
       </div>
     </HubDialog>
 

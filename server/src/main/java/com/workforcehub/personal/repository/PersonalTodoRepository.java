@@ -22,22 +22,26 @@ public class PersonalTodoRepository {
 
     public void insert(PersonalTodoResponse todo) {
         jdbcTemplate.update("""
-            INSERT INTO personal_todo (todo_id, owner_id, title, category, status, due_at, note)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO personal_todo (todo_id, owner_id, title, category, status, start_at, due_at, note, all_day, reminder_minutes, reminder_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             todo.getTodoId(), todo.getOwnerId(), todo.getTitle(), todo.getCategory(),
-            todo.getStatus(), todo.getDueAt() == null ? null : java.sql.Timestamp.valueOf(todo.getDueAt()), todo.getNote());
+            todo.getStatus(), todo.getStartAt() == null ? null : java.sql.Timestamp.valueOf(todo.getStartAt()),
+            todo.getDueAt() == null ? null : java.sql.Timestamp.valueOf(todo.getDueAt()), todo.getNote(),
+            todo.isAllDay(), todo.getReminderMinutes(), todo.getReminderAt());
     }
 
     public void update(PersonalTodoResponse todo) {
         jdbcTemplate.update("""
             UPDATE personal_todo
-            SET title = ?, category = ?, due_at = ?, note = ?
+            SET title = ?, category = ?, start_at = ?, due_at = ?, note = ?, all_day = ?, reminder_minutes = ?,
+                reminded_at = CASE WHEN reminder_at = ? THEN reminded_at ELSE NULL END, reminder_at = ?
             WHERE todo_id = ? AND owner_id = ?
             """,
             todo.getTitle(), todo.getCategory(),
+            todo.getStartAt() == null ? null : java.sql.Timestamp.valueOf(todo.getStartAt()),
             todo.getDueAt() == null ? null : java.sql.Timestamp.valueOf(todo.getDueAt()),
-            todo.getNote(), todo.getTodoId(), todo.getOwnerId());
+            todo.getNote(), todo.isAllDay(), todo.getReminderMinutes(), todo.getReminderAt(), todo.getReminderAt(), todo.getTodoId(), todo.getOwnerId());
     }
 
     public void updateStatus(Long todoId, Long ownerId, String status, java.time.LocalDateTime completedAt) {
@@ -51,12 +55,13 @@ public class PersonalTodoRepository {
 
     public Optional<PersonalTodoResponse> findByIdAndOwner(Long todoId, Long ownerId) {
         List<PersonalTodoResponse> rows = jdbcTemplate.query("""
-            SELECT todo_id, owner_id, title, category, status, due_at, note, created_at, completed_at
+            SELECT todo_id, owner_id, title, category, status, start_at, due_at, note, created_at, completed_at, all_day, reminder_minutes, reminder_at
             FROM personal_todo WHERE todo_id = ? AND owner_id = ?
             """,
             (rs, rowNum) -> mapRow(rs.getLong("todo_id"), rs.getLong("owner_id"), rs.getString("title"),
-                rs.getString("category"), rs.getString("status"), rs.getTimestamp("due_at"),
-                rs.getString("note"), rs.getTimestamp("created_at"), rs.getTimestamp("completed_at")),
+                rs.getString("category"), rs.getString("status"), rs.getTimestamp("start_at"), rs.getTimestamp("due_at"),
+                rs.getString("note"), rs.getTimestamp("created_at"), rs.getTimestamp("completed_at"), rs.getBoolean("all_day"),
+                rs.getObject("reminder_minutes", Integer.class), rs.getTimestamp("reminder_at")),
             todoId, ownerId);
         return rows.stream().findFirst();
     }
@@ -64,7 +69,7 @@ public class PersonalTodoRepository {
     public List<PersonalTodoResponse> find(Long ownerId, String category, String status,
                                            java.time.LocalDateTime start, java.time.LocalDateTime end) {
         StringBuilder sql = new StringBuilder("""
-            SELECT todo_id, owner_id, title, category, status, due_at, note, created_at, completed_at
+            SELECT todo_id, owner_id, title, category, status, start_at, due_at, note, created_at, completed_at, all_day, reminder_minutes, reminder_at
             FROM personal_todo WHERE owner_id = ?
             """);
         List<Object> params = new ArrayList<>();
@@ -78,31 +83,37 @@ public class PersonalTodoRepository {
             params.add(status);
         }
         if (start != null) {
-            sql.append(" AND due_at >= ?");
+            sql.append(" AND COALESCE(due_at, start_at) >= ?");
             params.add(java.sql.Timestamp.valueOf(start));
         }
         if (end != null) {
-            sql.append(" AND due_at <= ?");
+            sql.append(" AND COALESCE(start_at, due_at) <= ?");
             params.add(java.sql.Timestamp.valueOf(end));
         }
         sql.append(" ORDER BY created_at DESC");
         return jdbcTemplate.query(sql.toString(),
             (rs, rowNum) -> mapRow(rs.getLong("todo_id"), rs.getLong("owner_id"), rs.getString("title"),
-                rs.getString("category"), rs.getString("status"), rs.getTimestamp("due_at"),
-                rs.getString("note"), rs.getTimestamp("created_at"), rs.getTimestamp("completed_at")),
+                rs.getString("category"), rs.getString("status"), rs.getTimestamp("start_at"), rs.getTimestamp("due_at"),
+                rs.getString("note"), rs.getTimestamp("created_at"), rs.getTimestamp("completed_at"), rs.getBoolean("all_day"),
+                rs.getObject("reminder_minutes", Integer.class), rs.getTimestamp("reminder_at")),
             params.toArray());
     }
 
     private static PersonalTodoResponse mapRow(Long todoId, Long ownerId, String title, String category,
-                                               String status, java.sql.Timestamp dueAt, String note,
-                                               java.sql.Timestamp createdAt, java.sql.Timestamp completedAt) {
+                                               String status, java.sql.Timestamp startAt, java.sql.Timestamp dueAt, String note,
+                                               java.sql.Timestamp createdAt, java.sql.Timestamp completedAt, boolean allDay,
+                                               Integer reminderMinutes, java.sql.Timestamp reminderAt) {
         PersonalTodoResponse response = new PersonalTodoResponse();
         response.setTodoId(todoId);
         response.setOwnerId(ownerId);
         response.setTitle(title);
         response.setCategory(category);
         response.setStatus(status);
+        response.setStartAt(startAt == null ? null : startAt.toLocalDateTime());
         response.setDueAt(dueAt == null ? null : dueAt.toLocalDateTime());
+        response.setAllDay(allDay);
+        response.setReminderMinutes(reminderMinutes);
+        response.setReminderAt(reminderAt == null ? null : reminderAt.toLocalDateTime());
         response.setNote(note);
         response.setCreatedAt(createdAt == null ? null : createdAt.toLocalDateTime());
         response.setCompletedAt(completedAt == null ? null : completedAt.toLocalDateTime());

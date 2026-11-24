@@ -5,6 +5,11 @@
   --hw-card: #ffffff;
   --hw-inner: #f6f8fb;
   --hw-chip: #f2f5f9;
+  --hw-todo-sidebar: #faf9f7;
+  --hw-todo-divider: #ededed;
+  --hw-todo-blue: #edf6ff;
+  --hw-todo-neutral: #f8f7f6;
+  --hw-todo-today: #fafdff;
   --hw-track: #eaeff5;
   --hw-border: #e8edf3;
   --hw-control-border: #9ba6b4;
@@ -72,6 +77,11 @@
   --hw-card: #1a222c;
   --hw-inner: #232c39;
   --hw-chip: #26303d;
+  --hw-todo-sidebar: #171e27;
+  --hw-todo-divider: #2a3542;
+  --hw-todo-blue: #152a45;
+  --hw-todo-neutral: #232c39;
+  --hw-todo-today: #1b2633;
   --hw-track: #2a3542;
   --hw-border: #2a3542;
   --hw-control-border: #6e7a87;

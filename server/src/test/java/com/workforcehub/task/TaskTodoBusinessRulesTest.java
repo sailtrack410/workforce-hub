@@ -57,7 +57,9 @@ class TaskTodoBusinessRulesTest {
             + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         jdbc = new JdbcTemplate(source);
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V71__add_team_task_and_personal_todo.sql"),
-            new ClassPathResource("db/migration/V73__add_team_task_collaboration.sql"))
+            new ClassPathResource("db/migration/V72__add_personal_todo_start_at.sql"),
+            new ClassPathResource("db/migration/V73__add_team_task_collaboration.sql"),
+            new ClassPathResource("db/migration/V74__add_personal_todo_schedule_and_reminder.sql"))
             .execute(source);
         jdbc.execute("""
             CREATE TABLE org_user (id BIGINT PRIMARY KEY, real_name VARCHAR(128), primary_dept_id BIGINT,
@@ -349,6 +351,102 @@ class TaskTodoBusinessRulesTest {
         data(get(TASKS + "?start=invalid"), null, 400);
         data(post(TODOS), "{\"title\":\" \"}", 400);
         assertEquals(0, count("personal_todo"));
+    }
+
+    @Test
+    void personalTodoRangePersistsAndCanBeCleared() throws Exception {
+        var created = data(post(TODOS), """
+            {"title":"跨天安排","startAt":"2026-11-18 09:00:00","dueAt":"2026-11-21 18:00:00"}
+            """, 200);
+        assertTrue(created.path("startAt").asText().contains("2026-11-18"));
+        long id = created.path("todoId").asLong();
+        var updated = data(put(TODOS + "/" + id), """
+            {"title":"修改安排","startAt":"2026-11-19 10:00:00","dueAt":"2026-11-22 18:00:00"}
+            """, 200);
+        assertTrue(updated.path("startAt").asText().contains("2026-11-19"));
+        var cleared = data(put(TODOS + "/" + id), "{\"title\":\"清除时间\",\"startAt\":null,\"dueAt\":null}", 200);
+        assertTrue(cleared.path("startAt").isNull() || cleared.path("startAt").isMissingNode());
+        assertTrue(cleared.path("dueAt").isNull() || cleared.path("dueAt").isMissingNode());
+    }
+
+    @Test
+    void personalTodoRangeRejectsInvertedTimesBeforeWriting() throws Exception {
+        String invalid = """
+            {"title":"反向安排","startAt":"2026-11-20 11:00:00","dueAt":"2026-11-20 10:00:00"}
+            """;
+        data(post(TODOS), invalid, 400);
+        assertEquals(0, count("personal_todo"));
+        long id = data(post(TODOS), "{\"title\":\"原安排\"}", 200).path("todoId").asLong();
+        data(put(TODOS + "/" + id), invalid, 400);
+        assertEquals("原安排", data(get(TODOS), null, 200).get(0).path("title").asText());
+        data(post(TODOS), "{\"title\":\"无效时间\",\"startAt\":\"invalid\"}", 400);
+    }
+
+    @Test
+    void personalTodoRangeAllowsEitherEndpointAndSameTime() throws Exception {
+        var startOnly = data(post(TODOS), "{\"title\":\"开始\",\"startAt\":\"2026-11-19 09:00:00\"}", 200);
+        assertTrue(startOnly.path("startAt").asText().contains("2026-11-19"));
+        data(post(TODOS), "{\"title\":\"截止\",\"dueAt\":\"2026-11-19 09:00:00\"}", 200);
+        data(post(TODOS), """
+            {"title":"即时安排","startAt":"2026-11-19 09:00:00","dueAt":"2026-11-19 09:00:00"}
+            """, 200);
+        assertEquals(3, count("personal_todo"));
+    }
+
+    @Test
+    void personalTodoRangeQueryFindsOverlapsAndKeepsOwnership() throws Exception {
+        data(post(TODOS), """
+            {"title":"跨周安排","startAt":"2026-11-16 09:00:00","dueAt":"2026-11-25 18:00:00"}
+            """, 200);
+        data(post(TODOS), "{\"title\":\"开始点\",\"startAt\":\"2026-11-19 12:00:00\"}", 200);
+        data(post(TODOS), "{\"title\":\"截止点\",\"dueAt\":\"2026-11-19 12:00:00\"}", 200);
+        data(post(TODOS), "{\"title\":\"未安排\"}", 200);
+        assertEquals(3, data(get(TODOS + "?start=2026-11-19T12:00:00&end=2026-11-19T12:00:00"), null, 200).size());
+        assertEquals(1, data(get(TODOS + "?start=2026-11-25T18:00:00"), null, 200).size());
+        assertEquals(1, data(get(TODOS + "?end=2026-11-16T09:00:00"), null, 200).size());
+        assertEquals(4, data(get(TODOS), null, 200).size());
+        employee(2003);
+        assertEquals(0, data(get(TODOS + "?start=2026-11-19T00:00:00"), null, 200).size());
+    }
+
+    @Test
+    void personalTodoSchedulePersistsAllDayAndReminderAndCanClearThem() throws Exception {
+        var created = data(post(TODOS), """
+            {"title":"会议","category":"MEETING","startAt":"2026-11-25 10:00:00","dueAt":"2026-11-25 11:00:00","reminderMinutes":10}
+            """, 200);
+        assertEquals(10, created.path("reminderMinutes").asInt());
+        assertTrue(created.path("reminderAt").asText().contains("09:50:00"));
+        long id = created.path("todoId").asLong();
+        var allDay = data(put(TODOS + "/" + id), """
+            {"title":"全天事项","category":"REMINDER","startAt":"2026-11-26 00:00:00","dueAt":"2026-11-27 23:59:59","allDay":true}
+            """, 200);
+        assertTrue(allDay.path("allDay").asBoolean());
+        assertTrue(allDay.path("reminderAt").isNull());
+        assertEquals("REMINDER", allDay.path("category").asText());
+        var cleared = data(put(TODOS + "/" + id), "{\"title\":\"未安排\"}", 200);
+        assertFalse(cleared.path("allDay").asBoolean());
+        assertTrue(cleared.path("reminderMinutes").isNull());
+        employee(2003); assertEquals(0, data(get(TODOS), null, 200).size());
+        data(put(TODOS + "/" + id), "{\"title\":\"越权\"}", 404);
+    }
+
+    @Test
+    void invalidReminderAndUndatedAllDayNeverWrite() throws Exception {
+        data(post(TODOS), "{\"title\":\"缺日期\",\"reminderMinutes\":10}", 400);
+        data(post(TODOS), "{\"title\":\"缺日期\",\"allDay\":true}", 400);
+        data(post(TODOS), "{\"title\":\"非法间隔\",\"startAt\":\"2026-11-25 10:00:00\",\"reminderMinutes\":-1}", 400);
+        data(post(TODOS), "{\"title\":\"非法间隔\",\"startAt\":\"2026-11-25 10:00:00\",\"reminderMinutes\":9999}", 400);
+        assertEquals(0, count("personal_todo"));
+    }
+
+    @Test
+    void reminderUsesStartOrLegacyDeadlineAndPreservesClaimWhenTimeUnchanged() throws Exception {
+        long id = data(post(TODOS), "{\"title\":\"截止提醒\",\"dueAt\":\"2026-11-25 10:00:00\",\"reminderMinutes\":0}", 200).path("todoId").asLong();
+        jdbc.update("UPDATE personal_todo SET reminded_at = CURRENT_TIMESTAMP WHERE todo_id = ?", id);
+        data(put(TODOS + "/" + id), "{\"title\":\"修改标题\",\"dueAt\":\"2026-11-25 10:00:00\",\"reminderMinutes\":0}", 200);
+        assertNotNull(jdbc.queryForObject("SELECT reminded_at FROM personal_todo WHERE todo_id = ?", java.sql.Timestamp.class, id));
+        data(put(TODOS + "/" + id), "{\"title\":\"重新排程\",\"startAt\":\"2026-11-26 10:00:00\",\"reminderMinutes\":10}", 200);
+        assertNull(jdbc.queryForObject("SELECT reminded_at FROM personal_todo WHERE todo_id = ?", java.sql.Timestamp.class, id));
     }
 
     private JsonNode data(MockHttpServletRequestBuilder request, String payload, int expected) throws Exception {

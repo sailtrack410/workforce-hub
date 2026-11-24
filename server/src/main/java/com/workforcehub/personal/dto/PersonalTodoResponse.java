@@ -20,7 +20,15 @@ public class PersonalTodoResponse {
 
     private String status;
 
+    private LocalDateTime startAt;
+
     private LocalDateTime dueAt;
+
+    private boolean allDay;
+
+    private Integer reminderMinutes;
+
+    private LocalDateTime reminderAt;
 
     private String note;
 

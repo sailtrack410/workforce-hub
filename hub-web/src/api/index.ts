@@ -236,9 +236,9 @@ export const teamTaskApi = {
 export const personalTodoApi = {
   list: (query: { category?: string; status?: string; start?: string; end?: string } = {}) =>
     http.get<PersonalTodoResponse[]>('/api/employee/personal-todos', query),
-  create: (request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; dueAt?: string; note?: string }) =>
+  create: (request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; startAt?: string; dueAt?: string; note?: string; allDay?: boolean; reminderMinutes?: number | null }) =>
     http.post<PersonalTodoResponse>('/api/employee/personal-todos', request),
-  update: (todoId: EntityId, request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; dueAt?: string; note?: string }) =>
+  update: (todoId: EntityId, request: { title: string; category: 'APPROVAL' | 'MEETING' | 'TASK' | 'REMINDER'; startAt?: string; dueAt?: string; note?: string; allDay?: boolean; reminderMinutes?: number | null }) =>
     http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}`, request),
   complete: (todoId: EntityId) => http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}/complete`),
   reopen: (todoId: EntityId) => http.put<PersonalTodoResponse>(`/api/employee/personal-todos/${id(todoId)}/reopen`),

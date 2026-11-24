@@ -23,7 +23,7 @@ interface RequestOptions {
 
 // 需要按字符串保留精度的大整数 ID 字段
 const UNSAFE_INTEGER_FIELDS = new Set([
-  'accountId', 'agentId', 'agentTaskId', 'agentVersionId', 'applicantUserId', 'assigneeId', 'creatorId', 'listId', 'subtaskId', 'activityId', 'actorId',
+  'accountId', 'agentId', 'agentTaskId', 'agentVersionId', 'applicantUserId', 'assigneeId', 'creatorId', 'todoId', 'listId', 'subtaskId', 'activityId', 'actorId',
   'attachmentRefId', 'avatarAttachmentRefId', 'avatarFileId', 'bizId', 'boundAgentId',
   'conversationId', 'dailyResultId', 'deptId', 'downloadTicketId', 'exceptionId',
   'fileObjectId', 'groupId', 'leaveTypeId', 'managerUserId', 'memberId', 'messageId',

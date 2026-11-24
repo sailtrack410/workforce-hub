@@ -36,13 +36,18 @@ public class PersonalTodoService {
         if (!ALLOWED_CATEGORIES.contains(category)) {
             throw new BizException(400, "无效的待办分类");
         }
+        validateTimeRange(request);
         PersonalTodoResponse todo = new PersonalTodoResponse();
         todo.setTodoId(IdGenerator.nextId());
         todo.setOwnerId(ownerId);
         todo.setTitle(request.getTitle());
         todo.setCategory(category);
         todo.setStatus("PENDING");
+        todo.setStartAt(request.getStartAt());
         todo.setDueAt(request.getDueAt());
+        todo.setAllDay(request.isAllDay());
+        todo.setReminderMinutes(request.getReminderMinutes());
+        todo.setReminderAt(reminderAt(request));
         todo.setNote(request.getNote());
         personalTodoRepository.insert(todo);
         return requireTodo(todo.getTodoId());
@@ -66,6 +71,7 @@ public class PersonalTodoService {
     @Transactional(rollbackFor = Exception.class)
     public PersonalTodoResponse update(Long todoId, PersonalTodoSaveRequest request) {
         PersonalTodoResponse existing = requireTodo(todoId);
+        validateTimeRange(request);
         existing.setTitle(request.getTitle());
         if (StringUtils.hasText(request.getCategory())) {
             if (!ALLOWED_CATEGORIES.contains(request.getCategory())) {
@@ -73,7 +79,11 @@ public class PersonalTodoService {
             }
             existing.setCategory(request.getCategory());
         }
+        existing.setStartAt(request.getStartAt());
         existing.setDueAt(request.getDueAt());
+        existing.setAllDay(request.isAllDay());
+        existing.setReminderMinutes(request.getReminderMinutes());
+        existing.setReminderAt(reminderAt(request));
         existing.setNote(request.getNote());
         personalTodoRepository.update(existing);
         return requireTodo(todoId);
@@ -103,6 +113,26 @@ public class PersonalTodoService {
     public void delete(Long todoId) {
         requireTodo(todoId);
         personalTodoRepository.deleteById(todoId, CurrentUserHolder.requireUserId());
+    }
+
+    private void validateTimeRange(PersonalTodoSaveRequest request) {
+        if (request.getStartAt() != null && request.getDueAt() != null
+                && request.getStartAt().isAfter(request.getDueAt())) {
+            throw new BizException(400, "开始时间不能晚于截止时间");
+        }
+        if (request.isAllDay() && request.getStartAt() == null && request.getDueAt() == null) {
+            throw new BizException(400, "全天事项须选择日期");
+        }
+        if (request.getReminderMinutes() != null
+            && (!Set.of(0, 5, 10, 15, 30, 60, 1440).contains(request.getReminderMinutes())
+                || request.getStartAt() == null && request.getDueAt() == null)) {
+            throw new BizException(400, "提醒须选择有效的时间和提前分钟数");
+        }
+    }
+
+    private LocalDateTime reminderAt(PersonalTodoSaveRequest request) {
+        if (request.getReminderMinutes() == null) return null;
+        return (request.getStartAt() != null ? request.getStartAt() : request.getDueAt()).minusMinutes(request.getReminderMinutes());
     }
 
     private PersonalTodoResponse requireTodo(Long todoId) {
