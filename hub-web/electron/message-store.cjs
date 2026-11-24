@@ -20,23 +20,30 @@ class MessageStore {
     `);
   }
 
-  list(userId, conversationId) {
+  list(userId, conversationId, { beforeSeq, size = 200 } = {}) {
+    if (beforeSeq != null && (!Number.isSafeInteger(beforeSeq) || beforeSeq <= 0)) throw new TypeError('消息游标无效');
+    if (!Number.isSafeInteger(size) || size <= 0) throw new TypeError('消息分页大小无效');
     const rows = this.db.prepare(`
       SELECT payload FROM (SELECT payload,seq_no FROM im_messages
-      WHERE user_id = ? AND conversation_id = ? ORDER BY seq_no DESC LIMIT 200) ORDER BY seq_no
-    `).all(userId, conversationId);
+      WHERE user_id = ? AND conversation_id = ? AND (? IS NULL OR seq_no < ?)
+        AND COALESCE(json_extract(payload, '$.status'), '') <> 'PENDING'
+      ORDER BY seq_no DESC LIMIT ?) ORDER BY seq_no
+    `).all(userId, conversationId, beforeSeq ?? null, beforeSeq ?? null, Math.min(size, 200));
     return rows.flatMap((row) => {
       try { return [JSON.parse(row.payload)]; } catch { return []; }
     });
   }
 
-  replace(userId, conversationId, messages) {
+  replace(userId, conversationId, messages, range) {
+    if (range && (!Number.isSafeInteger(range.fromSeq) || !Number.isSafeInteger(range.toSeq) || range.fromSeq < 0 || range.toSeq < range.fromSeq)) throw new TypeError('消息同步范围无效');
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      this.db.prepare('DELETE FROM im_messages WHERE user_id=? AND conversation_id=?').run(userId, conversationId);
-      const statement = this.db.prepare('INSERT INTO im_messages(user_id,conversation_id,message_id,seq_no,sent_at,payload) VALUES(?,?,?,?,?,?)');
+      if (range) this.db.prepare('DELETE FROM im_messages WHERE user_id=? AND conversation_id=? AND seq_no BETWEEN ? AND ?').run(userId, conversationId, range.fromSeq, range.toSeq);
+      else this.db.prepare('DELETE FROM im_messages WHERE user_id=? AND conversation_id=?').run(userId, conversationId);
+      const statement = this.db.prepare('INSERT INTO im_messages(user_id,conversation_id,message_id,seq_no,sent_at,payload) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,message_id) DO UPDATE SET seq_no=excluded.seq_no,sent_at=excluded.sent_at,payload=excluded.payload');
       for (const message of messages) {
         if (String(message.conversationId) !== String(conversationId) || message.messageId == null || !Number.isFinite(message.seqNo)) throw new Error('消息格式无效');
+        if (range && (message.seqNo < range.fromSeq || message.seqNo > range.toSeq)) throw new Error('消息超出同步范围');
         statement.run(userId, conversationId, String(message.messageId), message.seqNo, message.sentAt ?? null, JSON.stringify(message));
       }
       this.db.exec('COMMIT');

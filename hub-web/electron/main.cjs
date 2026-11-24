@@ -345,11 +345,11 @@ app.whenReady().then(async () => {
     event.sender.downloadURL(url.href, { headers: { 'X-Workforce-Client': 'desktop' } });
   });
   store = new MessageStore(path.join(app.getPath('userData'), 'messages.sqlite'));
-  handle('messages:list', (_event, userId, conversationId) =>
-    String(userId) === String(activeAccount?.user.userId) ? store.list(activeAccount.scope, String(conversationId)) : []);
+  handle('messages:list', (_event, userId, conversationId, options, context) =>
+    String(userId) === String(activeAccount?.user.userId) ? store.list(context ? requireCache(context) : activeAccount.scope, String(conversationId), options) : []);
   handle('messages:save', (_event, userId, messages) =>
     String(userId) === String(activeAccount?.user.userId) ? store.save(activeAccount.scope, messages) : undefined);
-  handle('messages:replace', (_event, context, conversationId, messages) => store.replace(requireCache(context), String(conversationId), messages));
+  handle('messages:replace', (_event, context, conversationId, messages, range) => store.replace(requireCache(context), String(conversationId), messages, range));
   handle('messages:remove', (_event, context, messageId) => store.remove(requireCache(context), String(messageId)));
   handle('messages:clear', (_event, context, conversationId) => store.clear(requireCache(context), String(conversationId)));
   handle('files:write-local-upload', (_event, uploadPath, content) =>

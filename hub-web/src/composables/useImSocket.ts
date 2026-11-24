@@ -69,20 +69,23 @@ export function useImSocket(options: {
 
   function connect() {
     if (!session.isAuthenticated || socket) return;
+    const user = session.user;
     const next = new WebSocket(url());
     socket = next;
     next.onopen = () => {
+      if (socket !== next || session.user !== user) { next.close(); return; }
       im.socketConnected = true;
       attempts = 0;
-      void im.loadConversations().then(() => im.activeConversationId ? im.loadMessages(im.activeConversationId) : undefined).catch(() => undefined);
+      void im.syncMessagesAfterReconnect().catch(() => undefined);
       if (heartbeatTimer) window.clearInterval(heartbeatTimer);
       heartbeatTimer = window.setInterval(() => {
         if (next.readyState === WebSocket.OPEN) next.send('PING');
       }, 30000);
     };
-    next.onmessage = (event) => handleEvent(String(event.data));
+    next.onmessage = (event) => { if (socket === next && session.user === user) handleEvent(String(event.data)); };
     next.onclose = () => {
-      if (socket === next) socket = null;
+      if (socket !== next) return;
+      socket = null;
       im.socketConnected = false;
       if (heartbeatTimer) {
         window.clearInterval(heartbeatTimer);

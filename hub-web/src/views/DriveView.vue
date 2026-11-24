@@ -21,7 +21,7 @@ const browser = ref<EmployeeFileBrowserResponse | null>(null);
 const loading = ref(true);
 const keyword = ref('');
 const typeFilter = ref<'all' | 'folder' | 'doc'>('all');
-const currentFolderId = ref<number | null>(null);
+const currentFolderId = ref<string | null>(null);
 const deleting = ref<EmployeeFileResponse | null>(null);
 const sharing = ref<EmployeeFileResponse | null>(null);
 const showUpload = ref(false);
@@ -79,11 +79,11 @@ function typeLabel(f: EmployeeFileResponse) {
 }
 
 function openFolder(folder: EmployeeFileFolderResponse) {
-  currentFolderId.value = Number(folder.folderId);
+  currentFolderId.value = String(folder.folderId);
   load();
 }
 function goBreadcrumb(folder: EmployeeFileFolderResponse | null) {
-  currentFolderId.value = folder ? Number(folder.folderId) : null;
+  currentFolderId.value = folder ? String(folder.folderId) : null;
   load();
 }
 

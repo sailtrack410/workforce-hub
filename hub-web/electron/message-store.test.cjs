@@ -33,3 +33,26 @@ test('无效消息不写入缓存', () => {
   assert.equal(store.list('u1', '9').length, 0);
   store.close();
 });
+
+test('游标分页可以读取 200 条之前的本地历史，范围更新保留更早记录并同步删除', () => {
+  const store = new MessageStore(':memory:');
+  const message = seqNo => ({ messageId: String(seqNo), conversationId: '9', seqNo, status: 'NORMAL' });
+  store.save('scope', Array.from({ length: 350 }, (_, index) => message(index + 1)));
+  store.replace('scope', '9', [message(349), { ...message(350), status: 'RECALLED' }], { fromSeq: 348, toSeq: 350 });
+  assert.equal(store.list('scope', '9', { beforeSeq: 151, size: 100 })[0].seqNo, 51);
+  assert.equal(store.list('scope', '9', { beforeSeq: 51, size: 100 }).length, 50);
+  const latest = store.list('scope', '9');
+  assert.equal(latest.some(item => item.seqNo === 348), false);
+  assert.equal(latest.at(-1).status, 'RECALLED');
+  assert.throws(() => store.replace('scope', '9', [message(10)], { fromSeq: 348, toSeq: 350 }), /同步范围/);
+  assert.equal(store.list('scope', '9').at(-1).status, 'RECALLED');
+  store.close();
+});
+
+test('待发送消息由 outbox 恢复，不占用服务端历史的分页窗口', () => {
+  const store = new MessageStore(':memory:');
+  store.save('scope', [{ messageId: '1', conversationId: '9', seqNo: 1, status: 'NORMAL' },
+    ...Array.from({ length: 250 }, (_, index) => ({ messageId: `local-${index}`, conversationId: '9', seqNo: 1000 + index, status: 'PENDING' }))]);
+  assert.deepEqual(store.list('scope', '9').map(item => item.messageId), ['1']);
+  store.close();
+});

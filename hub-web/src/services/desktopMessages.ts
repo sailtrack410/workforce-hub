@@ -7,8 +7,8 @@ export function isDesktopApp() {
   return Boolean(desktop());
 }
 
-export async function listCachedMessages(userId: EntityId, conversationId: EntityId) {
-  return desktop()?.listMessages(String(userId), String(conversationId)) ?? [];
+export async function listCachedMessages(userId: EntityId, conversationId: EntityId, options?: { beforeSeq?: number; size?: number }, context?: string) {
+  return desktop()?.listMessages(String(userId), String(conversationId), options, context) ?? [];
 }
 
 export async function cacheMessages(userId: EntityId, messages: ImMessageResponse[]) {

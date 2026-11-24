@@ -38,9 +38,9 @@ contextBridge.exposeInMainWorld('workforceDesktop', {
     ipcRenderer.on('desktop:navigate', listener);
     return () => ipcRenderer.removeListener('desktop:navigate', listener);
   },
-  listMessages: (userId, conversationId) => ipcRenderer.invoke('messages:list', userId, conversationId),
+  listMessages: (userId, conversationId, options, context) => ipcRenderer.invoke('messages:list', userId, conversationId, options, context),
   saveMessages: (userId, messages) => ipcRenderer.invoke('messages:save', userId, messages),
-  replaceMessages: (context, conversationId, messages) => ipcRenderer.invoke('messages:replace', context, conversationId, messages),
+  replaceMessages: (context, conversationId, messages, range) => ipcRenderer.invoke('messages:replace', context, conversationId, messages, range),
   removeMessage: (context, messageId) => ipcRenderer.invoke('messages:remove', context, messageId),
   clearMessages: (context, conversationId) => ipcRenderer.invoke('messages:clear', context, conversationId),
   writeLocalUpload: (uploadPath, content) => ipcRenderer.invoke('files:write-local-upload', uploadPath, content),

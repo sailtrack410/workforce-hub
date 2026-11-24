@@ -20,6 +20,7 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined>;
+  cache?: boolean;
 }
 
 // 需要按字符串保留精度的大整数 ID 字段
@@ -27,7 +28,7 @@ const UNSAFE_INTEGER_FIELDS = new Set([
   'accountId', 'agentId', 'agentTaskId', 'agentVersionId', 'applicantUserId', 'assigneeId', 'creatorId', 'todoId', 'listId', 'subtaskId', 'activityId', 'actorId',
   'attachmentRefId', 'avatarAttachmentRefId', 'avatarFileId', 'bizId', 'boundAgentId',
   'conversationId', 'dailyResultId', 'deptId', 'downloadTicketId', 'exceptionId',
-  'fileObjectId', 'groupId', 'leaveTypeId', 'managerUserId', 'memberId', 'messageId',
+  'fileObjectId', 'folderId', 'parentFolderId', 'currentFolderId', 'groupId', 'leaveTypeId', 'managerUserId', 'memberId', 'messageId',
   'ownerId', 'ownerUserId', 'policyId', 'positionId', 'primaryDeptId',
   'publishedVersionId', 'punchRecordId', 'quotedMessageId', 'requestId', 'scheduleId',
   'senderId', 'shiftId', 'subjectId', 'taskId', 'uploadTicketId', 'uploaderId', 'userId',
@@ -124,7 +125,7 @@ function skipWhitespace(text: string, start: number): number {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const key = path + buildQuery(options.query);
-  const context = window.workforceDesktop && cacheable(path) ? await currentContext() : null;
+  const context = options.cache !== false && window.workforceDesktop && cacheable(path) ? await currentContext() : null;
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (window.workforceDesktop) headers['X-Workforce-Client'] = 'desktop';
   if (!SAFE_METHODS.has(method)) {
@@ -187,7 +188,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export const http = {
-  get: <T>(path: string, query?: RequestOptions['query']) => request<T>(path, { query }),
+  get: <T>(path: string, query?: RequestOptions['query'], options: { cache?: boolean } = {}) => request<T>(path, { ...options, query }),
   post: <T>(path: string, body?: unknown, query?: RequestOptions['query']) =>
     request<T>(path, { method: 'POST', body, query }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),

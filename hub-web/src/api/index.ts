@@ -58,8 +58,8 @@ export const imApi = {
   conversations: () => http.get<ImConversationSummaryResponse[]>('/api/employee/im/conversations'),
   detail: (conversationId: EntityId) =>
     http.get<ImConversationDetailResponse>(`/api/employee/im/conversations/${id(conversationId)}`),
-  messages: (conversationId: EntityId, query: { limit?: number } = {}) =>
-    http.get<ImMessageResponse[]>(`/api/employee/im/conversations/${id(conversationId)}/messages`, query),
+  messages: (conversationId: EntityId, query: { beforeSeq?: number; size?: number } = {}) =>
+    http.get<ImMessageResponse[]>(`/api/employee/im/conversations/${id(conversationId)}/messages`, query, { cache: false }),
   sendMessage: (conversationId: EntityId, request: {
     messageType: 'TEXT' | 'FILE';
     text?: string;

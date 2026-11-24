@@ -33,9 +33,9 @@ interface WorkforceDesktopBridge {
   dismissNotifications(): Promise<void>;
   download(url: string): Promise<void>;
   onNavigate(callback: (route: string) => void): () => void;
-  listMessages(userId: string, conversationId: string): Promise<import('./src/api/types').ImMessageResponse[]>;
+  listMessages(userId: string, conversationId: string, options?: { beforeSeq?: number; size?: number }, context?: string): Promise<import('./src/api/types').ImMessageResponse[]>;
   saveMessages(userId: string, messages: import('./src/api/types').ImMessageResponse[]): Promise<void>;
-  replaceMessages(context: string, conversationId: string, messages: import('./src/api/types').ImMessageResponse[]): Promise<void>;
+  replaceMessages(context: string, conversationId: string, messages: import('./src/api/types').ImMessageResponse[], range?: { fromSeq: number; toSeq: number }): Promise<void>;
   removeMessage(context: string, messageId: string): Promise<void>;
   clearMessages(context: string, conversationId: string): Promise<void>;
   writeLocalUpload(uploadPath: string, content: number[]): Promise<void>;

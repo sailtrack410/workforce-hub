@@ -98,6 +98,9 @@ watch(() => im.receivedMessage, (message) => {
     void im.loadConversations().catch(() => undefined);
   }
 });
+watch(() => im.loadingConversations[activeId.value], (loading, previous) => {
+  if (previous && !loading && activeId.value && !im.messageErrors[activeId.value]) void im.markRead(activeId.value);
+});
 
 /* ---------- 聊天头：记录搜索 + 面板切换（画布 3:2303） ---------- */
 const recordSearchOpen = ref(false);
@@ -206,6 +209,29 @@ const filteredConversations = computed(() => {
 /* ---------- 消息流滚动 ---------- */
 const messageStream = ref<HTMLElement | null>(null);
 const awayFromLatest = ref(false);
+async function loadOlderMessages() {
+  const id = activeId.value, el = messageStream.value;
+  if (!id || !el || im.loadingConversations[id] || im.loadingHistory[id]) return;
+  const anchor = [...el.querySelectorAll<HTMLElement>('[data-message-id]')]
+    .find(item => item.getBoundingClientRect().bottom > el.getBoundingClientRect().top);
+  const offset = anchor ? anchor.getBoundingClientRect().top - el.getBoundingClientRect().top : 0;
+  const height = el.scrollHeight, top = el.scrollTop;
+  try {
+    await im.loadOlderMessages(id);
+  } catch (error) {
+    if (activeId.value === id) showToast(error instanceof Error ? error.message : '历史消息加载失败');
+  }
+  await nextTick();
+  if (activeId.value !== id || messageStream.value !== el) return;
+  const restored = [...el.querySelectorAll<HTMLElement>('[data-message-id]')]
+    .find(item => item.dataset.messageId === anchor?.dataset.messageId);
+  el.scrollTop = restored ? el.scrollTop + restored.getBoundingClientRect().top - el.getBoundingClientRect().top - offset : top + el.scrollHeight - height;
+  updateLatestVisibility();
+}
+async function retryMessageLoad() {
+  if (im.messageErrors[activeId.value]?.history) await loadOlderMessages();
+  else await syncConversation(activeId.value);
+}
 function updateLatestVisibility() {
   const el = messageStream.value;
   awayFromLatest.value = Boolean(el && el.scrollHeight - el.scrollTop - el.clientHeight > 120);
@@ -909,12 +935,11 @@ const clearConfirmOpen = ref(false);
 const clearing = ref(false);
 async function confirmClearMessages() {
   if (clearing.value || !activeId.value) return;
+  const id = activeId.value;
   clearing.value = true;
   try {
-    await imApi.clearMessages(activeId.value);
-    const context = await currentContext();
-    if (context) await window.workforceDesktop?.clearMessages(context, activeId.value);
-    im.messagesByConversation[activeId.value] = [];
+    await imApi.clearMessages(id);
+    await im.resetMessageHistory(id);
     clearConfirmOpen.value = false;
     showToast('聊天记录已清空');
   } catch (error) {
@@ -1108,6 +1133,13 @@ onBeforeUnmount(() => {
 
       <div class="im-stream-wrap">
       <div :key="activeId" ref="messageStream" class="im-stream" @scroll.passive="updateLatestVisibility">
+        <div v-if="im.messageErrors[activeId]" class="im-history-control" role="status">
+          <span>{{ im.messageErrors[activeId]?.history ? '历史消息加载失败' : '消息同步失败' }}</span>
+          <button type="button" :disabled="im.loadingConversations[activeId] || im.loadingHistory[activeId]" @click="retryMessageLoad">重试</button>
+        </div>
+        <div v-if="activeMessages.length && im.hasMoreMessages[activeId] !== false" class="im-history-control">
+          <button type="button" :disabled="im.loadingConversations[activeId] || im.loadingHistory[activeId]" @click="loadOlderMessages">{{ im.loadingHistory[activeId] ? '正在加载…' : '加载更早消息' }}</button>
+        </div>
         <TransitionGroup name="im-message">
         <template v-if="streamItems.length">
           <template v-for="item in streamItems" :key="item.key">
