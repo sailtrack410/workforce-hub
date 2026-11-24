@@ -5,6 +5,8 @@ const { MessageStore } = require('./message-store.cjs');
 const { writeLocalUpload } = require('./local-upload.cjs');
 const { Preferences, isQuietTime, windowBounds, downloadPath } = require('./preferences.cjs');
 const { startAppServer } = require('./app-server.cjs');
+const { LocalStore } = require('./local-store.cjs');
+const { createHash, randomUUID } = require('node:crypto');
 
 // 更名后复用已有数据目录，保留消息缓存和登录会话。
 const legacyUserData = path.join(app.getPath('appData'), 'hub-web');
@@ -20,10 +22,52 @@ let tray;
 let quitting = false;
 let saveWindowTimer;
 let appServer;
+let localStore;
+let activeAccount;
+let cacheContext;
+let backendOrigin;
+let binding;
+let accountGeneration = 0;
 const notifications = new Map();
 const notified = new Set();
 const downloadPaths = new Set();
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+
+async function bindCacheAccount() {
+  if (binding) return binding;
+  binding = (async () => {
+    const generation = accountGeneration;
+    try {
+      const response = await require('electron').session.defaultSession.fetch(backendOrigin + '/api/employee/auth/me', { credentials: 'include', headers: { 'X-Workforce-Client': 'desktop' } });
+      if (response.status === 401 || response.status === 403) {
+        activeAccount = undefined; cacheContext = undefined; localStore.meta('account:' + backendOrigin, null); return null;
+      }
+      if (!response.ok) throw new Error('服务不可用');
+      const envelope = JSON.parse((await response.text()).replace(/("userId"\s*:\s*)(\d{16,})/g, '$1"$2"'));
+      const user = envelope.data;
+      if (envelope.code !== 0 || user?.userId == null) throw new Error('会话无效');
+      if (generation !== accountGeneration) return null;
+      const scope = createHash('sha256').update(`${backendOrigin}\n${user.tenantId ?? 'default'}\n${user.userId}`).digest('hex');
+      if (activeAccount?.scope !== scope) cacheContext = randomUUID();
+      activeAccount = { scope, user, verifiedAt: Date.now() };
+      localStore.meta('account:' + backendOrigin, activeAccount);
+      return { user, offline: false };
+    } catch {
+      if (generation !== accountGeneration) return null;
+      const saved = localStore.meta('account:' + backendOrigin);
+      if (!saved || Date.now() - saved.verifiedAt > SESSION_MAX_AGE_SECONDS * 1000) return null;
+      if (activeAccount?.scope !== saved.scope) cacheContext = randomUUID();
+      activeAccount = saved;
+      return { user: saved.user, offline: true };
+    }
+  })();
+  try { return await binding; } finally { binding = undefined; }
+}
+
+function requireCache(context) {
+  if (!context || cacheContext !== context || !activeAccount) throw new Error('本地账号已切换，请重新加载');
+  return activeAccount.scope;
+}
 
 function showWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -126,6 +170,29 @@ async function createWindow() {
 app.whenReady().then(async () => {
   if (process.platform === 'darwin') app.dock.setIcon(iconPath);
   preferences = new Preferences(path.join(app.getPath('userData'), 'preferences.json'), app.getPath('downloads'));
+  backendOrigin = new URL(preferences.get().serverUrl).origin;
+  fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  localStore = new LocalStore(path.join(app.getPath('userData'), 'local.sqlite'));
+  ipcMain.handle('cache:bind-account', () => bindCacheAccount());
+  ipcMain.handle('cache:context', async () => { if (!activeAccount) await bindCacheAccount(); return cacheContext ?? null; });
+  ipcMain.handle('cache:logout', async () => {
+    accountGeneration++;
+    activeAccount = undefined; cacheContext = undefined; localStore.meta('account:' + backendOrigin, null);
+    for (const n of notifications.values()) n.close(); notifications.clear(); notified.clear();
+    const cookies = require('electron').session.defaultSession.cookies;
+    for (const cookie of await cookies.get({ name: 'SESSION' })) {
+      await cookies.remove(`${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`, 'SESSION');
+    }
+  });
+  ipcMain.handle('cache:get', (_event, context, key) => localStore.get(requireCache(context), String(key)));
+  ipcMain.handle('cache:put', (_event, context, key, value) => {
+    if (typeof key !== 'string' || !key.startsWith('/api/employee/') || /auth|token|ticket|download/i.test(key)) throw new Error('不允许缓存此接口');
+    localStore.put(requireCache(context), key, value);
+  });
+  ipcMain.handle('cache:invalidate', (_event, context, prefix) => localStore.invalidate(requireCache(context), String(prefix)));
+  ipcMain.handle('cache:draft', (_event, context, key, value) => localStore.draft(requireCache(context), String(key), value));
+  ipcMain.handle('cache:read-draft', (_event, context, key) => localStore.readDraft(requireCache(context), String(key)));
+  ipcMain.handle('cache:stats', (_event, context) => localStore.stats(requireCache(context)));
   if (app.isPackaged) appServer = await startAppServer({ root: path.join(__dirname, '..', 'dist'), backend: preferences.get().serverUrl });
   syncTray();
   const session = require('electron').session.defaultSession;
@@ -187,9 +254,9 @@ app.whenReady().then(async () => {
   });
   store = new MessageStore(path.join(app.getPath('userData'), 'messages.sqlite'));
   ipcMain.handle('messages:list', (_event, userId, conversationId) =>
-    store.list(String(userId), String(conversationId)));
+    String(userId) === String(activeAccount?.user.userId) ? store.list(activeAccount.scope, String(conversationId)) : []);
   ipcMain.handle('messages:save', (_event, userId, messages) =>
-    store.save(String(userId), messages));
+    String(userId) === String(activeAccount?.user.userId) ? store.save(activeAccount.scope, messages) : undefined);
   ipcMain.handle('files:write-local-upload', (_event, uploadPath, content) =>
     writeLocalUpload(uploadPath, content));
   // 仅本机显式指定输出路径时生成验收截图，不对渲染进程暴露此能力。
@@ -217,4 +284,4 @@ app.on('before-quit', () => {
   saveWindowState();
   for (const n of notifications.values()) n.close();
 });
-app.on('will-quit', () => { appServer?.close(); store?.close(); });
+app.on('will-quit', () => { appServer?.close(); localStore?.close(); store?.close(); });

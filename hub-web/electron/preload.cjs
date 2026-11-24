@@ -3,6 +3,15 @@ const { contextBridge, ipcRenderer } = require('electron');
 // 渲染进程只能访问消息缓存能力，不暴露 Node、文件系统或任意 IPC。
 contextBridge.exposeInMainWorld('workforceDesktop', {
   platform: process.platform,
+  bindCacheAccount: () => ipcRenderer.invoke('cache:bind-account'),
+  cacheContext: () => ipcRenderer.invoke('cache:context'),
+  logoutCache: () => ipcRenderer.invoke('cache:logout'),
+  cacheGet: (context, key) => ipcRenderer.invoke('cache:get', context, key),
+  cachePut: (context, key, value) => ipcRenderer.invoke('cache:put', context, key, value),
+  cacheInvalidate: (context, prefix) => ipcRenderer.invoke('cache:invalidate', context, prefix),
+  saveDraft: (context, key, value) => ipcRenderer.invoke('cache:draft', context, key, value),
+  readDraft: (context, key) => ipcRenderer.invoke('cache:read-draft', context, key),
+  cacheStats: (context) => ipcRenderer.invoke('cache:stats', context),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
   chooseDownloadDirectory: () => ipcRenderer.invoke('settings:choose-download-directory'),

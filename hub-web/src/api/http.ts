@@ -2,6 +2,7 @@
 // 1) 信封响应 {code,message,data,requestId}，code!==0 抛错
 // 2) 非 GET 请求需要 XSRF-TOKEN（/api/csrf 引导）
 // 3) 雪花 ID（16 位以上数字）按字符串解析，防止精度丢失
+import { cacheable, currentContext, cachedResponse, storeResponse, invalidateResponse, localStatus } from '@/services/localData';
 
 export class ApiError extends Error {
   status?: number;
@@ -122,6 +123,8 @@ function skipWhitespace(text: string, start: number): number {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
+  const key = path + buildQuery(options.query);
+  const context = window.workforceDesktop && cacheable(path) ? await currentContext() : null;
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (window.workforceDesktop) headers['X-Workforce-Client'] = 'desktop';
   if (!SAFE_METHODS.has(method)) {
@@ -133,12 +136,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const apiBase = window.workforceDesktop && window.location.protocol === 'file:'
     ? (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080') : '';
-  const response = await fetch(`${apiBase}${path}${buildQuery(options.query)}`, {
+  let response: Response;
+  try { response = await fetch(`${apiBase}${key}`, {
     method,
     credentials: 'include',
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  }); } catch (error) {
+    localStatus.offline = true;
+    if (method === 'GET') { const cached = await cachedResponse<T>(context, key); if (cached !== undefined) return cached; }
+    throw error;
+  }
+  if ([502, 503, 504].includes(response.status)) {
+    localStatus.offline = true;
+    if (method === 'GET') { const cached = await cachedResponse<T>(context, key); if (cached !== undefined) return cached; }
+  } else localStatus.offline = false;
 
   const text = await response.text();
   let payload: unknown = null;
@@ -151,6 +163,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!response.ok) {
+    if ([401, 403, 404].includes(response.status)) await invalidateResponse(context, path);
     const message = (payload as { message?: string })?.message || `请求失败（${response.status}）`;
     throw new ApiError(message, { status: response.status });
   }
@@ -164,8 +177,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (envelope.code !== 0) {
       throw new ApiError(envelope.message || '请求失败', { code: envelope.code, requestId: envelope.requestId });
     }
+    if (method === 'GET') await storeResponse(context, key, envelope.data);
+    else await invalidateResponse(context, path);
     return envelope.data;
   }
+  if (method === 'GET') await storeResponse(context, key, payload);
+  else await invalidateResponse(context, path);
   return payload as T;
 }
 

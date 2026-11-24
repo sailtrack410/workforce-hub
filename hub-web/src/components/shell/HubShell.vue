@@ -18,6 +18,7 @@ import { NAV_MAX_WIDTH, NAV_MIN_WIDTH, navigationWidth } from '@/utils/imLayout'
 import { resolvedTheme as theme, savePreferences } from '@/services/preferences';
 import { useImSocket } from '@/composables/useImSocket';
 import { useDesktopNotifications } from '@/composables/useDesktopNotifications';
+import { localStatus } from '@/services/localData';
 
 const session = useSessionStore();
 const im = useImStore();
@@ -181,6 +182,7 @@ onBeforeUnmount(() => {
         <kbd>⌘ K</kbd>
       </form>
     </header>
+    <div v-if="localStatus.offline || localStatus.error" class="hw-local-status" role="status">{{ localStatus.error || '离线缓存' }}<time v-if="localStatus.offline && localStatus.cachedAt">{{ new Date(localStatus.cachedAt).toLocaleString('zh-CN', { hour12: false }) }}</time></div>
 
     <div class="hw-body" :class="{ 'nav-resizing': navResizing }" :style="{ '--hw-nav-width': `${navWidth}px` }">
       <aside class="hw-primary-nav" :class="{ compact: navWidth === NAV_MIN_WIDTH }" aria-label="一级导航">
@@ -240,6 +242,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .hw-shell { display: flex; flex-direction: column; height: 100dvh; min-width: 960px; background: var(--hw-canvas); overflow: hidden; }
+.hw-local-status { display: flex; align-items: center; gap: 16px; padding: 6px 20px; background: var(--hw-sky); color: var(--hw-secondary); font-size: 12px; flex: none; }
 .hw-topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 20px 0 calc(20px + var(--hw-desktop-inset)); border-bottom: 1px solid var(--hw-border); background: var(--hw-card); flex: none; app-region: drag; -webkit-app-region: drag; }
 .hw-topbar button, .hw-topbar input, .hw-topbar form { app-region: no-drag; -webkit-app-region: no-drag; }
 .hw-brand { display: flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--hw-ink); cursor: pointer; }

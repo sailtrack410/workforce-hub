@@ -2,6 +2,9 @@
 import { defineStore } from 'pinia';
 import { authApi, orgApi } from '@/api';
 import type { CurrentUserResponse, EntityId, OrgUserDetailResponse, OrgUserSummaryResponse } from '@/api/types';
+import { ApiError } from '@/api/http';
+import { localStatus } from '@/services/localData';
+import { useImStore } from '@/stores/im';
 
 // 视图层统一的联系人形态（选择器/提及/副标题使用）
 export interface ContactView {
@@ -56,20 +59,36 @@ export const useSessionStore = defineStore('hw-session', {
     async loadCurrentUser() {
       try {
         this.user = await authApi.me();
-      } catch {
-        this.user = null;
+        const account = await window.workforceDesktop?.bindCacheAccount?.();
+        if (account && !account.offline && String(account.user.userId) === String(this.user.userId)) this.user = account.user;
+        else if (account) await window.workforceDesktop?.logoutCache?.();
+      } catch (error) {
+        if (error instanceof TypeError || error instanceof ApiError && (error.status ?? 0) >= 500) {
+          const cached = await window.workforceDesktop?.bindCacheAccount?.().catch(() => null);
+          this.user = cached?.user ?? null; localStatus.offline = Boolean(cached?.offline);
+        } else {
+          this.user = null;
+          await window.workforceDesktop?.logoutCache?.().catch(() => undefined);
+        }
       } finally {
         this.initialized = true;
       }
     },
     async login(loginName: string, password: string) {
       this.user = await authApi.login(loginName, password);
+      const account = await window.workforceDesktop?.bindCacheAccount?.();
+      if (account && !account.offline && String(account.user.userId) === String(this.user.userId)) this.user = account.user;
+      else if (account) await window.workforceDesktop?.logoutCache?.();
       this.initialized = true;
     },
     async logout() {
       await authApi.logout().catch(() => undefined);
+      await window.workforceDesktop?.logoutCache?.().catch(() => undefined);
+      useImStore().$reset();
       this.user = null;
       this.profile = null;
+      this.manager = null; this.subordinates = []; this.colleagues = [];
+      Object.assign(localStatus, { offline: false, cachedAt: 0, pending: 0, conflicts: 0, error: '' });
     },
     async loadOrgProfile() {
       if (!this.user) return;

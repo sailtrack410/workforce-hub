@@ -32,6 +32,10 @@ async function runtime() {
     show() { shown.push(this); } close() { this.emit('close'); }
   }
   const session = new EventEmitter();
+  let user = { userId: '1001', displayName: 'Fixture A' };
+  let offline = false;
+  session.fetch = async () => { if (offline) throw new Error('offline'); return new Response(JSON.stringify({ code: 0, data: user })); };
+  session.cookies = { get: async () => [], remove: async () => {} };
   const electron = { app, BrowserWindow, Notification, session: { defaultSession: session }, ipcMain: { handle: (key, callback) => handlers.set(key, callback), on() {} },
     screen: { getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1440, height: 900 } }] },
     dialog: { showOpenDialog: async () => ({ canceled: false, filePaths: [dir] }), showErrorBox: () => assert.fail('Unexpected dialog') }, shell: {},
@@ -42,8 +46,8 @@ async function runtime() {
   });
   await app.ready;
   const win = BrowserWindow.instance;
-  return { dir, win, shown, downloads, session, invoke: (key, value) => handlers.get(key)({ sender: win.webContents }, value),
-    cleanup: () => { app.emit('before-quit'); fs.rmSync(dir, { recursive: true, force: true }); } };
+  return { dir, win, shown, downloads, session, setUser: (value) => { user = value; }, setOffline: (value) => { offline = value; }, invoke: (key, ...values) => handlers.get(key)({ sender: win.webContents }, ...values),
+    cleanup: () => { app.emit('before-quit'); app.emit('will-quit'); fs.rmSync(dir, { recursive: true, force: true }); } };
 }
 
 test('主进程通知执行预览隐私、声音、免打扰、关闭与去重策略，点击可导航', async () => {
@@ -71,6 +75,27 @@ test('主进程通知执行预览隐私、声音、免打扰、关闭与去重�
     assert.throws(() => r.invoke('desktop:notify', { ...n, route: 'https://external.test' }), /跳转/);
     r.invoke('desktop:dismiss-notifications');
     assert.equal(r.invoke('desktop:notify', n), true);
+  } finally { r.cleanup(); }
+});
+
+test('缓存身份由主进程核实，切换账号拒绝旧上下文，退出后离线不能恢复账号', async () => {
+  const r = await runtime();
+  try {
+    await r.invoke('cache:bind-account'); const first = await r.invoke('cache:context');
+    r.invoke('cache:put', first, '/api/employee/personal-todos', [{ title: 'A private' }]);
+    r.setUser({ userId: '1002', displayName: 'Fixture B' });
+    await r.invoke('cache:bind-account'); const second = await r.invoke('cache:context');
+    assert.notEqual(first, second);
+    assert.throws(() => r.invoke('cache:get', first, '/api/employee/personal-todos'), /账号已切换/);
+    assert.equal(r.invoke('cache:get', second, '/api/employee/personal-todos'), null);
+    r.setUser({ userId: '1001', displayName: 'Fixture A' }); await r.invoke('cache:bind-account');
+    const third = await r.invoke('cache:context');
+    assert.equal(r.invoke('cache:get', third, '/api/employee/personal-todos').value[0].title, 'A private');
+    r.setOffline(true);
+    assert.equal((await r.invoke('cache:bind-account')).offline, true);
+    await r.invoke('cache:logout');
+    assert.equal(await r.invoke('cache:bind-account'), null);
+    assert.equal(await r.invoke('cache:context'), null);
   } finally { r.cleanup(); }
 });
 

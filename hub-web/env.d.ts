@@ -2,6 +2,15 @@
 
 interface WorkforceDesktopBridge {
   platform: string;
+  bindCacheAccount(): Promise<{ user: import('./src/api/types').CurrentUserResponse; offline: boolean } | null>;
+  cacheContext(): Promise<string | null>;
+  logoutCache(): Promise<void>;
+  cacheGet(context: string, key: string): Promise<{ value: unknown; updatedAt: number } | null>;
+  cachePut(context: string, key: string, value: unknown): Promise<void>;
+  cacheInvalidate(context: string, prefix: string): Promise<void>;
+  saveDraft(context: string, key: string, value: unknown): Promise<void>;
+  readDraft(context: string, key: string): Promise<unknown>;
+  cacheStats(context: string): Promise<{ entries: number; bytes: number; drafts: number; pending: number }>;
   getSettings(): Promise<import('./src/services/preferences').DesktopSettings>;
   updateSettings(patch: Partial<import('./src/services/preferences').LocalPreferences>): Promise<import('./src/services/preferences').DesktopSettings>;
   chooseDownloadDirectory(): Promise<import('./src/services/preferences').DesktopSettings>;
