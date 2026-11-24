@@ -75,13 +75,17 @@ export const useSessionStore = defineStore('hw-session', {
       }
     },
     async login(loginName: string, password: string) {
+      localStatus.suspended = true;
+      try {
       this.user = await authApi.login(loginName, password);
       const account = await window.workforceDesktop?.bindCacheAccount?.();
       if (account && !account.offline && String(account.user.userId) === String(this.user.userId)) this.user = account.user;
       else if (account) await window.workforceDesktop?.logoutCache?.();
       this.initialized = true;
+      } finally { localStatus.suspended = false; }
     },
     async logout() {
+      localStatus.suspended = true;
       await authApi.logout().catch(() => undefined);
       await window.workforceDesktop?.logoutCache?.().catch(() => undefined);
       useImStore().$reset();

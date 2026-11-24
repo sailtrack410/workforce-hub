@@ -1,6 +1,6 @@
 import { reactive, watch, type Ref } from 'vue';
 
-export const localStatus = reactive({ offline: false, cachedAt: 0, pending: 0, conflicts: 0, error: '' });
+export const localStatus = reactive({ offline: false, cachedAt: 0, pending: 0, conflicts: 0, error: '', suspended: false });
 
 export function cacheable(path: string) {
   return path.startsWith('/api/employee/') && !/auth|token|ticket|download/i.test(path);

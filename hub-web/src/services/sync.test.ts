@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, ApiError } from '@/api/http';
 import { durableRequest, pendingOperations, syncPending, type SyncOperation } from './sync';
+import { localStatus } from './localData';
 vi.mock('@/api/http', () => ({ http: { post: vi.fn(), put: vi.fn(), delete: vi.fn() }, ApiError: class extends Error { status?: number; constructor(message: string, options: { status?: number }) { super(message); this.status = options.status; } } }));
 let queue: SyncOperation[];
 beforeEach(() => {
-  queue = []; vi.clearAllMocks();
+  queue = []; localStatus.suspended = false; vi.clearAllMocks();
   vi.stubGlobal('CustomEvent', class { type: string; detail: unknown; constructor(type: string, options: { detail: unknown }) { this.type = type; this.detail = options.detail; } });
   vi.stubGlobal('window', { dispatchEvent: vi.fn(), workforceDesktop: {
     cacheContext: async () => 'account-a', pendingOperations: async () => queue.map(op => ({ ...op })),
@@ -44,5 +45,12 @@ describe('待同步队列', () => {
     await syncPending(); await syncPending();
     expect(queue).toHaveLength(0); expect(http.put).toHaveBeenCalledTimes(2);
     expect(http.put).toHaveBeenLastCalledWith('/api/employee/personal-todos/1', { title: 'second', expectedVersion: 1 });
+  });
+  it('退出或切换账号时暂停队列，不把前一账号操作发送给新会话', async () => {
+    queue = [{ id: 'a', method: 'POST', path: '/api/employee/personal-todos' }, { id: 'b', method: 'POST', path: '/api/employee/personal-todos' }];
+    vi.mocked(http.post).mockImplementationOnce(async () => { localStatus.suspended = true; return { todoId: '1' }; });
+    await syncPending();
+    expect(http.post).toHaveBeenCalledTimes(1); expect(queue).toHaveLength(1); expect(queue[0].id).toBe('b');
+    await syncPending(); expect(http.post).toHaveBeenCalledTimes(1);
   });
 });

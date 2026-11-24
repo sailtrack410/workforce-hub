@@ -47,7 +47,7 @@ export async function durableRequest<T>(op: SyncOperation): Promise<{ queued: bo
 }
 
 export async function syncPending() {
-  if (syncing || !window.workforceDesktop) return;
+  if (syncing || localStatus.suspended || !window.workforceDesktop) return;
   syncing = true;
   try {
     const context = await currentContext(); if (!context) return;
@@ -55,6 +55,7 @@ export async function syncPending() {
     const queue = await desktop.pendingOperations(context);
     const blocked = new Set<string>();
     for (const op of queue) {
+      if (localStatus.suspended || await currentContext() !== context) break;
       if (op.state && op.state !== 'pending' || op.entityKey && blocked.has(op.entityKey)) { if (op.entityKey) blocked.add(op.entityKey); continue; }
       try {
         const value = await execute<Record<string, unknown>>(op);
