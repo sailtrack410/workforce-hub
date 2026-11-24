@@ -8,6 +8,7 @@ const { startAppServer } = require('./app-server.cjs');
 const { LocalStore } = require('./local-store.cjs');
 const { Diagnostics } = require('./diagnostics.cjs');
 const { AssetCache } = require('./asset-cache.cjs');
+const { Transfers } = require('./transfers.cjs');
 const { createHash, randomUUID } = require('node:crypto');
 
 // 更名后复用已有数据目录，保留消息缓存和登录会话。
@@ -32,6 +33,7 @@ let binding;
 let accountGeneration = 0;
 let diagnostics;
 let assets;
+let transfers;
 const notifications = new Map();
 const notified = new Set();
 const downloadPaths = new Set();
@@ -179,6 +181,12 @@ app.whenReady().then(async () => {
   diagnostics = new Diagnostics(path.join(app.getPath('userData'), 'logs'));
   diagnostics.write('info', 'app-start', app.getVersion?.() || 'development');
   assets = new AssetCache(path.join(app.getPath('userData'), 'asset-cache'));
+  transfers = new Transfers(path.join(app.getPath('userData'), 'transfers'));
+  ipcMain.handle('transfers:stage', (_event, context, id, bytes, metadata) => transfers.stage(requireCache(context), id, bytes, metadata));
+  ipcMain.handle('transfers:list', (_event, context) => transfers.list(requireCache(context)));
+  ipcMain.handle('transfers:read', (_event, context, id) => transfers.read(requireCache(context), id));
+  ipcMain.handle('transfers:status', (_event, context, id, status) => transfers.status(requireCache(context), id, status));
+  ipcMain.handle('transfers:discard', (_event, context, id) => transfers.discard(requireCache(context), id));
   localStore = new LocalStore(path.join(app.getPath('userData'), 'local.sqlite'));
   if (localStore.recovered) diagnostics.write('warn', 'local-database-recovered', '原文件已隔离保留');
   process.on?.('uncaughtExceptionMonitor', (error) => diagnostics.write('error', 'uncaught-exception', error.name));
@@ -196,7 +204,7 @@ app.whenReady().then(async () => {
     for (const file of ['local.sqlite', 'local.sqlite-wal', 'messages.sqlite', 'messages.sqlite-wal']) {
       try { databaseBytes += fs.statSync(path.join(app.getPath('userData'), file)).size; } catch { /* 尚无缓存 */ }
     }
-    return { ...business, databaseBytes, mediaBytes: assets.bytes(), logBytes: diagnostics.bytes(), recovered: Boolean(localStore.recovered) };
+    return { ...business, databaseBytes, mediaBytes: assets.bytes(), logBytes: diagnostics.bytes(), transferBytes: context ? transfers.bytes(requireCache(context)) : 0, recovered: Boolean(localStore.recovered) };
   });
   ipcMain.handle('storage:clear', async (_event, context) => {
     localStore.clearCache(requireCache(context)); assets.clear();

@@ -11,12 +11,17 @@ interface WorkforceDesktopBridge {
   saveDraft(context: string, key: string, value: unknown): Promise<void>;
   readDraft(context: string, key: string): Promise<unknown>;
   cacheStats(context: string): Promise<{ entries: number; bytes: number; drafts: number; pending: number }>;
-  storageStats(context: string | null): Promise<{ entries: number; bytes: number; drafts: number; pending: number; databaseBytes: number; mediaBytes: number; logBytes: number; recovered: boolean }>;
+  storageStats(context: string | null): Promise<{ entries: number; bytes: number; drafts: number; pending: number; databaseBytes: number; mediaBytes: number; logBytes: number; transferBytes: number; recovered: boolean }>;
   clearCache(context: string): Promise<void>;
   openDownloads(): Promise<string>;
   exportDiagnostics(): Promise<boolean>;
   reportError(kind: string): Promise<void>;
   media(context: string, key: string, url?: string): Promise<string | null>;
+  stageUpload(context: string, id: string, bytes: number[], metadata: import('./src/services/transfers').UploadRecord): Promise<void>;
+  uploads(context: string): Promise<import('./src/services/transfers').UploadRecord[]>;
+  readUpload(context: string, id: string): Promise<import('./src/services/transfers').UploadRecord & { bytes: number[] }>;
+  uploadStatus(context: string, id: string, status: string): Promise<void>;
+  discardUpload(context: string, id: string): Promise<void>;
   pendingOperations(context: string): Promise<import('./src/services/sync').SyncOperation[]>;
   enqueue(context: string, operation: import('./src/services/sync').SyncOperation): Promise<void>;
   setOperationState(context: string, id: string, state: string, error?: string): Promise<void>;

@@ -1,5 +1,6 @@
 // hub-web 上传工具：申请票据 → PUT 对象存储 → 确认上传
-import { fileApi } from '@/api';
+import { fileApi, teamTaskApi } from '@/api';
+import { currentContext } from '@/services/localData';
 import type { EntityId } from '@/api/types';
 
 async function sha256Hex(file: File): Promise<string> {
@@ -41,7 +42,28 @@ export async function uploadEmployeeFile(request: {
   ownerType: string;
   ownerId?: EntityId | null;
   folderId?: EntityId | null;
+  transferId?: string;
+  taskId?: string;
 }): Promise<{ attachmentRefId: EntityId }> {
+  const context = await currentContext();
+  const transferId = request.transferId || crypto.randomUUID();
+  if (context && !request.transferId) {
+    await window.workforceDesktop!.stageUpload(context, transferId, [...new Uint8Array(await request.file.arrayBuffer())], {
+      id: transferId, fileName: request.file.name, mimeType: request.file.type, fileSize: request.file.size,
+      ownerType: request.ownerType, ownerId: request.ownerId, folderId: request.folderId, taskId: request.taskId,
+    });
+  }
+  try {
+    const result = await performUpload(request, transferId);
+    if (request.taskId) await teamTaskApi.attach(request.taskId, result.attachmentRefId);
+    if (context) await window.workforceDesktop!.uploadStatus(context, transferId, 'done');
+    return result;
+  } catch (error) {
+    if (context) await window.workforceDesktop!.uploadStatus(context, transferId, 'failed').catch(() => undefined);
+    throw error;
+  }
+}
+async function performUpload(request: { file: File; ownerType: string; ownerId?: EntityId | null; folderId?: EntityId | null }, clientRequestId: string): Promise<{ attachmentRefId: EntityId }> {
   const { file, ownerType, ownerId = null, folderId = null } = request;
   const contentSha256 = await sha256Hex(file);
   const ticket = await fileApi.createUploadTicket({
@@ -52,7 +74,7 @@ export async function uploadEmployeeFile(request: {
     mimeType: file.type || 'application/octet-stream',
     fileSize: file.size,
     contentSha256,
-    clientRequestId: `hw-${ownerType.toLowerCase()}-${Date.now()}-${file.name}`,
+    clientRequestId,
   });
 
   // 秒传命中

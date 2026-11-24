@@ -11,6 +11,7 @@ import { useToast } from '@/composables/useToast';
 import { preferences, savePreferences, chooseDownloadDirectory, type LocalPreferences } from '@/services/preferences';
 import { pendingOperations, syncPending, discardOperation, type SyncOperation } from '@/services/sync';
 import { currentContext } from '@/services/localData';
+import { uploads, retryUpload, discardUpload, type UploadRecord } from '@/services/transfers';
 
 const session = useSessionStore();
 const { message: toastMessage, show: showToast } = useToast();
@@ -19,6 +20,14 @@ const saving = ref(false);
 const desktop = Boolean(window.workforceDesktop);
 const serverAddress = ref(preferences.serverUrl);
 const operations = ref<SyncOperation[]>([]);
+const uploadRecords = ref<UploadRecord[]>([]);
+async function refreshUploads() { uploadRecords.value = await uploads(); }
+async function resumeUpload(id: string) {
+  saving.value = true;
+  try { await retryUpload(id); showToast('上传已完成'); }
+  catch (error) { showToast(error instanceof Error ? error.message : '上传失败'); }
+  finally { saving.value = false; await refreshUploads(); await refreshStorage(); }
+}
 const storage = ref<Awaited<ReturnType<WorkforceDesktopBridge['storageStats']>> | null>(null);
 const clearingCache = ref(false);
 async function refreshStorage() { if (window.workforceDesktop) storage.value = await window.workforceDesktop.storageStats(await currentContext()); }
@@ -57,6 +66,7 @@ onMounted(() => {
   if (!session.profile) void session.loadOrgProfile();
   void refreshOperations();
   void refreshStorage();
+  void refreshUploads();
 });
 
 const title = computed(() => SECTIONS.find((s) => s.id === section.value)?.label ?? '通用');
@@ -169,6 +179,7 @@ async function selectDirectory() {
       </template>
 
       <template v-else-if="section === 'storage'">
+        <section v-if="uploadRecords.length" class="st-card"><h3>文件传输</h3><div v-for="upload in uploadRecords" :key="upload.id" class="st-row"><div class="st-copy"><strong>{{ upload.fileName }}</strong><small>{{ upload.status === 'done' ? '已上传' : upload.status === 'failed' ? '上传失败' : '待上传' }} · {{ formatBytes(upload.fileSize) }}</small></div><button v-if="upload.status !== 'done'" class="st-btn" :disabled="saving" @click="resumeUpload(upload.id)">重试</button><button class="st-btn" :disabled="saving" @click="discardUpload(upload.id).then(refreshUploads)">{{ upload.status === 'done' ? '移除记录' : '取消上传' }}</button></div></section>
         <section class="st-card">
           <h3>默认存储位置</h3>
           <div class="st-row">
@@ -180,7 +191,7 @@ async function selectDirectory() {
         <section class="st-card">
           <h3>本机数据</h3>
           <div class="st-row">
-            <div class="st-copy"><strong class="st-big">{{ storage ? formatBytes(storage.databaseBytes + storage.mediaBytes + storage.logBytes) : '—' }}</strong><small v-if="storage">数据库 {{ formatBytes(storage.databaseBytes) }} · 图片 {{ formatBytes(storage.mediaBytes) }} · 日志 {{ formatBytes(storage.logBytes) }}</small><small v-if="storage?.recovered">本地数据库异常，原文件已保留</small></div>
+            <div class="st-copy"><strong class="st-big">{{ storage ? formatBytes(storage.databaseBytes + storage.mediaBytes + storage.logBytes + storage.transferBytes) : '—' }}</strong><small v-if="storage">数据库 {{ formatBytes(storage.databaseBytes) }} · 图片 {{ formatBytes(storage.mediaBytes) }} · 日志 {{ formatBytes(storage.logBytes) }} · 待上传 {{ formatBytes(storage.transferBytes) }}</small><small v-if="storage?.recovered">本地数据库异常，原文件已保留</small></div>
             <button type="button" class="st-btn" :disabled="!desktop" @click="openDownloads">管理文件</button>
           </div>
         </section>

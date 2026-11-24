@@ -423,8 +423,8 @@ async function addAttachment(event: Event) {
   if (!file || taskId == null || busy.value) return;
   busy.value = true; detailsError.value = '';
   try {
-    const uploaded = await uploadEmployeeFile({ file, ownerType: 'PERSONAL_FILE' });
-    attachments.value = await teamTaskApi.attach(taskId, uploaded.attachmentRefId);
+    await uploadEmployeeFile({ file, ownerType: 'PERSONAL_FILE', taskId: String(taskId) });
+    attachments.value = await teamTaskApi.attachments(taskId);
     attachmentsFailed.value = false;
   } catch (error) { await handleDetailError(error); }
   finally { busy.value = false; input.value = ''; }
