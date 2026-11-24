@@ -6,6 +6,8 @@ const { writeLocalUpload } = require('./local-upload.cjs');
 const { Preferences, isQuietTime, windowBounds, downloadPath } = require('./preferences.cjs');
 const { startAppServer } = require('./app-server.cjs');
 const { LocalStore } = require('./local-store.cjs');
+const { Diagnostics } = require('./diagnostics.cjs');
+const { AssetCache } = require('./asset-cache.cjs');
 const { createHash, randomUUID } = require('node:crypto');
 
 // 更名后复用已有数据目录，保留消息缓存和登录会话。
@@ -28,6 +30,8 @@ let cacheContext;
 let backendOrigin;
 let binding;
 let accountGeneration = 0;
+let diagnostics;
+let assets;
 const notifications = new Map();
 const notified = new Set();
 const downloadPaths = new Set();
@@ -172,7 +176,53 @@ app.whenReady().then(async () => {
   preferences = new Preferences(path.join(app.getPath('userData'), 'preferences.json'), app.getPath('downloads'));
   backendOrigin = new URL(preferences.get().serverUrl).origin;
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  diagnostics = new Diagnostics(path.join(app.getPath('userData'), 'logs'));
+  diagnostics.write('info', 'app-start', app.getVersion?.() || 'development');
+  assets = new AssetCache(path.join(app.getPath('userData'), 'asset-cache'));
   localStore = new LocalStore(path.join(app.getPath('userData'), 'local.sqlite'));
+  if (localStore.recovered) diagnostics.write('warn', 'local-database-recovered', '原文件已隔离保留');
+  process.on?.('uncaughtExceptionMonitor', (error) => diagnostics.write('error', 'uncaught-exception', error.name));
+  app.on('render-process-gone', (_event, _contents, details) => diagnostics.write('error', 'renderer-gone', details.reason));
+  app.on('child-process-gone', (_event, details) => diagnostics.write('error', 'child-gone', details.reason));
+  ipcMain.handle('diagnostics:error', (_event, kind) => diagnostics.write('error', 'renderer-error', ['error', 'unhandledrejection'].includes(kind) ? kind : 'unknown'));
+  ipcMain.handle('diagnostics:export', async () => {
+    const result = await dialog.showSaveDialog(mainWindow, { title: '导出诊断日志', defaultPath: path.join(app.getPath('downloads'), 'workforce-diagnostics.log') });
+    if (!result.canceled && result.filePath) { diagnostics.export(result.filePath); return true; }
+    return false;
+  });
+  ipcMain.handle('storage:stats', (_event, context) => {
+    const business = context ? localStore.stats(requireCache(context)) : { entries: 0, bytes: 0, drafts: 0, pending: 0 };
+    let databaseBytes = 0;
+    for (const file of ['local.sqlite', 'local.sqlite-wal', 'messages.sqlite', 'messages.sqlite-wal']) {
+      try { databaseBytes += fs.statSync(path.join(app.getPath('userData'), file)).size; } catch { /* 尚无缓存 */ }
+    }
+    return { ...business, databaseBytes, mediaBytes: assets.bytes(), logBytes: diagnostics.bytes(), recovered: Boolean(localStore.recovered) };
+  });
+  ipcMain.handle('storage:clear', async (_event, context) => {
+    localStore.clearCache(requireCache(context)); assets.clear();
+    await require('electron').session.defaultSession.clearCache();
+    diagnostics.write('info', 'cache-cleared');
+  });
+  ipcMain.handle('storage:open-downloads', async () => { fs.mkdirSync(preferences.get().downloadDirectory, { recursive: true }); return shell.openPath(preferences.get().downloadDirectory); });
+  ipcMain.handle('media:get', async (_event, context, key, rawUrl) => {
+    const scope = requireCache(context);
+    if (typeof key !== 'string' || key.length > 512) throw new Error('媒体标识无效');
+    const cached = assets.get(scope, key);
+    if (!rawUrl) return cached ? `data:${cached.mime};base64,${cached.base64}` : null;
+    const url = new URL(rawUrl, mainWindow.webContents.getURL());
+    if (!['http:', 'https:'].includes(url.protocol) || ![new URL(mainWindow.webContents.getURL()).origin, backendOrigin].includes(url.origin)) throw new Error('媒体地址无效');
+    try {
+      const response = await require('electron').session.defaultSession.fetch(url.href, { headers: { 'X-Workforce-Client': 'desktop' }, redirect: 'error' });
+      if ([401, 403, 404].includes(response.status)) { assets.remove(scope, key); return null; }
+      if (!response.ok) throw new Error('媒体获取失败');
+      if (Number(response.headers.get('content-length')) > 15 * 1024 * 1024) throw new Error('媒体过大');
+      const reader = response.body.getReader(), chunks = []; let bytes = 0;
+      while (true) { const item = await reader.read(); if (item.done) break; bytes += item.value.length; if (bytes > 15 * 1024 * 1024) { await reader.cancel(); throw new Error('媒体过大'); } chunks.push(item.value); }
+      requireCache(context);
+      const entry = assets.put(scope, key, Buffer.concat(chunks), response.headers.get('content-type')?.split(';')[0]);
+      return `data:${entry.mime};base64,${entry.base64}`;
+    } catch { return cached ? `data:${cached.mime};base64,${cached.base64}` : null; }
+  });
   ipcMain.handle('cache:bind-account', () => bindCacheAccount());
   ipcMain.handle('cache:context', async () => { if (!activeAccount) await bindCacheAccount(); return cacheContext ?? null; });
   ipcMain.handle('cache:logout', async () => {

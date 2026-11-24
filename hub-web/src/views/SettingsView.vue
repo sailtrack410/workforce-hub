@@ -10,6 +10,7 @@ import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
 import { preferences, savePreferences, chooseDownloadDirectory, type LocalPreferences } from '@/services/preferences';
 import { pendingOperations, syncPending, discardOperation, type SyncOperation } from '@/services/sync';
+import { currentContext } from '@/services/localData';
 
 const session = useSessionStore();
 const { message: toastMessage, show: showToast } = useToast();
@@ -18,6 +19,25 @@ const saving = ref(false);
 const desktop = Boolean(window.workforceDesktop);
 const serverAddress = ref(preferences.serverUrl);
 const operations = ref<SyncOperation[]>([]);
+const storage = ref<Awaited<ReturnType<WorkforceDesktopBridge['storageStats']>> | null>(null);
+const clearingCache = ref(false);
+async function refreshStorage() { if (window.workforceDesktop) storage.value = await window.workforceDesktop.storageStats(await currentContext()); }
+function formatBytes(bytes: number) { return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
+async function clearLocalCache() {
+  const context = await currentContext(); if (!context) return;
+  saving.value = true;
+  try { await window.workforceDesktop!.clearCache(context); await refreshStorage(); clearingCache.value = false; showToast('缓存已清理'); }
+  catch { showToast('缓存清理失败'); }
+  finally { saving.value = false; }
+}
+async function exportLogs() {
+  try { if (await window.workforceDesktop?.exportDiagnostics()) showToast('日志已导出'); }
+  catch { showToast('日志导出失败'); }
+}
+async function openDownloads() {
+  try { const error = await window.workforceDesktop?.openDownloads(); if (error) showToast('下载目录打开失败'); }
+  catch { showToast('下载目录打开失败'); }
+}
 async function refreshOperations() { operations.value = await pendingOperations(); }
 async function syncNow() { await syncPending(); await refreshOperations(); }
 function operationLabel(operation: SyncOperation) {
@@ -36,6 +56,7 @@ onMounted(() => {
   /* 隐私模式不阻断 */
   if (!session.profile) void session.loadOrgProfile();
   void refreshOperations();
+  void refreshStorage();
 });
 
 const title = computed(() => SECTIONS.find((s) => s.id === section.value)?.label ?? '通用');
@@ -159,16 +180,19 @@ async function selectDirectory() {
         <section class="st-card">
           <h3>本机数据</h3>
           <div class="st-row">
-            <div class="st-copy"><strong class="st-big">256 MB</strong><small>离线消息与本机文件占用</small></div>
-            <button type="button" class="st-btn" @click="showToast('文件管理即将上线')">管理文件</button>
+            <div class="st-copy"><strong class="st-big">{{ storage ? formatBytes(storage.databaseBytes + storage.mediaBytes + storage.logBytes) : '—' }}</strong><small v-if="storage">数据库 {{ formatBytes(storage.databaseBytes) }} · 图片 {{ formatBytes(storage.mediaBytes) }} · 日志 {{ formatBytes(storage.logBytes) }}</small><small v-if="storage?.recovered">本地数据库异常，原文件已保留</small></div>
+            <button type="button" class="st-btn" :disabled="!desktop" @click="openDownloads">管理文件</button>
           </div>
         </section>
         <section class="st-card">
           <h3>临时文件</h3>
           <div class="st-row">
             <div class="st-copy"><strong>清理临时文件</strong><small>不会删除离线消息或已保存的业务文件</small></div>
-            <button type="button" class="st-btn" @click="showToast('清理临时文件即将上线')">清理</button>
+            <button type="button" class="st-btn" :disabled="saving || !desktop" @click="clearingCache = true">清理</button>
           </div>
+          <div v-if="clearingCache" class="st-row"><div class="st-copy"><strong>清理查询与图片缓存？</strong><small>保留消息、草稿、待同步操作和下载文件</small></div><button class="st-btn" :disabled="saving" @click="clearingCache = false">取消</button><button class="st-btn" :disabled="saving" @click="clearLocalCache">确认清理</button></div>
+        </section>
+        <section class="st-card"><h3>诊断日志</h3><div class="st-row"><div class="st-copy"><strong>本机日志</strong><small>{{ storage ? formatBytes(storage.logBytes) : '—' }}</small></div><button class="st-btn" :disabled="!desktop" @click="exportLogs">导出日志</button></div>
         </section>
       </template>
 

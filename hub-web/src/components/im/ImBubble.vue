@@ -12,6 +12,7 @@ import HubAvatar from '../base/HubAvatar.vue';
 import { imApi } from '@/api';
 import type { ImMessageAttachment } from '@/api/types';
 import { isImageAttachment, isVideoAttachment, type MessageView } from '@/utils/message';
+import { localMedia } from '@/services/media';
 
 const props = withDefaults(defineProps<{
   message: MessageView;
@@ -54,13 +55,17 @@ const lightboxUrl = ref('');
 async function fetchPreviewUrl(f: ImMessageAttachment) {
   const key = String(f.attachmentRefId);
   if (previewUrls.value[key] || previewFailed.value[key]) return;
+  const cacheKey = `im:${props.message.conversationId}:${props.message.id}:${key}`;
   try {
+    const cached = await localMedia(cacheKey);
+    if (cached) previewUrls.value[key] = cached;
     const ticket = await imApi.createMessageAttachmentDownloadTicket(
       props.message.conversationId, props.message.id, f.attachmentRefId, 'INLINE');
-    previewUrls.value[key] = ticket.downloadUrl || ticket.url || imApi.attachmentDownloadUrl(ticket.ticketNo);
+    const remote = ticket.downloadUrl || ticket.url || imApi.attachmentDownloadUrl(ticket.ticketNo);
+    previewUrls.value[key] = await localMedia(cacheKey, remote) || remote;
   } catch {
     // 后端限制（需求表 #15：IM 附件票证「第一版仅支持单文件下载」）：降级为占位块
-    previewFailed.value[key] = true;
+    previewFailed.value[key] = !previewUrls.value[key];
   }
 }
 onMounted(() => {

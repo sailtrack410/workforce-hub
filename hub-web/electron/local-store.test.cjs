@@ -4,6 +4,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { LocalStore } = require('./local-store.cjs');
+test('损坏数据库隔离原件并恢复空缓存，不直接删除原有文件', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'workforce-corrupt-'));
+  try {
+    const file = path.join(dir, 'cache.sqlite'); const pristine = Buffer.from('invalid sqlite fixture');
+    fs.writeFileSync(file, pristine); const store = new LocalStore(file);
+    assert.equal(store.recovered, true);
+    const preserved = fs.readdirSync(dir).find(name => name.startsWith('cache.sqlite.corrupt-'));
+    assert.deepEqual(fs.readFileSync(path.join(dir, preserved)), pristine);
+    assert.equal(store.stats('account').entries, 0); store.close();
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
 
 test('SQLite 重启后按服务器和账号隔离缓存、草稿与待同步操作，清理不损失未提交内容', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'workforce-local-'));

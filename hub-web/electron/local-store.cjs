@@ -1,8 +1,18 @@
 const { DatabaseSync } = require('node:sqlite');
+const fs = require('node:fs');
 
 class LocalStore {
   constructor(filename) {
     this.db = new DatabaseSync(filename);
+    try { this.db.prepare('PRAGMA quick_check').get(); }
+    catch (error) {
+      if (filename === ':memory:' || ![11, 26].includes(error.errcode)) throw error;
+      this.db.close();
+      const preserved = `${filename}.corrupt-${Date.now()}`;
+      for (const suffix of ['', '-wal', '-shm']) if (fs.existsSync(filename + suffix)) fs.renameSync(filename + suffix, preserved + suffix);
+      this.db = new DatabaseSync(filename); this.recovered = true;
+    }
+    if (this.db.prepare('PRAGMA user_version').get().user_version > 1) { this.db.close(); throw new Error('本地数据库版本较新，请升级应用'); }
     this.db.exec(`
       PRAGMA journal_mode=WAL;
       PRAGMA busy_timeout=5000;
