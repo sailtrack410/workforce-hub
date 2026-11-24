@@ -3,7 +3,8 @@
  * 审批中心：待我审批 / 我发起的 / 抄送我的 三个 tab；
  * 支持发起审批（请假、补卡走专用契约，其余走通用表单）、审批、撤回、详情查看。
  */
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useLocalDraft } from '@/services/localData';
 import { Download, Plus } from 'lucide-vue-next';
 import { fileApi, leaveApi, workflowApi } from '@/api';
@@ -23,6 +24,9 @@ import HubEmpty from '@/components/base/HubEmpty.vue';
 import HubToast from '@/components/base/HubToast.vue';
 
 const { message: toastMessage, show: showToast } = useToast();
+const route = useRoute(), router = useRouter();
+const returnPath = computed(() => route.query.from === 'attendance' ? '/attendance' : route.query.from === 'workbench' ? '/workbench' : '');
+let initialized = false;
 
 const tab = ref<'todo' | 'mine' | 'cc'>('todo');
 const loading = ref(true);
@@ -85,7 +89,7 @@ const approvalDraft = useLocalDraft('approval-form', computed({
   get: () => Object.fromEntries(Object.entries(approvalFields).map(([key, value]) => [key, value.value])),
   set: (value) => { for (const [key, field] of Object.entries(approvalFields)) if (key in value) (field as { value: unknown }).value = value[key]; },
 }));
-onMounted(() => { void approvalDraft.restore(); });
+onMounted(async () => { await approvalDraft.restore(); initialized = true; await applyRouteIntent(); await loadCurrent(); });
 onBeforeUnmount(approvalDraft.stop);
 
 const isLeave = computed(() => selectedProcess.value === 'LEAVE');
@@ -128,7 +132,6 @@ async function loadCurrent() {
   }
   loading.value = false;
 }
-onMounted(loadCurrent);
 
 async function switchTab(key: 'todo' | 'mine' | 'cc') {
   tab.value = key;
@@ -213,25 +216,39 @@ async function markRead(cc: WorkflowCcResponse) {
 }
 
 /* ---------- 发起审批 ---------- */
-async function openCreate() {
+async function openCreate(code?: string) {
   createOpen.value = true;
-  createStep.value = 'pick';
+  createStep.value = code ? 'form' : 'pick';
+  if (code) selectedProcess.value = code;
   if (!leaveAccounts.value.length) {
     try {
       leaveAccounts.value = await leaveApi.accounts();
     } catch { /* 假期账户加载失败时仅影响请假类型选项 */ }
   }
+  if (leaveAccounts.value.length && !leaveAccounts.value.some(account => String(account.leaveTypeId) === String(leaveTypeId.value))) leaveTypeId.value = leaveAccounts.value[0].leaveTypeId;
 }
 function pickProcess(code: string) {
   selectedProcess.value = code;
   createStep.value = 'form';
 }
+async function applyRouteIntent() {
+  if (['todo', 'mine', 'cc'].includes(String(route.query.tab))) tab.value = route.query.tab as 'todo' | 'mine' | 'cc';
+  const code = typeof route.query.create === 'string' ? route.query.create : '';
+  if (code) {
+    if (PROCESS_OPTIONS.some(option => option.code === code)) await openCreate(code);
+    else showToast('审批类型无效');
+    const query = { ...route.query }; delete query.create;
+    await router.replace({ path: '/approvals', query });
+  }
+  if (typeof route.query.requestId === 'string' && /^\d+$/.test(route.query.requestId)) await openDetail({ requestId: route.query.requestId });
+}
+watch(() => [route.query.create, route.query.tab, route.query.requestId], () => { if (initialized) void applyRouteIntent().then(loadCurrent); });
 function resetForm() {
   genericTitle.value = '';
   genericSummary.value = '';
   genericAmount.value = '';
   genericDate.value = '';
-  leaveTypeId.value = leaveAccounts.value[0]?.accountId ?? null;
+  leaveTypeId.value = leaveAccounts.value[0]?.leaveTypeId ?? null;
   leaveStart.value = '';
   leaveEnd.value = '';
   leaveReason.value = '';
@@ -319,7 +336,8 @@ async function pageCc(delta: number) {
     <header class="ap-head">
       <div><h1>审批中心</h1><p>待办审批、发起申请与抄送统一处理</p></div>
       <span class="ap-head-spacer" />
-      <button type="button" class="ap-btn-primary" @click="openCreate"><Plus :size="16" />发起审批</button>
+      <button v-if="returnPath" type="button" class="ap-btn-secondary" @click="router.push(returnPath)">{{ returnPath === '/attendance' ? '返回考勤' : '返回工作台' }}</button>
+      <button type="button" class="ap-btn-primary" @click="openCreate()"><Plus :size="16" />发起审批</button>
     </header>
 
     <section class="ap-card">
@@ -448,7 +466,7 @@ async function pageCc(delta: number) {
     </HubDialog>
 
     <!-- 发起审批弹层 -->
-    <HubDialog v-if="createOpen" @close="createOpen = false; resetForm()">
+    <HubDialog v-if="createOpen" :lock="submitting" @close="createOpen = false">
       <!-- 第一步：选择类型 -->
       <div v-if="createStep === 'pick'" class="ap-form">
         <h3 style="margin:0;font-size:15px">选择审批类型</h3>
@@ -464,8 +482,8 @@ async function pageCc(delta: number) {
         <!-- 请假 -->
         <template v-if="isLeave">
           <label>请假类型
-            <select v-model.number="leaveTypeId">
-              <option v-for="a in leaveAccounts" :key="a.accountId" :value="a.accountId">{{ a.leaveName }}</option>
+            <select v-model="leaveTypeId">
+              <option v-for="a in leaveAccounts" :key="String(a.accountId)" :value="a.leaveTypeId">{{ a.leaveName }}</option>
             </select>
           </label>
           <label>开始时间<input v-model="leaveStart" type="datetime-local" @change="previewDuration" /></label>

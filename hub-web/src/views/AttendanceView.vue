@@ -81,8 +81,8 @@ const leaveRows = computed(() => leaveAccounts.value.slice(0, 3).map((a) => {
     <header class="at-head">
       <div><h1>我的考勤</h1><p>出勤、假期、出差与加班记录统一查看</p></div>
       <span class="at-head-spacer" />
-      <button type="button" class="at-btn-secondary" @click="showToast('补卡申请表单即将上线')"><Wrench :size="18" />补卡申请</button>
-      <button type="button" class="at-btn-primary" @click="showToast('请假申请表单即将上线')"><CalendarDays :size="18" />申请请假</button>
+      <button type="button" class="at-btn-secondary" @click="router.push({ path: '/approvals', query: { create: 'CLOCK_CORRECTION', from: 'attendance' } })"><Wrench :size="18" />补卡申请</button>
+      <button type="button" class="at-btn-primary" @click="router.push({ path: '/approvals', query: { create: 'LEAVE', from: 'attendance' } })"><CalendarDays :size="18" />申请请假</button>
     </header>
 
     <section class="at-card at-today">

@@ -109,13 +109,13 @@ const notifyRows = computed(() => notifications.value.slice(0, 4).map((n) => ({
 })));
 
 const quickEntries = [
-  { id: 'leave', label: '请假', icon: CalendarDays, tone: 'amber', path: '' },
-  { id: 'expense', label: '报销', icon: Receipt, tone: 'blue', path: '' },
-  { id: 'overtime', label: '加班', icon: Timer, tone: 'blue', path: '' },
-  { id: 'seal', label: '用印', icon: Stamp, tone: 'blue', path: '' },
+  { id: 'leave', label: '请假', icon: CalendarDays, tone: 'amber', path: '/approvals?create=LEAVE&from=workbench' },
+  { id: 'expense', label: '报销', icon: Receipt, tone: 'blue', path: '/approvals?create=EXPENSE&from=workbench' },
+  { id: 'overtime', label: '加班', icon: Timer, tone: 'blue', path: '/approvals?create=OVERTIME&from=workbench' },
+  { id: 'seal', label: '用印', icon: Stamp, tone: 'blue', path: '/approvals?create=SEAL&from=workbench' },
   { id: 'tasks', label: '任务', icon: ListTodo, tone: 'blue', path: '/tasks' },
   { id: 'leave-balance', label: '假期', icon: CalendarCheck, tone: 'blue', path: '/attendance' },
-  { id: 'requests', label: '申请', icon: Inbox, tone: 'blue', path: '' },
+  { id: 'requests', label: '申请', icon: Inbox, tone: 'blue', path: '/approvals?tab=mine&from=workbench' },
   { id: 'all', label: '全部', icon: Grid2X2, tone: 'blue', path: '' },
 ];
 const allAppsOpen = ref(false);

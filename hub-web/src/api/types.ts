@@ -265,6 +265,7 @@ export interface AttendanceDailyResultResponse {
 /* ---------- 假期 ---------- */
 export interface LeaveAccountResponse {
   accountId: EntityId;
+  leaveTypeId: EntityId;
   leaveCode: string;
   leaveName: string;
   balanceMode: string;
