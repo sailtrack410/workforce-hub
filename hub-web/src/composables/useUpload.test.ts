@@ -1,0 +1,32 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { File } from 'node:buffer';
+import { fileApi } from '@/api';
+import { durableRequest } from '@/services/sync';
+import { uploadEmployeeFile } from './useUpload';
+vi.mock('@/api', () => ({ fileApi: { createUploadTicket: vi.fn(), confirmUpload: vi.fn() }, teamTaskApi: { attach: vi.fn() } }));
+vi.mock('@/services/sync', () => ({ durableRequest: vi.fn() }));
+vi.mock('@/stores/session', () => ({ useSessionStore: () => ({ user: { userId: '123' } }) }));
+afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+it('断网上传先暂存，重试复用同一标识，确认成功后释放暂存', async () => {
+  const stageUpload = vi.fn().mockResolvedValue(undefined), uploadStatus = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('window', { workforceDesktop: { cacheContext: async () => 'account', stageUpload, uploadStatus } });
+  vi.mocked(fileApi.createUploadTicket).mockRejectedValueOnce(new TypeError('offline')).mockResolvedValue({ deduplicated: true, attachmentRefId: '999' } as never);
+  const file = new File(['fixture'], 'a.txt', { type: 'text/plain' }) as unknown as globalThis.File;
+  await expect(uploadEmployeeFile({ file, ownerType: 'PERSONAL_FILE' })).rejects.toThrow('offline');
+  const id = stageUpload.mock.calls[0][1];
+  expect(uploadStatus).toHaveBeenCalledWith('account', id, 'failed');
+  await uploadEmployeeFile({ file, ownerType: 'PERSONAL_FILE', transferId: id });
+  expect(stageUpload).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(fileApi.createUploadTicket).mock.calls.map(call => call[0].clientRequestId)).toEqual([id, id]);
+  expect(uploadStatus).toHaveBeenLastCalledWith('account', id, 'done');
+});
+it('恢复会话上传后使用原标识将文件消息写入持久队列', async () => {
+  vi.stubGlobal('window', { workforceDesktop: { cacheContext: async () => 'account', uploadStatus: vi.fn().mockResolvedValue(undefined) } });
+  vi.mocked(fileApi.createUploadTicket).mockResolvedValue({ deduplicated: true, attachmentRefId: '999' } as never);
+  vi.mocked(durableRequest).mockResolvedValue({ queued: true });
+  const file = new File(['fixture'], 'a.txt', { type: 'text/plain' }) as unknown as globalThis.File;
+  const result = await uploadEmployeeFile({ file, ownerType: 'IM_MESSAGE_PENDING', transferId: 'original', conversationId: '456' });
+  expect(durableRequest).toHaveBeenCalledWith(expect.objectContaining({ id: 'file:original', path: '/api/employee/im/conversations/456/messages', body: { messageType: 'FILE', attachmentRefIds: ['999'], clientMessageId: 'file:original' } }));
+  expect(result.message?.status).toBe('PENDING');
+  expect(result.message?.attachments?.[0].displayName).toBe('a.txt');
+});
