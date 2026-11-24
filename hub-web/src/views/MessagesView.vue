@@ -371,13 +371,14 @@ async function handleAttachSelected(event: Event) {
   const conversationId = activeId.value;
   attachSending.value = true;
   try {
-    const uploaded = await uploadImAttachment(file);
+    const uploaded = await uploadImAttachment(file, conversationId);
+    if (uploaded.message) im.upsertMessage(uploaded.message);
     if (activeId.value !== conversationId) {
-      showToast('已切换会话，附件未发送');
+      showToast(uploaded.message?.status === 'PENDING' ? '文件已保存，等待发送' : '文件已发送');
       return;
     }
-    await im.sendFile(conversationId, uploaded.attachmentRefId);
-    showToast('文件已发送');
+    if (!uploaded.message) await im.sendFile(conversationId, uploaded.attachmentRefId);
+    showToast(uploaded.message?.status === 'PENDING' ? '文件已保存，等待发送' : '文件已发送');
     scrollToBottom();
   } catch (error) {
     showToast(error instanceof Error ? error.message : '文件发送失败');

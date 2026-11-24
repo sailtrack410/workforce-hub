@@ -12,6 +12,7 @@ import { preferences, savePreferences, chooseDownloadDirectory, type LocalPrefer
 import { pendingOperations, syncPending, discardOperation, type SyncOperation } from '@/services/sync';
 import { currentContext } from '@/services/localData';
 import { uploads, retryUpload, discardUpload, type UploadRecord } from '@/services/transfers';
+import { useImStore } from '@/stores/im';
 
 const session = useSessionStore();
 const { message: toastMessage, show: showToast } = useToast();
@@ -24,7 +25,7 @@ const uploadRecords = ref<UploadRecord[]>([]);
 async function refreshUploads() { uploadRecords.value = await uploads(); }
 async function resumeUpload(id: string) {
   saving.value = true;
-  try { await retryUpload(id); showToast('上传已完成'); }
+  try { const result = await retryUpload(id); if (result?.message) useImStore().upsertMessage(result.message); showToast('上传已完成'); }
   catch (error) { showToast(error instanceof Error ? error.message : '上传失败'); }
   finally { saving.value = false; await refreshUploads(); await refreshStorage(); }
 }
