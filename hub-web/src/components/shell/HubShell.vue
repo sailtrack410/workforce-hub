@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import HubAvatar from '@/components/base/HubAvatar.vue';
 import HubToast from '@/components/base/HubToast.vue';
+import brandIcon from '@/assets/brand/workforce.png';
 import { useSessionStore } from '@/stores/session';
 import { useImStore } from '@/stores/im';
 import { useToast } from '@/composables/useToast';
@@ -153,8 +154,8 @@ onBeforeUnmount(() => {
   <div class="hw-shell">
     <header class="hw-topbar">
       <button type="button" class="hw-brand" aria-label="返回工作台" @click="goto('/workbench')">
-        <span class="hw-brand-mark">W</span>
-        <strong>Workforce Hub</strong>
+        <img class="hw-brand-mark" :src="brandIcon" alt="" width="28" height="28" />
+        <strong>workforce</strong>
       </button>
       <form class="hw-global-search" role="search" @submit.prevent="globalSearch">
         <Search :size="17" :stroke-width="2" />
@@ -224,7 +225,7 @@ onBeforeUnmount(() => {
 .hw-topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 20px 0 calc(20px + var(--hw-desktop-inset)); border-bottom: 1px solid var(--hw-border); background: var(--hw-card); flex: none; app-region: drag; -webkit-app-region: drag; }
 .hw-topbar button, .hw-topbar input, .hw-topbar form { app-region: no-drag; -webkit-app-region: no-drag; }
 .hw-brand { display: flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--hw-ink); cursor: pointer; }
-.hw-brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--hw-primary); color: var(--hw-on-primary); font-size: 14px; font-weight: 600; }
+.hw-brand-mark { display: block; width: 28px; height: 28px; object-fit: contain; flex: none; }
 .hw-brand strong { font-size: 16px; font-weight: 600; white-space: nowrap; }
 .hw-global-search { display: flex; align-items: center; gap: 10px; width: 400px; height: 36px; padding: 0 12px; border: 1px solid transparent; border-radius: 6px; background: var(--hw-inner); color: var(--hw-muted); transition: border-color var(--hw-duration-fast) var(--hw-motion-enter), background var(--hw-duration-fast); }
 .hw-global-search:focus-within { border-color: var(--hw-sky-strong); background: var(--hw-card); }

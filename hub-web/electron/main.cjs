@@ -1,7 +1,15 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const { MessageStore } = require('./message-store.cjs');
 const { writeLocalUpload } = require('./local-upload.cjs');
+
+// 更名后复用已有数据目录，保留消息缓存和登录会话。
+const legacyUserData = path.join(app.getPath('appData'), 'hub-web');
+if (fs.existsSync(legacyUserData)) app.setPath('userData', legacyUserData);
+app.setName('workforce');
+app.setAppUserModelId('com.workforce.desktop');
+const iconPath = path.join(__dirname, 'icons', 'workforce.png');
 
 let store;
 let mainWindow;
@@ -32,7 +40,8 @@ async function createWindow() {
     height: 900,
     minWidth: 960,
     minHeight: 640,
-    title: 'Workforce Hub',
+    title: 'workforce',
+    icon: iconPath,
     backgroundColor: '#edf1f7',
     show: false,
     // macOS 使用系统绘制的内嵌红绿灯，业务页面不提供仿造控件。
@@ -61,6 +70,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin') app.dock.setIcon(iconPath);
   store = new MessageStore(path.join(app.getPath('userData'), 'messages.sqlite'));
   ipcMain.handle('messages:list', (_event, userId, conversationId) =>
     store.list(String(userId), String(conversationId)));

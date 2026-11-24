@@ -6,6 +6,7 @@ import {
   BellRing, Check, Eye, EyeOff, LoaderCircle, MessageSquare, ShieldCheck, Sparkles, X,
 } from 'lucide-vue-next';
 import HubToast from '@/components/base/HubToast.vue';
+import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
 import { useSessionStore } from '@/stores/session';
 
@@ -90,7 +91,7 @@ onBeforeUnmount(() => window.clearTimeout(loginTimer));
   <div class="auth-page">
     <div class="auth-card">
       <aside class="auth-brand">
-        <div class="auth-logo"><span class="auth-logo-mark">W</span><strong>Workforce Hub</strong></div>
+        <div class="auth-logo"><img class="auth-logo-mark" :src="brandIcon" alt="" width="32" height="32" /><strong>workforce</strong></div>
         <h1>智能人事协同<br />让工作更简单</h1>
         <p class="auth-slogan-sub">考勤 · 假期 · 审批 · 消息 · AI Agent，一个入口全部搞定</p>
         <ul class="auth-features">
@@ -107,7 +108,7 @@ onBeforeUnmount(() => window.clearTimeout(loginTimer));
           <div v-if="mode === 'login'" key="login" class="auth-view">
             <p v-if="restoring" class="auth-dialog-note">正在恢复登录状态…</p>
             <template v-else>
-            <header class="auth-heading"><h2>欢迎回来</h2><p>登录 Workforce Hub 员工端</p></header>
+            <header class="auth-heading"><h2>欢迎回来</h2><p>登录 workforce 员工端</p></header>
             <div class="auth-tabs" role="tablist" aria-label="登录方式">
               <button type="button" role="tab" :aria-selected="loginTab === 'password'" :class="{ active: loginTab === 'password' }" @click="loginTab = 'password'">密码登录</button>
               <button type="button" role="tab" :aria-selected="loginTab === 'code'" :class="{ active: loginTab === 'code' }" @click="loginTab = 'code'">验证码登录</button>
@@ -162,7 +163,7 @@ onBeforeUnmount(() => window.clearTimeout(loginTimer));
 .auth-card { display: flex; width: min(1100px, 100%); height: min(720px, calc(100dvh - 64px)); min-height: 600px; border-radius: 24px; background: var(--hw-card); box-shadow: var(--hw-shadow-card); overflow: hidden; }
 .auth-brand { display: flex; flex-direction: column; width: 440px; padding: 48px; background: linear-gradient(135deg, var(--hw-primary), var(--hw-primary-deep)); color: var(--hw-on-primary); flex: none; }
 .auth-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
-.auth-logo-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--hw-nav-hover); font-size: 16px; font-weight: 600; }
+.auth-logo-mark { display: block; width: 32px; height: 32px; object-fit: contain; flex: none; }
 .auth-logo strong { font-size: 20px; }
 .auth-brand h1 { font-size: 30px; line-height: 42px; }
 .auth-slogan-sub { margin-top: 20px; font-size: 13px; line-height: 22px; opacity: .82; }

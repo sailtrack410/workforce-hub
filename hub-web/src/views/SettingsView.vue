@@ -7,6 +7,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
 import HubToast from '@/components/base/HubToast.vue';
+import brandIcon from '@/assets/brand/workforce.png';
 import { useToast } from '@/composables/useToast';
 
 const session = useSessionStore();
@@ -79,7 +80,7 @@ function setTheme(value: 'light' | 'dark' | 'system') {
         <section class="st-card">
           <h3>桌面端</h3>
           <div class="st-row">
-            <div class="st-copy"><strong>开机时启动</strong><small>登录系统后自动打开 Workforce Hub</small></div>
+            <div class="st-copy"><strong>开机时启动</strong><small>登录系统后自动打开 workforce</small></div>
             <button type="button" class="st-toggle" aria-label="开机时启动" @click="showToast('开机启动即将上线')"><i /></button>
           </div>
           <div class="st-row">
@@ -119,7 +120,7 @@ function setTheme(value: 'light' | 'dark' | 'system') {
           <h3>默认存储位置</h3>
           <div class="st-row">
             <div class="st-copy"><strong>下载文件保存到</strong><small>仅影响本机下载目录，不改变云端文件位置</small></div>
-            <span class="st-path">~/Downloads/Workforce Hub</span>
+            <span class="st-path">~/Downloads/workforce</span>
             <button type="button" class="st-btn" @click="showToast('更改存储位置即将上线')">更改位置</button>
           </div>
         </section>
@@ -141,9 +142,9 @@ function setTheme(value: 'light' | 'dark' | 'system') {
 
       <template v-else>
         <section class="st-card st-about">
-          <span class="st-logo">W</span>
-          <h3>Workforce Hub</h3>
-          <small>版本 1.0.0 · 私有化部署</small>
+          <img class="st-logo" :src="brandIcon" alt="" width="48" height="48" />
+          <h3>workforce</h3>
+          <small>版本 0.1.0 · 私有化部署</small>
           <p>面向组织协作、审批与知识服务的工作平台</p>
           <div class="st-links">
             <button type="button" @click="showToast('用户协议即将上线')">用户协议</button>

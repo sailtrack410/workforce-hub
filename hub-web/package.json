@@ -1,5 +1,6 @@
 {
-  "name": "hub-web",
+  "name": "workforce",
+  "productName": "workforce",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,7 +10,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run --exclude 'electron/**' && node --test electron/*.test.cjs",
     "desktop": "electron .",
-    "desktop:pack": "npm run build && electron-packager . 'Workforce Hub' --out=desktop-dist --overwrite --prune=true --ignore='^/(desktop-dist|src|node_modules/.cache)'"
+    "desktop:pack": "npm run build && electron-packager . workforce --app-bundle-id=com.workforce.desktop --icon=electron/icons/workforce --out=desktop-dist --overwrite --prune=true --ignore='^/(desktop-dist|src|node_modules/.cache|[.]env)'",
+    "desktop:pack:win": "npm run build && electron-packager . workforce --platform=win32 --arch=x64 --app-bundle-id=com.workforce.desktop --icon=electron/icons/workforce --win32metadata.CompanyName=workforce --win32metadata.ProductName=workforce --out=desktop-dist --overwrite --prune=true --ignore='^/(desktop-dist|src|node_modules/.cache|[.]env)'"
   },
   "dependencies": {
     "lucide-vue-next": "0.499.0",
